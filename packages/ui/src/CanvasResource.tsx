@@ -469,7 +469,7 @@ export function CanvasResource(props: CanvasResourceProps) {
             // says so instead of vanishing.
             //
             // A toolbar item stays focusable while disabled (ADR 0073), so
-            // that promise now holds for the keyboard too — the control keeps
+            // that promise holds for the keyboard too — the control keeps
             // its place in the arrow order and announces itself unavailable,
             // instead of being drawn and unreachable.
             disabled={visibleContentEdit !== null}
@@ -508,17 +508,15 @@ export function CanvasResource(props: CanvasResourceProps) {
       // layout remains invariant; no wall-clock presentation state is allowed
       // to become a second expansion fact and move the Title mid-close.
       data-expanded={open}
-      // The rail is normally revealed with the Resource and hidden again at rest.
-      // A running edit is not a hover, so the controls that end it are read off
-      // this instead — an author writing in the body must be able to see the way
-      // out without going looking for it with the pointer.
+      // A running edit is not a hover, so `canvas-resource.css` draws the active
+      // face off this as well as `:hover` — a Resource being written in reads as
+      // active without the pointer on it.
       data-content-editing={visibleContentEdit !== null || portalEditing}
       style={style}
     >
       {/* Neutral: the band carries no colour and the commands on it sit on the
-          shared command surface (`.scratch/command-dock/issues/12`). The Graph's
-          colour is still on this Resource — `--canvas-resource-graph` below draws the
-          Title's own hover and caret treatment — and still on the handles and
+          shared command surface. The Graph's colour is on this Resource — `--canvas-resource-graph` below draws the
+          Title's own hover and caret treatment — and on the handles and
           Edges the adapter draws around it. */}
       {rail}
       {props.renderToolbar?.(toolbar)}
@@ -550,10 +548,10 @@ export function CanvasResource(props: CanvasResourceProps) {
               // The nesting is the whole point and it is the opposite of the
               // obvious arrangement. An accessible name comes from an element's
               // own label first and its content second, so a heading that
-              // *contains* a labelled control is named by that control: with
-              // the control inside, the heading read `Edit Title <name>` and
-              // the Title Lines were reachable through nothing. With the
-              // control outside, the control keeps the short action name ADR
+              // *contains* a labelled control is named by that control: do not
+              // move the control inside, or the heading reads `Edit Title
+              // <name>` and the Title Lines are reachable through nothing. With
+              // the control outside, the control keeps the short action name ADR
               // 0065 asks for and the heading is named by the Title Lines it
               // draws, which is how a reader reaches the lines below the name.
               //
@@ -643,7 +641,7 @@ interface TitleLadderProps {
  * starts a rung and a break the **box chose** does not. Each element wraps
  * freely within its own role, so a subtitle that runs to two visual lines is
  * one subtitle rather than a subtitle and a caption, and a long single-line
- * Title still draws entirely at the `title` role, as it always has.
+ * Title draws entirely at the `title` role.
  *
  * Keyed by position because position *is* the identity here — it is what gives
  * a line its role — and two lines of a Title may legitimately read the same.

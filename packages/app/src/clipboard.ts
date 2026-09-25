@@ -25,9 +25,9 @@ const clipboardOf = (host: ClipboardHost): Pick<Clipboard, 'writeText'> | undefi
  * rejected promise. Outside a secure context — a dev server reached over a LAN
  * address rather than `localhost` — reading `.writeText` off a missing
  * clipboard throws *synchronously*, before there is a promise for a `.catch` to
- * attach to. A caller that only handled the rejection lost that one past its own
+ * attach to. A caller that only handles the rejection loses that one past its own
  * handler and into the event handler it was called from, where no error boundary
- * catches it and the refusal it meant to show never rendered. Answering the
+ * catches it and the refusal it meant to show never renders. Answering the
  * message instead of throwing is what leaves one path for both.
  */
 export async function copyLink(href: string): Promise<string | null> {

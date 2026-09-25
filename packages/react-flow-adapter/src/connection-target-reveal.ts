@@ -7,8 +7,6 @@
  * already on it. Bounds are in **flow** coordinates (`positionAbsolute`);
  * `connection.pointer` is in **container** coordinates and must be converted
  * with {@link connectionPointerInFlow} before measuring.
- *
- * `.scratch/connection-handle-proximity/issues/01-reveal-seeking-handles-by-proximity-and-eligibility.md`
  */
 export const CONNECTION_TARGET_PROXIMITY = 80;
 

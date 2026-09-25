@@ -9,8 +9,8 @@ import { DatabaseTargetConfigurationError } from '../database/database-target';
 
 /*
  * `verifyMarker: false` disables the contract-marker check for the reason and
- * with the test coverage recorded on `postgresOptionsFor` (`src/prisma/db.ts`,
- * ticket 37) — `@prisma-next/sqlite`'s runtime extends the same
+ * with the test coverage recorded on `postgresOptionsFor` (`src/prisma/db.ts`)
+ * — `@prisma-next/sqlite`'s runtime extends the same
  * `@prisma-next/sql-runtime` `SqlRuntimeBase` and passes `verifyMarker`
  * straight through, so the same reasoning applies here.
  */
@@ -23,9 +23,8 @@ const optionsFor = (path: string | undefined): Parameters<typeof sqlite<Contract
  * Fail before the driver opens a connection the parent cannot support.
  *
  * SQLite will not create missing parents, and an unwritable directory surfaces
- * later as a driver error whose message is not ours. Ticket 15 asks for a
- * clear failure at composition
- * (`test/unit/prisma-sqlite-foundation.test.ts`).
+ * later as a driver error whose message is not ours, so this fails clearly at
+ * composition (`test/unit/prisma-sqlite-foundation.test.ts`).
  */
 const requireWritableParent = (path: string): string => {
   const absolute = resolve(path);

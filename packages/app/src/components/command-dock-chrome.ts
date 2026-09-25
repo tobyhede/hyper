@@ -13,21 +13,10 @@ import type { StoredSpaceRefusal } from '../space-authoring';
 import type { OpenBlockingSpace } from './PersistenceControl';
 
 /**
- * **What the Dock is given, in the groups the surface it replaced was given
- * them in.**
- *
- * It was one flat `Chrome` of thirty-three members, threaded whole into ten
- * components — so `PresentingExit`, which reads four of them, was declared to
- * take every command in the surface, and no signature in the file said what any
- * component actually used. `SpaceSidebar` did not do that: it took `canvas`,
- * `graph`, `addResource`, `createMap`, `persistence`, `selectedResource`,
- * `entityActions` and `titleEdit`, and each of its own pieces took the group it
- * drew.
- *
- * The groups here are named after it wherever there is a counterpart —
- * `canvas` is the Maps and the one that is drawing, `graph` is the Graphs
- * and Present, `persistence` is the report and its recoveries — which is what
- * made promoting this surface a move rather than a translation.
+ * **What the Dock is given, in groups.** Each component takes the group it
+ * draws, so its signature says what it uses: `canvas` is the Maps and the one
+ * that is drawing, `graph` is the Graphs and Present, `persistence` is the
+ * report and its recoveries.
  *
  * Two composition points take the whole of it, and that is the shape rather
  * than a leftover: `App` stands where the application mounts the surface and
@@ -40,8 +29,8 @@ export interface DockChrome {
    *
    * **One fact under the whole bar, reported rather than owned.** The editor is
    * `InlineTitleEditor` and which name is open is the bar's own slot
-   * (`useDockRenaming` in `CommandDock.tsx`) — which is the whole reason the shared draft the
-   * Sidebar needed is gone. But the *application* still has to know one is
+   * (`useDockRenaming` in `CommandDock.tsx`), so there is no shared draft. But
+   * the *application* still has to know one is
    * running: a live chrome rename withdraws Create Resource, Present, Delete Resource
    * and the canvas's own title editing, because each of those would re-derive
    * the canvas or take the caret from under it (`authoring-availability.ts`).
@@ -152,7 +141,7 @@ export interface DockSpace {
    * Resource or from a row of that menu, is a `SpaceResourceLifecycle` operation over
    * a second session (ADR 0076) and is deliberately not this.
    *
-   * Nullable rather than optional so both callers state it, and `null` now means
+   * Nullable rather than optional so both callers state it, and `null` means
    * the one guarantee it makes for {@link DockCanvas.onRename} and
    * {@link DockGraph.onRename}: the application has withdrawn chrome title
    * editing — a live Resource title editor or content edit owns the caret, or the
@@ -172,8 +161,7 @@ export interface DockSpace {
    * failure is caught the row that was chosen may no longer be in
    * {@link listing} at all. The Dock already holds the title of the row it
    * drew and the reader chose, so it hands it over rather than making the
-   * caller keep a last-known one (`.scratch/command-dock/issues/28`, decision
-   * 10).
+   * caller keep a last-known one.
    */
   readonly onSelect: (spaceId: UUID, title: string) => void;
   /**
@@ -189,11 +177,9 @@ export interface DockSpace {
    * Whether this Space can be left at all, which is one question and not two.
    *
    * The meta Space is permanent (`open-spaces.ts`), and every other open Space
-   * can be exited. This read {@link opener} instead — "is there a Space I was
-   * opened from" — which answers `null` for every Space reached by its own
-   * address as well, and so withheld Exit from a pasted link. The two happen to
-   * agree while the reader arrived by pressing Space Resources, which is what hid
-   * it.
+   * can be exited. Do not read {@link opener} for this — "is there a Space I was
+   * opened from" answers `null` for every Space reached by its own address as
+   * well, and so would withhold Exit from a pasted link.
    */
   readonly exitDisabled: boolean;
   /** The exit that did not happen, which is the only kind there is anything to draw about. */
@@ -224,10 +210,9 @@ export interface SpaceExitReport {
  * The canvas's one exclusive choice: which authored Map is drawing (ADR
  * 0079, ADR 0082).
  *
- * Named `canvas` after the group the Space Sidebar carried for the same purpose,
- * and carrying `selected` as the Map rather than as an id for the same reason
- * that one did — the title belongs to the Map, so a cluster naming what is
- * drawing reads it off the Map instead of deriving a second title.
+ * Carries `selected` as the Map rather than as an id: the title belongs to the
+ * Map, so a cluster naming what is drawing reads it off the Map instead of
+ * deriving a second title.
  */
 export interface DockCanvas {
   /** The Space's authored Maps, in the order it declares them. */
@@ -271,8 +256,8 @@ export interface DockCanvas {
    * holds two rules, and neither is derivable here without restating it: the
    * last Map cannot be deleted (ADR 0079), and every entity Edit is withdrawn
    * while a title editor or a live content edit owns the caret
-   * (`authoring-availability.ts`). A row that read only the first used to
-   * press cleanly, run nothing, and report nothing.
+   * (`authoring-availability.ts`). A row that read only the first would press
+   * cleanly, run nothing, and report nothing.
    */
   readonly onDelete: (() => void) | null;
   /**
@@ -319,8 +304,7 @@ export interface DockGraph {
    * what is on screen, so a recipient lands where the sender was.
    *
    * A Map **owns** its Graphs (ADR 0040) and a Graph also has its own
-   * permanent address, but the Graph menu offers only this one
-   * (`.scratch/dock-menu-reorganisation/issues/01`).
+   * permanent address, but the Graph menu offers only this one.
    */
   readonly onCopyLink: () => void;
   readonly presenting: boolean;
@@ -339,10 +323,10 @@ export interface DockGraph {
 /**
  * The two kinds Create offers, in the order the cluster draws them.
  *
- * **`reference` left, and it left the Dock rather than the list.** A Reference Resource is
- * always created *from* the Resource it points at, which supplies the Target
- * (ADR 0089), so the gesture is a row in that Resource's own command menu and
- * there is nothing here for it to be a peer of.
+ * **`reference` is not one of them.** A Reference Resource is always created
+ * *from* the Resource it points at, which supplies the Target (ADR 0089), so
+ * the gesture is a row in that Resource's own command menu and there is
+ * nothing here for it to be a peer of.
  */
 export const RESOURCE_KINDS = ['markdown', 'space'] as const;
 
@@ -421,10 +405,8 @@ export interface DockResourcesDisclosure {
   /**
    * The Resource the request is about, which the list marks.
    *
-   * Not nullable: every disclosure the application makes is about a Resource. The
-   * one caller that asked for the list with nothing to mark was New Map
-   * revealing it on an empty Map, and that command discloses nothing now —
-   * it continues in the new Map's name (ADR 0089).
+   * Not nullable: every disclosure the application makes is about a Resource.
+   * New Map discloses nothing — it continues in the new Map's name.
    */
   readonly resourceId: ResourceId;
 }
@@ -433,28 +415,19 @@ export interface DockResources {
   /**
    * The Resources, as a list this Dock draws.
    *
-   * **The Dock draws it rather than being handed it, and that is the whole of
-   * why the open state lives here.** The prototype's Resources cluster disclosed a
-   * filtered Popover it drew itself, chosen over a Drawer from the screen edge
-   * and a second docked panel in a comparison over twenty-nine unplaced Resources;
-   * the Popover won, and the reasons are written above `ResourcesPopover` and
-   * in `.scratch/command-dock/issues/10-decide-the-cards-surface.md`. The Dock's
-   * promotion shipped the application's `ResourcesDrawer` against that decision
-   * because the drawer already had parity claims and the prototype's evidence
-   * sat in a file marked throwaway; this slot was a `ReactNode` for as long as
-   * the surface was a foreign component.
-   *
-   * It is not one any more. A list the Dock draws takes the Dock's own single
-   * open slot, so opening it closes whichever menu was open and opening a menu
+   * **The Dock draws it rather than being handed it, and that is why the open
+   * state lives here.** A list the Dock draws takes the Dock's own single open
+   * slot, so opening it closes whichever menu was open and opening a menu
    * closes it — which a handed-in surface holding its own `open` could not do.
+   * Why it is a Popover is written above `ResourcesPopover`.
    */
   readonly list: DockResourcesList;
   /**
    * Create a Resource of one kind — the one command about the *set*.
    *
-   * The kind is chosen at creation, so the menu offers three peers rather than a
+   * The kind is chosen at creation, so the cluster offers peers rather than a
    * split button with a hidden default. This is *Create*, distinct from adding
-   * an existing Resource, which is what the surface above is for.
+   * an existing Resource, which is what the list above is for.
    */
   readonly onCreate: (kind: DockResourceKind) => void;
   /** Whether each Create peer may run — the kinds withdraw independently when in flight. */

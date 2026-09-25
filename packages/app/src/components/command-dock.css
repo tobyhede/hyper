@@ -5,15 +5,10 @@
    owes no inventory entry and is still held to the dead-rule half of the ratchet
    — a class no production module names is reported here exactly as it is there.
 
-   **It names no colour token of its own.** The prototype forked roughly two
-   dozen of them because it drew a light canvas while the application's `:root`
-   was still dark, and carried the fork onto portalled Popovers and Menus through
-   a `panel` class of its own. `:root` is light now (`packages/app/src/tailwind.css`)
-   and the destructive row's resting ink — the last rule that needed to reach a
-   portalled surface — is settled in `@project/ui` itself, so both the fork and
-   the class it was carried on are gone
-   (`.scratch/command-dock/issues/06`, `/07`). Every colour below is the
-   application's own token, read from the one place it is set.
+   **It names no colour token of its own.** Every colour below is the
+   application's own token, read from the one place it is set
+   (`packages/app/src/tailwind.css`); a portalled surface's ink is settled in
+   `@project/ui` itself.
 
    **There is no container block here.** The Dock positions itself against
    whichever element its caller hands it as the frame, which in the application
@@ -29,7 +24,7 @@
    `packages/ui/src/command-surface.css`, which `CommandToolbar` wears and this
    surface mounts — so the Dock and the Resource read as one language because they
    are one surface drawn twice, rather than because two stylesheets were kept in
-   step (`.scratch/command-dock/issues/12`). The axis is there too, read off the
+   step. The axis is there too, read off the
    same `data-orientation` Base UI is given.
 
    What is left below is the Dock's own: where it sits, how large it may grow,
@@ -43,10 +38,10 @@
    primary command surface down here is fighting for a target it cannot win.
 
    **Only while the dock is actually down there.** The offset is the Dock's to
-   ask for, so it is asked for by the Dock: unconditional, it moved the Graph key
-   and the zoom control up by 40px at every one of the twelve slots, which put
-   the key over the bottom-right corner of any Resource drawn under it — and a Resource's
-   resize control lives in exactly that corner.
+   ask for, so it is asked for by the Dock: unconditional, it would move the
+   Graph key and the zoom control up at every one of the twelve slots, over the
+   bottom-right corner of any Resource drawn under it — and a Resource's resize
+   control lives in exactly that corner.
 
    Written as an attribute test rather than `.bottom`, because `bottom` is a
    class React Flow puts on its own panel and no module here names. The
@@ -62,9 +57,9 @@
    caller gave the Dock as its container.
 
    **The report is not inside the toolbar**, and that is the whole reason this
-   element exists. It used to be a child of the surface — a status region nested
-   in `role="toolbar"`, which is what ADR 0082's *"status is not a command"*
-   forbids and what a screen reader reads as one more item in the command order.
+   element exists. A status region nested in `role="toolbar"` is what ADR 0082's
+   *"status is not a command"* forbids and what a screen reader reads as one
+   more item in the command order.
    A wrapper is the smallest structure that makes the two siblings without moving
    either off the dock. */
 .command-dock {
@@ -81,15 +76,9 @@
 
 /* **The responsive story, which is this surface's own** (ADR 0082).
 
-   The Sidebar got offcanvas collapse, a mobile Sheet, a remembered open state
-   and `cmd/ctrl+B` free from the registry primitive; a surface that is not a
-   Sidebar owns all of it. What it does *not* owe is the Sheet's contract. A
-   Sheet had to be dismissed before a command's result could be seen, because it
-   covered the canvas and trapped focus — so every command in it dismissed first
-   and the author was handed back the paper. This surface never took the canvas
-   away: it is furniture over it, it takes no layout space, and at 390px it
-   still covers a strip rather than a screen. There is nothing to dismiss, so
-   there is no dismissal to get right.
+   This surface never takes the canvas away: it is furniture over it, it takes
+   no layout space, and on a phone it still covers a strip rather than a
+   screen. There is nothing to dismiss, so there is no dismissal to get right.
 
    What is left is that it has to *fit*, and the answer is one constraint rather
    than a second arrangement. Four clusters do not fit across a phone, so the
@@ -107,14 +96,13 @@
    to hand the strip its size.** The cap belongs to the frame because the frame
    is the element the twelve slots place; but a cap on the box *around* a
    scroller constrains nothing, and a scroll property on a box that is still its
-   own content's size has no viewport to scroll inside. The horizontal strip
-   worked by accident — a block child fills its parent's content width without
-   being asked, so it was inside the cap already — and the vertical one did not,
-   because height does not work that way: a short viewport left the column at
-   its full content height, hanging out of the bottom of a shell that is
-   `overflow: hidden` and so cannot be scrolled to. One flex line is what closes
-   that: the strip is stretched to the frame's own capped box, and only then is
-   `overflow` a scroller rather than a declaration. */
+   own content's size has no viewport to scroll inside. A block child fills its
+   parent's content width without being asked, but height does not work that
+   way: without the flex line a short viewport would leave the column at its
+   full content height, hanging out of the bottom of a shell that is
+   `overflow: hidden` and so cannot be scrolled to. One flex line stretches the
+   strip to the frame's own capped box, and only then is `overflow` a scroller
+   rather than a declaration. */
 .command-dock {
   display: flex;
   max-width: calc(100% - 2 * 16px);
@@ -217,9 +205,8 @@
 /* Where a release would land, previewed while the drag is live.
    Positioned by `dockStyle` — the same function that places the dock itself —
    so the preview cannot drift from what release actually does. A marker the
-   size of a stop rather than a bar down a whole edge, because an edge is no
-   longer the answer: there are three stops on each, and a bar could not say
-   which of them a release had chosen. */
+   size of a stop rather than a bar down a whole edge: there are three stops on
+   each edge, and a bar could not say which of them a release had chosen. */
 .command-dock__snap-hint {
   position: absolute;
   z-index: 19;
@@ -238,23 +225,20 @@
 
 /* --------------------------------------------------------------- identity */
 
-/* Which Map and which Graph are active. The name is always drawn — the
-   three collapse modes a narrow dock was compared through are gone, because a
-   vertical dock stacks into named rows rather than shrinking into a rail.
+/* Which Map and which Graph are active. The name is always drawn: a vertical
+   dock stacks into named rows rather than shrinking into a rail.
 
    **How a name is drawn is not here either.** Ellipsed rather than wrapped, and
    never widening the strip it is on, is `CommandName` in `@project/ui` — shared
    with an Open Space Resource, which names a Map and a Graph exactly as this
    surface does.
 
-   **The gap belongs to the control, not to the label.** The label used to carry
-   `margin-inline-start: 6px`, which separated a name from the glyph before it —
-   and gave a label with no glyph a 6px indent from nothing. The one trigger
-   without a glyph is the Open Spaces menu at the root, and that is where it showed. The
-   space between a glyph and its name now comes from the button's own `gap`
-   below, which every named control in the Dock shares. */
+   **The gap belongs to the control, not to the label.** A margin on the label
+   would give a label with no glyph an indent from nothing. The space between a
+   glyph and its name comes from the button's own `gap` below, which every named
+   control in the Dock shares. */
 
-/* No cap: the dock is a fixed column now, so the name track is what bounds a
+/* No cap: the dock is a fixed column, so the name track is what bounds a
    title and a number here would only be a second, quieter bound that disagrees
    with it. */
 
@@ -270,11 +254,10 @@
 
 /* **The dock is a fixed column, and its rows are three fixed tracks.**
 
-   Two complaints, one cause. The width moved as the reader moved — `Meta Space`
-   and `Design system` are different lengths, so crossing resized the furniture
-   under the pointer — and the trailing controls did not line up, because each
-   row packed its own children and a row with two put its disclosure where a row
-   with three put its verb.
+   Without them the width moves as the reader moves — Space names are different
+   lengths, so crossing would resize the furniture under the pointer — and the
+   trailing controls do not line up, because a row packing its own children puts
+   its disclosure where a row with three puts its verb.
 
    So: one width, and one grid. The name takes the slack and truncates; the
    **disclosure** always lands in the second track and a row's **own verb** —
@@ -301,13 +284,13 @@
 
    **Three tracks, and the one verb takes the last.** A leading verb would need a
    fourth: Present would take a track of its own on every row, empty on the
-   three that have no verb — 84px of a 208px column spent on gutters. Trailing,
-   it sits in one track and the name keeps the width. `GraphControls` reorders
+   rows that have no verb. Trailing, it sits in one track and the name keeps
+   the width. `GraphControls` reorders
    its own JSX for this, so the Tab order still matches what the eye reads.
 
    **Resources is not placed by this grid at all** — see the Resources cluster below.
-   Its three Create commands would have wanted three more tracks, so it packs
-   instead and gives up the `1fr` track its fixed word never needed. */
+   Its Create commands would want more tracks, so it packs instead and gives up
+   the `1fr` track its fixed word never needed. */
 .command-dock__surface[data-orientation='vertical'] .command-dock__name-item,
 .command-dock__surface[data-orientation='vertical'] .command-dock__crumb {
   grid-column: 1;
@@ -332,35 +315,28 @@
    resizing the column when the reader crosses from `Meta Space` to `Design
    system`. "Resources" names a *set*. It has no name to edit — which is why the
    word lives inside its trigger rather than beside it — and it is the same
-   literal string in every Space there will ever be. Measured, that track holds
-   about 69px of nothing: the run from the Resource glyph to the chevron is 122px
-   under the grid against 53px packed.
+   literal string in every Space, so a `1fr` track would hold mostly nothing.
 
-   So this cluster packs and spends that room on its three Create commands. It
-   is the only cluster with a control on both sides of its name, and the
-   alternative was three verb tracks standing empty on the other three rows —
-   84px of a 208px column spent on gutters.
+   So this cluster packs and spends that room on its Create commands. It is the
+   only cluster with a control on both sides of its name, and the alternative
+   is verb tracks standing empty on the other rows.
 
    What it costs is the chevron column: a packed trigger puts its chevron where
-   the word ends (x=101) rather than in track 2 (x=146). That column was already
-   not exact at this row — under the grid this trigger spans tracks 1-2 and
-   pushes its chevron to the end of that span, landing at x=153 against the
-   others' x=146 — and this chevron is the odd one anyway, being *inside* its
-   trigger rather than a button beside it. The trailing edge is unaffected: the
-   last Create ends where Present ends. */
+   the word ends rather than in track 2. This chevron is the odd one anyway,
+   being *inside* its trigger rather than a button beside it. The trailing edge
+   is unaffected: the last Create ends where Present ends. */
 .command-dock__surface[data-orientation='vertical'] .command-dock__resources {
   display: flex;
   justify-content: space-between;
   gap: 1px;
 }
 
-/* The three are sized by their glyphs; the trigger takes every remaining pixel.
+/* The Creates are sized by their glyphs; the trigger takes every remaining pixel.
    That is also what pins the chevron: `.command-dock__resources-trigger` already
    pushes its last child to its own trailing edge, so an elastic trigger puts
-   that chevron one gap before the first Create — on the same 29px pitch the
-   three keep between themselves (a 28px button plus this 1px gap). The
-   trigger's existing 6px end padding is what makes that pitch exact; 5px and
-   7px put the chevron a pixel either side of the rhythm. */
+   that chevron one gap before the first Create — on the same pitch the Creates
+   keep between themselves (a button plus this gap). The trigger's end padding
+   is what makes that pitch exact. */
 .command-dock__surface[data-orientation='vertical'] .command-dock__resources .command-dock__create {
   flex: 0 0 auto;
 }
@@ -407,9 +383,9 @@
   gap: 1px;
 }
 
-/* The three Create commands, as one run. A group rather than three siblings so
-   the vertical column has one element to place — left loose they auto-place
-   onto three rows and the cluster stands at 102px beside a 44px Map. */
+/* The Create commands, as one run. A group rather than siblings so the vertical
+   column has one element to place — left loose they would auto-place onto a
+   row each and the cluster would stand taller than the Map beside it. */
 .command-dock__create {
   display: inline-flex;
   min-width: 0;
@@ -441,7 +417,7 @@
 /* The Space region: the trail of Spaces crossed, then the Space you are in.
 
    **Two lines in a vertical dock and one in a horizontal one**, which is the
-   only resource about this region the edge decides. A trail runs along its own
+   only thing about this region the edge decides. A trail runs along its own
    axis whatever the dock does — it is a breadcrumb, and a breadcrumb reads left
    to right — so a vertical dock that stacked everything else would have left a
    row of crumbs running across its narrow axis and set the dock's width by how
@@ -474,11 +450,11 @@
    is all either of them is for.
 
    **The Opener's ink is not here**, and neither is the open treatment every
-   disclosure in the Dock takes. Both were declarations over controls the shared
-   `Button` recipe draws, so this sheet was a second owner of that recipe's
-   appearance — and each won only by being loaded after Tailwind's output rather
-   than by saying anything stronger. They are the `receded` variant and
-   `quietFeedback`'s `aria-expanded` state in `@project/ui` now.
+   disclosure in the Dock takes. Both are the shared `Button` recipe's — the
+   `receded` variant and `quietFeedback`'s `aria-expanded` state in
+   `@project/ui`. Do not declare them over those controls here: this sheet
+   would become a second owner of that recipe's appearance, winning only by
+   load order.
 
    The Opener control uses the OPEN mark Meta shares, recedes below the current
    Space's tone, and keeps the Divider at the cluster boundary. The regular
@@ -490,13 +466,11 @@
 
 /* The open-Spaces tree, one hairline per level.
 
-   Structure drawn rather than implied, and the Space glyph gone with it: the
-   glyph repeated once per row was the loudest resource on a panel whose content is
-   names and nesting, and it repeated the same rule every time. The rules say
-   something different on every row.
+   Structure drawn rather than implied. The rules say something different on
+   every row.
 
    The negative block margin is what makes them meet. A menu item carries `py-1`,
-   so a rule stretched to the item's content box stops 4px short at each end and
+   so a rule stretched to the item's content box stops short at each end and
    the column reads as a stack of dashes; spending the item's own vertical
    padding turns them into one line per level. */
 .command-dock__guides {
@@ -512,20 +486,15 @@
   margin-inline-start: 6px;
 }
 
-/* The Open Spaces menu's trigger — a chevron, like every other disclosure in the Dock.
-
-   It was `⋯` while it stood for hidden steps of a trail. It stopped standing for
-   that when the trail became one named Opener and a list of the open set: what
-   it discloses is a set, which is what a chevron says everywhere else here, and
-   an ellipsis beside four chevrons was the one mark a reader had to learn
-   separately.
+/* The Open Spaces menu's trigger — a chevron, like every other disclosure in the
+   Dock: what it discloses is a set, which is what a chevron says everywhere
+   else here.
 
    The bar names one step whatever the depth, so a crossing costs nothing here:
-   the fourth Space to be opened lengthens a menu rather than the Dock.
+   another open Space lengthens a menu rather than the Dock.
 
-   Nothing sizes it. It is an icon button like every other disclosure, and it
-   was 24px against their 28 until the vertical dock put them all in one column
-   and the four pixels showed. */
+   Nothing sizes it. It is an icon button like every other disclosure, so the
+   vertical dock's column lines them all up. */
 .command-dock__more {
   color: var(--muted-foreground);
 }
@@ -554,12 +523,10 @@
   width: 22rem;
   /* **Capped by the room it is given, not by a fraction of the screen.**
 
-     `min(22rem, 80vw)` read as a responsive cap and was not one. 80% of the
-     viewport is a share of a box this notice never starts at the edge of: it is
-     positioned *out* of the dock frame, so it begins wherever that frame ends,
-     and a fraction measured from the screen's edge says nothing about what is
-     left after the strip. The two numbers only agreed while the dock was
-     small and centred.
+     Do not cap it at a fraction of the viewport: that is a share of a box this
+     notice never starts at the edge of. It is positioned *out* of the dock
+     frame, so it begins wherever that frame ends, and a fraction measured from
+     the screen's edge says nothing about what is left after the strip.
 
      `100vw` rather than a percentage, because a percentage here measures the
      **dock**: the notice's containing block is `.command-dock`, so `100%` is the
@@ -567,8 +534,8 @@
      strip's width nameable — which the side rules below need — and leaves the
      container's width as the one term this element cannot say, so the viewport
      stands in for it. Nothing scrolls the page (`.shell` is `overflow: hidden`
-     with no scrollbar to discount) and nothing yields a strip of it any more —
-     the Resources list is a Popover anchored to its own trigger and drawn over this
+     with no scrollbar to discount) and nothing yields a strip of it — the
+     Resources list is a Popover anchored to its own trigger and drawn over this
      notice rather than beside it — so the two agree.
 
      The 32px is `EDGE_INSET` spent twice — the 16px the dock is held off its own
@@ -605,13 +572,12 @@
    The two side-hung variants are the ones that bite, and they bite hardest
    exactly where the cap above is loosest: a side edge is the orientation that
    stacks the clusters and keeps every one of their names, so it is the widest
-   the dock ever is, and the notice starts *after* all of it. On a 390px phone
-   with the dock at the left edge that is a 208px column at a 16px inset with an
-   8px gap after it — 158px of room — while `80vw` asked for 312 and put the
-   trailing 154px outside the viewport. `.shell` is `overflow: hidden`, so that
-   was not a strip a reader could scroll to: it was the end of the sentence and
-   the whole of Retry, gone. ADR 0082 owes the opposite — a standing failure
-   visible with its recovery reachable.
+   the dock ever is, and the notice starts *after* all of it. On a phone with
+   the dock at a side edge, a notice not capped by what is left would run past
+   the viewport, and `.shell` is `overflow: hidden`, so that is not a strip a
+   reader could scroll to: it is the end of the sentence and Retry, gone. ADR
+   0082 owes the opposite — a standing failure visible with its recovery
+   reachable.
 
    So the subtraction names every part: the dock's own 16px inset, `100%` for
    the column itself, the 8px the offsets above hang it by, and 16px held at the
@@ -631,9 +597,8 @@
 /* **Which open Space is the unwell one**, on the Open Spaces menu row that names it.
 
    A dot rather than a word or an icon: the row's content is a name and an
-   indent, and the mark has to be findable down a six-row list without becoming
-   the loudest resource on it — which is the same test every candidate indent was
-   put through in `.scratch/command-dock/issues/01-...`. The sentence lives in
+   indent, and the mark has to be findable down the list without becoming the
+   loudest mark on it. The sentence lives in
    an `sr-only` span, so the state is never carried by colour alone.
 
    `margin-inline-start: auto` pushes it to the trailing edge, away from the

@@ -36,32 +36,20 @@ export function RenderedMarkdown({ markdown, className }: RenderedMarkdownProps)
 }
 
 /**
- * Renders a resource's title and its Markdown content, **parsed**.
+ * Renders a resource's title and its Markdown content, **parsed**, for presenting.
  *
- * The counterpart to the opened Resource's editor, which shows the source verbatim
- * in a `<textarea>`. There is no second component beside this one: the
- * `ResourceRenderer` that drew source in a `<pre>` went with the reading surface
- * (ADR 0037), leaving the editor as the only place source is shown.
- * Opening a resource is a view-source gesture and presenting is the one place a
- * resource's Markdown is drawn rendered (ADR 0011) — the noun changed when the deck
- * went (ADR 0024), the distinction did not. This is now the only Markdown parser
- * in the app; do not add a second, which is the divergence ADR 0011 removed.
+ * An Open Resource draws its body through {@link RenderedMarkdown} as well, and
+ * editing swaps that body for `MarkdownSourceEditor`, the one place source is
+ * shown. This module is the app's only Markdown parser; do not add a second,
+ * or the rendered and presented forms of one Resource can diverge.
  *
- * **Sanitised before insertion.** This used to go in raw, on the reasoning that
- * a resource is a local file the author wrote and the app never loads a space it was
- * not pointed at (ADR 0018). The reasoning was sound; the premise was not. The
- * save endpoint was reachable by DNS rebinding, so a page the author merely had
- * open could write a resource into the space they *were* pointed at — and `marked`
- * has had no `sanitize` option since v5, so `<img src=x onerror=…>`, a
- * `javascript:` href and `<iframe src=javascript:>` all passed through intact
- * and ran in the dev server's origin.
- *
- * The file write-back went with ADR 0030, but the premise did not come back with
- * it: `PUT /api/spaces/:id` accepts a whole snapshot, resource bodies included, and
- * checks neither Origin nor Host. A write path a page in the author's browser
- * can reach is still a write path, so this is not defence in depth behind a
- * closed hole — it is load-bearing. Resource bodies now arrive from a database over
- * HTTP, which is not a property to bet the origin on either.
+ * **Sanitised before insertion.** A Resource body is untrusted input: it arrives
+ * from a database over HTTP, and `POST /api/spaces` accepts a commit carrying
+ * Resource bodies without checking Origin or Host, so a page in the author's
+ * browser that can reach the host can write one. `marked` has no `sanitize`
+ * option, so `<img src=x onerror=…>`, a `javascript:` href and
+ * `<iframe src=javascript:>` would otherwise run in the app's origin. Do not
+ * insert parsed Markdown without passing it through DOMPurify.
  */
 export function ResourceContent({ title, markdown }: ResourceContentProps) {
   return (

@@ -130,7 +130,7 @@ const markdownSourceHighlighting = syntaxHighlighting(
  *
  * `Tab` is deliberately absent: `defaultKeymap` binds no Tab at all — it arrives only
  * through `indentWithTab`, which this component sets `false`. Naming it here would be
- * a guard over nothing, which is how the `Mod-Enter` collision stayed hidden.
+ * a guard over nothing.
  */
 const PANE_OWNED_KEYS: ReadonlySet<string> = new Set(['Escape', 'Mod-Enter']);
 

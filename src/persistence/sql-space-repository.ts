@@ -245,12 +245,11 @@ export const decideTopologyPreservingUpdate = (
 };
 
 /**
- * The one SQL Space repository (ADR 0095), serving `listSpaces`, `loadSpace`
- * (ticket 22), the Meta lifecycle -- `loadAggregate`, `initializeAggregate`,
- * `loadMetaSpaceId`, `replaceAggregate` and `markExported` (ticket 23) -- and
- * `commit` (ticket 24) for both databases through a database's own `SqlStore`
- * (`src/prisma/sql-store.ts`, `src/sqlite/sql-store.ts`). `PostgresSpaceRepository`
- * and `SqliteSpaceRepository`, the two adapters this class replaces, are gone.
+ * The one SQL Space repository (ADR 0095), serving `listSpaces`, `loadSpace`,
+ * the Meta lifecycle -- `loadAggregate`, `initializeAggregate`,
+ * `loadMetaSpaceId`, `replaceAggregate` and `markExported` -- and
+ * `commit` for both databases through a database's own `SqlStore`
+ * (`src/prisma/sql-store.ts`, `src/sqlite/sql-store.ts`).
  *
  * `Handle` and `Order` come from the `SqlStore` passed to the constructor —
  * whichever database it was built for — so this class itself names no
@@ -265,7 +264,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
 
   /**
    * Every public operation, naming a failure its store recognises as the
-   * database not answering (`SqlStore.isUnavailable`, ticket 38)
+   * database not answering (`SqlStore.isUnavailable`)
    * `PersistenceUnavailableError` on its way out, with the failure on `cause`,
    * so a reader asks one predicate rather than re-deriving "unreachable" from a
    * failure being something else. The store is asked only about a failure
@@ -277,10 +276,8 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    *
    * What decides is only what the failure carries, never how far the operation
    * got: a failure raised before a transaction callback runs is judged like any
-   * other. Ticket 31 named every such failure unavailable by position, which
-   * also named a wrong password or a missing database an outage (ticket 36);
-   * ticket 38 replaced that rule with the store's own recognition, which is
-   * what lets a read outside any transaction be named too.
+   * other, so a wrong password or a missing database is not named an outage,
+   * and a read outside any transaction is named too.
    */
   async #naming<T>(operation: () => Promise<T>): Promise<T> {
     try {
@@ -329,9 +326,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * `#loadEverySpace`'s own decode step) a stored revision the shared codec
    * refuses -- escapes unclassified rather than raising
    * `AggregateInvariantError`: `loadSpace` above answers for one Space, not the
-   * aggregate, and keeps the narrower error deliberately (ticket 27, "one
-   * Space failing intake is that resource's answer to give, not evidence the
-   * aggregate cannot be read"). The commit path calls
+   * aggregate, and keeps the narrower error deliberately: one Space failing
+   * intake is that resource's answer to give, not evidence the aggregate
+   * cannot be read. The commit path calls
    * `#loadStoredSpaceRowForCommit` below instead, which names the whole decode
    * step broken stored state.
    */
@@ -343,7 +340,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   /**
    * One stored row, parsed. No I/O: `tables.Space.loadWithResources` has already read it.
    * The raw documents go straight to `parseSnapshot`, as `#loadEverySpace`'s do, so
-   * `loadSpaceSnapshot` is their one schema intake (ticket 32).
+   * `loadSpaceSnapshot` is their one schema intake.
    */
   #decodeStoredSpaceRow(stored: SqlLoadedSpaceRow): LoadedSpace {
     const snapshot = parseSnapshot({
@@ -368,7 +365,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * (`#commitTopologyPreservingUpdate`) and the post-rollback conflict reload
    * (`#commitUnserialised`) -- naming every failure of the decode step
    * `AggregateInvariantError`, exactly as `#loadEverySpace` names the same
-   * row on the complete-aggregate path (ticket 31). A commit's correctness
+   * row on the complete-aggregate path. A commit's correctness
    * rests on reading the Space it is about to replace or conflict on, so a
    * stored row it cannot decode is stored state that commit cannot be judged
    * against, whichever of the two paths met it -- and left unclassified, it
@@ -586,9 +583,8 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   }
 
   /**
-   * The one helper both commit paths write an update through (ADR 0095,
-   * ticket 24), keeping the statement order the two adapters this repository
-   * replaced always kept: write the document to take the row lock and answer
+   * The one helper both commit paths write an update through, keeping this
+   * statement order: write the document to take the row lock and answer
    * the revision the row carried when that lock was granted, compare it
    * against `expectedRevision`, then write the new revision, then the
    * Resources, then delete the Resources the snapshot dropped -- which removes
@@ -687,8 +683,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * attempt re-reads and re-locks once for exactly that case, and answers
    * with **the identity the retry itself locks** -- the one now actually
    * stored -- never the one the first attempt read before the replacement.
-   * Ticket 23's race test on the (then two-adapter) PostgreSQL repository
-   * settled this (`test/integration/postgres-space-repository.test.ts`,
+   * `test/integration/postgres-space-repository.test.ts` holds this (
    * "conflicts a replacement authorized against an identity a concurrent
    * replacement retired" and "judges a complete-aggregate commit against an
    * identity a concurrent replacement retired"): answering with the
@@ -734,10 +729,8 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
    * position rather than by type: a connection failure cannot reach it, and
    * narrowing to today's three known causes would answer a fourth, future
    * decode failure as *unclassified* instead -- a failure neither named arm
-   * describes, where broken stored state has a name of its own (ticket 27,
-   * "The per-row catch is unconditional, by position rather than by type",
-   * declined narrowing this same shape on this same reasoning;
-   * `#loadStoredSpaceRowForCommit` takes the same shape for one row).
+   * describes, where broken stored state has a name of its own
+   * (`#loadStoredSpaceRowForCommit` takes the same shape for one row).
    *
    * `loadSpace`/`listSpaces` keep the narrower, unclassified error
    * deliberately: one Space failing intake is that resource's answer to give,

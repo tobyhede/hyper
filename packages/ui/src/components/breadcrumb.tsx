@@ -39,9 +39,10 @@ function Breadcrumb({ className, ...props }: React.ComponentProps<'nav'>) {
  * `default` is the registry's `text-sm`, which is a page's scale. `compact` is
  * the chrome's own `text-chrome-sm` (0.85rem) — the same size `Button` names
  * `compact` — and it exists because the list is what sets the scale for every
- * step inside it: a crumb rendered as a `compact` control took its font size
- * from itself and its line height from this element, so a trail dropped into a
- * command surface came out a pixel shorter than every control beside it.
+ * step inside it: a crumb rendered as a `compact` control takes its font size
+ * from itself and its line height from this element, so at the default scale a
+ * trail dropped into a command surface comes out a pixel shorter than every
+ * control beside it.
  */
 const breadcrumbListVariants = cva(
   'flex flex-wrap items-center gap-1.5 wrap-break-word text-muted-foreground',

@@ -62,7 +62,7 @@ export interface ResourceResize {
  * titling, hiding its Title, deleting — because
  * neither identifies an Edge alone: an Edge is `{ from, to }` and says nothing
  * about which Graph draws it, and a Graph holds many. Passing them as two
- * arguments meant every callee re-paired what its caller had just split.
+ * arguments would mean every callee re-pairing what its caller had just split.
  *
  * It is the **domain** Edge and its owning Graph, never the React Flow edge id.
  * A Graph cannot hold the same pair twice (ADR 0032), so this names exactly one
@@ -70,13 +70,11 @@ export interface ResourceResize {
  * does not.
  *
  * The projected id (`<graphId>::<from>::<to>`, minted by `buildGraphRenderEdges`)
- * is now built from that same triple, so the two agree about what identifies an
- * Edge. They did not always: the id named the Edge's *position* in its Graph and
- * re-indexed whenever a Graph lost an Edge, so a subject held by id would have
- * survived a deletion pointing at whichever Edge slid into the vacated slot.
- * Holding the domain value is still the rule — the id is React Flow's business
- * and this module's subject is the domain's — but the agreement is what stops a
- * replaced Edge inheriting the element its predecessor was drawn as.
+ * is built from that same triple, so the two agree about what identifies an
+ * Edge. Do not key it on the Edge's *position* in its Graph: that re-indexes
+ * whenever a Graph loses an Edge, so a replaced Edge would inherit the element
+ * its predecessor was drawn as. Holding the domain value is still the rule —
+ * the id is React Flow's business and this module's subject is the domain's.
  */
 export interface EdgeSubject {
   readonly graphId: GraphId;
@@ -183,7 +181,7 @@ export interface RenderAdapterState {
    * node's data, and React Flow's resize control tears down and re-registers its
    * drag handler whenever the callbacks built from it change identity. Zustand
    * merges every partial into a fresh state object, so a state that *was* a
-   * `ResourceResize` handed the canvas a new capability after every selection,
+   * `ResourceResize` would hand the canvas a new capability after every selection,
    * projection and drag frame — writes resize knows nothing about. Naming the
    * capability separately is also what stops the whole state being passed as
    * one.
@@ -308,7 +306,7 @@ function trackDragOrigins(
  * Each change is keyed through `owned`, the identities of the canvas Map's own
  * nodes, so a change for a node this store does not draw contributes nothing.
  *
- * Answers the drop points directly rather than a list of ids — Authoring now
+ * Answers the drop points directly rather than a list of ids — Authoring
  * merges these over the Map's own positions at derivation, so there is no
  * second lookup back into `nodes` for a caller to get wrong.
  */
@@ -500,7 +498,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // Resource then reads as selected on screen, since `selectedForAuthoring` is
       // right, while React Flow holds no selected node at all — and `F2` asks
       // React Flow, so `F2` is what stops working until a click repairs it.
-      // Add Resource, Add Reference Resource and create-and-connect all land here.
+      // Add Resource, Create Reference and create-and-connect all land here.
       const state = get();
       const reconciled = withSelection(
         reconcile(current?.nodes ?? [], nodes, state.dragOrigins),

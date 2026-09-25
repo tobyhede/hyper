@@ -149,10 +149,9 @@ export type AuthoringCompletion =
   /** Add Resource: a detached Markdown Resource at the visible centre, neutrally titled. */
   | { readonly kind: 'created-resource'; readonly anchor: MapPosition }
   /**
-   * Add Reference Resource: created only once its Target is chosen, because a Reference Resource without
-   * one is not a valid Resource. An empty title mints `Resource N` like any other Resource
-   * rather than copying the Target's, which is what stopped two Resources arriving
-   * with one name (ADR 0083 refines ADR 0046).
+   * Create Reference: created with its Target, because a Reference Resource without
+   * one is not a valid Resource. The caller supplies the Target's Title; an empty
+   * title mints `Resource N` like any other Resource.
    */
   | {
       readonly kind: 'created-reference';
@@ -187,9 +186,9 @@ export type AuthoringCompletion =
    * Map and Active Graph to continue in even though this one changes
    * neither. It resolves the selected Map only for that pair.
    *
-   * The shape rejected for it was parallel to `renamed-map`, below the
-   * general path: a `MapRequiredOperation` answer and a Map lookup for
-   * an Edit that touches no Map, both wrong about what this Edit is.
+   * Do not move it beside `renamed-map` on the general path: that demands a
+   * `MapRequiredOperation` answer and a Map lookup for an Edit that touches no
+   * Map, both wrong about what this Edit is.
    */
   | { readonly kind: 'renamed-space'; readonly title: string }
   | { readonly kind: 'added-graph' }
@@ -323,7 +322,7 @@ export type AuthoringRefusal =
  */
 export interface SpaceAuthoringState {
   /**
-   * ADR 0042's replacement signal: advances when a replacement Space is opened
+   * The replacement signal: advances when a replacement Space is opened
    * over this Authoring without recreating it, and at no other time. Retry,
    * Keep local, persistence status changes, Map selection and completed
    * Edits all leave it where it is.
@@ -385,10 +384,10 @@ export interface SpaceAuthoring {
    * Release the collaborator subscriptions this Authoring holds.
    *
    * The session outlives any Authoring composed over it, so one that never
-   * unsubscribes leaves a listener and its captured Navigation behind. Nothing
-   * replaces a composition mid-session now that accepting the stored Space is
-   * an edit to this one, but the subscriptions are still this object's to hand
-   * back and the seam is what makes that possible.
+   * unsubscribes leaves a listener and its captured Navigation behind. Accepting
+   * the stored Space is an edit to this Authoring rather than a new one, but the
+   * subscriptions are still this object's to hand back and the seam is what
+   * makes that possible.
    */
   readonly dispose: () => void;
 }
@@ -493,17 +492,11 @@ interface SpaceAuthoringDependencies {
    * Mints the identity of every Resource, Map and Graph a completed Edit creates.
    *
    * Taken here, once, rather than at each `newUuid()` call inside the derivation,
-   * so a test supplies the ids it is about to assert on instead of reaching past
-   * the module to mock `crypto.randomUUID` — which ADR 0016 rejected on its own
-   * terms: a constant collides across a property test's cases so it needs a
-   * counter, at which point a generator exists anyway; `randomUUID` is an
-   * unseedable CSPRNG, so controlling it means owning it; and a global mock stops
-   * working in silence the day the implementation moves to v7 and reads the clock
-   * as well as the entropy pool.
+   * so a test supplies the ids it is about to assert on. Do not mock
+   * `crypto.randomUUID` instead: ADR 0016 records why a global mock is refused.
    *
-   * It is also what makes {@link deriveCompletedEdit} the pure core its own
-   * comment claims: minting from the ambient CSPRNG was the one source of nondeterminism left in
-   * there that a second call could not reproduce.
+   * It is also what keeps {@link deriveCompletedEdit} a pure core: nothing in it
+   * mints from the ambient CSPRNG, so a second call reproduces the first.
    *
    * One function for all three kinds, because they are one type — the ids of
    * different entity kinds may legally share a UUID (ADR 0030) — and because
@@ -616,8 +609,8 @@ const namedResourceTitle = (title: string): string | null => {
 /**
  * Structural equality over the JSON values a snapshot is built from.
  *
- * Serializing both sides and comparing the text was the same answer only when
- * the two agreed on key order, and nothing promises that: a snapshot loaded
+ * Not a comparison of serialized text, which agrees only when the two agree
+ * on key order, and nothing promises that: a snapshot loaded
  * from the database or an import carries whatever order it was written in,
  * while a completed Edit rebuilds each Map in the writer's order. A
  * difference in order is not a difference an author made, and reading one as an
@@ -726,14 +719,14 @@ export function createSpaceAuthoring({
    * Space it accepted. The coordinated Space Resource lifecycle is the exception:
    * its recovery restores *every participant's* snapshot
    * (`session-registry.ts`), and only the Space whose conflict the author
-   * answered had a `SpaceAuthoring` to re-open. A second open Space rolled back
-   * past structure it held locally went on naming that structure, and nothing
-   * corrected it.
+   * answered had a `SpaceAuthoring` to re-open. Without this, a second open
+   * Space rolled back past structure it held locally would go on naming that
+   * structure.
    *
    * **Both halves of the selection, because a recovery can take either.** A
    * restore past a locally added Graph leaves the Active Graph naming a Graph
-   * the Map no longer owns, which made the Dock command a Graph the canvas
-   * was not drawing as active. A restore past a locally *created* Map leaves
+   * the Map no longer owns, so the Dock would command a Graph the canvas
+   * is not drawing as active. A restore past a locally *created* Map leaves
    * the selection itself dangling, and that one is worse: the Space still loads,
    * so `resolveMap` throws `MapNotFoundError` for a Space with nothing
    * wrong with it and `SpaceApp` draws the failure surface. One repair answers
@@ -1110,7 +1103,7 @@ export function createSpaceAuthoring({
       writeMap((map) => ({ ...map, graphs: [...graphs] }));
     };
     // The one way a Resource is added: mint it, and let `SnapshotEdit` add and
-    // place it. Add Resource and Add Reference Resource differ in the document
+    // place it. Add Resource and Create Reference differ in the document
     // they carry and in nothing else — neither creates an Edge, and neither adds
     // a Graph to a Map that already has one. Answers the new id, or the
     // derivation's answer when the module refused.
@@ -1198,12 +1191,10 @@ export function createSpaceAuthoring({
       // express this — the empty string is a value a caller really sends, and
       // the whole point is that it does not count as one.
       //
-      // **Copying the Target's Title is now what the one caller does** (ADR 0089).
-      // This arm used to carry an argument against it, from when a pane asked for
-      // a name before the Edit ran: there is no pane, the Reference Resource is named after
-      // its Target and renamed in place afterwards, and two Resources sharing a name
-      // is not a collision because a title is not an identifier (ADR 0016). What
-      // stays this module's is the default and the normalization, not the choice.
+      // The caller names the Reference Resource after its Target, and it is
+      // renamed in place afterwards; two Resources sharing a name is not a
+      // collision because a title is not an identifier (ADR 0016). What stays
+      // this module's is the default and the normalization, not the choice.
       // Normalized the way a rename is, and for the same reason: creation and
       // renaming write one field, so the same typed bytes have to reach the
       // same stored document whichever path wrote them (ADR 0083).
@@ -1320,7 +1311,7 @@ export function createSpaceAuthoring({
       // checked because this Edit resolves its Map from state read *later*
       // than the gesture that named one. `deriveCompletedEdit` takes the
       // selection from `navigation.getState()` at derivation time, and three
-      // resources put that ahead of the id the author submitted: a completion that
+      // paths put that ahead of the id the author submitted: a completion that
       // arrived while another was completing derives off the queue rather than
       // off the press; the Dock's `IdentityName` closes over the
       // `canvas.selected.id` of its last committed render, so a selection that
@@ -1601,11 +1592,11 @@ export function createSpaceAuthoring({
 
   /**
    * Validate the stored snapshot *before* handing it to the session. Accepting
-   * first and checking after published an unloadable snapshot as settled working
-   * state, so the conflict that could still have been resolved was gone. And the
-   * check cannot report by throwing: the caller is an `onClick` handler, which
-   * React error boundaries do not catch, so the throw escaped to the window
-   * leaving the stale Space on screen.
+   * first and checking after would publish an unloadable snapshot as settled
+   * working state, losing the conflict that could still have been resolved. And
+   * the check cannot report by throwing: the caller is an `onClick` handler,
+   * which React error boundaries do not catch, so a throw would escape to the
+   * window leaving the stale Space on screen.
    *
    * Refusing changes nothing — local work, conflict and every control survive —
    * so it answers with the reason and leaves the Space alone. The caller

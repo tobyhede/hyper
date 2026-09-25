@@ -22,13 +22,13 @@ import type {
  * ({@link classifyStoredFailure}).
  *
  * It lives here, beside `loadAggregate`, rather than on the server-only
- * superset that used to declare it. `loadAggregate` is `StoredSpaceRepository`'s,
- * so the failure it raises is the shared seam's too — declared once for both
- * consumers, the way the seam itself is. On the superset, `@project/http` could
- * not name the identity of the error its own repository handed it.
+ * superset. `loadAggregate` is `StoredSpaceRepository`'s, so the failure it
+ * raises is the shared seam's too — declared once for both consumers, the way
+ * the seam itself is. On the superset, `@project/http` could not name the
+ * identity of the error its own repository handed it.
  *
  * Every implementation of the seam raises it — the one SQL repository
- * (`SqlSpaceRepository`, ADR 0095) and its memory double,
+ * (`SqlSpaceRepository`) and its memory double,
  * `MemorySpaceRepository`, alike — or a memory-backed test proves nothing
  * about the database. `MemorySpaceBackend` is not on this seam: it doubles the
  * browser-side `SpaceBackend`, whose HTTP implementation never raises this.

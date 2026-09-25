@@ -59,16 +59,11 @@ type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
  * own named cause of warning #008 and of edges attaching to stale points; the
  * documented remedy is `useUpdateNodeInternals`. That remedy is for nodes that
  * leave measuring to React Flow. `projection.ts` does not: it puts the
- * strategy's geometry on `node.handles`, `parseHandles` prefers that to the DOM,
- * and every projection allocates fresh nodes, so a Graph gaining a handle or a
- * strategy moving one is re-derived on the spot.
- *
- * Calling the hook on top of that is a regression rather than a belt-and-braces:
- * a forced update rebuilds the bounds with `getHandleBounds`, which reads only
- * the handles the DOM renders — the anchors of Graphs this Resource is already on.
- * The declarations for every other Graph go with it, and those are exactly what
- * lets an Edge completed onto this Resource resolve in the render that first makes
- * it incident, before the projection catches up.
+ * declared anchor geometry on `node.handles`, `parseHandles` prefers that to the
+ * DOM, and every projection allocates fresh nodes, so a change of size is
+ * re-derived on the spot. Do not call the hook on top of that: a forced update
+ * rebuilds the bounds with `getHandleBounds` from the DOM rather than from the
+ * declaration (`declaredHandles` in `projection.ts`).
  */
 
 export function ResourceNode({
@@ -199,10 +194,9 @@ export function ResourceNode({
       // enforces nothing itself on a handle it did not render. Its `DefaultNode`
       // passes it straight to both `Handle`s, and this is the same forwarding.
       //
-      // These are the only handles a gesture can begin at — there are no others
-      // left since ADR 0087 — so dropping it left the flow-level flag governing
-      // nothing but whether the connection line rendered, with CSS and a pane's
-      // backdrop standing in for the withdrawal.
+      // These are the only handles a gesture can begin at, so without it the
+      // flow-level flag would govern nothing but whether the connection line
+      // renders, with CSS and a pane's backdrop standing in for the withdrawal.
       isConnectable={connectionAuthoring && isConnectable}
       isConnectableStart={
         connectionAuthoring && isConnectable && role === 'source' && !connectionInProgress
@@ -213,8 +207,8 @@ export function ResourceNode({
       isConnectableEnd={connectionAuthoring && isConnectable && role === seeking && eligible}
       // A handle is a drag affordance, and a click is not a drag. A press and
       // release inside React Flow's drag threshold starts no connection, so the
-      // click reached the Resource underneath and opened it to read — from the one
-      // control whose whole purpose is to begin an Edge. React Flow spreads
+      // click would reach the Resource underneath and open it to read — from the
+      // one control whose whole purpose is to begin an Edge. React Flow spreads
       // caller props after its own `onClick`, so this replaces it.
       onClick={(event) => event.stopPropagation()}
       style={{
@@ -228,7 +222,7 @@ export function ResourceNode({
   /*
    * A control reaches the Resource only when the composition supplied the
    * operation that performs it. Presence is the capability — there is no
-   * separate flag left to disagree with it — so `CanvasResource` draws no
+   * separate flag to disagree with it — so `CanvasResource` draws no
    * control it has no operation for, and withholding it here is the same
    * answer one layer up.
    */

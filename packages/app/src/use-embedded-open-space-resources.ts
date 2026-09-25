@@ -62,10 +62,10 @@ export function useEmbeddedOpenSpaceResources(
   /**
    * What each target could not be read with, kept apart from the others'.
    *
-   * One string for the whole canvas made every embedding answer for every
-   * other: any target that opened cleared a sentence raised by a different
-   * Space Resource, and the one on screen never said which target it was about.
-   * Keyed by the Space the read was aimed at, because that is what
+   * Not one string for the whole canvas: every embedding would then answer for
+   * every other — any target that opened would clear a sentence raised by a
+   * different Space Resource, and the one on screen would never say which
+   * target it was about. Keyed by the Space the read was aimed at, because that is what
    * `spaces.embed` is asked for — two Resources reaching the same missing Space
    * are reporting one failure, and each names itself where it is drawn.
    */

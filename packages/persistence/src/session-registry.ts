@@ -374,8 +374,8 @@ const readAggregate = async (
 };
 
 /**
- * The pre-commit verdict, from the same judge the repository runs (ADR 0095,
- * ADR 0097) over this turn's one aggregate read: Spaces the Edit does not
+ * The pre-commit verdict, from the same judge the repository runs (ADR 0097)
+ * over this turn's one aggregate read: Spaces the Edit does not
  * change are judged as stored and participants as what the commit sends. It
  * acts only on `aggregate-refused`; a `conflict` or `write` verdict still
  * reaches the backend, whose own answer carries the current state a conflict
@@ -477,7 +477,7 @@ const saveBlock = (spaces: LiveSpaces, refusal: SpaceResourceRefusal): SaveBlock
  * pre-check: against `MemorySpaceBackend`'s test double a queued `conflict`
  * or failure installs the acknowledged revision onto the session but not into
  * the stored copy, so the pre-check would answer a conflict of its own. The repository
- * re-validates every commit regardless (ADR 0095).
+ * re-validates every commit regardless.
  */
 const runCoordination = async <P, C>(
   coordinator: Coordinator,

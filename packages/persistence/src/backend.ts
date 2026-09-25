@@ -41,7 +41,7 @@ export interface SpaceConflict {
 }
 
 /**
- * What a store decided about a commit, shared by both commit seams (ADR 0098).
+ * What a store decided about a commit, shared by both commit seams.
  *
  * The stored seam adds its own refusal of a request it will not judge, and the
  * browser's adds the failures only a client can suffer; what a store *decided*

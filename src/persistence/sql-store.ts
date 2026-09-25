@@ -1,6 +1,6 @@
 /**
  * A JSON-compatible value, and the one converter every write of a stored
- * `document` column goes through on both databases (ADR 0095) — declared once
+ * `document` column goes through on both databases — declared once
  * here rather than duplicated per database, because it is identical logic,
  * not a database difference. Refuses a non-finite number
  * or a genuinely non-JSON value (a function, a `bigint`, …) and drops an
@@ -32,7 +32,7 @@ export const toJsonValue = (value: unknown): JsonValue => {
 /**
  * The row shape `listSpaces` reads off an unfiltered `Space.orderBy(...).all()`
  * — property syntax, no optional fields, `document` left `unknown` because
- * each database hands it back differently decoded (ADR 0095).
+ * each database hands it back differently decoded.
  */
 export interface SqlSpaceListRow {
   readonly id: string;
@@ -61,7 +61,7 @@ export interface SqlResourceRow {
 /**
  * The row shape `loadSpace` reads off `Space.where({ id }).include('resources',
  * …).first()`. `revision`/`exportedRevision` are canonical decimal TEXT on
- * both databases now (ADR 0095), so this shape is exactly the same whichever
+ * both databases, so this shape is exactly the same whichever
  * database answered it.
  */
 export interface SqlLoadedSpaceRow {
@@ -108,8 +108,7 @@ export interface SqlTables<Order> {
      * the relation's refined collection — that cannot be named without
      * depending on `@prisma-next/sql-orm-client` internals no package.json
      * lists directly, and cannot be kept opaque across this module boundary
-     * either; ticket 22's Answer
-     * (`.scratch/database-persistence/issues/22-…`) records what was tried.
+     * either.
      * Composing `.include(...)` inside the database module — ordinary
      * forward-typed code, the same shape the repository's own
      * `#loadStoredSpaceRow` calls through this — sidesteps the cross-module
@@ -244,7 +243,7 @@ export interface SqlTables<Order> {
 /**
  * What a database contributes so the one SQL repository can read and write
  * it, and nothing more (ADR 0095). A member added here is a place the two
- * databases have begun to differ again, and needs a reason.
+ * databases differ, and needs a reason.
  *
  * - `orm` — the handle for work outside a transaction, already resolved to
  *   the repository's one namespace (`db.orm.public` on PostgreSQL, the
@@ -276,7 +275,7 @@ export interface SqlTables<Order> {
  * - `isDuplicateKey(error, table)` — recognises a primary-key collision, the
  *   one error the two databases raise differently under a losing insert.
  * - `isUnavailable(error)` — whether a failure carries evidence that the
- *   database is not answering for now (ticket 38). Each database owns the
+ *   database is not answering for now. Each database owns the
  *   knowledge of what its driver raises; `SqlSpaceRepository` asks this for a
  *   failure nothing else has named, and wraps a `true` answer in
  *   `PersistenceUnavailableError`. `false` means no such evidence, not that
@@ -609,7 +608,7 @@ export interface Orderable<Order> {
 
 /**
  * Whether any error on a failure's cause chain satisfies `holds` — the one
- * walk every store's `isUnavailable` reads a failure through (ticket 38).
+ * walk every store's `isUnavailable` reads a failure through.
  *
  * The chain, because `@prisma-next/sql-runtime` carries a failed COMMIT's own
  * error, and the callback error behind a failed rollback, only on `.cause`;
@@ -633,7 +632,7 @@ export const someCause = (failure: unknown, holds: (link: Error) => boolean): bo
  * its cause chain — what both `@prisma-next/driver-postgres` and
  * `@prisma-next/driver-sqlite` normalise a statement's connection trouble to,
  * SQLite BUSY and LOCKED included. SQLite's `isUnavailable` answers `true`
- * for it (ticket 31, ticket 38); PostgreSQL's reads the same `kind` per link
+ * for it; PostgreSQL's reads the same `kind` per link
  * but first holds a socket errno on its `cause` to the store's allowlist,
  * because its driver names `ENOTFOUND` a connection failure too.
  *
@@ -642,7 +641,7 @@ export const someCause = (failure: unknown, holds: (link: Error) => boolean): bo
  * repository's. Not by `transient`: that flag says whether an *immediate*
  * retry might succeed, and the PostgreSQL driver marks a refused connection
  * `false` — which is the database being down, the very case a reader answers
- * "try again later" for. Not by message either, so ticket 18's two BUSY shapes
+ * "try again later" for. Not by message either, so SQLite's two BUSY shapes
  * (immediate and exhausted) are one answer without being told apart.
  * `test/unit/sql-connection-failure.test.ts` holds each of these through both
  * stores.

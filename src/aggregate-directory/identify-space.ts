@@ -32,11 +32,6 @@ interface SchemaIssue {
  * so neither moves alone: one failure should not read one way at the CLI and
  * another on the wire. `import-decoding.test.ts` holds them to it.
  *
- * It reached this module with the aggregate importer. It used to sit in
- * `PostgresSpaceRepository`, beside the compatibility `importSpaces` that was
- * the only door parsing unidentified input; that door is gone and this is the
- * door now, which is why the prose moved rather than being deleted with it.
- *
  * The fold to lower case is checked rather than incidental. Zod capitalises a
  * sentence that stands alone; here it is a clause after a path, so it reads as
  * one — but only while no message carries a word whose case is information.
@@ -66,13 +61,11 @@ export const describeSchemaFailure = (issues: readonly SchemaIssue[], label: str
  * Fill in every id the import input left out, producing the fully identified
  * snapshot the persistence seam takes.
  *
- * **This is the importer's job, not a repository's.** Both adapters used to
- * mint here — `resolveImport` in `PostgresSpaceRepository` and `identifyImport`
- * in the memory double — which made the same rule something two implementations
- * had to agree about, with a shared contract test standing over them to check
- * that they did. `initializeAggregate` and `replaceAggregate` take fully
+ * **This is the importer's job, not a repository's.** Minting in each
+ * repository would make the same rule something every implementation had to
+ * agree about. `initializeAggregate` and `replaceAggregate` take fully
  * identified snapshots (ADR 0078), so the minting has one home on the way in
- * and the adapters have none.
+ * and the repositories have none.
  *
  * `newId` is the caller's (ADR 0016) rather than an ambient generator, so the
  * CLI's composition root is the one place identity comes from and a test can

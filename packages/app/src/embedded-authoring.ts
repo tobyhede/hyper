@@ -47,10 +47,9 @@ const completeEmbedded = (
    * wiring defect, and `AuthoringResult`'s own rule (`space-authoring.ts`) says
    * a broken invariant "throws, or is reported through the non-throwing
    * reporter — dressing a programming defect as a refusal would put it in front
-   * of the author as their own mistake". The refusal that used to stand here
-   * did exactly that, and with an unrelated sentence:
-   * `edge-resource-outside-map` presents as "An Edge can only join Resources in
-   * this Map."
+   * of the author as their own mistake". Do not answer it with a refusal such
+   * as `edge-resource-outside-map`, which presents as the unrelated "An Edge
+   * can only join Resources in this Map."
    *
    * Reported rather than thrown, under the canvas-wide rule recorded once in
    * `docs/agents/rendering.md` ("React Flow itself") and argued in

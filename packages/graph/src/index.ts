@@ -60,8 +60,7 @@ export type {
 } from './layout';
 
 // `resolveContentResource` is the only function here: identity lookup is reached
-// through `space.lookup`, which the Space carries, so the shallow `get*` pairs
-// that used to sit beside it have no callers left to name.
+// through `space.lookup`, which the Space carries.
 export { resolveContentResource } from './lookup';
 export type { OwnedGraph, ResolvedContentResource, ResolvedMap, SpaceLookup } from './lookup';
 
@@ -83,12 +82,7 @@ export type { SnapshotEditOutcome, SnapshotEditRefusal } from './snapshot-edits'
 // `graphRenderEdgeId` is offered although no consumer *has* to name an Edge id:
 // it mints the `<graphId>::<from>::<to>` format, and a second producer of it is
 // the defect. A test outside this package that stands a projected Edge up by
-// hand was spelling the format out, which is exactly that.
-//
-// The per-Graph handle family that stood beside it — `buildResourceHandles`,
-// `filterHandlesByGraphs`, `inHandleId`, `outHandleId` and the two types they
-// were written in — left with ADR 0087. An Edge names no handle now, and the
-// anchor it attaches to is chosen while it is drawn.
+// hand mints its id here rather than spelling the format out.
 export { buildGraphRenderEdges, graphResourceIds, graphRenderEdgeId } from './graph-rendering';
 export type { GraphRenderEdge } from './graph-rendering';
 

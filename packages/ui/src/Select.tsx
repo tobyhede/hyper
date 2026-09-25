@@ -41,8 +41,8 @@ SelectTrigger.displayName = 'SelectTrigger';
  * the computed positioner styles for a constant `{ position: 'fixed' }` — so
  * `align` and `sideOffset` are silently discarded and the list is drawn over
  * the trigger with the selected item under the pointer. Exposing the two
- * without the switch was a type promising placement the primitive's own default
- * forbids. Forcing `alignItemWithTrigger={false}` instead would have been a
+ * without the switch would be a type promising placement the primitive's own
+ * default forbids. Forcing `alignItemWithTrigger={false}` instead would have been a
  * deviation from a Base UI default with no product requirement behind it
  * (ADR 0047, ADR 0050) — and shadcn's own `base-nova` select does neither: it
  * picks `align`, `alignOffset`, `side`, `sideOffset` and `alignItemWithTrigger`
@@ -69,12 +69,10 @@ export const SelectContent = forwardRef<
     >
       <SelectPrimitive.Popup
         ref={ref}
-        // `shadow-lg`, which is what `Popover` beside it spends — the same
-        // decision, for the same reason, and the last surface still holding the
-        // value it replaced. `shadow-[0_12px_40px_rgba(0,0,0,0.5)]` is half the
-        // black there is, written in numbers no theme can reach: it was picked
-        // to separate a dark popup from a dark canvas, and on light paper it is
-        // a grey cloud under the list.
+        // `shadow-lg`, which is what `Popover` beside it spends, for the same
+        // reason: a token moves with the theme, where an arbitrary value picked
+        // to separate a dark popup from a dark canvas is a grey cloud under the
+        // list on light paper.
         className={cn(
           'max-h-[var(--available-height)] min-w-[8rem] overflow-hidden rounded-chrome-md border border-border bg-card text-foreground shadow-lg data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1',
           className,

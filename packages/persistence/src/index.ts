@@ -1,6 +1,6 @@
 export * from './backend';
-/* The rules a commit is judged by, decided once for every implementation
- * (ADR 0095). The rest of the module is private to it. */
+/* The rules a commit is judged by, decided once for every implementation.
+ * The rest of the module is private to it. */
 export { commitRequestRefusal, committedRevision, decideCommit } from './commit-decision';
 /* The wire contract's two ends live in different processes. These are the
  * codecs the portable HTTP package reads the wire through. */
@@ -40,11 +40,11 @@ export type {
   ProblemDetails,
   ProblemError,
 } from './http-protocol';
-/* The one shared codec for a stored Revision column (ADR 0095): canonical
+/* The one shared codec for a stored Revision column: canonical
  * non-negative decimal TEXT on both databases, bound to the same 2^63−1
  * ceiling `http-protocol.ts`'s wire decode also enforces.
- * `src/persistence/*-space-repository.ts` reads and writes revisions through
- * this rather than each adapter owning its own format/ceiling check.
+ * `src/persistence/sql-space-repository.ts` reads and writes revisions
+ * through this, so no store owns a format or ceiling check of its own.
  * `CANONICAL_DECIMAL` belongs here too because `HttpSpaceBackend` validates a
  * revision header against it before decoding. */
 export {

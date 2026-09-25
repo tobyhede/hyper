@@ -83,7 +83,7 @@ export function resolveContentResource(
  * reach: `positionedMapSchema` requires at least one Graph, and every Space
  * arrives through that parse.
  *
- * It survives because `min(1)` does not reach the type — `noUncheckedIndexedAccess`
+ * It exists because `min(1)` does not reach the type — `noUncheckedIndexedAccess`
  * widens the first read to `| undefined` — so a total function needs an answer
  * for a state no document is in. Reporting it as a shape failure naming the
  * Map says exactly what the schema would have, in the one place still able to

@@ -61,8 +61,7 @@ export function graphEntryResources(graph: Graph): ResourceId[] {
  * `undefined` is left for a graph with no edges, and that is a **normal** state
  * rather than an unreachable one: creating a map creates its initial active
  * graph empty in the same edit (ADR 0040), so every new Map is in it until
- * the author draws something. `graphSchema`
- * used to forbid it and no longer does. Callers must answer it — presenting
+ * the author draws something. Callers must answer it — presenting
  * refuses, and the control that offers presenting is disabled — because a graph
  * with no edges has nowhere to begin, not because the type demands a branch.
  * If a graph ever wants to name its own start, that is a field on the graph and

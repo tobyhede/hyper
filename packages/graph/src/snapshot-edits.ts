@@ -16,17 +16,15 @@ import { Placement } from './placement';
 /**
  * The Resource membership rules that turn a Space snapshot into the next one when
  * a Resource joins, grows, shrinks or leaves a Map — Add, Open, Close, Resize,
- * Remove from Map, Delete from Space (ADR 0084, ADR 0086).
+ * Remove from Map, Delete from Space.
  *
  * `SnapshotEdit` operates on `SpaceSnapshot` — the one representation both
  * Space Authoring and the session registry already hold — rather than the
  * loaded `Space` (the registry would have to parse every snapshot to edit it)
  * or a bare `Placement` (a caller would keep assembling snapshots around it,
- * which is where the registry's copy of these rules diverged from Authoring's:
- * `session-registry.ts`'s own `removeSpaceResource` never called
- * {@link Placement.reclaim}, so an Open Space Resource's room stayed displaced
- * after it was deleted, and `addSpaceResource` never stepped off an occupied
- * point the way a menu-created Markdown Resource does).
+ * and every such assembly is a second copy of these rules free to diverge —
+ * skipping {@link Placement.reclaim} on a delete, or not stepping off an
+ * occupied point on a create).
  *
  * Every operation answers `completed(snapshot) | unchanged | refused(code)`,
  * never a throw for a domain rule (ADR 0057). This module declares its own
@@ -67,11 +65,10 @@ export type SnapshotEditOutcome =
  * How far a Resource creation steps when the point it was given is already taken,
  * and in which direction.
  *
- * Moved here from Space Authoring's own `freeAnchor`
- * (`packages/app/src/space-authoring.ts`), because the registry has to place a
- * menu-created Space Resource exactly as a menu-created Markdown Resource lands
- * (ADR 0089) and a rule with two owners had none — the registry wrote the
- * anchor it was given exactly, so a repeated centre-add stacked Space Resources
+ * Shared by Space Authoring and the session registry, because the registry has
+ * to place a menu-created Space Resource exactly as a menu-created Markdown
+ * Resource lands (ADR 0089), and a rule with two owners has none: a registry
+ * that wrote the anchor it was given exactly would stack repeated centre-adds
  * on top of each other.
  *
  * A visible stack rather than collision avoidance: existing Resources never move,
@@ -200,9 +197,7 @@ const removedFrom = (placement: Placement, resourceId: UUID): Placement =>
  * `resource-has-references` — naming every Reference Resource by title — for a Resource a Reference Resource in
  * this Space still targets: a Reference Resource whose Target vanished is not a Resource
  * intake accepts (ADR 0070), so the Space must not lose one out from under its
- * Reference Resources. Space Resource deletion used to skip this guard entirely and reach
- * intake instead, which answered the generic `aggregate-refused` — nothing
- * committed, but nothing useful said either.
+ * Reference Resources.
  */
 function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEditOutcome {
   if (!snapshot.resources.some((resource) => resource.id === resourceId)) {

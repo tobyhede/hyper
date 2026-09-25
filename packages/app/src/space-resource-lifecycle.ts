@@ -49,9 +49,9 @@ export interface SpaceResourceTarget {
 /**
  * Everything authoring a Space Resource needs, over the coordinated lifecycle.
  *
- * The lifecycle writes remain the module's public interface: the three topology
- * operations from ADR 0076, plus Map and Graph deletion now that either may
- * update Space Resources in several containing Spaces. The two reads are here rather than beside them on a backend
+ * The lifecycle writes are the module's public interface: the three topology
+ * operations, plus Map and Graph deletion, since either may update Space
+ * Resources in several containing Spaces. The two reads are here rather than beside them on a backend
  * because they answer the same question the writes do — *which Space, and which
  * of its Maps and Graphs* — and a surface that had to reach a backend for
  * them would be composing its own answer to a question this module already

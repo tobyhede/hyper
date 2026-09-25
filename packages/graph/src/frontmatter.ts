@@ -36,10 +36,8 @@ export function splitFrontmatter(text: string): FrontmatterSplit {
   return {
     // Terminated with a newline of our own rather than by taking the closing
     // fence's. `close` sits on the `\r` of a CRLF pair whose `\n` the fence
-    // match consumed, so slicing one past it handed YAML a dangling `\r` — and
-    // YAML, correctly, read it as part of the last field's value. Every resource in
-    // a CRLF checkout parsed with a trailing carriage return on whichever field
-    // came last. For LF this is byte-identical to what it replaced.
+    // match consumed, so slicing one past it would hand YAML a dangling `\r`,
+    // which YAML reads as part of the last field's value.
     yaml: text.slice(openLength, close) + '\n',
     // The body starts on the line after the fence. One newline separates them,
     // so one newline is dropped — anything further is the author's own blank

@@ -18,8 +18,7 @@ import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-ad
  *
  * **It cannot also be the chrome adapter.** The provider is conditional on
  * there being Resources on the canvas, so an adapter inside it would never spend a
- * chrome continuation while placement is pending or failed — which is exactly
- * when a creation pane is likely to have been cancelled.
+ * chrome continuation while placement is pending or failed.
  *
  * Readiness is discovered rather than declared: this re-resolves on every
  * render and spends when the element appears, so there is no `ready(fact)`

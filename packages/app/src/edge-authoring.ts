@@ -293,10 +293,9 @@ export interface EdgeAuthoring {
    * finished drag leaves no surface to correct — the sentence is the whole of
    * what they are told, and cancelling would take it away with the draft.
    *
-   * The Resource is held until the drag ends rather than answered to the caller: it
-   * used to be a return value the two connecting operations passed up and their
-   * call sites discarded, which is the second continuation channel
-   * `continuation.ts` replaced.
+   * The Resource is held until the drag ends rather than answered to the caller:
+   * a return value the connecting operations pass up would be a second
+   * continuation channel beside `continuation.ts`.
    */
   readonly endPointerDrag: () => void;
 
@@ -466,7 +465,7 @@ export function createEdgeAuthoring({
   /**
    * Ask the author be put back on the entity this Edit left them with.
    *
-   * One line, because where an Edit continues is one module now
+   * One line, because where an Edit continues is one module
    * (`continuation.ts`): this lifecycle says what it owes and an adapter that
    * can reach the target spends it, instead of publishing a one-shot of its own
    * for the React layer to resolve, wait on and clear.

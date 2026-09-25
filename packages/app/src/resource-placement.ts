@@ -75,7 +75,7 @@ export interface ResourcePlacementInput {
   /** The Map the canvas draws. */
   readonly map: SpaceMap;
   readonly presenting: boolean;
-  /** ADR 0042's epoch: a replacement discards a drag in flight. */
+  /** The replacement epoch: a replacement discards a drag in flight. */
   readonly replacementEpoch: number;
   readonly reportBreak: ObserverErrorReporter;
 }
@@ -94,11 +94,11 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
     space: ResourcesPopoverSpace,
     anchor: MapPosition,
   ) => Promise<string | null>;
-  /** Create Space Resource: one press, one Resource, one new Space (ADR 0089). */
+  /** Create Space Resource: one press, one Resource, one new Space. */
   readonly createSpaceResource: () => void;
   /** Whether a Create Space Resource is between its press and its installed Edit. */
   readonly creatingSpaceResource: boolean;
-  /** Create Reference, from the Resource it points at (ADR 0089). */
+  /** Create Reference, from the Resource it points at. */
   readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
   /** A drag from the Resources list began over a Resource row. */
   readonly startResourceDrag: (resourceId: ResourceId, settle: SettleResource) => void;
@@ -116,7 +116,7 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
  * Resources list, or dropped there — and the visible centre a Resource placed
  * by a press lands at.
  *
- * Each creation completes its Edit on activation (ADR 0089) and continues at
+ * Each creation completes its Edit on activation and continues at
  * the Resource it made. A drag from the Resources list is held here from its
  * start to its drop, and is dropped with nothing placed when the Map, the mode
  * or the Space under it changes.
@@ -132,7 +132,7 @@ export function useResourcePlacement(
   /**
    * Framing a Space from the surface that offers it, so a reader who found it in
    * the list never meets a picker. The Title defaults to the Space's own;
-   * renaming it afterwards is the ordinary inline Title edit (ADR 0083). The
+   * renaming it afterwards is the ordinary inline Title edit. The
    * anchor is the caller's: a press passes the visible centre and a drop the
    * point it landed on.
    */
@@ -298,7 +298,7 @@ export function useResourcePlacement(
 
   /**
    * **The one creation whose refusal no surface shows, and that is a decision.**
-   * A refusal carries a sentence for the author (ADR 0042), worth showing where
+   * A refusal carries a sentence for the author, worth showing where
    * the author can act on it. Add Resource takes no input at all, cannot refuse
    * against a choice the author made, and leaves nothing standing that a
    * sentence could correct. If it ever grows an input it grows a surface with

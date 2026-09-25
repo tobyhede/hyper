@@ -461,14 +461,10 @@ const moduleReferences = (source: ts.SourceFile): readonly ModuleReference[] => 
         : node.exportClause;
       // An import specifier's `propertyName` is the *exported* name and its
       // `name` the local one; an export specifier is the other way round, and
-      // `name` is what a consumer writes. Reading the wrong side made a referenced
-      // re-export match on its *local* name, so importing one component reached
-      // a second module that no story rendered. The reference that found this —
-      // `packages/ui/src/index.ts` re-exporting the shadcn registry's content
-      // component under a second name, because a domain component of the same
-      // name stood in the way — is gone with the collision ADR 0085 resolved.
-      // The rule is not: the barrel may reference again, and the fixtures below are
-      // the executable statement of it.
+      // `name` is what a consumer writes. Reading the wrong side makes a renamed
+      // re-export match on its *local* name, so importing one component reaches
+      // a second module that no story rendered. The fixtures below are the
+      // executable statement of the rule.
       const named =
         bindings === undefined
           ? null
@@ -520,15 +516,10 @@ const moduleReferences = (source: ts.SourceFile): readonly ModuleReference[] => 
  *
  * **Only a component name marks its module rendered.** A module may export a
  * component and a plain helper side by side, and a story taking the *helper*
- * renders nothing. The case this rule was written for: `OpenSpaces.tsx` exported
- * the retired open-Spaces strip beside `openSpaceStatusLabel`, the words the
- * Command Dock spends, and that one import marked the whole module rendered and
- * carried `components/tabs.tsx` in behind it. A dead surface passed the ratchet
- * unlisted, which is the one omission this walk exists to prevent. Both modules are
- * deleted now (`.scratch/command-dock/issues/08`) and the words live in
- * `packages/ui/src/open-space-status.ts`, so the example is history rather than
- * a module to look at — the rule it bought is not. Read off the name's own
- * casing, which is what a JSX tag is resolved by: `<OpenSpaces/>` was a
+ * renders nothing. Were a helper import to mark its module rendered, a
+ * component exported beside that helper would pass the ratchet unlisted, which
+ * is the one omission this walk exists to prevent. Read off the name's own
+ * casing, which is what a JSX tag is resolved by: `CommandDock` can be a
  * component and `openSpaceStatusLabel` cannot be one.
  */
 const isComponentName = (name: string): boolean => /^[A-Z]/u.test(name);
@@ -587,13 +578,13 @@ const productionComponents = (repositoryRoot: string): readonly string[] =>
 
 /**
  * The selector text of every rule in a stylesheet: whatever precedes each `{`,
- * once comments are gone — `styles.css` names retired selectors in its own
- * prose. Taking the text *before* a brace rather than deleting brace-delimited
- * bodies is what makes a rule nested in `@media` or `@container` visible: the
- * old fixpoint strip removed the inner body first and then swallowed the
- * at-rule's own braces along with the selector inside them. It also means an
- * `@import url('./reset.css');` prelude, which has no brace, contributes
- * nothing — it used to mint a phantom `.css` class.
+ * once comments are gone — a comment may name a selector in prose. Take the
+ * text *before* a brace rather than deleting brace-delimited bodies: that is
+ * what makes a rule nested in `@media` or `@container` visible, where deleting
+ * the inner body first would swallow the at-rule's own braces along with the
+ * selector inside them. It also means an `@import url('./reset.css');`
+ * prelude, which has no brace, contributes nothing rather than a phantom
+ * `.css` class.
  */
 const ruleSelectors = (css: string): readonly string[] =>
   [...css.replace(/\/\*[\s\S]*?\*\//gu, '').matchAll(/([^{}]*)\{/gu)]
@@ -809,8 +800,7 @@ export const buildUiCatalog = (repositoryRoot = process.cwd()): UiCatalog => {
   // the tags out of the sources rather than out of a Playwright run, which is
   // what makes it survive a sharded, filtered or `--last-failed` run: a reporter
   // attached to a partial run observes a partial collection and reports every
-  // claim outside its slice as missing evidence. `ci-wall-clock/02` retired the
-  // reporter that did.
+  // claim outside its slice as missing evidence.
   //
   // It deliberately stops at *existence*, and does not grow a sibling asserting
   // that the tagged test passed. Both Playwright configs set

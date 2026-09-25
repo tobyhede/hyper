@@ -30,7 +30,7 @@ import type { AuthoringResult } from './space-authoring';
 /**
  * The Graph the Dock's Graph cluster names: the Active Graph, or nothing.
  *
- * A Map always owns at least one Graph — ADR 0079 mints one with every Map and
+ * A Map always owns at least one Graph — every Map is minted with one and
  * Authoring refuses the Edit that would empty it — but the type does not say
  * so, and a surface that asserted it would be asserting a domain rule from the
  * outside. `null` is drawn as no Dock at all, the same answer the canvas gives

@@ -55,10 +55,10 @@ export const establishMetaSpace = async (
  * for the life of the process; capping the growth keeps a database that comes
  * back late from waiting hours to be found.
  *
- * There is deliberately no attempt bound on an unreachable database. A bounded
- * retry left a host that outlived it serving `503` at the root forever, because
- * the root address no longer establishes anything and nothing else was going to
- * — the bound did not surface the problem, it made it permanent. Every failed
+ * There is deliberately no attempt bound on an unreachable database. A host
+ * that outlived a bounded retry would serve `503` at the root forever, because
+ * the root address establishes nothing and nothing else would — a bound would
+ * not surface the problem, it would make it permanent. Every failed
  * attempt is reported, so a long outage is visible while it lasts. What stops
  * the retry is a failure no wait cures ({@link CONFIRMING_FAILURES}), and what
  * tells an operator it stopped is the terminal report in
@@ -108,10 +108,9 @@ export interface MetaSpaceRetryOptions {
  * Try establishment again after a first attempt failed, until one succeeds or a
  * failure arrives that no later attempt can cure.
  *
- * This is where the repair the root address used to perform now lives. `GET /`
- * established the Meta Space when the repository had none, so a safe method
- * created durable authored state; establishment is start-up's alone, and
- * start-up owns the failure, so it owns the repair too.
+ * Establishment is start-up's alone — `GET /` is a safe method and must not
+ * create durable authored state — and start-up owns the failure, so it owns
+ * the repair too.
  *
  * `wait` and `report` are the caller's rather than a timer and a stream this
  * module names (ADR 0016, ADR 0081), and they arrive together in one object

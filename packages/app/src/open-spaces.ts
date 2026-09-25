@@ -26,7 +26,7 @@ export interface OpenSpace {
   readonly session: SpaceSession;
   readonly app: ComposedApp;
   /**
-   * Authoring the Space Resources this Space holds (ADR 0074, ADR 0076).
+   * Authoring the Space Resources this Space holds.
    *
    * Carried on the entry rather than composed inside the app because it is
    * written over the *registry*, not over one session: creating, referencing
@@ -128,7 +128,7 @@ export type ListingRow = OpenListingRow | ClosedListingRow;
  * `switched` and `opened` carry the Space's title, read off the entry `select`
  * itself just produced. `refused` carries none: the only way to reach it is a
  * non-Meta Space that closed between the listing being drawn and the row being
- * chosen, and `OpenSpaces` no longer holds a title for a Space that is not
+ * chosen, and `OpenSpaces` holds no title for a Space that is not
  * open — the reader who drew the row is the one still holding it.
  */
 export type SelectSpaceResult =
@@ -157,8 +157,8 @@ export interface OpenSpaces {
    * closed Meta with no Opener, or refuse anything else.
    *
    * Load failures still throw rather than answering `refused` — a refusal is
-   * only ever the race decision 5 of `.scratch/command-dock/issues/28` names,
-   * never a failed load. Selecting the Space already on the canvas answers
+   * only ever a non-Meta Space closing between the listing being drawn and the
+   * row being chosen, never a failed load. Selecting the Space already on the canvas answers
    * `switched`.
    */
   readonly select: (spaceId: UUID) => Promise<SelectSpaceResult>;
@@ -271,8 +271,8 @@ interface OpenSpaceTreeRow extends NamedSpace {
  *
  * **Meta is the one exception to both rules**: it draws first at the root
  * whatever opened it, with what was Entered from it beneath. A Space Resource
- * may target Meta, so Meta can have an Opener, and hung by it Meta drew under
- * that Space where the menu promises it on top (`open-spaces.test.tsx`).
+ * may target Meta, so Meta can have an Opener, and hung by it Meta would draw
+ * under that Space where the menu promises it on top (`open-spaces.test.tsx`).
  */
 const openTree = (
   rows: readonly OpenSpaceTreeRow[],
@@ -758,7 +758,7 @@ export function createOpenSpaces({
           refusal: { code: 'persistence-recovery-required', recovery: 'resolve-conflict' },
         };
       }
-      // A permanent rejection and an aggregate refusal (`v1-release/17`) that
+      // A permanent rejection and an aggregate refusal that
       // no recovery attempt has blocked warn the same way here: both leave
       // nothing stored to lose by leaving, and both recover only through a
       // further Edit rather than through this Space's own persistence surface,

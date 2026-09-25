@@ -126,9 +126,9 @@ const subscribeToNothing = (): (() => void) => () => undefined;
  * One selector for both shortcuts, because the two answers have to agree: `C`
  * and `F2` are pressed on the same tree, and a control missing from one list and
  * present in the other makes the same element a command target for one key and
- * not for the other. They disagreed — `C` named only text entry — and the canvas
- * zoom controls render *inside* the wrapper both are bound to, so a `c` with
- * Zoom in focused added a Resource.
+ * not for the other. The canvas zoom controls render *inside* the wrapper both
+ * are bound to, so a list naming only text entry would let a `c` with Zoom in
+ * focused add a Resource.
  *
  * `button` and `select` are here for a different reason from `input`,
  * `textarea` and `contenteditable`: those are places an author is typing the
@@ -144,12 +144,6 @@ const subscribeToNothing = (): (() => void) => () => undefined;
  * the surfaces that carry no marker of their own — `ResourceSearchCombobox`'s popup
  * is `role="presentation"`, not `dialog`, because its input sits outside the
  * popup, so the marker rather than a role is what covers it.
- *
- * `[data-sidebar]` used to close the list: the registry `Sidebar` was the app's
- * chrome and set that attribute on every part of itself. It went with ADR 0082,
- * and the Command Dock that replaced it marks itself `.nokey` like every other
- * chrome surface — so the entry was covering nothing and has gone rather than
- * standing as a guard against a component the tree no longer contains.
  */
 const NOT_A_CANVAS_COMMAND =
   '.nokey, input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]';
@@ -300,7 +294,7 @@ export interface SpaceCanvasProps {
    *
    * A command list is built afresh on every render of the composition that owns
    * it — an address and an Edit both read state that has just changed — so this
-   * widens the measured exception below from "the node wrappers rebuild
+   * widens the exception noted below from "the node wrappers rebuild
    * whenever `nodes` changes identity" to "whenever this canvas renders".
    * Correctness is unaffected, and closing it is the same per-node cache that
    * note already names.
@@ -428,9 +422,8 @@ export function SpaceCanvas({
    *
    * Every reason the answers carry lives in `authoring-availability.ts`, beside
    * the answer it governs — including why the Edge lifecycle reads
-   * `authorOnCanvas` rather than the shorter rule it once had, and why a
-   * connection is reachable on the presented Resource that `authorOnCanvas`
-   * withdraws.
+   * `authorOnCanvas`, and why a connection is reachable on the presented
+   * Resource that `authorOnCanvas` withdraws.
    */
   const embeddedEditing = editingEmbeddingIds.size > 0;
   useLayoutEffect(() => {
@@ -539,7 +532,7 @@ export function SpaceCanvas({
             // same way: reopen the target's session so the next press acts.
             // The canvas still announces that delete removes the focused Resource
             // from its Map, and this drawing is still focusable, so an
-            // answer of `null` alone consumed the key and did nothing at all.
+            // answer of `null` alone would consume the key and do nothing at all.
             // There is no refusal to report either — the target is not open,
             // which is a state this press ends rather than a refused Edit.
             removeResource: () => {
@@ -603,9 +596,8 @@ export function SpaceCanvas({
   // which a drag does per frame, so React Flow's per-node
   // `userNode === internals.userNode` fast path misses and all of them re-render
   // rather than the one being dragged. Correctness is unaffected. Closing it
-  // needs a per-node cache or the callbacks moved into context — more machinery
-  // than a ten-Resource fixture asks for, so read it as a measured exception rather
-  // than an oversight.
+  // needs a per-node cache or the callbacks moved into context; it is a known
+  // exception rather than an oversight.
 
   // No pointer gesture on a Resource's body opens it (ADR 0036). A click is left to
   // React Flow, which selects; the Title is its own one-activation control
@@ -617,7 +609,7 @@ export function SpaceCanvas({
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
       if (event.key === 'Enter' || event.key === ' ') {
         if (bodyEditing) return;
-        // The same exclusion the `C` branch below makes, and now load-bearing
+        // The same exclusion the `C` branch below makes, and load-bearing
         // rather than defensive: an Expanded Resource draws its editor *inside* the
         // node, so a Space typed into it would otherwise be cancelled here
         // before the document ever received the character.
@@ -668,11 +660,10 @@ export function SpaceCanvas({
   );
 
   // `F2` renames the selected Resource, and this is the *only* handler that answers
-  // it. A React Flow `onKeyDown` branch used to answer it first and ask nothing
-  // about the target, so the key typed into a control renamed whichever Resource
-  // happened to be selected — a different one, once focus had moved. Two
-  // handlers for one key means one of them is the unguarded one; don't add a
-  // second back.
+  // it. Don't add a second, such as a React Flow `onKeyDown` branch: two handlers
+  // for one key means one of them is the unguarded one, and a branch that asks
+  // nothing about the target renames whichever Resource happens to be selected
+  // when the key is typed into a control.
   useLayoutEffect(() => {
     if (!availability.authorOnCanvas || bodyEditing) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
@@ -1256,7 +1247,7 @@ export function SpaceCanvas({
       tabIndex={-1}
       fitView={openingFraming === undefined}
       fitViewOptions={OVERVIEW_FIT}
-      // Nothing on a Resource answers a double click. ADR 0065 made the Title a
+      // Nothing on a Resource answers a double click. The Title is a
       // one-activation control, so the second click of a pair lands in the field
       // the first one opened — and that field, like the control, carries
       // `.nopan`, the one class React Flow's zoom filter exempts. The Resource body
@@ -1281,14 +1272,14 @@ export function SpaceCanvas({
       nodesConnectable={availability.connectOnCanvas}
       // **The placement fact, deliberately not an availability answer.** The
       // withheld form of this description is a sentence about placement, so the
-      // only condition that may gate it is whether placement resolved. Every
-      // other withdrawal — presenting, a creation pane, a live chrome rename —
-      // leaves the description saying "pending" about a placement that is not.
+      // only condition that may gate it is whether placement resolved. Any
+      // other withdrawal — presenting, a live chrome rename — would leave the
+      // description saying "pending" about a placement that is not.
       ariaLabelConfig={placementReady ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
       // authoring handles refuse via `isConnectableEnd` and the graph ports via
-      // `pointer-events: none` — so it advertised a capability the design forbids.
+      // `pointer-events: none` — so it would advertise a capability the design forbids.
       connectionLineStyle={connectionLineStyle}
       connectionLineComponent={GraphConnectionLine}
       minZoom={0.2}

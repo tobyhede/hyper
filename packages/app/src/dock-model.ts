@@ -13,7 +13,7 @@ import type { ExitSpaceResult, ListingRow } from './open-spaces';
  * sits and how a drag moves it is `dock-placement.ts`'s. The Dock's components
  * import from here; nothing here imports them. The listing
  * itself — the tree the open set makes, and Meta's row in it — is
- * `open-spaces.ts`'s (`.scratch/command-dock/issues/28`).
+ * `open-spaces.ts`'s.
  */
 
 /**
@@ -27,23 +27,20 @@ import type { ExitSpaceResult, ListingRow } from './open-spaces';
  * spinner about it, so neither earns a mark on a row a reader is scanning for
  * names.
  *
- * The words are `openSpaceStatusLabel`'s rather than this module's. They were
- * shared with `OpenSpaces`, the vertical tab strip that reported the same three
- * states over the same open set; this menu replaced it and
- * `.scratch/command-dock/issues/08` deleted it, so the words now live in
- * `packages/ui/src/open-space-status.ts` and {@link unwellReport} below is what
- * spends them — the Open Spaces menu draws what that answers. They stay in
+ * The words are `openSpaceStatusLabel`'s rather than this module's: they live
+ * in `packages/ui/src/open-space-status.ts` and {@link unwellReport} below is
+ * what spends them — the Open Spaces menu draws what that answers. They stay in
  * `@project/ui` rather than moving here because a second vocabulary for one
  * state is how a reader learns that "Save failed" and "Changes not saved" are
  * two different resources, and that risk returns with the next surface that
  * reports an unwell Space.
  *
  * **A total record and not a chain of `if`s**, which is the difference between
- * a state this surface has decided about and a state it has never heard of. The
- * chain that stood here answered `null` for anything it did not name, so a
- * sixth persistence arm would have compiled, drawn nothing, and reported
- * nothing — the row would say a Space is fine because the code had not been
- * taught otherwise. Keyed on the discriminant and held to both unions at once,
+ * a state this surface has decided about and a state it has never heard of. A
+ * chain answers `null` for anything it does not name, so a new persistence arm
+ * would compile, draw nothing, and report nothing — the row would say a Space
+ * is fine because the code had not been taught otherwise. Keyed on the
+ * discriminant and held to both unions at once,
  * it is a compile error instead, and the two unions cannot drift apart in
  * silence either.
  */
@@ -52,7 +49,7 @@ const UNWELL_STATUS = {
   pending: null,
   failed: 'failed',
   rejected: 'rejected',
-  // An aggregate refusal is its own persistence state (`v1-release/17`), but
+  // An aggregate refusal is its own persistence state, but
   // this row reports the same word a permanent rejection does: both mean "the
   // server declined this Space's last commit, and only a further Edit
   // recovers it," which is exactly what `OpenSpaceStatus`'s `rejected` says.
@@ -70,8 +67,7 @@ export const unwellReport = (persistence: SpaceSessionState['persistence']): str
  *
  * The closed Meta row is excluded by construction rather than by a check here:
  * it carries no `persistence` and reports nothing, so "N open" and
- * {@link unwellElsewhere} both read this rather than the listing's own length
- * (`.scratch/command-dock/issues/28`, decision 3).
+ * {@link unwellElsewhere} both read this rather than the listing's own length.
  */
 export const openCount = (listing: readonly ListingRow[]): number =>
   listing.filter((row) => row.open).length;
@@ -100,10 +96,9 @@ export const SPACES_LABEL = 'Spaces';
 /**
  * The Open Spaces trigger's accessible name.
  *
- * **The name is built from the visible word, not matched to it.** It read
- * `Switch Space. N open.` while the trigger showed `Spaces`, so the accessible
- * name did not contain the visible label — WCAG 2.5.3, and ADR 0082's naming
- * clause, which is what speech input reaches a control by. Writing the word
+ * **The name is built from the visible word, not matched to it.** The
+ * accessible name must contain the visible label — WCAG 2.5.3, and ADR 0082's
+ * naming clause, which is what speech input reaches a control by. Writing the word
  * twice and keeping the two in step is the fix that stops working the first
  * time either side is edited; sharing {@link SPACES_LABEL} is the one that
  * cannot come apart.

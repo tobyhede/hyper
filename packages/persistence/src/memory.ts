@@ -131,7 +131,7 @@ export class MemorySpaceBackend implements SpaceBackend {
     if (injected !== undefined) return clone(injected);
 
     // Read, not `clone`: a conflict answers `current` the way a load would, in
-    // id order, as the SQL adapters do off their own ordered query. The write
+    // id order, as the SQL repository does off its own ordered query. The write
     // decision carries those same copies back into `#spaces` below, so the
     // stored order converges on id order too — harmless, every read sorts.
     const decision = decideCommit(request, this.#metaSpaceId, [...this.#spaces.values()].map(read));

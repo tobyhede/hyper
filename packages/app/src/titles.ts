@@ -55,10 +55,10 @@ export const nextResourceTitle = (snapshot: SpaceSnapshot): string =>
  * **Numbered over the containing Space's Resource titles, which is the only source
  * that can be read synchronously.** The names of the Spaces already stored come
  * from a repository read, and the creation gesture completes on activation
- * (ADR 0089) with nothing to wait on — so a globally unique name would have to
+ * with nothing to wait on — so a globally unique name would have to
  * be minted inside the lifecycle and would disagree with the Resource's from the
  * outset. One string is handed to both the Space and the Space Resource, so they
- * agree at creation exactly as the retired pane's typed title did. Collisions
+ * agree at creation. Collisions
  * across Spaces are accepted: a title is not an identifier (ADR 0016).
  */
 export const nextSpaceTitle = (snapshot: SpaceSnapshot): string =>

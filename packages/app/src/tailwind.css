@@ -37,18 +37,17 @@
      surface, menu, popover and control states a step from this list by name
      rather than restating its own arbitrary value. The Resource's own geometry is
      a second, deliberately separate scale — declared below, beside the Resource's
-     colour tokens, rather than here (ticket 06).
+     colour tokens, rather than here.
 
-     **Every radius step is zero, and the six names are kept.** The chrome now
+     **Every radius step is zero, and the six names are kept.** The chrome
      draws the Resource's corner, so the steps collapse to one value; the names
-     stay because they are what makes the corner one edit rather than a hundred
-     (`.scratch/structural-tokens/issues/09-...`). Give them distinct values
-     again and every surface follows, which is the property the effort bought.
+     stay because they are what makes the corner one edit rather than a hundred.
+     Give them distinct values and every surface follows.
 
      Tailwind's own `--radius-*` is set with them, further down. The chrome is
-     drawn in two radius vocabularies — the registry components this effort did
-     not touch read `rounded-lg` and `rounded-md` — and a block that names only
-     one leaves half the chrome rounded. */
+     drawn in two radius vocabularies — the registry components read
+     `rounded-lg` and `rounded-md` — and a block that names only one leaves half
+     the chrome rounded. */
   --radius-chrome-2xs: 0;
   --radius-chrome-xs: 0;
   --radius-chrome-sm: 0;
@@ -65,7 +64,7 @@
   /* Tailwind's named shadow steps, restated with the theme's ink in place of
      the black its own `theme.css` writes. Each keeps Tailwind's offsets, blur
      and opacity, so a menu, popover or dialog still lifts on a soft shadow; only
-     the colour now follows `--foreground`. `inline` is what lets that
+     the colour follows `--foreground`. `inline` is what lets that
      `var()` resolve where the class is used rather than on `:root`. */
   --shadow-2xs: 0 1px color-mix(in oklab, var(--foreground) 5%, transparent);
   --shadow-xs: 0 1px 2px 0 color-mix(in oklab, var(--foreground) 5%, transparent);
@@ -102,12 +101,9 @@
  * scale over sand, so the only two surfaces on screen carrying warmth are the
  * canvas and a Resource's own face, and the only element carrying colour is a Graph.
  *
- * These values were settled in the Command Dock prototype, which drew a light
- * canvas while this block was still dark and so had to fork every token it
- * needed. That fork is gone: the values live here, once, and every
- * `@project/ui` control, menu, popover and dialog follows without being told —
- * including the ones that portal to `document.body`, which is what a scoped
- * fork could never reach.
+ * The values live here, once, and every `@project/ui` control, menu, popover
+ * and dialog follows without being told — including the ones that portal to
+ * `document.body`, which a scoped fork of these tokens could never reach.
  */
 :root {
   color-scheme: light;
@@ -168,8 +164,8 @@
   /* The Resource's own structural scale: border weight, corner and shadow
      character, kept apart from the chrome's for the same reason the two text
      roles above are — the Resource is paper lying on the canvas and the chrome
-     floats above it, so each states its own geometry even where the two agree
-     (`.scratch/structural-tokens/issues/06-...`). They agree on the corner and
+     floats above it, so each states its own geometry even where the two agree.
+     They agree on the corner and
      on the shadow's character and part on weight: the chrome draws a 1px border
      and the Resource a 4px one, and the Resource states a shadow only while it is
      being handled. Both shadows below are stated as one composite value each,
@@ -181,7 +177,7 @@
   --canvas-resource-shadow-selected: 0 0 0 3px var(--canvas-resource-ink-color);
   /* Declared unlayered as well as in `@theme` above, and both are needed: an
      unlayered declaration beats the `@layer theme` one `@theme` emits, so a
-     theme entry alone would leave `rounded-md` at the old value. */
+     theme entry alone would leave `rounded-md` at Tailwind's default. */
   --radius-md: 0;
   --border-width-chrome-accent: 3px;
   /* The chrome's one elevation: an unblurred offset cast in the chrome's own
@@ -205,11 +201,9 @@
   /* The chrome's second elevation: a surface the author has picked up. It is
      the elevated step cast further, in the same ink and the same unblurred
      character, so the two steps differ only in how far they cast. Its one consumer today is the Command
-     Dock while it is dragged, which used to cast a soft 34px shadow of its own
-     making; naming it is what lets a second surface that means "picked up"
-     reach for it rather than invent one
-     (`.scratch/structural-tokens/issues/12-...`). Stated from the elevated
-     offset, so a theme that changes one moves both. */
+     Dock while it is dragged; naming it is what lets a second surface that
+     means "picked up" reach for it rather than invent one. Stated from the
+     elevated offset, so a theme that changes one moves both. */
   --shadow-chrome-lifted-offset: calc(var(--shadow-chrome-elevated-offset) + 4px);
   --shadow-chrome-lifted: var(--shadow-chrome-lifted-offset) var(--shadow-chrome-lifted-offset) 0
     var(--foreground);
@@ -229,11 +223,8 @@
  * Tailwind v4's preflight resets every element to `border: 0 solid` and states
  * no colour, so a bare `border` or `border-t` — which is what a shadcn
  * component writes for a divider — paints in `currentColor`, the element's own
- * ink. That is never what one of them means: a divider means `--border`.
- *
- * It went unnoticed while the theme was dark, where ink was `#e6e9ef` and a
- * hairline of it passed for a light divider on a dark surface. Inverted, the
- * same rule is a black bar across a dialog footer.
+ * ink. That is never what one of them means: a divider means `--border`, and
+ * an ink hairline is a black bar across a dialog footer.
  *
  * Stated here rather than as a `border-border` added to each component: this is
  * what the reset omitted, so it belongs beside the tokens the reset should have

@@ -58,10 +58,9 @@ export type ResourceNodeData = {
    * Opens or Closes this Resource, absent where Resource-level authoring is
    * withheld: this Resource is outside the working Space, or the canvas is not
    * authorable. Presence is the whole capability — there is no separate flag
-   * left to disagree with it.
+   * to disagree with it.
    *
-   * **Not "owns content to edit"**, which is what withholding it meant while a
-   * Reference Resource had no Open front. A Reference Resource Opens and
+   * **Not "owns content to edit".** A Reference Resource Opens and
    * Closes through this same operation (ADR 0070), so a Reference Resource is
    * offered it exactly as a Markdown Resource is. What separates the kinds is
    * `onBeginBodyEditing`, which the application withholds from everything but
@@ -76,11 +75,11 @@ export type ResourceNodeData = {
    * editor without also saying what completes and cancels it.
    *
    * This is the pairing `CanvasResourceProps` already makes for its own
-   * `state: 'editing'`, held one layer up. Split into a boolean and two
-   * independent optional callbacks, the adapter had to manufacture total
-   * functions out of partial data, and an absent completion answered `null` —
-   * which `CanvasResource` reads as *accepted*, closing the editor on a rename that
-   * never happened.
+   * `state: 'editing'`, held one layer up. Do not split it into a boolean and
+   * two independent optional callbacks: the adapter would have to manufacture
+   * total functions out of partial data, and an absent completion answering
+   * `null` — which `CanvasResource` reads as *accepted* — would close the editor
+   * on a rename that never happened.
    */
   titleEditor?: ResourceTitleEditor;
   /**
@@ -299,10 +298,9 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
  * Map resources → React Flow resource nodes, each declaring the four anchors an Edge
  * may attach to on every side. The resource id is the React Flow node id.
  *
- * It took the Space's Graph colours too until ADR 0087, for the per-Graph
- * anchors it coloured one by one. A Resource's anchors are Graph-independent, and
- * the one colour left on a Resource is the Active Graph's, which the composition
- * resolves and passes as `activeGraphColor`.
+ * A Resource's anchors are Graph-independent, and the one colour on a Resource
+ * is the Active Graph's, which the composition resolves and passes as
+ * `activeGraphColor`.
  *
  * A node carries its resource's *title*, not its content (ADR 0006) — the content is
  * loaded when a resource is opened or presented, not embedded in every node.
@@ -324,11 +322,7 @@ export function projectResourceNodes(
     const active = resource.id === activeResourceId;
     const showContent = active && showActiveResourceContent;
     // Every Resource kind Opens, so the Map's Open set is the whole answer and
-    // there is no kind guard beside it. The guard this replaced named the two
-    // kinds that had a front to draw when Open; a Space Resource gained one with
-    // `entity-url-addressability/07` (ADR 0068), which left the third arm the
-    // only condition standing between a stored Open state and the Resource that state
-    // is about.
+    // there is no kind guard beside it.
     const open = options.openResourceIds?.has(resource.id) === true;
     // A reference resource shows its target's content under its own title (ADR 0009).
     const content = resolveContentResource(space, resource.id);
@@ -356,7 +350,7 @@ export function projectResourceNodes(
     // here means React Flow renders the node at exactly the size the map
     // reasoned about — no measure-then-reflow, and a centred `nodeOrigin` (if a
     // view chooses one) resolves correctly on first paint. Absent before the
-    // layout resolves, so React Flow falls back to measuring, as before.
+    // layout resolves, so React Flow falls back to measuring.
     //
     // `measured` is deliberately *not* set alongside them. React Flow documents
     // it as an output it writes after measuring, and it is redundant as an
@@ -388,10 +382,6 @@ export interface ProjectGraphEdgesOptions {
 
 /**
  * Map graph-derived edges → coloured React Flow edges.
- *
- * It took the laid-out graph too until ADR 0086, for the waypoints a routing
- * strategy might have placed on an edge. Nothing ever placed one, so the option
- * only ever carried a value nobody read.
  */
 export function projectGraphEdges(
   graphRenderEdges: readonly GraphRenderEdge[],
@@ -427,8 +417,8 @@ export function projectGraphEdges(
       source: edge.source,
       target: edge.target,
       className: `rf-graph-edge rf-graph-edge--${edge.graphId}${isActiveGraph ? ' rf-graph-edge--active' : ''}`,
-      // Never `animated`: React Flow's marching dash drew the emphasised Graph in
-      // constant motion, which competed with every Resource on the canvas for
+      // Never `animated`: React Flow's marching dash draws the emphasised Graph in
+      // constant motion, which competes with every Resource on the canvas for
       // attention. Emphasis is the stroke's width, opacity and paint order.
       animated: false,
       style: {

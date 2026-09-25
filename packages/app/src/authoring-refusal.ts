@@ -11,8 +11,8 @@ import { failureMessage } from './failure-message';
 /**
  * Why a coordinated Space Resource lifecycle operation refused (ADR 0076).
  *
- * Named by the lifecycle now rather than extracted from one of its results: the
- * three operations no longer share a result type, and a union reachable through
+ * Named by the lifecycle rather than extracted from one of its results: the
+ * three operations do not share a result type, and a union reachable through
  * `create` alone would be a second reading of a refusal `delete` can also make.
  */
 export type { SpaceResourceRefusal };
@@ -116,8 +116,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
  * some carry three, and a message reciting UUIDs is less legible than one
  * sentence about what is wrong.
  *
- * It lives here rather than beside the persistence dialog that first needed it
- * because a coordinated Edit is refused in two places now — as a rejected
+ * It lives here because a coordinated Edit is refused in two places — as a rejected
  * commit, and as a Space Resource lifecycle operation that never got to commit at
  * all — and one refusal reading differently in the two would be a difference
  * the author could see and nothing could explain.
@@ -259,9 +258,8 @@ export const describeConflictRecovery = (recovery: ConflictRecovery): string =>
  * Derived from the session state rather than imported as a union, because
  * `CommitResult` is not on `@project/persistence`'s surface and the two states
  * that carry these failures are. An aggregate refusal is excluded by
- * construction now rather than by `Exclude`: `rejected`'s `failure` no longer
- * carries it, `refused` does (`v1-release/17`), and `describeAggregateRefusal`
- * is that state's own translation.
+ * construction: `rejected`'s `failure` does not carry it, `refused` does, and
+ * `describeAggregateRefusal` is that state's own translation.
  */
 type Persistence = SpaceSessionState['persistence'];
 export type PersistenceFailure =
@@ -373,8 +371,8 @@ export const describeSpaceResourceRefusal = (refusal: SpaceResourceRefusal): str
  * refusal channel: both *reject*. A rejection is not a refusal: the lifecycle
  * refuses for everything it can name, so reaching here means an invariant broke
  * and there is no field to correct. The reader pressed a row and is owed a
- * sentence either way, and every surface that can show one now draws a single
- * string — the panes that placed fielded errors are gone (ADR 0089).
+ * sentence either way, and every surface that can show one draws a single
+ * string.
  *
  * Here rather than on the surface, because a Space Resource's prose is written in
  * this module or nowhere. The rejection is `unknown` because a `throw` can carry

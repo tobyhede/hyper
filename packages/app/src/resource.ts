@@ -1,6 +1,6 @@
 /**
- * The shape of a resource in the graph — declared once, consumed by both the map
- * and the stylesheet.
+ * The shape of a resource in the graph, read from `COLLAPSED_RESOURCE_SIZE` in
+ * `@project/core` and handed to the stylesheet.
  *
  * A resource draws its title (ADR 0006), so its content is bounded and every resource is
  * the same shape. That makes the size a design constant rather than something
@@ -8,9 +8,9 @@
  * a measured DOM size never decides placement here, the way it must in a layout
  * whose nodes are content-sized.
  *
- * Expressed as a ratio because that is the part that is deliberate. The base
- * width is arbitrary: placement is authored in its own coordinate space, and React
- * Flow's zoom maps it to the viewport, so only the proportion is a design decision.
+ * Only the proportion is a design decision. The base width is arbitrary:
+ * placement is authored in its own coordinate space, and React Flow's zoom maps
+ * it to the viewport.
  *
  * **16:9, matching the presentation surface.** A resource in the graph and the same
  * resource being presented are one object, so they share a silhouette — click a resource,
@@ -18,18 +18,9 @@
  * presentation actually lands on: projectors and external displays are
  * overwhelmingly 16:9, and that is the worst case to letterbox.
  *
- * **There is one source for the ratio, and it is this constant.** The frame an
- * opened or presented resource was drawn in used to restate it in a stylesheet
- * (`.resource-pane__panel`), and that rule went with the creation panes (ADR 0089);
- * what draws an opened or presented Resource now is `.resource--full`, which takes its
- * box from the node React Flow sizes from this constant rather than declaring a
- * ratio of its own. So a change here moves both surfaces together — which
- * matters because a mismatch would make the graph misrepresent what an audience
- * sees, and would break outright if the "show full content" view of ADR 0006
- * arrives and a resource becomes a live preview of a slide.
- *
- * (The predecessor was 260x300 portrait, inherited from when a resource rendered a
- * clipped page rather than a title.)
+ * **There is one source for the size, and it is `COLLAPSED_RESOURCE_SIZE`.** Do
+ * not restate the ratio in a stylesheet: a mismatch would make the graph
+ * misrepresent what an audience sees.
  */
 
 import type { CSSProperties } from 'react';

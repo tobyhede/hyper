@@ -23,9 +23,7 @@
  * links and taking a Resource back out of a Map belong to the Resource rail (ADR
  * 0073), which draws them on the Resource itself. This surface is *about* the
  * canvas; a Resource is the literal object on it. That is a dependency and not just
- * an exclusion — the Space Sidebar carried a Resource's links and its Delete in a
- * footer, and this arrangement is only complete because the rail carries them
- * now.
+ * an exclusion: this surface is only complete because the rail carries them.
  *
  * **A Space is a Space Resource, held by the Meta Space above it.** So the Spaces
  * *inside* a Space are Resources in it and the Resources surface already offers them,
@@ -40,10 +38,6 @@
  * reader — `failed`, `rejected`, `conflicted` — and those are
  * `PersistenceControl`'s and `PersistenceNotice`'s own surfaces, mounted
  * unchanged. Only their placement is this module's.
- *
- * It replaces `SpaceSidebar` and `OpenSpaceSidebars`, which ADR 0082 retired
- * along with the gutter they stood in
- * (`.scratch/command-dock/issues/07-promote-the-dock-and-retire-the-space-sidebar.md`).
  */
 import {
   Fragment,
@@ -111,7 +105,7 @@ interface RenamingSubject {
  * The bar's one rename: which name has the slot, and what the application is
  * told about it.
  *
- * **Three rules that were three copies of themselves, answered once.**
+ * **Three rules, answered once.**
  *
  * *A rename cannot outlive its subject.* The slot remembers the Map or Graph
  * the rename was begun against, so a reader who moves to another Map from
@@ -143,8 +137,8 @@ interface RenamingSubject {
  * taken", because a name whose rename has stopped being available draws
  * unavailable — a state in which no rename is live and the application must not
  * think one is. The cleanup covers the ending no transition sees, an unmount
- * mid-rename, which otherwise left the flag stuck true with nothing able to
- * clear it.
+ * mid-rename, which would otherwise leave the flag stuck true with nothing able
+ * to clear it.
  */
 function useDockRenaming(chrome: DockChrome): DockRenaming {
   /**
@@ -215,27 +209,22 @@ interface DragState {
 }
 
 /**
- * An dock that is dragged by its grip and snaps to the nearest edge.
+ * A dock that is dragged by its grip and snaps to the nearest edge.
  *
  * There is no free position: releasing always docks. What the drag chooses is
  * an edge and a place along it, and the edge is what the dock then reads to
  * decide how it draws — the caller passes the same children either way.
  *
  * The pointer capture, the snap hint and the edge arithmetic are all here
- * rather than in the dock, which is what let a second docked surface — the
- * Resources panel, while the list surface was still under comparison — be the same
- * drag rather than a second copy of it. That panel is gone with the decision;
- * this stays one component because the arithmetic is the awkward part and a
- * later docked surface should not write it again.
+ * rather than in the dock, so a later docked surface is the same drag rather
+ * than a second copy of it.
  *
- * **The frame the slots are measured in is a prop, not the DOM parent.** This
- * read `element.parentElement` and docked to whatever it found — a contract on
- * the caller's markup that no signature stated and no reader could see, which
- * a wrapper element inserted between them would have broken silently, moving
- * every slot without a line changing here. Taking the container as a ref is
- * what makes the caller's own frame the answer, and it is what lets this cross
- * into `@project/ui` at all: a component that reaches upward through the DOM
- * cannot be given to a caller whose markup it has never seen.
+ * **The frame the slots are measured in is a prop, not the DOM parent.** Do not
+ * read `element.parentElement`: that is a contract on the caller's markup that
+ * no signature states, and a wrapper element inserted between them would move
+ * every slot without a line changing here. Taking the container as a ref makes
+ * the caller's own frame the answer, and is what lets this cross into
+ * `@project/ui` at all.
  */
 function Dock({
   dock,
@@ -289,10 +278,8 @@ function Dock({
    * pair of them. It usually has — discrete events flush synchronously — but
    * "usually" is doing real work there: a sequence delivered inside one task
    * batches, every later handler reads `null`, and the press does nothing at
-   * all. That is not only a synthetic-events problem. It is the reason the drag
-   * could not be driven from a test, which is half of what this control exists
-   * to fix, so making the gesture legible to a test and making it correct are
-   * the same change.
+   * all. That is not only a synthetic-events problem: a gesture read from state
+   * cannot be driven from a test either.
    *
    * So the ref is the gesture and the state is the picture of it. Nothing reads
    * `drag` but the render.
@@ -306,8 +293,7 @@ function Dock({
   /**
    * Whether the press in flight has already been spent on something else.
    *
-   * **One ref where there were three**, and it is the only state the grip's two
-   * roles need to share. A press is spent if it dragged the dock, or if it
+   * It is the only state the grip's two roles need to share. A press is spent if it dragged the dock, or if it
    * began while the list was already open — in which case the `click` that
    * follows is the dismissal's, not a request to open again. Anything else is a
    * press that means "show me the slots".
@@ -337,15 +323,11 @@ function Dock({
    * menu on `mousedown` (`useClick` with `event: 'mousedown'`, which is what
    * makes a press-drag-release through a menu one gesture), and at `mousedown`
    * the grip cannot know whether the press is a click or the first pixel of a
-   * drag. What stood here deferred that open request on two refs and spent it
-   * on `click`, justified by a guard that does not exist: the comment claimed
-   * floating-ui's `onClick` is gated on `event.detail === 0`, where the real
-   * gate is `if (eventOption === 'mousedown' && pointerType)`. And the
-   * `mousedown` open runs inside a `frame.request`, so a press and release
-   * inside one animation frame passed the deferral entirely and opened the menu
-   * mid-drag.
+   * drag. Deferring that open to `click` does not work either: the `mousedown`
+   * open runs inside a `frame.request`, so a press and release inside one
+   * animation frame would pass any deferral and open the menu mid-drag.
    *
-   * So the trigger is gone. The menu is controlled — as every disclosure in the
+   * So the menu is controlled — as every disclosure in the
    * Dock is — the grip is a plain toolbar button, and the popup positions
    * against `grip` through `MenuPositioner`'s `anchor`, which is what
    * `PopoverContent` already does for a non-trigger anchor. `Enter` and `Space`
@@ -353,7 +335,7 @@ function Dock({
    * anything here has to arrange.
    *
    * Closing is Base UI's still: a press on the grip while the list is open is
-   * an *outside* press now, so the popup dismisses itself, and `pressSpent`
+   * an *outside* press, so the popup dismisses itself, and `pressSpent`
    * records that the `click` behind it has already been answered.
    */
   const onGripClick = () => {
@@ -379,12 +361,12 @@ function Dock({
    * spend what the press recorded. Left set, it is the *next* genuine press
    * that gets swallowed and the slot list does not open.
    *
-   * **This is the cancel path only, and sharing it with the release was a
-   * defect.** `click` fires *after* `pointerup`, so on that path the flag is
-   * exactly what the `click` is about to read: clearing it there threw away
-   * both the drag `onPointerMove` recorded and the dismissal `onPointerDown`
-   * did, so a completed drag opened the menu over the slot it had just landed
-   * in, and a press on an open list closed it and reopened it in one gesture.
+   * **This is the cancel path only; do not share it with the release.** `click`
+   * fires *after* `pointerup`, so on that path the flag is exactly what the
+   * `click` is about to read: clearing it there throws away both the drag
+   * `onPointerMove` recorded and the dismissal `onPointerDown` did, so a
+   * completed drag would open the menu over the slot it had just landed in,
+   * and a press on an open list would close it and reopen it in one gesture.
    */
   const cancel = (event: ReactPointerEvent<HTMLElement>) => {
     if (!holds(event)) return;
@@ -397,10 +379,9 @@ function Dock({
    * which press it answers is one of them.**
    *
    * A `pointerdown` fires for every button of every pointer, so with nothing
-   * asked the right button took hold of the dock, a right-button drag moved it,
-   * and the release docked the whole command surface in whatever slot the
-   * pointer had reached — a context-menu request answered by rearranging the
-   * chrome. Nothing in the Dock is performed by a secondary button, and a
+   * asked the right button would take hold of the dock and a right-button drag
+   * would dock the whole command surface wherever the pointer reached — a
+   * context-menu request answered by rearranging the chrome. Nothing in the Dock is performed by a secondary button, and a
    * non-primary pointer is a second finger while another one is already doing
    * something else.
    *
@@ -471,10 +452,8 @@ function Dock({
     event.currentTarget.releasePointerCapture(event.pointerId);
     // **The release spends the hint, and does not measure again.** The preview
     // is `nearestSlot` of the box the pointer put the dock in; re-measuring the
-    // live rect here asked the same question of a different subject and could
-    // answer differently, which is exactly the drift the hint's own comment
-    // says cannot happen. Now it cannot: one slot is computed, drawn, and
-    // landed on.
+    // live rect here would ask the same question of a different subject and
+    // could answer differently. One slot is computed, drawn, and landed on.
     //
     // A press that never moved docks nothing; the `click` after it spends the
     // menu request instead.
@@ -498,10 +477,9 @@ function Dock({
         />
       ) : null}
       {/* **The frame is what docks, and the toolbar is what commands.** The
-          two were one element until the persistence report needed somewhere to
-          be: it hangs off the dock, so it has to be positioned against the
-          docked box — and as a child of the toolbar it was a status region
-          inside `role="toolbar"`, which ADR 0082 forbids. The frame carries the
+          persistence report hangs off the dock, so it has to be positioned
+          against the docked box — and as a child of the toolbar it would be a
+          status region inside `role="toolbar"`, which ADR 0082 forbids. The frame carries the
           slot, the drag state and the presenting switch; the surface carries the
           treatment and the roving order. It is measured here rather than on the
           toolbar because it is the element the twelve slots place, and an
@@ -518,13 +496,11 @@ function Dock({
         data-dragging={dragging ? 'true' : 'false'}
         style={dragging ? { left: drag.x, top: drag.y } : dockStyle(dock)}
       >
-        {/* **One toolbar, and it is the command surface** (ADR 0073). Each cluster
-            used to be a `Toolbar` of its own, which made the Dock four roots and
-            so four tab stops; the ADR draws one root with named `role="group"`s
-            inside it, so the root is here and the clusters are groups. Putting a
-            wrapper *inside* the surface would have been the other way to do it and
-            is the wrong one: the vertical column's grid places this element's
-            direct children, so a layer between them moves every slot. */}
+        {/* **One toolbar, and it is the command surface** (ADR 0073): one root,
+            so one tab stop, with the clusters as named `role="group"`s inside
+            it. Do not put a wrapper *inside* the surface: the vertical column's
+            grid places this element's direct children, so a layer between them
+            moves every slot. */}
         <CommandToolbar
           aria-label={label}
           // The arrows follow the edge the dock is on: a column whose arrow keys
@@ -624,31 +600,27 @@ function Dock({
  * Where a persistence failure goes when the chrome is a strip floating over a
  * canvas.
  *
- * **Nothing here is a new state or a new sentence.** Production settled both
- * long ago and this module spends them unchanged: `PersistenceControl` maps a
+ * **Nothing here is a new state or a new sentence.** This module spends them
+ * unchanged: `PersistenceControl` maps a
  * conflict and a rejection `canRetry` does not admit to their `AlertDialog`s,
  * and `PersistenceNotice` is the standing `Alert` with a Retry for every state
  * `canRetry` admits — a retryable failure, a rejection for size, and a blocked
- * recovery. What had no answer is placement, so placement is all this
- * component decides.
+ * recovery. Placement is all this component decides.
  *
- * **The saving cue is gone, deliberately.** `PersistenceControl` also draws
+ * **There is no saving cue, deliberately.** `PersistenceControl` also draws
  * `PersistenceIndicator` for `settled`, `pending` and `saved`, and it is not
  * called for those here — the Dock draws nothing at all while saving is
  * working. A commit settles faster than the cue can be read, so a dot that
  * spends a permanent slot in a five-cluster strip to report the expected
  * outcome is a slot spent on nothing. The states worth a pixel are the three
- * that need a reader: `failed`, `rejected`, `conflicted`. That is the
- * proposal, and it is the one claim here a reviewer should challenge if
- * they disagree — the alternative is a sixth cluster that is blank 99% of the
- * time.
+ * that need a reader: `failed`, `rejected`, `conflicted`.
  *
  * **The two dialogs need no placement.** Both are portalled and own the
  * viewport, so a conflict blocks the canvas from wherever the Dock happens to
  * be — which is right: neither has a safe dismissal, and where the furniture
  * sits is not part of that decision.
  *
- * **The notice hangs off the Dock, and that is the answer to question B.** An
+ * **The notice hangs off the Dock.** An
  * `Alert` is several times the height of the strip it belongs to, so it cannot
  * go *in* the Dock; and pinned to a fixed corner of the viewport it would
  * collide with the Dock at four of the twelve slots and read as unrelated
@@ -666,7 +638,7 @@ function PersistenceReport({
   readonly edge: DockEdge;
 }) {
   const { state } = persistence;
-  // An aggregate refusal (`v1-release/17`) draws the same dialog a permanent
+  // An aggregate refusal draws the same dialog a permanent
   // rejection does — `PersistenceControl` treats the two `Rejection` kinds
   // alike — so it is a decision here too, unless `canRetry` admits it (a
   // blocked recovery, or a rejection for size) and the notice takes it over.
@@ -748,17 +720,13 @@ export function CommandDock({
             The three selections first, then the inventory. Which Space, which
             Map and which Graph are one question asked three times — each names
             the current one, discloses the set, and promotes at most one verb — and
-            Map and Graph are divided like the rest. They used to run together
-            on the grounds that a Graph is authored over a Map and so they are
-            one region — which stopped being legible the moment Present moved to
-            the head of the Graph cluster: an unseparated `[Collection 1 ⌄][▶ Long
-            ⌄]` reads as a Present belonging to the Map beside it. The
-            containment is still true and the order still says it; the rule no
-            longer has to be carried by an absent line.
+            Map and Graph are divided like the rest: Present heads the Graph
+            cluster, and an unseparated `[Collection 1 ⌄][▶ Long ⌄]` reads as a
+            Present belonging to the Map beside it. The order still says a Graph
+            is authored over a Map.
             Resources comes last because it is the odd cluster and should read as one:
             it names a set rather than a selection, so it has no name to edit and
-            nothing to promote but Create. Between Map and Space it looked like
-            a fourth selection that had lost its name. */}
+            nothing to promote but Create. */}
           {/* One open-id under the whole row, spent by every disclosure through
             `useDockDisclosure` — that, and not a convention each control keeps,
             is what makes at most one open. The hook says why the `Menubar` this
@@ -784,12 +752,8 @@ export function CommandDock({
 /**
  * The Command Dock over one Space.
  *
- * **One dock, not two.** A second instance sat on the left edge while the list
- * surface was under comparison, so an anchored popover could be seen under a
- * top dock and beside a side one at the same time. That question is settled, and
- * two docks over one canvas was never the proposal — drag this one by its grip
- * to see any edge, or press the grip and pick a slot, and the orientation
- * follows either way.
+ * **One dock.** Drag it by its grip to any edge, or press the grip and pick a
+ * slot, and the orientation follows either way.
  *
  * Drag a Resource out of the Resources popover onto the canvas, or press the row where
  * it stands. Both are real and both are the same Edit: the Resource joins the

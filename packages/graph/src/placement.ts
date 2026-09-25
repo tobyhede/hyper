@@ -16,10 +16,9 @@ declare const PLACEMENT: unique symbol;
  * the map inside it. It is also what an automatic strategy computes and what
  * `positionedStrategy` reads.
  *
- * Not the placement layer ADR 0004 rejected. That was an entity between a resource
- * and its position that edges and graphs referenced instead of the resource, letting
- * one resource occupy two positions. This is keyed by resource and holds at most one
- * position for each.
+ * It is keyed by resource and holds at most one position for each. Do not make a
+ * placement entry something edges and graphs reference instead of the resource:
+ * that would let one resource occupy two positions (ADR 0004).
  *
  * ## Sparse, and omission means something
  *
@@ -30,12 +29,11 @@ declare const PLACEMENT: unique symbol;
  * ## Branded, because ad-hoc construction is the bug this module exists for
  *
  * `Placement` is a `ReadonlyMap` the type system will not let you build with
- * `new Map()`. Every read works unchanged; only construction is closed. The
- * rendered geometry of an existing Map was twice copied wholesale into the
- * authored map by code that built one by hand, which persisted every resource the
- * Map deliberately omitted. Routing construction through `fromEntries` and
- * merging through `next` is what makes that unrepresentable rather than a rule
- * each new caller has to remember.
+ * `new Map()`. Every read works unchanged; only construction is closed. Code that
+ * builds one by hand can copy the rendered geometry of an existing Map wholesale
+ * into the authored map, persisting every resource the Map deliberately omits.
+ * Routing construction through `fromEntries` and merging through `next` is what
+ * makes that unrepresentable rather than a rule each new caller has to remember.
  *
  * ## Every value here is its caller's alone
  *
@@ -178,12 +176,10 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * nothing legitimate needs the wider read.
  *
  * What the report says is taken **as it stands**. Nothing sits between the
- * Map's positions and the canvas any more — displacement is applied by the
- * Edit that causes it (ADR 0084), so a canvas coordinate already is an authored
- * one and there is no derivation left to invert. A settled drag therefore
- * authors the drop point exactly, whatever is Open and wherever it sits. The
- * conversion this used to run could not be total, and the band it could not
- * cover was the room the derivation itself invented.
+ * Map's positions and the canvas — displacement is applied by the Edit that
+ * causes it (ADR 0084), so a canvas coordinate already is an authored one and
+ * there is no derivation to invert. A settled drag therefore authors the drop
+ * point exactly, whatever is Open and wherever it sits.
  *
  * The resource's own Open/Closed state and Open Size survive the merge: a renderer
  * reports React Flow node positions and nothing else, so only `x` and `y` are
@@ -310,14 +306,11 @@ function growth(openSize: Extent): Extent {
  * growth; a Resource clear on neither already overlaps the collapsed subject and
  * moves on neither.
  *
- * **One axis, and `x` first**, because the half-plane rule ADR 0084 stated —
- * any Resource strictly past the subject's origin on an axis takes that axis's
- * growth — moved a Resource beside the subject by the whole height growth for
- * being one unit lower than it. Read memorylessly at Close, a Resource the author
- * nudged below the Open subject's top while it stood beside it was pulled up by
- * the full height the Open never pushed it down by. A Resource clear on `x` is
- * clear of the grown rect after taking the width alone, so it has no need of
- * the height, and a Resource clear on both is the same case.
+ * **One axis, and `x` first.** A Resource clear on `x` is clear of the grown
+ * rect after taking the width alone, and a Resource clear on both is the same
+ * case. Do not also move it on `y`: a Resource beside the subject and one unit
+ * lower would take the whole height growth, and Close, read memorylessly, would
+ * pull it up by a height the Open never pushed it down by.
  *
  * **The collapsed rect and not the Open one**, because the membership has to
  * be the same at every Edit in a sequence for Open and Close to be a pair. The
@@ -406,9 +399,10 @@ function displace(placement: Placement, subjectId: ResourceId, growth: Extent): 
  * deleted from the Space, and all three owe the same negation of the growth of
  * the size it is Open at — the size read off its own entry, not off whatever
  * rect the gesture is proposing. That is why this is a member here beside
- * `growth` and `displace` rather than a line each caller writes: the third
- * caller is how a Resource deleted from a Map the Edit was not drawing came to
- * strand its room permanently, and a rule with three owners has none.
+ * `growth` and `displace` rather than a line each caller writes: a caller that
+ * misses it strands the Resource's room permanently — a Resource deleted from a
+ * Map the Edit is not drawing is the easy one to miss — and a rule with three
+ * owners has none.
  *
  * Answers the placement it was given for a Resource that is Closed or not a member,
  * neither of which holds any room. A Closed Resource's remembered Open Size is not

@@ -7,7 +7,7 @@
   --canvas-resource-error: var(--canvas-resource-error-color);
 
   /* The Title ladder (ADR 0083). One size and one leading are authored — the
-     `title` role's, which is the Title Hyper has always drawn — and the two
+     `title` role's — and the two
      rungs below it are ratios of that size rather than sizes of their own. A
      change to the top of the scale therefore moves the whole ladder, and a
      single-line Title, which is only ever the `title` role, is untouched by
@@ -81,9 +81,9 @@
   border-style: dotted;
 }
 
-/* `hover` is no longer a `data-state` value the adapter computes (it is real
-   pointer/focus state, owned here) — `:hover` stands in for it alongside the
-   remaining "not resting" states. The adapter's four spatial source handles
+/* Hover is not a `data-state` value the adapter computes: it is real
+   pointer/focus state, owned here, so `:hover` stands beside the adapter's
+   "not resting" states. The adapter's four spatial source handles
    sit outside this element's own box (centred on the border, half in and half
    out) so a pointer moving from the resource onto one leaves `.canvas-resource`'s own
    box without leaving the Resource visually or gesturally — `:has(~ … :hover)`
@@ -130,8 +130,7 @@
 }
 
 /* The rail's geometry is `ResourceRail`'s, in `resource-rail.css`, and it has no
-   colour at all (`.scratch/command-dock/issues/12`). **When the commands show is
-   not decided here any more.** On the canvas `ResourceNode` floats the toolbar
+   colour at all. **When the commands show is not decided here.** On the canvas `ResourceNode` floats the toolbar
    out of the Resource in React Flow's `NodeToolbar`, which draws it while the
    Resource is selected, or an edit is running, and not otherwise. The row, gap,
    border, paper and shadow are the shared `.command-surface`'s. What is left is
@@ -143,26 +142,10 @@
   pointer-events: auto;
 }
 
-/* A rail command's own appearance is **not declared here any more**. It is
-   `ToolbarButton`'s quiet icon button — the control treatment every command in
-   the Command Dock is drawn as — and it sits on the shared command surface
-   rather than on a Graph-coloured band, so there is nothing left for this
-   stylesheet to correct (`.scratch/command-dock/issues/12`).
-
-   What went, and why none of it is owed: a 22px hand-drawn box with the Resource's
-   own ink and paper; an inverted hover that painted the glyph in the Active
-   Graph's colour; and an `aria-disabled` rule that restored opacity and mixed a
-   border from the Resource's ink, because a semi-transparent control on a coloured
-   band read as a differently-coloured control rather than an unavailable one.
-
-   **The third of those said something true that the shared recipe was not
-   saying**, and it is said there now rather than dropped: a toolbar item stays
-   focusable while unavailable, so it carries `aria-disabled` and not the native
-   property, which `disabled:` utilities do not match — so an unavailable command
-   was quietened on a Resource by this file and nowhere else, the Command Dock's own
-   having never been quietened at all. `Button`'s recipe carries it now
-   (`Button.tsx`), which is one answer for both surfaces instead of one surface's
-   correction. */
+/* A rail command's appearance is not declared here. It is `ToolbarButton`'s
+   quiet icon button on the shared command surface, and its unavailable
+   treatment is `Button`'s recipe (`Button.tsx`), so the Command Dock and a
+   Resource's rail draw one answer. Do not correct it from this file. */
 
 .canvas-resource__body {
   display: flex;
@@ -179,8 +162,8 @@
 
 /* The heading box holds the ladder and caps it. Its own type is the `title`
    role's, so the Title Lines below it inherit the leading, the tracking and the
-   ink from one place, and a Title with no break in it is drawn by exactly the
-   declarations that drew it before there was a ladder at all. */
+   ink from one place, and a Title with no break in it is drawn by these
+   declarations alone. */
 .canvas-resource__title {
   display: block;
   max-height: calc(

@@ -121,8 +121,7 @@ function FieldTitle({ className, ...props }: React.ComponentProps<'div'>) {
  * The supporting line under a field's label.
  *
  * Taken as generated bar **one correction**, the same class of registry drift
- * `components/separator.tsx` records — `components/tabs.tsx` recorded it too
- * until `.scratch/command-dock/issues/08` deleted it. The registry balances the text on
+ * `components/separator.tsx` records. The registry balances the text on
  * `group-has-data-horizontal/field:`, which asks for a descendant carrying a
  * bare `data-horizontal`; nothing in the tree emits that attribute. `Field`
  * writes its orientation as `data-orientation` — which is what

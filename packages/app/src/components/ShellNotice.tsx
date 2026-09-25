@@ -18,11 +18,11 @@ import { COMMAND_CHANNELS, type CommandOutcomes } from '../command-outcomes';
  * Dock, deliberately, because a report drawn behind the furniture it reports
  * for is not a report (`styles.css`) — and the Dock moves between twelve slots,
  * so at every top slot the two share a corner and the notice wins hit testing.
- * Four of these clear themselves on the next corresponding command and one,
- * the Space command break, clears only when the next Space switch or exit is
- * attempted: through the Space menu, on the bar underneath it. So the reader
- * could be left pressing a control the report about the last press is sitting
- * on.
+ * A notice clears itself on the next corresponding command, and the Space
+ * command break clears only when the next Space switch or exit is attempted:
+ * through the Space menu, on the bar underneath it. So without a dismissal the
+ * reader could be left pressing a control the report about the last press is
+ * sitting on.
  *
  * The dismissal is `AlertAction`, which the shared `Alert` already reserves its
  * right padding for and which `PersistenceNotice` already spends on Retry — a

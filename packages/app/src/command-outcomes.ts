@@ -30,7 +30,7 @@ import type {
  * and where the caret goes after a creation. `run` narrows a command's result,
  * describes it and publishes it, and reports a throw, so a caller names its
  * command and its operation and nothing else; `App` draws what this module
- * publishes (`.scratch/command-outcomes/spec.md`).
+ * publishes.
  *
  * **Channels and commands are two tables.** A channel is one notice slot — the
  * thing drawn and dismissed. A command is one operation that reports on a

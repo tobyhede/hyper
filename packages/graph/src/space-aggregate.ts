@@ -144,9 +144,7 @@ export function loadSpaceAggregate({
       // The Resource's own stored id, with no fallback to the target's
       // `defaultMap` (ADR 0079). A Space Resource selects a Map from the
       // moment it exists, so a `map` that resolves to nothing is a dangling
-      // reference to a deleted Map rather than an unmade choice — which is
-      // what makes reporting it right where reading through the target's own
-      // opening selection used to be.
+      // reference to a deleted Map rather than an unmade choice.
       const mapId = resource.map;
       const resolvedMap = target.lookup.map(mapId);
       if (resolvedMap === undefined) {

@@ -4,12 +4,12 @@ import type { LoadedSpace, SpaceChange, SpaceCommit, SpaceConflict } from './bac
 import type { RepositoryCommitResult } from './repository';
 
 /*
- * What a commit means, decided once for every implementation (ADR 0095).
+ * What a commit means, decided once for every implementation.
  *
  * `decideCommit` takes what an implementation has already read and answers what
  * it must do next — answer the caller, or write — before any write happens. The
  * implementations keep their own reads, writes, locking and error
- * classification; nothing here names a store. Both database adapters,
+ * classification; nothing here names a store. `SqlSpaceRepository`,
  * `MemorySpaceRepository` and `MemorySpaceBackend` call it, and
  * `test/support/repository-contract.ts` holds the repositories to what it
  * decides.
@@ -44,10 +44,9 @@ const ascendingById = (left: LoadedSpace, right: LoadedSpace): number => {
  * It takes a plain change list rather than a `SpaceCommit`, which is a non-empty
  * tuple. Widening the parameter is what lets the empty case be *reached* — by a
  * test, and by a JavaScript caller the type never constrained — instead of being
- * a branch no one can enter and no one can cover. Ticket 20 concentrated the
- * commit rules here and both memory implementations' own empty-set guards went
- * with them, leaving an empty commit to fall through every implementation as a
- * `committed` result that wrote nothing.
+ * a branch no one can enter and no one can cover. No implementation guards the
+ * empty set itself, so without this refusal an empty commit would fall through
+ * every implementation as a `committed` result that wrote nothing.
  */
 export const commitRequestRefusal = (request: {
   changes: readonly SpaceChange[];

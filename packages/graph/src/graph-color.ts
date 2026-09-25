@@ -131,9 +131,8 @@ const GRAPH_PALETTE_DARK_SLOTS = GRAPH_PALETTE.filter((_, index) => index % 2 ==
  *
  * Candidates are the ten dark slots while any of them is not already in
  * `existing`, and all twenty once every one is. Holding the light slots back
- * until the dark ones run out is a decision of
- * `.scratch/graph-colour/issues/01-a-new-graph-takes-the-farthest-colour.md`,
- * not a property this function measures; an author can still choose a light
+ * until the dark ones run out is a design decision, not a property this
+ * function measures; an author can still choose a light
  * slot from Colour…. Ties break by palette order, so an empty Map's first Graph
  * is the first slot.
  *

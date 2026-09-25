@@ -32,7 +32,7 @@ export interface ResourceSearchComboboxProps {
  *
  * `id` is a `ResourceId` rather than a plain string, and that is what keeps the
  * boundary answered once: every caller builds a choice from a `Resource`, so a
- * widened id here only bought each of them a parse or an assertion on the way
+ * widened id here would only buy each of them a parse or an assertion on the way
  * back out of `onValueChange`.
  */
 export interface ResourceChoice {
@@ -86,7 +86,7 @@ export function ResourceSearchCombobox({
    * which line they typed a word on. A Resource visibly named `Auth` that cannot be
    * found by a word from its own subtitle reads as broken search.
    *
-   * The replacement is the primitive's own matcher pointed at a different
+   * The filter is the primitive's own matcher pointed at a different
    * string, not a second matching rule: `contains` is the same `Intl.Collator`
    * comparison Base UI would have run, so case, accents and punctuation behave
    * here exactly as they do in every other list.
@@ -99,8 +99,8 @@ export function ResourceSearchCombobox({
    * replacement for it. The two are true at once on a real screen: a Reference Resource
    * whose Target has left the Space is refused *and* has no eligible Resource left
    * to choose, so the field carries a `FieldError` and an empty list together.
-   * Overwriting left `aria-invalid="true"` announcing a problem whose sentence
-   * no assistive technology could reach.
+   * Overwriting would leave `aria-invalid="true"` announcing a problem whose
+   * sentence no assistive technology could reach.
    *
    * The caller's id leads, because `aria-describedby` is announced in the order
    * it names: a refusal is what the author has to act on, and the note saying

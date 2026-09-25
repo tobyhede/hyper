@@ -14,8 +14,7 @@ import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
  * canvas, and an Open Space Resource's rail, over the target Space it embeds.
  * This module decides once whether a command is available, which Edit to
  * complete and how to say a refusal, behind two private adapters — one per
- * context — and answers both callers in the same outcome vocabulary
- * (`.scratch/command-outcomes/issues/06`).
+ * context — and answers both callers in the same outcome vocabulary.
  *
  * **What stays outside.** Which Map is selected, Copy link, where the caret
  * goes and how a report is drawn are the surfaces'. The report's *lifetime* —
@@ -60,8 +59,7 @@ export interface MapCapability<Invocation> {
  * invocation, or `null` where it is unavailable.
  *
  * The one way a surface spends a capability, so its unavailable treatment and
- * what it invokes are read off one answer and cannot disagree
- * (`.scratch/command-outcomes/issues/09`). The press is the surface's — it
+ * what it invokes are read off one answer and cannot disagree. The press is the surface's — it
  * decides where the outcome goes and where the caret continues — and the
  * invocation still asks again when it is pressed.
  */

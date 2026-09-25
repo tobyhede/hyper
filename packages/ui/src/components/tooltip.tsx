@@ -47,7 +47,7 @@ function TooltipContent({
            * The arrow's corner is `rounded-chrome-2xs`, the chrome scale's
            * step for it, not the registry's own `rounded-[2px]`. Regenerating
            * this component from the registry brings the raw value back;
-           * reapply the token (`.scratch/structural-tokens/issues/04-registry-derived-components-consume-the-tokens.md`).
+           * reapply the token.
            */}
           <TooltipPrimitive.Arrow className="size-2.5 translate-y-[calc(-50%-2px)] rotate-45 rounded-chrome-2xs bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=inline-end]:top-1/2! data-[side=inline-end]:-left-1 data-[side=inline-end]:-translate-y-1/2 data-[side=inline-start]:top-1/2! data-[side=inline-start]:-right-1 data-[side=inline-start]:-translate-y-1/2 data-[side=left]:top-1/2! data-[side=left]:-right-1 data-[side=left]:-translate-y-1/2 data-[side=right]:top-1/2! data-[side=right]:-left-1 data-[side=right]:-translate-y-1/2 data-[side=top]:-bottom-2.5" />
         </TooltipPrimitive.Popup>

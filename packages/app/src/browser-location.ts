@@ -54,8 +54,7 @@ export interface BrowserLocation {
    * The one Space the location now names.
    *
    * There is one browser location and one history stack, so this module follows
-   * exactly one composition at a time — which is what the type says and the
-   * mounting used to leave implicit.
+   * exactly one composition at a time.
    */
   readonly follow: (app: ComposedApp) => void;
   /** A deliberate switch between already composed Spaces updates the address. */
@@ -71,10 +70,9 @@ export interface BrowserLocation {
  * Own the browser's location for whichever Space is on the canvas (ADR 0081).
  *
  * Navigation answers where the reader is and never learns what a URL is; this
- * asks what the browser should do about that position, and does it. Every rule
- * below was reachable only by mounting a React tree before this module existed,
- * which is why the seam it takes is a five-member interface rather than
- * `window`.
+ * asks what the browser should do about that position, and does it. The seam
+ * it takes is a five-member interface rather than `window`, so every rule
+ * below is reachable without mounting a React tree.
  */
 export function createBrowserLocation(
   history: HistoryApi,

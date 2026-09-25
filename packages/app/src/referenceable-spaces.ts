@@ -23,7 +23,7 @@ export type ReferenceableSpacesSource = Pick<
  * through the coordinated lifecycle, so one bump per such Edit costs one read
  * where keying on the snapshot would cost one per keystroke. The epoch is the
  * session's because the Edit that moves it is coordinated across Spaces, and
- * every open Space stays mounted with its own list (ADR 0074, ADR 0076).
+ * every open Space stays mounted with its own list.
  *
  * **The epoch invalidates rather than fetches.** Only the drawn Space
  * subscribes, a read first compares the epoch it last answered, and a Space

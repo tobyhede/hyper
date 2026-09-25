@@ -111,29 +111,28 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       // A destructive item's glyph follows the row rather than being coloured
-      // separately. The registry drop carried
-      // `data-[variant=destructive]:*:[svg]:text-destructive`, which paints
-      // `color` directly on the child `svg` — and a declared colour is not
+      // separately. Do not restore the registry's
+      // `data-[variant=destructive]:*:[svg]:text-destructive`: it paints
+      // `color` directly on the child `svg`, and a declared colour is not
       // overridden by an ancestor's, however specific that ancestor's rule is,
-      // so a surface restating the row's colour had to restate the glyph's too
-      // and reach for `!important` to be sure of it. The utility bought nothing:
-      // Lucide draws on `currentColor`, and the `**:text-accent-foreground` rule
-      // above excludes destructive rows precisely so their descendants keep it.
+      // so a surface restating the row's colour would have to restate the
+      // glyph's too and reach for `!important`. Lucide draws on `currentColor`,
+      // and the `**:text-accent-foreground` rule above excludes destructive
+      // rows precisely so their descendants keep it.
       //
       // **A destructive row is ink at rest and red where the reader is** — the
-      // registry's `data-[variant=destructive]:text-destructive` is gone with
-      // the glyph rule, and only the `focus:` pair below survives. A row that is
+      // registry's resting `data-[variant=destructive]:text-destructive` is not
+      // carried, and only the `focus:` pair below colours it. A row that is
       // already red before it is reached spends the alarm on merely being in the
       // list, so the menu reads as a warning about itself rather than about the
       // one command that removes something; the colour lands where a reader is
       // about to act instead. Base UI gives a menu item `:focus` on hover as
       // well as from the keyboard, so both routes get it.
       //
-      // Settled here rather than by each surface. It was a consumer rule in the
-      // Command Dock's prototype sheet (`.scratch/command-dock/issues/03`, `/07`);
-      // at promotion that would have become a production stylesheet contradicting
-      // the primitive, which is the second design system this package exists to
-      // prevent. `EntityActionsMenu`'s Delete rows change with it, deliberately.
+      // Settled here rather than by each surface: a consumer rule would be a
+      // production stylesheet contradicting the primitive, which is the second
+      // design system this package exists to prevent. `EntityActionsMenu`'s
+      // Delete rows follow it, deliberately.
       className={cn(
         "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 data-inset:pl-7 data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
@@ -233,10 +232,9 @@ function DropdownMenuCheckboxItem({
  *
  * Generic over the value, which Base UI declares as `any` on all three of
  * `value`, `defaultValue` and `onValueChange`. That `any` is the group's to
- * absorb, not each caller's: without this every consumer took an untyped
- * `next` back out of a group it had just handed typed values to, and laundered
- * it — `String(next)` five times over in one surface — which is a cast written
- * as a conversion.
+ * absorb, not each caller's: without this every consumer would take an untyped
+ * `next` back out of a group it had just handed typed values to, and launder
+ * it — a cast written as a conversion.
  *
  * `Value` is inferred from `value` or `defaultValue` where a caller passes one,
  * and can be named explicitly where the group is uncontrolled.
@@ -256,8 +254,7 @@ function DropdownMenuCheckboxItem({
  * accepts any element at all — `any` on the element's own props parameter is
  * what defeats it, and no variance trick recovers the check. Threading a
  * context or asking the caller to name the type twice are the two ways out, and
- * this is the second. `.scratch/command-dock/findings/` records both the
- * original weighing and the call sites that still owe the second name.
+ * this is the second.
  */
 type DropdownMenuRadioGroupProps<Value> = Omit<
   MenuPrimitive.RadioGroup.Props,
@@ -291,9 +288,9 @@ function DropdownMenuRadioGroup<Value>({
 /**
  * One of the set, and the member that makes the group's generic true.
  *
- * Base UI types `value` as `any` here too, which left `DropdownMenuRadioGroup`
- * promising a `Value` nothing was holding the items to: an item value the
- * group could not produce still rendered, and still came back out of
+ * Base UI types `value` as `any` here too, so unnamed, `DropdownMenuRadioGroup`
+ * would promise a `Value` nothing holds the items to: an item value the
+ * group could not produce would still render, and still come back out of
  * `onValueChange` wearing the group's type. Naming the type on the item is
  * what closes that — a surface that renders several binds it once with an
  * instantiation expression (`const Item = DropdownMenuRadioItem<Kind>`) rather

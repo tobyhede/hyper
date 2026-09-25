@@ -1,7 +1,7 @@
 /*
  * EXPERIMENT BLOCK — INERT. Nothing imports this file.
  *
- * Ticket 09. The values come from neobrutalism.dev's own styling registry,
+ * The values come from neobrutalism.dev's own styling registry,
  * `https://neobrutalism.dev/r/styling/blue.json`, read on 2026-09-16:
  *
  *   radius-base            5px
@@ -28,25 +28,22 @@
 
 /*
  * The chrome is drawn in TWO radius vocabularies, and a block that names only
- * one moves only half the chrome. This was measured, not assumed:
+ * one moves only half the chrome:
  *
- *   surface      class            token             baseline
- *   dock panel   (hand-rolled)    --radius-chrome-xl   10px
- *   dock button  rounded-chrome-* --radius-chrome-md    6px
- *   menu panel   rounded-lg       --radius-lg           8px
- *   menu item    rounded-md       --radius-md           8px
+ *   surface      class            token
+ *   dock panel   (hand-rolled)    --radius-chrome-xl
+ *   dock button  rounded-chrome-* --radius-chrome-md
+ *   menu panel   rounded-lg       --radius-lg
+ *   menu item    rounded-md       --radius-md
  *
- * The components tickets 02 to 07 touched read `--radius-chrome-*`. The
- * registry components they did not touch — `dropdown-menu`, `context-menu`,
- * `combobox`, `card`, `alert`, `alert-dialog`, `kbd`, `textarea`,
- * `input-group`, `field` — read Tailwind's own `--radius-*`. Both scales are
- * named below.
+ * The registry components — `dropdown-menu`, `context-menu`, `combobox`,
+ * `card`, `alert`, `alert-dialog`, `kbd`, `textarea`, `input-group`, `field` —
+ * read Tailwind's own `--radius-*`. Both scales are named below.
  *
  * `--radius-md` needs two declarations, and the second is not a mistake.
- * `tailwind.css` declares `--radius-md: 0.5rem` in an unlayered `:root`, and
- * an unlayered declaration beats the `@layer theme` one that `@theme` emits.
- * Ticket 01 recorded that rule; here it means a `@theme` entry alone does
- * nothing for `rounded-md`.
+ * `tailwind.css` declares `--radius-md` in an unlayered `:root`, and an
+ * unlayered declaration beats the `@layer theme` one that `@theme` emits, so
+ * a `@theme` entry alone does nothing for `rounded-md`.
  */
 
 @theme {

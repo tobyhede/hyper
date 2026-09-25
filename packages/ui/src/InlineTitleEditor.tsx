@@ -41,8 +41,8 @@ interface InlineTitleEditorBase {
    * the Dock's header does not — which is also what keeps the answer
    * visible at the call site rather than buried in a `variant` check here.
    *
-   * Unset, the control is a genuine single-line `Input` and `Enter` means
-   * exactly what it has always meant. Set, it is a `Textarea` that grows with
+   * Unset, the control is a genuine single-line `Input` and `Enter` completes.
+   * Set, it is a `Textarea` that grows with
    * its content, `Shift+Enter` inserts a line, and `Enter` still completes.
    */
   readonly multiline?: boolean;
@@ -60,9 +60,9 @@ interface InlineTitleEditorBase {
  * The draft and its refusal, held by the caller.
  *
  * One shape rather than four independent optional props: a caller that supplied
- * a change handler and no value got an editor that mounted blank instead of
- * pre-filled with the title, selected nothing, and submitted `''` on the first
- * Enter — a refusal for a rename the author never typed. Pairing them makes
+ * a change handler and no value would get an editor that mounted blank instead
+ * of pre-filled with the title, selected nothing, and submitted `''` on the
+ * first Enter — a refusal for a rename the author never typed. Pairing them makes
  * that unrepresentable rather than merely unlikely.
  */
 interface InlineTitleEditorControlled {

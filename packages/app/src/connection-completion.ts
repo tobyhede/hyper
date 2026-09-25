@@ -10,8 +10,8 @@ import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
  * Edge Authoring decides *when* a connect or create-and-connect interaction has
  * finished; this decides what finishing does. The two are separate because the
  * order below is a fact about the render adapter and Space Authoring rather
- * than about pointers and keys, and it was previously spread across two render
- * adapter methods that each knew half of it.
+ * than about pointers and keys, and it must not be split across render adapter
+ * methods that each know half of it.
  *
  * Neither the render adapter nor Space Authoring owns this: the adapter must
  * not interpret a gesture, and Authoring must not know that React Flow has a

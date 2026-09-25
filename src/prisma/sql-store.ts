@@ -55,9 +55,7 @@ const isPrimaryKeyConflict = (error: unknown, table: string): boolean => {
 /**
  * The SQLSTATEs that mean PostgreSQL is contended or not answering rather than
  * that the request, the code or the configuration is wrong: a later attempt of
- * the same request is the cure. The one place the set is kept; ticket 31's
- * `## Answer` (amendment) records why each is in and why its neighbours are
- * not.
+ * the same request is the cure. The one place the set is kept.
  *
  * - `08000`, `08001`, `08003`, `08004`, `08006` — connection exceptions.
  *   `08P01` (protocol violation) is left out: it is a client or server defect.
@@ -68,7 +66,7 @@ const isPrimaryKeyConflict = (error: unknown, table: string): boolean => {
  * - `57P01` admin shutdown, `57P02` crash shutdown, `57P03` cannot connect now.
  *   `57014` (query cancelled) is left out: a cancel can be deliberate.
  *
- * Read together with what is deliberately absent (ticket 38): `28P01` invalid
+ * Read together with what is deliberately absent: `28P01` invalid
  * password, `28000` invalid authorization, and `3D000` a database that does
  * not exist are raised at connect exactly as `53300` and `57P03` are, but they
  * are the configuration or the server refusing this client, which no wait
@@ -126,7 +124,7 @@ const carriesUnlistedSocketCode = (cause: unknown): boolean =>
   !isUnavailableSocketCode(cause.code);
 
 /**
- * PostgreSQL's `SqlStore.isUnavailable` (ticket 38): whether any error on the
+ * PostgreSQL's `SqlStore.isUnavailable`: whether any error on the
  * failure's cause chain is one of three shapes, each read by a structured
  * field and never by message.
  *

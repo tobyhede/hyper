@@ -149,7 +149,7 @@ export type SpaceResourceRecovery = 'retry' | 'resolve-conflict';
 
 /**
  * A plan's decision, made once from the Spaces as they stand after the
- * coordination's last wait (`.scratch/snapshot-edits/spec.md`).
+ * coordination's last wait.
  *
  * `open` names the stored Spaces the plan makes participants without a live
  * session; the coordination opens them before it prepares the commit.
@@ -260,7 +260,7 @@ export const refuseBeforeCreating = (
 
 /**
  * {@link refuseBeforeCreating}, then the target: the Space this Edit reads its
- * selection from must not need recovery either (ADR 0095). A merely
+ * selection from must not need recovery either. A merely
  * `rejected`, `refused` or divergent target is not refused — ADR 0076 lets it
  * keep taking part in its own Edits, and this one only reads what it stored.
  */
