@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved — PR #303 renames the field to `open`, the attribute to `data-open` and the refusal code to `resource-not-open`, and adds the vocabulary guard arm.
 
 **Priority:** P3
 
@@ -17,6 +17,6 @@
 
 Leave `aria-expanded` and React Flow's `expandParent` alone. Those are the platform's and React Flow's words.
 
-- [ ] `grep -rniE 'expanded|expansion' packages src test` finds only `aria-expanded`, `expandParent` and quotations of the avoid-list.
-- [ ] Consider adding an arm to `test/unit/current-domain-vocabulary.test.ts` so the word cannot drift back.
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass. Grep `test/e2e/` for `data-expanded` too, because the database proofs are not in `e2e`.
+- [x] `grep -rniE 'expanded|expansion' packages src test` finds only `aria-expanded`, `expandParent` and quotations of the avoid-list.
+- [x] Consider adding an arm to `test/unit/current-domain-vocabulary.test.ts` so the word cannot drift back.
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` pass. Grep `test/e2e/` for `data-expanded` too, because the database proofs are not in `e2e`.
