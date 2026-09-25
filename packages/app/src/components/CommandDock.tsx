@@ -626,9 +626,10 @@ function Dock({
  *
  * **Nothing here is a new state or a new sentence.** Production settled both
  * long ago and this module spends them unchanged: `PersistenceControl` maps a
- * conflict and a rejection to their `AlertDialog`s, and `PersistenceNotice` is
- * the standing `Alert` with a Retry for the one failure that is neither fine
- * nor final. What had no answer is placement, so placement is all this
+ * conflict and a rejection `canRetry` does not admit to their `AlertDialog`s,
+ * and `PersistenceNotice` is the standing `Alert` with a Retry for every state
+ * `canRetry` admits — a retryable failure, a rejection for size, and a blocked
+ * recovery. What had no answer is placement, so placement is all this
  * component decides.
  *
  * **The saving cue is gone, deliberately.** `PersistenceControl` also draws

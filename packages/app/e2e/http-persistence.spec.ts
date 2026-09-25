@@ -201,7 +201,7 @@ test(
 
 /**
  * A save over the host's request size limit, answered by the real HTTP
- * application rather than a stubbed route (code-quality ticket 22): the Dock
+ * application rather than a stubbed route: the Dock
  * explains it beside Retry, the Edit stays, a Retry as it stands is refused
  * again, and a reduced Edit saves and survives reload.
  */

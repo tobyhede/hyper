@@ -1139,7 +1139,7 @@ describe('openSpaceSession', () => {
 });
 
 /*
- * Code-quality ticket 22: a save over the request size limit keeps every Edit
+ * A save over the request size limit keeps every Edit
  * and offers Retry, which sends whatever the working Space holds then. A Retry
  * or a reduction still over the limit is rejected again the same way; one
  * under it saves.

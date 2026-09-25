@@ -13,8 +13,7 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 
 /**
- * Code-quality ticket 22, through the application: a save over the request size
- * limit is explained by the Dock's notice rather than a dialog, keeps every
+ * Through the application: a save over the request size limit is explained by the Dock's notice rather than a dialog, keeps every
  * Edit, offers Retry, and saves once the content is reduced enough — for a
  * coordinated save, counting every Space the request carries.
  */

@@ -3337,7 +3337,7 @@ describe('Space Resource recovery another coordination holds', () => {
 });
 
 /*
- * Code-quality ticket 22, for a coordinated save: the size limit is on the
+ * For a coordinated save: the size limit is on the
  * whole request, so a Meta that saves alone can be refused once a Space
  * Resource creation carries the new Space beside it. Every participant keeps
  * its Edits and offers Retry; a reduction anywhere in the request is what

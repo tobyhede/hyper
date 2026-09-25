@@ -92,7 +92,7 @@ const quiesced = async (spaces: OpenSpaces): Promise<void> => {
 };
 
 /**
- * Code-quality ticket 24's sequence, through the real lifecycle: a Space
+ * A blocked recovery, through the real lifecycle: a Space
  * Resource created in `rendering` is rejected (C0), a second created inside
  * its target conflicts there (C1), and an Edit in `rendering` asks C0's
  * recovery to replay, which the target, now held by C1, refuses.

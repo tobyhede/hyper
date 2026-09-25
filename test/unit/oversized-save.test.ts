@@ -13,7 +13,7 @@ import { createSpaceHttpApp, HttpSpaceBackend, MAX_COMMIT_BODY_BYTES } from '@pr
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
 /**
- * Code-quality ticket 22 across the HTTP boundary: the browser transport, the
+ * A save over the size limit across the HTTP boundary: the browser transport, the
  * Hono application and a real repository behind it. A request over
  * `MAX_COMMIT_BODY_BYTES` is refused as `payload-too-large` with nothing
  * stored; the session keeps the Edits and offers Retry; a request under the

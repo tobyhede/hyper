@@ -391,7 +391,8 @@ export function useDockChrome(
       state: persistence,
       active,
       onRetry: authoring.retryPersistence,
-      // Entered, so the Opener leads back here to Retry once it is resolved.
+      // Entered rather than opened in a new tab, so the blocking Space is where
+      // the author stands while resolving it.
       onOpenSpace:
         spaces === null
           ? null

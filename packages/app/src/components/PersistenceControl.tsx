@@ -49,11 +49,12 @@ type Persistence = SpaceSessionState['persistence'];
  * A permanent rejection and an aggregate refusal draw the same dialog.
  *
  * They are distinct `SpaceSessionState['persistence']` kinds (`v1-release/17`
- * criterion 2) with distinct recoveries in the session — this dialog offers
- * Retry for neither, and one `canRetry` admits is `PersistenceNotice`'s rather
- * than this dialog's — but nothing on this surface needs to tell them apart: both are "the server declined this,
- * continue editing to correct it," and `rejectionDescription` below is what
- * already carries the one difference an author reads, the sentence.
+ * criterion 2) with distinct recoveries in the session. This dialog offers
+ * Retry for neither; a rejection or refusal `canRetry` admits is drawn by
+ * `PersistenceNotice` instead. Nothing on this surface needs to tell the two
+ * apart: both are "the server declined this, continue editing to correct it,"
+ * and `rejectionDescription` below is what already carries the one difference
+ * an author reads, the sentence.
  */
 type Rejection = Extract<Persistence, { kind: 'rejected' } | { kind: 'refused' }>;
 type Conflict = Extract<Persistence, { kind: 'conflicted' }>;

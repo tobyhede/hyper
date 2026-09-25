@@ -920,7 +920,7 @@ test(
 );
 
 /**
- * A save over the request size limit (code-quality ticket 22): the standing
+ * A save over the request size limit: the standing
  * notice, not the rejection dialog, because the author reduces content and
  * retries. The story's backend answers the next attempt as stored.
  */
@@ -942,7 +942,7 @@ test(
 );
 
 /**
- * A save another Space blocks (code-quality ticket 24): the standing notice,
+ * A save another Space blocks: the standing notice,
  * not the rejection dialog, because the author has to leave for the Space it
  * names and come back to Retry.
  */
