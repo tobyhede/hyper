@@ -116,10 +116,10 @@ describe('describePersistenceFailure', () => {
    * the only instruction they had is gone.
    *
    * What it must not do is misdescribe the limit or the recovery. `MAX_COMMIT_
-   * BODY_BYTES` is checked over the whole serialised snapshot, so a Space can
-   * exceed it on Resource *count* with no long Resource anywhere — and the rejection
-   * dialog offers only Continue editing, since `PersistenceNotice`, which owns
-   * Retry, draws nothing for `rejected`.
+   * BODY_BYTES` is checked over the whole submitted request, which for a
+   * coordinated save carries every participating Space, so the sentence
+   * promises nothing per Space or per Resource. It is drawn in
+   * `PersistenceNotice` beside Retry, so it says what to do before retrying.
    */
   it('tells an author over the size limit what to do about it', () => {
     const description = describePersistenceFailure({
@@ -127,14 +127,11 @@ describe('describePersistenceFailure', () => {
       code: 'payload-too-large',
     });
 
-    expect(description).toMatch(/large|size|limit/i);
-    expect(description).not.toBe(
-      'The application and the server disagree about how changes are saved.',
+    expect(description).toBe(
+      'This save is larger than the server accepts in one request, counting every space it includes. Shorten or remove content, then retry.',
     );
-    // Not one Resource: the limit is on the whole change.
-    expect(description).not.toMatch(/\ba (long )?resource\b/i);
-    // Not a retry: this dialog has no such control.
-    expect(description).not.toMatch(/try again|retry/i);
+    // Not one Space or one Resource: the limit is on the whole request.
+    expect(description).not.toMatch(/\bthis space\b|\ba (long )?resource\b/i);
   });
 });
 

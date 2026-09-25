@@ -626,9 +626,10 @@ function Dock({
  *
  * **Nothing here is a new state or a new sentence.** Production settled both
  * long ago and this module spends them unchanged: `PersistenceControl` maps a
- * conflict and a rejection to their `AlertDialog`s, and `PersistenceNotice` is
- * the standing `Alert` with a Retry for the one failure that is neither fine
- * nor final. What had no answer is placement, so placement is all this
+ * conflict and a rejection `canRetry` does not admit to their `AlertDialog`s,
+ * and `PersistenceNotice` is the standing `Alert` with a Retry for every state
+ * `canRetry` admits — a retryable failure, a rejection for size, and a blocked
+ * recovery. What had no answer is placement, so placement is all this
  * component decides.
  *
  * **The saving cue is gone, deliberately.** `PersistenceControl` also draws
@@ -667,8 +668,8 @@ function PersistenceReport({
   const { state } = persistence;
   // An aggregate refusal (`v1-release/17`) draws the same dialog a permanent
   // rejection does — `PersistenceControl` treats the two `Rejection` kinds
-  // alike — so it is a decision here too, until a blocked recovery makes it
-  // retryable and the notice takes it over.
+  // alike — so it is a decision here too, unless `canRetry` admits it (a
+  // blocked recovery, or a rejection for size) and the notice takes it over.
   const decision =
     state.kind === 'conflicted' ||
     ((state.kind === 'rejected' || state.kind === 'refused') && !canRetry(state));

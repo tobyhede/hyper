@@ -455,6 +455,21 @@ describe('Open Spaces', () => {
     expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
   });
 
+  it('refuses to exit work rejected for size, which Retry can still save', async () => {
+    const control = new MemorySpaceBackendTestControl();
+    control.queueResult({ kind: 'permanent-failure', code: 'payload-too-large' });
+    const { openSpaces } = setup(control);
+    const other = await openSpaces.open(OTHER_ID);
+    other.session.submit(edit(other.session.getState().working));
+    await vi.waitFor(() => expect(other.session.getState().persistence.kind).toBe('rejected'));
+
+    await expect(openSpaces.exit(OTHER_ID)).resolves.toEqual({
+      kind: 'refused',
+      refusal: { code: 'persistence-recovery-required', recovery: 'retry' },
+    });
+    expect(openSpaces.entry(OTHER_ID)).toBe(other);
+  });
+
   it('commits an edit queued behind a Space Resource coordination before exiting', async () => {
     const control = new MemorySpaceBackendTestControl();
     const { backend, openSpaces } = setup(control, countingIds());

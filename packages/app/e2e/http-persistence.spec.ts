@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures';
 import type { Page, Route } from '@playwright/test';
+import { PRIMARY_MODIFIER } from './markdown-source';
 import {
   activateGraph,
   activeGraph,
@@ -8,6 +9,7 @@ import {
   nodeByTitle,
   positionOf,
   presentControl,
+  resourceControls,
   selectCanvas,
   settled,
 } from './graph';
@@ -194,6 +196,80 @@ test(
     await rejection.getByRole('button', { name: 'Continue editing' }).click();
     await expect(page.getByRole('button', { name: 'Persistence rejected' })).toBeVisible();
     await expect(resource).toBeVisible();
+  },
+);
+
+/**
+ * A save over the host's request size limit, answered by the real HTTP
+ * application rather than a stubbed route: the Dock
+ * explains it beside Retry, the Edit stays, a Retry as it stands is refused
+ * again, and a reduced Edit saves and survives reload.
+ */
+test(
+  'a save over the size limit keeps the Edit, offers Retry, and saves a reduction',
+  { tag: '@parity:command-dock-explains-an-oversized-save' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const resource = nodeByTitle(page, 'A').first();
+    await expect(resource).toBeVisible();
+    await settled(page);
+    const source = page.getByRole('textbox', { name: 'Markdown source of A' });
+    const command = async (name: string) =>
+      (await resourceControls(page, resource)).getByRole('button', { name });
+    const refusedForSize = () =>
+      page.waitForResponse(
+        (response) =>
+          isCommit(response.request().method(), response.url()) && response.status() === 413,
+      );
+    // 1,100 lines of a thousand characters: over the 1 MiB request limit alone.
+    const tooLong = Array.from({ length: 1_100 }, () => 'x'.repeat(999)).join('\n');
+
+    await (await command('Edit Resource A')).click();
+    await source.press(`${PRIMARY_MODIFIER}+a`);
+    // Pasted rather than typed: CodeMirror takes a paste as one transaction,
+    // where typing it has the browser lay out the whole text in the DOM first.
+    await source.evaluate((element, text) => {
+      const clipboardData = new DataTransfer();
+      clipboardData.setData('text/plain', text);
+      element.dispatchEvent(
+        new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }),
+      );
+    }, tooLong);
+    const refused = refusedForSize();
+    await (await command('Save Resource A')).click();
+    await refused;
+
+    const failure = page.getByTestId('persistence-failure');
+    await expect(failure).toContainText(
+      'This save is larger than the server accepts in one request, counting every space it includes. Shorten or remove content, then retry.',
+    );
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect.poll(() => navigationIsProtected(page)).toBe(true);
+
+    const refusedAgain = refusedForSize();
+    await failure.getByRole('button', { name: 'Retry' }).click();
+    await refusedAgain;
+    await expect(failure).toContainText('Shorten or remove content, then retry.');
+
+    await (await command('Edit Resource A')).click();
+    await expect(source).toContainText('x'.repeat(200));
+    await source.fill('# Reduced');
+    await (await command('Save Resource A')).click();
+
+    await expect(failure).toBeHidden();
+    await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+    await expect.poll(() => navigationIsProtected(page)).toBe(false);
+
+    await page.reload();
+    const persisted = nodeByTitle(page, 'A').first();
+    await expect(persisted).toBeVisible();
+    await (
+      await resourceControls(page, persisted)
+    )
+      .getByRole('button', { name: 'Edit Resource A' })
+      .click();
+    await expect(source).toContainText('# Reduced');
   },
 );
 

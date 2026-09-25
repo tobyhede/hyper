@@ -49,11 +49,12 @@ type Persistence = SpaceSessionState['persistence'];
  * A permanent rejection and an aggregate refusal draw the same dialog.
  *
  * They are distinct `SpaceSessionState['persistence']` kinds (`v1-release/17`
- * criterion 2) with distinct recoveries in the session — an aggregate refusal
- * never offers Retry, and neither offers it here either — but nothing on this
- * surface needs to tell them apart: both are "the server declined this,
- * continue editing to correct it," and `rejectionDescription` below is what
- * already carries the one difference an author reads, the sentence.
+ * criterion 2) with distinct recoveries in the session. This dialog offers
+ * Retry for neither; a rejection or refusal `canRetry` admits is drawn by
+ * `PersistenceNotice` instead. Nothing on this surface needs to tell the two
+ * apart: both are "the server declined this, continue editing to correct it,"
+ * and `rejectionDescription` below is what already carries the one difference
+ * an author reads, the sentence.
  */
 type Rejection = Extract<Persistence, { kind: 'rejected' } | { kind: 'refused' }>;
 type Conflict = Extract<Persistence, { kind: 'conflicted' }>;
@@ -110,8 +111,9 @@ export function PersistenceControl({
   }
 
   if (persistence.kind === 'rejected' || persistence.kind === 'refused') {
-    // A blocked recovery is explained and retried by `PersistenceNotice`, which
-    // leaves the canvas free to reach the Space that blocks it.
+    // A blocked recovery or a rejection for size is explained and retried by
+    // `PersistenceNotice`, which leaves the canvas free to reach the Space that
+    // blocks it or the content to reduce.
     if (acknowledged !== null || canRetry(persistence)) {
       return <PersistenceIndicator state="rejected" />;
     }
@@ -146,7 +148,9 @@ export interface PersistenceNoticeProps {
  * conflict has no safe dismissal and a rejection needs acknowledging.
  *
  * The reason is the latest attempt's: a blocked recovery says what blocked it
- * rather than the failure it was recovering from.
+ * rather than the failure it was recovering from. A rejection for size is here
+ * too: reducing content and retrying is its recovery, and the Edits stay put
+ * meanwhile.
  *
  * `role="alert"` is the shared `Alert`'s, so the reason is announced when it
  * arrives rather than sitting in a `title` attribute nothing reads aloud.
@@ -206,12 +210,15 @@ function OpenBlockingSpaceButton({
   );
 }
 
-/** The latest attempt's reason: what blocked a recovery, else the failure itself. */
+/**
+ * The latest attempt's reason: what blocked a recovery, else the failure itself
+ * — a retryable failure, or a rejection for size.
+ */
 const noticeReason = (persistence: RetryablePersistence): string => {
-  if (persistence.kind !== 'failed') return describeSaveBlock(persistence.blocked);
-  return persistence.blocked === undefined
-    ? describePersistenceFailure(persistence.failure)
-    : describeSaveBlock(persistence.blocked);
+  if (persistence.blocked !== undefined) return describeSaveBlock(persistence.blocked);
+  return persistence.kind === 'refused'
+    ? describeAggregateRefusal(persistence.failure.errors)
+    : describePersistenceFailure(persistence.failure);
 };
 
 /** A refused recovery, and the conflict it was refused under. */

@@ -7,7 +7,7 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 
 /**
- * Code-quality ticket 24, through the application: a coordinated save whose
+ * Through the application: a coordinated save whose
  * recovery another coordination blocks says which Space blocks it, reaches that
  * Space, and saves the Edits it kept only when Retry is pressed.
  */

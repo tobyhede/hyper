@@ -920,7 +920,29 @@ test(
 );
 
 /**
- * A save another Space blocks (code-quality ticket 24): the standing notice,
+ * A save over the request size limit: the standing
+ * notice, not the rejection dialog, because the author reduces content and
+ * retries. The story's backend answers the next attempt as stored.
+ */
+test(
+  'a save over the size limit is explained beside Retry and saves on Retry',
+  { tag: '@parity:command-dock-explains-an-oversized-save' },
+  async ({ page }) => {
+    await page.goto(story('save-too-large'));
+
+    const failure = page.getByTestId('persistence-failure').filter({ visible: true });
+    await expect(failure).toContainText(
+      'This save is larger than the server accepts in one request, counting every space it includes. Shorten or remove content, then retry.',
+    );
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+
+    await failure.getByRole('button', { name: 'Retry' }).click();
+    await expect(failure).toBeHidden();
+  },
+);
+
+/**
+ * A save another Space blocks: the standing notice,
  * not the rejection dialog, because the author has to leave for the Space it
  * names and come back to Retry.
  */

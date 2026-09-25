@@ -24,6 +24,7 @@ export type DockScenario =
   | 'save-failed'
   | 'save-rejected'
   | 'save-refused'
+  | 'save-too-large'
   | 'save-conflict'
   | 'save-blocked'
   | 'save-failed-elsewhere';
@@ -37,6 +38,9 @@ const UNWELL = {
   // refused the aggregate rather than declining the request outright, and the
   // Dock draws the same dialog from a structured refusal instead of a code.
   'save-refused': 'refused',
+  // A rejection the notice explains and retries rather than a dialog: the
+  // author reduces content, and the Edits stay until a save fits.
+  'save-too-large': 'rejected',
   'save-conflict': 'conflicted',
 } as const satisfies Partial<Record<DockScenario, SpaceSessionState['persistence']['kind']>>;
 
@@ -88,7 +92,7 @@ const quiesced = async (spaces: OpenSpaces): Promise<void> => {
 };
 
 /**
- * Code-quality ticket 24's sequence, through the real lifecycle: a Space
+ * A blocked recovery, through the real lifecycle: a Space
  * Resource created in `rendering` is rejected (C0), a second created inside
  * its target conflicts there (C1), and an Edit in `rendering` asks C0's
  * recovery to replay, which the target, now held by C1, refuses.
@@ -229,6 +233,11 @@ export async function openDockStory(scenario: DockScenario) {
       control.queueResult({
         kind: 'permanent-failure',
         code: 'forbidden',
+      });
+    } else if (scenario === 'save-too-large') {
+      control.queueResult({
+        kind: 'permanent-failure',
+        code: 'payload-too-large',
       });
     } else if (scenario === 'save-refused') {
       control.queueResult({
