@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import type { SpaceSessionState } from '@project/persistence';
+import type { UUID } from '@project/core';
+import {
+  canRetry,
+  type RetryablePersistence,
+  type SaveBlock,
+  type SpaceSessionState,
+} from '@project/persistence';
 import {
   Alert,
   AlertAction,
@@ -20,6 +26,7 @@ import {
   describeAggregateRefusal,
   describeConflictRecovery,
   describePersistenceFailure,
+  describeSaveBlock,
   describeStoredSpaceRefusal,
   type ConflictRecovery,
 } from '../authoring-refusal';
@@ -30,7 +37,12 @@ export interface PersistenceControlProps {
   readonly persistence: SpaceSessionState['persistence'];
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
+  /** Go to the Space whose recovery blocks keeping local work, when there is a way to. */
+  readonly onOpenSpace?: OpenBlockingSpace | null;
 }
+
+/** Go to the Space a {@link SaveBlock} names, which is where it is resolved. */
+export type OpenBlockingSpace = (spaceId: UUID, title: string) => void;
 
 type Persistence = SpaceSessionState['persistence'];
 /**
@@ -68,6 +80,7 @@ export function PersistenceControl({
   persistence,
   onAcceptRemote,
   onKeepLocal,
+  onOpenSpace = null,
 }: PersistenceControlProps) {
   const rejection: Rejection | null =
     persistence.kind === 'rejected' || persistence.kind === 'refused' ? persistence : null;
@@ -91,12 +104,17 @@ export function PersistenceControl({
         conflict={persistence}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={onKeepLocal}
+        onOpenSpace={onOpenSpace}
       />
     );
   }
 
   if (persistence.kind === 'rejected' || persistence.kind === 'refused') {
-    if (acknowledged !== null) return <PersistenceIndicator state="rejected" />;
+    // A blocked recovery is explained and retried by `PersistenceNotice`, which
+    // leaves the canvas free to reach the Space that blocks it.
+    if (acknowledged !== null || canRetry(persistence)) {
+      return <PersistenceIndicator state="rejected" />;
+    }
     return (
       <RejectionControl
         persistence={persistence}
@@ -113,29 +131,39 @@ export function PersistenceControl({
 export interface PersistenceNoticeProps {
   readonly persistence: SpaceSessionState['persistence'];
   readonly onRetry: () => void;
+  /** Go to the Space whose recovery blocks this save, when there is a way to. */
+  readonly onOpenSpace?: OpenBlockingSpace | null;
 }
 
 /**
- * The standing explanation behind the toolbar's red dot, for the one
- * persistence state that is neither fine nor final.
+ * The standing explanation behind the toolbar's red dot, for every persistence
+ * state that is neither fine nor final: the ones `canRetry` admits.
  *
- * It is not a dialog on purpose. A retryable failure leaves the local work
- * intact and the canvas fully usable — the author can keep editing, and the
- * next commit may succeed on its own — so blocking the canvas would overstate
- * it. Contrast the two dialogs above: a conflict has no safe dismissal and a
- * rejection needs acknowledging.
+ * It is not a dialog on purpose. A retryable failure or a blocked recovery
+ * leaves the local work intact and the canvas fully usable — the author can
+ * keep editing, go to the Space that blocks the save, and come back to Retry —
+ * so blocking the canvas would overstate it. Contrast the two dialogs above: a
+ * conflict has no safe dismissal and a rejection needs acknowledging.
+ *
+ * The reason is the latest attempt's: a blocked recovery says what blocked it
+ * rather than the failure it was recovering from.
  *
  * `role="alert"` is the shared `Alert`'s, so the reason is announced when it
  * arrives rather than sitting in a `title` attribute nothing reads aloud.
  */
-export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticeProps) {
-  if (persistence.kind !== 'failed') return null;
+export function PersistenceNotice({
+  persistence,
+  onRetry,
+  onOpenSpace = null,
+}: PersistenceNoticeProps) {
+  if (!canRetry(persistence)) return null;
 
   return (
     <Alert variant="destructive" data-testid="persistence-failure">
       <AlertIcon />
       <AlertTitle>Changes not saved</AlertTitle>
-      <AlertDescription>{describePersistenceFailure(persistence.failure)}</AlertDescription>
+      <AlertDescription>{noticeReason(persistence)}</AlertDescription>
+      <OpenBlockingSpaceButton blocked={persistence.blocked} onOpenSpace={onOpenSpace} />
       <AlertAction>
         <Button
           variant="secondary"
@@ -149,6 +177,42 @@ export function PersistenceNotice({ persistence, onRetry }: PersistenceNoticePro
     </Alert>
   );
 }
+
+/**
+ * The way to the Space a recovery blocked on, drawn only when the block names
+ * one and the caller can go there.
+ */
+function OpenBlockingSpaceButton({
+  blocked,
+  onOpenSpace,
+}: {
+  readonly blocked: SaveBlock | undefined;
+  readonly onOpenSpace: OpenBlockingSpace | null;
+}) {
+  if (blocked?.code !== 'persistence-recovery-required' || onOpenSpace === null) return null;
+  return (
+    <div className="mt-1.5 group-has-[>svg]/alert:col-start-2">
+      <Button
+        variant="secondary"
+        size="compact"
+        data-testid="persistence-open-blocking-space"
+        onClick={() => {
+          onOpenSpace(blocked.spaceId, blocked.title);
+        }}
+      >
+        Open {blocked.title}
+      </Button>
+    </div>
+  );
+}
+
+/** The latest attempt's reason: what blocked a recovery, else the failure itself. */
+const noticeReason = (persistence: RetryablePersistence): string => {
+  if (persistence.kind !== 'failed') return describeSaveBlock(persistence.blocked);
+  return persistence.blocked === undefined
+    ? describePersistenceFailure(persistence.failure)
+    : describeSaveBlock(persistence.blocked);
+};
 
 /** A refused recovery, and the conflict it was refused under. */
 interface RefusedRecovery {
@@ -171,10 +235,12 @@ function ConflictControl({
   conflict,
   onAcceptRemote,
   onKeepLocal,
+  onOpenSpace,
 }: {
   readonly conflict: Conflict;
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
+  readonly onOpenSpace: OpenBlockingSpace | null;
 }) {
   const recovery = conflictRecovery(conflict);
   const [refused, setRefused] = useState<RefusedRecovery | null>(null);
@@ -198,6 +264,13 @@ function ConflictControl({
           <Alert variant="destructive" data-testid="persistence-remote-refused">
             <AlertTitle>Unable to reload</AlertTitle>
             <AlertDescription>{describeStoredSpaceRefusal(remoteRefusal)}</AlertDescription>
+          </Alert>
+        )}
+        {conflict.blocked === undefined ? null : (
+          <Alert variant="destructive" data-testid="persistence-keep-local-blocked">
+            <AlertTitle>Unable to keep local</AlertTitle>
+            <AlertDescription>{describeSaveBlock(conflict.blocked)}</AlertDescription>
+            <OpenBlockingSpaceButton blocked={conflict.blocked} onOpenSpace={onOpenSpace} />
           </Alert>
         )}
         <AlertDialogFooter>

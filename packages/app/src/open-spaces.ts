@@ -2,6 +2,7 @@ import type { MapId, GraphId, UUID } from '@project/core';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { resolveProductDestination } from '@project/http';
 import {
+  canRetry,
   createObservableState,
   createSpaceSessionRegistry,
   createWorkingSpaceLoader,
@@ -507,9 +508,11 @@ export function createOpenSpaces({
     followActiveSpace();
   };
 
-  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: MapId): OpenSpace => {
-    const spaceId = loaded.snapshot.id;
-    const session = registry.open(loaded);
+  const buildLoaded = ({ loaded }: ValidatedLoadedSpace, selection?: MapId): OpenSpace =>
+    buildSession(registry.open(loaded), selection);
+
+  const buildSession = (session: SpaceSession, selection?: MapId): OpenSpace => {
+    const spaceId = session.getState().working.id;
     // Every identity and every observer failure in a composed Space comes from
     // the seams Open Spaces was given (ADR 0016). Leaving either off here lets
     // `composeApp` fall back to the ambient generator and to `console.error`,
@@ -553,15 +556,23 @@ export function createOpenSpaces({
     await exiting.get(spaceId);
     const existing = compositions.get(spaceId);
     if (existing !== undefined) return existing;
-    const opening = loadWorkingSpace(spaceId).then((loaded) => {
-      if (loaded === undefined) throw new Error(`The backend could not load space ${spaceId}`);
-      return buildLoaded(validateLoadedSpace(loaded), selection);
-    });
+    // A live session is already working, so it is what the Space opens on:
+    // that is how a created Space no commit has stored yet is reached, such
+    // as one whose recovery blocks another Space's save
+    // (`blocked-save-retry.test.tsx`, 'names the blocking Space, reaches it…').
+    const live = registry.session(spaceId);
+    const opening =
+      live === undefined
+        ? loadWorkingSpace(spaceId).then((loaded) => {
+            if (loaded === undefined)
+              throw new Error(`The backend could not load space ${spaceId}`);
+            return buildLoaded(validateLoadedSpace(loaded), selection);
+          })
+        : Promise.resolve().then(() => buildSession(live, selection));
     compositions.set(spaceId, opening);
     void opening.catch(() => compositions.delete(spaceId));
     return opening;
   };
-
   const activateAfterLeavingSettles = async (
     target: OpenSpace,
     request: number,
@@ -733,7 +744,9 @@ export function createOpenSpaces({
     for (;;) {
       await registry.waitUntilRetirable(spaceId);
       const persistence = target.session.getState().persistence;
-      if (persistence.kind === 'failed') {
+      // A blocked recovery offers Retry, so its Edits are still recoverable
+      // here and exiting would abandon them, as it would a retryable failure.
+      if (canRetry(persistence)) {
         return {
           kind: 'refused',
           refusal: { code: 'persistence-recovery-required', recovery: 'retry' },
@@ -745,11 +758,11 @@ export function createOpenSpaces({
           refusal: { code: 'persistence-recovery-required', recovery: 'resolve-conflict' },
         };
       }
-      // A permanent rejection and an aggregate refusal (`v1-release/17`) warn
-      // the same way here: both leave nothing stored to lose by leaving, and
-      // both recover only through a further Edit rather than through this
-      // Space's own persistence surface, so exiting is the same choice either
-      // way.
+      // A permanent rejection and an aggregate refusal (`v1-release/17`) that
+      // no recovery attempt has blocked warn the same way here: both leave
+      // nothing stored to lose by leaving, and both recover only through a
+      // further Edit rather than through this Space's own persistence surface,
+      // so exiting is the same choice either way.
       if (
         (persistence.kind === 'rejected' || persistence.kind === 'refused') &&
         confirmation?.warning !== 'persistence-rejected'

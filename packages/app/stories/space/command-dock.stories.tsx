@@ -85,6 +85,14 @@ SaveRejected.meta = { iframed: true };
 export const SaveRefused: Story = () => <CommandDockFixture scenario="save-refused" />;
 SaveRefused.meta = { iframed: true };
 
+/**
+ * A save another Space blocks: the rejected Space's recovery replay was refused
+ * because the Space it names has a conflict of its own to resolve first. The
+ * notice names that Space, opens it, and offers Retry once it is resolved.
+ */
+export const SaveBlocked: Story = () => <CommandDockFixture scenario="save-blocked" />;
+SaveBlocked.meta = { iframed: true };
+
 /** A conflicting save: recovery is resolve-conflict rather than retry. */
 export const SaveConflict: Story = () => <CommandDockFixture scenario="save-conflict" />;
 SaveConflict.meta = { iframed: true };

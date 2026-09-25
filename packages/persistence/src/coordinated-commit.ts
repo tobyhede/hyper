@@ -31,7 +31,7 @@
  */
 import type { SpaceSnapshot, UUID } from '@project/core';
 import type { CommitResult, LoadedSpace, ProtocolFault, SpaceChange } from './backend';
-import type { CoordinatedRecovery, ManagedSpaceSession } from './session';
+import type { CoordinatedRecovery, ManagedSpaceSession, SaveBlock } from './session';
 import {
   changedSpaceId,
   recoveryRefusal,
@@ -426,8 +426,12 @@ export class CoordinatedCommit {
    * The replay this commit's recovery asked for has ended. If it never
    * prepared, recovery is usable again from the phase it began in; if it did,
    * the replay owns recovery and this is a no-op.
+   *
+   * `block` is why a replay that never prepared was refused. Every participant
+   * still answering to this recovery records it, so the reason each one shows
+   * is the latest attempt's rather than the outcome it recovers from.
    */
-  resumeRecovery(): void {
+  resumeRecovery(block?: SaveBlock): void {
     if (this.#phase === 'recovered') return;
     this.#require('recovering');
     const from = this.#recoveringFrom;
@@ -435,6 +439,12 @@ export class CoordinatedCommit {
     this.#recoveringFrom = undefined;
     // A return to where recovery began, not a move the table orders.
     this.#phase = from;
+    if (block === undefined) return;
+    const holders = [...this.#participants.values()].filter((managed) =>
+      managed.holdsCoordinatedRecovery(this.#recovery),
+    );
+    for (const managed of holders) managed.blockCoordinatedCommit(block);
+    for (const managed of holders) managed.notifyCoordinatedCommit();
   }
 
   #handOver(): void {

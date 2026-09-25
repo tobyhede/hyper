@@ -63,6 +63,7 @@ import {
   DropdownMenuRadioItem,
   ToolbarButton,
 } from '@project/ui';
+import { canRetry } from '@project/persistence';
 import { PersistenceControl, PersistenceNotice } from './PersistenceControl';
 import {
   alongLabel,
@@ -666,9 +667,11 @@ function PersistenceReport({
   const { state } = persistence;
   // An aggregate refusal (`v1-release/17`) draws the same dialog a permanent
   // rejection does — `PersistenceControl` treats the two `Rejection` kinds
-  // alike — so it is a decision here too.
+  // alike — so it is a decision here too, until a blocked recovery makes it
+  // retryable and the notice takes it over.
   const decision =
-    state.kind === 'conflicted' || state.kind === 'rejected' || state.kind === 'refused';
+    state.kind === 'conflicted' ||
+    ((state.kind === 'rejected' || state.kind === 'refused') && !canRetry(state));
 
   return (
     <>
@@ -678,11 +681,16 @@ function PersistenceReport({
           persistence={state}
           onAcceptRemote={persistence.onAcceptRemote}
           onKeepLocal={persistence.onKeepLocal}
+          onOpenSpace={persistence.onOpenSpace}
         />
       ) : null}
-      {state.kind === 'failed' && persistence.active ? (
+      {canRetry(state) && persistence.active ? (
         <div className="command-dock__notice" data-side={MENU_SIDE[edge]}>
-          <PersistenceNotice persistence={state} onRetry={persistence.onRetry} />
+          <PersistenceNotice
+            persistence={state}
+            onRetry={persistence.onRetry}
+            onOpenSpace={persistence.onOpenSpace}
+          />
         </div>
       ) : null}
     </>

@@ -18,6 +18,7 @@ import type {
 import {
   openManagedSpaceSession,
   type ManagedSpaceSession,
+  type SaveBlock,
   type SpaceSession,
   type SpaceSessionOptions,
 } from './session';
@@ -444,6 +445,25 @@ const commitPlan = async <C>(
 };
 
 /**
+ * What a refused replay tells the participants of the recovery it carried
+ * out. A replay plans nothing but {@link planReplay} and skips the pre-check,
+ * so a recovery another coordination holds and a failed read are the only
+ * refusals it meets; the blocking Space is named as its session reads now.
+ * `space-resource-lifecycle.test.ts` holds both: 'names the Space whose
+ * recovery refused the replay…' and 'says a Retry whose replay read failed…'.
+ */
+const saveBlock = (spaces: LiveSpaces, refusal: SpaceResourceRefusal): SaveBlock | undefined => {
+  if (refusal.code === 'persistence-read-failed') return { code: refusal.code };
+  if (refusal.code !== 'persistence-recovery-required') return undefined;
+  return {
+    code: refusal.code,
+    spaceId: refusal.spaceId,
+    title: spaces.working(refusal.spaceId).document.title,
+    recovery: refusal.recovery,
+  };
+};
+
+/**
  * One coordination turn: wait for the turn, raise the barrier and wait for
  * whatever is already in flight, then prepare, read, plan and commit.
  *
@@ -462,9 +482,14 @@ const commitPlan = async <C>(
 const runCoordination = async <P, C>(
   coordinator: Coordinator,
   operation: SpaceResourceCoordinatedOperation<P, C>,
-  installed: (result: SpaceResourceCoordinationResult<C>) => void,
+  answer: (result: SpaceResourceCoordinationResult<C>) => void,
   predecessor: CoordinatedCommit | undefined,
 ): Promise<void> => {
+  let refusal: SpaceResourceRefusal | undefined;
+  const installed = (result: SpaceResourceCoordinationResult<C>): void => {
+    if (result.kind === 'refused') refusal = result.refusal;
+    answer(result);
+  };
   const turn = coordinator.turns.claim();
   await turn.ready;
   coordinator.spaces.raiseBarrier();
@@ -495,7 +520,9 @@ const runCoordination = async <P, C>(
     await commitPlan(coordinator, read.aggregate, planned, installed, predecessor);
   } finally {
     try {
-      predecessor?.resumeRecovery();
+      predecessor?.resumeRecovery(
+        refusal === undefined ? undefined : saveBlock(coordinator.spaces, refusal),
+      );
     } finally {
       turn.finish(() => {
         coordinator.spaces.lowerBarrier();
@@ -689,8 +716,9 @@ export function createSpaceSessionRegistry(
     spaces,
     turns,
     // A replay's answer has no caller to reach: its participants' own states
-    // carry the outcome, and one that never installed has resumed the
-    // predecessor's recovery, so a rejection is settled here.
+    // carry the outcome, a refusal included (`runCoordination` records it on
+    // the predecessor's participants), and one that never installed has
+    // resumed the predecessor's recovery, so a rejection is settled here.
     replay: (items, predecessor) => {
       void coordinate(coordinator, replayOperation(items, predecessor), predecessor).catch(
         () => undefined,

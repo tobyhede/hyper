@@ -351,4 +351,128 @@ describe('PersistenceNotice', () => {
 
     expect(screen.getByText('Your device could not reach the server.')).toBeVisible();
   });
+  const blockedByTarget = {
+    code: 'persistence-recovery-required',
+    spaceId: TARGET_ID,
+    title: 'Target',
+    recovery: 'resolve-conflict',
+  } as const;
+
+  it('names the Space whose recovery blocks a rejected save, and offers to open it and Retry', () => {
+    const onRetry = vi.fn();
+    const onOpenSpace = vi.fn();
+    render(
+      <PersistenceNotice
+        persistence={{
+          kind: 'rejected',
+          failure: { kind: 'permanent-failure', code: 'forbidden' },
+          blocked: blockedByTarget,
+        }}
+        onRetry={onRetry}
+        onOpenSpace={onOpenSpace}
+      />,
+    );
+
+    const notice = screen.getByRole('alert');
+    expect(notice).toHaveTextContent(
+      'Target has a conflict to resolve before these changes can be saved. Resolve it there, then retry here.',
+    );
+    // The rejection it recovers from is not the reason any more.
+    expect(notice).not.toHaveTextContent('permission');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Target' }));
+    expect(onOpenSpace).toHaveBeenCalledWith(TARGET_ID, 'Target');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('says a failed replay read did not send the changes, with Retry and nothing to open', () => {
+    render(
+      <PersistenceNotice
+        persistence={{
+          kind: 'failed',
+          failure: { kind: 'retryable-failure', code: 'network' },
+          blocked: { code: 'persistence-read-failed' },
+        }}
+        onRetry={vi.fn()}
+        onOpenSpace={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText('The stored Spaces could not be read, so these changes were not sent.'),
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Open/ })).toBeNull();
+  });
+
+  it('draws nothing for a rejection no recovery attempt has blocked', () => {
+    render(
+      <PersistenceNotice
+        persistence={{
+          kind: 'rejected',
+          failure: { kind: 'permanent-failure', code: 'forbidden' },
+        }}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('leaves a blocked rejection to the notice rather than a dialog', () => {
+    render(
+      <PersistenceControl
+        persistence={{
+          kind: 'rejected',
+          failure: { kind: 'permanent-failure', code: 'forbidden' },
+          blocked: blockedByTarget,
+        }}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('explains inside the conflict why keeping local work did not save', () => {
+    render(
+      <PersistenceControl
+        persistence={{
+          kind: 'conflicted',
+          current: STORED,
+          baseline: undefined,
+          blocked: { code: 'persistence-read-failed' },
+        }}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('persistence-keep-local-blocked')).toHaveTextContent(
+      'The stored Spaces could not be read, so these changes were not sent.',
+    );
+    expect(screen.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
+  });
+
+  it('offers to open the Space whose recovery blocks keeping local work', () => {
+    const onOpenSpace = vi.fn();
+    render(
+      <PersistenceControl
+        persistence={{
+          kind: 'conflicted',
+          current: STORED,
+          baseline: undefined,
+          blocked: blockedByTarget,
+        }}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+        onOpenSpace={onOpenSpace}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Target' }));
+    expect(onOpenSpace).toHaveBeenCalledWith(TARGET_ID, 'Target');
+  });
 });
