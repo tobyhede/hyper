@@ -350,7 +350,7 @@ const hasSubpathImports = (value: unknown): value is SubpathImportsField =>
 /**
  * The package a file belongs to, which is the package whose `imports` map its
  * `#` specifiers resolve through. `packages/ui` declares its own `#components/*`
- * and `sidebar.tsx` uses it, so resolving every `#` specifier under
+ * and `combobox.tsx` uses it, so resolving every `#` specifier under
  * `packages/app` loses those and the modules they reach look uncatalogued.
  */
 const owningPackage = (file: string, repositoryRoot: string): string | null => {
@@ -661,10 +661,10 @@ const CLASS_STEM = /^[a-zA-Z][\w-]*$/u;
 /**
  * Where a class name is actually written: a `className`/`class` JSX attribute,
  * a `className` property (React Flow node objects carry one), or a `cn`/`clsx`
- * call. Reading *every* string literal instead made domain values look like
- * class names — `.resource` was held live by `{ kind: 'resource' }` in `render-adapter`
- * and `type: 'resource'` in `projection`, none of which is a class, so deleting the
- * real `className="resource"` would have left the rule reported as named.
+ * call. Do not read *every* string literal: domain values look like class
+ * names — `{ kind: 'resource' }` in `render-adapter` and `type: 'resource'` in
+ * `projection` would hold `.resource` live, so deleting the real
+ * `className="resource"` would leave the rule reported as named.
  */
 const CLASS_BUILDERS = new Set(['cn', 'clsx', 'classNames', 'twMerge']);
 

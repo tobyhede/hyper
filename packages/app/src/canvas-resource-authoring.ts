@@ -93,7 +93,7 @@ export interface CanvasResourceAuthoringInput {
    *
    * Two answers are read here, and they are deliberately different: every
    * control drawn on a Resource is `authorOnCanvas`, while a *live* content editor
-   * is `editResourceBody`, which a modal pane does not withdraw.
+   * is `editResourceBody`, which a modal dialog does not withdraw.
    */
   readonly availability: AuthoringAvailability;
   readonly nameOnCreation: string | null;

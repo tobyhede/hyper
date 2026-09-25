@@ -148,10 +148,10 @@ const NOT_SENT = 'Not sent';
  * What a copy command's own label says when the clipboard refused it.
  *
  * The application also pins "Link not copied" under the header, and that notice
- * is not enough on its own: below the Sidebar's breakpoint the menu is inside a
- * Sheet drawn over the area the notice renders in, so the item the reader just
- * pressed is the only place they can be told. Same two words as the notice's
- * title, minus the subject the item already names.
+ * is not enough on its own: the Resource rail is a menu on the canvas, and a
+ * reader whose eyes are on the Resource they pressed is not looking at the
+ * notice, so the item they just pressed is the only place they can be told. Same
+ * two words as the notice's title, minus the subject the item already names.
  */
 const NOT_COPIED = 'Not copied';
 

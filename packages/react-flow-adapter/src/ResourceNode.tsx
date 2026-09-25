@@ -196,7 +196,7 @@ export function ResourceNode({
       //
       // These are the only handles a gesture can begin at, so without it the
       // flow-level flag would govern nothing but whether the connection line
-      // renders, with CSS and a pane's backdrop standing in for the withdrawal.
+      // renders, with CSS standing in for the withdrawal.
       isConnectable={connectionAuthoring && isConnectable}
       isConnectableStart={
         connectionAuthoring && isConnectable && role === 'source' && !connectionInProgress

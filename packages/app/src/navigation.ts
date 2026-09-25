@@ -425,9 +425,11 @@ export function createNavigation(
     // **Don't clamp the index to the Edge count here.** Every write keeps it in
     // range for the Resource it was written against: `selectBranch` takes it modulo
     // the count, `retreat` uses a `findIndex` result, and every other write is
-    // 0. Changing Graph or Resource rewrites the index, and accepting the stored
-    // Space opens fresh navigation, which resets Traversal history and the index
-    // with it. Clamping would be the wrong repair rather than a safe one: `moves()` marks the selection by
+    // 0. A stale index needs the Edge set to shrink during a live traversal, and
+    // nothing does: presenting withdraws the Edge lifecycle (`authorOnCanvas`),
+    // so the one Edit it admits, a pointer connection, only adds Edges. Changing
+    // Graph or Resource rewrites the index, and accepting the stored Space opens
+    // fresh navigation, which resets Traversal history and the index with it. Clamping would be the wrong repair rather than a safe one: `moves()` marks the selection by
     // `index === branchIndex`, so a stale index shows *no* move selected, and
     // advancing to "the last valid Edge" would silently move down one the presenter was
     // never shown. It cannot replace this guard either, since an empty Edge set

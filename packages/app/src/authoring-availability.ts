@@ -73,7 +73,7 @@ export interface AuthoringInProgress {
    * Some embedded Map on this canvas is running a Resource edit of its own.
    *
    * A Space Resource draws another Space's Map inside this one, and a Resource edit
-   * begun in there is a second authoring surface exactly as a creation pane is
+   * begun in there is a second authoring surface exactly as a Markdown body edit is
    * — held apart from `editingResourceBody` and `editingResourceTitle` because those
    * name an edit of *this* Space's own Resources, and this one is an edit of a
    * different Space that happens to be drawn within a Resource of this one.
