@@ -2638,13 +2638,11 @@ test('drawing an Edge into an explicitly created Map then refuses its duplicate'
  * Two connections in one session, chained so the second starts from the Resource the
  * first selected.
  *
- * The second one is the whole point. A Resource's declared handles (`projection.ts`)
- * include every Graph id, not only the ones incident to it, so a completed
- * connection resolves in the same render that first makes its target incident.
- * Forcing React Flow to re-measure from the DOM replaces those declarations with
- * only the anchors actually rendered, which drops the not-yet-incident ones — and
- * the *next* connection then fails to resolve its source handle. One connection
- * cannot see it; the damage is done to the gesture after.
+ * The second one is the whole point: a completed connection must leave every
+ * Resource's handles where the next gesture can resolve them, and the damage, when
+ * there is any, is done to the gesture after. One connection cannot see it. This is
+ * one of the tests that fails when `ResourceNode` forces React Flow to re-measure
+ * with `useUpdateNodeInternals`.
  */
 test('a second connection drawn in the same session resolves its handles', async ({ page }) => {
   await page.goto('/');

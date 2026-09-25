@@ -53,20 +53,19 @@ type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
- * to React Flow.
+ * to React Flow, and `ResourceNode` never calls `useUpdateNodeInternals`.
  *
- * React Flow measures a node's handles once and caches the result, which is its
- * own named cause of warning #008 and of edges attaching to stale points; the
- * documented remedy is `useUpdateNodeInternals`. That remedy is for nodes that
- * leave measuring to React Flow. `projection.ts` does not: it puts the
- * declared anchor geometry on `node.handles`, `parseHandles` prefers that to the
- * DOM, and every projection allocates fresh nodes, so a change of size is
- * re-derived on the spot. The hook would add nothing to that: it rebuilds the
- * bounds with `getHandleBounds` from the DOM, and React Flow's own resize
- * observer already does so whenever this node's element changes size. Both
- * read the same four anchors the declaration names, because every side renders
- * on every Resource, and the next projection declares them again.
- * `ResourceNode.test.tsx` holds that nothing here calls it.
+ * `projection.ts` puts the declared anchor geometry on `node.handles`,
+ * `parseHandles` prefers that to the DOM, and every projection allocates fresh
+ * nodes, so a change of size is re-derived on the spot; React Flow's own resize
+ * observer re-reads the handles whenever this node's element changes size.
+ * Forcing a remeasure from here on mount or on Opening breaks the canvas:
+ * `editing.spec.ts` "a second connection drawn in the same session resolves
+ * its handles" and "opening a Resource displaces its neighbours once, and
+ * dragging it never displaces them again", and the Ladle story
+ * `edge-toolbar.spec.ts` "hovering an Edge's line reveals its toolbar", all
+ * fail with the call in place. `ResourceNode.test.tsx` holds that nothing here
+ * calls it.
  */
 
 export function ResourceNode({
