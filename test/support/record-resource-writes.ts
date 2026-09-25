@@ -10,39 +10,33 @@ import type { SqlStore } from '../../src/persistence/sql-store';
  * the write ran in. A write in a transaction that later rolled back is
  * recorded too: this counts what the repository issued, not what survived.
  */
-export const recordResourceWrites = <Handle, Order>(
-  store: SqlStore<Handle, Order>,
-): {
-  readonly store: SqlStore<Handle, Order>;
-  /** Every Resource id written since the last call, and forget them. */
-  readonly takeResourceWrites: () => readonly string[];
-} => {
+export const recordResourceWrites = <Handle, Order>(store: SqlStore<Handle, Order>) => {
   let written: string[] = [];
-  return {
-    store: {
-      ...store,
-      tables: (handle) => {
-        const tables = store.tables(handle);
-        return {
-          ...tables,
-          Resource: {
-            ...tables.Resource,
-            create: (input) => {
-              written.push(input.id);
-              return tables.Resource.create(input);
-            },
-            upsert: (input) => {
-              written.push(input.id);
-              return tables.Resource.upsert(input);
-            },
+  const recording: SqlStore<Handle, Order> = {
+    ...store,
+    tables: (handle) => {
+      const tables = store.tables(handle);
+      return {
+        ...tables,
+        Resource: {
+          ...tables.Resource,
+          create: (input) => {
+            written.push(input.id);
+            return tables.Resource.create(input);
           },
-        };
-      },
-    },
-    takeResourceWrites: () => {
-      const taken = written;
-      written = [];
-      return taken;
+          upsert: (input) => {
+            written.push(input.id);
+            return tables.Resource.upsert(input);
+          },
+        },
+      };
     },
   };
+  /** Every Resource id written since the last call, and forget them. */
+  const takeResourceWrites = (): readonly string[] => {
+    const taken = written;
+    written = [];
+    return taken;
+  };
+  return { store: recording, takeResourceWrites };
 };
