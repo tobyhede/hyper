@@ -852,15 +852,14 @@ describe('ResourceNode graph authoring', () => {
 
 /*
  * `projection.ts` declares each laid-out Resource's handle geometry on the node, and
- * React Flow's `parseHandles` takes that in preference to measuring the DOM. A
- * forced remeasure replaces it with `getHandleBounds`, which reads the DOM and
- * whatever it happens to report at that instant — `offsetWidth` is 0 on a node
- * mid-transition, and a handle measured then is one an Edge attaches to at the
- * wrong point until something else re-declares it. So the contract with React
- * Flow is that we never ask.
+ * React Flow's `parseHandles` takes that in preference to measuring the DOM, so
+ * `ResourceNode` leaves measuring to React Flow and never calls
+ * `updateNodeInternals` itself. React Flow's own resize observer re-reads the
+ * handles from the DOM when a node changes size regardless; these tests hold
+ * only that the component adds no call of its own.
  *
- * Asserting the absence of that call is the only seam that can say so: the loss
- * is visible in React Flow's node lookup and nowhere in the rendered output, and
+ * Asserting the absence of that call is the only seam that can say so: its
+ * effect is in React Flow's node lookup and nowhere in the rendered output, and
  * a test reaching into that lookup would pin @xyflow/system's private shape.
  */
 describe('ResourceNode handle geometry', () => {

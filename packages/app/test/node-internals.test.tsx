@@ -19,10 +19,9 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest';
  * caught it: the error never reaches a test body, so Vitest prints every test as
  * passing and then exits 1 on the unhandled error.
  *
- * `ResourceNode` deliberately does *not* call `updateNodeInternals` — a forced
- * remeasure discards the handles `projection.ts` declares for Graphs not yet
- * incident to the resource, which breaks the next connection. But the stub is still
- * required: React Flow's own `useResizeObserver` reaches the same
+ * `ResourceNode` does not call `updateNodeInternals`, because `projection.ts`
+ * declares its handles. The stub is still required: React Flow's own
+ * `useResizeObserver` reaches the same
  * `DOMMatrixReadOnly` call with `force: true`, so any test rendering a real
  * `<ReactFlow>` can hit it without anyone calling the hook directly.
  *

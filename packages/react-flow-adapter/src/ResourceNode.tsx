@@ -61,9 +61,12 @@ type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
  * leave measuring to React Flow. `projection.ts` does not: it puts the
  * declared anchor geometry on `node.handles`, `parseHandles` prefers that to the
  * DOM, and every projection allocates fresh nodes, so a change of size is
- * re-derived on the spot. Do not call the hook on top of that: a forced update
- * rebuilds the bounds with `getHandleBounds` from the DOM rather than from the
- * declaration (`declaredHandles` in `projection.ts`).
+ * re-derived on the spot. The hook would add nothing to that: it rebuilds the
+ * bounds with `getHandleBounds` from the DOM, and React Flow's own resize
+ * observer already does so whenever this node's element changes size. Both
+ * read the same four anchors the declaration names, because every side renders
+ * on every Resource, and the next projection declares them again.
+ * `ResourceNode.test.tsx` holds that nothing here calls it.
  */
 
 export function ResourceNode({
