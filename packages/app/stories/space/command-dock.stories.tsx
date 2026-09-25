@@ -86,6 +86,14 @@ export const SaveRefused: Story = () => <CommandDockFixture scenario="save-refus
 SaveRefused.meta = { iframed: true };
 
 /**
+ * A save over the request size limit: the notice explains it beside Retry
+ * rather than a dialog, because reducing content and retrying is the recovery
+ * and the Edits stay until a save fits.
+ */
+export const SaveTooLarge: Story = () => <CommandDockFixture scenario="save-too-large" />;
+SaveTooLarge.meta = { iframed: true };
+
+/**
  * A save another Space blocks: the rejected Space's recovery replay was refused
  * because the Space it names has a conflict of its own to resolve first. The
  * notice names that Space, opens it, and offers Retry once it is resolved.

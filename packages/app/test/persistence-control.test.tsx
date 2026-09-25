@@ -406,6 +406,34 @@ describe('PersistenceNotice', () => {
     expect(screen.queryByRole('button', { name: /^Open/ })).toBeNull();
   });
 
+  it('explains a save over the size limit and offers Retry, without a dialog', () => {
+    const onRetry = vi.fn();
+    const oversized = {
+      kind: 'rejected',
+      failure: { kind: 'permanent-failure', code: 'payload-too-large' },
+    } as const;
+    render(
+      <>
+        <PersistenceControl
+          persistence={oversized}
+          onAcceptRemote={vi.fn(() => null)}
+          onKeepLocal={vi.fn()}
+        />
+        <PersistenceNotice persistence={oversized} onRetry={onRetry} onOpenSpace={vi.fn()} />
+      </>,
+    );
+
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    const notice = screen.getByRole('alert');
+    expect(notice).toHaveTextContent('Changes not saved');
+    expect(notice).toHaveTextContent(
+      'This save is larger than the server accepts in one request, counting every space it includes. Shorten or remove content, then retry.',
+    );
+    expect(screen.queryByRole('button', { name: /^Open/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
   it('draws nothing for a rejection no recovery attempt has blocked', () => {
     render(
       <PersistenceNotice

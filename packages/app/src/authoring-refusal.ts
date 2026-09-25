@@ -291,11 +291,11 @@ const PERSISTENCE_FAILURE_REASONS = {
     'Changes were sent faster than the server accepts. Wait a moment before retrying.',
   'invalid-commit': 'These changes are not in a form the server can store.',
   forbidden: 'You do not have permission to save this space.',
-  // The limit is on the whole change, not one Resource: a Space can exceed it on
-  // Resource count with nothing long in it. And the rejection dialog offers only
-  // Continue editing, so this names no retry.
+  // The limit is on the whole request, which for a coordinated save carries
+  // every participating Space, so this promises nothing per Space or Resource.
+  // It is drawn beside Retry, so it says what to do before retrying.
   'payload-too-large':
-    'This space is larger than the server accepts in one save. Shortening its longest resources is what brings it under the limit.',
+    'This save is larger than the server accepts in one request, counting every space it includes. Shorten or remove content, then retry.',
   protocol: 'The application and the server disagree about how changes are saved.',
   // `satisfies` for the reason the aggregate table above gives: it still fails
   // the moment a code is added without a sentence, without widening the map.

@@ -667,8 +667,8 @@ function PersistenceReport({
   const { state } = persistence;
   // An aggregate refusal (`v1-release/17`) draws the same dialog a permanent
   // rejection does — `PersistenceControl` treats the two `Rejection` kinds
-  // alike — so it is a decision here too, until a blocked recovery makes it
-  // retryable and the notice takes it over.
+  // alike — so it is a decision here too, unless `canRetry` admits it (a
+  // blocked recovery, or a rejection for size) and the notice takes it over.
   const decision =
     state.kind === 'conflicted' ||
     ((state.kind === 'rejected' || state.kind === 'refused') && !canRetry(state));

@@ -471,6 +471,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'A refused aggregate — a distinct persistence state from permanent rejection — explains the reason as one sentence and can be acknowledged, with no retry offered.',
   },
   {
+    id: 'command-dock-explains-an-oversized-save',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'SaveTooLarge',
+    claim:
+      'A save over the request size limit is explained beside Retry rather than in a dialog, counting every Space the request carries; the Edits stay, a Retry still over the limit is refused again, and a save that fits clears the notice.',
+  },
+  {
     id: 'command-dock-names-the-space-blocking-a-save',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'SaveBlocked',
