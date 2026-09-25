@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { watchUnownedReactUpdates } from './test/support/unowned-react-updates';
 
 /**
  * React honours `act(...)` only when this global says the environment supports
@@ -299,4 +300,25 @@ if (typeof window !== 'undefined' && !('PointerEvent' in window)) {
     writable: true,
     value: MouseEvent,
   });
+}
+
+/**
+ * A React update that no test boundary owns fails the test it lands in.
+ *
+ * Recorded by `watchUnownedReactUpdates`, which matches React's two act
+ * reports and passes every call through to the console unchanged. The check
+ * runs after each test, once Testing Library's cleanup has unmounted what the
+ * test rendered: `afterEach` hooks run in reverse order of registration, so
+ * this one, from the setup file, runs after every hook a test file registers.
+ * A report that lands between tests is charged to the next test; one after the
+ * last test of a file, to `afterAll`.
+ *
+ * A test that replaces `console.error` with `vi.spyOn(...).mockImplementation(...)`
+ * takes these reports with it for as long as the spy stands. Such a test owns
+ * its console; a spy that only records calls through.
+ */
+if (typeof document !== 'undefined') {
+  const unowned = watchUnownedReactUpdates(console);
+  afterEach(unowned.failIfAny);
+  afterAll(unowned.failIfAny);
 }
