@@ -142,7 +142,9 @@ describe('placing a Resource into a Map without a pointer (ADR 0082)', () => {
     // activation, so what a node test can hold is that the control is the kind
     // the browser activates.
     expect(row.tagName).toBe('BUTTON');
-    row.focus();
+    act(() => {
+      row.focus();
+    });
     expect(document.activeElement).toBe(row);
   });
 
@@ -650,7 +652,10 @@ describe('the last Map and Graph', () => {
     // Still drawing: neither `loadSpaceSnapshot`'s refusal nor the fixture's own
     // guard was reached, which is what an emptied Space would have done.
     expect(within(dock()).getByRole('button', { name: /^Map: / })).toBeInTheDocument();
-    expect(within(dock()).getByRole('button', { name: /^Active Graph: / })).toBeInTheDocument();
+    const graph = within(dock()).getByRole('button', { name: /^Active Graph: / });
+    expect(graph).toBeInTheDocument();
+    // The dismissed menu hands the caret back to the name it opened from.
+    await waitFor(() => expect(graph).toHaveFocus());
   });
 });
 

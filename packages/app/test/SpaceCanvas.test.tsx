@@ -1,4 +1,4 @@
-import { createEvent, fireEvent, render, screen, type RenderResult } from '@testing-library/react';
+import { act, createEvent, fireEvent, screen, type RenderResult } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema } from '@project/core';
@@ -11,6 +11,7 @@ import { composeApp } from '../src/compose-app';
 import type { EdgeAuthoring } from '../src/edge-authoring';
 import { RESOURCE_SIZE } from '../src/resource';
 import type { ResourceResize } from '../src/render-adapter';
+import { mountSettled } from './settled-mount';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -128,7 +129,7 @@ function inertEdgeAuthoring(): EdgeAuthoring {
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
-function mountGraph(
+async function mountGraph(
   initialNodes: ResourceFlowNode[] = [resourceNode('A')],
   onSelectResource: (resourceId: string) => void = () => undefined,
   resourceResize: ResourceResize = {
@@ -138,7 +139,7 @@ function mountGraph(
     cancelResize: () => undefined,
   },
   editable = true,
-): Harness {
+): Promise<Harness> {
   const openResource = vi.fn();
   const addResource = vi.fn();
   const addExistingResource = vi.fn();
@@ -211,7 +212,7 @@ function mountGraph(
       />
     </ReactFlowProvider>
   );
-  const view = render(graph());
+  const view = await mountSettled(graph());
   return {
     view,
     openResource,
@@ -247,8 +248,8 @@ function nodeOf(id: string): HTMLElement {
  * draft. B is there so the tests can ask what the refusal did to the rest of the
  * graph — A's own affordance is hidden while its title is being renamed.
  */
-function refuseTitleEdit(settle: 'enter' | 'blur' = 'enter'): Harness {
-  const harness = mountGraph([
+async function refuseTitleEdit(settle: 'enter' | 'blur' = 'enter'): Promise<Harness> {
+  const harness = await mountGraph([
     resourceNode('A', RESOURCE_ID, true),
     resourceNode('B', OTHER_RESOURCE_ID),
   ]);
@@ -287,16 +288,16 @@ afterAll(() => vi.unstubAllGlobals());
  * contains its own events, while the Resource body keeps selection (ADR 0065).
  */
 describe('a title Edit the graph refused', () => {
-  it('does not open a Resource on the click that blurred it', () => {
-    const { openResource } = refuseTitleEdit('blur');
+  it('does not open a Resource on the click that blurred it', async () => {
+    const { openResource } = await refuseTitleEdit('blur');
 
     fireEvent.click(nodeOf(RESOURCE_ID));
 
     expect(openResource).not.toHaveBeenCalled();
   });
 
-  it('leaves the rest of the graph working', () => {
-    const { openResource, setNodes } = refuseTitleEdit('blur');
+  it('leaves the rest of the graph working', async () => {
+    const { openResource, setNodes } = await refuseTitleEdit('blur');
     // B's commands are drawn once B is the selected Resource (`ResourceNode`'s
     // `toolbarVisible`), so selection moves to B the way React Flow reports it.
     setNodes([resourceNode('A', RESOURCE_ID), resourceNode('B', OTHER_RESOURCE_ID, true)]);
@@ -316,24 +317,24 @@ describe('opening a Resource', () => {
   it.each([
     ['a single click', (node: HTMLElement) => fireEvent.click(node)],
     ['a double click', (node: HTMLElement) => fireEvent.doubleClick(node)],
-  ])('does not happen on %s of the Resource body', (_name, gesture) => {
-    const { openResource } = mountGraph();
+  ])('does not happen on %s of the Resource body', async (_name, gesture) => {
+    const { openResource } = await mountGraph();
 
     gesture(nodeOf(RESOURCE_ID));
 
     expect(openResource).not.toHaveBeenCalled();
   });
 
-  it('happens from the Resource affordance', () => {
-    const { openResource } = mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+  it('happens from the Resource affordance', async () => {
+    const { openResource } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
     expect(openResource).toHaveBeenCalledWith(RESOURCE_ID);
   });
 
-  it('leaves the Title control free to rename without Opening the Resource', () => {
-    const { openResource } = mountGraph();
+  it('leaves the Title control free to rename without Opening the Resource', async () => {
+    const { openResource } = await mountGraph();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
@@ -355,16 +356,16 @@ describe('opening a Resource', () => {
  * control under the key here is one of the selected Resource's own commands.
  */
 describe('F2 while a control has focus', () => {
-  it('does not rename the selected Resource from one of its toolbar commands', () => {
-    mountGraph([resourceNode('A', RESOURCE_ID, true), resourceNode('B', OTHER_RESOURCE_ID)]);
+  it('does not rename the selected Resource from one of its toolbar commands', async () => {
+    await mountGraph([resourceNode('A', RESOURCE_ID, true), resourceNode('B', OTHER_RESOURCE_ID)]);
 
     fireEvent.keyDown(screen.getByRole('button', { name: 'Open Resource A' }), { key: 'F2' });
 
     expect(screen.queryByRole('textbox', { name: 'Resource title' })).not.toBeInTheDocument();
   });
 
-  it('renames the selected Resource when the key is not typed into a control', () => {
-    mountGraph([resourceNode('A', RESOURCE_ID, true), resourceNode('B', OTHER_RESOURCE_ID)]);
+  it('renames the selected Resource when the key is not typed into a control', async () => {
+    await mountGraph([resourceNode('A', RESOURCE_ID, true), resourceNode('B', OTHER_RESOURCE_ID)]);
 
     fireEvent.keyDown(document.body, { key: 'F2' });
 
@@ -388,10 +389,12 @@ describe.each([
   ['Enter', 'Enter', 'native'],
   ['Space', ' ', 'composite'],
 ] as const)('%s on the focused Resource affordance', (_name, key, activation) => {
-  it('opens the Resource once through the button rather than the graph', () => {
-    const { openResource } = mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+  it('opens the Resource once through the button rather than the graph', async () => {
+    const { openResource } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
     const button = screen.getByRole('button', { name: 'Open Resource A' });
-    button.focus();
+    act(() => {
+      button.focus();
+    });
 
     fireEvent.keyDown(button, { key });
     if (activation === 'native') fireEvent.click(button);
@@ -401,10 +404,10 @@ describe.each([
   });
 });
 
-it.each(['Enter', ' '])('opens a focused Reference Resource with %s', (key) => {
+it.each(['Enter', ' '])('opens a focused Reference Resource with %s', async (key) => {
   const reference = resourceNode('A again', REFERENCE_ID);
   reference.data.kind = 'reference';
-  const { openResource } = mountGraph([reference]);
+  const { openResource } = await mountGraph([reference]);
 
   const focusedReference = nodeOf(REFERENCE_ID);
   focusedReference.focus();
@@ -424,8 +427,8 @@ describe.each([
     REFERENCE_ID,
   ],
 ] as const)('a focused %s while placement is pending', (_kind, projected, id) => {
-  it.each(['Enter', ' '])('does not open with %s', (key) => {
-    const { openResource } = mountGraph([projected], undefined, undefined, false);
+  it.each(['Enter', ' '])('does not open with %s', async (key) => {
+    const { openResource } = await mountGraph([projected], undefined, undefined, false);
     const focused = nodeOf(id);
     focused.focus();
 
@@ -434,8 +437,8 @@ describe.each([
     expect(openResource).not.toHaveBeenCalled();
   });
 
-  it('does not announce authoring keyboard commands', () => {
-    mountGraph([projected], undefined, undefined, false);
+  it('does not announce authoring keyboard commands', async () => {
+    await mountGraph([projected], undefined, undefined, false);
 
     expect(nodeOf(id)).toHaveAccessibleDescription(
       'This Resource is unavailable while placement is pending.',
@@ -444,8 +447,8 @@ describe.each([
 });
 
 describe('the Resource affordance', () => {
-  it('opens the Resource rather than renaming its title on the graph', () => {
-    const { openResource } = mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+  it('opens the Resource rather than renaming its title on the graph', async () => {
+    const { openResource } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
@@ -455,11 +458,11 @@ describe('the Resource affordance', () => {
 });
 
 describe('withdrawing canvas authoring from an Expanded Resource', () => {
-  it('withdraws body editing and resize through the same complete gate', () => {
+  it('withdraws body editing and resize through the same complete gate', async () => {
     const expanded = resourceNode('A', RESOURCE_ID, true);
     expanded.data.expanded = true;
     expanded.data.body = '# A';
-    const { view, setTitleEditing } = mountGraph([expanded]);
+    const { view, setTitleEditing } = await mountGraph([expanded]);
 
     expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
@@ -476,7 +479,7 @@ describe('withdrawing canvas authoring from an Expanded Resource', () => {
       const expanded = resourceNode('A', RESOURCE_ID, true);
       expanded.data.expanded = true;
       expanded.data.body = '# A';
-      const { openResource } = mountGraph([expanded]);
+      const { openResource } = await mountGraph([expanded]);
       fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
 
       const editor = await screen.findByRole('textbox', { name: 'Markdown source of A' });
@@ -489,16 +492,16 @@ describe('withdrawing canvas authoring from an Expanded Resource', () => {
   );
 });
 
-test('reports a live Resource title edit so Space chrome can withdraw', () => {
-  const { titleEditingChanged } = mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+test('reports a live Resource title edit so Space chrome can withdraw', async () => {
+  const { titleEditingChanged } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
 
   fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
   expect(titleEditingChanged).toHaveBeenLastCalledWith(true);
 });
 
-test('returns Space chrome when it unmounts over a live Resource title edit', () => {
-  const { titleEditingChanged, view } = mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+test('returns Space chrome when it unmounts over a live Resource title edit', async () => {
+  const { titleEditingChanged, view } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
 
   fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
   expect(titleEditingChanged).toHaveBeenLastCalledWith(true);
@@ -549,7 +552,9 @@ function resizeControl(): Element {
 
 /** Press that control. */
 function pressResizeControl(): void {
-  resizeControl().dispatchEvent(mouseEventInView('mousedown'));
+  act(() => {
+    resizeControl().dispatchEvent(mouseEventInView('mousedown'));
+  });
 }
 
 /**
@@ -562,12 +567,16 @@ function touchResizeControl(
   clientX = 0,
   clientY = 0,
 ): void {
-  resizeControl().dispatchEvent(touchEventOnControl(type, clientX, clientY));
+  act(() => {
+    resizeControl().dispatchEvent(touchEventOnControl(type, clientX, clientY));
+  });
 }
 
 /** Carry a pressed control to a pointer position, the way one drag frame does. */
 function dragResizeControlTo(clientX: number, clientY: number): void {
-  window.dispatchEvent(mouseEventInView('mousemove', clientX, clientY));
+  act(() => {
+    window.dispatchEvent(mouseEventInView('mousemove', clientX, clientY));
+  });
 }
 
 /**
@@ -577,17 +586,17 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
  * ownership and must not read back as a second resize gate.
  */
 describe('resize belongs to Resource rather than to a Resource kind', () => {
-  it('offers a resize operation to an Open Resource whatever its kind', () => {
+  it('offers a resize operation to an Open Resource whatever its kind', async () => {
     const reference = resourceNode('Reference Resource', RESOURCE_ID, false);
     reference.data.kind = 'reference';
     reference.data.expanded = true;
-    const { view } = mountGraph([reference]);
+    const { view } = await mountGraph([reference]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
   });
 
-  it('offers no resize operation to a Closed Resource', () => {
-    const { view } = mountGraph([resourceNode('A')]);
+  it('offers no resize operation to a Closed Resource', async () => {
+    const { view } = await mountGraph([resourceNode('A')]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
   });
@@ -599,7 +608,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    * than a stand-in for it. One drag both selects the Resource and grows it —
    * never a separate click first.
    */
-  it('routes one resize lifecycle from the control to the canvas capability', () => {
+  it('routes one resize lifecycle from the control to the canvas capability', async () => {
     const expanded = resourceNode('A', RESOURCE_ID, false);
     expanded.data.expanded = true;
     expanded.data.body = '# A';
@@ -610,7 +619,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    mountGraph([expanded], onSelectResource, resourceResize);
+    await mountGraph([expanded], onSelectResource, resourceResize);
 
     pressResizeControl();
 
@@ -635,7 +644,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    * the next projected draft publishes the resized Resource, its displaced
    * neighbours, handles and Edges together.
    */
-  it('proposes no node change to React Flow while it resizes', () => {
+  it('proposes no node change to React Flow while it resizes', async () => {
     const expanded = resourceNode('A', RESOURCE_ID, false);
     expanded.data.expanded = true;
     const resourceResize: ResourceResize = {
@@ -644,7 +653,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    const { nodesChanged } = mountGraph([expanded], () => undefined, resourceResize);
+    const { nodesChanged } = await mountGraph([expanded], () => undefined, resourceResize);
     nodesChanged.mockClear();
 
     pressResizeControl();
@@ -656,7 +665,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
     expect(nodesChanged).not.toHaveBeenCalled();
   });
 
-  it('routes loss of an active resize to cancellation', () => {
+  it('routes loss of an active resize to cancellation', async () => {
     const expanded = resourceNode('A', RESOURCE_ID, false);
     expanded.data.expanded = true;
     const resourceResize: ResourceResize = {
@@ -665,7 +674,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    mountGraph([expanded], () => undefined, resourceResize);
+    await mountGraph([expanded], () => undefined, resourceResize);
     pressResizeControl();
 
     fireEvent.blur(window);
@@ -690,7 +699,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
    * projection on every preview frame, which is exactly the publish staged here
    * between the first frame and the second.
    */
-  it('keeps a touch gesture alive across the projection its own frames publish', () => {
+  it('keeps a touch gesture alive across the projection its own frames publish', async () => {
     const expanded = resourceNode('A', RESOURCE_ID, false);
     expanded.data.expanded = true;
     const resourceResize: ResourceResize = {
@@ -699,7 +708,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
       finishResize: vi.fn(),
       cancelResize: vi.fn(),
     };
-    const { setNodes } = mountGraph([expanded], () => undefined, resourceResize);
+    const { setNodes } = await mountGraph([expanded], () => undefined, resourceResize);
 
     touchResizeControl('touchstart');
     expect(resourceResize.beginResize).toHaveBeenCalledWith(RESOURCE_ID);
@@ -720,8 +729,8 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
  * key pressed anywhere else in the app never reaches.
  */
 describe('the C shortcut', () => {
-  it('adds a Resource from a focused Resource', () => {
-    const { addResource } = mountGraph();
+  it('adds a Resource from a focused Resource', async () => {
+    const { addResource } = await mountGraph();
 
     fireEvent.keyDown(nodeOf(RESOURCE_ID), { key: 'c' });
 
@@ -734,8 +743,8 @@ describe('the C shortcut', () => {
    * through the editor rather than through a bare input: the guard covers
    * whatever text entry the canvas gains next.
    */
-  it('is a letter while the caret is in the title editor', () => {
-    const { addResource } = mountGraph();
+  it('is a letter while the caret is in the title editor', async () => {
+    const { addResource } = await mountGraph();
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Resource title' }), { key: 'c' });
@@ -748,8 +757,8 @@ describe('the C shortcut', () => {
    * held down. Neither is a command, and the default stays with whoever else
    * wanted it.
    */
-  it('ignores a modified press and a key repeat', () => {
-    const { addResource } = mountGraph();
+  it('ignores a modified press and a key repeat', async () => {
+    const { addResource } = await mountGraph();
     const node = nodeOf(RESOURCE_ID);
 
     fireEvent.keyDown(node, { key: 'c', metaKey: true });
@@ -769,16 +778,16 @@ describe('the C shortcut', () => {
    * And Caps Lock is not a modifier: it changes the character, never `shiftKey`,
    * so the shortcut has to keep working with it on.
    */
-  it('answers an unmodified C typed with Caps Lock on', () => {
-    const { addResource } = mountGraph();
+  it('answers an unmodified C typed with Caps Lock on', async () => {
+    const { addResource } = await mountGraph();
 
     fireEvent.keyDown(nodeOf(RESOURCE_ID), { key: 'C' });
 
     expect(addResource).toHaveBeenCalledTimes(1);
   });
 
-  it('is withdrawn along with every other Resource authoring control', () => {
-    const { addResource, setTitleEditing } = mountGraph();
+  it('is withdrawn along with every other Resource authoring control', async () => {
+    const { addResource, setTitleEditing } = await mountGraph();
 
     setTitleEditing(false);
     fireEvent.keyDown(nodeOf(RESOURCE_ID), { key: 'c' });
@@ -797,7 +806,7 @@ describe('the C shortcut', () => {
   it.each(['Zoom in', 'Zoom out', 'Fit view'] as const)(
     'is a keypress on the %s control rather than a command',
     async (name) => {
-      const { addResource } = mountGraph();
+      const { addResource } = await mountGraph();
 
       fireEvent.keyDown(await screen.findByRole('button', { name }), { key: 'c' });
 
@@ -816,7 +825,7 @@ describe('the C shortcut', () => {
    * React Flow's own subscriptions, which the canvas guard now reads too.
    */
   it('is a keypress on the zoom slider rather than a command', async () => {
-    const { addResource } = mountGraph();
+    const { addResource } = await mountGraph();
     const slider = await screen.findByLabelText('Zoom');
     expect(slider).toHaveAttribute('type', 'range');
     expect(slider.closest('.nokey')).not.toBeNull();
@@ -838,8 +847,8 @@ describe('the C shortcut', () => {
  * re-attaches `keydown`/`keyup` on `document` for every code still subscribed.
  */
 describe("React Flow's document key subscriptions", () => {
-  it('does not re-subscribe them on an unchanged re-render', () => {
-    const { rerender } = mountGraph();
+  it('does not re-subscribe them on an unchanged re-render', async () => {
+    const { rerender } = await mountGraph();
     const listen = vi.spyOn(document, 'addEventListener');
 
     rerender();
@@ -847,8 +856,8 @@ describe("React Flow's document key subscriptions", () => {
     expect(listen.mock.calls.filter(([type]) => type === 'keydown')).toEqual([]);
   });
 
-  it('does not re-subscribe the F2 listener on an unrelated unchanged re-render', () => {
-    const { rerender } = mountGraph();
+  it('does not re-subscribe the F2 listener on an unrelated unchanged re-render', async () => {
+    const { rerender } = await mountGraph();
     const listen = vi.spyOn(window, 'addEventListener');
 
     rerender();
@@ -871,8 +880,8 @@ describe.each([
   ['Enter', 'Enter'],
   ['Space', ' '],
 ] as const)('%s typed into a text control inside a Resource', (_name, key) => {
-  it('is a keypress rather than a request to open that Resource', () => {
-    const { openResource } = mountGraph();
+  it('is a keypress rather than a request to open that Resource', async () => {
+    const { openResource } = await mountGraph();
     const field = document.createElement('div');
     field.setAttribute('contenteditable', 'true');
     nodeOf(RESOURCE_ID).append(field);
@@ -884,8 +893,8 @@ describe.each([
 });
 
 describe('dragging a Resource from the Resources list over canvas chrome', () => {
-  it('does not offer a drop the pane will refuse', () => {
-    mountGraph();
+  it('does not offer a drop the pane will refuse', async () => {
+    await mountGraph();
     const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
     expect(zoomIn.closest('.react-flow__pane')).toBeNull();
 
@@ -915,8 +924,8 @@ describe('dropping a Space from the Resources list', () => {
     return found;
   };
 
-  it('offers a Space drop on the pane, and places that Space at the drop point', () => {
-    const harness = mountGraph();
+  it('offers a Space drop on the pane, and places that Space at the drop point', async () => {
+    const harness = await mountGraph();
     const dataTransfer = carrying(SPACE_DRAG_TYPE);
 
     fireEvent.dragOver(pane(), { dataTransfer });
@@ -937,8 +946,8 @@ describe('dropping a Space from the Resources list', () => {
     expect(harness.addExistingResource).not.toHaveBeenCalled();
   });
 
-  it('never reads a Space drop as a Resource drop, nor a Resource drop as a Space one', () => {
-    const harness = mountGraph();
+  it('never reads a Space drop as a Resource drop, nor a Resource drop as a Space one', async () => {
+    const harness = await mountGraph();
 
     fireEvent.drop(pane(), { dataTransfer: carrying(RESOURCE_DRAG_TYPE) });
 
@@ -946,8 +955,8 @@ describe('dropping a Space from the Resources list', () => {
     expect(harness.placeSpace).not.toHaveBeenCalled();
   });
 
-  it('does not offer a Space drop over canvas chrome', () => {
-    const harness = mountGraph();
+  it('does not offer a Space drop over canvas chrome', async () => {
+    const harness = await mountGraph();
     const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
     const dataTransfer = carrying(SPACE_DRAG_TYPE);
 
@@ -958,8 +967,8 @@ describe('dropping a Space from the Resources list', () => {
     expect(harness.placeSpace).not.toHaveBeenCalled();
   });
 
-  it('places nothing while the canvas is not authorable', () => {
-    const harness = mountGraph(undefined, undefined, undefined, false);
+  it('places nothing while the canvas is not authorable', async () => {
+    const harness = await mountGraph(undefined, undefined, undefined, false);
     const dataTransfer = carrying(SPACE_DRAG_TYPE);
 
     fireEvent.dragOver(pane(), { dataTransfer });
