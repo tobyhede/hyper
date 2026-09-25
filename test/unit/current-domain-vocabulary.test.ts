@@ -1393,10 +1393,8 @@ describe('a Map is named once (ADR 0085)', () => {
  *
  * What needs a **file** exemption is what ADR 0085 predicted, and it is the one
  * carve-out: the vendored shadcn registry. `packages/ui/src/components/card.tsx`
- * exports seven components under the retired name, and six other modules import
- * them — a barrel, two components, a baseline test, a review story, and the
- * agent-facing document that explains why the barrel carries two content
- * components with different names. A foreign name with no shape to read, exactly
+ * exports seven components under the retired name, and four other modules import
+ * them — a barrel, two components and a baseline test. A foreign name with no shape to read, exactly
  * as Lucide's glyph is for Route and elkjs's options bag is for Layout.
  *
  * The registry's Tailwind tokens and custom properties need **nothing**, and
@@ -1553,9 +1551,9 @@ const withoutForeignResourceSpellings = (source: string): string =>
  */
 const FOREIGN_RESOURCE_FILES: readonly string[] = [
   // The vendored shadcn skill set, which `skills-lock.json` pins and which is
-  // written in shadcn's own vocabulary. Masked by spelling rather than skipped
-  // as a tree, so a pinned-skills bump that introduced a domain compound would
-  // still be reported.
+  // written in shadcn's own vocabulary. Its Markdown is prose and unscanned;
+  // the evals are data, masked by spelling rather than skipped, so a
+  // pinned-skills bump that put a domain compound there would still be reported.
   '.agents/skills/shadcn/evals/evals.json',
   'packages/ui/src/components/card.tsx',
   'packages/ui/src/index.ts',
@@ -1567,8 +1565,8 @@ const FOREIGN_RESOURCE_FILES: readonly string[] = [
 /**
  * The implementation source that renders the registry's *bare* component, which
  * is spelled exactly as the domain type was. Narrower than the list above on
- * purpose: `ResourceRail` takes only the header, and the two fixtures are not
- * implementation source, so neither reaches the bare arm at all.
+ * purpose: `ResourceRail` takes only the header, and the catalogue fixture and
+ * the skill's evals are not implementation source, so neither reaches the bare arm at all.
  */
 const FOREIGN_BARE_RESOURCE_FILES: readonly string[] = [
   'packages/ui/src/components/card.tsx',

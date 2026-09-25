@@ -113,6 +113,9 @@ describe('ticket numbers', () => {
     const roadmap = buildRoadmap(join(REPOSITORY_ROOT, '.scratch'));
 
     // A tracker the scan quietly stopped reaching would report nothing forever.
+    expect(roadmap.features.filter((feature) => feature.issues.length > 0).length).toBeGreaterThan(
+      20,
+    );
     expect(roadmap.features.map((feature) => feature.slug)).toContain('command-dock');
     expect(roadmap.features.flatMap((feature) => feature.duplicateNumbers)).toEqual([]);
   });

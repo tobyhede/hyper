@@ -15,7 +15,7 @@
 
 ## Answer
 
-Ticket 11 approved 13 non-keep rows (all recommendations accepted, 2026-09-25). Eleven are implemented in one PR; two are held because their stated precondition or premise did not hold when checked.
+Ticket 11 approved 13 non-keep rows (all recommendations accepted, 2026-09-25). All thirteen are implemented in one PR. Rows 7 and 23 were held until the user re-confirmed them, because their stated precondition or premise did not hold when checked.
 
 | Row | Test | Approved | Done | How the replacement was shown to detect the failure |
 | --- | ---- | -------- | ---- | ---------------------------------------------------- |
@@ -42,4 +42,4 @@ Ticket 11 approved 13 non-keep rows (all recommendations accepted, 2026-09-25). 
 
 **Follow-up.** None. Rows 7 and 23 were held for re-confirmation because their approvals' conditions did not hold; the user re-confirmed both, row 7 once the lint was made to report it.
 
-**Verification (2026-09-25).** `pnpm verify` exit 0: 250 test files, 3428 passed and 13 skipped. `pnpm e2e` and `pnpm e2e:ladle` were not run: no product behaviour, component or story changed — the only `src/` edits are two comments.
+**Verification (2026-09-25).** `pnpm verify` exit 0: 249 test files, 3426 passed and 13 skipped. `pnpm e2e` and `pnpm e2e:ladle` were not run: no product behaviour, component or story changed — the only `src/` edits are three comments (two in `packages/app/src/`, one in `packages/ui/src/components/breadcrumb.tsx`), plus `jsxPragma: null` in `eslint.config.js`, which changes how lint reads JSX but not what anything renders.
