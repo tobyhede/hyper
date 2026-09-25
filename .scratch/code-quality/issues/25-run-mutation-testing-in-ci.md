@@ -1,6 +1,6 @@
 # 25: Run mutation testing in CI
 
-**Status:** needs-triage
+**Status:** deferred by the user (Toby Hede, 2026-09-25). Not in the active queue; the decisions below stay open until it is picked up again.
 
 **Blocked by:** None; follows the Stryker decision in 13
 

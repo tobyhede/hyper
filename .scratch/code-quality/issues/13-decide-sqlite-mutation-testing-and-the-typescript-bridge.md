@@ -98,7 +98,7 @@ Decision: **Keep** (Toby Hede, 2026-09-24). SQLite is important for portability:
 
 **The single fact to decide on:** it has not visibly been run since 2026-08-22, and its two findings tickets (05, 06) are still `needs-triage`. Its value depends entirely on someone running it deliberately, because nothing runs it automatically.
 
-Decision: **Keep, and run it in CI** (Toby Hede, 2026-09-25). Since this evidence was gathered, #283 closed both findings tickets (mutation 05 and 06), so the "findings sit untriaged" argument no longer holds. Running it in CI reverses the standing "local diagnostic, never a gate" rule in AGENTS.md and `build-tooling.md`, so the change needs an ADR. Follow-up: ticket 25.
+Decision: **Keep, and run it in CI** (Toby Hede, 2026-09-25). Since this evidence was gathered, #283 closed both findings tickets (mutation 05 and 06), so the "findings sit untriaged" argument no longer holds. Running it in CI reverses the standing "local diagnostic, never a gate" rule in AGENTS.md and `build-tooling.md`, so the change needs an ADR. Follow-up: ticket 25, which the user has since deferred (2026-09-25). Until 25 is picked up, the standing rule holds: mutation testing stays a local diagnostic, not run in CI or `verify`.
 
 ### 3. The TypeScript 6 compatibility bridge beside TypeScript 7
 
