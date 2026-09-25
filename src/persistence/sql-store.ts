@@ -262,6 +262,13 @@ export interface SqlTables<Order> {
  *   Meta identity with another transaction's newly committed Spaces.
  *   PostgreSQL needs an advisory lock even when no row exists; SQLite's
  *   transaction snapshot and refusal of stale write upgrades already suffice.
+ * - `lockAggregateShared` — the same protection in shared mode, for the
+ *   commit fast path: it waits for an exclusive holder and makes one wait,
+ *   while fast paths never wait for each other. PostgreSQL needs it because
+ *   READ COMMITTED would otherwise let the fast path's one-Space read and its
+ *   row-lock write straddle a replacement, a deletion or another aggregate
+ *   commit; SQLite needs nothing more than `lockAggregate` does
+ *   (`test/support/fast-path-races.ts`, run on each database).
  * - `readDocument` — decodes a stored `document`/`document` cell into a plain
  *   value a schema can parse: identity on PostgreSQL, whose `jsonb` codec
  *   already decoded it; `JSON.parse` on SQLite's TEXT, which only decodes at
@@ -290,6 +297,8 @@ export interface SqlStore<Handle, Order> {
   readonly transaction: <T>(fn: (orm: Handle) => Promise<T>) => Promise<T>;
   /** Protect aggregate decisions for this transaction, including when no Meta row exists. */
   readonly lockAggregate: (orm: Handle) => Promise<void>;
+  /** `lockAggregate` in shared mode: shared holders do not wait for each other. */
+  readonly lockAggregateShared: (orm: Handle) => Promise<void>;
   readonly readDocument: (value: unknown) => unknown;
   readonly isDuplicateKey: (error: unknown, table: string) => boolean;
   readonly isUnavailable: (error: unknown) => boolean;

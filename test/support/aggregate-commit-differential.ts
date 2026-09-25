@@ -32,6 +32,9 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
 
 const scenarios = [
   'topology-preserving-update',
+  'map-internal-update',
+  'selected-graph-replaced',
+  'graph-added',
   'create-ordinary-space',
   'create-conflict',
   'update-conflict',
@@ -215,6 +218,92 @@ const fixtureFor = ({
         ],
       };
       break;
+    case 'map-internal-update': {
+      // Positions, an Edge, and Graph and Map titles and colour: nothing
+      // another Space's Space Resource selects.
+      const [map] = selectedParent.document.maps ?? [];
+      if (map === undefined) throw new Error('Generated Space requires a Map');
+      const [first, second] = selectedParent.resources;
+      const positions = Object.fromEntries(
+        selectedParent.resources.map((resource, index) => [
+          resource.id,
+          { x: index * 300, y: seed % 400, open: false as const },
+        ]),
+      );
+      commit = {
+        changes: [
+          update({
+            ...selectedParent,
+            document: {
+              ...selectedParent.document,
+              maps: [
+                {
+                  ...map,
+                  title: `Map moved ${seed}`,
+                  positions,
+                  graphs: map.graphs.map((graph) => ({
+                    ...graph,
+                    title: `Graph ${seed}`,
+                    color: 'teal',
+                    edges:
+                      first === undefined || second === undefined
+                        ? []
+                        : [{ from: first.id, to: second.id }],
+                  })),
+                },
+              ],
+            },
+          }),
+        ],
+      };
+      break;
+    }
+    case 'selected-graph-replaced': {
+      // Every parent's Space Resource selects the shared Space's one Graph, so
+      // replacing its id leaves them dangling.
+      const [map] = shared.document.maps ?? [];
+      if (map === undefined) throw new Error('Generated Space requires a Map');
+      const replacement = idAt(seed, 250);
+      commit = {
+        changes: [
+          update({
+            ...shared,
+            document: {
+              ...shared.document,
+              maps: [
+                {
+                  ...map,
+                  graphs: [{ id: replacement, title: 'Replacement', edges: [] }],
+                  activeGraph: replacement,
+                },
+              ],
+            },
+          }),
+        ],
+      };
+      break;
+    }
+    case 'graph-added': {
+      const [map] = selectedParent.document.maps ?? [];
+      if (map === undefined) throw new Error('Generated Space requires a Map');
+      commit = {
+        changes: [
+          update({
+            ...selectedParent,
+            document: {
+              ...selectedParent.document,
+              maps: [
+                {
+                  ...map,
+                  graphs: [...map.graphs, { id: idAt(seed, 251), title: 'Added', edges: [] }],
+                },
+              ],
+            },
+          }),
+        ],
+      };
+      break;
+    }
     case 'create-ordinary-space': {
       const created: SpaceSnapshot = {
         id: newSpaceId,
@@ -300,6 +389,17 @@ const fixtureFor = ({
 };
 
 /**
+ * The outcome a scenario exists to reach, where one is fixed, so that both
+ * sides agreeing on some other answer -- a fixture that fails intake, say --
+ * does not pass for the case the scenario names.
+ */
+const expectedKind = (scenario: Scenario): CommitResult['kind'] | undefined => {
+  if (scenario === 'map-internal-update' || scenario === 'graph-added') return 'committed';
+  if (scenario === 'selected-graph-replaced') return 'aggregate-refused';
+  return undefined;
+};
+
+/**
  * Both sides' answers in the browser's vocabulary. A repository's rejection
  * carries the stored seam's `message`, which the memory backend's permanent
  * failure does not (ADR 0057), so a rejection is compared by its code.
@@ -369,6 +469,8 @@ export const assertDifferential = (target: {
       ]);
 
       expect(comparableResult(targetResult)).toEqual(comparableResult(memoryResult));
+      const expected = expectedKind(generated.scenario);
+      if (expected !== undefined) expect(memoryResult.kind).toBe(expected);
       await expect(
         target.repository.loadAggregate().then(comparableAggregateResult),
       ).resolves.toEqual(comparableAggregateResult(await memory.loadAggregate()));

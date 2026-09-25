@@ -245,6 +245,12 @@ export const sqliteSqlStore = (database: SqliteDatabase) => {
       // serialise queues same-handle work; other handles retain that refusal.
       return Promise.resolve();
     },
+    lockAggregateShared(): Promise<void> {
+      // The same file locks and same-handle queue `lockAggregate` relies on
+      // already keep a fast-path read and its write from straddling another
+      // writer's commit (`test/integration/sqlite-fast-path-races.test.ts`).
+      return Promise.resolve();
+    },
     readDocument,
     isDuplicateKey(error: unknown, table: string): boolean {
       return isUniqueViolation(error, table);

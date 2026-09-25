@@ -244,6 +244,21 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
         .build();
       await handle.execute(plan);
     },
+    async lockAggregateShared(handle: Handle): Promise<void> {
+      // `lockAggregate`'s key in shared mode, built the same way: shared
+      // holders do not wait for each other, and wait for, or are waited on by,
+      // the exclusive holder. The two keys must stay identical
+      // (`test/unit/postgres-aggregate-lock-key.test.ts`).
+      const plan = database.sql.public.repository_state
+        .select(() => ({
+          count: database.raw`count(*)::integer`.returns('pg/int4@1'),
+          lock: database.raw`pg_advisory_xact_lock_shared(1213812818, 1)::text`.returns(
+            'pg/text@1',
+          ),
+        }))
+        .build();
+      await handle.execute(plan);
+    },
     readDocument(value: unknown): unknown {
       return value;
     },
