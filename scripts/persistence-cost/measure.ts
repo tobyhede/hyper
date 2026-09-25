@@ -2,46 +2,47 @@
  * Persistence cost harness for small Edits (ticket 17,
  * `.scratch/code-quality/issues/17-measure-persistence-work-for-small-edits.md`).
  *
- * A diagnostic, never a gate: nothing here asserts a threshold, and nothing
- * runs it in `verify` or CI. It drives the real `createSpaceHttpApp` commit
- * route in process, over the real `SqlSpaceRepository` on a migrated temporary
- * SQLite file and over `MemorySpaceRepository`, and reports per commit:
+ * A diagnostic, never a gate: nothing here asserts a threshold, and no job in
+ * `ci.yml` runs it. `.github/workflows/persistence-cost.yml` runs it against
+ * CI's PostgreSQL for the numbers, and reports without judging them. It drives
+ * the real `createSpaceHttpApp` commit route in process, over the real
+ * `SqlSpaceRepository` on PostgreSQL and on a migrated temporary SQLite file,
+ * and over `MemorySpaceRepository`, and reports per commit:
  *
  * - request and response bytes, against `MAX_COMMIT_BODY_BYTES`;
  * - SQL statements the runtime executed, by verb and table (the first table the
  *   statement names, so the one-statement `include` read of a Space and its
  *   Resources is listed under `resources`), the rows they
  *   answered and the bytes of the parameters they carried (a middleware on the
- *   `@prisma-next/sqlite` runtime; the driver's own BEGIN/COMMIT are not plans
- *   and are not counted);
+ *   `@prisma-next` runtime; the driver's own BEGIN/COMMIT are not plans and are
+ *   not counted);
  * - which commit path ran (`fast` or `aggregate`, read off the statements);
+ * - the time the aggregate-lock statements took, which on PostgreSQL includes
+ *   any wait for the lock;
  * - complete Space snapshot parses (`spaceSnapshotSchema.safeParse` calls) and
  *   the Resource documents those parses covered;
- * - wall-clock latency, which is labelled unreliable on a loaded machine.
+ * - wall-clock latency, which is only as good as the machine is quiet.
  *
  * Run from the repository root:
  *
  *   pnpm exec tsx scripts/persistence-cost/measure.ts
  *
- * `PERSISTENCE_COST_SAMPLES` (default 5) sets samples per Edit kind, and
- * `PERSISTENCE_COST_QUICK=1` runs only the smallest scenarios.
+ * `PERSISTENCE_COST_TARGETS` (default `sqlite,memory`) chooses the
+ * repositories, from `postgres`, `sqlite` and `memory`; `postgres` needs
+ * `DATABASE_URL` naming a migrated database, whose content every scenario
+ * deletes. `PERSISTENCE_COST_SAMPLES` (default 5) sets samples per Edit kind,
+ * and `PERSISTENCE_COST_QUICK=1` runs only the smallest scenarios.
  * `PERSISTENCE_COST_TRACE=1` writes every commit's SQL to stderr.
+ *
+ * Contention between independent clients is `contention.ts`.
  */
-import { copyFile, mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { cpus, loadavg, platform, release, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import sqlite from '@prisma-next/sqlite/runtime';
 import { spaceSnapshotSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
 import { decodeCommitResponse, encodeCommitRequest, type SpaceCommit } from '@project/persistence';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
-import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
-import type { Contract } from '../../src/sqlite/contract.d';
-import contractJson from '../../src/sqlite/contract.json' with { type: 'json' };
-import { sqliteSqlStore } from '../../src/sqlite/sql-store';
-import { MemorySpaceRepository } from '../../test/support/memory-space-repository';
-import { migrateSqliteFile } from '../../test/support/sqlite-harness';
 import {
   applyEdit,
   EDIT_KINDS,
@@ -50,28 +51,34 @@ import {
   type Scenario,
   type Workload,
 } from './scenarios';
+import {
+  memoryTarget,
+  postgresTarget,
+  requiredDatabaseUrl,
+  sqliteTarget,
+  type StatementSink,
+  type Target,
+  type TargetName,
+} from './targets';
+import { spread } from './statistics';
 
 const SAMPLES = Number(process.env['PERSISTENCE_COST_SAMPLES'] ?? '5');
 const QUICK = process.env['PERSISTENCE_COST_QUICK'] === '1';
 const TRACE = process.env['PERSISTENCE_COST_TRACE'] === '1';
+const TARGETS = (process.env['PERSISTENCE_COST_TARGETS'] ?? 'sqlite,memory')
+  .split(',')
+  .map((name) => name.trim())
+  .filter((name): name is TargetName => {
+    if (name === 'postgres' || name === 'sqlite' || name === 'memory') return true;
+    throw new Error(`Unknown PERSISTENCE_COST_TARGETS entry "${name}"`);
+  });
 const BODY_LENGTH = 600;
 
 // ---------------------------------------------------------------- counters
 
-interface StatementRecord {
-  readonly verb: string;
-  readonly table: string;
-  readonly rows: number;
-  readonly sql: string;
-  readonly paramBytes: number;
-}
-
-const statements: StatementRecord[] = [];
+const statements: StatementSink = [];
 let snapshotParses = 0;
 let resourcesParsed = 0;
-
-const statementTable = (sql: string): string =>
-  /\b(?:from|into|update)\s+"?(\w+)"?/iu.exec(sql)?.[1] ?? 'none';
 
 /*
  * Every complete snapshot intake — `loadSpaceSnapshot`, and through it
@@ -93,57 +100,6 @@ const resetCounters = (): void => {
   resourcesParsed = 0;
 };
 
-// ---------------------------------------------------------------- repositories
-
-interface Target {
-  readonly name: 'sqlite' | 'memory';
-  readonly repository: SpaceRepository;
-  readonly close: () => Promise<void>;
-}
-
-let migratedTemplate: string | undefined;
-
-const openSqlite = async (directory: string, label: string): Promise<Target> => {
-  if (migratedTemplate === undefined) {
-    migratedTemplate = join(directory, 'template.db');
-    migrateSqliteFile(migratedTemplate);
-  }
-  const path = join(directory, `${label}.db`);
-  await copyFile(migratedTemplate, path);
-  // `src/sqlite/db.ts`'s own options, plus the counting middleware.
-  const database = sqlite<Contract>({
-    contractJson,
-    path,
-    verifyMarker: false,
-    middleware: [
-      {
-        name: 'persistence-cost-statements',
-        afterExecute: (plan, result) => {
-          statements.push({
-            verb: (/^\s*(\w+)/u.exec(plan.sql)?.[1] ?? '?').toLowerCase(),
-            table: statementTable(plan.sql),
-            rows: result.rowCount,
-            paramBytes: Buffer.byteLength(JSON.stringify(plan.params)),
-            sql: plan.sql,
-          });
-          return Promise.resolve();
-        },
-      },
-    ],
-  });
-  return {
-    name: 'sqlite',
-    repository: new SqlSpaceRepository(sqliteSqlStore(database)),
-    close: () => database.close(),
-  };
-};
-
-const openMemory = (): Target => ({
-  name: 'memory',
-  repository: new MemorySpaceRepository(),
-  close: () => Promise.resolve(),
-});
-
 // ---------------------------------------------------------------- one commit
 
 type Outcome = 'committed' | 'conflict' | 'refused' | 'too-large' | 'other';
@@ -164,6 +120,8 @@ interface Sample {
   readonly path: string;
   readonly snapshotParses: number;
   readonly resourcesParsed: number;
+  /** Time spent in aggregate-lock statements, including any wait for the lock. */
+  readonly lockMs: number;
   readonly ms: number;
 }
 
@@ -178,7 +136,11 @@ const outcomeOf = (status: number): Outcome => {
 const commitPath = (target: Target): string => {
   if (target.name === 'memory') return 'decideCommit';
   if (statements.length === 0) return 'none';
-  if (statements.some((s) => s.table === 'repository_state' && s.verb === 'update')) {
+  if (
+    statements.some(
+      (s) => s.lock === 'exclusive' || (s.table === 'repository_state' && s.verb === 'update'),
+    )
+  ) {
     return 'aggregate';
   }
   return statements.some((s) => s.verb === 'update' || s.verb === 'insert')
@@ -235,6 +197,7 @@ const post = async (
       path: commitPath(target),
       snapshotParses,
       resourcesParsed,
+      lockMs: statements.filter((s) => s.lock !== undefined).reduce((sum, s) => sum + s.ms, 0),
       ms,
     },
   };
@@ -362,14 +325,6 @@ const largestAccepted = (bodyLength: number): number => {
 
 // ---------------------------------------------------------------- report
 
-const median = (values: readonly number[]): number => {
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1
-    ? (sorted[middle] ?? Number.NaN)
-    : ((sorted[middle - 1] ?? Number.NaN) + (sorted[middle] ?? Number.NaN)) / 2;
-};
-
 const deterministic = (sample: Sample): string =>
   [
     sample.outcome,
@@ -390,17 +345,17 @@ const report = (samples: readonly Sample[]): void => {
     groups.set(key, group);
   }
   console.log(
-    '| repo | scenario | edit | outcome | path | req bytes | resp bytes | stmts | rows read | rows written | param bytes written | snapshot parses | resource docs parsed | ms median (min–max) | statements |',
+    '| repo | scenario | edit | outcome | path | req bytes | resp bytes | stmts | rows read | rows written | param bytes written | snapshot parses | resource docs parsed | n | ms median / p90 (min–max) | lock stmt ms median / p90 (min–max) | statements |',
   );
-  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const group of groups.values()) {
     const [first] = group;
     if (first === undefined) continue;
     const stable = group.every((sample) => deterministic(sample) === deterministic(first));
-    const times = group.map((sample) => sample.ms);
+    const locked = group.some((sample) => sample.lockMs > 0);
     const range = (values: readonly number[]) => `${Math.min(...values)}–${Math.max(...values)}`;
     console.log(
-      `| ${first.target} | ${first.scenario} | ${first.edit} | ${first.outcome} | ${first.path}${stable ? '' : ' (varies)'} | ${range(group.map((s) => s.requestBytes))} | ${range(group.map((s) => s.responseBytes))} | ${range(group.map((s) => s.statements))} | ${range(group.map((s) => s.rowsRead))} | ${range(group.map((s) => s.rowsWritten))} | ${range(group.map((s) => s.paramBytesWritten))} | ${range(group.map((s) => s.snapshotParses))} | ${range(group.map((s) => s.resourcesParsed))} | ${median(times).toFixed(1)} (${Math.min(...times).toFixed(1)}–${Math.max(...times).toFixed(1)}) | ${first.byVerb} |`,
+      `| ${first.target} | ${first.scenario} | ${first.edit} | ${first.outcome} | ${first.path}${stable ? '' : ' (varies)'} | ${range(group.map((s) => s.requestBytes))} | ${range(group.map((s) => s.responseBytes))} | ${range(group.map((s) => s.statements))} | ${range(group.map((s) => s.rowsRead))} | ${range(group.map((s) => s.rowsWritten))} | ${range(group.map((s) => s.paramBytesWritten))} | ${range(group.map((s) => s.snapshotParses))} | ${range(group.map((s) => s.resourcesParsed))} | ${group.length} | ${spread(group.map((s) => s.ms))} | ${locked ? spread(group.map((s) => s.lockMs)) : '—'} | ${first.byVerb} |`,
     );
   }
 };
@@ -430,11 +385,15 @@ const WORKLOADS: readonly Workload[] = (
   bodyLength: BODY_LENGTH,
 }));
 
+const runner = process.env['RUNNER_NAME'];
+
 const main = async (): Promise<void> => {
   const [cpu] = cpus();
   console.log('## Environment\n');
+  console.log(`- targets: ${TARGETS.join(', ')}`);
   console.log(`- node ${process.version}, ${platform()} ${release()}`);
   console.log(`- ${cpus().length} logical CPUs, ${cpu?.model ?? 'unknown model'}`);
+  if (runner !== undefined) console.log(`- GitHub Actions runner: ${runner}`);
   console.log(
     `- load average at start: ${loadavg()
       .map((value) => value.toFixed(1))
@@ -446,11 +405,23 @@ const main = async (): Promise<void> => {
   console.log(`- MAX_COMMIT_BODY_BYTES: ${MAX_COMMIT_BODY_BYTES}\n`);
 
   const directory = await mkdtemp(join(tmpdir(), 'hyper-persistence-cost-'));
+  const postgres = TARGETS.includes('postgres')
+    ? postgresTarget(requiredDatabaseUrl(), statements)
+    : undefined;
+  const open = async (name: TargetName, label: string): Promise<Target> => {
+    if (name === 'sqlite') return sqliteTarget(directory, label, statements);
+    if (name === 'memory') return memoryTarget();
+    if (postgres === undefined) throw new Error('postgres was not opened');
+    await postgres.clear();
+    // The one runtime serves every scenario, so closing it waits for the end.
+    return { ...postgres, close: () => Promise.resolve() };
+  };
   const samples: Sample[] = [];
   try {
     for (const [index, workload] of WORKLOADS.entries()) {
       const subject = scenario(workload);
-      for (const target of [await openSqlite(directory, `scenario-${index}`), openMemory()]) {
+      for (const name of TARGETS) {
+        const target = await open(name, `scenario-${index}`);
         try {
           samples.push(...(await runScenario(target, subject)));
         } finally {
@@ -467,7 +438,8 @@ const main = async (): Promise<void> => {
       unrelatedResources: 0,
       bodyLength: BODY_LENGTH,
     });
-    const target = await openSqlite(directory, 'oversized');
+    const [first = 'memory'] = TARGETS;
+    const target = await open(first, 'oversized');
     try {
       await target.repository.initializeAggregate({
         metaSpaceId: oversized.metaSpaceId,
@@ -496,6 +468,10 @@ const main = async (): Promise<void> => {
       await target.close();
     }
   } finally {
+    if (postgres !== undefined) {
+      await postgres.clear();
+      await postgres.close();
+    }
     await rm(directory, { recursive: true, force: true });
   }
 
