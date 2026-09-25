@@ -46,10 +46,10 @@ export interface SpaceSessionState {
      * The two share one recovery: neither offers Retry unless a recovery
      * attempt was blocked ({@link canRetry}), and both leave `submit` free to
      * resubmit past them, because an authored correction is what a refusal or a
-     * rejection alike waits for. A shared `kind` would cost the type-level
-     * distinction between "the server declined the request" and "the proposed
-     * aggregate is invalid". A `refused` state makes that distinction the discriminant, so a consumer
-     * that means one and not the other says so at the type it switches on.
+     * rejection alike waits for. Their own `kind` is the distinction between
+     * "the server declined the request" and "the proposed aggregate is
+     * invalid", so a consumer that means one and not the other says so at the
+     * type it switches on.
      */
     | { kind: 'refused'; failure: AggregateRefusal; blocked?: SaveBlock }
     | {

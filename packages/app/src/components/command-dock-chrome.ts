@@ -10,6 +10,7 @@ import type { MapMemberships } from '../map-memberships';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
 import type { StoredSpaceRefusal } from '../space-authoring';
+import type { OpenBlockingSpace } from './PersistenceControl';
 
 /**
  * **What the Dock is given, in the groups the surface it replaced was given
@@ -103,7 +104,7 @@ export interface DockPersistence {
    * Go to the Space whose recovery blocks this one's save, or `null` with no
    * open set to go through.
    */
-  readonly onOpenSpace: ((spaceId: UUID, title: string) => void) | null;
+  readonly onOpenSpace: OpenBlockingSpace | null;
   /** Take the stored Space over the local one, ending a conflict. */
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   /** Keep the local Space and commit it again, ending a conflict. */

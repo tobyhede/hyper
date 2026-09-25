@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import type { UUID } from '@project/core';
-import { canRetry, type RetryablePersistence, type SpaceSessionState } from '@project/persistence';
+import {
+  canRetry,
+  type RetryablePersistence,
+  type SaveBlock,
+  type SpaceSessionState,
+} from '@project/persistence';
 import {
   Alert,
   AlertAction,
@@ -32,7 +37,12 @@ export interface PersistenceControlProps {
   readonly persistence: SpaceSessionState['persistence'];
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
+  /** Go to the Space whose recovery blocks keeping local work, when there is a way to. */
+  readonly onOpenSpace?: OpenBlockingSpace | null;
 }
+
+/** Go to the Space a {@link SaveBlock} names, which is where it is resolved. */
+export type OpenBlockingSpace = (spaceId: UUID, title: string) => void;
 
 type Persistence = SpaceSessionState['persistence'];
 /**
@@ -70,6 +80,7 @@ export function PersistenceControl({
   persistence,
   onAcceptRemote,
   onKeepLocal,
+  onOpenSpace = null,
 }: PersistenceControlProps) {
   const rejection: Rejection | null =
     persistence.kind === 'rejected' || persistence.kind === 'refused' ? persistence : null;
@@ -93,6 +104,7 @@ export function PersistenceControl({
         conflict={persistence}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={onKeepLocal}
+        onOpenSpace={onOpenSpace}
       />
     );
   }
@@ -120,7 +132,7 @@ export interface PersistenceNoticeProps {
   readonly persistence: SpaceSessionState['persistence'];
   readonly onRetry: () => void;
   /** Go to the Space whose recovery blocks this save, when there is a way to. */
-  readonly onOpenSpace?: ((spaceId: UUID, title: string) => void) | null;
+  readonly onOpenSpace?: OpenBlockingSpace | null;
 }
 
 /**
@@ -139,30 +151,19 @@ export interface PersistenceNoticeProps {
  * `role="alert"` is the shared `Alert`'s, so the reason is announced when it
  * arrives rather than sitting in a `title` attribute nothing reads aloud.
  */
-export function PersistenceNotice({ persistence, onRetry, onOpenSpace }: PersistenceNoticeProps) {
+export function PersistenceNotice({
+  persistence,
+  onRetry,
+  onOpenSpace = null,
+}: PersistenceNoticeProps) {
   if (!canRetry(persistence)) return null;
-  const { blocked } = persistence;
-  const blocking = blocked?.code === 'persistence-recovery-required' ? blocked : null;
 
   return (
     <Alert variant="destructive" data-testid="persistence-failure">
       <AlertIcon />
       <AlertTitle>Changes not saved</AlertTitle>
       <AlertDescription>{noticeReason(persistence)}</AlertDescription>
-      {blocking === null || onOpenSpace === undefined || onOpenSpace === null ? null : (
-        <div className="mt-1.5 group-has-[>svg]/alert:col-start-2">
-          <Button
-            variant="secondary"
-            size="compact"
-            data-testid="persistence-open-blocking-space"
-            onClick={() => {
-              onOpenSpace(blocking.spaceId, blocking.title);
-            }}
-          >
-            Open {blocking.title}
-          </Button>
-        </div>
-      )}
+      <OpenBlockingSpaceButton blocked={persistence.blocked} onOpenSpace={onOpenSpace} />
       <AlertAction>
         <Button
           variant="secondary"
@@ -174,6 +175,34 @@ export function PersistenceNotice({ persistence, onRetry, onOpenSpace }: Persist
         </Button>
       </AlertAction>
     </Alert>
+  );
+}
+
+/**
+ * The way to the Space a recovery blocked on, drawn only when the block names
+ * one and the caller can go there.
+ */
+function OpenBlockingSpaceButton({
+  blocked,
+  onOpenSpace,
+}: {
+  readonly blocked: SaveBlock | undefined;
+  readonly onOpenSpace: OpenBlockingSpace | null;
+}) {
+  if (blocked?.code !== 'persistence-recovery-required' || onOpenSpace === null) return null;
+  return (
+    <div className="mt-1.5 group-has-[>svg]/alert:col-start-2">
+      <Button
+        variant="secondary"
+        size="compact"
+        data-testid="persistence-open-blocking-space"
+        onClick={() => {
+          onOpenSpace(blocked.spaceId, blocked.title);
+        }}
+      >
+        Open {blocked.title}
+      </Button>
+    </div>
   );
 }
 
@@ -206,10 +235,12 @@ function ConflictControl({
   conflict,
   onAcceptRemote,
   onKeepLocal,
+  onOpenSpace,
 }: {
   readonly conflict: Conflict;
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
+  readonly onOpenSpace: OpenBlockingSpace | null;
 }) {
   const recovery = conflictRecovery(conflict);
   const [refused, setRefused] = useState<RefusedRecovery | null>(null);
@@ -239,6 +270,7 @@ function ConflictControl({
           <Alert variant="destructive" data-testid="persistence-keep-local-blocked">
             <AlertTitle>Unable to keep local</AlertTitle>
             <AlertDescription>{describeSaveBlock(conflict.blocked)}</AlertDescription>
+            <OpenBlockingSpaceButton blocked={conflict.blocked} onOpenSpace={onOpenSpace} />
           </Alert>
         )}
         <AlertDialogFooter>

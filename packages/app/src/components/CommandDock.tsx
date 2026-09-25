@@ -681,6 +681,7 @@ function PersistenceReport({
           persistence={state}
           onAcceptRemote={persistence.onAcceptRemote}
           onKeepLocal={persistence.onKeepLocal}
+          onOpenSpace={persistence.onOpenSpace}
         />
       ) : null}
       {canRetry(state) && persistence.active ? (

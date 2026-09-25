@@ -2,6 +2,7 @@ import type { MapId, GraphId, UUID } from '@project/core';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { resolveProductDestination } from '@project/http';
 import {
+  canRetry,
   createObservableState,
   createSpaceSessionRegistry,
   createWorkingSpaceLoader,
@@ -557,7 +558,8 @@ export function createOpenSpaces({
     if (existing !== undefined) return existing;
     // A live session is already working, so it is what the Space opens on:
     // that is how a created Space no commit has stored yet is reached, such
-    // as one whose recovery blocks another Space's save.
+    // as one whose recovery blocks another Space's save
+    // (`blocked-save-retry.test.tsx`, 'names the blocking Space, reaches it…').
     const live = registry.session(spaceId);
     const opening =
       live === undefined
@@ -742,7 +744,9 @@ export function createOpenSpaces({
     for (;;) {
       await registry.waitUntilRetirable(spaceId);
       const persistence = target.session.getState().persistence;
-      if (persistence.kind === 'failed') {
+      // A blocked recovery offers Retry, so its Edits are still recoverable
+      // here and exiting would abandon them, as it would a retryable failure.
+      if (canRetry(persistence)) {
         return {
           kind: 'refused',
           refusal: { code: 'persistence-recovery-required', recovery: 'retry' },
@@ -754,11 +758,11 @@ export function createOpenSpaces({
           refusal: { code: 'persistence-recovery-required', recovery: 'resolve-conflict' },
         };
       }
-      // A permanent rejection and an aggregate refusal (`v1-release/17`) warn
-      // the same way here: both leave nothing stored to lose by leaving, and
-      // both recover only through a further Edit rather than through this
-      // Space's own persistence surface, so exiting is the same choice either
-      // way.
+      // A permanent rejection and an aggregate refusal (`v1-release/17`) that
+      // no recovery attempt has blocked warn the same way here: both leave
+      // nothing stored to lose by leaving, and both recover only through a
+      // further Edit rather than through this Space's own persistence surface,
+      // so exiting is the same choice either way.
       if (
         (persistence.kind === 'rejected' || persistence.kind === 'refused') &&
         confirmation?.warning !== 'persistence-rejected'

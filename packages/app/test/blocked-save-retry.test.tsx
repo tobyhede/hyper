@@ -150,6 +150,81 @@ const blockedSequence = async () => {
   return { control, backend, openSpaces, meta, targetId };
 };
 
+/**
+ * The same block one level down, on a Space that can exit: C1 creates CHILD in
+ * TARGET and is rejected; C2 creates a Space in CHILD and conflicts; then an
+ * Edit in TARGET asks C1's recovery to replay, which CHILD, now held by C2,
+ * blocks.
+ */
+const blockedTarget = async () => {
+  const control = new MemorySpaceBackendTestControl();
+  const backend = new MemorySpaceBackend(
+    META_ID,
+    [{ snapshot: metaSnapshot, revision: 3n, exportedRevision: null }],
+    control,
+  );
+  const openSpaces = createOpenSpaces({
+    backend,
+    metaSpaceId: META_ID,
+    metaSpaceTitle: 'Meta',
+    newId: countingIds(),
+    history: recordingHistory(),
+  });
+  const meta = await openSpaces.open(META_ID);
+  render(<OpenSpacesApplication spaces={openSpaces} initial={meta} />);
+
+  const createIn = async (containing: OpenSpace, title: string) => {
+    const mapId = containing.session.getState().working.document.defaultMap;
+    if (mapId === undefined) throw new Error(`${title}'s container has no Map`);
+    const created = await act(() =>
+      openSpaces.spaceResources.create({
+        containingSpaceId: containing.id,
+        mapId,
+        title,
+        position: { x: 240, y: 0 },
+      }),
+    );
+    if (created.kind !== 'completed') throw new Error(`${title} did not install`);
+    return targetOf(containing, created.resourceId);
+  };
+
+  const targetId = await createIn(meta, 'Target');
+  await waitFor(() => expect(meta.session.getState().persistence.kind).toBe('settled'));
+  const target = await act(() => openSpaces.embed(targetId));
+
+  control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
+  const childId = await createIn(target, 'Child');
+  await waitFor(() => expect(target.session.getState().persistence.kind).toBe('rejected'));
+
+  const child = await act(() => openSpaces.embed(childId));
+  control.queueResult({
+    kind: 'conflict',
+    conflicts: [
+      {
+        spaceId: childId,
+        current: {
+          snapshot: renamed(child.session.getState().working, 'Child'),
+          revision: 9n,
+          exportedRevision: null,
+        },
+      },
+    ],
+  });
+  await createIn(child, 'Grandchild');
+  await waitFor(() => expect(child.session.getState().persistence.kind).toBe('conflicted'));
+
+  act(() => {
+    target.session.submit(renamed(target.session.getState().working, 'Target edited'));
+  });
+  await waitFor(() =>
+    expect(target.session.getState().persistence).toMatchObject({
+      kind: 'rejected',
+      blocked: { spaceId: childId },
+    }),
+  );
+  return { control, openSpaces, target, targetId };
+};
+
 const notice = () => screen.getByTestId('persistence-failure');
 
 describe('A save another Space blocks', () => {
@@ -249,5 +324,18 @@ describe('A save another Space blocks', () => {
     expect(within(notice()).getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(notesTitle(meta)).toBe(EDITED);
     expect(control.requests).toHaveLength(2);
+  });
+
+  it('refuses to exit a Space whose blocked save Retry can still make', async () => {
+    const { control, openSpaces, target, targetId } = await blockedTarget();
+    const requests = control.requests.length;
+
+    await expect(openSpaces.exit(targetId)).resolves.toEqual({
+      kind: 'refused',
+      refusal: { code: 'persistence-recovery-required', recovery: 'retry' },
+    });
+    expect(openSpaces.entry(targetId)).toBe(target);
+    expect(target.session.getState().working.document.title).toBe('Target edited');
+    expect(control.requests).toHaveLength(requests);
   });
 });

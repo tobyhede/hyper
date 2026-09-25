@@ -455,4 +455,24 @@ describe('PersistenceNotice', () => {
     );
     expect(screen.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
   });
+
+  it('offers to open the Space whose recovery blocks keeping local work', () => {
+    const onOpenSpace = vi.fn();
+    render(
+      <PersistenceControl
+        persistence={{
+          kind: 'conflicted',
+          current: STORED,
+          baseline: undefined,
+          blocked: blockedByTarget,
+        }}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+        onOpenSpace={onOpenSpace}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Target' }));
+    expect(onOpenSpace).toHaveBeenCalledWith(TARGET_ID, 'Target');
+  });
 });
