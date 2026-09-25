@@ -2,7 +2,7 @@
 
 **Priority:** P2 — bounded measurement task
 
-**Status:** resolved. PostgreSQL, SQLite and memory are measured on the current code, including aggregate-lock contention between independent clients; see "Current measurement". The findings first recorded here predate tickets 20 and 21 and are kept, labelled, as the historical baseline. One question the contention numbers raise is left for a human under "Open question".
+**Status:** resolved. PostgreSQL, SQLite and memory are measured on the current code, including aggregate-lock contention between independent clients; see "Current measurement". The findings first recorded here predate tickets 20 and 21 and are kept, labelled, as the historical baseline. The question the contention numbers raise was accepted by the user; see "Decision on aggregate-lock contention".
 
 **Blocked by:** None
 
@@ -99,7 +99,9 @@ SQLite cannot answer this question and was not measured for it: every write on a
 
 **Acceptable within the measured range**, on these numbers, for one author or a few: a fast-path Edit is 6–14 ms on PostgreSQL for Spaces up to 100 Resources, whatever the aggregate, and ~90 ms at 1,000; an aggregate-path Edit is under ~65 ms up to about 1,100 Resources in the aggregate and ~170 ms at 4,000. No optimisation is filed. The contention result is the one place the numbers could change that, and it is left as a question rather than decided here.
 
-### Open question
+### Decision on aggregate-lock contention
+
+**Accepted by the user, 2026-09-25.** An aggregate-path commit may stall every other author's fast-path commits for its duration within the measured range. No follow-up ticket is filed. Reopen this if a workload beyond the measured range makes the stall matter.
 
 Whether an aggregate-path commit may stall every other author's fast-path commits for its duration is a product and design question, not a measurement. At 1,100 Resources that is ~60 ms per membership change; it grows linearly with the aggregate. If it matters, the candidates each need their own ticket and differential/concurrency tests: take the exclusive lock only for the part of the aggregate decision that needs it; make more Edits fast-path (ticket 21 already names `defaultMap`); or bound the aggregate size. Nothing in this ticket's range makes it urgent.
 
@@ -194,4 +196,4 @@ A 1,500-Resource Space (1,315,039 bytes) was answered 413 with no statements and
 
 ## Remaining
 
-Nothing in this ticket. The PostgreSQL run and the contention question it listed are answered above; the question the contention answer raises is under "Open question".
+Nothing in this ticket. The PostgreSQL run and the contention question it listed are answered above; the question the contention answer raises is decided under "Decision on aggregate-lock contention".
