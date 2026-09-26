@@ -1220,7 +1220,7 @@ describe('Space app Resources list', () => {
    * Refused through a spy on the Space Resource lifecycle, because its
    * refusals are races or recovery states no mount can stage.
    */
-  it('reports a refused Dock Delete Map as Map not deleted and keeps the Map', async () => {
+  it('clears a refused Dock Delete Map notice when another Map is selected', async () => {
     const base = snapshot('Space', 'Resource', 10, 20);
     const stored = { snapshot: base, revision: 0n, exportedRevision: null };
     const { spaceSession: session, spaceResources } = openTestSpace(
@@ -1246,8 +1246,11 @@ describe('Space app Resources list', () => {
     expect(screen.getByText('This Map is no longer part of the Space.')).toBeInTheDocument();
     expect(session.getState().working.document.maps).toHaveLength(2);
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent(title);
-    fireEvent.click(notice);
-    await waitFor(() => expect(screen.queryByText('Map not deleted')).not.toBeInTheDocument());
+
+    act(() => app.navigation.selectMap(MAP_ID));
+    await waitFor(() => expect(notice).not.toBeInTheDocument());
+    expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Map');
+    expect(session.getState().working.document.maps).toHaveLength(2);
   });
 
   /**
