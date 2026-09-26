@@ -1,8 +1,8 @@
 import type { ResourceDocument, GraphId, MapId, UUID } from '@project/core';
 import {
   graphColor,
+  type CanvasSpaceResourceCommands,
   type CanvasSpaceResourceGraphCommands,
-  type CanvasSpaceResourceMapCommands,
 } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
@@ -11,11 +11,10 @@ import { offered, renameDraftAnswer } from './authoring-commands';
 import { embeddedGraphAuthoringCommands } from './graph-authoring-commands';
 import { embeddedMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
-import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 
 interface SpaceResourceContextCommands {
-  readonly mapCommands: CanvasSpaceResourceMapCommands;
+  readonly mapCommands: CanvasSpaceResourceCommands;
   readonly graphCommands?: CanvasSpaceResourceGraphCommands;
 }
 
@@ -24,11 +23,8 @@ export interface SpaceResourceRailContext {
   readonly entry: OpenSpace;
   readonly spaces: OpenSpaces;
   readonly containingSpaceId: UUID;
-  /** The containing canvas's, where a Map report from this rail is held. */
+  /** The containing canvas's, where a report from this rail is held. */
   readonly commandOutcomes: CommandOutcomes;
-  readonly complete: (
-    completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
-  ) => AuthoringResult;
 }
 
 /** The Dock commands, addressed to the target and the context this Resource stores. */
@@ -56,7 +52,7 @@ export function spaceResourceContextCommands(
   const addressed = mapAuthoring.map(mapId);
   // Each press is built from the capability that answers its availability,
   // so the rail draws a command unavailable exactly when invoking it would be.
-  const mapCommands: CanvasSpaceResourceMapCommands = {
+  const mapCommands: CanvasSpaceResourceCommands = {
     // The containing canvas's command outcomes hold the report: the notice
     // is drawn by the Space the author is looking at, not by the target. The
     // editor holds a refused draft open on the report's sentence.
@@ -122,10 +118,11 @@ export function spaceResourceContextCommands(
       }),
       // Graph authoring orders the creation and the selection write, and the
       // containing canvas holds its report. The rail does not continue into
-      // the new Graph's name, and the creation never moves the containing
-      // canvas's Map.
+      // the new Graph's name, so the caret never goes there, and the creation
+      // never moves the containing canvas's Map.
       onCreate: offered(graphAuthoring.map(mapId).create, (create) => async () => {
         await commandOutcomes.run('graph-create', create);
+        return false;
       }),
       // Graph authoring waits for both Spaces, repoints every Space Resource
       // that selected the Graph — this one included — and leaves the target's

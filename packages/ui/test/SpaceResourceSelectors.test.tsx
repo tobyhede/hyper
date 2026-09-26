@@ -202,7 +202,7 @@ describe('SpaceResourceSelectors', () => {
 
   /**
    * A Map or Graph creation's refusal is the containing canvas's notice, so
-   * the rail reports no sentence of its own for either; a Map creation
+   * the rail reports no sentence of its own for either; each creation
    * answers only whether the caret went on.
    */
   it('reports no sentence of its own for a Map or a Graph creation', async () => {
@@ -218,7 +218,7 @@ describe('SpaceResourceSelectors', () => {
         },
         graphCommands: {
           onRename: () => null,
-          onCreate: () => Promise.resolve(),
+          onCreate: () => Promise.resolve(false),
           onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
           color: '#1f77b4',
@@ -254,7 +254,7 @@ describe('SpaceResourceSelectors', () => {
     const onReport = vi.fn();
     const graphCommands = {
       onRename: () => null,
-      onCreate: () => Promise.resolve(),
+      onCreate: () => Promise.resolve(false),
       onDelete: () => Promise.resolve(),
       onCopyLink: () => Promise.resolve(null),
       color: '#1f77b4',
@@ -338,7 +338,7 @@ describe('SpaceResourceSelectors', () => {
       clusters({
         graphCommands: {
           onRename: () => null,
-          onCreate: () => Promise.resolve(),
+          onCreate: () => Promise.resolve(false),
           onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
           color: '#1f77b4',

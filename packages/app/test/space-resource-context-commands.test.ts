@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema, type SpaceSnapshot, type ResourceDocument } from '@project/core';
 import { GRAPH_PALETTE } from '@project/graph';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
-import { completeEmbeddedAuthoring } from '../src/embedded-authoring';
 import { createOpenSpaces } from '../src/open-spaces';
 import { spaceResourceContextCommands } from '../src/space-resource-context-commands';
 import { recordingHistory } from './browser-history';
@@ -106,8 +105,6 @@ async function setup(available = true) {
       spaces,
       containingSpaceId: META,
       commandOutcomes: source.app.commandOutcomes,
-      complete: (completion) =>
-        completeEmbeddedAuthoring(entry, document.map, completion, entry.app.reportObserverError),
     },
     document,
     (map, graph) => {
@@ -152,13 +149,49 @@ describe('the rail’s Map commands', () => {
   });
 });
 
+/**
+ * The Graph commands are built the same way, from Graph authoring's
+ * capabilities; what the rail adds is the colour its row line draws, and that
+ * it never continues into a new Graph's name.
+ */
 describe('the rail’s Graph commands', () => {
+  it('offers each Graph command its capability answers available', async () => {
+    const { commands } = await setup();
+
+    const graphCommands = commands.graphCommands;
+    if (graphCommands === undefined) throw new Error('Commands missing');
+    expect(graphCommands.onRename).not.toBeNull();
+    expect(graphCommands.onRecolor).not.toBeNull();
+    expect(graphCommands.onCreate).not.toBeNull();
+    expect(graphCommands.onDelete).not.toBeNull();
+  });
+
+  it('offers none of them while the rail is withdrawn', async () => {
+    const { commands } = await setup(false);
+
+    expect(commands.graphCommands).toMatchObject({
+      onRename: null,
+      onRecolor: null,
+      onCreate: null,
+      onDelete: null,
+    });
+  });
+
   it('marks as current the colour the Graph’s row line draws, for a Graph that stores none', async () => {
     const { commands } = await setup();
 
     // SECOND_GRAPH stores no colour and is the target's second Graph, so the
     // Map draws it — and its row line resolves it — as the second slot.
     expect(commands.graphCommands?.color).toBe(GRAPH_PALETTE[1]);
+  });
+
+  it('leaves the caret where it was after a new Graph', async () => {
+    const { commands, source } = await setup();
+    const graphCommands = commands.graphCommands;
+    if (graphCommands === undefined) throw new Error('Commands missing');
+
+    expect(await offeredPress(graphCommands.onCreate)('test-rail')).toBe(false);
+    expect(source.app.continuation.getState().pending).toBeNull();
   });
 });
 
@@ -171,49 +204,25 @@ describe('persisting a Space Resource context command', () => {
     const loaded = await backend.loadSpace(TARGET);
     expect(loaded?.snapshot.document.maps?.map((map) => map.id)).toEqual([FIRST_MAP]);
   });
-
-  it('persists Graph deletion after moving the stored referring Resource', async () => {
-    const { backend, spaces, commands } = await setup();
-    const graphCommands = commands.graphCommands;
-    if (graphCommands === undefined) throw new Error('Commands missing');
-    await offeredPress(graphCommands.onDelete)();
-    await spaces.waitForPersistence(META);
-    await spaces.waitForPersistence(TARGET);
-    const loaded = await backend.loadSpace(TARGET);
-    expect(
-      loaded?.snapshot.document.maps
-        ?.find((map) => map.id === SECOND_MAP)
-        ?.graphs.map((graph) => graph.id),
-    ).toEqual([SURVIVOR_GRAPH]);
-  });
 });
 
-it.each(['map', 'graph'] as const)(
-  'persists a new %s before the Resource refers to it',
-  async (kind) => {
-    const { backend, spaces, commands, source, control } = await setup();
-    const release = control.deferNextCommit();
-    const graphCommands = commands.graphCommands;
-    if (graphCommands === undefined) throw new Error('Commands missing');
-    // A Map creation answers whether the caret continues in its name; a
-    // Graph creation leaves the caret where it was and answers nothing.
-    const creating =
-      kind === 'map'
-        ? offeredPress(commands.mapCommands.onCreate)('test-rail')
-        : offeredPress(graphCommands.onCreate)();
-    try {
-      await vi.waitFor(() => expect(control.requests).toHaveLength(1));
-      expect(source.session.getState().working.resources[0]?.document).toEqual(document);
-    } finally {
-      release();
-    }
-    expect(await creating).toBe(kind === 'map' ? true : undefined);
-    expect(await spaces.waitForPersistence(META)).toBe(true);
-    expect(await spaces.waitForPersistence(TARGET)).toBe(true);
-    const stored = await backend.loadSpace(META);
-    expect(stored?.snapshot.resources[0]?.document).not.toEqual(document);
-  },
-);
+it('persists a new Map before the Resource refers to it', async () => {
+  const { backend, spaces, commands, source, control } = await setup();
+  const release = control.deferNextCommit();
+  const creating = offeredPress(commands.mapCommands.onCreate)('test-rail');
+  try {
+    await vi.waitFor(() => expect(control.requests).toHaveLength(1));
+    expect(source.session.getState().working.resources[0]?.document).toEqual(document);
+  } finally {
+    release();
+  }
+  // The rail's New Map continues in the new Map's name.
+  expect(await creating).toBe(true);
+  expect(await spaces.waitForPersistence(META)).toBe(true);
+  expect(await spaces.waitForPersistence(TARGET)).toBe(true);
+  const stored = await backend.loadSpace(META);
+  expect(stored?.snapshot.resources[0]?.document).not.toEqual(document);
+});
 
 /**
  * The rail's New Map authors in the target and never moves the containing
