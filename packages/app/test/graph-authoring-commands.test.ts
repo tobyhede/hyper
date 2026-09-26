@@ -8,7 +8,11 @@ import {
   type ResourceDocument,
   type SpaceSnapshot,
 } from '@project/core';
-import { MemorySpaceBackend } from '@project/persistence';
+import {
+  MemorySpaceBackend,
+  MemorySpaceBackendTestControl,
+  type ObserverErrorReporter,
+} from '@project/persistence';
 import { renameDraftAnswer } from '../src/authoring-commands';
 import type { CommandOutcomes } from '../src/command-outcomes';
 import {
@@ -17,7 +21,7 @@ import {
   type GraphAuthoringCommands,
 } from '../src/graph-authoring-commands';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
-import type { AuthoringRefusal } from '../src/space-authoring';
+import type { AuthoringResult } from '../src/space-authoring';
 import { recordingHistory } from './browser-history';
 
 const id = (suffix: string) =>
@@ -92,16 +96,23 @@ const target: SpaceSnapshot = {
   resources: [],
 };
 
-const openSpaces = () =>
+const PERSISTENCE_UNSETTLED = 'The change could not be saved. Check the Space persistence status.';
+
+const openSpaces = (
+  control = new MemorySpaceBackendTestControl(),
+  reportObserverError: ObserverErrorReporter = () => undefined,
+) =>
   createOpenSpaces({
     backend: new MemorySpaceBackend(
       META,
       [meta, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+      control,
     ),
     metaSpaceId: META,
     metaSpaceTitle: meta.document.title,
     newId: newUuid,
     history: recordingHistory(),
+    reportObserverError,
   });
 
 const selectOn =
@@ -114,6 +125,17 @@ const selectOn =
     });
     return result.kind === 'refused' ? result.refusal.code : null;
   };
+
+const storedSelection = (source: OpenSpace) => {
+  const stored = source.session.getState().working.resources[0]?.document;
+  return stored?.kind === 'space' ? { map: stored.map, graph: stored.graph } : undefined;
+};
+
+const graphsOf = (space: OpenSpace, mapId: MapId): readonly GraphId[] =>
+  space.app
+    .currentSpace()
+    .lookup.map(mapId)
+    ?.map.graphs.map((graph) => graph.id) ?? [];
 
 const graphOf = (space: OpenSpace, mapId: MapId, graphId: GraphId) =>
   space.app
@@ -140,8 +162,10 @@ interface ContractContext {
   readonly graphId: GraphId;
   readonly commands: GraphAuthoringCommands;
   readonly withdraw: () => void;
-  /** Refuse the context's next Edit, as Space Authoring would. */
-  readonly refuseNext: (refusal: AuthoringRefusal) => void;
+  /** Answer the context's next Edit with `answer` in place of Space Authoring. */
+  readonly answerNext: (answer: () => AuthoringResult) => void;
+  /** What reached the reporter. */
+  readonly reported: readonly unknown[];
 }
 
 const contexts: readonly {
@@ -151,7 +175,8 @@ const contexts: readonly {
   {
     name: 'the top-level Space',
     setup: async () => {
-      const spaces = openSpaces();
+      const reported: unknown[] = [];
+      const spaces = openSpaces(undefined, (error) => reported.push(error));
       const authored = await spaces.open(TARGET);
       let available = true;
       return {
@@ -162,23 +187,23 @@ const contexts: readonly {
         commands: topLevelGraphAuthoringCommands(authored, {
           rename: () => available,
           recolor: () => available,
+          create: () => available,
         }),
         withdraw: () => {
           available = false;
         },
-        refuseNext: (refusal) => {
-          vi.spyOn(authored.app.authoring, 'complete').mockReturnValueOnce({
-            kind: 'refused',
-            refusal,
-          });
+        answerNext: (answer) => {
+          vi.spyOn(authored.app.authoring, 'complete').mockImplementationOnce(answer);
         },
+        reported,
       };
     },
   },
   {
     name: 'an embedded Space Resource',
     setup: async () => {
-      const spaces = openSpaces();
+      const reported: unknown[] = [];
+      const spaces = openSpaces(undefined, (error) => reported.push(error));
       const source = await spaces.open(META);
       const authored = await spaces.embed(TARGET);
       let available = true;
@@ -197,12 +222,10 @@ const contexts: readonly {
         withdraw: () => {
           available = false;
         },
-        refuseNext: (refusal) => {
-          vi.spyOn(authored.app.authoring, 'completeInMap').mockReturnValueOnce({
-            kind: 'refused',
-            refusal,
-          });
+        answerNext: (answer) => {
+          vi.spyOn(authored.app.authoring, 'completeInMap').mockImplementationOnce(answer);
         },
+        reported,
       };
     },
   },
@@ -294,8 +317,8 @@ describe.each(contexts)('Graph recolour through $name', ({ setup }) => {
   });
 
   it('answers a refusal with the complete Graph report, which command outcomes holds', async () => {
-    const { authored, mapId, graphId, commands, outcomes, refuseNext } = await setup();
-    refuseNext({ code: 'graph-not-owned' });
+    const { authored, mapId, graphId, commands, outcomes, answerNext } = await setup();
+    answerNext(() => ({ kind: 'refused', refusal: { code: 'graph-not-owned' } }));
     const report = { title: 'Graph unchanged', message: 'That Graph is not one this Map owns.' };
     const recolor = commands.map(mapId).graph(graphId).recolor;
     expect(outcomes.run('graph-edit', () => recolor.invoke(OTHER_COLOR))).toEqual({
@@ -334,6 +357,222 @@ describe.each(contexts)('Graph recolour through $name', ({ setup }) => {
   });
 });
 
+describe.each(contexts)('Graph creation through $name', ({ setup }) => {
+  it('creates one empty Graph in the addressed Map and answers its Map and Graph', async () => {
+    const { authored, mapId, commands } = await setup();
+    const before = graphsOf(authored, mapId);
+    const create = commands.map(mapId).create;
+    expect(create.available).toBe(true);
+    const outcome = await create.invoke();
+    if (outcome.kind !== 'completed') throw new Error(`Graph creation answered ${outcome.kind}`);
+    expect(outcome.mapId).toBe(mapId);
+    expect(graphsOf(authored, mapId)).toEqual([...before, outcome.graphId]);
+    expect(graphOf(authored, mapId, outcome.graphId)?.edges).toEqual([]);
+  });
+
+  it('answers a stale invocation as unavailable without authoring anything', async () => {
+    const { authored, mapId, commands, outcomes, withdraw } = await setup();
+    const create = commands.map(mapId).create;
+    const working = authored.session.getState().working;
+    const publications = publicationsOf(authored);
+    withdraw();
+    expect(await outcomes.run('graph-create', () => create.invoke())).toEqual({
+      kind: 'unavailable',
+    });
+    expect(publications.count()).toBe(0);
+    expect(authored.session.getState().working).toBe(working);
+    expect(commands.map(mapId).create.available).toBe(false);
+    expect(outcomes.getState().notices.has('graph-create')).toBe(false);
+  });
+
+  it('answers a creation in a Map that has gone as unavailable', async () => {
+    const { authored, mapId, commands } = await setup();
+    const create = commands.map(mapId).create;
+    expect(authored.app.authoring.complete({ kind: 'deleted-map', mapId }).kind).toBe('completed');
+    const publications = publicationsOf(authored);
+    expect(await create.invoke()).toEqual({ kind: 'unavailable' });
+    expect(publications.count()).toBe(0);
+    expect(commands.map(mapId).create.available).toBe(false);
+  });
+
+  it('answers a refused creation with the complete Graph report, which command outcomes holds', async () => {
+    const { authored, mapId, commands, outcomes, answerNext } = await setup();
+    const before = graphsOf(authored, mapId);
+    answerNext(() => ({ kind: 'refused', refusal: { code: 'map-not-found' } }));
+    const report = {
+      title: 'Graph not created',
+      message: 'This Map is no longer part of the Space.',
+    };
+    const create = commands.map(mapId).create;
+    expect(await outcomes.run('graph-create', () => create.invoke())).toEqual({
+      kind: 'refused',
+      report,
+    });
+    expect(graphsOf(authored, mapId)).toEqual(before);
+    expect(outcomes.getState().notices.get('graph-create')).toEqual(report);
+    expect(outcomes.getState().notices.has('graph-edit')).toBe(false);
+    outcomes.dismiss('graph-create');
+    expect(outcomes.getState().notices.has('graph-create')).toBe(false);
+  });
+
+  it('answers an unchanged creation as unchanged', async () => {
+    const { mapId, commands, answerNext } = await setup();
+    answerNext(() => ({ kind: 'unchanged' }));
+    expect(await commands.map(mapId).create.invoke()).toEqual({ kind: 'unchanged' });
+  });
+
+  it('breaks rather than answering when a queued creation leaves no Graph to answer', async () => {
+    const { mapId, commands, answerNext } = await setup();
+    answerNext(() => ({ kind: 'queued' }));
+    await expect(commands.map(mapId).create.invoke()).rejects.toThrow(/queued/);
+  });
+
+  it('breaks rather than answering when a completed creation names no Graph', async () => {
+    const { mapId, commands, answerNext } = await setup();
+    answerNext(() => ({ kind: 'completed' }));
+    await expect(commands.map(mapId).create.invoke()).rejects.toThrow(/no Graph/);
+  });
+
+  it('says a throw as a break, never as a refusal', async () => {
+    const { mapId, commands, outcomes, answerNext, reported } = await setup();
+    const failure = new Error('creation broke');
+    answerNext(() => {
+      throw failure;
+    });
+    const create = commands.map(mapId).create;
+    expect(await outcomes.run('graph-create', () => create.invoke())).toEqual({ kind: 'broke' });
+    expect(reported).toContain(failure);
+    expect(outcomes.getState().notices.has('graph-create')).toBe(false);
+  });
+});
+
+describe('what each context creates in', () => {
+  const embedded = async (
+    control = new MemorySpaceBackendTestControl(),
+    select?: (mapId: MapId, graphId: GraphId) => string | null,
+  ) => {
+    const spaces = openSpaces(control);
+    const source = await spaces.open(META);
+    const authored = await spaces.embed(TARGET);
+    const commands = embeddedGraphAuthoringCommands({
+      target: authored,
+      spaces,
+      containingSpaceId: META,
+      select: select ?? selectOn(source),
+      available: () => true,
+    });
+    return { spaces, source, authored, commands, control };
+  };
+
+  it('activates the created Graph on the top-level canvas', async () => {
+    const spaces = openSpaces();
+    const authored = await spaces.open(TARGET);
+    const commands = topLevelGraphAuthoringCommands(authored, {
+      rename: () => true,
+      recolor: () => true,
+      create: () => true,
+    });
+    const outcome = await commands.map(FIRST_MAP).create.invoke();
+    if (outcome.kind !== 'completed') throw new Error(`Graph creation answered ${outcome.kind}`);
+    expect(authored.app.navigation.getState()).toMatchObject({
+      selectedMapId: FIRST_MAP,
+      activeGraphId: outcome.graphId,
+    });
+  });
+
+  it('does not create in a Map the top-level canvas has moved off', async () => {
+    const spaces = openSpaces();
+    const authored = await spaces.open(TARGET);
+    const create = topLevelGraphAuthoringCommands(authored, {
+      rename: () => true,
+      recolor: () => true,
+      create: () => true,
+    }).map(SECOND_MAP).create;
+    expect(create.available).toBe(false);
+    expect(await create.invoke()).toEqual({ kind: 'unavailable' });
+    expect(graphsOf(authored, SECOND_MAP)).toEqual([SECOND_GRAPH]);
+  });
+
+  it('withholds creation alone when only creation is withdrawn at the top level', async () => {
+    const spaces = openSpaces();
+    const authored = await spaces.open(TARGET);
+    const commands = topLevelGraphAuthoringCommands(authored, {
+      rename: () => true,
+      recolor: () => true,
+      create: () => false,
+    });
+    expect(commands.map(FIRST_MAP).create.available).toBe(false);
+    expect(commands.map(FIRST_MAP).graph(FIRST_GRAPH).rename.available).toBe(true);
+    expect(await commands.map(FIRST_MAP).create.invoke()).toEqual({ kind: 'unavailable' });
+    expect(graphsOf(authored, FIRST_MAP)).toEqual([FIRST_GRAPH, OTHER_GRAPH]);
+  });
+
+  it('persists a new Graph before the Resource refers to it, without moving either canvas', async () => {
+    const { spaces, source, authored, commands, control } = await embedded();
+    const release = control.deferNextCommit();
+    const creating = commands.map(SECOND_MAP).create.invoke();
+    try {
+      // The target's commit is held: the Resource must not name a Graph that
+      // has not been stored.
+      await vi.waitFor(() => expect(control.requests).toHaveLength(1));
+      expect(storedSelection(source)).toEqual({ map: SECOND_MAP, graph: SECOND_GRAPH });
+    } finally {
+      release();
+    }
+    const outcome = await creating;
+    if (outcome.kind !== 'completed') throw new Error(`Graph creation answered ${outcome.kind}`);
+    expect(storedSelection(source)).toEqual({ map: SECOND_MAP, graph: outcome.graphId });
+    expect(await spaces.waitForPersistence(META)).toBe(true);
+    expect(source.app.navigation.getState().selectedMapId).toBe(META_MAP);
+    expect(authored.app.navigation.getState()).toMatchObject({
+      selectedMapId: FIRST_MAP,
+      activeGraphId: FIRST_GRAPH,
+    });
+  });
+
+  it('creates nothing while the containing Space has not saved, and reports a Graph not created', async () => {
+    const { source, authored, commands, control } = await embedded();
+    control.throwNext(new Error('offline'));
+    expect(
+      source.app.authoring.complete({ kind: 'renamed-map', mapId: META_MAP, title: 'Renamed' })
+        .kind,
+    ).toBe('completed');
+    expect(await commands.map(SECOND_MAP).create.invoke()).toEqual({
+      kind: 'refused',
+      report: { title: 'Graph not created', message: PERSISTENCE_UNSETTLED },
+    });
+    expect(graphsOf(authored, SECOND_MAP)).toEqual([SECOND_GRAPH]);
+  });
+
+  it('reports a target that did not save as a Graph not saved, and leaves the Resource alone', async () => {
+    const { source, commands, control } = await embedded();
+    control.throwNext(new Error('offline'));
+    expect(await commands.map(SECOND_MAP).create.invoke()).toEqual({
+      kind: 'refused',
+      report: { title: 'Graph not saved', message: PERSISTENCE_UNSETTLED },
+    });
+    expect(storedSelection(source)).toEqual({ map: SECOND_MAP, graph: SECOND_GRAPH });
+  });
+
+  it('reports a refused selection write as a Graph created but not selected', async () => {
+    const { authored, commands } = await embedded(undefined, () => 'The selection is invalid.');
+    expect(await commands.map(SECOND_MAP).create.invoke()).toEqual({
+      kind: 'refused',
+      report: { title: 'Graph not selected', message: 'The selection is invalid.' },
+    });
+    expect(graphsOf(authored, SECOND_MAP)).toHaveLength(2);
+  });
+
+  it('creates nothing in an embedded target exited while its Spaces were saving', async () => {
+    const { spaces, authored, commands } = await embedded();
+    const before = authored.session.getState().working;
+    const creating = commands.map(SECOND_MAP).create.invoke();
+    await spaces.exit(TARGET);
+    expect(await creating).toEqual({ kind: 'unavailable' });
+    expect(authored.session.getState().working).toBe(before);
+  });
+});
+
 describe('what each context addresses', () => {
   const topLevel = async () => {
     const spaces = openSpaces();
@@ -341,6 +580,7 @@ describe('what each context addresses', () => {
     const commands = topLevelGraphAuthoringCommands(authored, {
       rename: () => true,
       recolor: () => true,
+      create: () => true,
     });
     return { authored, commands };
   };
@@ -392,6 +632,7 @@ describe('what each context addresses', () => {
     const renames = topLevelGraphAuthoringCommands(authored, {
       rename: () => true,
       recolor: () => false,
+      create: () => true,
     })
       .map(FIRST_MAP)
       .graph(FIRST_GRAPH);
@@ -400,6 +641,7 @@ describe('what each context addresses', () => {
     const recolors = topLevelGraphAuthoringCommands(authored, {
       rename: () => false,
       recolor: () => true,
+      create: () => true,
     })
       .map(FIRST_MAP)
       .graph(FIRST_GRAPH);

@@ -149,13 +149,17 @@ export function useDockChrome(
 
   /**
    * Graph Edits on the Active Graph of the drawn Map: rename while a chrome
-   * command may run, recolour while entity Edits may.
+   * command may run, recolour and creation while entity Edits may.
    */
   const graphAuthoring = useMemo(
     () =>
       topLevelGraphAuthoringCommands(
         { app, spaceResources },
-        { rename: () => chromeTitleEdit, recolor: () => entityEdits },
+        {
+          rename: () => chromeTitleEdit,
+          recolor: () => entityEdits,
+          create: () => entityEdits,
+        },
       ),
     [app, spaceResources, chromeTitleEdit, entityEdits],
   );
@@ -241,7 +245,8 @@ export function useDockChrome(
       .find((action) => action.id === id)
       ?.onSelect(null);
   };
-  const activeGraphCommands = graphAuthoring.map(map.id).graph(activeGraph.id);
+  const mapGraphCommands = graphAuthoring.map(map.id);
+  const activeGraphCommands = mapGraphCommands.graph(activeGraph.id);
   const { placement } = resources;
   const { centreAnchor } = placement;
 
@@ -326,9 +331,11 @@ export function useDockChrome(
       onRecolor: offered(activeGraphCommands.recolor, (recolor) => (color: string) => {
         commandOutcomes.run('graph-edit', () => recolor(color));
       }),
-      onCreate: () => {
-        commandOutcomes.run('graph-add', () => authoring.complete({ kind: 'added-graph' }));
-      },
+      // The Edit makes the new Graph Active on this canvas; the caret stays
+      // where it was.
+      onCreate: offered(mapGraphCommands.create, (create) => () => {
+        void commandOutcomes.run('graph-create', create);
+      }),
       // The notice is command outcomes'; the Graph Navigation adopts after a
       // completed delete is this caller's.
       onDelete: (graphId) => {

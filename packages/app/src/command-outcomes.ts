@@ -14,6 +14,7 @@ import type { CoordinatedContextDeleteResult } from './coordinated-context-delet
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
 import type { EditOutcome } from './authoring-commands';
+import type { CompletedGraphEdit } from './graph-authoring-commands';
 import type { CompletedMapEdit } from './map-authoring-commands';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
@@ -91,6 +92,7 @@ const CHANNELS = {
   'map-create': { resetsOnMapChange: true, words: 'reported' },
   'map-manage': { resetsOnMapChange: true, words: 'reported' },
   'map-delete': { resetsOnMapChange: true, words: 'reported' },
+  'graph-create': { resetsOnMapChange: true, words: 'reported' },
   'graph-edit': { resetsOnMapChange: true, words: 'reported' },
   'graph-delete': {
     resetsOnMapChange: true,
@@ -152,6 +154,7 @@ export const COMMAND_CHANNELS = [
   'space-resource-create',
   'reference-create',
   'space-command',
+  'graph-create',
   'graph-edit',
   'graph-delete',
 ] as const satisfies readonly CommandChannel[];
@@ -223,8 +226,11 @@ interface CommandSignatures {
     readonly result: EditOutcome;
     readonly options: [options: MapCompletionClaim];
   };
+  readonly 'graph-create': {
+    readonly result: EditOutcome<CompletedGraphEdit>;
+    readonly options: [];
+  };
   readonly 'graph-edit': { readonly result: EditOutcome; readonly options: [] };
-  readonly 'graph-add': { readonly result: AuthoringResult; readonly options: [] };
   readonly 'graph-delete': {
     readonly result: CoordinatedContextDeleteResult;
     readonly options: [];
@@ -342,17 +348,11 @@ const COMMANDS: CommandDefinitions = {
     broke: null,
     movedMap: claimedMove,
   },
+  // A creation's completion activates the new Graph in the Map it was pressed
+  // on, and never moves the Map, so it needs no claim; where the caret goes
+  // after it is the surface's, which neither the Dock nor the rail spends.
+  'graph-create': reportedCommand('graph-create'),
   'graph-edit': reportedCommand('graph-edit'),
-  // The Dock's New Graph, until Graph authoring answers creation too: its
-  // refusal is said under the title Graph authoring reports a Graph Edit in.
-  'graph-add': {
-    channel: 'graph-edit',
-    settle: (result) =>
-      result.kind === 'refused'
-        ? notice({ title: 'Graph unchanged', message: describeAuthoringRefusal(result.refusal) })
-        : CLEAR,
-    broke: (failure) => ({ title: 'Graph unchanged', message: failureMessage(failure) }),
-  },
   // `coordinatedGraphDelete` has already said its gate and its lifecycle
   // refusal in a sentence, so the describer is that sentence.
   'graph-delete': {

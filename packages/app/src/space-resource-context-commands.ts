@@ -7,9 +7,8 @@ import {
 import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, graphColorsByGraphId } from '@project/graph';
-import { offered, PERSISTENCE_UNSETTLED, renameDraftAnswer } from './authoring-commands';
+import { offered, renameDraftAnswer } from './authoring-commands';
 import { coordinatedGraphDelete } from './coordinated-context-delete';
-import { coordinatedContextCreate } from './coordinated-context-create';
 import { embeddedGraphAuthoringCommands } from './graph-authoring-commands';
 import { embeddedMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
@@ -35,7 +34,7 @@ export interface SpaceResourceRailContext {
 
 /** The Dock commands, addressed to the target and the context this Resource stores. */
 export function spaceResourceContextCommands(
-  { entry, spaces, containingSpaceId, complete, commandOutcomes }: SpaceResourceRailContext,
+  { entry, spaces, containingSpaceId, commandOutcomes }: SpaceResourceRailContext,
   document: Extract<ResourceDocument, { kind: 'space' }>,
   select: (map: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   available: () => boolean,
@@ -54,11 +53,6 @@ export function spaceResourceContextCommands(
   const settled = async () =>
     (await spaces.waitForPersistence(entry.id)) &&
     (await spaces.waitForPersistence(containingSpaceId));
-  const selectAndSave = async (next: Pick<SpaceResourceTargetMap, 'id'>, nextGraph: GraphId) => {
-    const refusal = select(next, nextGraph);
-    if (refusal !== null) return refusal;
-    return (await spaces.waitForPersistence(containingSpaceId)) ? null : PERSISTENCE_UNSETTLED;
-  };
   const { map: mapId, graph: graphId } = document;
   const space = entry.app.currentSpace();
   const map = space.maps.find((each) => each.id === mapId);
@@ -131,19 +125,13 @@ export function spaceResourceContextCommands(
       onRecolor: offered(addressedGraph.recolor, (recolor) => (color: string) => {
         commandOutcomes.run('graph-edit', () => recolor(color));
       }),
-      onCreate: async () =>
-        coordinatedContextCreate({
-          waitBefore: settled,
-          create: () => complete({ kind: 'added-graph' }),
-          waitUntilPersisted: () => spaces.waitForPersistence(entry.id),
-          createdOf: (result) => {
-            const updated = entry.app.currentSpace().maps.find((each) => each.id === mapId);
-            return result.createdGraphId !== undefined && updated !== undefined
-              ? { created: updated, active: result.createdGraphId }
-              : undefined;
-          },
-          afterCreated: selectAndSave,
-        }),
+      // Graph authoring orders the creation and the selection write, and the
+      // containing canvas holds its report. The rail does not continue into
+      // the new Graph's name, and the creation never moves the containing
+      // canvas's Map.
+      onCreate: offered(graphAuthoring.map(mapId).create, (create) => async () => {
+        await commandOutcomes.run('graph-create', create);
+      }),
       onDelete: async () => {
         const updated = entry.app.currentSpace().maps.find((each) => each.id === mapId);
         const result = await coordinatedGraphDelete(

@@ -201,11 +201,11 @@ describe('SpaceResourceSelectors', () => {
   });
 
   /**
-   * A Map creation's refusal is the containing canvas's notice, so the rail
-   * reports no sentence of its own for it; it learns only whether the caret
-   * went on. A Graph creation still answers the sentence the rail reports.
+   * A Map or Graph creation's refusal is the containing canvas's notice, so
+   * the rail reports no sentence of its own for either; a Map creation
+   * answers only whether the caret went on.
    */
-  it('reports no sentence of its own for a Map creation, and a Graph creation’s refusal', async () => {
+  it('reports no sentence of its own for a Map or a Graph creation', async () => {
     const onReport = vi.fn();
     mount(
       clusters({
@@ -218,7 +218,7 @@ describe('SpaceResourceSelectors', () => {
         },
         graphCommands: {
           onRename: () => null,
-          onCreate: () => Promise.resolve('Graph refused.'),
+          onCreate: () => Promise.resolve(),
           onDelete: () => Promise.resolve(null),
           onCopyLink: () => Promise.resolve(null),
           deleteDisabled: false,
@@ -241,7 +241,9 @@ describe('SpaceResourceSelectors', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'New Graph' }));
       await Promise.resolve();
     });
-    await waitFor(() => expect(onReport).toHaveBeenLastCalledWith('Graph refused.'));
+    await waitFor(() => expect(screen.getByTestId('space-resource-graph')).toBeEnabled());
+    expect(onReport).toHaveBeenLastCalledWith(null);
+    expect(onReport).not.toHaveBeenCalledWith(expect.any(String));
   });
 
   it('draws a selection the target no longer holds as unavailable', () => {
@@ -303,7 +305,7 @@ describe('SpaceResourceSelectors', () => {
       clusters({
         graphCommands: {
           onRename: () => null,
-          onCreate: () => Promise.resolve(null),
+          onCreate: () => Promise.resolve(),
           onDelete: () => Promise.resolve(null),
           onCopyLink: () => Promise.resolve(null),
           deleteDisabled: false,

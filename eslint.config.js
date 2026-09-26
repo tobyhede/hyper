@@ -339,20 +339,6 @@ export default tseslint.config(
   // Single-module bans inside `app`. Each restates the `app` zone above, which
   // it replaces for its file.
   //
-  // Coordination modules answer an outcome and never place a caret: where an
-  // Edit continues is the surface's decision, spent through `./continuation`.
-  {
-    files: ['packages/app/src/coordinated-context-create.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, CONTINUATION_IMPORT],
-          patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
-        },
-      ],
-    },
-  },
   // Authoring commands are pure coordination over the Space's collaborators:
   // no continuation, no React and no DOM.
   {

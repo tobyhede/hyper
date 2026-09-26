@@ -51,15 +51,16 @@ export interface CanvasSpaceResourceMapCommands {
  * The Graph commands on an Open Space Resource rail, addressed to the Graph
  * this Resource selects.
  *
- * Rename and Colour are each one field, the press or `null`, as the Map
- * commands are, and say nothing on the rail: a refused rename answers the
- * sentence that holds its draft open, and the containing canvas's command
- * outcomes say every refusal as a notice. New Graph and Delete answer the
+ * Rename, Colour and New Graph are each one field, the press or `null`, as
+ * the Map commands are, and say nothing on the rail: a refused rename answers
+ * the sentence that holds its draft open, and the containing canvas's command
+ * outcomes say every refusal as a notice. New Graph resolves once the
+ * creation settles and leaves the caret where it was. Delete answers the
  * sentence the rail reports, or `null`.
  */
 export interface CanvasSpaceResourceGraphCommands {
   readonly onRename: ((title: string) => string | null) | null;
-  readonly onCreate: (renameScope: string) => Promise<string | null>;
+  readonly onCreate: (() => Promise<void>) | null;
   readonly onDelete: () => Promise<string | null>;
   readonly onCopyLink: () => Promise<string | null>;
   readonly deleteDisabled: boolean;
@@ -106,16 +107,22 @@ const mapSelectorCommands = (commands: CanvasSpaceResourceMapCommands): Selector
   };
 };
 
-const graphSelectorCommands = (commands: CanvasSpaceResourceGraphCommands): SelectorCommands => ({
-  rename: commands.onRename,
-  create: async (renameScope) => ({
-    continued: false,
-    report: await commands.onCreate(renameScope),
-  }),
-  delete: commands.deleteDisabled ? null : commands.onDelete,
-  copyLink: commands.onCopyLink,
-  palette: commands,
-});
+const graphSelectorCommands = (commands: CanvasSpaceResourceGraphCommands): SelectorCommands => {
+  const { onCreate } = commands;
+  return {
+    rename: commands.onRename,
+    create:
+      onCreate === null
+        ? null
+        : async () => {
+            await onCreate();
+            return { continued: false, report: null };
+          },
+    delete: commands.deleteDisabled ? null : commands.onDelete,
+    copyLink: commands.onCopyLink,
+    palette: commands,
+  };
+};
 
 /**
  * The two choices an Open Space Resource publishes, and what is available to make
@@ -434,9 +441,8 @@ function SpaceResourceSelector({
           (palette !== undefined ? (
             <GraphMenuActions
               {...commonCommands}
-              editsDisabled={disabled}
               deleteDisabled={onDelete === null}
-              onCreate={() => onCreate?.()}
+              onCreate={onCreate}
               onDelete={() => onDelete?.()}
               color={palette.color}
               colors={palette.colors}

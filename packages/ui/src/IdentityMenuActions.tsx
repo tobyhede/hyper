@@ -85,11 +85,13 @@ export interface GraphMenuActionsProps {
   readonly title: string;
   readonly renameItem: ReactNode;
   readonly deleteDisabled: boolean;
-  readonly onCreate: () => void;
+  /**
+   * New Graph's press, or `null` where it is unavailable — one field, as
+   * {@link MapMenuActionsProps.onCreate} is.
+   */
+  readonly onCreate: (() => void) | null;
   readonly onCopyLink: () => void;
   readonly onDelete: () => void;
-  /** Whether New Graph may run. */
-  readonly editsDisabled: boolean;
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   /** Store the Graph's colour, or `null` while Colour… may not run. */
@@ -109,7 +111,6 @@ export interface GraphMenuActionsProps {
 export function GraphMenuActions({
   title,
   renameItem,
-  editsDisabled,
   deleteDisabled,
   color,
   colors,
@@ -121,7 +122,11 @@ export function GraphMenuActions({
   return (
     <>
       <DropdownMenuGroup>
-        <DropdownMenuItem className="gap-2" disabled={editsDisabled} onClick={onCreate}>
+        <DropdownMenuItem
+          className="gap-2"
+          disabled={onCreate === null}
+          onClick={() => onCreate?.()}
+        >
           <PlusIcon />
           New Graph
         </DropdownMenuItem>

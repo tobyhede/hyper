@@ -33,7 +33,7 @@ export interface AuthoredSpace {
 /** The Edits a context completes addressed to one Map of its Space. */
 export type AddressedCompletion = Extract<
   AuthoringCompletion,
-  { readonly kind: 'renamed-map' | 'renamed-graph' | 'recolored-graph' }
+  { readonly kind: 'renamed-map' | 'added-graph' | 'renamed-graph' | 'recolored-graph' }
 >;
 
 /**

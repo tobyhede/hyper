@@ -293,18 +293,18 @@ export interface DockGraph {
    * are one Graph authoring answer (`graph-authoring-commands.ts`).
    */
   readonly onRecolor: ((color: string) => void) | null;
-  readonly onCreate: () => void;
+  /**
+   * Create an empty Graph in the drawn Map, which becomes the Active Graph,
+   * or `null` while New Graph may not run. One field, like
+   * {@link DockGraph.onRecolor}.
+   */
+  readonly onCreate: (() => void) | null;
   readonly onDelete: (graphId: GraphId) => void;
   /**
-   * Whether New Graph and Delete may run at all.
-   *
-   * One term for the two of them, because they are withdrawn by one rule and
-   * not by two: both are entity Edits, and no entity Edit runs while a title
-   * editor or a live content edit owns the caret (`authoring-availability.ts`).
-   * Delete carries the ADR 0079 rule on top of this one, read off `graphs`
-   * here; the Map cluster splits create from delete because creating a Map
-   * **selects** it and so has a second reason of its own, which no Graph
-   * command has.
+   * Whether Delete may run at all: an entity Edit, and no entity Edit runs
+   * while a title editor or a live content edit owns the caret
+   * (`authoring-availability.ts`). Delete carries the ADR 0079 rule on top of
+   * this one, read off `graphs` here.
    */
   readonly editsDisabled: boolean;
   /**

@@ -195,18 +195,18 @@ it.each(['map', 'graph'] as const)(
     const graphCommands = commands.graphCommands;
     if (graphCommands === undefined) throw new Error('Commands missing');
     // A Map creation answers whether the caret continues in its name; a
-    // Graph creation answers the sentence the rail reports.
+    // Graph creation leaves the caret where it was and answers nothing.
     const creating =
       kind === 'map'
         ? offeredPress(commands.mapCommands.onCreate)('test-rail')
-        : graphCommands.onCreate('test-rail');
+        : offeredPress(graphCommands.onCreate)();
     try {
       await vi.waitFor(() => expect(control.requests).toHaveLength(1));
       expect(source.session.getState().working.resources[0]?.document).toEqual(document);
     } finally {
       release();
     }
-    expect(await creating).toBe(kind === 'map' ? true : null);
+    expect(await creating).toBe(kind === 'map' ? true : undefined);
     expect(await spaces.waitForPersistence(META)).toBe(true);
     expect(await spaces.waitForPersistence(TARGET)).toBe(true);
     const stored = await backend.loadSpace(META);

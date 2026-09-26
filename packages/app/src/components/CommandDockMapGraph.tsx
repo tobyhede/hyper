@@ -244,7 +244,6 @@ function GraphIdentityMenu({
       <GraphMenuActions
         title={graph.active.title}
         renameItem={renameItem}
-        editsDisabled={graph.editsDisabled}
         deleteDisabled={graph.editsDisabled || graph.graphs.length <= 1}
         color={graph.activeColor}
         colors={GRAPH_PALETTE_ENTRIES}

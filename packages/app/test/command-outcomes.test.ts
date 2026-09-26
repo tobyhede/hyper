@@ -116,6 +116,8 @@ const refusedMap = { kind: 'refused', report: mapReport } as const;
 const createdMap = { kind: 'completed', mapId: MAP_B, graphId: GRAPH_B } as const;
 const graphReport = { title: 'Graph unchanged', message: 'A Graph title is required.' };
 const refusedGraph = { kind: 'refused', report: graphReport } as const;
+const graphCreateReport = { title: 'Graph not created', message: MAP_GONE };
+const refusedGraphCreate = { kind: 'refused', report: graphCreateReport } as const;
 /** New Map's continuation, in the name of the Map the creation made. */
 const inTheName = ({ mapId }: CompletedMapEdit): PendingContinuation => ({
   target: { kind: 'control', name: 'map-name', scope: { id: 'rail', subject: mapId } },
@@ -143,6 +145,7 @@ async function refuseOnEveryChannel(outcomes: ReturnType<typeof open>['outcomes'
   outcomes.run('map-create', () => refusedMap, { continueAt: inTheName, completionMovesMap: true });
   outcomes.run('map-manage', () => refusedMap);
   outcomes.run('map-delete', () => refusedMap, DOCK);
+  outcomes.run('graph-create', () => refusedGraphCreate);
   outcomes.run('graph-edit', () => refusedGraph);
   outcomes.run('graph-delete', () => refusedGraphDelete);
   outcomes.run('resource-delete', () => refusedAuthoring);
@@ -193,15 +196,15 @@ describe('titles and sentences', () => {
     expect(notice(outcomes, 'graph-edit')).toEqual(graphReport);
   });
 
-  it('publishes a refused Dock New Graph under "Graph unchanged"', () => {
+  it('publishes a refused Graph creation’s complete report on "graph-create"', async () => {
     const { outcomes } = open();
 
-    expect(outcomes.run('graph-add', () => refusedAuthoring)).toBe(refusedAuthoring);
+    await expect(
+      outcomes.run('graph-create', () => Promise.resolve(refusedGraphCreate)),
+    ).resolves.toBe(refusedGraphCreate);
 
-    expect(notice(outcomes, 'graph-edit')).toEqual({
-      title: 'Graph unchanged',
-      message: MAP_GONE,
-    });
+    expect(notice(outcomes, 'graph-create')).toEqual(graphCreateReport);
+    expect(notice(outcomes, 'graph-edit')).toBeNull();
   });
 
   it('publishes a refused Reference Resource creation under its own title', () => {
@@ -260,7 +263,7 @@ describe('the Map-change reset', () => {
   it('clears exactly the channels a Map change resets', async () => {
     const { outcomes, navigation } = open();
     await refuseOnEveryChannel(outcomes);
-    expect(outcomes.getState().notices.size).toBe(10);
+    expect(outcomes.getState().notices.size).toBe(11);
 
     navigation.selectMap(MAP_B);
 
@@ -449,23 +452,15 @@ describe('a thrown operation', () => {
     });
   });
 
-  it('says a thrown Dock New Graph and Reference Resource creation in the words the failure carries', () => {
+  it('says a thrown Reference Resource creation in the words the failure carries', () => {
     const { outcomes, reported } = open();
-    const graphFailure = new Error('creation broke');
     const referenceFailure = new Error('reference broke');
 
-    outcomes.run('graph-add', () => {
-      throw graphFailure;
-    });
     outcomes.run('reference-create', () => {
       throw referenceFailure;
     });
 
-    expect(reported).toEqual([graphFailure, referenceFailure]);
-    expect(notice(outcomes, 'graph-edit')).toEqual({
-      title: 'Graph unchanged',
-      message: 'creation broke',
-    });
+    expect(reported).toEqual([referenceFailure]);
     expect(notice(outcomes, 'reference-create')).toEqual({
       title: 'Reference Resource not created',
       message: 'reference broke',
@@ -498,6 +493,18 @@ describe('a thrown operation', () => {
 
     expect(reported).toEqual([failure]);
     expect(notice(outcomes, 'graph-edit')).toBeNull();
+  });
+
+  it('reports a Graph creation throw and leaves its channel clear', async () => {
+    const { outcomes, reported } = open();
+    const failure = new Error('creation broke');
+
+    await expect(outcomes.run('graph-create', () => Promise.reject(failure))).resolves.toBe(
+      COMMAND_BROKE,
+    );
+
+    expect(reported).toEqual([failure]);
+    expect(notice(outcomes, 'graph-create')).toBeNull();
   });
 });
 
