@@ -13,7 +13,8 @@ import {
 import type { CoordinatedContextDeleteResult } from './coordinated-context-delete';
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
-import type { CompletedMapEdit, MapEditOutcome } from './map-authoring-commands';
+import type { EditOutcome } from './authoring-commands';
+import type { CompletedMapEdit } from './map-authoring-commands';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
@@ -218,12 +219,12 @@ export interface MapCompletionClaim {
  */
 interface CommandSignatures {
   readonly 'map-create': {
-    readonly result: MapEditOutcome<CompletedMapEdit>;
+    readonly result: EditOutcome<CompletedMapEdit>;
     readonly options: [options: MapCreateContinuation & MapCompletionClaim];
   };
-  readonly 'map-manage': { readonly result: MapEditOutcome; readonly options: [] };
+  readonly 'map-manage': { readonly result: EditOutcome; readonly options: [] };
   readonly 'map-delete': {
-    readonly result: MapEditOutcome;
+    readonly result: EditOutcome;
     readonly options: [options: MapCompletionClaim];
   };
   readonly 'graph-edit': { readonly result: AuthoringResult; readonly options: [] };
@@ -308,10 +309,10 @@ const CLEAR: Settlement = { kind: 'clear', continuation: null };
 
 const notice = (value: CommandNotice): Settlement => ({ kind: 'notice', notice: value });
 
-const claimedMove = (result: MapEditOutcome, { completionMovesMap }: MapCompletionClaim): boolean =>
+const claimedMove = (result: EditOutcome, { completionMovesMap }: MapCompletionClaim): boolean =>
   completionMovesMap && result.kind === 'completed';
 
-const reportedMapCommand = (channel: ReportedChannel): CommandDefinition<MapEditOutcome, []> => ({
+const reportedMapCommand = (channel: ReportedChannel): CommandDefinition<EditOutcome, []> => ({
   channel,
   settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
   broke: null,

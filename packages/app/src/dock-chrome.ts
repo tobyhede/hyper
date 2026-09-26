@@ -20,7 +20,8 @@ import {
   type SpaceChromeTitleSubject,
   type SpaceEntity,
 } from './entity-actions';
-import { offered, renameDraftAnswer, topLevelMapAuthoringCommands } from './map-authoring-commands';
+import { offered, renameDraftAnswer } from './authoring-commands';
+import { topLevelMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces, RejectedExitConfirmation } from './open-spaces';
 import type { ResourcePlacementCommands } from './resource-placement';
 import type { ResourcesDisclosure } from './resources-disclosure';

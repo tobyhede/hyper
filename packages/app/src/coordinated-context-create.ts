@@ -1,6 +1,6 @@
 import type { GraphId, UUID } from '@project/core';
 import { describeAuthoringRefusal } from './authoring-refusal';
-import { PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
+import { PERSISTENCE_UNSETTLED } from './authoring-commands';
 import type { AuthoringResult } from './space-authoring';
 
 /** The identities a completed creation leaves for the call site. */

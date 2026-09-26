@@ -7,10 +7,11 @@ import {
 import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, graphColorsByGraphId } from '@project/graph';
+import { offered, PERSISTENCE_UNSETTLED, renameDraftAnswer } from './authoring-commands';
 import { describeAuthoringRefusal } from './authoring-refusal';
-import { coordinatedGraphDelete, PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
+import { coordinatedGraphDelete } from './coordinated-context-delete';
 import { coordinatedContextCreate } from './coordinated-context-create';
-import { embeddedMapAuthoringCommands, offered, renameDraftAnswer } from './map-authoring-commands';
+import { embeddedMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';

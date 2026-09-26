@@ -1,8 +1,8 @@
 import type { GraphId, MapId, UUID } from '@project/core';
+import { PERSISTENCE_UNSETTLED, type Capability, type EditOutcome } from './authoring-commands';
 import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
-import type { CommandBroke, CommandDiscarded, CommandNotice } from './command-outcomes';
+import type { CommandNotice } from './command-outcomes';
 import type { ComposedApp } from './compose-app';
-import { PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
@@ -14,7 +14,10 @@ import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
  * canvas, and an Open Space Resource's rail, over the target Space it embeds.
  * This module decides once whether a command is available, which Edit to
  * complete and how to say a refusal, behind two private adapters — one per
- * context — and answers both callers in the same outcome vocabulary.
+ * context — and answers both callers in the shared capability and outcome
+ * vocabulary (`authoring-commands.ts`). What is Map-specific stays here: which
+ * Maps each context addresses, that a Space's last Map is never deletable, the
+ * survivor a deletion leaves, and the titles a refusal is reported under.
  *
  * **What stays outside.** Which Map is selected, Copy link, where the caret
  * goes and how a report is drawn are the surfaces'. The report's *lifetime* —
@@ -25,51 +28,8 @@ import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
  * DOM (an `eslint.config.js` zone holds it).
  */
 
-/**
- * What a Map Edit answers.
- *
- * `unavailable` is distinct from `refused`: nothing was attempted — the
- * command was withdrawn, or its Map has gone — so there is nothing to report.
- * `Completed` is the completed arm a capability declares, so a creation can
- * carry the identities it made without a second outcome vocabulary.
- */
-export type MapEditOutcome<
-  Completed extends { readonly kind: 'completed' } = { readonly kind: 'completed' },
-> =
-  | Completed
-  | { readonly kind: 'unchanged' }
-  | { readonly kind: 'unavailable' }
-  | { readonly kind: 'refused'; readonly report: CommandNotice };
-
-/**
- * One command a surface offers, and whether it may offer it.
- *
- * `available` is the answer when the capability was read, which is what a
- * surface draws its unavailable treatment from. `invoke` asks again when it is
- * pressed and answers `unavailable` if the answer has changed, so a surface
- * drawn from a stale answer cannot complete an Edit that is no longer offered.
- */
-export interface MapCapability<Invocation> {
-  readonly available: boolean;
-  readonly invoke: Invocation;
-}
-
-/**
- * A capability as a surface draws it: the press built from its own
- * invocation, or `null` where it is unavailable.
- *
- * The one way a surface spends a capability, so its unavailable treatment and
- * what it invokes are read off one answer and cannot disagree. The press is the surface's — it
- * decides where the outcome goes and where the caret continues — and the
- * invocation still asks again when it is pressed.
- */
-export const offered = <Invocation, Press>(
-  capability: MapCapability<Invocation>,
-  press: (invoke: Invocation) => Press,
-): Press | null => (capability.available ? press(capability.invoke) : null);
-
 /** Rename one Map: synchronous, so an inline editor can hold a refused draft open. */
-export type MapRename = MapCapability<(title: string) => MapEditOutcome>;
+export type MapRename = Capability<(title: string) => EditOutcome>;
 
 /**
  * A completed Map Edit that leaves its context on a Map: that Map and its
@@ -94,7 +54,7 @@ export interface CompletedMapEdit {
  * A Space's last Map is never available (ADR 0079), and neither is a Map
  * that has gone; both are asked again when invoked.
  */
-export type MapDelete = MapCapability<() => Promise<MapEditOutcome<CompletedMapEdit>>>;
+export type MapDelete = Capability<() => Promise<EditOutcome<CompletedMapEdit>>>;
 
 /** The commands addressed to one Map. */
 export interface MapCommands {
@@ -106,7 +66,7 @@ export interface MapCommands {
  * Create one empty Map: asynchronous, because an embedded creation waits for
  * the Spaces it writes to save before and after it.
  */
-export type MapCreate = MapCapability<() => Promise<MapEditOutcome<CompletedMapEdit>>>;
+export type MapCreate = Capability<() => Promise<EditOutcome<CompletedMapEdit>>>;
 
 /**
  * Every Map Edit one context offers.
@@ -118,30 +78,6 @@ export interface MapAuthoringCommands {
   readonly create: MapCreate;
   readonly map: (mapId: MapId) => MapCommands;
 }
-
-/**
- * The editor's answer to a rename: the sentence that holds a refused draft
- * open, or `null` to close it.
- *
- * `unavailable` and a broken invocation close it too — neither is the author's
- * draft being wrong, and the surface ends a withdrawn editor on its next
- * render in any case. A break has already reached the reporter. A discarded
- * settlement has nothing to say.
- */
-export const renameDraftAnswer = (
-  outcome: MapEditOutcome | CommandBroke | CommandDiscarded,
-): string | null => {
-  switch (outcome.kind) {
-    case 'refused':
-      return outcome.report.message;
-    case 'completed':
-    case 'unchanged':
-    case 'unavailable':
-    case 'broke':
-    case 'discarded':
-      return null;
-  }
-};
 
 type RenamedMap = Extract<AuthoringCompletion, { readonly kind: 'renamed-map' }>;
 
@@ -229,7 +165,7 @@ const recoverCreatedMap = (app: AuthoringApp): CompletedMapEdit => {
 const createMap = async (
   creation: MapCreation,
   live: () => boolean,
-): Promise<MapEditOutcome<CompletedMapEdit>> => {
+): Promise<EditOutcome<CompletedMapEdit>> => {
   if (!live()) return UNAVAILABLE;
   if (creation.before !== undefined) {
     const stopped = await creation.before();
@@ -289,7 +225,7 @@ const deleteMap = async (
   deletion: MapDeletion,
   mapId: MapId,
   live: () => boolean,
-): Promise<MapEditOutcome<CompletedMapEdit>> => {
+): Promise<EditOutcome<CompletedMapEdit>> => {
   if (!live()) return UNAVAILABLE;
   const { app, spaceResources } = deletion.space;
   if (deletion.before !== undefined) {
@@ -321,7 +257,7 @@ const deleteMap = async (
  * one drains; it answers `completed`, so the editor closes on it as on a
  * completed rename (`renameDraftAnswer`).
  */
-const renameOutcome = (result: AuthoringResult): MapEditOutcome => {
+const renameOutcome = (result: AuthoringResult): EditOutcome => {
   switch (result.kind) {
     case 'refused':
       return {

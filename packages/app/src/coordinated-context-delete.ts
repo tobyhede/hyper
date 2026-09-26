@@ -3,16 +3,8 @@ import type {
   DeleteReferencedGraphInput,
   SpaceResourceContextDeletionResult,
 } from '@project/persistence';
+import { PERSISTENCE_UNSETTLED } from './authoring-commands';
 import { describeSpaceResourceRefusal } from './authoring-refusal';
-
-/**
- * Why a coordinated context command did not run: a Space in the Edit had not
- * settled. The sentence is the one Space Resource commands used; delete and create
- * tests pin it (`coordinated-context-delete.test.ts`,
- * `coordinated-context-create.test.ts`).
- */
-export const PERSISTENCE_UNSETTLED =
-  'The change could not be saved. Check the Space persistence status.';
 
 export type CoordinatedContextDeleteResult =
   | { readonly kind: 'completed'; readonly mapId: UUID; readonly graphId: UUID }
