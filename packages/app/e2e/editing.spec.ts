@@ -2452,10 +2452,14 @@ test('drawing between existing Resources persists one active-Graph Edge and sele
     // `toBeAttached`, not `toBeVisible`: a connection drawn between two Resources
     // whose centres share a row is a horizontal `path`, and a zero-height
     // bounding box is what Playwright calls hidden. What the assertion is about
-    // is the line's colour and its arrow, both read below.
+    // is the line's colour and its head shape, both read below.
     await expect(preview).toBeAttached();
     await expect(preview).toHaveCSS('stroke', activeGraphColor);
     await expect(preview).toHaveAttribute('marker-end', /url/);
+    // The Active Graph stores no head shape, so the preview ends in the arrow.
+    const head = connectionPreviewHead(page);
+    await expect(head).toHaveAttribute('data-head-shape', 'arrow');
+    await expect(head).toHaveCSS('fill', activeGraphColor);
   });
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
@@ -2469,6 +2473,54 @@ test('drawing between existing Resources persists one active-Graph Edge and sele
     '1',
   );
   await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+});
+
+/** The head shape the connection preview ends in, through the marker its path names. */
+const connectionPreviewHead = (page: Page): Locator =>
+  page.locator('marker#graph-authoring-connection-head [data-slot="graph-head-shape"]');
+
+/**
+ * The preview ends in the head shape of the Graph the Edge will join, in that
+ * Graph's colour (ADR 0105) — so activating a Graph with a different head
+ * shape changes the next preview. The tracked fixture's Mid stores `dot` and
+ * Short `diamond`.
+ */
+test('the connection preview ends in the Active Graph’s head shape', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await addExistingResource(page, 'E');
+  const source = nodeByTitle(page, 'A').first();
+  const target = nodeByTitle(page, 'E').first();
+  await expect(target).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+
+  let revision = 1;
+  for (const [title, headShape] of [
+    ['Mid', 'dot'],
+    ['Short', 'diamond'],
+  ] as const) {
+    await activateGraph(page, title);
+    await expect(activeGraph(page)).toContainText(title);
+    await settled(page);
+    await source.hover();
+    const sourceHandle = authoringHandle(source, 'source', 'right');
+    const targetHandle = authoringHandle(target, 'target', 'top');
+    await expect(sourceHandle).toHaveCSS('opacity', '1');
+    const graphColor = await sourceHandle.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+
+    await connectHandles(page, sourceHandle, targetHandle, async () => {
+      const head = connectionPreviewHead(page);
+      await expect(head).toHaveAttribute('data-head-shape', headShape);
+      await expect(head).toHaveCSS('fill', graphColor);
+    });
+    revision += 1;
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+      'data-revision',
+      String(revision),
+    );
+  }
 });
 
 test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
