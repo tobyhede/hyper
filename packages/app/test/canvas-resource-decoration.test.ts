@@ -8,7 +8,6 @@ import {
   type CanvasResourceDecorationContext,
 } from '../src/canvas-resource-decoration';
 import { RESOURCE_SIZE } from '../src/resource';
-import { completeEmbeddedAuthoring } from '../src/embedded-authoring';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 
@@ -94,7 +93,6 @@ const context = (
   spaces: null,
   commandOutcomes: undefined,
   completeSpaceResourceSelection: () => null,
-  completeEmbedded: completeEmbeddedAuthoring,
   portalEditing: undefined,
   onPortalEditingChange: undefined,
   contextNotices: new Map(),

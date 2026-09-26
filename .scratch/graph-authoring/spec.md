@@ -1,5 +1,7 @@
 # Graph Edits through one authoring command interface
 
+Status: resolved — tickets `01`–`05` all shipped. No live work remains here; the out-of-scope list below is what is left.
+
 Graph Edits — create, rename, recolour and delete — move behind one Graph authoring module with two private adapters, one for the Command Dock over the Space on the canvas and one for an Open Space Resource over the target Space it embeds. It is the second instance of the shape `.scratch/command-outcomes/issues/06`–`09` gave Map Edits (`packages/app/src/map-authoring-commands.ts`), so the capability vocabulary that module declares under Map names moves into a shared module first and both instances spend it.
 
 Grilled out of the 2026-09-24 architecture review (candidate 1, "Graph authoring commands, shaped like Map authoring"). No ADR and no `CONTEXT.md` change: like command outcomes and Map authoring, these are application constructs, not domain terms.

@@ -281,24 +281,30 @@ export interface DockGraph {
   /** The Active Graph's colour, which several controls carry as its identity. */
   readonly activeColor: string;
   readonly onActivate: (graphId: GraphId) => void;
-  /** Absent while no chrome rename may begin — {@link DockSpace.onRename}'s second arm. */
-  readonly onRename: ((graphId: GraphId, title: string) => string | null) | null;
-  /** A Graph's stored colour, which the canvas draws its Edges in. */
-  readonly onRecolor: (graphId: GraphId, color: string) => void;
-  readonly onCreate: () => void;
-  readonly onDelete: (graphId: GraphId) => void;
   /**
-   * Whether this cluster's lifecycle commands may run at all.
-   *
-   * One term for the three of them, because they are withdrawn by one rule and
-   * not by three: New Graph, Colour and Delete are entity Edits, and no entity
-   * Edit runs while a title editor or a live content edit owns the caret
-   * (`authoring-availability.ts`). Delete carries the ADR 0079 rule on top of
-   * this one, read off `graphs` here; the Map cluster splits create from
-   * delete because creating a Map **selects** it and so has a second reason
-   * of its own, which no Graph command has.
+   * Rename the Active Graph. Absent while no chrome rename may begin —
+   * {@link DockSpace.onRename}'s second arm.
    */
-  readonly editsDisabled: boolean;
+  readonly onRename: ((title: string) => string | null) | null;
+  /**
+   * Store the Active Graph's colour, which the canvas draws its Edges in, or
+   * `null` while Colour may not run. One field, like
+   * {@link DockCanvas.onDelete}: the row's unavailable treatment and its press
+   * are one Graph authoring answer (`graph-authoring-commands.ts`).
+   */
+  readonly onRecolor: ((color: string) => void) | null;
+  /**
+   * Create an empty Graph in the drawn Map, which becomes the Active Graph,
+   * or `null` while New Graph may not run. One field, like
+   * {@link DockGraph.onRecolor}.
+   */
+  readonly onCreate: (() => void) | null;
+  /**
+   * Delete the Active Graph, or `null` while Delete may not run. One field,
+   * like {@link DockCanvas.onDelete}, and for the same reason: the answer holds
+   * the last-Graph rule (ADR 0079) and the entity-Edit gate together.
+   */
+  readonly onDelete: (() => void) | null;
   /**
    * Copy this Graph's within-Map address — "Copy link to Graph" reproduces
    * what is on screen, so a recipient lands where the sender was.

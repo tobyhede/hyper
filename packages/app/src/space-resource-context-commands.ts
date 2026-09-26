@@ -1,25 +1,20 @@
-import type { ResourceDocument, GraphId, UUID } from '@project/core';
+import type { ResourceDocument, GraphId, MapId, UUID } from '@project/core';
 import {
   graphColor,
+  type CanvasSpaceResourceCommands,
   type CanvasSpaceResourceGraphCommands,
-  type CanvasSpaceResourceMapCommands,
 } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, graphColorsByGraphId } from '@project/graph';
-import { describeAuthoringRefusal } from './authoring-refusal';
-import { coordinatedGraphDelete, PERSISTENCE_UNSETTLED } from './coordinated-context-delete';
-import { coordinatedContextCreate } from './coordinated-context-create';
-import { embeddedMapAuthoringCommands, offered, renameDraftAnswer } from './map-authoring-commands';
+import { offered, renameDraftAnswer } from './authoring-commands';
+import { embeddedGraphAuthoringCommands } from './graph-authoring-commands';
+import { embeddedMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
-import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 
-const refusalOf = (result: AuthoringResult): string | null =>
-  result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
-
 interface SpaceResourceContextCommands {
-  readonly mapCommands: CanvasSpaceResourceMapCommands;
+  readonly mapCommands: CanvasSpaceResourceCommands;
   readonly graphCommands?: CanvasSpaceResourceGraphCommands;
 }
 
@@ -28,37 +23,28 @@ export interface SpaceResourceRailContext {
   readonly entry: OpenSpace;
   readonly spaces: OpenSpaces;
   readonly containingSpaceId: UUID;
-  /** The containing canvas's, where a Map report from this rail is held. */
+  /** The containing canvas's, where a report from this rail is held. */
   readonly commandOutcomes: CommandOutcomes;
-  readonly complete: (
-    completion: Exclude<EmbeddedContextCompletion, { kind: 'deleted-graph' }>,
-  ) => AuthoringResult;
 }
 
 /** The Dock commands, addressed to the target and the context this Resource stores. */
 export function spaceResourceContextCommands(
-  { entry, spaces, containingSpaceId, complete, commandOutcomes }: SpaceResourceRailContext,
+  { entry, spaces, containingSpaceId, commandOutcomes }: SpaceResourceRailContext,
   document: Extract<ResourceDocument, { kind: 'space' }>,
   select: (map: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   available: () => boolean,
 ): SpaceResourceContextCommands {
   // The rail's own answer, asked again when a command is pressed.
-  const mapAuthoring = embeddedMapAuthoringCommands({
+  const embedded = {
     target: entry,
     spaces,
     containingSpaceId,
-    select: (mapId, graphId) => select({ id: mapId }, graphId),
+    select: (mapId: MapId, graphId: GraphId) => select({ id: mapId }, graphId),
     available,
-  });
-  const location = spaces.browserLocation;
-  const settled = async () =>
-    (await spaces.waitForPersistence(entry.id)) &&
-    (await spaces.waitForPersistence(containingSpaceId));
-  const selectAndSave = async (next: Pick<SpaceResourceTargetMap, 'id'>, nextGraph: GraphId) => {
-    const refusal = select(next, nextGraph);
-    if (refusal !== null) return refusal;
-    return (await spaces.waitForPersistence(containingSpaceId)) ? null : PERSISTENCE_UNSETTLED;
   };
+  const mapAuthoring = embeddedMapAuthoringCommands(embedded);
+  const graphAuthoring = embeddedGraphAuthoringCommands(embedded);
+  const location = spaces.browserLocation;
   const { map: mapId, graph: graphId } = document;
   const space = entry.app.currentSpace();
   const map = space.maps.find((each) => each.id === mapId);
@@ -66,7 +52,7 @@ export function spaceResourceContextCommands(
   const addressed = mapAuthoring.map(mapId);
   // Each press is built from the capability that answers its availability,
   // so the rail draws a command unavailable exactly when invoking it would be.
-  const mapCommands: CanvasSpaceResourceMapCommands = {
+  const mapCommands: CanvasSpaceResourceCommands = {
     // The containing canvas's command outcomes hold the report: the notice
     // is drawn by the Space the author is looking at, not by the target. The
     // editor holds a refused draft open on the report's sentence.
@@ -111,46 +97,39 @@ export function spaceResourceContextCommands(
     onCopyLink: () => copyLink(location.href({ kind: 'map', spaceId: entry.id, mapId })),
   };
   if (map === undefined || graph === undefined) return { mapCommands };
+  const addressedGraph = graphAuthoring.map(mapId).graph(graphId);
   return {
     mapCommands,
     graphCommands: {
-      deleteDisabled: map.graphs.length <= 1,
       // The colour the Graph's row line draws, so the two marks agree for a
       // Graph that stores none.
       color: graphColor(graph, graphColorsByGraphId(space)),
       colors: GRAPH_PALETTE_ENTRIES,
-      onRename: (title) => refusalOf(complete({ kind: 'renamed-graph', graphId, title })),
-      onRecolor: (color) => refusalOf(complete({ kind: 'recolored-graph', graphId, color })),
-      onCreate: async () =>
-        coordinatedContextCreate({
-          waitBefore: settled,
-          create: () => complete({ kind: 'added-graph' }),
-          waitUntilPersisted: () => spaces.waitForPersistence(entry.id),
-          createdOf: (result) => {
-            const updated = entry.app.currentSpace().maps.find((each) => each.id === mapId);
-            return result.createdGraphId !== undefined && updated !== undefined
-              ? { created: updated, active: result.createdGraphId }
-              : undefined;
-          },
-          afterCreated: selectAndSave,
-        }),
-      onDelete: async () => {
-        const updated = entry.app.currentSpace().maps.find((each) => each.id === mapId);
-        const result = await coordinatedGraphDelete(
-          entry.spaceResources.deleteGraph,
-          {
-            targetSpaceId: entry.id,
-            mapId,
-            graphId,
-            preferredGraphId: updated?.activeGraph ?? null,
-          },
-          settled,
-        );
-        if (result.kind === 'error') return result.message;
-        if (result.kind === 'completed' && entry.app.navigation.getState().selectedMapId === mapId)
-          entry.app.navigation.activateGraph(result.graphId);
-        return null;
-      },
+      // Graph authoring completes both in the target; the containing canvas's
+      // command outcomes hold a refusal, and the rail says no sentence of its
+      // own. A refused rename is also the editor's, which holds the draft open.
+      onRename: offered(
+        addressedGraph.rename,
+        (rename) => (title: string) =>
+          renameDraftAnswer(commandOutcomes.run('graph-edit', () => rename(title))),
+      ),
+      onRecolor: offered(addressedGraph.recolor, (recolor) => (color: string) => {
+        commandOutcomes.run('graph-edit', () => recolor(color));
+      }),
+      // Graph authoring orders the creation and the selection write, and the
+      // containing canvas holds its report. The rail does not continue into
+      // the new Graph's name, so the caret never goes there, and the creation
+      // never moves the containing canvas's Map.
+      onCreate: offered(graphAuthoring.map(mapId).create, (create) => async () => {
+        await commandOutcomes.run('graph-create', create);
+        return false;
+      }),
+      // Graph authoring waits for both Spaces, repoints every Space Resource
+      // that selected the Graph — this one included — and leaves the target's
+      // canvas on the survivor; the containing canvas holds a refusal.
+      onDelete: offered(addressedGraph.delete, (remove) => async () => {
+        await commandOutcomes.run('graph-delete', remove);
+      }),
       onCopyLink: () =>
         copyLink(location.href({ kind: 'map-graph', spaceId: entry.id, mapId, graphId })),
     },

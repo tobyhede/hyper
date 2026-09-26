@@ -1,17 +1,28 @@
 # 03 — Graph creation through both context adapters
 
-Status: ready-for-agent
+Status: resolved
 Blocked by: 02
 
 **What to build:** Add `map(mapId).create`, an asynchronous capability completing `added-graph` and answering `{ kind: 'completed', mapId, graphId }` of the Graph it made. The embedded adapter owns what `coordinatedContextCreate` does today: wait for both Spaces, recheck, create, wait for the target to save, write the Space Resource's selection, wait for the containing Space. Add a `graph-create` reported channel with "Graph not created", "Graph not saved" and "Graph not selected", mirroring Map creation. The Dock's gate stays `entityEdits`. See `../spec.md`.
 
 **Why:** Creation is one Graph Edit with two context-specific sequences, exactly as Map creation was (`.scratch/command-outcomes/issues/07`).
 
-- [ ] Both surfaces spend create through `offered` and publish on `graph-create`; `graph-edit` no longer carries creation.
-- [ ] Space state is rechecked at invocation and again after the embedded wait; a target exited during the wait creates nothing.
-- [ ] Coordination failures return complete reports under the three titles; a throw is a break.
-- [ ] Each surface keeps its current continuation behaviour; the rail still does not continue into the new Graph's name.
-- [ ] The contract suite covers completed, withdrawn, refused, unchanged and the embedded ordering ("persists a new Graph before the Resource refers to it").
-- [ ] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` green.
+- [x] Both surfaces spend create through `offered` and publish on `graph-create`; `graph-edit` no longer carries creation.
+- [x] Space state is rechecked at invocation and again after the embedded wait; a target exited during the wait creates nothing.
+- [x] Coordination failures return complete reports under the three titles; a throw is a break.
+- [x] Each surface keeps its current continuation behaviour; the rail still does not continue into the new Graph's name.
+- [x] The contract suite covers completed, withdrawn, refused, unchanged and the embedded ordering ("persists a new Graph before the Resource refers to it").
+- [x] `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` green.
 
 ## Comments
+
+**2026-09-26, resolved.** `pnpm verify` green (255 files, 3513 passed, 19 skipped). `pnpm e2e` green (233 passed) and `pnpm e2e:ladle` green (127 passed).
+
+- **The capability.** `graph-authoring-commands.ts` adds `map(mapId).create: GraphCreate = Capability<() => Promise<EditOutcome<CompletedGraphEdit>>>`, a getter as the Map module's `create` is. `CompletedGraphEdit` is `{ kind: 'completed', mapId, graphId }` — the same shape as `CompletedMapEdit`, **mirrored rather than shared**, so neither module names the other's. `GraphAuthoringAvailability` gains `create`; the Dock answers it with `entityEdits`, the rail with its one `available`. Availability is `available.create() && context.addressesMap(mapId)`: the top level creates only in the selected Map, embedded in any Map of the target while it is the open entry.
+- **One sequence, two contexts.** The private `createGraph` checks availability, waits for `coordination.settled()` (embedded only) and **checks again**, completes `added-graph` through `context.complete(mapId, …)` — `AddressedCompletion` now includes `added-graph` — and names the Graph by the result's `createdGraphId`. Embedded, it then waits for the target, writes the Space Resource's selection through `coordination.select`, and waits for the containing Space. Reports: "Graph not created" (authoring refusal, or Spaces unsettled before the Edit), "Graph not saved" (target did not save), "Graph not selected" (selection refused, or containing Space did not save). A `queued` result, or a completion naming no Graph, **throws**: through `commandOutcomes.run` it reaches the reporter and leaves the channel clear.
+- **Command outcomes.** New reported channel and command `graph-create` (result `EditOutcome<CompletedGraphEdit>`, no options: a Graph creation never moves the Map command outcomes read, so it claims nothing). It is drawn before `graph-edit` in `COMMAND_CHANNELS`, as `map-create` precedes `map-manage`. The transitional `graph-add` command is deleted; `graph-edit` carries rename and recolour only.
+- **Surfaces.** The Dock's `DockGraph.onCreate` is `(() => void) | null` through `offered`; it requests no continuation (the Edit makes the new Graph Active). `DockGraph.editsDisabled` now governs Delete alone. The rail's `CanvasSpaceResourceGraphCommands.onCreate` is `(() => Promise<void>) | null` through `offered`, says no local sentence, and still does not continue into the new Graph's name. `GraphMenuActions` takes a nullable `onCreate` and drops `editsDisabled`, matching `MapMenuActions`.
+- **`coordinated-context-create.ts` is deleted**, with its test and its `eslint.config.js` zone: nothing called it once the rail's creation moved. That is one of ticket 05's boxes done early.
+- **Tests.** `graph-authoring-commands.test.ts` runs a creation contract against both adapters (completed with an empty Graph and its identities, withdrawn and vanished-Map unavailable with no publication and no notice, refused with the complete report held and dismissed on `graph-create`, unchanged, queued and identity-less completions throw, a throw is a break with the channel clear), plus context cases: the top level activates the new Graph, does not create in a Map it moved off, and withholds creation alone; embedded "persists a new Graph before the Resource refers to it, without moving either canvas", not created while the containing Space is unsettled, not saved, not selected, and a target exited during the wait creates nothing. Removing the post-wait recheck or the target wait fails three of them. `command-outcomes.test.ts` swaps the `graph-add` cases for `graph-create`; `resource-rail-actions.test.tsx` now expects "Graph not created" one promise later; `SpaceResourceSelectors.test.tsx` holds that the rail reports no sentence for a Graph creation either.
+- **For 04–05.** `SpaceResourceRailContext.complete` is now read by nothing — `spaceResourceContextCommands` no longer destructures it — but it is still built in `canvas-resource-decoration.ts` from `completeEmbedded`; 05 should delete the field, `CanvasResourceDecorationContext.completeEmbedded` and its wiring in `canvas-resource-authoring.ts` and the two tests that supply it, and trim `embedded-authoring.ts`'s comment (the rail's rename, recolour and add-Graph no longer reach `completeEmbedded`). `SpaceResourceSelectors`' `graphSelectorCommands` still converts the Graph shape, only now its `create` mirrors the Map one; `deleteDisabled` and `DockGraph.editsDisabled` are 04's. 04 can mirror `createGraph`'s settled/recheck prologue for deletion, as the Map module's `deleteMap` does.
+

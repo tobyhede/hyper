@@ -182,11 +182,7 @@ export function GraphControls({
         testId="active-graph"
         title={graph.active.title}
         triggerTitle="Switch Graph"
-        onRename={
-          graph.onRename === null
-            ? null
-            : (title) => graph.onRename?.(graph.active.id, title) ?? null
-        }
+        onRename={graph.onRename}
       >
         {(disclosure) => (
           <GraphIdentityMenu
@@ -248,17 +244,19 @@ function GraphIdentityMenu({
       <GraphMenuActions
         title={graph.active.title}
         renameItem={renameItem}
-        editsDisabled={graph.editsDisabled}
-        deleteDisabled={graph.editsDisabled || graph.graphs.length <= 1}
         color={graph.activeColor}
         colors={GRAPH_PALETTE_ENTRIES}
-        onRecolor={(color) => {
-          graph.onRecolor(graph.active.id, color);
-          onOpenChange(false);
-        }}
+        onRecolor={
+          graph.onRecolor === null
+            ? null
+            : (color) => {
+                graph.onRecolor?.(color);
+                onOpenChange(false);
+              }
+        }
         onCreate={graph.onCreate}
         onCopyLink={graph.onCopyLink}
-        onDelete={() => graph.onDelete(graph.active.id)}
+        onDelete={graph.onDelete}
       />
     </ChoiceMenu>
   );

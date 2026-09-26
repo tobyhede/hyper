@@ -687,7 +687,7 @@ describe('useDockChrome', () => {
   it('adds a Graph to the drawing Map', () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
-    act(() => chrome?.graph.onCreate());
+    act(() => chrome?.graph.onCreate?.());
     const drawn = opened.session.getState().working.document.maps?.find(({ id }) => id === MAP_ID);
     expect(drawn?.graphs.map(({ id }) => id)).toEqual([GRAPH_ID, CREATED]);
   });
