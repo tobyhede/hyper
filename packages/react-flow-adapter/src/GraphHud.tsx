@@ -1,5 +1,5 @@
-import type { Graph } from '@project/core';
-import { MapIcon, GraphColorLine, GraphIcon, Separator, SpaceIcon, graphColor } from '@project/ui';
+import { graphHeadShape, type Graph } from '@project/core';
+import { MapIcon, GraphIcon, GraphLegendMark, Separator, SpaceIcon, graphColor } from '@project/ui';
 import { MiniMap, Panel } from '@xyflow/react';
 
 export interface GraphHudProps {
@@ -33,8 +33,8 @@ const PANEL_INSET = 15;
  * Edges being read. What the two must
  * never do is disagree, which is why both resolve a Graph's colour through the
  * one shared `graphColor` seam rather than each deriving its own — and why each
- * key row draws `GraphColorLine`, the same mark the Graph choice lists draw
- * (held by the `graph-choice-rows-draw-the-graph-colour-line` parity claim).
+ * key row draws `GraphLegendMark`, the same mark the Graph choice lists draw
+ * (held by the `graph-choice-rows-draw-the-graph-legend-mark` parity claim).
  *
  * It lives in the adapter because the MiniMap is a React Flow component, and it
  * owns its own semantic presentation rather than delegating the markup: the key
@@ -118,7 +118,10 @@ export function GraphHud({
                     className="legend__item flex items-center gap-[8px] text-chrome-xs text-foreground"
                     style={{ opacity: dimmed ? 0.5 : 1 }}
                   >
-                    <GraphColorLine color={graphColor(graph, colorByGraphId)} />
+                    <GraphLegendMark
+                      color={graphColor(graph, colorByGraphId)}
+                      headShape={graphHeadShape(graph)}
+                    />
                     {graph.title}
                   </li>
                 );

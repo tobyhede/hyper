@@ -1023,7 +1023,7 @@ describe('CanvasResource Space front', () => {
       { id: 'l1', title: 'Collection 1' },
       { id: 'l2', title: 'Collection 2' },
     ],
-    graphs: [{ id: 'g1', title: 'Long', color: '#1f77b4' }],
+    graphs: [{ id: 'g1', title: 'Long', color: '#1f77b4', headShape: 'arrow' }],
     mapId: 'l1',
     graphId: 'g1',
     onMapChange: vi.fn(),

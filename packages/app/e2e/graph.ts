@@ -386,15 +386,14 @@ export async function createResource(page: Page, kind: ResourceKindName): Promis
   await createResourceControl(page, kind).click();
 }
 
-/** The resolved colour drawn on one Graph's legend swatch, by its title. */
+/** The resolved colour drawn on one Graph's legend mark, by its title. */
 export async function graphLegendSwatchColor(page: Page, title: string): Promise<string> {
-  const swatch = page
+  const line = page
     .getByTestId('graph-legend')
     .locator('.legend__item')
     .filter({ hasText: title })
-    .locator('span')
-    .first();
-  return swatch.evaluate((el) => getComputedStyle(el).backgroundColor);
+    .locator('[data-slot="graph-legend-mark-line"]');
+  return line.evaluate((el) => getComputedStyle(el).stroke);
 }
 
 /** Where React Flow has actually put a node, in flow coordinates. */

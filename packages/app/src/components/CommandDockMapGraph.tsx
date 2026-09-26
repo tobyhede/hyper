@@ -5,8 +5,8 @@
  */
 import {
   ChoiceMenu,
-  GraphColorLine,
   GraphIcon,
+  GraphLegendMark,
   GraphMenuActions,
   MapIcon,
   MapMenuActions,
@@ -15,7 +15,7 @@ import {
   ToolbarGroup,
   graphColor,
 } from '@project/ui';
-import type { GraphId, MapId } from '@project/core';
+import { graphHeadShape, type GraphId, type MapId } from '@project/core';
 import { GRAPH_PALETTE_ENTRIES } from '@project/graph';
 import type { MenuSide } from '../dock-placement';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
@@ -206,9 +206,10 @@ export function GraphControls({
  * The same `ChoiceMenu` the Map cluster and an Open Space Resource draw,
  * with each row carrying the colour its Graph is drawn in — a choice's
  * own mark is the choice's, which is why it rides on the choice rather
- * than being rendered here. The mark is `GraphColorLine`, the line the canvas
- * HUD's key draws, rather than a Graph glyph on every row: the list is already
- * a list of Graphs, and the line is what a Graph's colour means on the canvas.
+ * than being rendered here. The mark is `GraphLegendMark`, the miniature Edge the
+ * canvas HUD's key draws, rather than a Graph glyph on every row: the list is
+ * already a list of Graphs, and the line and its head shape are how a Graph's
+ * Edges are drawn on the canvas.
  * The cluster's own identity and Colour… keep the coloured glyph, where it says
  * which kind of entity the colour belongs to.
  */
@@ -231,7 +232,12 @@ function GraphIdentityMenu({
       choices={graph.graphs.map((each) => ({
         id: each.id,
         title: each.title,
-        icon: <GraphColorLine color={graphColor(each, graph.colorByGraphId)} />,
+        icon: (
+          <GraphLegendMark
+            color={graphColor(each, graph.colorByGraphId)}
+            headShape={graphHeadShape(each)}
+          />
+        ),
       }))}
       chosen={graph.active.id}
       onChoose={graph.onActivate}

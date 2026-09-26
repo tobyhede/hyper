@@ -370,7 +370,7 @@ test(
   {
     tag: [
       '@parity:open-space-resource-chooses-its-context-on-the-shared-controls',
-      '@parity:open-space-resource-graph-rows-draw-the-graph-colour-line',
+      '@parity:open-space-resource-graph-rows-draw-the-graph-legend-mark',
     ],
   },
   async ({ page }) => {
@@ -469,19 +469,24 @@ test(
       }),
     ).toBeVisible();
 
-    // The Graph list marks its one row with the target Graph's colour line —
-    // the created Space's first Graph takes the palette's first slot — and
-    // the Map list beside it carries no mark.
+    // The Graph list marks its one row with the target Graph's legend mark —
+    // the created Space's first Graph takes the palette's first slot and the
+    // arrow every new Graph starts as — and the Map list beside it carries no
+    // mark.
     await (await resourceControls(page, resource)).getByTestId('space-resource-graph').click();
     const graphRow = page.getByRole('menuitemradio', { name: 'Graph 1' });
-    await expect(graphRow.locator('[data-slot="graph-color-line"]')).toHaveCSS(
-      'background-color',
+    await expect(graphRow.locator('[data-slot="graph-legend-mark-line"]')).toHaveCSS(
+      'stroke',
       'rgb(31, 119, 180)',
+    );
+    await expect(graphRow.locator('[data-slot="graph-legend-mark"]')).toHaveAttribute(
+      'data-head-shape',
+      'arrow',
     );
     await page.keyboard.press('Escape');
     await (await resourceControls(page, resource)).getByTestId('space-resource-map').click();
     await expect(page.getByRole('menuitemradio', { name: 'Map 1' })).toBeVisible();
-    await expect(page.getByRole('menu').locator('[data-slot="graph-color-line"]')).toHaveCount(0);
+    await expect(page.getByRole('menu').locator('[data-slot="graph-legend-mark"]')).toHaveCount(0);
     await page.keyboard.press('Escape');
   },
 );

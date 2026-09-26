@@ -280,14 +280,12 @@ test(
     const choices = await graphChoices(page);
     expect(await legendItems.allInnerTexts()).toEqual(await choices.allInnerTexts());
 
-    // Colours. Both surfaces draw the one `GraphColorLine` mark, so one
+    // Colours. Both surfaces draw the one `GraphLegendMark`, so one
     // property reads both: each resolved value, in the same order.
     const lineColors = (rows: Locator) =>
       rows
-        .locator('[data-slot="graph-color-line"]')
-        .evaluateAll((els: readonly Element[]) =>
-          els.map((el) => getComputedStyle(el).backgroundColor),
-        );
+        .locator('[data-slot="graph-legend-mark-line"]')
+        .evaluateAll((els: readonly Element[]) => els.map((el) => getComputedStyle(el).stroke));
     const dockColors = await lineColors(choices);
     const hudColors = await lineColors(legendItems);
     expect(hudColors).toEqual(dockColors);
@@ -318,22 +316,31 @@ test(
 );
 
 /**
- * A Graph row in the Dock's list is the HUD key's row: the same line, the same
- * box, the same colour, and no Graph glyph.
- * The Graph identity and Colour… keep the coloured glyph, which says what kind
- * of entity the colour belongs to; the Map list, drawn by the same component,
- * carries no mark.
+ * A Graph row in the Dock's list is the HUD key's row: the same mark, the same
+ * box, the same colour, the same head shape, and no Graph glyph.
+ * The fixture's Long stores no head shape and draws the arrow; Mid and Short
+ * store `dot` and `diamond`. The Graph identity and Colour… keep the coloured
+ * glyph, which says what kind of entity the colour belongs to; the Map list,
+ * drawn by the same component, carries no mark.
  */
 test(
-  'the Dock’s Graph rows draw the HUD key’s colour line rather than a Graph glyph',
-  { tag: '@parity:graph-choice-rows-draw-the-graph-colour-line' },
+  'the Dock’s Graph rows draw the HUD key’s legend mark rather than a Graph glyph',
+  { tag: '@parity:graph-choice-rows-draw-the-graph-legend-mark' },
   async ({ page }) => {
     await page.goto('/');
     const marks = (rows: Locator) =>
-      rows.locator('[data-slot="graph-color-line"]').evaluateAll((els: readonly Element[]) =>
+      rows.locator('[data-slot="graph-legend-mark"]').evaluateAll((els: readonly Element[]) =>
         els.map((el) => {
           const style = getComputedStyle(el);
-          return { color: style.backgroundColor, width: style.width, height: style.height };
+          const line = el.querySelector('[data-slot="graph-legend-mark-line"]');
+          const head = el.querySelector('[data-slot="graph-head-shape"]');
+          return {
+            color: line === null ? null : getComputedStyle(line).stroke,
+            headShape: head?.getAttribute('data-head-shape') ?? null,
+            headColor: head === null ? null : getComputedStyle(head).fill,
+            width: style.width,
+            height: style.height,
+          };
         }),
       );
     const legendItems = page.getByTestId('graph-legend').locator('.legend__item');
@@ -346,11 +353,19 @@ test(
       .evaluate((el) => getComputedStyle(el).stroke);
     const choices = await graphChoices(page);
     expect(await marks(choices)).toEqual(key);
-    expect(key.every((line) => line.width === '14px' && line.height === '3px')).toBe(true);
-    await expect(choices.and(page.locator('[aria-checked="false"]')).locator('svg')).toHaveCount(0);
+    expect(key.every((line) => line.width === '14px' && line.height === '10px')).toBe(true);
+    expect(key.every((line) => line.headColor === line.color)).toBe(true);
+    expect(key.map((line) => line.headShape)).toEqual(['arrow', 'dot', 'diamond']);
     await expect(
-      choices.and(page.locator('[aria-checked="true"]')).locator('[data-slot="graph-color-line"]'),
-    ).toHaveCSS('background-color', identityStroke);
+      choices
+        .and(page.locator('[aria-checked="false"]'))
+        .locator('svg:not([data-slot="graph-legend-mark"] svg)'),
+    ).toHaveCount(0);
+    await expect(
+      choices
+        .and(page.locator('[aria-checked="true"]'))
+        .locator('[data-slot="graph-legend-mark-line"]'),
+    ).toHaveCSS('stroke', identityStroke);
     await expect(page.getByRole('menuitem', { name: 'Colour…' }).locator('svg').first()).toHaveCSS(
       'stroke',
       identityStroke,
@@ -359,7 +374,7 @@ test(
     await page.keyboard.press('Escape');
     const maps = await mapChoices(page);
     await expect(maps.first()).toBeVisible();
-    await expect(maps.locator('[data-slot="graph-color-line"]')).toHaveCount(0);
+    await expect(maps.locator('[data-slot="graph-legend-mark"]')).toHaveCount(0);
   },
 );
 

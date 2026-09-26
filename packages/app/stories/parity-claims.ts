@@ -745,17 +745,17 @@ export const parityClaims: readonly ParityClaim[] = [
       'The canvas HUD keys the Graphs of the Map it opens on, not the Graphs of the Space: a Map that owns one Graph draws a key of one, and the Graphs another Map owns are absent from it rather than dimmed.',
   },
   {
-    id: 'graph-choice-rows-draw-the-graph-colour-line',
+    id: 'graph-choice-rows-draw-the-graph-legend-mark',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Each row of the Graph list is marked with the line the canvas HUD’s key draws, in that Graph’s colour and with no Graph glyph, while the Graph identity and Colour… keep the coloured Graph glyph and the Map list carries no mark.',
+      'Each row of the Graph list is marked with the mark the canvas HUD’s key draws — a line in that Graph’s colour ending in its head shape, the arrow where the Graph stores none — with no Graph glyph, while the Graph identity and Colour… keep the coloured Graph glyph and the Map list carries no mark.',
   },
   {
-    id: 'open-space-resource-graph-rows-draw-the-graph-colour-line',
+    id: 'open-space-resource-graph-rows-draw-the-graph-legend-mark',
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',
     claim:
-      'An Open Space Resource’s Graph list marks each row with the same colour line, in the colour the target draws that Graph’s Edges in, and its Map list carries no mark.',
+      'An Open Space Resource’s Graph list marks each row with the same legend mark, in the colour and head shape the target draws that Graph’s Edges in, and its Map list carries no mark.',
   },
 ] as const;

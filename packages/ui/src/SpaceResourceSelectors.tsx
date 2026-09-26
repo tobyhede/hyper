@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { DropdownMenuItem } from './components/dropdown-menu';
 import { ChoiceMenu, ChoiceMenuTrigger, type ChoiceMenuChoice } from './ChoiceMenu';
-import { GraphColorLine } from './GraphColorLine';
+import type { GraphHeadShape } from '@project/core';
+import { GraphLegendMark } from './GraphLegendMark';
 import { ToolbarButton, ToolbarGroup } from './components/toolbar';
 import { MapMenuActions, GraphMenuActions } from './IdentityMenuActions';
 import { MapIcon, EditIcon, GraphIcon } from './icons';
@@ -14,10 +15,12 @@ export interface CanvasSpaceResourceChoice {
   readonly title: string;
 }
 
-/** A Graph a Space Resource can select, carrying the colour its row is marked in. */
+/** A Graph a Space Resource can select, carrying the colour and head shape its row is marked in. */
 export interface CanvasSpaceResourceGraphChoice extends CanvasSpaceResourceChoice {
   /** The Graph's resolved colour, through the shared `graphColor` seam. */
   readonly color: string;
+  /** The Graph's resolved head shape, through `graphHeadShape`. */
+  readonly headShape: GraphHeadShape;
 }
 
 /**
@@ -205,10 +208,10 @@ export function SpaceResourceSelectors({
         onReport={onReport}
         icon={<GraphIcon size={14} />}
         testId="space-resource-graph"
-        choices={graphs.map(({ id, title, color }) => ({
+        choices={graphs.map(({ id, title, color, headShape }) => ({
           id,
           title,
-          icon: <GraphColorLine color={color} />,
+          icon: <GraphLegendMark color={color} headShape={headShape} />,
         }))}
         chosen={graphId}
         disabled={disabled === true || busy}
@@ -227,7 +230,7 @@ interface SpaceResourceSelectorProps {
   readonly label: string;
   readonly icon: ReactNode;
   readonly testId: string;
-  /** Each row's own mark rides on its choice: a Graph's colour line, and nothing on a Map. */
+  /** Each row's own mark rides on its choice: a Graph's legend mark, and nothing on a Map. */
   readonly choices: readonly ChoiceMenuChoice<string>[];
   readonly chosen: string | null;
   /** Authoring is withdrawn from this canvas; the selection itself is known. */

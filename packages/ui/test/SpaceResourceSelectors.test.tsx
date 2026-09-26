@@ -57,7 +57,7 @@ const clusters = (
     { id: 'l1', title: 'Collection 1' },
     { id: 'l2', title: 'Collection 2' },
   ],
-  graphs: [{ id: 'g1', title: 'Long', color: '#1f77b4' }],
+  graphs: [{ id: 'g1', title: 'Long', color: '#1f77b4', headShape: 'arrow' }],
   mapId: 'l1',
   graphId: 'g1',
   onMapChange: vi.fn(),
@@ -337,16 +337,17 @@ describe('SpaceResourceSelectors', () => {
   });
 
   /**
-   * A Graph row says which colour its Edges are drawn in with the same line
-   * the canvas HUD's key draws, and no Graph glyph: the list is already a list
-   * of Graphs, so a glyph on every row said nothing the caption does not.
+   * A Graph row says how its Edges are drawn with the same mark the canvas
+   * HUD's key draws — a line in the Graph's colour ending in its head shape —
+   * and no Graph glyph: the list is already a list of Graphs, so a glyph on
+   * every row said nothing the caption does not.
    */
-  it('marks each Graph row with a line in that Graph’s colour and no glyph', () => {
+  it('marks each Graph row with its colour and head shape and no glyph', () => {
     mount(
       clusters({
         graphs: [
-          { id: 'g1', title: 'Long', color: '#1f77b4' },
-          { id: 'g2', title: 'Short', color: '#ff7f0e' },
+          { id: 'g1', title: 'Long', color: '#1f77b4', headShape: 'arrow' },
+          { id: 'g2', title: 'Short', color: '#ff7f0e', headShape: 'vee' },
         ],
       }),
     );
@@ -354,12 +355,22 @@ describe('SpaceResourceSelectors', () => {
     const rows = screen.getAllByRole('menuitemradio');
 
     expect(rows).toHaveLength(2);
-    const lines = rows.map((row) => row.querySelector('[data-slot="graph-color-line"]'));
-    expect(lines[0]).toHaveStyle({ backgroundColor: '#1f77b4' });
-    expect(lines[1]).toHaveStyle({ backgroundColor: '#ff7f0e' });
-    // The unchosen row draws nothing else; the chosen one draws only the
-    // radio indicator the menu marks the chosen member with.
-    expect(rows[1]?.querySelector('svg')).toBeNull();
+    const marks = rows.map((row) => row.querySelector('[data-slot="graph-legend-mark"]'));
+    expect(marks[0]?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+      'stroke',
+      '#1f77b4',
+    );
+    expect(marks[0]).toHaveAttribute('data-head-shape', 'arrow');
+    expect(marks[1]?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+      'stroke',
+      '#ff7f0e',
+    );
+    expect(marks[1]).toHaveAttribute('data-head-shape', 'vee');
+    // The unchosen row draws nothing but its mark; the chosen one adds only
+    // the radio indicator the menu marks the chosen member with.
+    expect(rows[1]?.querySelectorAll('svg:not([data-slot="graph-legend-mark"] svg)')).toHaveLength(
+      0,
+    );
   });
 
   it('leaves the Map rows unmarked', () => {
@@ -367,6 +378,6 @@ describe('SpaceResourceSelectors', () => {
     fireEvent.click(screen.getByTestId('space-resource-map'));
 
     for (const row of screen.getAllByRole('menuitemradio'))
-      expect(row.querySelector('[data-slot="graph-color-line"]')).toBeNull();
+      expect(row.querySelector('[data-slot="graph-legend-mark"]')).toBeNull();
   });
 });

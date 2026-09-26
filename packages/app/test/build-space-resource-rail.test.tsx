@@ -30,21 +30,21 @@ const target: SpaceResourceTarget = {
       id: FIRST_MAP_ID,
       title: 'Collection 1',
       graphs: [
-        { id: FIRST_GRAPH_ID, title: 'Overview', color: '#1f77b4' },
-        { id: SECOND_GRAPH_ID, title: 'Detail', color: '#ff7f0e' },
+        { id: FIRST_GRAPH_ID, title: 'Overview', color: '#1f77b4', headShape: 'arrow' },
+        { id: SECOND_GRAPH_ID, title: 'Detail', color: '#ff7f0e', headShape: 'dot' },
       ],
     },
     {
       id: SECOND_MAP_ID,
       title: 'Collection 2',
-      graphs: [{ id: THIRD_GRAPH_ID, title: 'Second pass', color: '#2ca02c' }],
+      graphs: [{ id: THIRD_GRAPH_ID, title: 'Second pass', color: '#2ca02c', headShape: 'arrow' }],
     },
     {
       id: THIRD_MAP_ID,
       title: 'Collection 3',
       graphs: [
-        { id: FOURTH_GRAPH_ID, title: 'Draft', color: '#d62728' },
-        { id: FIFTH_GRAPH_ID, title: 'Current', color: '#9467bd' },
+        { id: FOURTH_GRAPH_ID, title: 'Draft', color: '#d62728', headShape: 'vee' },
+        { id: FIFTH_GRAPH_ID, title: 'Current', color: '#9467bd', headShape: 'diamond' },
       ],
       activeGraph: FIFTH_GRAPH_ID,
     },
@@ -99,13 +99,21 @@ describe('buildSpaceResourceRail', () => {
     );
 
     fireEvent.click(screen.getByTestId('space-resource-graph'));
-    const lines = screen
+    const marks = screen
       .getAllByRole('menuitemradio')
-      .map((row) => row.querySelector('[data-slot="graph-color-line"]'));
+      .map((row) => row.querySelector('[data-slot="graph-legend-mark"]'));
 
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toHaveStyle({ backgroundColor: '#1f77b4' });
-    expect(lines[1]).toHaveStyle({ backgroundColor: '#ff7f0e' });
+    expect(marks).toHaveLength(2);
+    expect(marks[0]?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+      'stroke',
+      '#1f77b4',
+    );
+    expect(marks[0]).toHaveAttribute('data-head-shape', 'arrow');
+    expect(marks[1]?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+      'stroke',
+      '#ff7f0e',
+    );
+    expect(marks[1]).toHaveAttribute('data-head-shape', 'dot');
   });
 
   /**
