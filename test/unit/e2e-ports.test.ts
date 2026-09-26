@@ -17,8 +17,8 @@ import {
 
 /**
  * `pnpm dev` names no port: `packages/app/vite.config.ts` sets 5173 as the
- * server default and binds it under `strictPort` all the same. It is the one
- * reserved port no script can be read for.
+ * server default, not port-strict, so a second host drifts upward from it. It
+ * is the one reserved port no script can be read for.
  */
 const VITE_CONFIG_DEFAULT_PORT = 5173;
 
@@ -26,9 +26,10 @@ const VITE_CONFIG_DEFAULT_PORT = 5173;
  * The ports a developer's own runs hold, read out of the `dev:*` scripts rather
  * than restated beside them. A hand-kept list goes stale in the direction that
  * matters: the script adding `--port 5301` would still pass a test naming only
- * the ports someone remembered, and the collision would surface as a `strictPort`
- * startup failure in the human's terminal instead. Deriving it means adding that
- * script fails here first.
+ * the ports someone remembered, and the collision would surface in the human's
+ * terminal instead: a `strictPort` startup failure for a scripted host, a silent
+ * move to another port for `pnpm dev`. Deriving it means adding that script
+ * fails here first.
  */
 function developerPorts(): number[] {
   const ports = new Set([VITE_CONFIG_DEFAULT_PORT]);
