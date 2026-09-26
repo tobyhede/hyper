@@ -1153,6 +1153,24 @@ test(
   { tag: '@parity:space-resource-context-menus-share-dock-actions' },
   async ({ page }) => {
     const resource = await openSpaceResourceOnItsMap(page);
+    // A new target Space's Graph has no Edge, and Shape… is proved on the Edges
+    // it redraws — so author one through the product first: a self-Edge on the
+    // one embedded Resource, as the connect test above draws.
+    await beginPortalEdit(page, resource);
+    const embedded = embeddedNodes(page);
+    await embedded.hover();
+    await connectHandles(
+      page,
+      authoringHandle(embedded, 'source', 'right'),
+      authoringHandle(embedded, 'target', 'left'),
+    );
+    await settled(page);
+    await expect.poll(() => embeddedGraphEdgeCount(page, resource)).toBe(1);
+    await (
+      await resourceToolbar(page, resource)
+    )
+      .getByRole('button', { name: 'Done Resource Architecture' })
+      .click();
     await exerciseSpaceResourceContextMenus(page, resource);
     await page.reload();
     const reopened = nodeByTitle(page, 'Architecture');

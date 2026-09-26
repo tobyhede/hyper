@@ -49,7 +49,8 @@ export interface GraphHeadShapeSwatchGridProps {
 /**
  * The four head shapes (ADR 0105) as a swatch grid, each drawn in the Graph's
  * colour at the size a colour swatch takes, so Shape… and Colour… open panels
- * of one size, marking the current head shape as Colour… marks the current colour.
+ * of one size, marking the current head shape as Colour… marks the current
+ * colour — its check at the corner, clear of the glyph it would cover.
  */
 export function GraphHeadShapeSwatchGrid({
   value,
@@ -65,6 +66,7 @@ export function GraphHeadShapeSwatchGrid({
       onValueChange={onValueChange}
       disabled={disabled}
       aria-label={ariaLabel}
+      checkPlacement="corner"
       renderSwatch={(headShape) => (
         <GraphHeadShapeIcon headShape={headShape} color={color} className="size-full" />
       )}

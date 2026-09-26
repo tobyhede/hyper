@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
-import { expectMenuGroups, resourceActions } from '../e2e/graph';
+import { boxOf, expectMenuGroups, resourceActions } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -646,6 +646,16 @@ test(
     );
     for (const glyph of await group.locator('[data-slot="graph-head-shape"]').all())
       await expect(glyph).toHaveAttribute('fill', colour ?? '');
+    // The check marking the current head shape leaves its glyph clear to read.
+    const current = group.getByRole('radio', { name: 'Arrow', exact: true });
+    const glyphBox = await boxOf(current.locator('[data-slot="graph-head-shape"]'), 'Arrow glyph');
+    const checkBox = await boxOf(current.locator('.lucide-check'), 'current head shape check');
+    const overlap = (a: number, aSize: number, b: number, bSize: number) =>
+      Math.max(0, Math.min(a + aSize, b + bSize) - Math.max(a, b));
+    expect(
+      overlap(glyphBox.x, glyphBox.width, checkBox.x, checkBox.width) *
+        overlap(glyphBox.y, glyphBox.height, checkBox.y, checkBox.height),
+    ).toBe(0);
 
     await group.getByRole('radio', { name: 'Diamond', exact: true }).click();
     await expect(group).toHaveCount(0);

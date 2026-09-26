@@ -20,6 +20,12 @@ export interface SwatchGridProps<Value extends string> {
   readonly disabled?: boolean;
   readonly 'aria-label': string;
   readonly className?: string | undefined;
+  /**
+   * Where the current choice's check sits: over the swatch, for a swatch that
+   * is only a fill, or clear of it at the corner, for a swatch drawing a glyph
+   * the check would cover.
+   */
+  readonly checkPlacement?: 'over' | 'corner';
 }
 
 /** The grid's column count, which the vertical arrows step by. */
@@ -50,7 +56,8 @@ const rovingTarget = (key: string, index: number, count: number): number | null 
  * A closed set of choices drawn as a two-column grid of square swatches, each
  * named only in its accessible label and tooltip. The Graph menu's Colour… and
  * Shape… both open one, so the two panels are one size, one interaction and
- * one marking: the current choice takes the selected treatment and a check.
+ * one marking: the current choice takes the selected treatment and a check —
+ * over a fill, and at the corner of a glyph it would otherwise cover.
  *
  * Deviation (shadcn-first-ui):
  * - Existing Hyper component considered: `DropdownMenuRadioGroup` /
@@ -84,6 +91,7 @@ export function SwatchGrid<Value extends string>({
   disabled = false,
   'aria-label': ariaLabel,
   className,
+  checkPlacement = 'over',
 }: SwatchGridProps<Value>) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const current = entries.findIndex((entry) => entry.value === value);
@@ -110,7 +118,7 @@ export function SwatchGrid<Value extends string>({
             disabled={disabled}
             tabIndex={index === tabStop ? 0 : -1}
             className={cn(
-              'flex cursor-pointer items-center justify-center rounded-chrome-md border border-transparent p-[0.35rem] transition-[background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
+              'relative flex cursor-pointer items-center justify-center rounded-chrome-md border border-transparent p-[0.35rem] transition-[background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
               selected && 'border-border bg-accent',
             )}
             onClick={() => onValueChange(entry.value)}
@@ -124,7 +132,7 @@ export function SwatchGrid<Value extends string>({
           >
             <span aria-hidden className="relative flex size-[1.35rem]">
               {renderSwatch(entry.value)}
-              {selected ? (
+              {selected && checkPlacement === 'over' ? (
                 <Check
                   aria-hidden
                   size={12}
@@ -133,6 +141,14 @@ export function SwatchGrid<Value extends string>({
                 />
               ) : null}
             </span>
+            {selected && checkPlacement === 'corner' ? (
+              <span
+                aria-hidden
+                className="absolute -top-0.75 -right-0.75 flex size-2.5 items-center justify-center rounded-full bg-background text-foreground ring-1 ring-border"
+              >
+                <Check aria-hidden size={8} strokeWidth={3.5} />
+              </span>
+            ) : null}
           </button>
         );
       })}

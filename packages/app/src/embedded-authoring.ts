@@ -7,10 +7,43 @@ import {
 } from '@project/persistence';
 import type { OpenSpace } from './open-spaces';
 import { createRenderAdapter, type RenderAdapterAuthoring } from './render-adapter';
-import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
+import type {
+  AuthoringCompletion,
+  AuthoringResult,
+  EmbeddedContextCompletion,
+  EmbeddedResourceCompletion,
+} from './space-authoring';
 
 /** Nothing was authored: the answer this canvas owes the author no prose for. */
 const NOTHING_AUTHORED = { kind: 'unchanged' } as const;
+
+/** What an embedded Map forwards: every completion `completeInMap` takes, bar Graph deletion. */
+type ForwardedCompletion = Exclude<
+  EmbeddedResourceCompletion | EmbeddedContextCompletion,
+  { kind: 'deleted-graph' }
+>;
+
+/**
+ * The forwarded kinds, keyed by the union `completeInMap` declares, so a kind
+ * added to it fails to compile here until it is forwarded — or excluded above.
+ */
+const FORWARDED = {
+  'opened-resource': true,
+  'closed-resource': true,
+  'resized-resource': true,
+  'edited-resource': true,
+  'settled-resource-movement': true,
+  'removed-resource-from-map': true,
+  'connected-resources': true,
+  'renamed-map': true,
+  'added-graph': true,
+  'renamed-graph': true,
+  'recolored-graph': true,
+  'changed-graph-head-shape': true,
+} as const satisfies Record<ForwardedCompletion['kind'], true>;
+
+const isForwarded = (completion: AuthoringCompletion): completion is ForwardedCompletion =>
+  Object.hasOwn(FORWARDED, completion.kind);
 
 const completeEmbedded = (
   entry: OpenSpace,
@@ -18,26 +51,11 @@ const completeEmbedded = (
   completion: AuthoringCompletion,
   report: ObserverErrorReporter,
 ): AuthoringResult => {
-  if (
-    completion.kind === 'opened-resource' ||
-    completion.kind === 'closed-resource' ||
-    completion.kind === 'resized-resource' ||
-    completion.kind === 'edited-resource' ||
-    completion.kind === 'settled-resource-movement' ||
-    completion.kind === 'removed-resource-from-map' ||
-    completion.kind === 'connected-resources' ||
-    completion.kind === 'renamed-map' ||
-    completion.kind === 'added-graph' ||
-    completion.kind === 'renamed-graph' ||
-    completion.kind === 'recolored-graph' ||
-    completion.kind === 'changed-graph-head-shape'
-  ) {
-    return entry.app.authoring.completeInMap(mapId, completion);
-  }
+  if (isForwarded(completion)) return entry.app.authoring.completeInMap(mapId, completion);
   /**
    * Anything else is a broken invariant, not a refusal.
    *
-   * The kinds above are the whole of what the surfaces holding this
+   * The kinds `FORWARDED` names are the whole of what the surfaces holding this
    * `authoring` produce — `EmbeddedMapAuthoring`, the render adapter's
    * resize and movement settlements, Canvas Resource Authoring, and the Space
    * Resource rail's rename / recolor / head shape / add-Graph commands. Graph deletion is
