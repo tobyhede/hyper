@@ -134,6 +134,18 @@ describe('canvasProjection', () => {
     expect(opacityOf(OTHER_GRAPH)).toBeLessThan(1);
   });
 
+  it("ends each Graph's Edges in its head shape, and a Graph storing none in an arrow", async () => {
+    const space = spaceWith({ maps: [mapOwning({ ...DRAWN, headShape: 'diamond' }, OTHER)] });
+
+    const { edges } = await projectThrough(space, { ...AT_REST, activeGraphId: DRAWN_GRAPH });
+
+    const headOf = (graphId: string) =>
+      edges.find((edge) => edge.data?.['graphId'] === graphId)?.data?.['headShape'];
+    expect(headOf(DRAWN_GRAPH)).toBe('diamond');
+    // Other stops short beside the Active Graph and still ends in its head.
+    expect(headOf(OTHER_GRAPH)).toBe('arrow');
+  });
+
   /*
    * Two Space Resources on one target, selecting one Map at different Graphs
    * (ADR 0026).

@@ -81,10 +81,36 @@ const near = (actual: Point, expected: Point, what: string): void => {
  *  the fixture's Active Graph, so its Edge takes the centre lane and connects
  *  anchor to anchor (ADR 0100). */
 const LONG = '00000000-0000-4000-8000-000000000023';
+const MID = '00000000-0000-4000-8000-000000000024';
+const SHORT = '00000000-0000-4000-8000-000000000025';
 const RESOURCE_A = '00000000-0000-4000-8000-000000000002';
 const RESOURCE_B = '00000000-0000-4000-8000-000000000003';
 const A_TO_B = `${LONG}::${RESOURCE_A}::${RESOURCE_B}`;
 const A_TO_A = `${LONG}::${RESOURCE_A}::${RESOURCE_A}`;
+
+/** Every drawn Edge the selector matches: its id, path, stroke and the head
+ *  shape its end marker draws. */
+async function drawnLines(page: Page, selector: string) {
+  return page.locator(selector).evaluateAll((elements) =>
+    elements.map((element) => {
+      const path = element.querySelector('.react-flow__edge-path');
+      return {
+        id: element.getAttribute('data-id') ?? '',
+        d: path?.getAttribute('d') ?? '',
+        stroke: path === null ? '' : getComputedStyle(path).stroke,
+        head: (() => {
+          const id = /^url\('#(.+)'\)$/.exec(path?.getAttribute('marker-end') ?? '')?.[1];
+          const marker = id === undefined ? null : document.getElementById(id);
+          return (
+            marker
+              ?.querySelector('[data-slot="graph-head-shape"]')
+              ?.getAttribute('data-head-shape') ?? null
+          );
+        })(),
+      };
+    }),
+  );
+}
 
 test('an Edge leaves and enters on the sides the two Resources face', async ({ page }) => {
   await page.goto('/');
@@ -186,23 +212,15 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
   await settled(page);
 
   // Long, Mid and Short all carry A → B, and A and B sit level. Long is active,
-  // so it connects on the centre line (asserted against the anchors above) and
-  // carries the arrowhead; Mid and Short run below it (ADR 0100) — each a level
-  // line of its own, in its own colour, stopping short of both Resources with no
-  // marker.
-  const lines = await page
-    .locator(`.react-flow__edge[data-id$="::${RESOURCE_A}::${RESOURCE_B}"]`)
-    .evaluateAll((elements) =>
-      elements.map((element) => {
-        const path = element.querySelector('.react-flow__edge-path');
-        return {
-          id: element.getAttribute('data-id') ?? '',
-          d: path?.getAttribute('d') ?? '',
-          stroke: path === null ? '' : getComputedStyle(path).stroke,
-          marker: path?.getAttribute('marker-end') ?? null,
-        };
-      }),
-    );
+  // so it connects on the centre line (asserted against the anchors above); Mid
+  // and Short run below it (ADR 0100) — each a level line of its own, in its own
+  // colour, stopping short of both Resources. Every line ends in its Graph's
+  // head shape (ADR 0105): Long stores none and ends in an arrow, Mid a dot and
+  // Short a diamond, so the three tell apart with colour removed.
+  const lines = await drawnLines(
+    page,
+    `.react-flow__edge[data-id$="::${RESOURCE_A}::${RESOURCE_B}"]`,
+  );
   expect(lines.length, 'three Graphs carry A → B').toBe(3);
   expect(new Set(lines.map((line) => line.stroke)).size, 'each in its own colour').toBe(3);
 
@@ -213,14 +231,37 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
     return ys[0]!;
   };
   const activeLine = lines.find((line) => line.id === A_TO_B)!;
-  expect(activeLine.marker, 'the active line carries the arrowhead').not.toBeNull();
+  expect(activeLine.head, 'Long, storing no head shape, ends in an arrow').toBe('arrow');
+  expect(
+    Object.fromEntries(lines.map((line) => [line.id.split('::')[0], line.head])),
+    'each line ends in its own Graph’s head shape',
+  ).toEqual({ [LONG]: 'arrow', [MID]: 'dot', [SHORT]: 'diamond' });
+
+  // Every drawn Edge ends in its Graph's head shape, not only the ones over A and B.
+  const every = await drawnLines(page, '.react-flow__edge');
+  expect(every.length, 'Long, Mid and Short draw nine Edges between them').toBe(9);
+  const headOf = new Map([
+    [LONG, 'arrow'],
+    [MID, 'dot'],
+    [SHORT, 'diamond'],
+  ]);
+  for (const edge of every) {
+    expect(edge.head, `${edge.id} ends in its Graph’s head shape`).toBe(
+      headOf.get(edge.id.split('::')[0]!),
+    );
+  }
+  // Nine Edges name three markers: each Graph's is drawn once for the canvas,
+  // in one `<defs>`, and no Edge draws one of its own.
+  await expect(page.locator('.react-flow marker'), 'one head marker per Graph').toHaveCount(3);
+  await expect(page.locator('.react-flow defs:has(marker)')).toHaveCount(1);
+  await expect(page.locator('.react-flow__edge marker')).toHaveCount(0);
+
   const active = pointsOf(activeLine.d);
   const activeLevel = levelOf(active);
 
   const others = lines.filter((line) => line.id !== A_TO_B);
   const levels = new Set<number>();
   for (const other of others) {
-    expect(other.marker, 'a line beside the active one carries no marker').toBeNull();
     const line = pointsOf(other.d);
     const level = levelOf(line);
     expect(level, 'runs below the active line').toBeGreaterThan(activeLevel);
@@ -229,6 +270,72 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
     expect(line[6]!, 'stops short of B').toBeLessThan(active[6]!);
   }
   expect(levels.size, 'each in its own lane').toBe(2);
+});
+
+/** The colour the page paints at a point on screen, as `[r, g, b]`. */
+async function pixelAt(page: Page, point: Point): Promise<number[]> {
+  const png = await page.screenshot({
+    clip: { x: Math.floor(point.x), y: Math.floor(point.y), width: 1, height: 1 },
+  });
+  return page.evaluate(async (base64) => {
+    const image = await createImageBitmap(
+      await (await fetch(`data:image/png;base64,${base64}`)).blob(),
+    );
+    const context = new OffscreenCanvas(1, 1).getContext('2d');
+    if (context === null) throw new Error('No 2D context to read a pixel with.');
+    context.drawImage(image, 0, 0);
+    return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  }, png.toString('base64'));
+}
+
+test("a receding Graph's head is painted at its Edge's opacity", async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  // Long is active, so Mid recedes. Its marker is shared with every Mid Edge
+  // and lives outside the Edge, so what is proved here is that a marker is
+  // painted as part of the path naming it: at the path's opacity.
+  const line = page.locator(
+    `.react-flow__edge[data-id="${MID}::${RESOURCE_A}::${RESOURCE_B}"] .react-flow__edge-path`,
+  );
+  const { head, body, stroke, opacity } = await line.evaluate((element) => {
+    if (!(element instanceof SVGPathElement)) throw new Error('An Edge draws a path.');
+    const style = getComputedStyle(element);
+    const length = element.getTotalLength();
+    const tip = element.getPointAtLength(length);
+    const back = element.getPointAtLength(length - 1);
+    const [dx, dy] = [tip.x - back.x, tip.y - back.y];
+    // A dot's centre lies three frame units behind the tip, and a frame unit
+    // is 12.5/20 of a stroke width (`GraphHeadMarker`). The line runs through
+    // it too, so an opaque head would paint the Graph's full colour there.
+    const behind = 3 * ((Number.parseFloat(style.strokeWidth) * 12.5) / 20);
+    const screen = (x: number, y: number) => {
+      const matrix = element.getScreenCTM();
+      if (matrix === null) throw new Error('The Edge is not on screen.');
+      const at = new DOMPoint(x, y).matrixTransform(matrix);
+      return { x: at.x, y: at.y };
+    };
+    const middle = element.getPointAtLength(length / 2);
+    return {
+      head: screen(tip.x - dx * behind, tip.y - dy * behind),
+      body: screen(middle.x, middle.y),
+      stroke: (style.stroke.match(/\d+/g) ?? []).slice(0, 3).map(Number),
+      opacity: style.opacity,
+    };
+  });
+  expect(opacity, 'Mid recedes').toBe('0.35');
+
+  const [atHead, atBody] = [await pixelAt(page, head), await pixelAt(page, body)];
+  const distance = (a: number[], b: number[]) =>
+    Math.max(...a.map((channel, index) => Math.abs(channel - b[index]!)));
+  // Mid's colour is pale, so an opaque head would differ from the translucent
+  // line by little more than the line differs from the colour: the bounds sit
+  // either side of the middle of that gap.
+  expect(distance(atBody, stroke), 'the line itself is translucent').toBeGreaterThan(20);
+  expect(distance(atHead, stroke), 'the head is not painted opaque').toBeGreaterThan(20);
+  expect(distance(atHead, atBody), 'the head is as translucent as its line').toBeLessThan(12);
 });
 
 test('a selected Edge draws its controls on the geometry it moved to', async ({ page }) => {

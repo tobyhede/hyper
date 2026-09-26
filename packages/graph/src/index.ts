@@ -64,7 +64,7 @@ export type {
 export { resolveContentResource } from './lookup';
 export type { OwnedGraph, ResolvedContentResource, ResolvedMap, SpaceLookup } from './lookup';
 
-export { initializeSpace, newSpace } from './new-space';
+export { initializeSpace, newGraph, newSpace } from './new-space';
 export type { InitializeSpaceOptions, NewSpace } from './new-space';
 
 // One name carrying both the branded map type and the module that builds it.

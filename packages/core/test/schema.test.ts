@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ZodIssue } from 'zod';
 import {
   EDGE_TITLE_ONE_LINE,
+  GRAPH_HEAD_SHAPES,
   graphEdgeSchema,
+  graphSchema,
   resourceFrontmatterSchema,
   resourceSchema,
   spaceFileSchema,
@@ -250,6 +252,21 @@ describe('space file schema', () => {
       ]),
     );
     expect(result.success).toBe(true);
+  });
+
+  it('accepts each of the four head shapes and leaves an absent one absent (ADR 0105)', () => {
+    for (const headShape of GRAPH_HEAD_SHAPES) {
+      const graph = graphSchema.parse({ ...MAIN, headShape });
+      expect(graph.headShape).toBe(headShape);
+    }
+    expect(GRAPH_HEAD_SHAPES).toEqual(['arrow', 'vee', 'dot', 'diamond']);
+    expect(graphSchema.parse(MAIN)).not.toHaveProperty('headShape');
+  });
+
+  it('refuses a head shape outside the four, including one that draws no head', () => {
+    for (const headShape of ['none', 'tee', 'box', 'Arrow', '', 1, null]) {
+      expect(graphSchema.safeParse({ ...MAIN, headShape }).success, String(headShape)).toBe(false);
+    }
   });
 
   it('rejects an edge missing an endpoint', () => {

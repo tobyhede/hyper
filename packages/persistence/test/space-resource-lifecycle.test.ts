@@ -1217,7 +1217,13 @@ describe('Space Resource lifecycle', () => {
               kind: 'positioned',
               positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
               graphs: [
-                { id: TARGET_GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] },
+                {
+                  id: TARGET_GRAPH_ID,
+                  title: 'Graph 1',
+                  color: nextGraphColor([]),
+                  headShape: 'arrow',
+                  edges: [],
+                },
               ],
               activeGraph: TARGET_GRAPH_ID,
             },
@@ -1442,7 +1448,13 @@ describe('Space Resource lifecycle', () => {
               kind: 'positioned',
               positions: {},
               graphs: [
-                { id: TARGET_GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] },
+                {
+                  id: TARGET_GRAPH_ID,
+                  title: 'Graph 1',
+                  color: nextGraphColor([]),
+                  headShape: 'arrow',
+                  edges: [],
+                },
               ],
               activeGraph: TARGET_GRAPH_ID,
             },

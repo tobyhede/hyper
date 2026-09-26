@@ -52,7 +52,7 @@ The fixtures are excluded from lint, format and the root program on purpose. ESL
 
 ## Ownership
 
-- `no-shape-in-symbol-names`: name symbols for their domain role or owner; `shape` describes structure but assigns no responsibility.
+- `no-shape-in-symbol-names`: name symbols for their domain role or owner; `shape` describes structure but assigns no responsibility. The one allowed compound is the domain term **head shape** (ADR 0105), configured as `allowedCompounds` in `.oxlintrc.json`; a new domain term joins that list only if `CONTEXT.md` defines it and "shape" in it names drawn geometry.
 - `no-object-parameters` also rejects ownerless `object` contracts; name what the function accepts.
 
 ## Seams and operations

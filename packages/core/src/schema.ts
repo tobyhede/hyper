@@ -230,11 +230,24 @@ export const graphEdgeSchema = z
     path: ['titleHidden'],
   });
 
+/**
+ * What a Graph's Edges draw at their heads, the `to` end (ADR 0105). Closed and
+ * without `none`: a Graph is directed, so every head shape shows direction.
+ */
+export const GRAPH_HEAD_SHAPES = ['arrow', 'vee', 'dot', 'diamond'] as const;
+
+export const graphHeadShapeSchema = z.enum(GRAPH_HEAD_SHAPES);
+
 export const graphSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
   // Optional CSS color for this graph's edges; falls back to a palette by order.
   color: z.string().min(1).optional(),
+  /**
+   * Optional, as `color` is: every creation gesture writes `arrow`, and a
+   * Graph with none stored draws as `arrow` (`graphHeadShape`).
+   */
+  headShape: graphHeadShapeSchema.optional(),
   /**
    * Possibly none. A graph *is* its edges, but it is not minted by drawing
    * one: creating a map creates its initial empty active graph in the same

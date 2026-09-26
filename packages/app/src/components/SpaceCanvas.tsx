@@ -38,6 +38,7 @@ import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, GraphIcon, type EntityActionGroup } 
 import {
   nodeTypes,
   GraphConnectionLine,
+  GraphHeadMarkers,
   GraphHud,
   ZoomSlider,
   type ResourceFlowNode,
@@ -1289,6 +1290,7 @@ export function SpaceCanvas({
       maxZoom={MAX_ZOOM}
     >
       <Background gap={24} />
+      <GraphHeadMarkers />
       <svg aria-hidden="true" width={0} height={0}>
         <defs>
           {embeddedRequests.map(({ parent, absolute, bounds, tiltCenter }) => (

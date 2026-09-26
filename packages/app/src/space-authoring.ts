@@ -19,7 +19,7 @@ import {
 import {
   graphColorsByGraphId,
   loadSpaceSnapshot,
-  nextGraphColor,
+  newGraph,
   Placement,
   SnapshotEdit,
   type SnapshotEditOutcome,
@@ -937,14 +937,7 @@ export function createSpaceAuthoring({
               title: nextMapTitle(snapshot),
               kind: 'positioned',
               positions: {},
-              graphs: [
-                {
-                  id: graphId,
-                  title: 'Graph 1',
-                  color: nextGraphColor([]),
-                  edges: [],
-                },
-              ],
+              graphs: [newGraph(graphId, 'Graph 1', [])],
               activeGraph: graphId,
             },
           ],
@@ -1348,17 +1341,14 @@ export function createSpaceAuthoring({
       // The colour the Map draws for each Graph it owns — its stored colour,
       // or the resolved fallback for one that stores none.
       const drawn = graphColorsByGraphId(space);
-      const graph: Graph = {
-        id: newId(),
-        title: nextGraphTitle(space.graphs),
-        color: nextGraphColor(
-          ownedGraphs.flatMap((owned) => {
-            const color = drawn[owned.id];
-            return color === undefined ? [] : [color];
-          }),
-        ),
-        edges: [],
-      };
+      const graph = newGraph(
+        newId(),
+        nextGraphTitle(space.graphs),
+        ownedGraphs.flatMap((owned) => {
+          const color = drawn[owned.id];
+          return color === undefined ? [] : [color];
+        }),
+      );
       writeGraphs([...ownedGraphs, graph]);
       activeGraphId = graph.id;
       createdGraphId = graph.id;

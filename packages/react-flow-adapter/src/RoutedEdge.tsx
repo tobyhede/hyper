@@ -7,7 +7,7 @@ import {
   type InternalNode,
   type Node,
 } from '@xyflow/react';
-import type { GraphId } from '@project/core';
+import type { GraphHeadShape, GraphId } from '@project/core';
 
 import {
   edgeAttachment,
@@ -46,6 +46,12 @@ export type RoutedEdgeData = {
    * stops short.
    */
   endTrim: number;
+  /**
+   * Its Graph's head shape (ADR 0105), which the canvas's one marker for the
+   * Graph draws (`GraphHeadMarkers`) at the end of the line as drawn, whether or
+   * not it connects.
+   */
+  headShape: GraphHeadShape;
   /** The Edge's Title and whether it is hidden at rest; drawn by the application, not here. */
   title?: string;
   titleHidden?: true;
@@ -106,11 +112,18 @@ export function useRoutedEdgeGeometry(props: EdgeProps<RoutedFlowEdge>): RoutedE
 }
 
 /**
- * The Edge's curve alone, over a geometry its caller already holds.
+ * The Edge's curve alone, over a geometry its caller already holds, ending in
+ * the marker React Flow hands it.
  *
  * Separate from `RoutedEdge` so a composition that also draws controls reads the
  * store once: it needs the midpoint anyway, and rendering `RoutedEdge` beneath
  * its own controls would resolve the same attachment a second time.
+ *
+ * The head is the Edge object's `markerEnd` — its Graph's marker, drawn once
+ * for the canvas by `GraphHeadMarkers` — which React Flow resolves to a
+ * `url('#…')` and this forwards. A marker sits at the end of the line as drawn:
+ * the anchor for an Edge that connects, the trimmed end for one that stops
+ * short (ADR 0105).
  */
 export function RoutedEdgePath({
   id,
@@ -121,19 +134,18 @@ export function RoutedEdgePath({
   const baseEdgeProps: ComponentProps<typeof BaseEdge> = { id, path };
   if (markerEnd !== undefined) baseEdgeProps.markerEnd = markerEnd;
   if (style !== undefined) baseEdgeProps.style = style;
-
   return <BaseEdge {...baseEdgeProps} />;
 }
 
 /**
- * What `RoutedEdgePath` forwards to `BaseEdge`, built from an Edge's own props
- * and the path it drew.
+ * What `RoutedEdgePath` draws from, built from an Edge's own props and the
+ * path it drew.
  *
  * Offered because the application composes its own Edge over `RoutedEdgePath`
  * and so assembles the same object — and `exactOptionalPropertyTypes` makes that
- * three conditional lines rather than a spread, which is exactly the shape that
- * gets copied and then diverges. One producer, so the day the path component
- * forwards a fourth prop there is one place it reaches.
+ * conditional lines rather than a spread, which is exactly the shape that gets
+ * copied and then diverges. One producer, so the day the path component reads
+ * another prop there is one place it reaches.
  */
 export function routedEdgePathProps(
   { id, markerEnd, style }: Pick<EdgeProps<RoutedFlowEdge>, 'id' | 'markerEnd' | 'style'>,
