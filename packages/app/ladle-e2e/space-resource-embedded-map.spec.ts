@@ -5,6 +5,7 @@ import {
   resourceToolbar,
   selectResource,
   boxOf,
+  graphLegendMarkLine,
 } from '../e2e/graph';
 import {
   beginPortalEdit,
@@ -294,11 +295,29 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
   });
   const hostBefore = await hostGraphEdgeCount(page, parent);
   const shownBefore = await embeddedGraphEdgeCount(page, parent);
+  const shownEdge = page.locator(
+    '.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"]',
+  );
+  const shownStroke = await shownEdge
+    .locator('path')
+    .first()
+    .evaluate((el) => getComputedStyle(el).stroke);
   await storage.hover();
   await connectHandles(
     page,
     authoringHandle(storage, 'source', 'right'),
     authoringHandle(intake, 'target', 'left'),
+    async () => {
+      // The preview is drawn as the Graph the Edge joins — the shown Overview,
+      // `diamond` in its own colour — not as the containing Graph 1.
+      const preview = page.locator('.react-flow__connection-path');
+      await expect(preview).toHaveCSS('stroke', shownStroke);
+      const head = page.locator(
+        'marker#graph-authoring-connection-head [data-slot="graph-head-shape"]',
+      );
+      await expect(head).toHaveAttribute('data-head-shape', 'diamond');
+      await expect(head).toHaveCSS('fill', shownStroke);
+    },
   );
   await expect.poll(() => hostGraphEdgeCount(page, parent)).toBe(hostBefore);
   await expect.poll(() => embeddedGraphEdgeCount(page, parent)).toBe(shownBefore + 1);
@@ -542,19 +561,28 @@ test(
 );
 
 /**
- * An Open Space Resource's Graph list marks each row with the line the canvas
- * HUD's key draws, in the colour the target draws that Graph's Edges in — read
- * off the embedded Edge on screen — and its Map list carries no mark.
+ * An Open Space Resource's Graph list marks each row with the mark the canvas
+ * HUD's key draws, in the colour and head shape the target draws that Graph's
+ * Edges in — read off the embedded Edge on screen — and its Map list carries
+ * no mark. The target's Overview stores `diamond`, so both draw it.
  */
 test(
-  "an Open Space Resource's Graph rows draw the Graph's colour line",
-  { tag: '@parity:open-space-resource-graph-rows-draw-the-graph-colour-line' },
+  "an Open Space Resource's Graph rows draw the Graph's legend mark",
+  { tag: '@parity:open-space-resource-graph-rows-draw-the-graph-legend-mark' },
   async ({ page }) => {
     await open(page);
-    const edgeStroke = await page
-      .locator('.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"] path')
+    const edge = page.locator(
+      '.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"]',
+    );
+    const edgeStroke = await edge
+      .locator('path')
       .first()
       .evaluate((el) => getComputedStyle(el).stroke);
+    const edgeHeadShape = await edge
+      .locator('[data-slot="graph-head-shape"]')
+      .first()
+      .getAttribute('data-head-shape');
+    expect(edgeHeadShape).toBe('diamond');
 
     // Opened from the keyboard, as `exerciseSpaceResourceContextMenus` opens
     // these lists: the rail can sit under the Dock at this viewport.
@@ -567,14 +595,15 @@ test(
     };
     await openList('graph');
     const row = page.getByRole('menuitemradio', { name: 'Overview' });
-    await expect(row.locator('[data-slot="graph-color-line"]')).toHaveCSS(
-      'background-color',
-      edgeStroke,
+    await expect(graphLegendMarkLine(row)).toHaveCSS('stroke', edgeStroke);
+    await expect(row.locator('[data-slot="graph-legend-mark"]')).toHaveAttribute(
+      'data-head-shape',
+      edgeHeadShape ?? '',
     );
     await page.keyboard.press('Escape');
 
     await openList('map');
     await expect(page.getByRole('menuitemradio', { name: 'Collection 2' })).toBeVisible();
-    await expect(page.getByRole('menu').locator('[data-slot="graph-color-line"]')).toHaveCount(0);
+    await expect(page.getByRole('menu').locator('[data-slot="graph-legend-mark"]')).toHaveCount(0);
   },
 );

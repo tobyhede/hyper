@@ -650,32 +650,60 @@ describe('the last Map and Graph', () => {
 });
 
 /**
- * **A Graph row carries the Graph's colour as a line, and the identity keeps
- * the glyph**. The rows of the Graph list
- * draw the line the canvas HUD's key draws, so a Graph looks the same in the
- * list as beside its Edges; the cluster's own identity and Colour… keep the
- * coloured Graph glyph, where it says which kind of entity the colour is.
+ * **A Graph row carries the Graph's legend mark, and the identity keeps the
+ * glyph**. The rows of the Graph list draw the mark the canvas HUD's key
+ * draws — a line in the Graph's colour ending in its head shape — so a Graph
+ * looks the same in the list as beside its Edges; the cluster's own identity
+ * and Colour… keep the coloured Graph glyph, where it says which kind of
+ * entity the colour is.
  */
-describe('the Graph list marks each row with its colour line', () => {
+describe('the Graph list marks each row with its legend mark', () => {
   const graphIdentity = (): HTMLElement =>
     within(dock()).getByRole('button', { name: /^Active Graph: / });
 
-  it('draws a line per Graph row and no Graph glyph', async () => {
+  it('draws a mark per Graph row and no Graph glyph', async () => {
     await renderDock(<Default />);
     fireEvent.click(graphIdentity());
 
     const rows = within(screen.getByRole('menu')).getAllByRole('menuitemradio');
     expect(rows.length).toBeGreaterThan(1);
-    const colors = rows.map((row) => {
-      const line = row.querySelector<HTMLElement>('[data-slot="graph-color-line"]');
-      if (line === null) throw new Error(`${row.textContent} draws no colour line`);
-      return line.style.background;
+    const marks = rows.map((row) => {
+      const mark = row.querySelector('[data-slot="graph-legend-mark"]');
+      if (mark === null) throw new Error(`${row.textContent} draws no legend mark`);
+      return {
+        color: mark.querySelector('[data-slot="graph-legend-mark-line"]')?.getAttribute('stroke'),
+        headShape: mark.getAttribute('data-head-shape'),
+      };
     });
     // Each Graph in its own colour, and nothing drawn on an unchosen row but
-    // the line: the chosen row's radio indicator is the list's, not the Graph's.
-    expect(new Set(colors).size).toBe(rows.length);
+    // the mark: the chosen row's radio indicator is the list's, not the Graph's.
+    expect(new Set(marks.map(({ color }) => color)).size).toBe(rows.length);
     for (const row of rows.filter((each) => each.getAttribute('aria-checked') !== 'true'))
-      expect(row.querySelector('svg')).toBeNull();
+      expect(row.querySelectorAll('svg:not([data-slot="graph-legend-mark"] svg)')).toHaveLength(0);
+  });
+
+  /**
+   * The fixture's Long stores no head shape, Mid `dot` and Short `diamond`:
+   * each row reads its Graph's own from the Space, and the one with none
+   * draws the default.
+   */
+  it('ends each row’s mark in that Graph’s head shape, `arrow` where none is stored', async () => {
+    await renderDock(<Default />);
+    fireEvent.click(graphIdentity());
+
+    const rows = within(screen.getByRole('menu')).getAllByRole('menuitemradio');
+    expect(
+      rows.map((row) => [
+        row.textContent,
+        row
+          .querySelector('[data-slot="graph-legend-mark"] [data-slot="graph-head-shape"]')
+          ?.getAttribute('data-head-shape'),
+      ]),
+    ).toEqual([
+      ['Long', 'arrow'],
+      ['Mid', 'dot'],
+      ['Short', 'diamond'],
+    ]);
   });
 
   it('keeps the coloured Graph glyph on the identity and on Colour…', async () => {
@@ -690,8 +718,8 @@ describe('the Graph list marks each row with its colour line', () => {
       .getAllByRole('menuitemradio')
       .find((row) => row.getAttribute('aria-checked') === 'true');
     expect(
-      chosen?.querySelector<HTMLElement>('[data-slot="graph-color-line"]')?.style.background,
-    ).not.toBe('');
+      chosen?.querySelector('[data-slot="graph-legend-mark-line"]')?.getAttribute('stroke'),
+    ).toBe(activeColor);
     const colour = within(menu).getByRole('menuitem', { name: 'Colour…' });
     expect(colour.querySelector('svg')).toHaveAttribute('stroke', activeColor ?? '');
   });
@@ -701,6 +729,6 @@ describe('the Graph list marks each row with its colour line', () => {
     fireEvent.click(within(dock()).getByRole('button', { name: /^Map: / }));
 
     for (const row of within(screen.getByRole('menu')).getAllByRole('menuitemradio'))
-      expect(row.querySelector('[data-slot="graph-color-line"]')).toBeNull();
+      expect(row.querySelector('[data-slot="graph-legend-mark"]')).toBeNull();
   });
 });

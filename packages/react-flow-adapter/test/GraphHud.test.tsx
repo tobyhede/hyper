@@ -219,10 +219,58 @@ describe('GraphHud', () => {
     expect(active).toHaveAttribute('data-active', 'true');
     expect(active).toHaveStyle({ opacity: '1' });
     // The projection's colour, not the Graph's own — `graphColor`'s precedence.
-    expect(active?.querySelector('[aria-hidden="true"]')).toHaveStyle({ background: '#123456' });
+    expect(active?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+      'stroke',
+      '#123456',
+    );
     expect(inactive).toHaveAttribute('data-active', 'false');
     expect(inactive).toHaveStyle({ opacity: '0.5' });
-    expect(inactive?.querySelector('[aria-hidden="true"]')).toHaveStyle({ background: '#f4a259' });
+    expect(inactive?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+      'stroke',
+      '#f4a259',
+    );
+  });
+
+  /**
+   * Each key row ends in its own Graph's head shape, read off the Graph the
+   * key is handed, and a Graph that stores none draws the default arrow — so
+   * a Map whose Graphs share a colour for some reader still tells them apart.
+   */
+  it('ends each row’s mark in its Graph’s head shape, `arrow` where none is stored', () => {
+    render(
+      <GraphHud
+        spaceTitle="Atlas"
+        mapTitle="Overview"
+        graphs={[
+          { id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Plain', edges: [] },
+          {
+            id: uuid('00000000-0000-4000-8000-000000000011'),
+            title: 'Dotted',
+            headShape: 'dot',
+            edges: [],
+          },
+          {
+            id: uuid('00000000-0000-4000-8000-000000000012'),
+            title: 'Veed',
+            headShape: 'vee',
+            edges: [],
+          },
+        ]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    const key = screen.getByTestId('graph-legend');
+    const headShapeOf = (title: string) =>
+      within(key)
+        .getByText(title)
+        .closest('li')
+        ?.querySelector('[data-slot="graph-legend-mark"] [data-slot="graph-head-shape"]')
+        ?.getAttribute('data-head-shape');
+    expect(headShapeOf('Plain')).toBe('arrow');
+    expect(headShapeOf('Dotted')).toBe('dot');
+    expect(headShapeOf('Veed')).toBe('vee');
   });
 
   /*

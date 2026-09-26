@@ -644,7 +644,9 @@ const dockPositions = (count: number): Record<string, ResourcePlacement> =>
  *
  * **No Graph carries a colour**, exactly as `authoredSnapshot` does not: a Graph
  * without one takes a palette slot by order through `graphColorsByGraphId`, so
- * the fixture cannot disagree with the palette the canvas draws.
+ * the fixture cannot disagree with the palette the canvas draws. Mid and Short
+ * store the head shapes the tracked fixture's Graphs of those names do, and
+ * Long stores none, so the Graph lists draw a default beside two stored ones.
  *
  * It **declares where it opens**, so `defaultMap` answers that for the Dock
  * exactly as it does for the app.
@@ -663,8 +665,8 @@ export const commandDockSnapshot: SpaceSnapshot = {
         positions: dockPositions(5),
         graphs: [
           { id: dockId(2), title: 'Long', edges: dockChain(4) },
-          { id: dockId(3), title: 'Mid', edges: dockChain(3) },
-          { id: dockId(4), title: 'Short', edges: dockChain(2) },
+          { id: dockId(3), title: 'Mid', headShape: 'dot', edges: dockChain(3) },
+          { id: dockId(4), title: 'Short', headShape: 'diamond', edges: dockChain(2) },
         ],
       },
       {

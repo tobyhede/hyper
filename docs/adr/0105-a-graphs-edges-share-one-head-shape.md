@@ -18,8 +18,8 @@ A Graph carries a **head shape**, one of `arrow`, `vee`, `dot` or `diamond`. Eve
 ## Where it shows
 
 - The Graph menu has **Shape…** directly under **Colour…**. It opens a grid of the four shapes, the same size as the colour swatches, drawn in the Graph's colour.
-- The mark beside every Graph title is a miniature Edge: a short line in the Graph's colour ending in its head shape. This applies in the overview legend, the Command Dock's Graph choices and an Open Space Resource's Graph choices. Those lists name every Graph on the Map, not just the active one, so they are where a viewer matches a receding Edge's shape to its Graph without colour. `GraphIcon`, which names only the Active Graph or the Graphs heading, is not the legend.
-- The connection preview draws the Active Graph's head shape, because that is the Graph the new Edge joins. Presenting draws the same Edges and needs nothing extra.
+- The mark beside every Graph title is a miniature Edge: a short line in the Graph's colour ending in its head shape. This applies in the overview legend, the Command Dock's Graph choices and an Open Space Resource's Graph choices. Those lists name every Graph on the Map, not just the active one, so they are where a viewer matches a receding Edge's shape to its Graph without colour. `GraphIcon`, which names only the Active Graph or the Graphs heading, is not the legend. The mark is `GraphLegendMark` in `@project/ui`, and every list reads the Graph's colour and head shape together through `graphAppearance`.
+- The connection preview draws the Active Graph's head shape, because that is the Graph the new Edge joins. A connection drawn between two Resources inside an Open Space Resource joins the Graph that embedding shows, so its preview draws that Graph's head shape and colour instead of the host's. React Flow hands a connection line only its geometry and style, so the colour rides on the style's stroke and the head shape reaches it through context. Presenting draws the same Edges and needs nothing extra.
 
 ## Vocabulary
 

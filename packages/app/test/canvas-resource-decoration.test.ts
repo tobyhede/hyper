@@ -28,7 +28,7 @@ const target: SpaceResourceTarget = {
     {
       id: TARGET_MAP_ID,
       title: 'Collection 1',
-      graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview', color: '#1f77b4' }],
+      graphs: [{ id: TARGET_GRAPH_ID, title: 'Overview', color: '#1f77b4', headShape: 'arrow' }],
     },
   ],
 };

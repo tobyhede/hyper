@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
-import { expectMenuGroups, resourceActions } from '../e2e/graph';
+import { expectMenuGroups, graphLegendMarkLine, resourceActions } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -1185,23 +1185,32 @@ test(
 );
 
 /**
- * A Graph row is marked with the line the canvas HUD's key draws, in that
- * Graph's colour, and with no Graph glyph.
- * The list and the key are compared on screen in the same page — colour and
- * box — so the two cannot drift apart without this failing. The Graph identity
+ * A Graph row is marked with the mark the canvas HUD's key draws — a line in
+ * that Graph's colour ending in its head shape — and with no Graph glyph.
+ * The list and the key are compared on screen in the same page — colour, head
+ * shape and box — so the two cannot drift apart without this failing. The
+ * fixture's Long stores no head shape and draws the arrow. The Graph identity
  * and Colour… keep the coloured glyph; the Map list is unmarked.
  */
 test(
-  'the Graph list marks each row with the colour line the HUD key draws',
-  { tag: '@parity:graph-choice-rows-draw-the-graph-colour-line' },
+  'the Graph list marks each row with the legend mark the HUD key draws',
+  { tag: '@parity:graph-choice-rows-draw-the-graph-legend-mark' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const mark = (row: Locator) =>
-      row.locator('[data-slot="graph-color-line"]').evaluateAll((els) =>
+      row.locator('[data-slot="graph-legend-mark"]').evaluateAll((els) =>
         els.map((el) => {
           const style = getComputedStyle(el);
-          return { color: style.backgroundColor, width: style.width, height: style.height };
+          const line = el.querySelector('[data-slot="graph-legend-mark-line"]');
+          const head = el.querySelector('[data-slot="graph-head-shape"]');
+          return {
+            color: line === null ? null : getComputedStyle(line).stroke,
+            headShape: head?.getAttribute('data-head-shape') ?? null,
+            headColor: head === null ? null : getComputedStyle(head).fill,
+            width: style.width,
+            height: style.height,
+          };
         }),
       );
     // The key draws once the canvas has projected the Space, which is after
@@ -1225,21 +1234,28 @@ test(
     await expect(rows).toHaveCount(key.length);
     expect(await mark(rows)).toEqual(key);
     expect(new Set(key.map((line) => line.color)).size).toBe(key.length);
-    // No Graph glyph: an unchosen row draws its line and its title, and the
+    expect(key.every((line) => line.headColor === line.color)).toBe(true);
+    expect(key.map((line) => line.headShape)).toEqual(['arrow', 'dot', 'diamond']);
+    // No Graph glyph: an unchosen row draws its mark and its title, and the
     // chosen row adds only the list's own radio indicator.
-    await expect(rows.and(page.locator('[aria-checked="false"]')).locator('svg')).toHaveCount(0);
+    await expect(
+      rows
+        .and(page.locator('[aria-checked="false"]'))
+        .locator('svg:not([data-slot="graph-legend-mark"] svg)'),
+    ).toHaveCount(0);
 
     // The identity and Colour… keep the glyph, in the Active Graph's colour.
     const colour = menu.getByRole('menuitem', { name: 'Colour…' });
     // The first glyph is the Graph's; the second is the submenu's own chevron.
     await expect(colour.locator('svg').first()).toHaveCSS('stroke', identityStroke);
-    await expect(
-      rows.and(page.locator('[aria-checked="true"]')).locator('[data-slot="graph-color-line"]'),
-    ).toHaveCSS('background-color', identityStroke);
+    await expect(graphLegendMarkLine(rows.and(page.locator('[aria-checked="true"]')))).toHaveCSS(
+      'stroke',
+      identityStroke,
+    );
 
     // The Map list, drawn by the same component, is unchanged.
     await page.keyboard.press('Escape');
     const maps = await disclose(page, 'Map: Collection 1');
-    await expect(maps.locator('[data-slot="graph-color-line"]')).toHaveCount(0);
+    await expect(maps.locator('[data-slot="graph-legend-mark"]')).toHaveCount(0);
   },
 );
