@@ -31,14 +31,18 @@ export interface SwatchGridProps<Value extends string> {
 /** The grid's column count, which the vertical arrows step by. */
 const COLUMNS = 2;
 
-/** Where an arrow, Home or End moves focus from `index`, wrapping; `null` for any other key. */
+/**
+ * Where an arrow, Home or End moves focus from `index`; `null` for a key the
+ * grid leaves to its surroundings. ArrowLeft at the first column is one of
+ * those, so a surrounding submenu closes on it; every other move wraps.
+ */
 const rovingTarget = (key: string, index: number, count: number): number | null => {
   const step = (by: number) => (index + by + count) % count;
   switch (key) {
     case 'ArrowRight':
       return step(1);
     case 'ArrowLeft':
-      return step(-1);
+      return index % COLUMNS === 0 ? null : index - 1;
     case 'ArrowDown':
       return step(COLUMNS);
     case 'ArrowUp':
@@ -75,10 +79,12 @@ const rovingTarget = (key: string, index: number, count: number): number | null 
  *   (`aria-pressed`), not one exclusive choice.
  * - Custom behaviour being introduced: `role="radio"` buttons in a
  *   `role="radiogroup"`, one tab stop (the current choice, else the first),
- *   and focus roving that follows the grid — Left/Right by one, Up/Down by a
- *   row, Home/End, all wrapping — without choosing: Enter, Space or a press
- *   chooses. The keys it moves on stop there, so the menu around it neither
- *   moves its highlight nor closes the submenu on ArrowLeft; Escape still does.
+ *   and focus roving that follows the grid — Right by one and Up/Down by a
+ *   row, wrapping, Left by one within a row, and Home/End — without choosing:
+ *   Enter, Space or a press chooses. The keys it moves on stop there, so the
+ *   menu around it does not move its highlight; ArrowLeft at the first column
+ *   moves nothing and reaches the menu, which closes the submenu onto its
+ *   trigger, and Escape reaches it too.
  * - Tests proving the deviation: `SwatchGrid.test.tsx`,
  *   `PaletteColorPicker.test.tsx`, `GraphHeadShapeSwatchGrid.test.tsx`, and
  *   the Dock and application parity tests for recolour and head shape.

@@ -668,6 +668,38 @@ test(
   },
 );
 
+/**
+ * A swatch grid keeps ArrowLeft only where it has a swatch to move to, so at
+ * the first column the key reaches the submenu, which closes and returns focus
+ * to the item that opened it — for Colour… and Shape… alike.
+ */
+test('ArrowLeft from the first swatch closes Colour… and Shape… onto their trigger', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  for (const [item, grid] of [
+    ['Colour…', 'Graph colour'],
+    ['Shape…', 'Graph head shape'],
+  ] as const) {
+    const menu = await disclose(page, 'Active Graph: Long');
+    const trigger = menu.getByRole('menuitem', { name: item });
+    await trigger.click({ delay: 120 });
+    const group = page.getByRole('radiogroup', { name: grid });
+    const radios = group.getByRole('radio');
+    await radios.nth(1).focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(radios.first()).toBeFocused();
+
+    await page.keyboard.press('ArrowLeft');
+    await expect(group).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+  }
+});
+
 test(
   'a new Space names its initial Map and empty Graph and cannot present',
   { tag: '@parity:command-dock-names-a-new-spaces-initial-map-and-graph' },

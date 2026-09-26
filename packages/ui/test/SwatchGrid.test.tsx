@@ -53,7 +53,7 @@ describe('SwatchGrid', () => {
     expect(checks).toEqual([false, true, false, false, false]);
   });
 
-  it('roves focus across the two-column grid, wrapping, without choosing', () => {
+  it('roves focus across the two-column grid without choosing', () => {
     const { onValueChange, onOuterKeyDown } = mount('a');
     radio('A').focus();
 
@@ -65,15 +65,37 @@ describe('SwatchGrid', () => {
     expect(radio('B')).toHaveFocus();
     fireEvent.keyDown(radio('B'), { key: 'ArrowLeft' });
     expect(radio('A')).toHaveFocus();
-    fireEvent.keyDown(radio('A'), { key: 'ArrowLeft' });
-    expect(radio('E')).toHaveFocus();
-    fireEvent.keyDown(radio('E'), { key: 'Home' });
+    fireEvent.keyDown(radio('A'), { key: 'ArrowUp' });
+    expect(radio('D')).toHaveFocus();
+    fireEvent.keyDown(radio('D'), { key: 'ArrowLeft' });
+    expect(radio('C')).toHaveFocus();
+    fireEvent.keyDown(radio('C'), { key: 'Home' });
     expect(radio('A')).toHaveFocus();
     fireEvent.keyDown(radio('A'), { key: 'End' });
     expect(radio('E')).toHaveFocus();
 
     expect(onValueChange).not.toHaveBeenCalled();
     // The keys it moves on stop at the grid, so a surrounding menu does not act on them.
+    expect(onOuterKeyDown).not.toHaveBeenCalled();
+  });
+
+  it('lets ArrowLeft through from the first column, so a surrounding submenu closes', () => {
+    const { onOuterKeyDown } = mount('a');
+    for (const name of ['A', 'C', 'E']) {
+      radio(name).focus();
+      const handled = !fireEvent.keyDown(radio(name), { key: 'ArrowLeft' });
+      expect(handled).toBe(false);
+      expect(radio(name)).toHaveFocus();
+    }
+    expect(onOuterKeyDown).toHaveBeenCalledTimes(3);
+  });
+
+  it('moves ArrowLeft one swatch left from any other column', () => {
+    const { onOuterKeyDown } = mount('a');
+    radio('D').focus();
+    const handled = !fireEvent.keyDown(radio('D'), { key: 'ArrowLeft' });
+    expect(handled).toBe(true);
+    expect(radio('C')).toHaveFocus();
     expect(onOuterKeyDown).not.toHaveBeenCalled();
   });
 
