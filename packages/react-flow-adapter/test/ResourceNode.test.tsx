@@ -852,9 +852,12 @@ describe('ResourceNode graph authoring', () => {
  * `projection.ts` declares each laid-out Resource's handle geometry on the node, and
  * React Flow's `parseHandles` takes that in preference to measuring the DOM, so
  * `ResourceNode` leaves measuring to React Flow and never calls
- * `updateNodeInternals` itself. React Flow's own resize observer re-reads the
- * handles from the DOM when a node changes size regardless; these tests hold
- * only that the component adds no call of its own.
+ * `updateNodeInternals` itself. A call on mount or on Opening breaks the canvas in a
+ * browser: `editing.spec.ts` "a second connection drawn in the same session
+ * resolves its handles" and "opening a Resource displaces its neighbours once, and
+ * dragging it never displaces them again", and the Ladle `edge-toolbar.spec.ts`
+ * "hovering an Edge's line reveals its toolbar", fail with it in place. These
+ * tests catch the call without a browser.
  *
  * Asserting the absence of that call is the only seam that can say so: its
  * effect is in React Flow's node lookup and nowhere in the rendered output, and
