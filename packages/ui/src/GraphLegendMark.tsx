@@ -1,10 +1,11 @@
 import type { GraphHeadShape } from '@project/core';
 import { GraphHeadShapeGlyph } from './GraphHeadShape';
 
+/** A Graph's resolved appearance — the caller resolves both through `graphAppearance`. */
 export interface GraphLegendMarkProps {
-  /** The Graph's resolved colour — the caller resolves it through `graphColor`. */
+  /** The Graph's resolved colour. */
   readonly color: string;
-  /** The Graph's resolved head shape — the caller resolves it through `graphHeadShape`. */
+  /** The Graph's resolved head shape. */
   readonly headShape: GraphHeadShape;
 }
 
@@ -37,8 +38,8 @@ const LINE_WIDTH = 2.5;
  * The head is `GraphHeadShapeGlyph`, the glyph the canvas's own markers draw,
  * and the line runs into it as an Edge's path runs into its marker. It takes
  * a resolved colour and head shape rather than a Graph, so the rule for each
- * stays in `graphColor` and `graphHeadShape` and every caller reaches it
- * there. Decorative: the title beside it names the Graph.
+ * stays in `graphColor` and `graphHeadShape`, and every caller reaches both
+ * through `graphAppearance`. Decorative: the title beside it names the Graph.
  */
 export function GraphLegendMark({ color, headShape }: GraphLegendMarkProps) {
   // The box is the span's rather than the svg's: a menu row sizes every svg

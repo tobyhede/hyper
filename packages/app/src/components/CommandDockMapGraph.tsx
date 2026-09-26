@@ -13,9 +13,9 @@ import {
   PresentIcon,
   ToolbarButton,
   ToolbarGroup,
-  graphColor,
+  graphAppearance,
 } from '@project/ui';
-import { graphHeadShape, type GraphId, type MapId } from '@project/core';
+import type { GraphId, MapId } from '@project/core';
 import { GRAPH_PALETTE_ENTRIES } from '@project/graph';
 import type { MenuSide } from '../dock-placement';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
@@ -232,12 +232,7 @@ function GraphIdentityMenu({
       choices={graph.graphs.map((each) => ({
         id: each.id,
         title: each.title,
-        icon: (
-          <GraphLegendMark
-            color={graphColor(each, graph.colorByGraphId)}
-            headShape={graphHeadShape(each)}
-          />
-        ),
+        icon: <GraphLegendMark {...graphAppearance(each, graph.colorByGraphId)} />,
       }))}
       chosen={graph.active.id}
       onChoose={graph.onActivate}

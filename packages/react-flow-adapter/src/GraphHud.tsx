@@ -1,5 +1,12 @@
-import { graphHeadShape, type Graph } from '@project/core';
-import { MapIcon, GraphIcon, GraphLegendMark, Separator, SpaceIcon, graphColor } from '@project/ui';
+import type { Graph } from '@project/core';
+import {
+  MapIcon,
+  GraphIcon,
+  GraphLegendMark,
+  Separator,
+  SpaceIcon,
+  graphAppearance,
+} from '@project/ui';
 import { MiniMap, Panel } from '@xyflow/react';
 
 export interface GraphHudProps {
@@ -32,7 +39,7 @@ const PANEL_INSET = 15;
  * says the same three facts. It is the on-canvas colour reference beside the
  * Edges being read. What the two must
  * never do is disagree, which is why both resolve a Graph's colour through the
- * one shared `graphColor` seam rather than each deriving its own — and why each
+ * one shared `graphAppearance` seam rather than each deriving its own — and why each
  * key row draws `GraphLegendMark`, the same mark the Graph choice lists draw
  * (held by the `graph-choice-rows-draw-the-graph-legend-mark` parity claim).
  *
@@ -118,10 +125,7 @@ export function GraphHud({
                     className="legend__item flex items-center gap-[8px] text-chrome-xs text-foreground"
                     style={{ opacity: dimmed ? 0.5 : 1 }}
                   >
-                    <GraphLegendMark
-                      color={graphColor(graph, colorByGraphId)}
-                      headShape={graphHeadShape(graph)}
-                    />
+                    <GraphLegendMark {...graphAppearance(graph, colorByGraphId)} />
                     {graph.title}
                   </li>
                 );

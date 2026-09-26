@@ -7,14 +7,8 @@ import {
   type SpaceSessionRegistry,
   type SpaceSummary,
 } from '@project/persistence';
-import {
-  graphHeadShape,
-  type GraphHeadShape,
-  type GraphId,
-  type Map,
-  type UUID,
-} from '@project/core';
-import { graphColor } from '@project/ui';
+import type { GraphHeadShape, GraphId, Map, UUID } from '@project/core';
+import { graphAppearance } from '@project/ui';
 
 export type {
   CreateSpaceResourceInput,
@@ -35,8 +29,8 @@ export interface SpaceResourceTargetMap {
   /**
    * The Graphs this Map owns, each with the colour and head shape its Edges
    * are drawn in — resolved here, against the target Space, because the target
-   * is the only Space that knows them, and through `graphColor` and
-   * `graphHeadShape` because the canvas resolves them there too.
+   * is the only Space that knows them, and through `graphAppearance` because
+   * the canvas resolves them there too.
    */
   readonly graphs: readonly {
     readonly id: GraphId;
@@ -138,8 +132,7 @@ const targetMap = (
     graphs: map.graphs.map((graph) => ({
       id: graph.id,
       title: graph.title,
-      color: graphColor(graph, colorByGraphId),
-      headShape: graphHeadShape(graph),
+      ...graphAppearance(graph, colorByGraphId),
     })),
   };
   return map.activeGraph === undefined ? read : { ...read, activeGraph: map.activeGraph };

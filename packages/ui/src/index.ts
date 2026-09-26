@@ -95,7 +95,12 @@ export type {
   EntityActionsProps,
   EntityActionsTriggerProps,
 } from './EntityActionsMenu';
-export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
+export {
+  FALLBACK_GRAPH_COLOR,
+  graphAppearance,
+  graphColor,
+  type GraphAppearance,
+} from './graph-color';
 export { GraphLegendMark } from './GraphLegendMark';
 export type { GraphLegendMarkProps } from './GraphLegendMark';
 export {
