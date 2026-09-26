@@ -13,7 +13,6 @@ import type {
   DockResourcesList,
   SpaceExitReport,
 } from './components/command-dock-chrome';
-import { coordinatedGraphDelete } from './coordinated-context-delete';
 import { COPY_LINK_ACTION_ID, type EntityCommandId, type SpaceEntity } from './entity-actions';
 import { offered, renameDraftAnswer } from './authoring-commands';
 import { topLevelGraphAuthoringCommands } from './graph-authoring-commands';
@@ -149,7 +148,7 @@ export function useDockChrome(
 
   /**
    * Graph Edits on the Active Graph of the drawn Map: rename while a chrome
-   * command may run, recolour and creation while entity Edits may.
+   * command may run, recolour, creation and deletion while entity Edits may.
    */
   const graphAuthoring = useMemo(
     () =>
@@ -159,6 +158,7 @@ export function useDockChrome(
           rename: () => chromeTitleEdit,
           recolor: () => entityEdits,
           create: () => entityEdits,
+          delete: () => entityEdits,
         },
       ),
     [app, spaceResources, chromeTitleEdit, entityEdits],
@@ -336,25 +336,11 @@ export function useDockChrome(
       onCreate: offered(mapGraphCommands.create, (create) => () => {
         void commandOutcomes.run('graph-create', create);
       }),
-      // The notice is command outcomes'; the Graph Navigation adopts after a
-      // completed delete is this caller's.
-      onDelete: (graphId) => {
-        void commandOutcomes
-          .run('graph-delete', () =>
-            coordinatedGraphDelete(spaceResources.deleteGraph, {
-              targetSpaceId: space.id,
-              mapId: map.id,
-              graphId,
-              preferredGraphId: null,
-            }),
-          )
-          .then((result) => {
-            if (result.kind === 'completed') {
-              navigation.activateGraph(result.graphId);
-            }
-          });
-      },
-      editsDisabled: !availability.entityEdits,
+      // Deleting the Active Graph repoints every Space Resource that selected
+      // it and leaves the canvas on the survivor, in the same Map.
+      onDelete: offered(activeGraphCommands.delete, (remove) => () => {
+        void commandOutcomes.run('graph-delete', remove);
+      }),
       onCopyLink: runEntityCommand({ kind: 'graph', graph: activeGraph, map }, COPY_LINK_ACTION_ID),
       presenting,
       onPresent: navigation.present,

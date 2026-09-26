@@ -51,19 +51,18 @@ export interface CanvasSpaceResourceMapCommands {
  * The Graph commands on an Open Space Resource rail, addressed to the Graph
  * this Resource selects.
  *
- * Rename, Colour and New Graph are each one field, the press or `null`, as
- * the Map commands are, and say nothing on the rail: a refused rename answers
- * the sentence that holds its draft open, and the containing canvas's command
- * outcomes say every refusal as a notice. New Graph resolves once the
- * creation settles and leaves the caret where it was. Delete answers the
- * sentence the rail reports, or `null`.
+ * Rename, Colour, New Graph and Delete are each one field, the press or
+ * `null`, as the Map commands are, and say nothing on the rail: a refused
+ * rename answers the sentence that holds its draft open, and the containing
+ * canvas's command outcomes say every refusal as a notice. New Graph resolves
+ * once the creation settles and leaves the caret where it was; Delete
+ * resolves once the deletion settles.
  */
 export interface CanvasSpaceResourceGraphCommands {
   readonly onRename: ((title: string) => string | null) | null;
   readonly onCreate: (() => Promise<void>) | null;
-  readonly onDelete: () => Promise<string | null>;
+  readonly onDelete: (() => Promise<void>) | null;
   readonly onCopyLink: () => Promise<string | null>;
-  readonly deleteDisabled: boolean;
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: ((color: string) => void) | null;
@@ -108,7 +107,7 @@ const mapSelectorCommands = (commands: CanvasSpaceResourceMapCommands): Selector
 };
 
 const graphSelectorCommands = (commands: CanvasSpaceResourceGraphCommands): SelectorCommands => {
-  const { onCreate } = commands;
+  const { onCreate, onDelete } = commands;
   return {
     rename: commands.onRename,
     create:
@@ -118,7 +117,13 @@ const graphSelectorCommands = (commands: CanvasSpaceResourceGraphCommands): Sele
             await onCreate();
             return { continued: false, report: null };
           },
-    delete: commands.deleteDisabled ? null : commands.onDelete,
+    delete:
+      onDelete === null
+        ? null
+        : async () => {
+            await onDelete();
+            return null;
+          },
     copyLink: commands.onCopyLink,
     palette: commands,
   };
@@ -441,9 +446,8 @@ function SpaceResourceSelector({
           (palette !== undefined ? (
             <GraphMenuActions
               {...commonCommands}
-              deleteDisabled={onDelete === null}
               onCreate={onCreate}
-              onDelete={() => onDelete?.()}
+              onDelete={onDelete}
               color={palette.color}
               colors={palette.colors}
               onRecolor={

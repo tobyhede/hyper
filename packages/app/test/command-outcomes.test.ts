@@ -9,7 +9,8 @@ import {
 } from '../src/command-outcomes';
 import type { PendingContinuation } from '../src/continuation';
 import { composeApp } from '../src/compose-app';
-import type { CoordinatedContextDeleteResult } from '../src/coordinated-context-delete';
+import type { EditOutcome } from '../src/authoring-commands';
+import type { CompletedGraphEdit } from '../src/graph-authoring-commands';
 import type { CompletedMapEdit } from '../src/map-authoring-commands';
 import type { AuthoringResult } from '../src/space-authoring';
 import type {
@@ -129,10 +130,8 @@ const inTheName = ({ mapId }: CompletedMapEdit): PendingContinuation => ({
  * the completion's move.
  */
 const DOCK = { completionMovesMap: true } as const;
-const refusedGraphDelete: CoordinatedContextDeleteResult = {
-  kind: 'error',
-  message: 'Graph refused.',
-};
+const graphDeleteReport = { title: 'Graph not deleted', message: MAP_GONE };
+const refusedGraphDelete = { kind: 'refused', report: graphDeleteReport } as const;
 const completedAuthoring: AuthoringResult = { kind: 'completed' };
 const unchangedAuthoring: AuthoringResult = { kind: 'unchanged' };
 const queuedAuthoring: AuthoringResult = { kind: 'queued' };
@@ -595,25 +594,19 @@ describe('space-command', () => {
 });
 
 describe('graph-delete', () => {
-  it('publishes the coordinated helper\'s message under "Graph not deleted"', async () => {
+  it('publishes a refused Graph deletion’s complete report on "graph-delete"', async () => {
     const { outcomes } = open();
 
     const result = await outcomes.run('graph-delete', () => Promise.resolve(refusedGraphDelete));
 
     expect(result).toBe(refusedGraphDelete);
-    expect(notice(outcomes, 'graph-delete')).toEqual({
-      title: 'Graph not deleted',
-      message: 'Graph refused.',
-    });
+    expect(notice(outcomes, 'graph-delete')).toEqual(graphDeleteReport);
+    expect(notice(outcomes, 'graph-edit')).toBeNull();
   });
 
   it('answers a completed delete to the caller and leaves the channel clear', async () => {
     const { outcomes } = open();
-    const completed: CoordinatedContextDeleteResult = {
-      kind: 'completed',
-      mapId: MAP_A,
-      graphId: GRAPH_A,
-    };
+    const completed: CompletedGraphEdit = { kind: 'completed', mapId: MAP_A, graphId: GRAPH_A };
     outcomes.run('graph-delete', () => refusedGraphDelete);
 
     await expect(outcomes.run('graph-delete', () => Promise.resolve(completed))).resolves.toBe(
@@ -637,7 +630,7 @@ describe('graph-delete', () => {
 
   it('discards a delete pressed on one Map that settles under another', async () => {
     const { outcomes, navigation } = open();
-    const pending = deferred<CoordinatedContextDeleteResult>();
+    const pending = deferred<EditOutcome<CompletedGraphEdit>>();
     const running = outcomes.run('graph-delete', () => pending.promise);
 
     navigation.selectMap(MAP_B);
@@ -647,7 +640,7 @@ describe('graph-delete', () => {
     expect(notice(outcomes, 'graph-delete')).toBeNull();
   });
 
-  it('says a thrown delete in the words the failure carries, and reports it', async () => {
+  it('reports a thrown delete and leaves its channel clear', async () => {
     const { outcomes, reported } = open();
     const failure = new Error('lifecycle broke');
 
@@ -656,10 +649,7 @@ describe('graph-delete', () => {
     );
 
     expect(reported).toEqual([failure]);
-    expect(notice(outcomes, 'graph-delete')).toEqual({
-      title: 'Graph not deleted',
-      message: 'lifecycle broke',
-    });
+    expect(notice(outcomes, 'graph-delete')).toBeNull();
   });
 });
 

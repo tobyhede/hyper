@@ -84,14 +84,14 @@ export function MapMenuActions({
 export interface GraphMenuActionsProps {
   readonly title: string;
   readonly renameItem: ReactNode;
-  readonly deleteDisabled: boolean;
   /**
    * New Graph's press, or `null` where it is unavailable — one field, as
    * {@link MapMenuActionsProps.onCreate} is.
    */
   readonly onCreate: (() => void) | null;
   readonly onCopyLink: () => void;
-  readonly onDelete: () => void;
+  /** Delete's press, or `null` where it is unavailable, as New Graph's is. */
+  readonly onDelete: (() => void) | null;
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   /** Store the Graph's colour, or `null` while Colour… may not run. */
@@ -111,7 +111,6 @@ export interface GraphMenuActionsProps {
 export function GraphMenuActions({
   title,
   renameItem,
-  deleteDisabled,
   color,
   colors,
   onRecolor,
@@ -159,8 +158,8 @@ export function GraphMenuActions({
         <DropdownMenuItem
           variant="destructive"
           className="gap-2"
-          disabled={deleteDisabled}
-          onClick={onDelete}
+          disabled={onDelete === null}
+          onClick={() => onDelete?.()}
         >
           <DeleteIcon />
           Delete {title}

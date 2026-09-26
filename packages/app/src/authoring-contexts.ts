@@ -27,7 +27,7 @@ export type AuthoringApp = Pick<ComposedApp, 'authoring' | 'currentSpace' | 'nav
 /** The Space a context authors: its composition, and the cross-Space lifecycle over it. */
 export interface AuthoredSpace {
   readonly app: AuthoringApp;
-  readonly spaceResources: Pick<SpaceResourceAuthoring, 'deleteMap'>;
+  readonly spaceResources: Pick<SpaceResourceAuthoring, 'deleteMap' | 'deleteGraph'>;
 }
 
 /** The Edits a context completes addressed to one Map of its Space. */

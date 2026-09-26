@@ -8,7 +8,6 @@ import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, graphColorsByGraphId } from '@project/graph';
 import { offered, renameDraftAnswer } from './authoring-commands';
-import { coordinatedGraphDelete } from './coordinated-context-delete';
 import { embeddedGraphAuthoringCommands } from './graph-authoring-commands';
 import { embeddedMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
@@ -50,9 +49,6 @@ export function spaceResourceContextCommands(
   const mapAuthoring = embeddedMapAuthoringCommands(embedded);
   const graphAuthoring = embeddedGraphAuthoringCommands(embedded);
   const location = spaces.browserLocation;
-  const settled = async () =>
-    (await spaces.waitForPersistence(entry.id)) &&
-    (await spaces.waitForPersistence(containingSpaceId));
   const { map: mapId, graph: graphId } = document;
   const space = entry.app.currentSpace();
   const map = space.maps.find((each) => each.id === mapId);
@@ -109,7 +105,6 @@ export function spaceResourceContextCommands(
   return {
     mapCommands,
     graphCommands: {
-      deleteDisabled: map.graphs.length <= 1,
       // The colour the Graph's row line draws, so the two marks agree for a
       // Graph that stores none.
       color: graphColor(graph, graphColorsByGraphId(space)),
@@ -132,23 +127,12 @@ export function spaceResourceContextCommands(
       onCreate: offered(graphAuthoring.map(mapId).create, (create) => async () => {
         await commandOutcomes.run('graph-create', create);
       }),
-      onDelete: async () => {
-        const updated = entry.app.currentSpace().maps.find((each) => each.id === mapId);
-        const result = await coordinatedGraphDelete(
-          entry.spaceResources.deleteGraph,
-          {
-            targetSpaceId: entry.id,
-            mapId,
-            graphId,
-            preferredGraphId: updated?.activeGraph ?? null,
-          },
-          settled,
-        );
-        if (result.kind === 'error') return result.message;
-        if (result.kind === 'completed' && entry.app.navigation.getState().selectedMapId === mapId)
-          entry.app.navigation.activateGraph(result.graphId);
-        return null;
-      },
+      // Graph authoring waits for both Spaces, repoints every Space Resource
+      // that selected the Graph — this one included — and leaves the target's
+      // canvas on the survivor; the containing canvas holds a refusal.
+      onDelete: offered(addressedGraph.delete, (remove) => async () => {
+        await commandOutcomes.run('graph-delete', remove);
+      }),
       onCopyLink: () =>
         copyLink(location.href({ kind: 'map-graph', spaceId: entry.id, mapId, graphId })),
     },

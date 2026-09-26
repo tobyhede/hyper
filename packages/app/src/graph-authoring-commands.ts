@@ -9,10 +9,11 @@ import {
   embeddedContext,
   topLevelContext,
   type AuthoredSpace,
+  type AuthoringApp,
   type AuthoringContext,
   type EmbeddedAuthoring,
 } from './authoring-contexts';
-import { describeAuthoringRefusal } from './authoring-refusal';
+import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
 import type { CommandNotice } from './command-outcomes';
 
 /**
@@ -42,17 +43,13 @@ export type GraphRename = Capability<(title: string) => EditOutcome>;
 /** Store one Graph's colour, which the canvas draws its Edges in. */
 export type GraphRecolor = Capability<(color: string) => EditOutcome>;
 
-/** The commands addressed to one Graph. */
-export interface GraphCommands {
-  readonly rename: GraphRename;
-  readonly recolor: GraphRecolor;
-}
-
 /**
  * A completed Graph Edit that leaves its context on a Graph: that Graph and
  * the Map that owns it.
  *
- * A creation answers the Graph it made. The same shape as a completed Map
+ * A creation answers the Graph it made. A deletion answers the survivor:
+ * every Space Resource that selected the deleted Graph now selects it, and so
+ * does a canvas that was showing the deleted Graph. The same shape as a completed Map
  * Edit (`map-authoring-commands.ts`), declared here so neither module names
  * the other's.
  */
@@ -67,6 +64,22 @@ export interface CompletedGraphEdit {
  * waits for the Spaces it writes to save before and after it.
  */
 export type GraphCreate = Capability<() => Promise<EditOutcome<CompletedGraphEdit>>>;
+
+/**
+ * Delete one Graph: asynchronous, because every Space Resource that selects
+ * it is repointed in the same Edit, across Spaces (ADR 0076).
+ *
+ * A Map's last Graph is never available (ADR 0079), and neither is a Graph
+ * that has gone; both are asked again when invoked.
+ */
+export type GraphDelete = Capability<() => Promise<EditOutcome<CompletedGraphEdit>>>;
+
+/** The commands addressed to one Graph. */
+export interface GraphCommands {
+  readonly rename: GraphRename;
+  readonly recolor: GraphRecolor;
+  readonly delete: GraphDelete;
+}
 
 /**
  * The Graph Edits addressed to one Map: `create` is the Map-scoped one, and
@@ -86,13 +99,14 @@ export interface GraphAuthoringCommands {
  * Whether each command may run, as the surface answers it.
  *
  * Separate answers because they differ at the top level: a rename is a chrome
- * title edit, and a recolour and a creation are entity Edits
+ * title edit, and a recolour, a creation and a deletion are entity Edits
  * (`authoring-availability.ts`).
  */
 export interface GraphAuthoringAvailability {
   readonly rename: () => boolean;
   readonly recolor: () => boolean;
   readonly create: () => boolean;
+  readonly delete: () => boolean;
 }
 
 const UNAVAILABLE = { kind: 'unavailable' } as const;
@@ -160,6 +174,76 @@ const createGraph = async (
       };
 };
 
+const notDeleted = (message: string): CommandNotice => ({ title: 'Graph not deleted', message });
+
+/**
+ * The Graph the deletion should leave its Map on: the Active Graph the
+ * context's canvas shows when that is not the one going, and otherwise the
+ * Map's own Active Graph when that survives.
+ *
+ * **This preference is how the canvas continues on the survivor.** The
+ * lifecycle repoints every Space Resource that selected the deleted Graph at
+ * the Graph preferred here, moves the Map's Active Graph to it when the Map's
+ * was the one going, and installs the Edit in the Space's session, where Space
+ * Authoring's reconciliation moves a canvas whose Active Graph has vanished to
+ * the Map's Active Graph (`space-authoring.ts`, `reconcileNavigation`).
+ * Preferring the Map's own Active Graph is what makes those one Graph; with
+ * none to prefer the lifecycle takes the first Graph that survives and makes
+ * it the Map's, so the two still agree. A canvas not showing the deleted
+ * Graph — including one the author moved while the deletion ran — is never
+ * moved, because reconciliation only moves a selection that has gone.
+ * `graph-authoring-commands.test.ts` holds each: "continues on the Map’s
+ * stored Active Graph…", "prefers the Active Graph an embedded target
+ * shows…" and "leaves a canvas the author moved…".
+ */
+const preferredSurvivor = (app: AuthoringApp, mapId: MapId, graphId: GraphId): GraphId | null => {
+  const { selectedMapId, activeGraphId } = app.navigation.getState();
+  if (selectedMapId === mapId && activeGraphId !== null && activeGraphId !== graphId) {
+    return activeGraphId;
+  }
+  const stored = app.currentSpace().lookup.map(mapId)?.map.activeGraph;
+  return stored === undefined || stored === graphId ? null : stored;
+};
+
+/**
+ * Delete `graphId` of `mapId` through the cross-Space lifecycle, which
+ * repoints every Space Resource that selected it in the same Edit.
+ *
+ * Availability is asked at invocation and, embedded, again after the Spaces
+ * settle, because the wait gives the target time to be exited or the Graph to
+ * go.
+ */
+const deleteGraph = async (
+  context: AuthoringContext,
+  mapId: MapId,
+  graphId: GraphId,
+  live: () => boolean,
+): Promise<EditOutcome<CompletedGraphEdit>> => {
+  if (!live()) return UNAVAILABLE;
+  const { app, spaceResources } = context.space;
+  if (context.coordination !== null) {
+    if (!(await context.coordination.settled())) {
+      return { kind: 'refused', report: notDeleted(PERSISTENCE_UNSETTLED) };
+    }
+    if (!live()) return UNAVAILABLE;
+  }
+  const result = await spaceResources.deleteGraph({
+    targetSpaceId: app.currentSpace().id,
+    mapId,
+    graphId,
+    preferredGraphId: preferredSurvivor(app, mapId, graphId),
+  });
+  switch (result.kind) {
+    case 'refused':
+      return { kind: 'refused', report: notDeleted(describeSpaceResourceRefusal(result.refusal)) };
+    case 'unchanged':
+      return { kind: 'unchanged' };
+    case 'completed':
+      break;
+  }
+  return { kind: 'completed', mapId: result.mapId, graphId: result.graphId };
+};
+
 const graphAuthoringCommands = (
   context: AuthoringContext,
   available: GraphAuthoringAvailability,
@@ -175,6 +259,12 @@ const graphAuthoringCommands = (
       const addressed = (): boolean => context.addressesGraph(mapId, graphId);
       const renames = (): boolean => available.rename() && addressed();
       const recolors = (): boolean => available.recolor() && addressed();
+      // The last Graph of a Map is never deletable (ADR 0079): a Map keeps
+      // one to draw and to be selected with.
+      const deletes = (): boolean =>
+        available.delete() &&
+        addressed() &&
+        (context.space.app.currentSpace().lookup.map(mapId)?.map.graphs.length ?? 0) > 1;
       return {
         rename: {
           available: renames(),
@@ -196,6 +286,10 @@ const graphAuthoringCommands = (
                 )
               : UNAVAILABLE,
         },
+        delete: {
+          available: deletes(),
+          invoke: () => deleteGraph(context, mapId, graphId, deletes),
+        },
       };
     },
   }),
@@ -208,6 +302,8 @@ const graphAuthoringCommands = (
  * Graph the Dock names; any other is a stale press, answered unavailable.
  * It creates in the selected Map with nothing to wait for: the Edit makes the
  * new Graph Active, and the Space's own session saves it like any other Edit.
+ * It deletes with nothing to wait for either: the lifecycle refuses a Space
+ * whose session needs recovery, and the canvas continues on the survivor.
  *
  * `available` is the composition's answer to whether each chrome command may
  * run; it is as live as the caller makes it.
@@ -230,6 +326,10 @@ export function topLevelGraphAuthoringCommands(
  * settle first; the Graph is created in the target and saved there; only then
  * is the Resource pointed at it and the containing Space saved — so a stored
  * Resource never names a Graph its target has not stored.
+ *
+ * **Deletion waits for both Spaces to settle first**, as creation does, and
+ * says an unsettled Space as a Graph not deleted: the lifecycle then repoints
+ * every Space Resource that selected the Graph in the one Edit that deletes it.
  */
 export function embeddedGraphAuthoringCommands({
   available,
@@ -239,5 +339,6 @@ export function embeddedGraphAuthoringCommands({
     rename: available,
     recolor: available,
     create: available,
+    delete: available,
   });
 }

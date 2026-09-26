@@ -244,7 +244,6 @@ function GraphIdentityMenu({
       <GraphMenuActions
         title={graph.active.title}
         renameItem={renameItem}
-        deleteDisabled={graph.editsDisabled || graph.graphs.length <= 1}
         color={graph.activeColor}
         colors={GRAPH_PALETTE_ENTRIES}
         onRecolor={
@@ -257,7 +256,7 @@ function GraphIdentityMenu({
         }
         onCreate={graph.onCreate}
         onCopyLink={graph.onCopyLink}
-        onDelete={() => graph.onDelete(graph.active.id)}
+        onDelete={graph.onDelete}
       />
     </ChoiceMenu>
   );

@@ -219,9 +219,8 @@ describe('SpaceResourceSelectors', () => {
         graphCommands: {
           onRename: () => null,
           onCreate: () => Promise.resolve(),
-          onDelete: () => Promise.resolve(null),
+          onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
-          deleteDisabled: false,
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],
           onRecolor: () => null,
@@ -244,6 +243,40 @@ describe('SpaceResourceSelectors', () => {
     await waitFor(() => expect(screen.getByTestId('space-resource-graph')).toBeEnabled());
     expect(onReport).toHaveBeenLastCalledWith(null);
     expect(onReport).not.toHaveBeenCalledWith(expect.any(String));
+  });
+
+  /**
+   * A Graph deletion's refusal is the containing canvas's notice too, and a
+   * Graph Delete the application withholds is drawn unavailable from the same
+   * field that would press it.
+   */
+  it('reports no sentence of its own for a Graph deletion, and draws a withheld one unavailable', async () => {
+    const onReport = vi.fn();
+    const graphCommands = {
+      onRename: () => null,
+      onCreate: () => Promise.resolve(),
+      onDelete: () => Promise.resolve(),
+      onCopyLink: () => Promise.resolve(null),
+      color: '#1f77b4',
+      colors: [{ color: '#1f77b4', label: 'Blue' }],
+      onRecolor: () => null,
+    };
+    const { unmount } = mount(clusters({ onReport, graphCommands }));
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Long' }));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByTestId('space-resource-graph')).toBeEnabled());
+    expect(onReport).not.toHaveBeenCalledWith(expect.any(String));
+    unmount();
+
+    mount(clusters({ graphCommands: { ...graphCommands, onDelete: null } }));
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    expect(screen.getByRole('menuitem', { name: 'Delete Long' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('draws a selection the target no longer holds as unavailable', () => {
@@ -306,9 +339,8 @@ describe('SpaceResourceSelectors', () => {
         graphCommands: {
           onRename: () => null,
           onCreate: () => Promise.resolve(),
-          onDelete: () => Promise.resolve(null),
+          onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
-          deleteDisabled: false,
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],
           onRecolor: () => null,

@@ -10,7 +10,6 @@ import {
   describeSpaceResourceCreationBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
-import type { CoordinatedContextDeleteResult } from './coordinated-context-delete';
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
 import type { EditOutcome } from './authoring-commands';
@@ -94,11 +93,7 @@ const CHANNELS = {
   'map-delete': { resetsOnMapChange: true, words: 'reported' },
   'graph-create': { resetsOnMapChange: true, words: 'reported' },
   'graph-edit': { resetsOnMapChange: true, words: 'reported' },
-  'graph-delete': {
-    resetsOnMapChange: true,
-    words: 'described',
-    title: 'Graph not deleted',
-  },
+  'graph-delete': { resetsOnMapChange: true, words: 'reported' },
   'resource-delete': {
     resetsOnMapChange: true,
     words: 'described',
@@ -232,7 +227,7 @@ interface CommandSignatures {
   };
   readonly 'graph-edit': { readonly result: EditOutcome; readonly options: [] };
   readonly 'graph-delete': {
-    readonly result: CoordinatedContextDeleteResult;
+    readonly result: EditOutcome<CompletedGraphEdit>;
     readonly options: [];
   };
   readonly 'resource-delete': { readonly result: AuthoringResult; readonly options: [] };
@@ -353,14 +348,9 @@ const COMMANDS: CommandDefinitions = {
   // after it is the surface's, which neither the Dock nor the rail spends.
   'graph-create': reportedCommand('graph-create'),
   'graph-edit': reportedCommand('graph-edit'),
-  // `coordinatedGraphDelete` has already said its gate and its lifecycle
-  // refusal in a sentence, so the describer is that sentence.
-  'graph-delete': {
-    channel: 'graph-delete',
-    settle: (result) =>
-      result.kind === 'error' ? notice(described('graph-delete')(result.message)) : CLEAR,
-    broke: (failure) => described('graph-delete')(failureMessage(failure)),
-  },
+  // A deletion leaves the canvas on a surviving Graph of the same Map, so it
+  // never moves the Map either.
+  'graph-delete': reportedCommand('graph-delete'),
   'resource-delete': authoringCommand('resource-delete'),
   'space-resource-delete': {
     channel: 'resource-delete',

@@ -174,8 +174,9 @@ describe('persisting a Space Resource context command', () => {
 
   it('persists Graph deletion after moving the stored referring Resource', async () => {
     const { backend, spaces, commands } = await setup();
-    expect(commands.graphCommands).toBeDefined();
-    expect(await commands.graphCommands?.onDelete()).toBeNull();
+    const graphCommands = commands.graphCommands;
+    if (graphCommands === undefined) throw new Error('Commands missing');
+    await offeredPress(graphCommands.onDelete)();
     await spaces.waitForPersistence(META);
     await spaces.waitForPersistence(TARGET);
     const loaded = await backend.loadSpace(TARGET);

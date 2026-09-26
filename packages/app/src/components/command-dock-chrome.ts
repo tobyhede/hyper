@@ -299,14 +299,12 @@ export interface DockGraph {
    * {@link DockGraph.onRecolor}.
    */
   readonly onCreate: (() => void) | null;
-  readonly onDelete: (graphId: GraphId) => void;
   /**
-   * Whether Delete may run at all: an entity Edit, and no entity Edit runs
-   * while a title editor or a live content edit owns the caret
-   * (`authoring-availability.ts`). Delete carries the ADR 0079 rule on top of
-   * this one, read off `graphs` here.
+   * Delete the Active Graph, or `null` while Delete may not run. One field,
+   * like {@link DockCanvas.onDelete}, and for the same reason: the answer holds
+   * the last-Graph rule (ADR 0079) and the entity-Edit gate together.
    */
-  readonly editsDisabled: boolean;
+  readonly onDelete: (() => void) | null;
   /**
    * Copy this Graph's within-Map address — "Copy link to Graph" reproduces
    * what is on screen, so a recipient lands where the sender was.
