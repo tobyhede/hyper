@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { expect, it } from 'vitest';
 
 import {
+  GRAPH_HEAD_SHAPES,
   normalizeTitle,
   uuidSchema,
   type Resource,
@@ -143,6 +144,11 @@ const operation = fc.oneof(
     op: fc.constant('recolored-graph' as const),
     graph: index,
     color: fc.constantFrom(...GRAPH_PALETTE),
+  }),
+  fc.record({
+    op: fc.constant('changed-graph-head-shape' as const),
+    graph: index,
+    headShape: fc.constantFrom(...GRAPH_HEAD_SHAPES),
   }),
   fc.record({ op: fc.constant('deleted-graph' as const), graph: index }),
   fc.record({ op: fc.constant('deleted-edge' as const), graph: index, edge: index }),
@@ -325,6 +331,8 @@ function resolve(
       return { kind: 'renamed-graph', graphId, title: generated.title };
     case 'recolored-graph':
       return { kind: 'recolored-graph', graphId, color: generated.color };
+    case 'changed-graph-head-shape':
+      return { kind: 'changed-graph-head-shape', graphId, headShape: generated.headShape };
     case 'deleted-graph':
       return { kind: 'deleted-graph', graphId };
     case 'deleted-edge':

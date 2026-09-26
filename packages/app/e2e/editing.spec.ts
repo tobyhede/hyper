@@ -32,6 +32,9 @@ import {
   newMap,
   newGraph,
   openGraphColourPicker,
+  openGraphHeadShapePicker,
+  changeActiveGraphHeadShape,
+  drawnHeadShape,
   settleNewMapName,
   nodeByTitle,
   positionOf,
@@ -3512,6 +3515,53 @@ test('Copy link to Target on a Reference Resource copies its Target’s own addr
       })}`,
     );
 });
+
+/**
+ * Shape… is one Edit that the canvas redraws the Active Graph's Edges with,
+ * and choosing the head shape the Graph already has is no Edit (ADR 0105).
+ * Long stores none, so it draws — and Shape… marks — the arrow.
+ */
+test(
+  'changing the Active Graph head shape redraws its Edges and persists',
+  { tag: '@parity:command-dock-changes-graph-head-shape' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+    const longAToB = page.locator(
+      '.react-flow__edge[data-id="00000000-0000-4000-8000-000000000023::00000000-0000-4000-8000-000000000002::00000000-0000-4000-8000-000000000003"]',
+    );
+    expect(await drawnHeadShape(longAToB)).toBe('arrow');
+    const status = page.getByTestId('persistence-status');
+    const revision = (await status.getAttribute('data-revision')) ?? '';
+
+    const current = await openGraphHeadShapePicker(page);
+    await expect(current.getByRole('radio', { name: 'Arrow', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await current.getByRole('radio', { name: 'Arrow', exact: true }).click();
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await settled(page);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', revision);
+
+    // One revision past the start: the Arrow choice committed nothing.
+    await changeActiveGraphHeadShape(page, 'Vee');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(status).toHaveAttribute('data-revision', String(Number(revision) + 1));
+    await expect.poll(() => drawnHeadShape(longAToB)).toBe('vee');
+
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    await expect.poll(() => drawnHeadShape(longAToB)).toBe('vee');
+    const reopened = await openGraphHeadShapePicker(page);
+    await expect(reopened.getByRole('radio', { name: 'Vee', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  },
+);
 
 test(
   'recolouring the Active Graph persists through the swatch picker',

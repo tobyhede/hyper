@@ -366,6 +366,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'Colour… in the Graph menu opens a palette-bound swatch grid offering every Tableau Classic 20 slot, each named in its accessible label; choosing one recolours the Active Graph.',
   },
   {
+    id: 'command-dock-changes-graph-head-shape',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'Shape… sits directly under Colour… in the Graph menu, its trigger showing the Active Graph’s head shape; it opens the four head shapes as swatches in the Graph’s colour with the current one marked, and choosing one stores it on the Active Graph and closes the menu.',
+  },
+  {
     id: 'palette-color-picker-chooses-a-closed-palette-colour',
     storyFile: 'components/palette-color-picker.stories.tsx',
     storyExport: 'Default',
@@ -670,7 +677,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',
     claim:
-      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
+      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Shape, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
   },
   {
     id: 'open-space-resource-chooses-its-context-on-the-shared-controls',

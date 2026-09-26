@@ -63,10 +63,10 @@ const CLASS_CARVE_OUTS: readonly ClassCarveOut[] = [
       prefix === 'rounded' && content.startsWith('calc(var(--radius-md)'),
   },
   {
-    description: "PaletteColorPicker.tsx's glyph contrast outline",
+    description: "SwatchGrid.tsx's glyph contrast outline",
     reason:
-      'a 1px black outline on the selected-swatch check glyph is how the glyph stays legible against an arbitrary swatch colour the author picked, not an elevation sized for a dark canvas; ticket 10 scopes a contrast outline on a glyph out of the black-shadow ban, and it is a drop-shadow rather than a shadow for the same reason.',
-    file: 'packages/ui/src/PaletteColorPicker.tsx',
+      'a 1px black outline on the selected-swatch check glyph is how the glyph stays legible against whatever the swatch beneath it draws — an arbitrary palette colour, or a head shape filled in one — not an elevation sized for a dark canvas; ticket 10 scopes a contrast outline on a glyph out of the black-shadow ban, and it is a drop-shadow rather than a shadow for the same reason.',
+    file: 'packages/ui/src/SwatchGrid.tsx',
     matches: (prefix, content) =>
       prefix === 'drop-shadow' && content === '0_0_1px_rgba(0,0,0,0.85)',
   },

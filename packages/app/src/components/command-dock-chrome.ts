@@ -3,7 +3,16 @@
  * clusters draws. The application builds it (`dock-chrome.ts`) and the Dock's
  * modules draw it, and both read the one declaration here.
  */
-import type { Graph, GraphId, Map, MapId, Resource, ResourceId, UUID } from '@project/core';
+import type {
+  Graph,
+  GraphHeadShape,
+  GraphId,
+  Map,
+  MapId,
+  Resource,
+  ResourceId,
+  UUID,
+} from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { ExitOutcome } from '../dock-model';
 import type { MapMemberships } from '../map-memberships';
@@ -285,6 +294,10 @@ export interface DockGraph {
   readonly onRename: ((graphId: GraphId, title: string) => string | null) | null;
   /** A Graph's stored colour, which the canvas draws its Edges in. */
   readonly onRecolor: (graphId: GraphId, color: string) => void;
+  /** The head shape the Active Graph's Edges draw, which Shape… marks as current. */
+  readonly activeHeadShape: GraphHeadShape;
+  /** A Graph's stored head shape, which every one of its Edges ends in (ADR 0105). */
+  readonly onChangeHeadShape: (graphId: GraphId, headShape: GraphHeadShape) => void;
   readonly onCreate: () => void;
   readonly onDelete: (graphId: GraphId) => void;
   /**

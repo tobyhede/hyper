@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import type { GraphHeadShape } from '@project/core';
 import { DropdownMenuItem } from './components/dropdown-menu';
 import { ChoiceMenu, ChoiceMenuTrigger, type ChoiceMenuChoice } from './ChoiceMenu';
 import { GraphColorLine } from './GraphColorLine';
@@ -60,6 +61,8 @@ export interface CanvasSpaceResourceGraphCommands {
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => string | null;
+  readonly headShape: GraphHeadShape;
+  readonly onChangeHeadShape: (headShape: GraphHeadShape) => string | null;
 }
 
 /**
@@ -77,8 +80,11 @@ interface SelectorCommands {
     | null;
   readonly delete: (() => Promise<string | null>) | null;
   readonly copyLink: () => Promise<string | null>;
-  /** A Graph's colour, the one command a Graph carries that a Map does not. */
-  readonly palette?: Pick<CanvasSpaceResourceGraphCommands, 'color' | 'colors' | 'onRecolor'>;
+  /** How a Graph's Edges are drawn, the commands a Graph carries that a Map does not. */
+  readonly appearance?: Pick<
+    CanvasSpaceResourceGraphCommands,
+    'color' | 'colors' | 'onRecolor' | 'headShape' | 'onChangeHeadShape'
+  >;
 }
 
 const mapSelectorCommands = (commands: CanvasSpaceResourceMapCommands): SelectorCommands => {
@@ -108,7 +114,7 @@ const graphSelectorCommands = (commands: CanvasSpaceResourceGraphCommands): Sele
   }),
   delete: commands.deleteDisabled ? null : commands.onDelete,
   copyLink: commands.onCopyLink,
-  palette: commands,
+  appearance: commands,
 });
 
 /**
@@ -307,7 +313,7 @@ function SpaceResourceSelector({
   const rename = disabled || selected === undefined ? null : (commands?.rename ?? null);
   const create = disabled ? null : (commands?.create ?? null);
   const remove = disabled ? null : (commands?.delete ?? null);
-  const palette = commands?.palette;
+  const appearance = commands?.appearance;
   const renameItem = (
     <DropdownMenuItem
       className="gap-2"
@@ -424,17 +430,22 @@ function SpaceResourceSelector({
         }
       >
         {commands !== undefined &&
-          (palette !== undefined ? (
+          (appearance !== undefined ? (
             <GraphMenuActions
               {...commonCommands}
               editsDisabled={disabled}
               deleteDisabled={onDelete === null}
               onCreate={() => onCreate?.()}
               onDelete={() => onDelete?.()}
-              color={palette.color}
-              colors={palette.colors}
+              color={appearance.color}
+              colors={appearance.colors}
               onRecolor={(color) => {
-                onReport(palette.onRecolor(color));
+                onReport(appearance.onRecolor(color));
+                setMenuOpen(false);
+              }}
+              headShape={appearance.headShape}
+              onChangeHeadShape={(headShape) => {
+                onReport(appearance.onChangeHeadShape(headShape));
                 setMenuOpen(false);
               }}
             />

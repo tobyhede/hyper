@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_OPEN_SIZE,
   EDGE_TITLE_ONE_LINE,
+  graphHeadShape,
   uuidSchema,
   type Graph,
   type MapId,
@@ -628,6 +629,67 @@ describe('Edit Graph', () => {
     expect(
       authoring.complete({ kind: 'recolored-graph', graphId: GRAPH_ID, color: GRAPH_PALETTE[3] }),
     ).toEqual({ kind: 'unchanged' });
+  });
+
+  it('stores a chosen head shape and treats the current one as unchanged', () => {
+    const { authoring, session } = openPositioned();
+    const graph = graphsOf(session.getState().working)[0];
+    if (graph === undefined) throw new Error('fixture has a Graph');
+    const current = graphHeadShape(graph);
+    const before = session.getState().working;
+
+    expect(
+      authoring.complete({
+        kind: 'changed-graph-head-shape',
+        graphId: GRAPH_ID,
+        headShape: current,
+      }),
+    ).toEqual({ kind: 'unchanged' });
+    expect(session.getState().working).toBe(before);
+
+    expect(
+      authoring.complete({
+        kind: 'changed-graph-head-shape',
+        graphId: GRAPH_ID,
+        headShape: 'diamond',
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(graphsOf(session.getState().working)[0]?.headShape).toBe('diamond');
+
+    expect(
+      authoring.complete({
+        kind: 'changed-graph-head-shape',
+        graphId: GRAPH_ID,
+        headShape: 'diamond',
+      }),
+    ).toEqual({ kind: 'unchanged' });
+  });
+
+  it('treats arrow as the head shape of a Graph that stores none', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+    const stored = graphsOf(before)[0];
+    expect(stored).toBeDefined();
+    expect(stored).not.toHaveProperty('headShape');
+    expect(
+      authoring.complete({
+        kind: 'changed-graph-head-shape',
+        graphId: GRAPH_ID,
+        headShape: 'arrow',
+      }),
+    ).toEqual({ kind: 'unchanged' });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('refuses a head shape for a Graph the Map does not own', () => {
+    const { authoring } = openPositioned();
+    expect(
+      authoring.complete({
+        kind: 'changed-graph-head-shape',
+        graphId: OTHER_GRAPH_ID,
+        headShape: 'dot',
+      }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
 });
 

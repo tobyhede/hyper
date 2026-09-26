@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { type ReactNode } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   SpaceResourceSelectors,
@@ -225,6 +225,8 @@ describe('SpaceResourceSelectors', () => {
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],
           onRecolor: () => null,
+          headShape: 'arrow',
+          onChangeHeadShape: () => null,
         },
       }),
     );
@@ -298,7 +300,7 @@ describe('SpaceResourceSelectors', () => {
     expect(screen.queryByText(/Copy permanent link/)).not.toBeInTheDocument();
   });
 
-  it('groups the Graph menu into New Graph, Colour… with Rename and Copy link, then Delete', () => {
+  it('groups the Graph menu into New Graph, Colour… and Shape… with Rename and Copy link, then Delete', () => {
     mount(
       clusters({
         graphCommands: {
@@ -310,6 +312,8 @@ describe('SpaceResourceSelectors', () => {
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],
           onRecolor: () => null,
+          headShape: 'arrow',
+          onChangeHeadShape: () => null,
         },
       }),
     );
@@ -329,11 +333,53 @@ describe('SpaceResourceSelectors', () => {
       'Long',
       'New Graph',
       'Colour…',
+      'Shape…',
       'Rename',
       'Copy link to Graph',
       'Delete Long',
     ]);
     expect(screen.queryByText(/Copy permanent link/)).not.toBeInTheDocument();
+  });
+
+  /**
+   * Shape… answers the sentence the rail reports, as Colour… does, and the
+   * menu closes behind the choice.
+   */
+  it('changes the Graph head shape from Shape…, reporting and closing', async () => {
+    const onReport = vi.fn();
+    const onChangeHeadShape = vi.fn(() => 'Head shape refused.');
+    mount(
+      clusters({
+        onReport,
+        graphCommands: {
+          onRename: () => null,
+          onCreate: () => Promise.resolve(null),
+          onDelete: () => Promise.resolve(null),
+          onCopyLink: () => Promise.resolve(null),
+          deleteDisabled: false,
+          color: '#1f77b4',
+          colors: [{ color: '#1f77b4', label: 'Blue' }],
+          onRecolor: () => null,
+          headShape: 'dot',
+          onChangeHeadShape,
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    const trigger = screen.getByRole('menuitem', { name: 'Shape…' });
+    expect(trigger.querySelector('[data-head-shape]')).toHaveAttribute('data-head-shape', 'dot');
+    fireEvent.click(trigger);
+    const grid = await screen.findByRole('radiogroup', { name: 'Graph head shape' });
+    expect(within(grid).getByRole('radio', { name: 'Dot' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    fireEvent.click(within(grid).getByRole('radio', { name: 'Diamond' }));
+
+    expect(onChangeHeadShape).toHaveBeenCalledWith('diamond');
+    expect(onReport).toHaveBeenLastCalledWith('Head shape refused.');
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   });
 
   /**

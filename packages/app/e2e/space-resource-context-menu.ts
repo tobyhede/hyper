@@ -1,7 +1,13 @@
-import { expectMenuGroups, resourceControls } from './graph';
+import { drawnHeadShape, expectMenuGroups, resourceControls } from './graph';
 import { expect, type Locator, type Page } from '@playwright/test';
 
-/** Exercise the same target commands through the application and its production story. */
+/**
+ * Exercise the same target commands through the application and its production story.
+ *
+ * The target Graph the Space Resource shows must have at least one Edge: Shape…
+ * is proved by every Edge the Space Resource draws for it ending in the chosen
+ * head shape, which a Graph with none would satisfy without drawing anything.
+ */
 export async function exerciseSpaceResourceContextMenus(
   page: Page,
   resource: Locator,
@@ -55,7 +61,7 @@ export async function exerciseSpaceResourceContextMenus(
   const mapLink = await page.evaluate(() => navigator.clipboard.readText());
   expect(new URL(mapLink).pathname).toMatch(/^\/spaces\/[^/]+\/maps\/[^/]+$/);
 
-  // Same grammar, with Colour… heading the commands on this Graph —
+  // Same grammar, with Colour… and Shape… heading the commands on this Graph —
   // and no permanent address offered.
   await openMenu('graph');
   const graphMenu = page.getByRole('menu');
@@ -63,7 +69,7 @@ export async function exerciseSpaceResourceContextMenus(
   await expectMenuGroups(graphMenu, [
     await graphMenu.getByRole('menuitemradio').allInnerTexts(),
     ['New Graph'],
-    ['Colour…', 'Rename', 'Copy link to Graph'],
+    ['Colour…', 'Shape…', 'Rename', 'Copy link to Graph'],
     [/^Delete /],
   ]);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
@@ -81,6 +87,30 @@ export async function exerciseSpaceResourceContextMenus(
     'aria-checked',
     'true',
   );
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  // Shape… changes the target's Graph as Colour… does, and closes behind it.
+  await openMenu('graph');
+  await page.getByRole('menuitem', { name: 'Shape…', exact: true }).click();
+  await page
+    .getByRole('radiogroup', { name: 'Graph head shape' })
+    .getByRole('radio', { name: 'Dot', exact: true })
+    .click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  const placement = await resource.getAttribute('data-id');
+  const embeddedEdges = page.locator(
+    `.react-flow:visible .react-flow__edge[data-id^="${placement}:"]`,
+  );
+  await expect.poll(() => embeddedEdges.count()).toBeGreaterThan(0);
+  for (const edge of await embeddedEdges.all())
+    await expect.poll(() => drawnHeadShape(edge)).toBe('dot');
+  await openMenu('graph');
+  await page.getByRole('menuitem', { name: 'Shape…', exact: true }).click();
+  await expect(
+    page
+      .getByRole('radiogroup', { name: 'Graph head shape' })
+      .getByRole('radio', { name: 'Dot', exact: true }),
+  ).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await openMenu('graph');
