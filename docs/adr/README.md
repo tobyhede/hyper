@@ -44,6 +44,7 @@ under `superseded/`.
 | [0076](0076-multi-space-edits-coordinate-per-space-sessions-behind-space-card-lifecycle.md) | Multi-Space edits coordinate per-Space sessions behind the Space Card lifecycle. |
 | [0097](0097-a-multi-space-edit-is-judged-against-what-it-commits.md) | A multi-Space Edit is derived and judged with `decideCommit` against the stored Spaces plus its participants' working Spaces. |
 | [0099](0099-the-barrier-waits-only-for-commits-in-flight.md) | The coordination barrier pauses, then awaits only in-flight commits; one recovery rule covers both deletion cascades, reading stored and working state. |
+| [0106](0106-an-image-resource-owns-a-url-not-bytes.md) | An Image Resource owns a URL, not bytes. The host stores images at `/images/<sha256>`, named for what they are and outside the aggregate. The repo-state rule is deliberately waived for the picture. |
 
 ## Layout, View and Graph
 
@@ -76,7 +77,7 @@ under `superseded/`.
 | [0030](0030-postgres-is-the-live-write-model.md) | PostgreSQL is the live write model. Files are imported and exported. |
 | [0018](0018-a-new-space-is-a-single-centered-card.md) | A new Space is one centred Card. |
 | [0054](0054-the-unreleased-prototype-rolls-forward.md) | The prototype is unreleased, so a format change rolls forward and adds no migration. |
-| [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. |
+| [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. ADR 0106 excepts an Image Resource's picture. |
 | [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate that CLI hard reset restores. |
 | [0078](0078-the-server-side-repository-owns-meta-lifecycle.md) | The server-side repository owns Meta lifecycle; its browser seam does not expose lifecycle administration. |
 | [0094](0094-dangerous-truncate-replaces-whatever-is-stored.md) | `--dangerous-truncate` replaces whatever is stored, valid or not, still authorized by the Meta identity it read. |
