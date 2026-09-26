@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { GraphHeadShapeSwatchGrid } from '../src';
+import { GraphHeadShapeSwatchGrid } from '../src/GraphHeadShapeSwatchGrid';
 
 describe('GraphHeadShapeSwatchGrid', () => {
   it('offers exactly the four head shapes, in the Graph colour, with the current one marked', () => {
@@ -22,6 +22,12 @@ describe('GraphHeadShapeSwatchGrid', () => {
       'true',
       'false',
       'false',
+    ]);
+    expect(radios.map((radio) => radio.querySelector('.lucide-check') !== null)).toEqual([
+      false,
+      true,
+      false,
+      false,
     ]);
     for (const [index, headShape] of ['arrow', 'vee', 'dot', 'diamond'].entries()) {
       const glyph = radios[index]?.querySelector('[data-slot="graph-head-shape"]');

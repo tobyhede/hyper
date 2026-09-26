@@ -104,9 +104,8 @@ export interface GraphMenuActionsProps {
  * remove this one — with Colour… and Shape… heading the group of commands on
  * the Graph you are on, the two a Graph carries that a Map does not: how its
  * Edges are drawn (ADR 0104, ADR 0105). Shape… is withdrawn exactly when
- * Colour… is. Copy link
- * to Graph copies the within-Map address; this menu offers no separate
- * permanent address for the Graph itself.
+ * Colour… is. Copy link to Graph copies the within-Map address; this menu
+ * offers no separate permanent address for the Graph itself.
  */
 export function GraphMenuActions({
   title,

@@ -667,8 +667,10 @@ describe('Edit Graph', () => {
 
   it('treats arrow as the head shape of a Graph that stores none', () => {
     const { authoring, session } = openPositioned();
-    const stored = graphsOf(session.getState().working)[0];
-    expect(stored?.headShape ?? 'arrow').toBe('arrow');
+    const before = session.getState().working;
+    const stored = graphsOf(before)[0];
+    expect(stored).toBeDefined();
+    expect(stored).not.toHaveProperty('headShape');
     expect(
       authoring.complete({
         kind: 'changed-graph-head-shape',
@@ -676,6 +678,7 @@ describe('Edit Graph', () => {
         headShape: 'arrow',
       }),
     ).toEqual({ kind: 'unchanged' });
+    expect(session.getState().working).toBe(before);
   });
 
   it('refuses a head shape for a Graph the Map does not own', () => {

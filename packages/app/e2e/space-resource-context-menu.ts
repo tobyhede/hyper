@@ -1,11 +1,17 @@
-import { expectMenuGroups, resourceControls } from './graph';
+import { drawnHeadShape, expectMenuGroups, resourceControls } from './graph';
 import { expect, type Locator, type Page } from '@playwright/test';
 
-/** Exercise the same target commands through the application and its production story. */
+/**
+ * Exercise the same target commands through the application and its production story.
+ *
+ * Answers how many of the target Graph's Edges the Space Resource drew when
+ * Shape… changed it — each asserted to end in the chosen head shape — so a
+ * caller whose target has Edges can say the canvas was observed at all.
+ */
 export async function exerciseSpaceResourceContextMenus(
   page: Page,
   resource: Locator,
-): Promise<void> {
+): Promise<number> {
   const canvas = page.locator('[data-testid="selected-canvas"]:visible');
   const containingMap = await canvas.textContent();
   await page.evaluate(() => {
@@ -91,6 +97,13 @@ export async function exerciseSpaceResourceContextMenus(
     .getByRole('radio', { name: 'Dot', exact: true })
     .click();
   await expect(page.getByRole('menu')).toHaveCount(0);
+  const placement = await resource.getAttribute('data-id');
+  const embeddedEdges = page.locator(
+    `.react-flow:visible .react-flow__edge[data-id^="${placement}:"]`,
+  );
+  const redrawn = await embeddedEdges.count();
+  for (const edge of await embeddedEdges.all())
+    await expect.poll(() => drawnHeadShape(edge)).toBe('dot');
   await openMenu('graph');
   await page.getByRole('menuitem', { name: 'Shape…', exact: true }).click();
   await expect(
@@ -132,6 +145,7 @@ export async function exerciseSpaceResourceContextMenus(
     (await resourceControls(page, resource)).getByTestId('space-resource-map'),
   ).toHaveText('Target context');
   await expect(canvas).toHaveText(containingMap ?? '');
+  return redrawn;
 }
 
 /** The Space Resource entity menu and its Reference Resource creation, through both production hosts. */

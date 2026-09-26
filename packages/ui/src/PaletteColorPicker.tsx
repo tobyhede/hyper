@@ -1,5 +1,4 @@
 import { useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
-import { Check } from 'lucide-react';
 import { cn } from './lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import { SwatchGrid, swatchPanelClassName } from './SwatchGrid';
@@ -19,11 +18,7 @@ export interface PaletteColorSwatchGridProps {
   readonly className?: string;
 }
 
-/**
- * A closed palette drawn as a swatch grid — shared by the popover and menu
- * surfaces. The chosen swatch carries a check as well as the grid's selected
- * treatment, because a colour swatch fills its whole square.
- */
+/** A closed palette drawn as a swatch grid — shared by the popover and menu surfaces. */
 export function PaletteColorSwatchGrid({
   entries,
   value,
@@ -40,21 +35,11 @@ export function PaletteColorSwatchGrid({
       disabled={disabled}
       aria-label={ariaLabel}
       className={className}
-      renderSwatch={(color, selected) => (
+      renderSwatch={(color) => (
         <span
-          aria-hidden
-          className="relative h-[1.35rem] w-[1.35rem] rounded-chrome-sm border border-border/60"
+          className="size-full rounded-chrome-sm border border-border/60"
           style={{ backgroundColor: color }}
-        >
-          {selected ? (
-            <Check
-              aria-hidden
-              size={12}
-              strokeWidth={3}
-              className="absolute inset-0 m-auto text-foreground drop-shadow-[0_0_1px_rgba(0,0,0,0.85)]"
-            />
-          ) : null}
-        </span>
+        />
       )}
     />
   );

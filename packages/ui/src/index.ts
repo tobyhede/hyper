@@ -105,11 +105,6 @@ export {
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
 export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
-export { GraphHeadShapeIcon, GraphHeadShapeSwatchGrid } from './GraphHeadShapeSwatchGrid';
-export type {
-  GraphHeadShapeIconProps,
-  GraphHeadShapeSwatchGridProps,
-} from './GraphHeadShapeSwatchGrid';
 export { PaletteColorPicker, PaletteColorSwatchGrid } from './PaletteColorPicker';
 export type {
   PaletteColorEntry,

@@ -49,7 +49,7 @@ export interface GraphHeadShapeSwatchGridProps {
 /**
  * The four head shapes (ADR 0105) as a swatch grid, each drawn in the Graph's
  * colour at the size a colour swatch takes, so Shape… and Colour… open panels
- * of one size. The current head shape carries the grid's selected treatment.
+ * of one size, marking the current head shape as Colour… marks the current colour.
  */
 export function GraphHeadShapeSwatchGrid({
   value,
@@ -66,7 +66,7 @@ export function GraphHeadShapeSwatchGrid({
       disabled={disabled}
       aria-label={ariaLabel}
       renderSwatch={(headShape) => (
-        <GraphHeadShapeIcon headShape={headShape} color={color} className="size-[1.35rem]" />
+        <GraphHeadShapeIcon headShape={headShape} color={color} className="size-full" />
       )}
     />
   );
