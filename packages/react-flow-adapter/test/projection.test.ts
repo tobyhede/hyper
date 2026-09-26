@@ -440,8 +440,33 @@ describe('projectGraphEdges', () => {
         endTrim: DETACHED_END_TRIM,
         headShape: 'arrow',
       });
-      // The Edge draws its head itself, so React Flow is handed no marker of its own.
-      expect(edges.every((e) => e.markerEnd === undefined)).toBe(true);
+    });
+
+    it("names its Graph's one head marker as the Edge's end marker", () => {
+      const edges = projectGraphEdges(shared, colors, {
+        activeGraphId: uuid(BLUE!),
+        headShapes: { [uuid(BLUE!)]: 'dot' },
+      });
+
+      // One marker per Graph, whichever Edge of it this is and whether or not
+      // it connects; Green stores no head shape and still names its own.
+      expect(edges.map((e) => [e.data!.graphId, e.markerEnd])).toEqual([
+        [RED, 'graph-head-00000000-0000-4000-8000-000000000201'],
+        [GREEN, 'graph-head-00000000-0000-4000-8000-000000000203'],
+        [BLUE, 'graph-head-00000000-0000-4000-8000-000000000202'],
+      ]);
+    });
+
+    it('namespaces the marker by the canvas the Edges are drawn in', () => {
+      const markersIn = (flowId: string) =>
+        projectGraphEdges(shared, colors, { flowId }).map((e) => e.markerEnd);
+
+      expect(markersIn('host')).toEqual([
+        'host__graph-head-00000000-0000-4000-8000-000000000201',
+        'host__graph-head-00000000-0000-4000-8000-000000000202',
+        'host__graph-head-00000000-0000-4000-8000-000000000203',
+      ]);
+      expect(markersIn('other')[0]).toBe('other__graph-head-00000000-0000-4000-8000-000000000201');
     });
 
     it('moves the centre to whichever Graph becomes active', () => {

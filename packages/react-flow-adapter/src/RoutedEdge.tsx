@@ -1,4 +1,4 @@
-import { useId, type ComponentProps } from 'react';
+import type { ComponentProps } from 'react';
 import {
   BaseEdge,
   useInternalNode,
@@ -8,7 +8,6 @@ import {
   type Node,
 } from '@xyflow/react';
 import type { GraphHeadShape, GraphId } from '@project/core';
-import { FALLBACK_GRAPH_COLOR, GraphHeadMarker } from '@project/ui';
 
 import {
   edgeAttachment,
@@ -48,8 +47,9 @@ export type RoutedEdgeData = {
    */
   endTrim: number;
   /**
-   * What the Edge draws at its head — its Graph's head shape (ADR 0105) — at
-   * the end of the line as drawn, whether or not it connects.
+   * Its Graph's head shape (ADR 0105), which the canvas's one marker for the
+   * Graph draws (`GraphHeadMarkers`) at the end of the line as drawn, whether or
+   * not it connects.
    */
   headShape: GraphHeadShape;
   /** The Edge's Title and whether it is hidden at rest; drawn by the application, not here. */
@@ -113,53 +113,28 @@ export function useRoutedEdgeGeometry(props: EdgeProps<RoutedFlowEdge>): RoutedE
 
 /**
  * The Edge's curve alone, over a geometry its caller already holds, ending in
- * its Graph's head shape.
+ * the marker React Flow hands it.
  *
  * Separate from `RoutedEdge` so a composition that also draws controls reads the
  * store once: it needs the midpoint anyway, and rendering `RoutedEdge` beneath
  * its own controls would resolve the same attachment a second time.
  *
- * The head is drawn as a marker on the path, so it sits at the end of the line
- * as drawn — the anchor for an Edge that connects, the trimmed end for one that
- * stops short (ADR 0105) — in the stroke's colour and at the path's opacity.
- * The marker's id is minted per rendered path, so one Edge drawn twice on a
- * page — a Map on the canvas and again inside an Open Space Resource — never
- * names the other's marker. An Edge with no head shape, which only an Edge
- * without its Graph's data has, draws no head.
+ * The head is the Edge object's `markerEnd` — its Graph's marker, drawn once
+ * for the canvas by `GraphHeadMarkers` — which React Flow resolves to a
+ * `url('#…')` and this forwards. A marker sits at the end of the line as drawn:
+ * the anchor for an Edge that connects, the trimmed end for one that stops
+ * short (ADR 0105).
  */
 export function RoutedEdgePath({
   id,
   path,
-  headShape,
+  markerEnd,
   style,
-}: Pick<EdgeProps<RoutedFlowEdge>, 'id' | 'style'> & {
-  path: string;
-  headShape?: GraphHeadShape;
-}) {
-  // React's ids are wrapped in colons; dropping them keeps each unique and
-  // leaves a plain name for `url('#…')`.
-  const markerId = `graph-head-${useId().replaceAll(':', '')}`;
+}: Pick<EdgeProps<RoutedFlowEdge>, 'id' | 'markerEnd' | 'style'> & { path: string }) {
   const baseEdgeProps: ComponentProps<typeof BaseEdge> = { id, path };
-  if (headShape !== undefined) baseEdgeProps.markerEnd = `url('#${markerId}')`;
+  if (markerEnd !== undefined) baseEdgeProps.markerEnd = markerEnd;
   if (style !== undefined) baseEdgeProps.style = style;
-
-  // The marker follows the path, so the Edge's own path stays the first in its
-  // group: the embedded-drag proof (`packages/app/e2e/support/embedded-drag.ts`)
-  // reads an Edge's line as its first `path`.
-  return (
-    <>
-      <BaseEdge {...baseEdgeProps} />
-      {headShape === undefined ? null : (
-        <defs>
-          <GraphHeadMarker
-            id={markerId}
-            headShape={headShape}
-            color={style?.stroke ?? FALLBACK_GRAPH_COLOR}
-          />
-        </defs>
-      )}
-    </>
-  );
+  return <BaseEdge {...baseEdgeProps} />;
 }
 
 /**
@@ -173,11 +148,11 @@ export function RoutedEdgePath({
  * another prop there is one place it reaches.
  */
 export function routedEdgePathProps(
-  { id, data, style }: Pick<EdgeProps<RoutedFlowEdge>, 'id' | 'data' | 'style'>,
+  { id, markerEnd, style }: Pick<EdgeProps<RoutedFlowEdge>, 'id' | 'markerEnd' | 'style'>,
   path: string,
 ): ComponentProps<typeof RoutedEdgePath> {
   const props: ComponentProps<typeof RoutedEdgePath> = { id, path };
-  if (data !== undefined) props.headShape = data.headShape;
+  if (markerEnd !== undefined) props.markerEnd = markerEnd;
   if (style !== undefined) props.style = style;
   return props;
 }

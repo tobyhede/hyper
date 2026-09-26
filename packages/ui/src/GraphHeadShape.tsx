@@ -54,7 +54,7 @@ export function GraphHeadShapeGlyph({ headShape, color }: GraphHeadShapeGlyphPro
 }
 
 export interface GraphHeadMarkerProps extends GraphHeadShapeGlyphProps {
-  /** Unique in the document: the path that ends in it names it by `url('#id')`. */
+  /** Unique in the document: every path that ends in it names it by `url('#id')`. */
   readonly id: string;
 }
 

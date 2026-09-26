@@ -23,6 +23,7 @@ import type {
 import { ROUTED_EDGE_TYPE, type RoutedEdgeData, type RoutedFlowEdge } from './RoutedEdge';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
+import { graphHeadMarkerId } from './GraphHeadMarkers';
 
 const FALLBACK_COLOR = '#8a94a6';
 
@@ -391,6 +392,11 @@ export interface ProjectGraphEdgesOptions {
   activeGraphId?: GraphId | null;
   /** What each Graph's Edges end in (ADR 0105). */
   headShapes?: HeadShapeByGraphId;
+  /**
+   * The React Flow `id` of the canvas these Edges are drawn in, which
+   * namespaces each Graph's head marker. Absent for a canvas that sets none.
+   */
+  flowId?: string;
 }
 
 /**
@@ -435,6 +441,9 @@ export function projectGraphEdges(
       // constant motion, which competes with every Resource on the canvas for
       // attention. Emphasis is the stroke's width, opacity and paint order.
       animated: false,
+      // Its Graph's one head marker, which `GraphHeadMarkers` draws once for
+      // the canvas and React Flow hands the Edge as `url('#…')`.
+      markerEnd: graphHeadMarkerId(edge.graphId, options.flowId),
       style: {
         stroke: color,
         strokeWidth: isActiveGraph ? 3 : 2,

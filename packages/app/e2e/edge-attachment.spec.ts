@@ -250,6 +250,11 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
       headOf.get(edge.id.split('::')[0]!),
     );
   }
+  // Nine Edges name three markers: each Graph's is drawn once for the canvas,
+  // in one `<defs>`, and no Edge draws one of its own.
+  await expect(page.locator('.react-flow marker'), 'one head marker per Graph').toHaveCount(3);
+  await expect(page.locator('.react-flow defs:has(marker)')).toHaveCount(1);
+  await expect(page.locator('.react-flow__edge marker')).toHaveCount(0);
 
   const active = pointsOf(activeLine.d);
   const activeLevel = levelOf(active);
@@ -265,6 +270,72 @@ test('several Graphs over one pair of Resources run as parallel lines below the 
     expect(line[6]!, 'stops short of B').toBeLessThan(active[6]!);
   }
   expect(levels.size, 'each in its own lane').toBe(2);
+});
+
+/** The colour the page paints at a point on screen, as `[r, g, b]`. */
+async function pixelAt(page: Page, point: Point): Promise<number[]> {
+  const png = await page.screenshot({
+    clip: { x: Math.floor(point.x), y: Math.floor(point.y), width: 1, height: 1 },
+  });
+  return page.evaluate(async (base64) => {
+    const image = await createImageBitmap(
+      await (await fetch(`data:image/png;base64,${base64}`)).blob(),
+    );
+    const context = new OffscreenCanvas(1, 1).getContext('2d');
+    if (context === null) throw new Error('No 2D context to read a pixel with.');
+    context.drawImage(image, 0, 0);
+    return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  }, png.toString('base64'));
+}
+
+test("a receding Graph's head is painted at its Edge's opacity", async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  // Long is active, so Mid recedes. Its marker is shared with every Mid Edge
+  // and lives outside the Edge, so what is proved here is that a marker is
+  // painted as part of the path naming it: at the path's opacity.
+  const line = page.locator(
+    `.react-flow__edge[data-id="${MID}::${RESOURCE_A}::${RESOURCE_B}"] .react-flow__edge-path`,
+  );
+  const { head, body, stroke, opacity } = await line.evaluate((element) => {
+    if (!(element instanceof SVGPathElement)) throw new Error('An Edge draws a path.');
+    const style = getComputedStyle(element);
+    const length = element.getTotalLength();
+    const tip = element.getPointAtLength(length);
+    const back = element.getPointAtLength(length - 1);
+    const [dx, dy] = [tip.x - back.x, tip.y - back.y];
+    // A dot's centre lies three frame units behind the tip, and a frame unit
+    // is 12.5/20 of a stroke width (`GraphHeadMarker`). The line runs through
+    // it too, so an opaque head would paint the Graph's full colour there.
+    const behind = 3 * ((Number.parseFloat(style.strokeWidth) * 12.5) / 20);
+    const screen = (x: number, y: number) => {
+      const matrix = element.getScreenCTM();
+      if (matrix === null) throw new Error('The Edge is not on screen.');
+      const at = new DOMPoint(x, y).matrixTransform(matrix);
+      return { x: at.x, y: at.y };
+    };
+    const middle = element.getPointAtLength(length / 2);
+    return {
+      head: screen(tip.x - dx * behind, tip.y - dy * behind),
+      body: screen(middle.x, middle.y),
+      stroke: (style.stroke.match(/\d+/g) ?? []).slice(0, 3).map(Number),
+      opacity: style.opacity,
+    };
+  });
+  expect(opacity, 'Mid recedes').toBe('0.35');
+
+  const [atHead, atBody] = [await pixelAt(page, head), await pixelAt(page, body)];
+  const distance = (a: number[], b: number[]) =>
+    Math.max(...a.map((channel, index) => Math.abs(channel - b[index]!)));
+  // Mid's colour is pale, so an opaque head would differ from the translucent
+  // line by little more than the line differs from the colour: the bounds sit
+  // either side of the middle of that gap.
+  expect(distance(atBody, stroke), 'the line itself is translucent').toBeGreaterThan(20);
+  expect(distance(atHead, stroke), 'the head is not painted opaque').toBeGreaterThan(20);
+  expect(distance(atHead, atBody), 'the head is as translucent as its line').toBeLessThan(12);
 });
 
 test('a selected Edge draws its controls on the geometry it moved to', async ({ page }) => {
