@@ -356,7 +356,12 @@ export default tseslint.config(
   // Authoring commands are pure coordination over the Space's collaborators:
   // no continuation, no React and no DOM.
   {
-    files: ['packages/app/src/authoring-commands.ts', 'packages/app/src/map-authoring-commands.ts'],
+    files: [
+      'packages/app/src/authoring-commands.ts',
+      'packages/app/src/authoring-contexts.ts',
+      'packages/app/src/map-authoring-commands.ts',
+      'packages/app/src/graph-authoring-commands.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

@@ -1,4 +1,4 @@
-import type { ResourceDocument, GraphId, UUID } from '@project/core';
+import type { ResourceDocument, GraphId, MapId, UUID } from '@project/core';
 import {
   graphColor,
   type CanvasSpaceResourceGraphCommands,
@@ -8,16 +8,13 @@ import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, graphColorsByGraphId } from '@project/graph';
 import { offered, PERSISTENCE_UNSETTLED, renameDraftAnswer } from './authoring-commands';
-import { describeAuthoringRefusal } from './authoring-refusal';
 import { coordinatedGraphDelete } from './coordinated-context-delete';
 import { coordinatedContextCreate } from './coordinated-context-create';
+import { embeddedGraphAuthoringCommands } from './graph-authoring-commands';
 import { embeddedMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringResult, EmbeddedContextCompletion } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
-
-const refusalOf = (result: AuthoringResult): string | null =>
-  result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
 
 interface SpaceResourceContextCommands {
   readonly mapCommands: CanvasSpaceResourceMapCommands;
@@ -44,13 +41,15 @@ export function spaceResourceContextCommands(
   available: () => boolean,
 ): SpaceResourceContextCommands {
   // The rail's own answer, asked again when a command is pressed.
-  const mapAuthoring = embeddedMapAuthoringCommands({
+  const embedded = {
     target: entry,
     spaces,
     containingSpaceId,
-    select: (mapId, graphId) => select({ id: mapId }, graphId),
+    select: (mapId: MapId, graphId: GraphId) => select({ id: mapId }, graphId),
     available,
-  });
+  };
+  const mapAuthoring = embeddedMapAuthoringCommands(embedded);
+  const graphAuthoring = embeddedGraphAuthoringCommands(embedded);
   const location = spaces.browserLocation;
   const settled = async () =>
     (await spaces.waitForPersistence(entry.id)) &&
@@ -112,6 +111,7 @@ export function spaceResourceContextCommands(
     onCopyLink: () => copyLink(location.href({ kind: 'map', spaceId: entry.id, mapId })),
   };
   if (map === undefined || graph === undefined) return { mapCommands };
+  const addressedGraph = graphAuthoring.map(mapId).graph(graphId);
   return {
     mapCommands,
     graphCommands: {
@@ -120,8 +120,17 @@ export function spaceResourceContextCommands(
       // Graph that stores none.
       color: graphColor(graph, graphColorsByGraphId(space)),
       colors: GRAPH_PALETTE_ENTRIES,
-      onRename: (title) => refusalOf(complete({ kind: 'renamed-graph', graphId, title })),
-      onRecolor: (color) => refusalOf(complete({ kind: 'recolored-graph', graphId, color })),
+      // Graph authoring completes both in the target; the containing canvas's
+      // command outcomes hold a refusal, and the rail says no sentence of its
+      // own. A refused rename is also the editor's, which holds the draft open.
+      onRename: offered(
+        addressedGraph.rename,
+        (rename) => (title: string) =>
+          renameDraftAnswer(commandOutcomes.run('graph-edit', () => rename(title))),
+      ),
+      onRecolor: offered(addressedGraph.recolor, (recolor) => (color: string) => {
+        commandOutcomes.run('graph-edit', () => recolor(color));
+      }),
       onCreate: async () =>
         coordinatedContextCreate({
           waitBefore: settled,

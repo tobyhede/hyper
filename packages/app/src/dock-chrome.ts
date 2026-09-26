@@ -14,19 +14,14 @@ import type {
   SpaceExitReport,
 } from './components/command-dock-chrome';
 import { coordinatedGraphDelete } from './coordinated-context-delete';
-import {
-  COPY_LINK_ACTION_ID,
-  type EntityCommandId,
-  type SpaceChromeTitleSubject,
-  type SpaceEntity,
-} from './entity-actions';
+import { COPY_LINK_ACTION_ID, type EntityCommandId, type SpaceEntity } from './entity-actions';
 import { offered, renameDraftAnswer } from './authoring-commands';
+import { topLevelGraphAuthoringCommands } from './graph-authoring-commands';
 import { topLevelMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces, RejectedExitConfirmation } from './open-spaces';
 import type { ResourcePlacementCommands } from './resource-placement';
 import type { ResourcesDisclosure } from './resources-disclosure';
 import { useReferenceableSpaces } from './referenceable-spaces';
-import type { AuthoringResult } from './space-authoring';
 
 /**
  * The Graph the Dock's Graph cluster names: the Active Graph, or nothing.
@@ -153,20 +148,31 @@ export function useDockChrome(
   );
 
   /**
-   * A Space or Graph rename from the Dock; a Map's goes through `mapAuthoring`.
+   * Graph Edits on the Active Graph of the drawn Map: rename while a chrome
+   * command may run, recolour while entity Edits may.
+   */
+  const graphAuthoring = useMemo(
+    () =>
+      topLevelGraphAuthoringCommands(
+        { app, spaceResources },
+        { rename: () => chromeTitleEdit, recolor: () => entityEdits },
+      ),
+    [app, spaceResources, chromeTitleEdit, entityEdits],
+  );
+
+  /**
+   * A Space rename from the Dock; a Map's and a Graph's go through their
+   * authoring commands.
    *
    * The editor holds a refused draft open, so this answers the refusal's
    * sentence, and `null` for an Edit that landed. `unchanged` is `null` too: a
-   * title the subject already has is the value the author already authored.
+   * title the Space already has is the value the author already authored.
    */
-  const renameChromeTitle = useCallback(
-    (subject: Exclude<SpaceChromeTitleSubject, { kind: 'map' }>, title: string): string | null => {
-      const result =
-        subject.kind === 'space'
-          ? // No id: the Edit writes `document.title` on the session this
-            // composition is closed over, which is the Space the Dock draws.
-            authoring.complete({ kind: 'renamed-space', title })
-          : authoring.complete({ kind: 'renamed-graph', graphId: subject.id, title });
+  const renameSpace = useCallback(
+    (title: string): string | null => {
+      // No id: the Edit writes `document.title` on the session this
+      // composition is closed over, which is the Space the Dock draws.
+      const result = authoring.complete({ kind: 'renamed-space', title });
       return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
     },
     [authoring],
@@ -235,10 +241,7 @@ export function useDockChrome(
       .find((action) => action.id === id)
       ?.onSelect(null);
   };
-  /** A Graph Edit from the cluster, reported on `graph-edit`. */
-  const runGraphEdit = (operation: () => AuthoringResult): void => {
-    commandOutcomes.run('graph-edit', operation);
-  };
+  const activeGraphCommands = graphAuthoring.map(map.id).graph(activeGraph.id);
   const { placement } = resources;
   const { centreAnchor } = placement;
 
@@ -255,9 +258,7 @@ export function useDockChrome(
       // Behind `chromeTitleEdit` exactly as the Map and Graph names are: all
       // three are withdrawn together while something else owns the caret or the
       // canvas has no placement to edit against.
-      onRename: availability.chromeTitleEdit
-        ? (title) => renameChromeTitle({ kind: 'space' }, title)
-        : null,
+      onRename: availability.chromeTitleEdit ? renameSpace : null,
       onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),
       // Named by the title the Dock drew for the row: neither `select`'s own
       // refusal nor a thrown load failure carries one.
@@ -314,16 +315,19 @@ export function useDockChrome(
       colorByGraphId: projection.colors,
       activeColor: projection.colors[activeGraph.id] ?? FALLBACK_GRAPH_COLOR,
       onActivate: location.activateGraph,
-      onRename: availability.chromeTitleEdit
-        ? (graphId, title) => renameChromeTitle({ kind: 'graph', id: graphId }, title)
-        : null,
-      // Answered rather than swallowed: a Graph Edit can be refused for reasons
-      // no surface can see coming (`graph-not-owned`).
-      onRecolor: (graphId, color) => {
-        runGraphEdit(() => authoring.complete({ kind: 'recolored-graph', graphId, color }));
-      },
+      // Each is the press built from the capability that answers it, addressed
+      // to the Active Graph. A refused rename is said twice: inline, where the
+      // editor holds the draft open, and as the `graph-edit` notice.
+      onRename: offered(
+        activeGraphCommands.rename,
+        (rename) => (title: string) =>
+          renameDraftAnswer(commandOutcomes.run('graph-edit', () => rename(title))),
+      ),
+      onRecolor: offered(activeGraphCommands.recolor, (recolor) => (color: string) => {
+        commandOutcomes.run('graph-edit', () => recolor(color));
+      }),
       onCreate: () => {
-        runGraphEdit(() => authoring.complete({ kind: 'added-graph' }));
+        commandOutcomes.run('graph-add', () => authoring.complete({ kind: 'added-graph' }));
       },
       // The notice is command outcomes'; the Graph Navigation adopts after a
       // completed delete is this caller's.

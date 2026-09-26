@@ -1,11 +1,20 @@
-import type { GraphId, MapId, UUID } from '@project/core';
-import { PERSISTENCE_UNSETTLED, type Capability, type EditOutcome } from './authoring-commands';
+import type { GraphId, MapId } from '@project/core';
+import {
+  PERSISTENCE_UNSETTLED,
+  completionOutcome,
+  type Capability,
+  type EditOutcome,
+} from './authoring-commands';
+import {
+  embeddedContext,
+  topLevelContext,
+  type AuthoredSpace,
+  type AuthoringApp,
+  type AuthoringContext,
+  type EmbeddedAuthoring,
+} from './authoring-contexts';
 import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
 import type { CommandNotice } from './command-outcomes';
-import type { ComposedApp } from './compose-app';
-import type { OpenSpace, OpenSpaces } from './open-spaces';
-import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
-import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
 
 /**
  * Map Edits, as one interface for every context that authors a Map.
@@ -79,54 +88,6 @@ export interface MapAuthoringCommands {
   readonly map: (mapId: MapId) => MapCommands;
 }
 
-type RenamedMap = Extract<AuthoringCompletion, { readonly kind: 'renamed-map' }>;
-
-/** The composition a context authors through. */
-type AuthoringApp = Pick<ComposedApp, 'authoring' | 'currentSpace' | 'navigation'>;
-
-/** The Space a context authors: its composition, and the cross-Space lifecycle over it. */
-export interface AuthoredSpace {
-  readonly app: AuthoringApp;
-  readonly spaceResources: Pick<SpaceResourceAuthoring, 'deleteMap'>;
-}
-
-/**
- * How one context creates a Map, around the Edit both contexts share.
- *
- * The Edit is `created-map` on `app`, which selects the Map it makes there.
- * `before` and `after` are the context's own coordination; each answers the
- * report that stops the creation, or `null` to go on.
- */
-interface MapCreation {
-  readonly app: AuthoringApp;
-  /** Asked before the Edit; absent where there is nothing to wait for. */
-  readonly before?: () => Promise<CommandNotice | null>;
-  /** Asked once the Edit has completed, with what it made. */
-  readonly after?: (created: CompletedMapEdit) => Promise<CommandNotice | null>;
-}
-
-/**
- * How one context deletes a Map, around the lifecycle Edit both share.
- *
- * `before` is the context's own persistence gate, answering the report that
- * stops the deletion or `null` to go on.
- */
-interface MapDeletion {
-  readonly space: AuthoredSpace;
-  readonly before?: () => Promise<CommandNotice | null>;
-}
-
-/** What differs between the two contexts, and nothing else. */
-interface MapAuthoringContext {
-  /** Whether each command may run, asked at read and again at invocation. */
-  readonly available: MapAuthoringAvailability;
-  /** Whether this context can author `mapId` as the Space stands now. */
-  readonly addresses: (mapId: MapId) => boolean;
-  readonly complete: (mapId: MapId, completion: RenamedMap) => AuthoringResult;
-  readonly creation: MapCreation;
-  readonly deletion: MapDeletion;
-}
-
 /**
  * Whether each command may run, as the surface answers it.
  *
@@ -163,17 +124,20 @@ const recoverCreatedMap = (app: AuthoringApp): CompletedMapEdit => {
 };
 
 const createMap = async (
-  creation: MapCreation,
+  context: AuthoringContext,
   live: () => boolean,
 ): Promise<EditOutcome<CompletedMapEdit>> => {
   if (!live()) return UNAVAILABLE;
-  if (creation.before !== undefined) {
-    const stopped = await creation.before();
-    if (stopped !== null) return { kind: 'refused', report: stopped };
+  const { app } = context.space;
+  const { coordination } = context;
+  if (coordination !== null) {
+    if (!(await coordination.settled())) {
+      return { kind: 'refused', report: notCreated(PERSISTENCE_UNSETTLED) };
+    }
     // The wait gave the Space time to move: ask again before authoring.
     if (!live()) return UNAVAILABLE;
   }
-  const result = creation.app.authoring.complete({ kind: 'created-map' });
+  const result = app.authoring.complete({ kind: 'created-map' });
   switch (result.kind) {
     case 'refused':
       return { kind: 'refused', report: notCreated(describeAuthoringRefusal(result.refusal)) };
@@ -186,12 +150,21 @@ const createMap = async (
     case 'completed':
       break;
   }
-  const created = recoverCreatedMap(creation.app);
-  if (creation.after !== undefined) {
-    const stopped = await creation.after(created);
-    if (stopped !== null) return { kind: 'refused', report: stopped };
+  const created = recoverCreatedMap(app);
+  if (coordination === null) return created;
+  // A failure from here on is not a Map not created, because it was: the
+  // target not saving it is a Map not saved, and the Resource not taking it a
+  // Map not selected.
+  if (!(await coordination.targetSaved())) {
+    return { kind: 'refused', report: { title: 'Map not saved', message: PERSISTENCE_UNSETTLED } };
   }
-  return created;
+  const refusal = coordination.select(created.mapId, created.graphId);
+  if (refusal !== null) {
+    return { kind: 'refused', report: { title: 'Map not selected', message: refusal } };
+  }
+  return (await coordination.containingSaved())
+    ? created
+    : { kind: 'refused', report: { title: 'Map not selected', message: PERSISTENCE_UNSETTLED } };
 };
 
 const notDeleted = (message: string): CommandNotice => ({ title: 'Map not deleted', message });
@@ -222,15 +195,16 @@ const preferredSurvivor = (app: AuthoringApp, mapId: MapId): MapId | null => {
 };
 
 const deleteMap = async (
-  deletion: MapDeletion,
+  context: AuthoringContext,
   mapId: MapId,
   live: () => boolean,
 ): Promise<EditOutcome<CompletedMapEdit>> => {
   if (!live()) return UNAVAILABLE;
-  const { app, spaceResources } = deletion.space;
-  if (deletion.before !== undefined) {
-    const stopped = await deletion.before();
-    if (stopped !== null) return { kind: 'refused', report: stopped };
+  const { app, spaceResources } = context.space;
+  if (context.coordination !== null) {
+    if (!(await context.coordination.settled())) {
+      return { kind: 'refused', report: notDeleted(PERSISTENCE_UNSETTLED) };
+    }
     // The wait gave the Space time to move: ask again before deleting.
     if (!live()) return UNAVAILABLE;
   }
@@ -250,54 +224,40 @@ const deleteMap = async (
   return { kind: 'completed', mapId: result.mapId, graphId: result.graphId };
 };
 
-/**
- * A Space Authoring answer as a Map Edit outcome.
- *
- * `queued` is an Edit accepted behind the one completing, which lands when that
- * one drains; it answers `completed`, so the editor closes on it as on a
- * completed rename (`renameDraftAnswer`).
- */
-const renameOutcome = (result: AuthoringResult): EditOutcome => {
-  switch (result.kind) {
-    case 'refused':
-      return {
-        kind: 'refused',
-        report: { title: 'Map unchanged', message: describeAuthoringRefusal(result.refusal) },
-      };
-    case 'unchanged':
-      return { kind: 'unchanged' };
-    case 'completed':
-    case 'queued':
-      return { kind: 'completed' };
-  }
-};
-
-const mapAuthoringCommands = (context: MapAuthoringContext): MapAuthoringCommands => {
-  const creates = context.available.create;
+const mapAuthoringCommands = (
+  context: AuthoringContext,
+  available: MapAuthoringAvailability,
+): MapAuthoringCommands => {
+  // Creation is Space-scoped, so no Map address carries the context's own
+  // check: it joins creation's availability instead.
+  const creates = (): boolean => available.create() && context.current();
   return {
     // Read as a getter so `available` is the answer when the capability is
     // read, as `map(mapId)`'s are, rather than when the commands were built.
     get create(): MapCreate {
-      return { available: creates(), invoke: () => createMap(context.creation, creates) };
+      return { available: creates(), invoke: () => createMap(context, creates) };
     },
     map: (mapId) => {
-      const live = (): boolean => context.available.rename() && context.addresses(mapId);
+      const live = (): boolean => available.rename() && context.addressesMap(mapId);
       // The last Map is never deletable (ADR 0079): a Space keeps one to open on.
       const deletes = (): boolean =>
-        context.available.delete() &&
-        context.addresses(mapId) &&
-        context.deletion.space.app.currentSpace().maps.length > 1;
+        available.delete() &&
+        context.addressesMap(mapId) &&
+        context.space.app.currentSpace().maps.length > 1;
       return {
         rename: {
           available: live(),
           invoke: (title) =>
             live()
-              ? renameOutcome(context.complete(mapId, { kind: 'renamed-map', mapId, title }))
+              ? completionOutcome(
+                  context.complete(mapId, { kind: 'renamed-map', mapId, title }),
+                  'Map unchanged',
+                )
               : UNAVAILABLE,
         },
         delete: {
           available: deletes(),
-          invoke: () => deleteMap(context.deletion, mapId, deletes),
+          invoke: () => deleteMap(context, mapId, deletes),
         },
       };
     },
@@ -305,17 +265,13 @@ const mapAuthoringCommands = (context: MapAuthoringContext): MapAuthoringCommand
 };
 
 /**
- * Map Edits on the Space the canvas draws.
+ * Map Edits on the Space the canvas draws (`topLevelContext`).
  *
- * It addresses the **selected** Map only: Space Authoring's top-level rename
- * resolves the selection at derivation and refuses any other id as
- * `map-not-found` (`space-authoring.ts`), so a Map that is not selected when
- * the press lands is a stale press — unavailable — rather than a refusal.
- *
- * It creates with nothing to wait for: the Edit selects the Map it makes, and
- * the Space's own session saves it like any other Edit. It deletes with
- * nothing to wait for either: the lifecycle refuses a Space whose session
- * needs recovery, and the canvas continues on the survivor.
+ * It addresses the selected Map only. It creates with nothing to wait for:
+ * the Edit selects the Map it makes, and the Space's own session saves it
+ * like any other Edit. It deletes with nothing to wait for either: the
+ * lifecycle refuses a Space whose session needs recovery, and the canvas
+ * continues on the survivor.
  *
  * `available` is the composition's answer to whether each chrome command may
  * run; it is as live as the caller makes it.
@@ -324,88 +280,32 @@ export function topLevelMapAuthoringCommands(
   space: AuthoredSpace,
   available: MapAuthoringAvailability,
 ): MapAuthoringCommands {
-  const { app } = space;
-  return mapAuthoringCommands({
-    available,
-    addresses: (mapId) =>
-      app.navigation.getState().selectedMapId === mapId &&
-      app.currentSpace().lookup.map(mapId) !== undefined,
-    complete: (_mapId, completion) => app.authoring.complete(completion),
-    creation: { app },
-    deletion: { space },
-  });
-}
-
-/** What an embedded context authors through, and the Resource that embeds it. */
-export interface EmbeddedMapAuthoring {
-  /** The open entry the rail was drawn from. */
-  readonly target: OpenSpace;
-  readonly spaces: Pick<OpenSpaces, 'entry' | 'waitForPersistence'>;
-  /** The Space holding the Space Resource, where its selection is written. */
-  readonly containingSpaceId: UUID;
-  /**
-   * Point the Space Resource at a Map and Graph of the target: the sentence
-   * that refused it, or `null` once it is written.
-   */
-  readonly select: (mapId: MapId, graphId: GraphId) => string | null;
-  /** The rail's general availability, one answer for every command it offers. */
-  readonly available: () => boolean;
+  return mapAuthoringCommands(topLevelContext(space), available);
 }
 
 /**
- * Map Edits on a target Space an Open Space Resource embeds.
+ * Map Edits on a target Space an Open Space Resource embeds
+ * (`embeddedContext`).
  *
- * It addresses any Map of the target while the target is still the open entry
- * the rail was drawn from — an exited Space is no longer authored through its
- * old composition — and completes through `completeInMap`, which authors the
- * addressed Map without moving the target's own canvas.
+ * It addresses any Map of the target while the target is still the open
+ * entry, without moving the target's own canvas.
  *
  * **Creation is ordered by what the Space Resource may name.** Both Spaces
  * settle first; the Map is created in the target and saved there; only then
  * is the Resource pointed at it and the containing Space saved — so a stored
- * Resource never names a Map its target has not stored. A failure after the
- * Edit is not reported as a Map not created, because it was: the target not
- * saving it is a Map not saved, and the Resource not taking it a Map not
- * selected.
+ * Resource never names a Map its target has not stored.
  *
  * **Deletion waits for both Spaces to settle first**, as creation does, and
  * says an unsettled Space as a Map not deleted: the lifecycle then repoints
  * every Space Resource that selected the Map in the one Edit that deletes it.
  */
 export function embeddedMapAuthoringCommands({
-  target,
-  spaces,
-  containingSpaceId,
-  select,
   available,
-}: EmbeddedMapAuthoring): MapAuthoringCommands {
-  const current = (): boolean => spaces.entry(target.id) === target;
-  const saved = spaces.waitForPersistence;
-  const settled = async (): Promise<boolean> =>
-    (await saved(target.id)) && (await saved(containingSpaceId));
-  return mapAuthoringCommands({
-    // Creation is Space-scoped, so no Map address carries the entry check:
-    // it joins creation's own availability instead.
-    available: { rename: available, create: () => available() && current(), delete: available },
-    addresses: (mapId) => current() && target.app.currentSpace().lookup.map(mapId) !== undefined,
-    complete: (mapId, completion) => target.app.authoring.completeInMap(mapId, completion),
-    creation: {
-      app: target.app,
-      before: async () => ((await settled()) ? null : notCreated(PERSISTENCE_UNSETTLED)),
-      after: async ({ mapId, graphId }) => {
-        if (!(await saved(target.id))) {
-          return { title: 'Map not saved', message: PERSISTENCE_UNSETTLED };
-        }
-        const refusal = select(mapId, graphId);
-        if (refusal !== null) return { title: 'Map not selected', message: refusal };
-        return (await saved(containingSpaceId))
-          ? null
-          : { title: 'Map not selected', message: PERSISTENCE_UNSETTLED };
-      },
-    },
-    deletion: {
-      space: target,
-      before: async () => ((await settled()) ? null : notDeleted(PERSISTENCE_UNSETTLED)),
-    },
+  ...embedded
+}: EmbeddedAuthoring): MapAuthoringCommands {
+  return mapAuthoringCommands(embeddedContext(embedded), {
+    rename: available,
+    create: available,
+    delete: available,
   });
 }

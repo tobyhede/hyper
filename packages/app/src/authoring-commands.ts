@@ -1,4 +1,6 @@
+import { describeAuthoringRefusal } from './authoring-refusal';
 import type { CommandBroke, CommandDiscarded, CommandNotice } from './command-outcomes';
+import type { AuthoringResult } from './space-authoring';
 
 /**
  * The vocabulary every authoring command module answers in, whatever it
@@ -9,7 +11,8 @@ import type { CommandBroke, CommandDiscarded, CommandNotice } from './command-ou
  * capability through {@link offered}. What the Edit is, which contexts may
  * author it and how its refusal is said are the module's own
  * (`map-authoring-commands.ts`); this module declares only what is the same for
- * all of them, so no module borrows another's names for it.
+ * all of them, so no module borrows another's names for it. The contexts they
+ * author in are defined once as well (`authoring-contexts.ts`).
  *
  * Like the modules that spend it, it imports no continuation, no React and no
  * DOM (an `eslint.config.js` zone holds it).
@@ -38,6 +41,29 @@ export type EditOutcome<
   | { readonly kind: 'unchanged' }
   | { readonly kind: 'unavailable' }
   | { readonly kind: 'refused'; readonly report: CommandNotice };
+
+/**
+ * A synchronous Space Authoring answer as an Edit outcome, a refusal reported
+ * under `title`.
+ *
+ * `queued` is an Edit accepted behind the one completing, which lands when that
+ * one drains; it answers `completed`, so an editor closes on it as on a
+ * completed rename (`renameDraftAnswer`).
+ */
+export const completionOutcome = (result: AuthoringResult, title: string): EditOutcome => {
+  switch (result.kind) {
+    case 'refused':
+      return {
+        kind: 'refused',
+        report: { title, message: describeAuthoringRefusal(result.refusal) },
+      };
+    case 'unchanged':
+      return { kind: 'unchanged' };
+    case 'completed':
+    case 'queued':
+      return { kind: 'completed' };
+  }
+};
 
 /**
  * One command a surface offers, and whether it may offer it.

@@ -88,10 +88,12 @@ export interface GraphMenuActionsProps {
   readonly onCreate: () => void;
   readonly onCopyLink: () => void;
   readonly onDelete: () => void;
+  /** Whether New Graph may run. */
   readonly editsDisabled: boolean;
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
-  readonly onRecolor: (color: string) => void;
+  /** Store the Graph's colour, or `null` while Colour… may not run. */
+  readonly onRecolor: ((color: string) => void) | null;
 }
 
 /**
@@ -127,7 +129,7 @@ export function GraphMenuActions({
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2" disabled={editsDisabled}>
+          <DropdownMenuSubTrigger className="gap-2" disabled={onRecolor === null}>
             <GraphIcon color={color} size={14} />
             Colour…
           </DropdownMenuSubTrigger>
@@ -135,8 +137,8 @@ export function GraphMenuActions({
             <PaletteColorSwatchGrid
               entries={colors}
               value={color}
-              onValueChange={onRecolor}
-              disabled={editsDisabled}
+              onValueChange={(next) => onRecolor?.(next)}
+              disabled={onRecolor === null}
               aria-label="Graph colour"
             />
           </DropdownMenuSubContent>

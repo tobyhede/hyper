@@ -114,6 +114,8 @@ const MAP_GONE = 'This Map is no longer part of the Space.';
 const mapReport: CommandNotice = { title: 'Map not created', message: 'Try a different name.' };
 const refusedMap = { kind: 'refused', report: mapReport } as const;
 const createdMap = { kind: 'completed', mapId: MAP_B, graphId: GRAPH_B } as const;
+const graphReport = { title: 'Graph unchanged', message: 'A Graph title is required.' };
+const refusedGraph = { kind: 'refused', report: graphReport } as const;
 /** New Map's continuation, in the name of the Map the creation made. */
 const inTheName = ({ mapId }: CompletedMapEdit): PendingContinuation => ({
   target: { kind: 'control', name: 'map-name', scope: { id: 'rail', subject: mapId } },
@@ -141,7 +143,7 @@ async function refuseOnEveryChannel(outcomes: ReturnType<typeof open>['outcomes'
   outcomes.run('map-create', () => refusedMap, { continueAt: inTheName, completionMovesMap: true });
   outcomes.run('map-manage', () => refusedMap);
   outcomes.run('map-delete', () => refusedMap, DOCK);
-  outcomes.run('graph-edit', () => refusedAuthoring);
+  outcomes.run('graph-edit', () => refusedGraph);
   outcomes.run('graph-delete', () => refusedGraphDelete);
   outcomes.run('resource-delete', () => refusedAuthoring);
   outcomes.run('resource-remove', () => refusedAuthoring);
@@ -183,10 +185,18 @@ describe('titles and sentences', () => {
     });
   });
 
-  it('publishes a refused Graph Edit under "Graph unchanged"', () => {
+  it('publishes a refused Graph Edit’s complete report on "graph-edit"', () => {
     const { outcomes } = open();
 
-    expect(outcomes.run('graph-edit', () => refusedAuthoring)).toBe(refusedAuthoring);
+    expect(outcomes.run('graph-edit', () => refusedGraph)).toBe(refusedGraph);
+
+    expect(notice(outcomes, 'graph-edit')).toEqual(graphReport);
+  });
+
+  it('publishes a refused Dock New Graph under "Graph unchanged"', () => {
+    const { outcomes } = open();
+
+    expect(outcomes.run('graph-add', () => refusedAuthoring)).toBe(refusedAuthoring);
 
     expect(notice(outcomes, 'graph-edit')).toEqual({
       title: 'Graph unchanged',
@@ -439,12 +449,12 @@ describe('a thrown operation', () => {
     });
   });
 
-  it('says a thrown Graph Edit and Reference Resource creation in the words the failure carries', () => {
+  it('says a thrown Dock New Graph and Reference Resource creation in the words the failure carries', () => {
     const { outcomes, reported } = open();
-    const graphFailure = new Error('recolour broke');
+    const graphFailure = new Error('creation broke');
     const referenceFailure = new Error('reference broke');
 
-    outcomes.run('graph-edit', () => {
+    outcomes.run('graph-add', () => {
       throw graphFailure;
     });
     outcomes.run('reference-create', () => {
@@ -454,7 +464,7 @@ describe('a thrown operation', () => {
     expect(reported).toEqual([graphFailure, referenceFailure]);
     expect(notice(outcomes, 'graph-edit')).toEqual({
       title: 'Graph unchanged',
-      message: 'recolour broke',
+      message: 'creation broke',
     });
     expect(notice(outcomes, 'reference-create')).toEqual({
       title: 'Reference Resource not created',
@@ -476,6 +486,18 @@ describe('a thrown operation', () => {
 
     expect(reported).toEqual([failure]);
     expect(notice(outcomes, 'map-delete')).toBeNull();
+  });
+
+  it('reports a Graph Edit throw and leaves its channel clear', () => {
+    const { outcomes, reported } = open();
+    const failure = new Error('recolour broke');
+
+    outcomes.run('graph-edit', () => {
+      throw failure;
+    });
+
+    expect(reported).toEqual([failure]);
+    expect(notice(outcomes, 'graph-edit')).toBeNull();
   });
 });
 

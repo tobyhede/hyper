@@ -42,11 +42,11 @@ import type {
  * Enter, Exit and Open are three operations on "Space command failed", each
  * naming its own `subject`.
  *
- * **Map channels carry a complete report instead of words.** Map authoring
- * owns the title and message of a Map Edit's report beside the decision that
- * produced it; a Map command's refused result carries that {@link CommandNotice}
- * whole, and this module owns only its lifetime — staleness, dismissal and the
- * Map-change reset.
+ * **Reported channels carry a complete report instead of words.** Map and
+ * Graph authoring own the title and message of an Edit's report beside the
+ * decision that produced it; a reported command's refused result carries that
+ * {@link CommandNotice} whole, and this module owns only its lifetime —
+ * staleness, dismissal and the Map-change reset.
  *
  * **A throw is never dressed as a refusal** (`CONTEXT.md`, Completion outcome).
  * It reaches the reporter and publishes the command's break sentence, and
@@ -91,11 +91,7 @@ const CHANNELS = {
   'map-create': { resetsOnMapChange: true, words: 'reported' },
   'map-manage': { resetsOnMapChange: true, words: 'reported' },
   'map-delete': { resetsOnMapChange: true, words: 'reported' },
-  'graph-edit': {
-    resetsOnMapChange: true,
-    words: 'described',
-    title: 'Graph unchanged',
-  },
+  'graph-edit': { resetsOnMapChange: true, words: 'reported' },
   'graph-delete': {
     resetsOnMapChange: true,
     words: 'described',
@@ -227,7 +223,8 @@ interface CommandSignatures {
     readonly result: EditOutcome;
     readonly options: [options: MapCompletionClaim];
   };
-  readonly 'graph-edit': { readonly result: AuthoringResult; readonly options: [] };
+  readonly 'graph-edit': { readonly result: EditOutcome; readonly options: [] };
+  readonly 'graph-add': { readonly result: AuthoringResult; readonly options: [] };
   readonly 'graph-delete': {
     readonly result: CoordinatedContextDeleteResult;
     readonly options: [];
@@ -312,7 +309,7 @@ const notice = (value: CommandNotice): Settlement => ({ kind: 'notice', notice: 
 const claimedMove = (result: EditOutcome, { completionMovesMap }: MapCompletionClaim): boolean =>
   completionMovesMap && result.kind === 'completed';
 
-const reportedMapCommand = (channel: ReportedChannel): CommandDefinition<EditOutcome, []> => ({
+const reportedCommand = (channel: ReportedChannel): CommandDefinition<EditOutcome, []> => ({
   channel,
   settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
   broke: null,
@@ -338,14 +335,24 @@ const COMMANDS: CommandDefinitions = {
     broke: null,
     movedMap: claimedMove,
   },
-  'map-manage': reportedMapCommand('map-manage'),
+  'map-manage': reportedCommand('map-manage'),
   'map-delete': {
     channel: 'map-delete',
     settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
     broke: null,
     movedMap: claimedMove,
   },
-  'graph-edit': authoringCommand('graph-edit'),
+  'graph-edit': reportedCommand('graph-edit'),
+  // The Dock's New Graph, until Graph authoring answers creation too: its
+  // refusal is said under the title Graph authoring reports a Graph Edit in.
+  'graph-add': {
+    channel: 'graph-edit',
+    settle: (result) =>
+      result.kind === 'refused'
+        ? notice({ title: 'Graph unchanged', message: describeAuthoringRefusal(result.refusal) })
+        : CLEAR,
+    broke: (failure) => ({ title: 'Graph unchanged', message: failureMessage(failure) }),
+  },
   // `coordinatedGraphDelete` has already said its gate and its lifecycle
   // refusal in a sentence, so the describer is that sentence.
   'graph-delete': {

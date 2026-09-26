@@ -49,17 +49,23 @@ export interface CanvasSpaceResourceMapCommands {
 
 /**
  * The Graph commands on an Open Space Resource rail, addressed to the Graph
- * this Resource selects. Each answers the sentence the rail reports, or `null`.
+ * this Resource selects.
+ *
+ * Rename and Colour are each one field, the press or `null`, as the Map
+ * commands are, and say nothing on the rail: a refused rename answers the
+ * sentence that holds its draft open, and the containing canvas's command
+ * outcomes say every refusal as a notice. New Graph and Delete answer the
+ * sentence the rail reports, or `null`.
  */
 export interface CanvasSpaceResourceGraphCommands {
-  readonly onRename: (title: string) => string | null;
+  readonly onRename: ((title: string) => string | null) | null;
   readonly onCreate: (renameScope: string) => Promise<string | null>;
   readonly onDelete: () => Promise<string | null>;
   readonly onCopyLink: () => Promise<string | null>;
   readonly deleteDisabled: boolean;
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
-  readonly onRecolor: (color: string) => string | null;
+  readonly onRecolor: ((color: string) => void) | null;
 }
 
 /**
@@ -308,6 +314,7 @@ function SpaceResourceSelector({
   const create = disabled ? null : (commands?.create ?? null);
   const remove = disabled ? null : (commands?.delete ?? null);
   const palette = commands?.palette;
+  const recolor = disabled ? null : (palette?.onRecolor ?? null);
   const renameItem = (
     <DropdownMenuItem
       className="gap-2"
@@ -433,10 +440,14 @@ function SpaceResourceSelector({
               onDelete={() => onDelete?.()}
               color={palette.color}
               colors={palette.colors}
-              onRecolor={(color) => {
-                onReport(palette.onRecolor(color));
-                setMenuOpen(false);
-              }}
+              onRecolor={
+                recolor === null
+                  ? null
+                  : (color) => {
+                      recolor(color);
+                      setMenuOpen(false);
+                    }
+              }
             />
           ) : (
             <MapMenuActions {...commonCommands} onCreate={onCreate} onDelete={onDelete} />
