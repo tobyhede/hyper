@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { Map, Graph, SpaceSnapshot } from '@project/core';
 import { authoredSnapshot, sparseAuthoredSnapshot } from '../stories/support/spaces';
+import { graphLegendMarkLine } from '../e2e/graph';
 
 /** The canvas HUD, on the rendered stories. */
 
@@ -153,9 +154,9 @@ test(
     await expect(key.locator('li[data-active="true"]')).toHaveCount(1);
     await expect(key.locator('li[data-active="true"]')).toHaveText(active.title);
     await expect(key.locator('li[data-active="false"]')).toHaveCount(titles.length - 1);
-    const lines = await items
-      .locator('[data-slot="graph-legend-mark-line"]')
-      .evaluateAll((els) => els.map((el) => getComputedStyle(el).stroke));
+    const lines = await graphLegendMarkLine(items).evaluateAll((els) =>
+      els.map((el) => getComputedStyle(el).stroke),
+    );
     expect(new Set(lines).size).toBe(titles.length);
   },
 );

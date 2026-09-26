@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
-import { expectMenuGroups, resourceActions } from '../e2e/graph';
+import { expectMenuGroups, graphLegendMarkLine, resourceActions } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -1248,11 +1248,10 @@ test(
     const colour = menu.getByRole('menuitem', { name: 'Colour…' });
     // The first glyph is the Graph's; the second is the submenu's own chevron.
     await expect(colour.locator('svg').first()).toHaveCSS('stroke', identityStroke);
-    await expect(
-      rows
-        .and(page.locator('[aria-checked="true"]'))
-        .locator('[data-slot="graph-legend-mark-line"]'),
-    ).toHaveCSS('stroke', identityStroke);
+    await expect(graphLegendMarkLine(rows.and(page.locator('[aria-checked="true"]')))).toHaveCSS(
+      'stroke',
+      identityStroke,
+    );
 
     // The Map list, drawn by the same component, is unchanged.
     await page.keyboard.press('Escape');

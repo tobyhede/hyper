@@ -16,6 +16,7 @@ import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
 import { expectEmbeddedResourceToFollowDrag } from './support/embedded-drag';
 import {
+  activateGraph,
   authoringHandle,
   boxOf,
   connectHandles,
@@ -23,6 +24,8 @@ import {
   dragBy,
   expectResourceFillsNode,
   FIXTURE_ORDINARY_SPACE_COUNT,
+  graphLegendLineStroke,
+  graphLegendMarkLine,
   nodeByTitle,
   selectCanvas,
   settled,
@@ -475,10 +478,7 @@ test(
     // mark.
     await (await resourceControls(page, resource)).getByTestId('space-resource-graph').click();
     const graphRow = page.getByRole('menuitemradio', { name: 'Graph 1' });
-    await expect(graphRow.locator('[data-slot="graph-legend-mark-line"]')).toHaveCSS(
-      'stroke',
-      'rgb(31, 119, 180)',
-    );
+    await expect(graphLegendMarkLine(graphRow)).toHaveCSS('stroke', 'rgb(31, 119, 180)');
     await expect(graphRow.locator('[data-slot="graph-legend-mark"]')).toHaveAttribute(
       'data-head-shape',
       'arrow',
@@ -763,6 +763,11 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
   page,
 }) => {
   const parent = await openSpaceResourceOnItsMap(page);
+  // The host's Active Graph is made to differ from the shown one in both colour
+  // and head shape — the fixture's `Short` stores `diamond`, the created target's
+  // one Graph stores none — so a preview drawn from the host's Graph is caught.
+  await activateGraph(page, 'Short');
+  const hostColor = await graphLegendLineStroke(page, 'Short');
   await beginPortalEdit(page, parent);
   const embedded = embeddedNodes(page);
   await expect(embedded).toHaveCount(1);
@@ -779,6 +784,7 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
   const shownColor = await sourceHandle.evaluate(
     (element) => getComputedStyle(element).backgroundColor,
   );
+  expect(shownColor).not.toBe(hostColor);
   await connectHandles(
     page,
     sourceHandle,

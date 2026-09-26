@@ -5,6 +5,7 @@ import {
   resourceToolbar,
   selectResource,
   boxOf,
+  graphLegendMarkLine,
 } from '../e2e/graph';
 import {
   beginPortalEdit,
@@ -594,10 +595,7 @@ test(
     };
     await openList('graph');
     const row = page.getByRole('menuitemradio', { name: 'Overview' });
-    await expect(row.locator('[data-slot="graph-legend-mark-line"]')).toHaveCSS(
-      'stroke',
-      edgeStroke,
-    );
+    await expect(graphLegendMarkLine(row)).toHaveCSS('stroke', edgeStroke);
     await expect(row.locator('[data-slot="graph-legend-mark"]')).toHaveAttribute(
       'data-head-shape',
       edgeHeadShape ?? '',

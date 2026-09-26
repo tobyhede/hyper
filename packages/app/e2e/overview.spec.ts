@@ -7,6 +7,7 @@ import {
   boxOf,
   graphChoices,
   graphLegendLineStroke,
+  graphLegendMarkLine,
   mapChoices,
   openResource,
   resourceControls,
@@ -283,9 +284,9 @@ test(
     // Colours. Both surfaces draw the one `GraphLegendMark`, so one
     // property reads both: each resolved value, in the same order.
     const lineColors = (rows: Locator) =>
-      rows
-        .locator('[data-slot="graph-legend-mark-line"]')
-        .evaluateAll((els: readonly Element[]) => els.map((el) => getComputedStyle(el).stroke));
+      graphLegendMarkLine(rows).evaluateAll((els: readonly Element[]) =>
+        els.map((el) => getComputedStyle(el).stroke),
+      );
     const dockColors = await lineColors(choices);
     const hudColors = await lineColors(legendItems);
     expect(hudColors).toEqual(dockColors);
@@ -361,11 +362,10 @@ test(
         .and(page.locator('[aria-checked="false"]'))
         .locator('svg:not([data-slot="graph-legend-mark"] svg)'),
     ).toHaveCount(0);
-    await expect(
-      choices
-        .and(page.locator('[aria-checked="true"]'))
-        .locator('[data-slot="graph-legend-mark-line"]'),
-    ).toHaveCSS('stroke', identityStroke);
+    await expect(graphLegendMarkLine(choices.and(page.locator('[aria-checked="true"]')))).toHaveCSS(
+      'stroke',
+      identityStroke,
+    );
     await expect(page.getByRole('menuitem', { name: 'Colour…' }).locator('svg').first()).toHaveCSS(
       'stroke',
       identityStroke,

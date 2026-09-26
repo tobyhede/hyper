@@ -312,9 +312,14 @@ export async function mapChoices(page: Page): Promise<Locator> {
   return (await mapMenu(page)).getByRole('menuitemradio');
 }
 
-/** The Graph the Dock is naming as active, or nothing when none is. */
+/**
+ * The Graph the Dock is naming as active, or nothing when none is.
+ *
+ * Through {@link dock}, whose role query skips the Docks of open Spaces that
+ * are mounted but not shown; a test id alone would match those too.
+ */
 export function activeGraph(page: Page): Locator {
-  return page.getByTestId('active-graph');
+  return dock(page).getByTestId('active-graph');
 }
 
 /** Emphasise one Graph by title. Activating is never an Edit (ADR 0028). */
@@ -386,13 +391,20 @@ export async function createResource(page: Page, kind: ResourceKindName): Promis
   await createResourceControl(page, kind).click();
 }
 
+/**
+ * The line of every Graph legend mark inside `scope` — the stroke the mark
+ * draws in the Graph's colour, whichever list (the HUD key, a Graph choice row)
+ * carries it.
+ */
+export function graphLegendMarkLine(scope: Locator): Locator {
+  return scope.locator('[data-slot="graph-legend-mark-line"]');
+}
+
 /** The resolved stroke of one Graph's legend mark line, by its title. */
 export async function graphLegendLineStroke(page: Page, title: string): Promise<string> {
-  const line = page
-    .getByTestId('graph-legend')
-    .locator('.legend__item')
-    .filter({ hasText: title })
-    .locator('[data-slot="graph-legend-mark-line"]');
+  const line = graphLegendMarkLine(
+    page.getByTestId('graph-legend').locator('.legend__item').filter({ hasText: title }),
+  );
   return line.evaluate((el) => getComputedStyle(el).stroke);
 }
 
