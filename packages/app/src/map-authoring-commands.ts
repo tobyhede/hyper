@@ -1,20 +1,22 @@
-import type { GraphId, MapId } from '@project/core';
+import type { MapId } from '@project/core';
 import {
-  PERSISTENCE_UNSETTLED,
+  UNAVAILABLE,
   completionOutcome,
   type Capability,
+  type CompletedContextEdit,
   type EditOutcome,
 } from './authoring-commands';
 import {
+  coordinatedCreation,
+  coordinatedDeletion,
   embeddedContext,
   topLevelContext,
   type AuthoredSpace,
   type AuthoringApp,
   type AuthoringContext,
+  type CreationReports,
   type EmbeddedAuthoring,
 } from './authoring-contexts';
-import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
-import type { CommandNotice } from './command-outcomes';
 
 /**
  * Map Edits, as one interface for every context that authors a Map.
@@ -22,17 +24,19 @@ import type { CommandNotice } from './command-outcomes';
  * A Map is authored from two places: the Command Dock, over the Space on the
  * canvas, and an Open Space Resource's rail, over the target Space it embeds.
  * This module decides once whether a command is available, which Edit to
- * complete and how to say a refusal, behind two private adapters — one per
- * context — and answers both callers in the shared capability and outcome
- * vocabulary (`authoring-commands.ts`). What is Map-specific stays here: which
- * Maps each context addresses, that a Space's last Map is never deletable, the
- * survivor a deletion leaves, and the titles a refusal is reported under.
+ * complete and how to say a refusal, over the two contexts every authoring
+ * command module shares (`authoring-contexts.ts`), which also hold the order a
+ * creation or deletion waits in, and answers both callers in the shared
+ * capability and outcome vocabulary (`authoring-commands.ts`). What is
+ * Map-specific stays here: the Edits a Map takes, that a Space's last Map is
+ * never deletable, the survivor a deletion leaves, and the titles a refusal is
+ * reported under.
  *
  * **What stays outside.** Which Map is selected, Copy link, where the caret
  * goes and how a report is drawn are the surfaces'. The report's *lifetime* —
  * publishing, dismissal and the Map-change reset — is command outcomes'
  * (`command-outcomes.ts`): a refused outcome carries the complete
- * {@link CommandNotice}, so that module holds it without reading an
+ * `CommandNotice`, so that module holds it without reading an
  * `AuthoringRefusal`. So this module imports no continuation, no React and no
  * DOM (an `eslint.config.js` zone holds it).
  */
@@ -41,29 +45,13 @@ import type { CommandNotice } from './command-outcomes';
 export type MapRename = Capability<(title: string) => EditOutcome>;
 
 /**
- * A completed Map Edit that leaves its context on a Map: that Map and its
- * Active Graph.
- *
- * A creation answers the Map it made, and the surface continues in its name
- * with these — which is why they are answered rather than read back off
- * whatever is selected afterwards. A deletion answers the survivor: every
- * Space Resource that selected the deleted Map now selects this pair, and so
- * does a canvas that was showing it.
- */
-export interface CompletedMapEdit {
-  readonly kind: 'completed';
-  readonly mapId: MapId;
-  readonly graphId: GraphId;
-}
-
-/**
  * Delete one Map: asynchronous, because every Space Resource that selects it
  * is repointed in the same Edit, across Spaces (ADR 0076).
  *
  * A Space's last Map is never available (ADR 0079), and neither is a Map
  * that has gone; both are asked again when invoked.
  */
-export type MapDelete = Capability<() => Promise<EditOutcome<CompletedMapEdit>>>;
+export type MapDelete = Capability<() => Promise<EditOutcome<CompletedContextEdit>>>;
 
 /** The commands addressed to one Map. */
 export interface MapCommands {
@@ -75,7 +63,7 @@ export interface MapCommands {
  * Create one empty Map: asynchronous, because an embedded creation waits for
  * the Spaces it writes to save before and after it.
  */
-export type MapCreate = Capability<() => Promise<EditOutcome<CompletedMapEdit>>>;
+export type MapCreate = Capability<() => Promise<EditOutcome<CompletedContextEdit>>>;
 
 /**
  * Every Map Edit one context offers.
@@ -102,9 +90,13 @@ export interface MapAuthoringAvailability {
   readonly delete: () => boolean;
 }
 
-const UNAVAILABLE = { kind: 'unavailable' } as const;
+const CREATION_REPORTS: CreationReports = {
+  notCreated: 'Map not created',
+  notSaved: 'Map not saved',
+  notSelected: 'Map not selected',
+};
 
-const notCreated = (message: string): CommandNotice => ({ title: 'Map not created', message });
+const NOT_DELETED = 'Map not deleted';
 
 /**
  * The Map a completed `created-map` made, read where the Edit left it.
@@ -114,7 +106,7 @@ const notCreated = (message: string): CommandNotice => ({ title: 'Map not create
  * Authoring breaking its own contract, and it throws rather than answering a
  * Map the author did not make.
  */
-const recoverCreatedMap = (app: AuthoringApp): CompletedMapEdit => {
+const recoverCreatedMap = (app: AuthoringApp): CompletedContextEdit => {
   const created = app.currentSpace().lookup.map(app.navigation.getState().selectedMapId)?.map;
   const graphId = created?.activeGraph ?? created?.graphs[0]?.id;
   if (created === undefined || graphId === undefined) {
@@ -123,51 +115,19 @@ const recoverCreatedMap = (app: AuthoringApp): CompletedMapEdit => {
   return { kind: 'completed', mapId: created.id, graphId };
 };
 
-const createMap = async (
+const createMap = (
   context: AuthoringContext,
-  live: () => boolean,
-): Promise<EditOutcome<CompletedMapEdit>> => {
-  if (!live()) return UNAVAILABLE;
+  creates: () => boolean,
+): Promise<EditOutcome<CompletedContextEdit>> => {
   const { app } = context.space;
-  const { coordination } = context;
-  if (coordination !== null) {
-    if (!(await coordination.settled())) {
-      return { kind: 'refused', report: notCreated(PERSISTENCE_UNSETTLED) };
-    }
-    // The wait gave the Space time to move: ask again before authoring.
-    if (!live()) return UNAVAILABLE;
-  }
-  const result = app.authoring.complete({ kind: 'created-map' });
-  switch (result.kind) {
-    case 'refused':
-      return { kind: 'refused', report: notCreated(describeAuthoringRefusal(result.refusal)) };
-    case 'unchanged':
-      return { kind: 'unchanged' };
-    case 'queued':
-      // A creation accepted behind a running completion has made nothing
-      // yet, so there is no Map to answer.
-      throw new Error('Map creation was queued behind a running completion.');
-    case 'completed':
-      break;
-  }
-  const created = recoverCreatedMap(app);
-  if (coordination === null) return created;
-  // A failure from here on is not a Map not created, because it was: the
-  // target not saving it is a Map not saved, and the Resource not taking it a
-  // Map not selected.
-  if (!(await coordination.targetSaved())) {
-    return { kind: 'refused', report: { title: 'Map not saved', message: PERSISTENCE_UNSETTLED } };
-  }
-  const refusal = coordination.select(created.mapId, created.graphId);
-  if (refusal !== null) {
-    return { kind: 'refused', report: { title: 'Map not selected', message: refusal } };
-  }
-  return (await coordination.containingSaved())
-    ? created
-    : { kind: 'refused', report: { title: 'Map not selected', message: PERSISTENCE_UNSETTLED } };
+  return coordinatedCreation(
+    context,
+    creates,
+    CREATION_REPORTS,
+    () => app.authoring.complete({ kind: 'created-map' }),
+    () => recoverCreatedMap(app),
+  );
 };
-
-const notDeleted = (message: string): CommandNotice => ({ title: 'Map not deleted', message });
 
 /**
  * The Map the deletion should leave its Space on: the one the canvas shows
@@ -194,34 +154,19 @@ const preferredSurvivor = (app: AuthoringApp, mapId: MapId): MapId | null => {
   return opening === undefined || opening === mapId ? null : opening;
 };
 
-const deleteMap = async (
+const deleteMap = (
   context: AuthoringContext,
   mapId: MapId,
-  live: () => boolean,
-): Promise<EditOutcome<CompletedMapEdit>> => {
-  if (!live()) return UNAVAILABLE;
+  deletes: () => boolean,
+): Promise<EditOutcome<CompletedContextEdit>> => {
   const { app, spaceResources } = context.space;
-  if (context.coordination !== null) {
-    if (!(await context.coordination.settled())) {
-      return { kind: 'refused', report: notDeleted(PERSISTENCE_UNSETTLED) };
-    }
-    // The wait gave the Space time to move: ask again before deleting.
-    if (!live()) return UNAVAILABLE;
-  }
-  const result = await spaceResources.deleteMap({
-    targetSpaceId: app.currentSpace().id,
-    mapId,
-    preferredMapId: preferredSurvivor(app, mapId),
-  });
-  switch (result.kind) {
-    case 'refused':
-      return { kind: 'refused', report: notDeleted(describeSpaceResourceRefusal(result.refusal)) };
-    case 'unchanged':
-      return { kind: 'unchanged' };
-    case 'completed':
-      break;
-  }
-  return { kind: 'completed', mapId: result.mapId, graphId: result.graphId };
+  return coordinatedDeletion(context, deletes, NOT_DELETED, () =>
+    spaceResources.deleteMap({
+      targetSpaceId: app.currentSpace().id,
+      mapId,
+      preferredMapId: preferredSurvivor(app, mapId),
+    }),
+  );
 };
 
 const mapAuthoringCommands = (
@@ -238,7 +183,7 @@ const mapAuthoringCommands = (
       return { available: creates(), invoke: () => createMap(context, creates) };
     },
     map: (mapId) => {
-      const live = (): boolean => available.rename() && context.addressesMap(mapId);
+      const renames = (): boolean => available.rename() && context.addressesMap(mapId);
       // The last Map is never deletable (ADR 0079): a Space keeps one to open on.
       const deletes = (): boolean =>
         available.delete() &&
@@ -246,9 +191,9 @@ const mapAuthoringCommands = (
         context.space.app.currentSpace().maps.length > 1;
       return {
         rename: {
-          available: live(),
+          available: renames(),
           invoke: (title) =>
-            live()
+            renames()
               ? completionOutcome(
                   context.complete(mapId, { kind: 'renamed-map', mapId, title }),
                   'Map unchanged',

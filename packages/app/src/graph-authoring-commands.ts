@@ -1,20 +1,22 @@
 import type { GraphId, MapId } from '@project/core';
 import {
-  PERSISTENCE_UNSETTLED,
+  UNAVAILABLE,
   completionOutcome,
   type Capability,
+  type CompletedContextEdit,
   type EditOutcome,
 } from './authoring-commands';
 import {
+  coordinatedCreation,
+  coordinatedDeletion,
   embeddedContext,
   topLevelContext,
   type AuthoredSpace,
   type AuthoringApp,
   type AuthoringContext,
+  type CreationReports,
   type EmbeddedAuthoring,
 } from './authoring-contexts';
-import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
-import type { CommandNotice } from './command-outcomes';
 
 /**
  * Graph Edits, as one interface for every context that authors a Graph.
@@ -24,10 +26,12 @@ import type { CommandNotice } from './command-outcomes';
  * Graph of the target Space it embeds. This module decides once whether a
  * command is available, which Edit to complete and how to say a refusal,
  * over the two contexts every authoring command module shares
- * (`authoring-contexts.ts`), and answers both callers in the shared capability
+ * (`authoring-contexts.ts`), which also hold the order a creation or deletion
+ * waits in, and answers both callers in the shared capability
  * and outcome vocabulary (`authoring-commands.ts`). What is Graph-specific
- * stays here: the Edits a Graph takes and the title a refusal is reported
- * under.
+ * stays here: the Edits a Graph takes, that a Map's last Graph is never
+ * deletable, the survivor a deletion leaves, and the titles a refusal is
+ * reported under.
  *
  * **What stays outside.** Which Graph is active, Copy link, where the caret
  * goes and how a report is drawn are the surfaces'. The report's lifetime is
@@ -44,26 +48,10 @@ export type GraphRename = Capability<(title: string) => EditOutcome>;
 export type GraphRecolor = Capability<(color: string) => EditOutcome>;
 
 /**
- * A completed Graph Edit that leaves its context on a Graph: that Graph and
- * the Map that owns it.
- *
- * A creation answers the Graph it made. A deletion answers the survivor:
- * every Space Resource that selected the deleted Graph now selects it, and so
- * does a canvas that was showing the deleted Graph. The same shape as a completed Map
- * Edit (`map-authoring-commands.ts`), declared here so neither module names
- * the other's.
- */
-export interface CompletedGraphEdit {
-  readonly kind: 'completed';
-  readonly mapId: MapId;
-  readonly graphId: GraphId;
-}
-
-/**
  * Create one empty Graph in a Map: asynchronous, because an embedded creation
  * waits for the Spaces it writes to save before and after it.
  */
-export type GraphCreate = Capability<() => Promise<EditOutcome<CompletedGraphEdit>>>;
+export type GraphCreate = Capability<() => Promise<EditOutcome<CompletedContextEdit>>>;
 
 /**
  * Delete one Graph: asynchronous, because every Space Resource that selects
@@ -72,7 +60,7 @@ export type GraphCreate = Capability<() => Promise<EditOutcome<CompletedGraphEdi
  * A Map's last Graph is never available (ADR 0079), and neither is a Graph
  * that has gone; both are asked again when invoked.
  */
-export type GraphDelete = Capability<() => Promise<EditOutcome<CompletedGraphEdit>>>;
+export type GraphDelete = Capability<() => Promise<EditOutcome<CompletedContextEdit>>>;
 
 /** The commands addressed to one Graph. */
 export interface GraphCommands {
@@ -109,72 +97,40 @@ export interface GraphAuthoringAvailability {
   readonly delete: () => boolean;
 }
 
-const UNAVAILABLE = { kind: 'unavailable' } as const;
-
 const UNCHANGED_TITLE = 'Graph unchanged';
 
-const notCreated = (message: string): CommandNotice => ({ title: 'Graph not created', message });
+const CREATION_REPORTS: CreationReports = {
+  notCreated: 'Graph not created',
+  notSaved: 'Graph not saved',
+  notSelected: 'Graph not selected',
+};
+
+const NOT_DELETED = 'Graph not deleted';
 
 /**
  * Create an empty Graph in `mapId`, which the Map makes its Active Graph.
  *
- * Availability is asked at invocation and, embedded, again after the Spaces
- * settle, because the wait gives the target time to be exited or the Map to
- * go. The Graph is named by the Edit's own `createdGraphId`; a completion
- * that names none, or a creation queued behind a running completion, has no
- * Graph to answer, and throws rather than answering one the author did not
- * make.
+ * The Graph is named by the Edit's own `createdGraphId`; a completion that
+ * names none has no Graph to answer, and throws rather than answering one the
+ * author did not make.
  */
-const createGraph = async (
+const createGraph = (
   context: AuthoringContext,
   mapId: MapId,
-  live: () => boolean,
-): Promise<EditOutcome<CompletedGraphEdit>> => {
-  if (!live()) return UNAVAILABLE;
-  const { coordination } = context;
-  if (coordination !== null) {
-    if (!(await coordination.settled())) {
-      return { kind: 'refused', report: notCreated(PERSISTENCE_UNSETTLED) };
-    }
-    if (!live()) return UNAVAILABLE;
-  }
-  const result = context.complete(mapId, { kind: 'added-graph' });
-  switch (result.kind) {
-    case 'refused':
-      return { kind: 'refused', report: notCreated(describeAuthoringRefusal(result.refusal)) };
-    case 'unchanged':
-      return { kind: 'unchanged' };
-    case 'queued':
-      throw new Error('Graph creation was queued behind a running completion.');
-    case 'completed':
-      break;
-  }
-  if (result.createdGraphId === undefined) {
-    throw new Error('A completed Graph creation named no Graph.');
-  }
-  const created: CompletedGraphEdit = { kind: 'completed', mapId, graphId: result.createdGraphId };
-  if (coordination === null) return created;
-  // From here the Graph exists in the target: the target not saving it is a
-  // Graph not saved, and the Resource not taking it a Graph not selected.
-  if (!(await coordination.targetSaved())) {
-    return {
-      kind: 'refused',
-      report: { title: 'Graph not saved', message: PERSISTENCE_UNSETTLED },
-    };
-  }
-  const refusal = coordination.select(mapId, created.graphId);
-  if (refusal !== null) {
-    return { kind: 'refused', report: { title: 'Graph not selected', message: refusal } };
-  }
-  return (await coordination.containingSaved())
-    ? created
-    : {
-        kind: 'refused',
-        report: { title: 'Graph not selected', message: PERSISTENCE_UNSETTLED },
-      };
-};
-
-const notDeleted = (message: string): CommandNotice => ({ title: 'Graph not deleted', message });
+  creates: () => boolean,
+): Promise<EditOutcome<CompletedContextEdit>> =>
+  coordinatedCreation(
+    context,
+    creates,
+    CREATION_REPORTS,
+    () => context.complete(mapId, { kind: 'added-graph' }),
+    ({ createdGraphId }) => {
+      if (createdGraphId === undefined) {
+        throw new Error('A completed Graph creation named no Graph.');
+      }
+      return { kind: 'completed', mapId, graphId: createdGraphId };
+    },
+  );
 
 /**
  * The Graph the deletion should leave its Map on: the Active Graph the
@@ -205,43 +161,21 @@ const preferredSurvivor = (app: AuthoringApp, mapId: MapId, graphId: GraphId): G
   return stored === undefined || stored === graphId ? null : stored;
 };
 
-/**
- * Delete `graphId` of `mapId` through the cross-Space lifecycle, which
- * repoints every Space Resource that selected it in the same Edit.
- *
- * Availability is asked at invocation and, embedded, again after the Spaces
- * settle, because the wait gives the target time to be exited or the Graph to
- * go.
- */
-const deleteGraph = async (
+const deleteGraph = (
   context: AuthoringContext,
   mapId: MapId,
   graphId: GraphId,
-  live: () => boolean,
-): Promise<EditOutcome<CompletedGraphEdit>> => {
-  if (!live()) return UNAVAILABLE;
+  deletes: () => boolean,
+): Promise<EditOutcome<CompletedContextEdit>> => {
   const { app, spaceResources } = context.space;
-  if (context.coordination !== null) {
-    if (!(await context.coordination.settled())) {
-      return { kind: 'refused', report: notDeleted(PERSISTENCE_UNSETTLED) };
-    }
-    if (!live()) return UNAVAILABLE;
-  }
-  const result = await spaceResources.deleteGraph({
-    targetSpaceId: app.currentSpace().id,
-    mapId,
-    graphId,
-    preferredGraphId: preferredSurvivor(app, mapId, graphId),
-  });
-  switch (result.kind) {
-    case 'refused':
-      return { kind: 'refused', report: notDeleted(describeSpaceResourceRefusal(result.refusal)) };
-    case 'unchanged':
-      return { kind: 'unchanged' };
-    case 'completed':
-      break;
-  }
-  return { kind: 'completed', mapId: result.mapId, graphId: result.graphId };
+  return coordinatedDeletion(context, deletes, NOT_DELETED, () =>
+    spaceResources.deleteGraph({
+      targetSpaceId: app.currentSpace().id,
+      mapId,
+      graphId,
+      preferredGraphId: preferredSurvivor(app, mapId, graphId),
+    }),
+  );
 };
 
 const graphAuthoringCommands = (

@@ -9,9 +9,7 @@ import {
 } from '../src/command-outcomes';
 import type { PendingContinuation } from '../src/continuation';
 import { composeApp } from '../src/compose-app';
-import type { EditOutcome } from '../src/authoring-commands';
-import type { CompletedGraphEdit } from '../src/graph-authoring-commands';
-import type { CompletedMapEdit } from '../src/map-authoring-commands';
+import type { CompletedContextEdit, EditOutcome } from '../src/authoring-commands';
 import type { AuthoringResult } from '../src/space-authoring';
 import type {
   SpaceResourceCreationResult,
@@ -120,7 +118,7 @@ const refusedGraph = { kind: 'refused', report: graphReport } as const;
 const graphCreateReport = { title: 'Graph not created', message: MAP_GONE };
 const refusedGraphCreate = { kind: 'refused', report: graphCreateReport } as const;
 /** New Map's continuation, in the name of the Map the creation made. */
-const inTheName = ({ mapId }: CompletedMapEdit): PendingContinuation => ({
+const inTheName = ({ mapId }: CompletedContextEdit): PendingContinuation => ({
   target: { kind: 'control', name: 'map-name', scope: { id: 'rail', subject: mapId } },
   select: false,
   then: 'rename',
@@ -606,7 +604,7 @@ describe('graph-delete', () => {
 
   it('answers a completed delete to the caller and leaves the channel clear', async () => {
     const { outcomes } = open();
-    const completed: CompletedGraphEdit = { kind: 'completed', mapId: MAP_A, graphId: GRAPH_A };
+    const completed: CompletedContextEdit = { kind: 'completed', mapId: MAP_A, graphId: GRAPH_A };
     outcomes.run('graph-delete', () => refusedGraphDelete);
 
     await expect(outcomes.run('graph-delete', () => Promise.resolve(completed))).resolves.toBe(
@@ -630,7 +628,7 @@ describe('graph-delete', () => {
 
   it('discards a delete pressed on one Map that settles under another', async () => {
     const { outcomes, navigation } = open();
-    const pending = deferred<EditOutcome<CompletedGraphEdit>>();
+    const pending = deferred<EditOutcome<CompletedContextEdit>>();
     const running = outcomes.run('graph-delete', () => pending.promise);
 
     navigation.selectMap(MAP_B);

@@ -1,5 +1,6 @@
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { CommandBroke, CommandDiscarded, CommandNotice } from './command-outcomes';
+import type { GraphId, MapId } from '@project/core';
 import type { AuthoringResult } from './space-authoring';
 
 /**
@@ -10,7 +11,7 @@ import type { AuthoringResult } from './space-authoring';
  * invocation answers an {@link EditOutcome}, and every surface spends a
  * capability through {@link offered}. What the Edit is, which contexts may
  * author it and how its refusal is said are the module's own
- * (`map-authoring-commands.ts`); this module declares only what is the same for
+ * (`map-authoring-commands.ts`, `graph-authoring-commands.ts`); this module declares only what is the same for
  * all of them, so no module borrows another's names for it. The contexts they
  * author in are defined once as well (`authoring-contexts.ts`).
  *
@@ -19,11 +20,30 @@ import type { AuthoringResult } from './space-authoring';
  */
 
 /**
- * Why a coordinated context command did not run: a Space in the Edit had not
- * settled.
+ * The sentence a refusal carries when a Space an Edit writes to has not saved:
+ * before an Edit that crosses Spaces, after it in the target, or after the
+ * containing Space takes the Space Resource's selection.
  */
 export const PERSISTENCE_UNSETTLED =
   'The change could not be saved. Check the Space persistence status.';
+
+/**
+ * A completed Edit that leaves its context on a Map and a Graph of that Map.
+ *
+ * A creation answers what it made, and the surface continues there with these
+ * — which is why they are answered rather than read back off whatever is
+ * selected afterwards. A deletion answers the survivor: every Space Resource
+ * that selected what was deleted now selects this pair, and so does a canvas
+ * that was showing it.
+ */
+export interface CompletedContextEdit {
+  readonly kind: 'completed';
+  readonly mapId: MapId;
+  readonly graphId: GraphId;
+}
+
+/** The answer to a command that is no longer offered, or whose subject has gone. */
+export const UNAVAILABLE = { kind: 'unavailable' } as const;
 
 /**
  * What an authoring Edit answers.

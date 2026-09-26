@@ -1,4 +1,12 @@
 import type { GraphId, MapId, UUID } from '@project/core';
+import type { SpaceResourceContextDeletionResult } from '@project/persistence';
+import {
+  PERSISTENCE_UNSETTLED,
+  UNAVAILABLE,
+  type CompletedContextEdit,
+  type EditOutcome,
+} from './authoring-commands';
+import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
 import type { ComposedApp } from './compose-app';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
@@ -14,8 +22,12 @@ import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
  * addressed to a Map, and what it waits for around an Edit that crosses
  * Spaces — so it is written here once and every authoring command module
  * (`map-authoring-commands.ts`, `graph-authoring-commands.ts`) builds its
- * own public constructors over it. What each module does with the waits, and
- * the reports it says a failed wait in, stay the module's.
+ * own public constructors over it.
+ *
+ * The order a creation or deletion runs its waits in is the same for both
+ * modules too, so {@link coordinatedCreation} and {@link coordinatedDeletion}
+ * hold it here. Each module supplies the Edit itself, when it is offered, and
+ * the titles its failures are reported under.
  *
  * Like the modules that spend it, it imports no continuation, no React and no
  * DOM (an `eslint.config.js` zone holds it).
@@ -37,6 +49,12 @@ export type AddressedCompletion = Extract<
 >;
 
 /**
+ * Point the Space Resource at a Map and Graph of the target: the sentence
+ * that refused it, or `null` once it is written.
+ */
+export type SelectInTarget = (mapId: MapId, graphId: GraphId) => string | null;
+
+/**
  * What an embedded context waits for around an Edit, so a stored Space
  * Resource never names a Map or Graph its target has not stored.
  *
@@ -50,11 +68,7 @@ export interface ContextCoordination {
   readonly targetSaved: () => Promise<boolean>;
   /** The containing Space has saved the Space Resource's selection. */
   readonly containingSaved: () => Promise<boolean>;
-  /**
-   * Point the Space Resource at a Map and Graph of the target: the sentence
-   * that refused it, or `null` once it is written.
-   */
-  readonly select: (mapId: MapId, graphId: GraphId) => string | null;
+  readonly select: SelectInTarget;
 }
 
 /** One context, as every authoring command module reads it. */
@@ -118,11 +132,7 @@ export interface EmbeddedAuthoring {
   readonly spaces: Pick<OpenSpaces, 'entry' | 'waitForPersistence'>;
   /** The Space holding the Space Resource, where its selection is written. */
   readonly containingSpaceId: UUID;
-  /**
-   * Point the Space Resource at a Map and Graph of the target: the sentence
-   * that refused it, or `null` once it is written.
-   */
-  readonly select: (mapId: MapId, graphId: GraphId) => string | null;
+  readonly select: SelectInTarget;
   /** The rail's general availability, one answer for every command it offers. */
   readonly available: () => boolean;
 }
@@ -161,3 +171,128 @@ export function embeddedContext({
     },
   };
 }
+
+/** Every answer but a completion: what an Edit ends on when it does not run. */
+type NotCompleted = Exclude<EditOutcome, { readonly kind: 'completed' }>;
+
+/**
+ * Before an Edit that crosses Spaces, wait for both to settle and ask again
+ * whether the command is still offered, because the wait gives the target
+ * time to be exited or the subject to go. `null` is the go-ahead.
+ *
+ * Only a context with coordination asks it, so a context that crosses no
+ * Spaces begins its Edit within the press, before anything is awaited: a
+ * surface reads the Space the press left synchronously.
+ */
+const unsettledBefore = async (
+  coordination: ContextCoordination,
+  live: () => boolean,
+  notDone: string,
+): Promise<NotCompleted | null> => {
+  if (!(await coordination.settled())) {
+    return { kind: 'refused', report: { title: notDone, message: PERSISTENCE_UNSETTLED } };
+  }
+  return live() ? null : UNAVAILABLE;
+};
+
+/** The titles a creation's failures are reported under, one per step that can fail. */
+export interface CreationReports {
+  /** Nothing was made: the Spaces did not settle, or the Edit was refused. */
+  readonly notCreated: string;
+  /** It was made, and the target did not save it. */
+  readonly notSaved: string;
+  /** It was saved, and the Space Resource did not take it or did not save taking it. */
+  readonly notSelected: string;
+}
+
+/** A completion as Space Authoring answers it, which a creation reads what it made off. */
+export type CompletedAuthoring = Extract<AuthoringResult, { readonly kind: 'completed' }>;
+
+/**
+ * Create something in a context's Space, in the order a Space Resource may
+ * name it.
+ *
+ * Embedded, both Spaces settle first; the Edit is completed in the target and
+ * saved there; only then is the Space Resource pointed at what it made and the
+ * containing Space saved — so a stored Resource never names a Map or Graph its
+ * target has not stored. A failure after the Edit completes is not reported as
+ * not created, because it was.
+ *
+ * A creation queued behind a running completion has made nothing yet, so
+ * there is nothing to answer; it throws, as `made` throws where a completion
+ * does not say what it made, rather than answering something the author did
+ * not make.
+ */
+export const coordinatedCreation = async (
+  context: AuthoringContext,
+  live: () => boolean,
+  reports: CreationReports,
+  complete: () => AuthoringResult,
+  made: (completed: CompletedAuthoring) => CompletedContextEdit,
+): Promise<EditOutcome<CompletedContextEdit>> => {
+  if (!live()) return UNAVAILABLE;
+  if (context.coordination !== null) {
+    const unsettled = await unsettledBefore(context.coordination, live, reports.notCreated);
+    if (unsettled !== null) return unsettled;
+  }
+  const result = complete();
+  switch (result.kind) {
+    case 'refused':
+      return {
+        kind: 'refused',
+        report: { title: reports.notCreated, message: describeAuthoringRefusal(result.refusal) },
+      };
+    case 'unchanged':
+      return { kind: 'unchanged' };
+    case 'queued':
+      throw new Error(`${reports.notCreated}: it was queued behind a running completion.`);
+    case 'completed':
+      break;
+  }
+  const created = made(result);
+  const { coordination } = context;
+  if (coordination === null) return created;
+  if (!(await coordination.targetSaved())) {
+    return { kind: 'refused', report: { title: reports.notSaved, message: PERSISTENCE_UNSETTLED } };
+  }
+  const refusal = coordination.select(created.mapId, created.graphId);
+  if (refusal !== null) {
+    return { kind: 'refused', report: { title: reports.notSelected, message: refusal } };
+  }
+  return (await coordination.containingSaved())
+    ? created
+    : { kind: 'refused', report: { title: reports.notSelected, message: PERSISTENCE_UNSETTLED } };
+};
+
+/**
+ * Delete something from a context's Space through the cross-Space lifecycle,
+ * which repoints every Space Resource that selected it in the one Edit that
+ * deletes it, and answer the survivor.
+ *
+ * Embedded, both Spaces settle first, and an unsettled Space is reported under
+ * `notDeleted`, as a refusal is.
+ */
+export const coordinatedDeletion = async (
+  context: AuthoringContext,
+  live: () => boolean,
+  notDeleted: string,
+  remove: () => Promise<SpaceResourceContextDeletionResult>,
+): Promise<EditOutcome<CompletedContextEdit>> => {
+  if (!live()) return UNAVAILABLE;
+  if (context.coordination !== null) {
+    const unsettled = await unsettledBefore(context.coordination, live, notDeleted);
+    if (unsettled !== null) return unsettled;
+  }
+  const result = await remove();
+  switch (result.kind) {
+    case 'refused':
+      return {
+        kind: 'refused',
+        report: { title: notDeleted, message: describeSpaceResourceRefusal(result.refusal) },
+      };
+    case 'unchanged':
+      return { kind: 'unchanged' };
+    case 'completed':
+      return { kind: 'completed', mapId: result.mapId, graphId: result.graphId };
+  }
+};

@@ -12,9 +12,7 @@ import {
 } from './authoring-refusal';
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
-import type { EditOutcome } from './authoring-commands';
-import type { CompletedGraphEdit } from './graph-authoring-commands';
-import type { CompletedMapEdit } from './map-authoring-commands';
+import type { CompletedContextEdit, EditOutcome } from './authoring-commands';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
@@ -186,7 +184,7 @@ type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;
  * so a `completed` answer from `run` means the continuation was requested.
  */
 export interface MapCreateContinuation {
-  readonly continueAt: (created: CompletedMapEdit) => PendingContinuation;
+  readonly continueAt: (created: CompletedContextEdit) => PendingContinuation;
 }
 
 /**
@@ -213,7 +211,7 @@ export interface MapCompletionClaim {
  */
 interface CommandSignatures {
   readonly 'map-create': {
-    readonly result: EditOutcome<CompletedMapEdit>;
+    readonly result: EditOutcome<CompletedContextEdit>;
     readonly options: [options: MapCreateContinuation & MapCompletionClaim];
   };
   readonly 'map-manage': { readonly result: EditOutcome; readonly options: [] };
@@ -222,12 +220,12 @@ interface CommandSignatures {
     readonly options: [options: MapCompletionClaim];
   };
   readonly 'graph-create': {
-    readonly result: EditOutcome<CompletedGraphEdit>;
+    readonly result: EditOutcome<CompletedContextEdit>;
     readonly options: [];
   };
   readonly 'graph-edit': { readonly result: EditOutcome; readonly options: [] };
   readonly 'graph-delete': {
-    readonly result: EditOutcome<CompletedGraphEdit>;
+    readonly result: EditOutcome<CompletedContextEdit>;
     readonly options: [];
   };
   readonly 'resource-delete': { readonly result: AuthoringResult; readonly options: [] };
