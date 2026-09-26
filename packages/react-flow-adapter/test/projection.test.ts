@@ -311,12 +311,14 @@ describe('projectGraphEdges', () => {
       laneOffset: 0,
       laneReach: GRAPH_LANE_SPACING,
       endTrim: 0,
+      headShape: 'arrow',
     });
     expect(edges.find((e) => e.id === ALT_EDGE_ID)!.data).toEqual({
       graphId: uuid('00000000-0000-4000-8000-000000000030'),
       laneOffset: GRAPH_LANE_SPACING,
       laneReach: GRAPH_LANE_SPACING,
       endTrim: 0,
+      headShape: 'arrow',
     });
   });
 
@@ -414,24 +416,32 @@ describe('projectGraphEdges', () => {
       // A sorts before B, so A → B takes the negative side.
       expect(forward.data).toMatchObject({ laneOffset: -GRAPH_LANE_SPACING / 2, endTrim: 0 });
       expect(back.data).toMatchObject({ laneOffset: GRAPH_LANE_SPACING / 2, endTrim: 0 });
-      expect(forward.markerEnd).toMatchObject({ type: 'arrowclosed' });
-      expect(back.markerEnd).toMatchObject({ type: 'arrowclosed' });
       expect(byId(A!, B!, RED!).data).toMatchObject({
         laneOffset: (3 * GRAPH_LANE_SPACING) / 2,
         endTrim: DETACHED_END_TRIM,
       });
-      expect(byId(A!, B!, RED!).markerEnd).toBeUndefined();
     });
 
-    it('draws an arrowhead on the connecting Edge alone', () => {
+    it("ends every Edge in its Graph's head shape, the ones that stop short included", () => {
       const edges = projectGraphEdges(shared, colors, {
         activeGraphId: uuid(BLUE!),
+        headShapes: { [uuid(BLUE!)]: 'dot', [uuid(RED!)]: 'diamond' },
       });
-      const markerOf = (graphId: string) => edges.find((e) => e.id.startsWith(graphId))!.markerEnd;
 
-      expect(markerOf(BLUE!)).toMatchObject({ type: 'arrowclosed' });
-      expect(markerOf(RED!)).toBeUndefined();
-      expect(markerOf(GREEN!)).toBeUndefined();
+      // Blue connects; Red stops short beside it and Green stops short alone.
+      // Each still ends in its own Graph's head shape (ADR 0105), and Green,
+      // storing none, ends in an arrow.
+      expect(dataOf(edges, BLUE!)).toMatchObject({ endTrim: 0, headShape: 'dot' });
+      expect(dataOf(edges, RED!)).toMatchObject({
+        endTrim: DETACHED_END_TRIM,
+        headShape: 'diamond',
+      });
+      expect(dataOf(edges, GREEN!)).toMatchObject({
+        endTrim: DETACHED_END_TRIM,
+        headShape: 'arrow',
+      });
+      // The Edge draws its head itself, so React Flow is handed no marker of its own.
+      expect(edges.every((e) => e.markerEnd === undefined)).toBe(true);
     });
 
     it('moves the centre to whichever Graph becomes active', () => {

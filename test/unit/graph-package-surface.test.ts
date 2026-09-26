@@ -47,6 +47,7 @@ const OFFERED_VALUES = [
   'loadSpace',
   'loadSpaceAggregate',
   'loadSpaceSnapshot',
+  'newGraph',
   'newSpace',
   'nextGraphColor',
   'outgoingEdges',

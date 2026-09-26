@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { selfEdgeAttachment } from '../src/edge-attachment';
 import { RoutedEdge, useEdgeAttachment } from '../src/RoutedEdge';
 import type { RoutedFlowEdge } from '../src/RoutedEdge';
+import { uuid } from './uuid';
 
 /**
  * React Flow is the system boundary, so the store is stood in for and the
@@ -28,7 +29,9 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     useInternalNode: (id: string) => nodes.get(id),
     /** React Flow's own `<path>`, stood in for so a test can read the curve the
      *  Edge asked for. */
-    BaseEdge: ({ path }: { path: string }) => <div data-testid="edge-path" data-d={path} />,
+    BaseEdge: ({ path, markerEnd }: { path: string; markerEnd?: string }) => (
+      <div data-testid="edge-path" data-d={path} data-marker-end={markerEnd} />
+    ),
   };
 });
 
@@ -112,5 +115,104 @@ describe('RoutedEdge', () => {
     const path = screen.getByTestId('edge-path').getAttribute('data-d') ?? '';
     expect(path.startsWith('M130,158')).toBe(true);
     expect(path.endsWith('130,488')).toBe(true);
+  });
+});
+
+describe("an Edge's head", () => {
+  const DOTTED = {
+    graphId: uuid('00000000-0000-4000-8000-000000000001'),
+    laneOffset: 0,
+    laneReach: 0,
+    endTrim: 0,
+    headShape: 'dot',
+  } as const;
+
+  const markerOf = (container: HTMLElement): Element => {
+    const reference = screen.getByTestId('edge-path').getAttribute('data-marker-end') ?? '';
+    const id = /^url\('#(.+)'\)$/.exec(reference)?.[1];
+    expect(id, 'the path ends in a marker it names').toBeDefined();
+    const marker = [...container.querySelectorAll('marker')].find((m) => m.id === id);
+    expect(marker, 'the marker the path names is drawn').toBeDefined();
+    return marker!;
+  };
+
+  it("ends in its Graph's head shape and colour, at the end of a line that stops short", () => {
+    nodes.clear();
+    nodes.set('above', rect(0, 0));
+    nodes.set('below', rect(0, 500));
+
+    const { container } = render(
+      <svg>
+        <RoutedEdge
+          {...edgeProps('above', 'below')}
+          data={{
+            graphId: uuid('00000000-0000-4000-8000-000000000001'),
+            laneOffset: 8,
+            laneReach: 8,
+            endTrim: 0.2,
+            headShape: 'dot',
+          }}
+          style={{ stroke: '#2ca02c', opacity: 0.4 }}
+        />
+      </svg>,
+    );
+
+    const glyph = markerOf(container).querySelector('[data-slot="graph-head-shape"]');
+    expect(glyph).toHaveAttribute('data-head-shape', 'dot');
+    expect(glyph).toHaveAttribute('fill', '#2ca02c');
+  });
+
+  it('draws its line before its marker, so the line is the first thing in the Edge', () => {
+    nodes.clear();
+    nodes.set('above', rect(0, 0));
+    nodes.set('below', rect(0, 500));
+
+    const { container } = render(
+      <svg>
+        <RoutedEdge {...edgeProps('above', 'below')} data={DOTTED} style={{ stroke: '#1f77b4' }} />
+      </svg>,
+    );
+
+    expect(container.querySelector('marker')).not.toBeNull();
+    expect(container.querySelector('svg')?.firstElementChild).toBe(screen.getByTestId('edge-path'));
+  });
+
+  it('draws no head for an Edge carrying no Graph data', () => {
+    nodes.clear();
+    nodes.set('above', rect(0, 0));
+    nodes.set('below', rect(0, 500));
+
+    const { container } = render(
+      <svg>
+        <RoutedEdge {...edgeProps('above', 'below')} style={{ stroke: '#1f77b4' }} />
+      </svg>,
+    );
+
+    expect(screen.getByTestId('edge-path')).not.toHaveAttribute('data-marker-end');
+    expect(container.querySelector('marker')).toBeNull();
+  });
+
+  // One Map can be drawn twice on a page — on the canvas and inside an Open
+  // Space Resource — so the same Edge id is rendered twice, each in its own
+  // colour context.
+  it('names a marker of its own, even where the same Edge is drawn twice', () => {
+    nodes.clear();
+    nodes.set('a', rect(0, 0));
+    nodes.set('b', rect(0, 500));
+
+    const { container } = render(
+      <svg>
+        <RoutedEdge {...edgeProps('a', 'b')} id="g1::a::b" data={DOTTED} />
+        <RoutedEdge {...edgeProps('a', 'b')} id="g1::a::b" data={DOTTED} />
+      </svg>,
+    );
+
+    const ids = [...container.querySelectorAll('marker')].map((marker) => marker.id);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+    const references = screen
+      .getAllByTestId('edge-path')
+      .map((path) => path.getAttribute('data-marker-end'));
+    expect(references).toEqual(ids.map((id) => `url('#${id}')`));
   });
 });

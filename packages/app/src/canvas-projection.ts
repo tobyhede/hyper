@@ -1,4 +1,4 @@
-import type { ResourceId, Graph, GraphId } from '@project/core';
+import type { ResourceId, Graph, GraphHeadShape, GraphId } from '@project/core';
 import {
   buildGraphRenderEdges,
   buildLayoutStrategyGraph,
@@ -72,6 +72,13 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
   const visibleGraphs = resolved.map.graphs;
   const drawnGraphIds = visibleGraphs.map((graph) => graph.id);
   const visible = new Set<GraphId>(drawnGraphIds);
+  // The stored head shapes only: `projectGraphEdges` is where a Graph storing
+  // none resolves to the default.
+  const headShapes = Object.fromEntries(
+    visibleGraphs.flatMap((graph): [GraphId, GraphHeadShape][] =>
+      graph.headShape === undefined ? [] : [[graph.id, graph.headShape]],
+    ),
+  );
   const edges = buildGraphRenderEdges(space).filter((edge) => visible.has(edge.graphId));
   // The Map chooses the Resources it draws. In particular, a Map's sparse
   // placement omits Resources from its canvas; the Resources list is the surface that
@@ -104,7 +111,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           resourceIds,
           openResourceIds,
         }),
-        edges: projectGraphEdges(edges, colors, { activeGraphId }),
+        edges: projectGraphEdges(edges, colors, { activeGraphId, headShapes }),
       };
     },
   };

@@ -1,12 +1,18 @@
 import type { Node, NodeHandle } from '@xyflow/react';
-import { MarkerType, Position } from '@xyflow/react';
+import { Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import type {
   CanvasResourceBodyEditor,
   CanvasSpaceResourceSelection,
   EntityActionGroup,
 } from '@project/ui';
-import type { Resource, ResourceId, GraphId } from '@project/core';
+import {
+  DEFAULT_GRAPH_HEAD_SHAPE,
+  type Resource,
+  type ResourceId,
+  type GraphHeadShape,
+  type GraphId,
+} from '@project/core';
 import { resolveContentResource } from '@project/graph';
 import type {
   GraphRenderEdge,
@@ -233,6 +239,9 @@ export type ResourceFlowNode = Node<ResourceNodeData, 'resource'>;
 
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 
+/** Each Graph's head shape; a Graph missing here draws as `DEFAULT_GRAPH_HEAD_SHAPE`. */
+export type HeadShapeByGraphId = Readonly<Partial<Record<GraphId, GraphHeadShape>>>;
+
 export interface ProjectResourceNodesOptions {
   /** Draw Resources without any Resource-owned authoring controls. The four anchors of
    *  each role are declared and rendered either way — an Edge attaches to one,
@@ -380,6 +389,8 @@ export function projectResourceNodes(
 export interface ProjectGraphEdgesOptions {
   /** The graph to emphasise, if any. */
   activeGraphId?: GraphId | null;
+  /** What each Graph's Edges end in (ADR 0105). */
+  headShapes?: HeadShapeByGraphId;
 }
 
 /**
@@ -408,6 +419,7 @@ export function projectGraphEdges(
       laneOffset: lane.offset,
       laneReach: lane.reach,
       endTrim: lane.connects ? 0 : DETACHED_END_TRIM,
+      headShape: options.headShapes?.[edge.graphId] ?? DEFAULT_GRAPH_HEAD_SHAPE,
     };
     if (edge.title !== undefined) data.title = edge.title;
     if (edge.titleHidden === true) data.titleHidden = true;
@@ -430,9 +442,6 @@ export function projectGraphEdges(
       },
       data,
     };
-    // The arrowhead says where the Graph goes, so it is the connecting Edge's
-    // alone: a Graph running beside the active one stops short and carries none.
-    if (lane.connects) flowEdge.markerEnd = { type: MarkerType.ArrowClosed, color };
     return { flowEdge, onTop: isActiveGraph };
   });
   return [

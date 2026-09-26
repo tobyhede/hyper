@@ -1,4 +1,11 @@
-import { SPACE_FILE_VERSION, type Resource, type SpaceFile, type UUID } from '@project/core';
+import {
+  DEFAULT_GRAPH_HEAD_SHAPE,
+  SPACE_FILE_VERSION,
+  type Graph,
+  type Resource,
+  type SpaceFile,
+  type UUID,
+} from '@project/core';
 import { nextGraphColor } from './graph-color';
 import { serializeResourceFile, type ResourceFile } from './resource-file';
 
@@ -18,6 +25,25 @@ import { serializeResourceFile, type ResourceFile } from './resource-file';
 export interface NewSpace {
   readonly file: SpaceFile;
   readonly resourceFiles: readonly ResourceFile[];
+}
+
+/**
+ * The Graph every creation gesture makes: no Edges, the head shape a new Graph
+ * stores, and the colour {@link nextGraphColor} picks against `siblingColors` —
+ * the colours the owning Map's other Graphs draw, empty for a Map's first Graph.
+ *
+ * `initializeSpace`, a mapless Space's first-load Graph in `@project/persistence`,
+ * Add Map and Add Graph all build through it, so a Graph does not get different
+ * stored properties according to how it was created.
+ */
+export function newGraph(id: UUID, title: string, siblingColors: readonly string[]): Graph {
+  return {
+    id,
+    title,
+    color: nextGraphColor(siblingColors),
+    headShape: DEFAULT_GRAPH_HEAD_SHAPE,
+    edges: [],
+  };
 }
 
 /** The first neutral Resource title; later creation continues the same sequence. */
@@ -76,7 +102,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
           title: 'Map 1',
           kind: 'positioned',
           positions: { [resourceId]: { x: 0, y: 0, open: false } },
-          graphs: [{ id: graphId, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
+          graphs: [newGraph(graphId, 'Graph 1', [])],
           activeGraph: graphId,
         },
       ],

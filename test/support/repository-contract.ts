@@ -1,4 +1,10 @@
-import { uuidSchema, type GraphEdge, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  uuidSchema,
+  type GraphEdge,
+  type GraphHeadShape,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import {
   AggregateInvariantError,
@@ -992,6 +998,38 @@ export const spaceRepositoryContract = (
       await expect(repository.loadAggregate()).resolves.toEqual({
         kind: 'loaded',
         aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(shown, 1n, null)] },
+      });
+    });
+  });
+
+  it(`${name} keeps a Graph's head shape through initialization, commit and load`, async () => {
+    await withHarness(async (repository) => {
+      const withHeadShape = (headShape: GraphHeadShape): SpaceSnapshot => {
+        const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
+        return {
+          ...base,
+          document: {
+            ...base.document,
+            maps: (base.document.maps ?? []).map((map) => ({
+              ...map,
+              graphs: map.graphs.map((graph) => ({ ...graph, headShape })),
+            })),
+          },
+        };
+      };
+      const dotted = withHeadShape('dot');
+
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [dotted] });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(dotted, 0n, null));
+
+      const diamond = withHeadShape('diamond');
+      await expect(commitUpdate(repository, diamond, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(diamond, 1n, null));
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(diamond, 1n, null)] },
       });
     });
   });

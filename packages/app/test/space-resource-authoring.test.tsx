@@ -806,7 +806,15 @@ describe('referencing an existing Space', () => {
         title: 'Map 1',
         kind: 'positioned',
         positions: {},
-        graphs: [{ id: MINTED_GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
+        graphs: [
+          {
+            id: MINTED_GRAPH_ID,
+            title: 'Graph 1',
+            color: nextGraphColor([]),
+            headShape: 'arrow',
+            edges: [],
+          },
+        ],
         activeGraph: MINTED_GRAPH_ID,
       },
     ]);

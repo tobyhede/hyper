@@ -119,7 +119,15 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
                 title: 'Map 1',
                 kind: 'positioned',
                 positions: { [resourceId]: { x: 0, y: 0, open: false } },
-                graphs: [{ id: graph.id, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
+                graphs: [
+                  {
+                    id: graph.id,
+                    title: 'Graph 1',
+                    color: nextGraphColor([]),
+                    headShape: 'arrow',
+                    edges: [],
+                  },
+                ],
                 activeGraph: graph.id,
               },
             ],
