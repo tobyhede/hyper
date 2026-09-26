@@ -166,62 +166,23 @@ describe('a completion an embedded Map does not support', () => {
     expect(reported).toEqual([]);
   });
 
-  it('does not forward Graph deletion, which coordinated lifecycle owns', () => {
+  /**
+   * Map and Graph authoring complete a Map or Graph Edit on the Map a Space
+   * Resource shows through the target's `completeInMap`, so none reaches
+   * this adapter from a surface that is wired correctly.
+   */
+  it.each([
+    { kind: 'renamed-map', mapId: MAP_ID, title: 'Renamed' },
+    { kind: 'added-graph' },
+    { kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Renamed Graph' },
+    { kind: 'recolored-graph', graphId: GRAPH_ID, color: '#aec7e8' },
+    { kind: 'deleted-graph', graphId: GRAPH_ID },
+  ] as const)('does not forward a Map or Graph Edit: $kind', (completion) => {
     const { composition, reported } = embedded();
+    const before = composition.authoring.getState().session.working.document;
 
-    expect(composition.authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID })).toEqual({
-      kind: 'unchanged',
-    });
-    expect(String(reported[0])).toContain('deleted-graph');
-    expect(
-      composition.authoring.getState().session.working.document.maps?.[0]?.graphs,
-    ).toHaveLength(1);
-  });
-});
-
-describe('context commands on the Map an embedding is showing', () => {
-  it('forwards renaming the Map', () => {
-    const { composition, reported } = embedded();
-
-    expect(
-      composition.authoring.complete({
-        kind: 'renamed-map',
-        mapId: MAP_ID,
-        title: 'Renamed',
-      }),
-    ).toEqual({ kind: 'completed' });
-    expect(reported).toEqual([]);
-    expect(composition.authoring.getState().session.working.document.maps?.[0]?.title).toBe(
-      'Renamed',
-    );
-  });
-
-  it('forwards renaming, recoloring and adding a Graph', () => {
-    const { composition, reported } = embedded();
-
-    expect(
-      composition.authoring.complete({
-        kind: 'renamed-graph',
-        graphId: GRAPH_ID,
-        title: 'Renamed Graph',
-      }),
-    ).toEqual({ kind: 'completed' });
-    expect(
-      composition.authoring.complete({
-        kind: 'recolored-graph',
-        graphId: GRAPH_ID,
-        color: '#aec7e8',
-      }),
-    ).toEqual({ kind: 'completed' });
-    expect(composition.authoring.complete({ kind: 'added-graph' })).toMatchObject({
-      kind: 'completed',
-    });
-    expect(reported).toEqual([]);
-    const graph = composition.authoring.getState().session.working.document.maps?.[0]?.graphs[0];
-    expect(graph?.title).toBe('Renamed Graph');
-    expect(graph?.color).toBe('#aec7e8');
-    expect(
-      composition.authoring.getState().session.working.document.maps?.[0]?.graphs,
-    ).toHaveLength(2);
+    expect(composition.authoring.complete(completion)).toEqual({ kind: 'unchanged' });
+    expect(String(reported[0])).toContain(completion.kind);
+    expect(composition.authoring.getState().session.working.document).toBe(before);
   });
 });

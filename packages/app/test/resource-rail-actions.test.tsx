@@ -354,11 +354,12 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * A refused Graph Edit and a refused Reference Resource creation are drawn
-   * from command outcomes' `graph-edit` and `reference-create` channels, each
-   * under its own title, and each dismissal puts away only its own notice.
+   * A refused Graph creation and a refused Reference Resource creation are
+   * drawn from command outcomes' `graph-create` and `reference-create`
+   * channels, each under its own title, and each dismissal puts away only its
+   * own notice.
    */
-  it('shows a refused Graph Edit and Reference Resource creation, and dismisses each', async () => {
+  it('shows a refused Graph creation and Reference Resource creation, and dismisses each', async () => {
     const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
       const complete = authoring.complete;
       vi.spyOn(authoring, 'complete').mockImplementation((completion) => {
@@ -378,17 +379,22 @@ describe('a Resource’s commands on the canvas rail', () => {
     await waitFor(() => expect(newGraphItem('Graph')).not.toHaveAttribute('aria-disabled', 'true'));
     fireEvent.click(newGraphItem('Graph'));
 
-    const alerts = await screen.findAllByRole('alert');
+    // A Graph creation settles a promise later than the press.
+    const alerts = await waitFor(() => {
+      const drawn = screen.getAllByRole('alert');
+      expect(drawn).toHaveLength(2);
+      return drawn;
+    });
     expect(alerts.map((alert) => alert.textContent)).toEqual([
       expect.stringContaining('Reference Resource not created'),
-      expect.stringContaining('Graph unchanged'),
+      expect.stringContaining('Graph not created'),
     ]);
     expect(alerts[0]).toHaveTextContent('This Resource is no longer part of the Space.');
     expect(alerts[1]).toHaveTextContent('This Map is no longer part of the Space.');
     expect(resourceIds(session)).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Graph unchanged' }));
-    await waitFor(() => expect(screen.queryByText('Graph unchanged')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Graph not created' }));
+    await waitFor(() => expect(screen.queryByText('Graph not created')).not.toBeInTheDocument());
     expect(screen.getByText('Reference Resource not created')).toBeInTheDocument();
 
     fireEvent.click(

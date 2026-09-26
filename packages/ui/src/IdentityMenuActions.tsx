@@ -84,14 +84,18 @@ export function MapMenuActions({
 export interface GraphMenuActionsProps {
   readonly title: string;
   readonly renameItem: ReactNode;
-  readonly deleteDisabled: boolean;
-  readonly onCreate: () => void;
+  /**
+   * New Graph's press, or `null` where it is unavailable — one field, as
+   * {@link MapMenuActionsProps.onCreate} is.
+   */
+  readonly onCreate: (() => void) | null;
   readonly onCopyLink: () => void;
-  readonly onDelete: () => void;
-  readonly editsDisabled: boolean;
+  /** Delete's press, or `null` where it is unavailable, as New Graph's is. */
+  readonly onDelete: (() => void) | null;
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
-  readonly onRecolor: (color: string) => void;
+  /** Store the Graph's colour, or `null` while Colour… may not run. */
+  readonly onRecolor: ((color: string) => void) | null;
 }
 
 /**
@@ -107,8 +111,6 @@ export interface GraphMenuActionsProps {
 export function GraphMenuActions({
   title,
   renameItem,
-  editsDisabled,
-  deleteDisabled,
   color,
   colors,
   onRecolor,
@@ -119,7 +121,11 @@ export function GraphMenuActions({
   return (
     <>
       <DropdownMenuGroup>
-        <DropdownMenuItem className="gap-2" disabled={editsDisabled} onClick={onCreate}>
+        <DropdownMenuItem
+          className="gap-2"
+          disabled={onCreate === null}
+          onClick={() => onCreate?.()}
+        >
           <PlusIcon />
           New Graph
         </DropdownMenuItem>
@@ -127,7 +133,7 @@ export function GraphMenuActions({
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2" disabled={editsDisabled}>
+          <DropdownMenuSubTrigger className="gap-2" disabled={onRecolor === null}>
             <GraphIcon color={color} size={14} />
             Colour…
           </DropdownMenuSubTrigger>
@@ -135,8 +141,8 @@ export function GraphMenuActions({
             <PaletteColorSwatchGrid
               entries={colors}
               value={color}
-              onValueChange={onRecolor}
-              disabled={editsDisabled}
+              onValueChange={(next) => onRecolor?.(next)}
+              disabled={onRecolor === null}
               aria-label="Graph colour"
             />
           </DropdownMenuSubContent>
@@ -152,8 +158,8 @@ export function GraphMenuActions({
         <DropdownMenuItem
           variant="destructive"
           className="gap-2"
-          disabled={deleteDisabled}
-          onClick={onDelete}
+          disabled={onDelete === null}
+          onClick={() => onDelete?.()}
         >
           <DeleteIcon />
           Delete {title}

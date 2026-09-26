@@ -81,12 +81,12 @@ const CONTINUATION_IMPORT = {
   message: 'Where an Edit continues is the surface’s decision, not this module’s.',
 };
 
-const MAP_AUTHORING_MESSAGE =
-  'Map authoring imports no continuation, React or DOM: where the caret goes is the surface’s.';
+const AUTHORING_COMMANDS_MESSAGE =
+  'Authoring commands import no continuation, React or DOM: where the caret goes is the surface’s.';
 
-const MAP_AUTHORING_REACT = ['react', 'react-dom'].map((name) => ({
+const AUTHORING_COMMANDS_REACT = ['react', 'react-dom'].map((name) => ({
   name,
-  message: MAP_AUTHORING_MESSAGE,
+  message: AUTHORING_COMMANDS_MESSAGE,
 }));
 
 /**
@@ -339,33 +339,28 @@ export default tseslint.config(
   // Single-module bans inside `app`. Each restates the `app` zone above, which
   // it replaces for its file.
   //
-  // Coordination modules answer an outcome and never place a caret: where an
-  // Edit continues is the surface's decision, spent through `./continuation`.
+  // Authoring commands are pure coordination over the Space's collaborators:
+  // no continuation, no React and no DOM.
   {
-    files: ['packages/app/src/coordinated-context-create.ts'],
+    files: [
+      'packages/app/src/authoring-commands.ts',
+      'packages/app/src/authoring-contexts.ts',
+      'packages/app/src/map-authoring-commands.ts',
+      'packages/app/src/graph-authoring-commands.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',
         {
-          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, CONTINUATION_IMPORT],
-          patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
-        },
-      ],
-    },
-  },
-  // Map authoring is pure coordination over the Space's collaborators: no
-  // continuation, no React and no DOM.
-  {
-    files: ['packages/app/src/map-authoring-commands.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, CONTINUATION_IMPORT, ...MAP_AUTHORING_REACT],
+          paths: [
+            ...UI_IMPLEMENTATION_DEPENDENCIES,
+            CONTINUATION_IMPORT,
+            ...AUTHORING_COMMANDS_REACT,
+          ],
           patterns: [
             ESCAPE_PATTERN,
             APP_UI_IMPLEMENTATION_PATTERN,
-            { group: ['react/*', 'react-dom/*'], message: MAP_AUTHORING_MESSAGE },
+            { group: ['react/*', 'react-dom/*'], message: AUTHORING_COMMANDS_MESSAGE },
           ],
         },
       ],
@@ -373,8 +368,8 @@ export default tseslint.config(
         'error',
         {
           globals: [
-            { name: 'document', message: MAP_AUTHORING_MESSAGE },
-            { name: 'window', message: MAP_AUTHORING_MESSAGE },
+            { name: 'document', message: AUTHORING_COMMANDS_MESSAGE },
+            { name: 'window', message: AUTHORING_COMMANDS_MESSAGE },
           ],
           checkGlobalObject: true,
         },

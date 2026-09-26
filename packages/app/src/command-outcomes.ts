@@ -10,10 +10,9 @@ import {
   describeSpaceResourceCreationBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
-import type { CoordinatedContextDeleteResult } from './coordinated-context-delete';
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
-import type { CompletedMapEdit, MapEditOutcome } from './map-authoring-commands';
+import type { CompletedContextEdit, EditOutcome } from './authoring-commands';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
@@ -41,11 +40,11 @@ import type {
  * Enter, Exit and Open are three operations on "Space command failed", each
  * naming its own `subject`.
  *
- * **Map channels carry a complete report instead of words.** Map authoring
- * owns the title and message of a Map Edit's report beside the decision that
- * produced it; a Map command's refused result carries that {@link CommandNotice}
- * whole, and this module owns only its lifetime — staleness, dismissal and the
- * Map-change reset.
+ * **Reported channels carry a complete report instead of words.** Map and
+ * Graph authoring own the title and message of an Edit's report beside the
+ * decision that produced it; a reported command's refused result carries that
+ * {@link CommandNotice} whole, and this module owns only its lifetime —
+ * staleness, dismissal and the Map-change reset.
  *
  * **A throw is never dressed as a refusal** (`CONTEXT.md`, Completion outcome).
  * It reaches the reporter and publishes the command's break sentence, and
@@ -90,16 +89,9 @@ const CHANNELS = {
   'map-create': { resetsOnMapChange: true, words: 'reported' },
   'map-manage': { resetsOnMapChange: true, words: 'reported' },
   'map-delete': { resetsOnMapChange: true, words: 'reported' },
-  'graph-edit': {
-    resetsOnMapChange: true,
-    words: 'described',
-    title: 'Graph unchanged',
-  },
-  'graph-delete': {
-    resetsOnMapChange: true,
-    words: 'described',
-    title: 'Graph not deleted',
-  },
+  'graph-create': { resetsOnMapChange: true, words: 'reported' },
+  'graph-edit': { resetsOnMapChange: true, words: 'reported' },
+  'graph-delete': { resetsOnMapChange: true, words: 'reported' },
   'resource-delete': {
     resetsOnMapChange: true,
     words: 'described',
@@ -155,6 +147,7 @@ export const COMMAND_CHANNELS = [
   'space-resource-create',
   'reference-create',
   'space-command',
+  'graph-create',
   'graph-edit',
   'graph-delete',
 ] as const satisfies readonly CommandChannel[];
@@ -191,7 +184,7 @@ type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;
  * so a `completed` answer from `run` means the continuation was requested.
  */
 export interface MapCreateContinuation {
-  readonly continueAt: (created: CompletedMapEdit) => PendingContinuation;
+  readonly continueAt: (created: CompletedContextEdit) => PendingContinuation;
 }
 
 /**
@@ -218,17 +211,21 @@ export interface MapCompletionClaim {
  */
 interface CommandSignatures {
   readonly 'map-create': {
-    readonly result: MapEditOutcome<CompletedMapEdit>;
+    readonly result: EditOutcome<CompletedContextEdit>;
     readonly options: [options: MapCreateContinuation & MapCompletionClaim];
   };
-  readonly 'map-manage': { readonly result: MapEditOutcome; readonly options: [] };
+  readonly 'map-manage': { readonly result: EditOutcome; readonly options: [] };
   readonly 'map-delete': {
-    readonly result: MapEditOutcome;
+    readonly result: EditOutcome;
     readonly options: [options: MapCompletionClaim];
   };
-  readonly 'graph-edit': { readonly result: AuthoringResult; readonly options: [] };
+  readonly 'graph-create': {
+    readonly result: EditOutcome<CompletedContextEdit>;
+    readonly options: [];
+  };
+  readonly 'graph-edit': { readonly result: EditOutcome; readonly options: [] };
   readonly 'graph-delete': {
-    readonly result: CoordinatedContextDeleteResult;
+    readonly result: EditOutcome<CompletedContextEdit>;
     readonly options: [];
   };
   readonly 'resource-delete': { readonly result: AuthoringResult; readonly options: [] };
@@ -308,10 +305,10 @@ const CLEAR: Settlement = { kind: 'clear', continuation: null };
 
 const notice = (value: CommandNotice): Settlement => ({ kind: 'notice', notice: value });
 
-const claimedMove = (result: MapEditOutcome, { completionMovesMap }: MapCompletionClaim): boolean =>
+const claimedMove = (result: EditOutcome, { completionMovesMap }: MapCompletionClaim): boolean =>
   completionMovesMap && result.kind === 'completed';
 
-const reportedMapCommand = (channel: ReportedChannel): CommandDefinition<MapEditOutcome, []> => ({
+const reportedCommand = (channel: ReportedChannel): CommandDefinition<EditOutcome, []> => ({
   channel,
   settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
   broke: null,
@@ -337,22 +334,21 @@ const COMMANDS: CommandDefinitions = {
     broke: null,
     movedMap: claimedMove,
   },
-  'map-manage': reportedMapCommand('map-manage'),
+  'map-manage': reportedCommand('map-manage'),
   'map-delete': {
     channel: 'map-delete',
     settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
     broke: null,
     movedMap: claimedMove,
   },
-  'graph-edit': authoringCommand('graph-edit'),
-  // `coordinatedGraphDelete` has already said its gate and its lifecycle
-  // refusal in a sentence, so the describer is that sentence.
-  'graph-delete': {
-    channel: 'graph-delete',
-    settle: (result) =>
-      result.kind === 'error' ? notice(described('graph-delete')(result.message)) : CLEAR,
-    broke: (failure) => described('graph-delete')(failureMessage(failure)),
-  },
+  // A creation's completion activates the new Graph in the Map it was pressed
+  // on, and never moves the Map, so it needs no claim; where the caret goes
+  // after it is the surface's, which neither the Dock nor the rail spends.
+  'graph-create': reportedCommand('graph-create'),
+  'graph-edit': reportedCommand('graph-edit'),
+  // A deletion leaves the canvas on a surviving Graph of the same Map, so it
+  // never moves the Map either.
+  'graph-delete': reportedCommand('graph-delete'),
   'resource-delete': authoringCommand('resource-delete'),
   'space-resource-delete': {
     channel: 'resource-delete',

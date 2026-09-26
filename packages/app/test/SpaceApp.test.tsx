@@ -1179,6 +1179,42 @@ describe('Space app Resources list', () => {
   });
 
   /**
+   * A refused Dock Graph rename is answered twice, each by its owner, as a
+   * Map rename is: the editor holds the draft open on the sentence, and
+   * command outcomes hold the report as "Graph unchanged" until it is
+   * dismissed.
+   */
+  it('holds a refused Dock Graph rename open and reports it as Graph unchanged', async () => {
+    const base = snapshot('Space', 'Resource', 10, 20);
+    const stored = { snapshot: base, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceResources } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    const app = composeApp({ spaceSession: session });
+    const complete = app.authoring.complete;
+    vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
+      completion.kind === 'renamed-graph'
+        ? { kind: 'refused', refusal: { code: 'graph-not-owned' } }
+        : complete(completion),
+    );
+    mountSpace({ id: runtime(base).id, session, app, spaceResources }, (view) => render(view));
+
+    await beginRename('active-graph');
+    const graphEditor = await screen.findByRole('textbox', { name: 'Graph name' });
+    fireEvent.change(graphEditor, { target: { value: 'Renamed' } });
+    fireEvent.keyDown(graphEditor, { key: 'Enter' });
+
+    expect(screen.getByRole('textbox', { name: 'Graph name' })).toHaveValue('Renamed');
+    expect(screen.getByRole('textbox', { name: 'Graph name' })).toHaveAccessibleDescription(
+      'That Graph is not one this Map owns.',
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Dismiss: Graph unchanged' }));
+    await waitFor(() => expect(screen.queryByText('Graph unchanged')).not.toBeInTheDocument());
+    expect(screen.getByRole('textbox', { name: 'Graph name' })).toHaveValue('Renamed');
+  });
+
+  /**
    * A refused Dock New Map is reported as "Map not created" by command
    * outcomes, and the caret stays where it was: the Dock continues in a name
    * only after a completed creation.
