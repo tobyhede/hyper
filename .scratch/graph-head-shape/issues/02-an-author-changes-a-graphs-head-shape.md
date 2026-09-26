@@ -4,11 +4,11 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Shape… sits directly under Colour… in the Graph menu, disabled whenever Colour… is.
-- [ ] The submenu offers exactly the four shapes, sized like the colour swatches, in the Graph's colour, with the current one marked.
-- [ ] Choosing a different shape is one Edit, and the canvas redraws the Graph's Edges with it.
-- [ ] Choosing the current shape produces no Edit (`unchanged`).
-- [ ] The Open Space Resource's Graph menu offers Shape… and it changes the target Space's Graph, as recolour does there.
-- [ ] Ladle story and application proof for the submenu (ADR 0052); `pnpm ui:catalog:check` passes.
+- [x] Shape… sits directly under Colour… in the Graph menu, disabled whenever Colour… is.
+- [x] The submenu offers exactly the four shapes, sized like the colour swatches, in the Graph's colour, with the current one marked.
+- [x] Choosing a different shape is one Edit, and the canvas redraws the Graph's Edges with it.
+- [x] Choosing the current shape produces no Edit (`unchanged`).
+- [x] The Open Space Resource's Graph menu offers Shape… and it changes the target Space's Graph, as recolour does there.
+- [x] Ladle story and application proof for the submenu (ADR 0052); `pnpm ui:catalog:check` passes.

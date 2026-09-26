@@ -1,4 +1,4 @@
-import type { ResourceDocument, GraphId, UUID } from '@project/core';
+import { graphHeadShape, type ResourceDocument, type GraphId, type UUID } from '@project/core';
 import {
   graphColor,
   type CanvasSpaceResourceGraphCommands,
@@ -121,6 +121,9 @@ export function spaceResourceContextCommands(
       colors: GRAPH_PALETTE_ENTRIES,
       onRename: (title) => refusalOf(complete({ kind: 'renamed-graph', graphId, title })),
       onRecolor: (color) => refusalOf(complete({ kind: 'recolored-graph', graphId, color })),
+      headShape: graphHeadShape(graph),
+      onChangeHeadShape: (headShape) =>
+        refusalOf(complete({ kind: 'changed-graph-head-shape', graphId, headShape })),
       onCreate: async () =>
         coordinatedContextCreate({
           waitBefore: settled,

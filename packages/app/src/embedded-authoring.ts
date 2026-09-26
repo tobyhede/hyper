@@ -29,7 +29,8 @@ const completeEmbedded = (
     completion.kind === 'renamed-map' ||
     completion.kind === 'added-graph' ||
     completion.kind === 'renamed-graph' ||
-    completion.kind === 'recolored-graph'
+    completion.kind === 'recolored-graph' ||
+    completion.kind === 'changed-graph-head-shape'
   ) {
     return entry.app.authoring.completeInMap(mapId, completion);
   }
@@ -39,7 +40,7 @@ const completeEmbedded = (
    * The kinds above are the whole of what the surfaces holding this
    * `authoring` produce — `EmbeddedMapAuthoring`, the render adapter's
    * resize and movement settlements, Canvas Resource Authoring, and the Space
-   * Resource rail's rename / recolor / add-Graph commands. Graph deletion is
+   * Resource rail's rename / recolor / head shape / add-Graph commands. Graph deletion is
    * not forwarded (`embedded-authoring.test.ts` — "does not forward Graph
    * deletion, which coordinated lifecycle owns"). Connecting two embedded Resources is
    * completed here as `connected-resources`; the host Edge Authoring module is
@@ -58,7 +59,7 @@ const completeEmbedded = (
    */
   report(
     new Error(
-      `A ${completion.kind} completion reached an embedded Map, which supports only Open, Close, Edit, Resize, movement, Remove from Map, connecting Resources, renaming the Map, and renaming, recoloring or adding a Graph.`,
+      `A ${completion.kind} completion reached an embedded Map, which supports only Open, Close, Edit, Resize, movement, Remove from Map, connecting Resources, renaming the Map, and renaming, recoloring, changing the head shape of or adding a Graph.`,
     ),
   );
   return NOTHING_AUTHORED;

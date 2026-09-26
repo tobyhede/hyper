@@ -55,7 +55,7 @@ export async function exerciseSpaceResourceContextMenus(
   const mapLink = await page.evaluate(() => navigator.clipboard.readText());
   expect(new URL(mapLink).pathname).toMatch(/^\/spaces\/[^/]+\/maps\/[^/]+$/);
 
-  // Same grammar, with Colour… heading the commands on this Graph —
+  // Same grammar, with Colour… and Shape… heading the commands on this Graph —
   // and no permanent address offered.
   await openMenu('graph');
   const graphMenu = page.getByRole('menu');
@@ -63,7 +63,7 @@ export async function exerciseSpaceResourceContextMenus(
   await expectMenuGroups(graphMenu, [
     await graphMenu.getByRole('menuitemradio').allInnerTexts(),
     ['New Graph'],
-    ['Colour…', 'Rename', 'Copy link to Graph'],
+    ['Colour…', 'Shape…', 'Rename', 'Copy link to Graph'],
     [/^Delete /],
   ]);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
@@ -81,6 +81,23 @@ export async function exerciseSpaceResourceContextMenus(
     'aria-checked',
     'true',
   );
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  // Shape… changes the target's Graph as Colour… does, and closes behind it.
+  await openMenu('graph');
+  await page.getByRole('menuitem', { name: 'Shape…', exact: true }).click();
+  await page
+    .getByRole('radiogroup', { name: 'Graph head shape' })
+    .getByRole('radio', { name: 'Dot', exact: true })
+    .click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await openMenu('graph');
+  await page.getByRole('menuitem', { name: 'Shape…', exact: true }).click();
+  await expect(
+    page
+      .getByRole('radiogroup', { name: 'Graph head shape' })
+      .getByRole('radio', { name: 'Dot', exact: true }),
+  ).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await openMenu('graph');

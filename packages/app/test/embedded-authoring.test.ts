@@ -196,6 +196,22 @@ describe('context commands on the Map an embedding is showing', () => {
     );
   });
 
+  it('forwards changing a Graph head shape to the target Space', () => {
+    const { composition, reported } = embedded();
+
+    expect(
+      composition.authoring.complete({
+        kind: 'changed-graph-head-shape',
+        graphId: GRAPH_ID,
+        headShape: 'vee',
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(reported).toEqual([]);
+    expect(
+      composition.authoring.getState().session.working.document.maps?.[0]?.graphs[0]?.headShape,
+    ).toBe('vee');
+  });
+
   it('forwards renaming, recoloring and adding a Graph', () => {
     const { composition, reported } = embedded();
 

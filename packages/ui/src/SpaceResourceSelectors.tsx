@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import type { GraphHeadShape } from '@project/core';
 import { DropdownMenuItem } from './components/dropdown-menu';
 import { ChoiceMenu, ChoiceMenuTrigger, type ChoiceMenuChoice } from './ChoiceMenu';
 import { GraphColorLine } from './GraphColorLine';
@@ -60,6 +61,8 @@ export interface CanvasSpaceResourceGraphCommands {
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => string | null;
+  readonly headShape: GraphHeadShape;
+  readonly onChangeHeadShape: (headShape: GraphHeadShape) => string | null;
 }
 
 /**
@@ -77,8 +80,11 @@ interface SelectorCommands {
     | null;
   readonly delete: (() => Promise<string | null>) | null;
   readonly copyLink: () => Promise<string | null>;
-  /** A Graph's colour, the one command a Graph carries that a Map does not. */
-  readonly palette?: Pick<CanvasSpaceResourceGraphCommands, 'color' | 'colors' | 'onRecolor'>;
+  /** How a Graph's Edges are drawn, the commands a Graph carries that a Map does not. */
+  readonly palette?: Pick<
+    CanvasSpaceResourceGraphCommands,
+    'color' | 'colors' | 'onRecolor' | 'headShape' | 'onChangeHeadShape'
+  >;
 }
 
 const mapSelectorCommands = (commands: CanvasSpaceResourceMapCommands): SelectorCommands => {
@@ -435,6 +441,11 @@ function SpaceResourceSelector({
               colors={palette.colors}
               onRecolor={(color) => {
                 onReport(palette.onRecolor(color));
+                setMenuOpen(false);
+              }}
+              headShape={palette.headShape}
+              onChangeHeadShape={(headShape) => {
+                onReport(palette.onChangeHeadShape(headShape));
                 setMenuOpen(false);
               }}
             />

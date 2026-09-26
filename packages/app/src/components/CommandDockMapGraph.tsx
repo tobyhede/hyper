@@ -256,6 +256,11 @@ function GraphIdentityMenu({
           graph.onRecolor(graph.active.id, color);
           onOpenChange(false);
         }}
+        headShape={graph.activeHeadShape}
+        onChangeHeadShape={(headShape) => {
+          graph.onChangeHeadShape(graph.active.id, headShape);
+          onOpenChange(false);
+        }}
         onCreate={graph.onCreate}
         onCopyLink={graph.onCopyLink}
         onDelete={() => graph.onDelete(graph.active.id)}

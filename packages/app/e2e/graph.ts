@@ -346,6 +346,37 @@ export async function recolorActiveGraph(page: Page, label: string): Promise<voi
   await page.getByRole('radio', { name: label, exact: true }).click();
 }
 
+/** Open Shape…, the Active Graph's four head shapes, from the Graph menu. */
+export async function openGraphHeadShapePicker(page: Page): Promise<Locator> {
+  const menu = await graphMenu(page);
+  await menu.getByRole('menuitem', { name: 'Shape…' }).click({ delay: 120 });
+  const group = page.getByRole('radiogroup', { name: 'Graph head shape' });
+  await expect(group.getByRole('radio')).toHaveCount(4);
+  return group;
+}
+
+/** Choose the Active Graph's head shape by the name Shape… reads it by. */
+export async function changeActiveGraphHeadShape(page: Page, label: string): Promise<void> {
+  const group = await openGraphHeadShapePicker(page);
+  await group.getByRole('radio', { name: label, exact: true }).click();
+}
+
+/**
+ * The head shape an Edge's drawn line ends in, read from the marker its path
+ * names as `marker-end`.
+ */
+export async function drawnHeadShape(edge: Locator): Promise<string | null> {
+  return edge.evaluate((element) => {
+    const path = element.querySelector('.react-flow__edge-path');
+    const id = /^url\('#(.+)'\)$/.exec(path?.getAttribute('marker-end') ?? '')?.[1];
+    const marker = id === undefined ? null : document.getElementById(id);
+    return (
+      marker?.querySelector('[data-slot="graph-head-shape"]')?.getAttribute('data-head-shape') ??
+      null
+    );
+  });
+}
+
 /**
  * Present, which traverses the Active Graph.
  *

@@ -238,7 +238,7 @@ test(
     await expectMenuGroups(menu, [
       ['Long', 'Mid', 'Short'],
       ['New Graph'],
-      ['Colour…', 'Rename', 'Copy link to Graph'],
+      ['Colour…', 'Shape…', 'Rename', 'Copy link to Graph'],
       ['Delete Long'],
     ]);
 
@@ -604,6 +604,57 @@ test(
     const finalStroke = await presentSvg.evaluate((element) => getComputedStyle(element).stroke);
     expect(finalStroke).not.toBe(initialStroke);
     expect(finalStroke).toBe('rgb(255, 127, 14)');
+  },
+);
+
+/**
+ * Shape… sits under Colour… and opens the four head shapes, drawn in the
+ * Graph's colour, with the one its Edges end in marked (ADR 0105). Long stores
+ * none, so the arrow is current.
+ */
+test(
+  'Shape… changes the Active Graph head shape and closes the menu',
+  { tag: '@parity:command-dock-changes-graph-head-shape' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const menu = await disclose(page, 'Active Graph: Long');
+    const items = await menu.getByRole('menuitem').allInnerTexts();
+    expect(items.indexOf('Shape…')).toBe(items.indexOf('Colour…') + 1);
+    const trigger = menu.getByRole('menuitem', { name: 'Shape…' });
+    await expect(trigger.locator('[data-slot="graph-head-shape"]')).toHaveAttribute(
+      'data-head-shape',
+      'arrow',
+    );
+    const colour = await menu
+      .getByRole('menuitem', { name: 'Colour…' })
+      .locator('svg')
+      .first()
+      .getAttribute('stroke');
+
+    await trigger.click({ delay: 120 });
+    const group = page.getByRole('radiogroup', { name: 'Graph head shape' });
+    await expect(group.getByRole('radio')).toHaveCount(4);
+    expect(
+      await group
+        .getByRole('radio')
+        .evaluateAll((radios) => radios.map((radio) => radio.getAttribute('aria-label'))),
+    ).toEqual(['Arrow', 'Vee', 'Dot', 'Diamond']);
+    await expect(group.getByRole('radio', { name: 'Arrow', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    for (const glyph of await group.locator('[data-slot="graph-head-shape"]').all())
+      await expect(glyph).toHaveAttribute('fill', colour ?? '');
+
+    await group.getByRole('radio', { name: 'Diamond', exact: true }).click();
+    await expect(group).toHaveCount(0);
+    await expect(page.getByRole('menu')).toHaveCount(0);
+
+    const reopened = await disclose(page, 'Active Graph: Long');
+    await expect(
+      reopened.getByRole('menuitem', { name: 'Shape…' }).locator('[data-slot="graph-head-shape"]'),
+    ).toHaveAttribute('data-head-shape', 'diamond');
   },
 );
 

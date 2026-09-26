@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import {
-  PaletteColorSwatchGrid,
-  paletteSwatchPanelClassName,
-  type PaletteColorEntry,
-} from './PaletteColorPicker';
+import type { GraphHeadShape } from '@project/core';
+import { GraphHeadShapeIcon, GraphHeadShapeSwatchGrid } from './GraphHeadShapeSwatchGrid';
+import { PaletteColorSwatchGrid, type PaletteColorEntry } from './PaletteColorPicker';
+import { swatchPanelClassName } from './SwatchGrid';
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -92,6 +91,9 @@ export interface GraphMenuActionsProps {
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: (color: string) => void;
+  /** The head shape the Graph's Edges draw — its stored one, else the default. */
+  readonly headShape: GraphHeadShape;
+  readonly onChangeHeadShape: (headShape: GraphHeadShape) => void;
 }
 
 /**
@@ -99,8 +101,10 @@ export interface GraphMenuActionsProps {
  * named.
  *
  * The same grouping grammar as {@link MapMenuActions} — make one, this one,
- * remove this one — with Colour… heading the group of commands on the Graph
- * you are on, the one command a Graph carries that a Map does not. Copy link
+ * remove this one — with Colour… and Shape… heading the group of commands on
+ * the Graph you are on, the two a Graph carries that a Map does not: how its
+ * Edges are drawn (ADR 0104, ADR 0105). Shape… is withdrawn exactly when
+ * Colour… is. Copy link
  * to Graph copies the within-Map address; this menu offers no separate
  * permanent address for the Graph itself.
  */
@@ -112,6 +116,8 @@ export function GraphMenuActions({
   color,
   colors,
   onRecolor,
+  headShape,
+  onChangeHeadShape,
   onCreate,
   onCopyLink,
   onDelete,
@@ -131,13 +137,27 @@ export function GraphMenuActions({
             <GraphIcon color={color} size={14} />
             Colour…
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
+          <DropdownMenuSubContent className={swatchPanelClassName}>
             <PaletteColorSwatchGrid
               entries={colors}
               value={color}
               onValueChange={onRecolor}
               disabled={editsDisabled}
               aria-label="Graph colour"
+            />
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="gap-2" disabled={editsDisabled}>
+            <GraphHeadShapeIcon headShape={headShape} color={color} className="size-[14px]" />
+            Shape…
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className={swatchPanelClassName}>
+            <GraphHeadShapeSwatchGrid
+              value={headShape}
+              color={color}
+              onValueChange={onChangeHeadShape}
+              disabled={editsDisabled}
             />
           </DropdownMenuSubContent>
         </DropdownMenuSub>

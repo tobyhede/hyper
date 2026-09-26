@@ -1,5 +1,13 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { Graph, GraphId, Map as SpaceMap, Resource, ResourceId, UUID } from '@project/core';
+import {
+  graphHeadShape,
+  type Graph,
+  type GraphId,
+  type Map as SpaceMap,
+  type Resource,
+  type ResourceId,
+  type UUID,
+} from '@project/core';
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSessionState } from '@project/persistence';
 import { FALLBACK_GRAPH_COLOR, type EntityActionGroup } from '@project/ui';
@@ -312,6 +320,7 @@ export function useDockChrome(
       active: activeGraph,
       colorByGraphId: projection.colors,
       activeColor: projection.colors[activeGraph.id] ?? FALLBACK_GRAPH_COLOR,
+      activeHeadShape: graphHeadShape(activeGraph),
       onActivate: location.activateGraph,
       onRename: availability.chromeTitleEdit
         ? (graphId, title) => renameChromeTitle({ kind: 'graph', id: graphId }, title)
@@ -320,6 +329,11 @@ export function useDockChrome(
       // no surface can see coming (`graph-not-owned`).
       onRecolor: (graphId, color) => {
         runGraphEdit(() => authoring.complete({ kind: 'recolored-graph', graphId, color }));
+      },
+      onChangeHeadShape: (graphId, headShape) => {
+        runGraphEdit(() =>
+          authoring.complete({ kind: 'changed-graph-head-shape', graphId, headShape }),
+        );
       },
       onCreate: () => {
         runGraphEdit(() => authoring.complete({ kind: 'added-graph' }));

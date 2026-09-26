@@ -2,9 +2,7 @@ import { useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { cn } from './lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
-
-/** Panel sizing shared by the popover and Dock submenu surfaces that host the grid. */
-export const paletteSwatchPanelClassName = 'nokey w-[6.75rem] p-[0.6rem]';
+import { SwatchGrid, swatchPanelClassName } from './SwatchGrid';
 
 /** One closed-palette slot the picker may offer. */
 export interface PaletteColorEntry {
@@ -22,12 +20,9 @@ export interface PaletteColorSwatchGridProps {
 }
 
 /**
- * A closed palette drawn as a swatch grid — shared by the popover and menu surfaces.
- *
- * Deviation: hand-rolled `role="radio"` buttons rather than a registry RadioGroup —
- * the grid mounts inside a popover or submenu panel, not a Menu radio list, and needs
- * a two-column swatch layout. Behaviour is held by `PaletteColorPicker.test.tsx` and
- * the Dock/application recolour parity tests.
+ * A closed palette drawn as a swatch grid — shared by the popover and menu
+ * surfaces. The chosen swatch carries a check as well as the grid's selected
+ * treatment, because a colour swatch fills its whole square.
  */
 export function PaletteColorSwatchGrid({
   entries,
@@ -38,47 +33,30 @@ export function PaletteColorSwatchGrid({
   className,
 }: PaletteColorSwatchGridProps) {
   return (
-    <div
-      role="radiogroup"
+    <SwatchGrid
+      entries={entries.map(({ color, label }) => ({ value: color, label }))}
+      value={value}
+      onValueChange={onValueChange}
+      disabled={disabled}
       aria-label={ariaLabel}
-      className={cn('grid grid-cols-2 gap-[0.35rem]', className)}
-    >
-      {entries.map(({ color, label }) => {
-        const selected = value === color;
-        return (
-          <button
-            key={color}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            data-testid={`palette-swatch-${label.replace(/\s+/g, '-').toLowerCase()}`}
-            className={cn(
-              'flex cursor-pointer items-center justify-center rounded-chrome-md border border-transparent p-[0.35rem] transition-[background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
-              selected && 'border-border bg-accent',
-            )}
-            onClick={() => onValueChange(color)}
-          >
-            <span
+      className={className}
+      renderSwatch={(color, selected) => (
+        <span
+          aria-hidden
+          className="relative h-[1.35rem] w-[1.35rem] rounded-chrome-sm border border-border/60"
+          style={{ backgroundColor: color }}
+        >
+          {selected ? (
+            <Check
               aria-hidden
-              className="relative h-[1.35rem] w-[1.35rem] rounded-chrome-sm border border-border/60"
-              style={{ backgroundColor: color }}
-            >
-              {selected ? (
-                <Check
-                  aria-hidden
-                  size={12}
-                  strokeWidth={3}
-                  className="absolute inset-0 m-auto text-foreground drop-shadow-[0_0_1px_rgba(0,0,0,0.85)]"
-                />
-              ) : null}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+              size={12}
+              strokeWidth={3}
+              className="absolute inset-0 m-auto text-foreground drop-shadow-[0_0_1px_rgba(0,0,0,0.85)]"
+            />
+          ) : null}
+        </span>
+      )}
+    />
   );
 }
 
@@ -142,7 +120,7 @@ export function PaletteColorPicker({
       >
         {trigger ?? 'Choose colour'}
       </PopoverTrigger>
-      <PopoverContent side={side} align={align} className={paletteSwatchPanelClassName}>
+      <PopoverContent side={side} align={align} className={swatchPanelClassName}>
         <PaletteColorSwatchGrid
           entries={entries}
           value={value}
