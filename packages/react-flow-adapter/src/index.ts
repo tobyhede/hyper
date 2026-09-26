@@ -36,6 +36,7 @@ export {
 // package asks that question — the application composes the Edge, not the rule.
 // A test of the rule imports it from its own module.
 export { GraphHud } from './GraphHud';
+export { GraphHeadMarkers } from './GraphHeadMarkers';
 export { GraphConnectionLine } from './GraphConnectionLine';
 export { ZoomSlider } from './ZoomSlider';
 export type { ZoomSliderProps } from './ZoomSlider';

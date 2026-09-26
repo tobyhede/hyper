@@ -19,6 +19,7 @@ import {
 import {
   nodeTypes,
   edgeTypes,
+  GraphHeadMarkers,
   ZoomSlider,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
@@ -243,6 +244,7 @@ export function StoryCanvas({
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={24} />
+          <GraphHeadMarkers />
           {children}
         </ReactFlow>
       </ReactFlowProvider>

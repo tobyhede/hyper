@@ -371,7 +371,8 @@ describe('commit wire policy', () => {
 
 describe('Space HTTP reads', () => {
   it('retains collection listing and lazy resource loading', async () => {
-    // Which colour initialization stores is persistence's rule, held by its own tests.
+    // Which colour initialization stores is persistence's rule, held by its own
+    // tests; every creation stores the arrow head shape (ADR 0105).
     const storedColour: unknown = expect.any(String);
     const ids = [MAP_ID, GRAPH_ID];
     const base = repository();
@@ -399,7 +400,15 @@ describe('Space HTTP reads', () => {
               title: 'Map 1',
               kind: 'positioned',
               positions: {},
-              graphs: [{ id: GRAPH_ID, title: 'Graph 1', color: storedColour, edges: [] }],
+              graphs: [
+                {
+                  id: GRAPH_ID,
+                  title: 'Graph 1',
+                  color: storedColour,
+                  headShape: 'arrow',
+                  edges: [],
+                },
+              ],
               activeGraph: GRAPH_ID,
             },
           ],

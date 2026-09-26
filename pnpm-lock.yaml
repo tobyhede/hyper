@@ -229,6 +229,9 @@ importers:
 
   packages/react-flow-adapter:
     dependencies:
+      '@project/core':
+        specifier: workspace:*
+        version: link:../core
       '@project/graph':
         specifier: workspace:*
         version: link:../graph

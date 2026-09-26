@@ -142,6 +142,7 @@ describe('Add Map', () => {
             id: MINTED_GRAPH,
             title: 'Graph 1',
             color: GRAPH_PALETTE[0],
+            headShape: 'arrow',
             edges: [],
           },
         ],
@@ -508,7 +509,13 @@ describe('Add Graph', () => {
             // The colour this Map's Graphs alone would choose, carried by
             // another Map, so counting it would choose something else.
             graphs: [
-              { id: OTHER_GRAPH_ID, title: 'Other', color: nextGraphColor([BLUE]), edges: [] },
+              {
+                id: OTHER_GRAPH_ID,
+                title: 'Other',
+                color: nextGraphColor([BLUE]),
+                headShape: 'arrow',
+                edges: [],
+              },
             ],
           },
         ],
@@ -552,7 +559,13 @@ describe('Add Graph', () => {
 
     expect(graphsOf(session.getState().working)).toEqual([
       MAIN_GRAPH,
-      { id: MINTED, title: 'Graph 1', color: nextGraphColor([BLUE]), edges: [] },
+      {
+        id: MINTED,
+        title: 'Graph 1',
+        color: nextGraphColor([BLUE]),
+        headShape: 'arrow',
+        edges: [],
+      },
     ]);
     expect(mapOf(session.getState().working, MAP_ID)?.activeGraph).toBe(MINTED);
     expect(navigation.getState().activeGraphId).toBe(MINTED);

@@ -98,7 +98,15 @@ describe('initializeSpace', () => {
         title: 'Map 1',
         kind: 'positioned',
         positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
-        graphs: [{ id: GRAPH_ID, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
+        graphs: [
+          {
+            id: GRAPH_ID,
+            title: 'Graph 1',
+            color: nextGraphColor([]),
+            headShape: 'arrow',
+            edges: [],
+          },
+        ],
         activeGraph: GRAPH_ID,
       },
     ]);

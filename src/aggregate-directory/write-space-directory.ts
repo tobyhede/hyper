@@ -78,14 +78,16 @@ const canonicalEdge = (edge: GraphEdge): GraphEdge => {
 const canonicalGraphs = (
   graphs: NonNullable<SpaceFile['maps']>[number]['graphs'],
 ): NonNullable<SpaceFile['maps']>[number]['graphs'] =>
-  graphs.map((graph) => {
-    const edges = graph.edges.map(canonicalEdge);
-    // Two full literals rather than a base object with `color` assigned after:
-    // `color` sits between `title` and `edges` in the exported key order, and an
-    // assignment after construction would insert it last instead.
-    return graph.color === undefined
-      ? { id: graph.id, title: graph.title, edges }
-      : { id: graph.id, title: graph.title, color: graph.color, edges };
+  graphs.map(({ id, title, color, headShape, edges }) => {
+    // Each optional field is added to the head in exported key order, and
+    // `edges` is spread in after the head so it stays last.
+    const head: Omit<NonNullable<SpaceFile['maps']>[number]['graphs'][number], 'edges'> = {
+      id,
+      title,
+    };
+    if (color !== undefined) head.color = color;
+    if (headShape !== undefined) head.headShape = headShape;
+    return { ...head, edges: edges.map(canonicalEdge) };
   });
 
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {

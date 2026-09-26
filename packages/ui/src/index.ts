@@ -99,6 +99,13 @@ export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
 export { GraphColorLine } from './GraphColorLine';
 export type { GraphColorLineProps } from './GraphColorLine';
 export {
+  GRAPH_HEAD_SHAPE_FRAME,
+  GRAPH_HEAD_SHAPE_LABELS,
+  GraphHeadMarker,
+  GraphHeadShapeGlyph,
+} from './GraphHeadShape';
+export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
+export {
   PaletteColorPicker,
   PaletteColorSwatchGrid,
   paletteSwatchPanelClassName,

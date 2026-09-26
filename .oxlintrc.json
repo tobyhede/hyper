@@ -38,7 +38,12 @@
     "anti-slop/no-unknown-type-aliases": "error",
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/no-chained-type-assertions": "error",
-    "anti-slop/no-shape-in-symbol-names": "error",
+    // "head shape" is a domain term (CONTEXT.md, ADR 0105): what a Graph's Edges
+    // draw at their heads, stored as a Graph's `headShape`. There "shape" names
+    // the drawn geometry itself rather than a structure standing in for an
+    // owner, so the compound is allowed in every casing; "shape" alone or in any
+    // other compound is still reported (`test/unit/anti-slop/no-shape-in-symbol-names.test.ts`).
+    "anti-slop/no-shape-in-symbol-names": ["error", { "allowedCompounds": ["head shape"] }],
     "anti-slop/no-module-mocking": "error",
     "anti-slop/no-known-value-widening": "error",
     "anti-slop/no-unknown-returns": "error",

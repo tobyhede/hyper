@@ -32,7 +32,7 @@ export interface GraphLane {
    */
   readonly reach: number;
   /**
-   * Whether the Edge runs anchor to anchor and carries the arrowhead. The
+   * Whether the Edge runs anchor to anchor rather than stopping short. The
    * Active Graph's Edges connect, and while no Graph is active every Edge does;
    * any other Edge runs beside them and stops short (ADR 0100).
    */
@@ -108,7 +108,7 @@ export interface LaneGeometry {
   readonly labelY: number;
   /**
    * Straight distance between the drawn line's ends, after lane offset and
-   * trim, excluding the arrowhead marker. A midpoint Title's room is measured
+   * trim, excluding the head marker. A midpoint Title's room is measured
    * against it.
    */
   readonly span: number;
@@ -158,14 +158,14 @@ export const DETACHED_END_TRIM = 0.2;
  * At a left, right, top or bottom anchor the curve leaves along the direction
  * the side faces, so its normal there is along the side, and each end of a
  * lane sits beside its anchor, moved along the side the anchor sits on. The
- * arrowheads move with their lanes rather than meeting on one point.
+ * heads move with their lanes rather than meeting on one point.
  *
  * A positive offset runs below an Edge whose sides are left and right, and to
  * the right of one whose sides are top and bottom — along the side the anchors
  * sit on, whichever way the Edge travels; a negative one runs above or left. A
  * self-Edge's two sides are on different axes, so its lane is not an offset:
  * each anchor moves along its own side, away from the corner the loop goes
- * round, so an arrowhead still lands on its Resource, and the curve between
+ * round, so a connecting Edge's head still lands on its Resource, and the curve between
  * them is `getBezierPath` over the moved anchors. The lane is then a loop of
  * its own, and the lanes are not kept from crossing.
  *
