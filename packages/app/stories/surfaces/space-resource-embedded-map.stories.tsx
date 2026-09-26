@@ -38,6 +38,11 @@ const REVIEW_ID = id('000000000017');
  * and nothing more. So `Collection 2` draws one Resource of its own, `Review`,
  * which `Collection 1` does not position; whichever Map the Resource selects,
  * what the embedding draws names it.
+ *
+ * **Overview is drawn unlike the containing Graph** — its own colour and a
+ * `diamond` head where the containing Graph 1 takes the palette's first slot
+ * and the arrow — so a surface drawing the target's Graph cannot pass by
+ * drawing the containing one.
  */
 const target: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: TARGET_ID,
@@ -54,7 +59,13 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
           [STORAGE_ID]: { x: 300, y: 0, open: false },
         },
         graphs: [
-          { id: TARGET_GRAPH_ID, title: 'Overview', edges: [{ from: INTAKE_ID, to: STORAGE_ID }] },
+          {
+            id: TARGET_GRAPH_ID,
+            title: 'Overview',
+            color: '#ff7f0e',
+            headShape: 'diamond',
+            edges: [{ from: INTAKE_ID, to: STORAGE_ID }],
+          },
         ],
       },
       {

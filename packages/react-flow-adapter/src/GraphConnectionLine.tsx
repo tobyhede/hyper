@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { getBezierPath, type ConnectionLineComponentProps } from '@xyflow/react';
-import { DEFAULT_GRAPH_HEAD_SHAPE, type GraphHeadShape } from '@project/core';
+import { graphHeadShape, type GraphHeadShape } from '@project/core';
 import { FALLBACK_GRAPH_COLOR, GraphHeadMarker } from '@project/ui';
 
 /** One connection is drawn at a time, so its marker needs no per-instance id. */
@@ -13,22 +13,23 @@ export type GraphConnectionLineProps = Pick<
 >;
 
 /**
- * The head shape the preview ends in. React Flow hands a connection line only
- * its geometry and `connectionLineStyle`, so the Active Graph's head shape
- * reaches it through context rather than a prop; the colour rides on the
- * style's stroke, as it always has.
+ * The head shape the joined Graph stores, absent where it stores none. React
+ * Flow hands a connection line only its geometry and `connectionLineStyle`, so
+ * the head shape reaches it through context rather than a prop; the colour
+ * rides on the style's stroke.
  */
-const ConnectionHeadShape = createContext<GraphHeadShape>(DEFAULT_GRAPH_HEAD_SHAPE);
+const ConnectionHeadShape = createContext<GraphHeadShape | undefined>(undefined);
 
 /**
- * Supplies the head shape of the Graph a drawn connection will join — the
- * Active Graph's, resolved through `graphHeadShape` — to the preview beneath.
+ * Supplies the head shape stored on the Graph a drawn connection will join to
+ * the preview beneath. The preview resolves it through `graphHeadShape`, so an
+ * absent one draws as the default.
  */
 export function GraphConnectionLineHeadShape({
   headShape,
   children,
 }: {
-  readonly headShape: GraphHeadShape;
+  readonly headShape: GraphHeadShape | undefined;
   readonly children: ReactNode;
 }) {
   return <ConnectionHeadShape.Provider value={headShape}>{children}</ConnectionHeadShape.Provider>;
@@ -48,7 +49,7 @@ export function GraphConnectionLine({
   toPosition,
   connectionLineStyle,
 }: GraphConnectionLineProps) {
-  const headShape = useContext(ConnectionHeadShape);
+  const headShape = graphHeadShape({ headShape: useContext(ConnectionHeadShape) });
   const [path] = getBezierPath({
     sourceX: fromX,
     sourceY: fromY,

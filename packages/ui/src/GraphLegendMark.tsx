@@ -35,9 +35,10 @@ const LINE_WIDTH = 2.5;
  * Dock's Graph identity, the Colour… command — keep the coloured `GraphIcon`.
  *
  * The head is `GraphHeadShapeGlyph`, the glyph the canvas's own markers draw,
- * and the line runs into it as an Edge's path runs into its marker. It takes a resolved colour and head shape rather than a Graph, so
- * the rule for each stays in `graphColor` and `graphHeadShape` and every
- * caller reaches it there. Decorative: the title beside it names the Graph.
+ * and the line runs into it as an Edge's path runs into its marker. It takes
+ * a resolved colour and head shape rather than a Graph, so the rule for each
+ * stays in `graphColor` and `graphHeadShape` and every caller reaches it
+ * there. Decorative: the title beside it names the Graph.
  */
 export function GraphLegendMark({ color, headShape }: GraphLegendMarkProps) {
   // The box is the span's rather than the svg's: a menu row sizes every svg

@@ -386,8 +386,8 @@ export async function createResource(page: Page, kind: ResourceKindName): Promis
   await createResourceControl(page, kind).click();
 }
 
-/** The resolved colour drawn on one Graph's legend mark, by its title. */
-export async function graphLegendSwatchColor(page: Page, title: string): Promise<string> {
+/** The resolved stroke of one Graph's legend mark line, by its title. */
+export async function graphLegendLineStroke(page: Page, title: string): Promise<string> {
   const line = page
     .getByTestId('graph-legend')
     .locator('.legend__item')

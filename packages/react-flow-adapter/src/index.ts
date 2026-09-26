@@ -38,7 +38,6 @@ export {
 export { GraphHud } from './GraphHud';
 export { GraphHeadMarkers } from './GraphHeadMarkers';
 export { GraphConnectionLine, GraphConnectionLineHeadShape } from './GraphConnectionLine';
-export type { GraphConnectionLineProps } from './GraphConnectionLine';
 export { ZoomSlider } from './ZoomSlider';
 export type { ZoomSliderProps } from './ZoomSlider';
 export type { GraphHudProps } from './GraphHud';

@@ -24,8 +24,6 @@ import {
   useStore,
 } from '@xyflow/react';
 import {
-  DEFAULT_GRAPH_HEAD_SHAPE,
-  graphHeadShape,
   titleName,
   uuidSchema,
   type Resource,
@@ -46,7 +44,7 @@ import {
   ZoomSlider,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
-import { activeGraphColor } from '../colors';
+import { connectionAppearance } from '../colors';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringAvailability } from '../authoring-availability';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
@@ -565,6 +563,9 @@ export function SpaceCanvas({
   );
 
   const embedConnectFrom = useRef<EmbeddedConnectionStart | null>(null);
+  // The embedding a connection in flight started in, as state so the preview
+  // redraws in that embedding's Graph when one starts.
+  const [embeddedConnectionParent, setEmbeddedConnectionParent] = useState<string | null>(null);
   const mayOfferEmbedded = useCallback(
     (resourceId: ResourceId) => {
       const session = embedConnectFrom.current;
@@ -1090,18 +1091,21 @@ export function SpaceCanvas({
     return () => window.removeEventListener('keydown', deleteSelection);
   }, []);
 
-  const connectionLineStyle = useMemo(
-    () => ({
-      stroke: activeGraphColor(colorByGraphId, activeGraphId),
-      strokeWidth: 3,
-    }),
-    [activeGraphId, colorByGraphId],
+  // The preview is drawn as the Graph the new Edge joins: the target's shown
+  // Graph for a connection between one embedding's Resources, else the Active
+  // Graph.
+  const preview = useMemo(
+    () =>
+      (embeddedConnectionParent === null
+        ? undefined
+        : embeddedPublications.get(embeddedConnectionParent)?.connectionAppearance()) ??
+      connectionAppearance(graphs, colorByGraphId, activeGraphId),
+    [embeddedConnectionParent, embeddedPublications, graphs, colorByGraphId, activeGraphId],
   );
-  // The Graph a drawn connection joins; none is active before the first
-  // connection mints one, which starts as the default head shape.
-  const connectingGraph = graphs.find((graph) => graph.id === activeGraphId);
-  const connectionHeadShape =
-    connectingGraph === undefined ? DEFAULT_GRAPH_HEAD_SHAPE : graphHeadShape(connectingGraph);
+  const connectionLineStyle = useMemo(
+    () => ({ stroke: preview.color, strokeWidth: 3 }),
+    [preview.color],
+  );
 
   const {
     onConnect,
@@ -1124,9 +1128,11 @@ export function SpaceCanvas({
       const parsed = parseEmbeddedNodeId(params.nodeId ?? '');
       if (parsed !== undefined) {
         embedConnectFrom.current = { parentId: parsed.parentId, from: parsed.resourceId };
+        setEmbeddedConnectionParent(parsed.parentId);
         return;
       }
       embedConnectFrom.current = null;
+      setEmbeddedConnectionParent(null);
       onConnectStart(event, params);
     },
     [onConnectStart],
@@ -1145,6 +1151,7 @@ export function SpaceCanvas({
   const onEmbeddedConnectEnd = useCallback<OnConnectEnd>(
     (event, connection) => {
       embedConnectFrom.current = null;
+      setEmbeddedConnectionParent(null);
       onConnectEnd(event, connection);
     },
     [onConnectEnd],
@@ -1217,212 +1224,211 @@ export function SpaceCanvas({
     return props;
   }, [presenting, embeddedRequests, resumeEmbedded]);
 
-  return edgeSurface.provide(
-    <GraphConnectionLineHeadShape headShape={connectionHeadShape}>
-      <ReactFlow
-        ref={canvasRef}
-        nodes={canvasNodes}
-        edges={canvasEdges}
-        nodeTypes={nodeTypes}
-        edgeTypes={canvasEdgeTypes}
-        onNodesChange={changeCanvasNodes}
-        {...embeddedEvents}
-        onEdgesChange={onEdgesChange}
-        // Edge Authoring's own properties, named one by one rather than spread, so
-        // no property order below can silently replace one of its handlers.
-        onConnect={onEmbeddedConnect}
-        onConnectStart={onEmbeddedConnectStart}
-        onConnectEnd={onEmbeddedConnectEnd}
-        isValidConnection={isEmbeddedConnectionValid}
-        onMouseMove={onMouseMove}
-        onEdgeMouseEnter={onEdgeMouseEnter}
-        onEdgeMouseLeave={onEdgeMouseLeave}
-        onDragOver={onExternalDragOver}
-        onDrop={onExternalDrop}
-        edgesReconnectable={edgesReconnectable}
-        edgesFocusable={edgesFocusable}
-        // Passed through rather than copied: `useKeyPress` has this value in the
-        // dependency array of its listener effect, so a fresh array per render
-        // re-attaches React Flow's `keydown`/`keyup` on `document`.
-        deleteKeyCode={deleteKeyCode}
-        multiSelectionKeyCode={multiSelectionKeyCode}
-        selectionKeyCode={selectionKeyCode}
-        selectionOnDrag={selectionOnDrag}
-        onKeyDown={handleKeyDown}
-        // Programmatically focusable, and deliberately not a tab stop. React Flow's
-        // native Edge Escape calls `blur()`, which leaves focus on `body` — not an
-        // authoring context — and its pane carries no `tabindex`, so there is
-        // nothing for the repair to focus without this. Negative, so the canvas
-        // never becomes a stop a keyboard author has to pass through.
-        tabIndex={-1}
-        fitView={openingFraming === undefined}
-        fitViewOptions={OVERVIEW_FIT}
-        // Nothing on a Resource answers a double click. The Title is a
-        // one-activation control, so the second click of a pair lands in the field
-        // the first one opened — and that field, like the control, carries
-        // `.nopan`, the one class React Flow's zoom filter exempts. The Resource body
-        // carries no such class, so a double click there would zoom the canvas
-        // while meaning nothing to the Resource. Off for the whole canvas rather than
-        // per node, so the gesture does not change meaning two pixels away from a
-        // Resource.
-        zoomOnDoubleClick={false}
-        // While presenting the arrow keys control traversal, so React Flow must not
-        // also read them as moving or selecting a node.
-        nodesDraggable={availability.dragNodes}
-        nodesFocusable={availability.selectNodes}
-        elementsSelectable={availability.selectNodes}
-        // Half of a pair, and useless without the other half. React Flow resolves
-        // this into `NodeProps.isConnectable` and hands it to the node, enforcing
-        // nothing itself on a handle it did not render — so `ResourceNode` forwards it
-        // to the four authoring handles, and only then does this line mean
-        // anything beyond whether the connection line draws.
-        //
-        // **Not `authorOnCanvas`**: presenting deliberately keeps this one
-        // gesture, and `authoring-availability.ts` records why.
-        nodesConnectable={availability.connectOnCanvas}
-        // **The placement fact, deliberately not an availability answer.** The
-        // withheld form of this description is a sentence about placement, so the
-        // only condition that may gate it is whether placement resolved. Any
-        // other withdrawal — presenting, a live chrome rename — would leave the
-        // description saying "pending" about a placement that is not.
-        ariaLabelConfig={placementReady ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
-        // No `connectionMode`: the default is Strict, and every legal drop here is
-        // already source-to-target. Loose only adds source-to-source, which the
-        // authoring handles refuse via `isConnectableEnd` and the graph ports via
-        // `pointer-events: none` — so it would advertise a capability the design forbids.
-        connectionLineStyle={connectionLineStyle}
-        connectionLineComponent={GraphConnectionLine}
-        minZoom={0.2}
-        // Presenting draws one resource full-screen, which is far closer than React
-        // Flow's default ceiling of 2. See `MAX_ZOOM` — without it the camera sits
-        // outside its own extent and the first wheel tick yanks it back.
-        maxZoom={MAX_ZOOM}
-      >
-        <Background gap={24} />
-        <GraphHeadMarkers />
-        <svg aria-hidden="true" width={0} height={0}>
-          <defs>
-            {embeddedRequests.map(({ parent, absolute, bounds, tiltCenter }) => (
-              <clipPath
-                key={parent.id}
-                id={embeddedClipId(parent.id)}
-                clipPathUnits="userSpaceOnUse"
-              >
-                <rect
-                  x={absolute.x + bounds.left}
-                  y={absolute.y + bounds.top}
-                  width={Math.max(0, bounds.right - bounds.left)}
-                  height={Math.max(0, bounds.bottom - bounds.top)}
-                  // The window leans with the Resource it is cut out of. Written as
-                  // SVG's own `rotate(angle cx cy)`, which carries its centre and
-                  // so needs none of the `transform-box` reasoning the Edge layer
-                  // does — this `<clipPath>` lives in a 0x0 `<svg>` of its own,
-                  // where a view box would mean nothing.
-                  transform={
-                    tiltCenter === undefined
-                      ? undefined
-                      : `rotate(${CANVAS_RESOURCE_DRAG_TILT_DEGREES} ${tiltCenter.x} ${tiltCenter.y})`
-                  }
-                />
-              </clipPath>
-            ))}
-          </defs>
-        </svg>
-        {embeddedRequests.map((request) =>
-          request.entry === undefined ? null : (
-            <EmbeddedMapAuthoring
-              commandOutcomes={commandOutcomes}
-              key={`${request.parent.id}:${request.mapId}`}
-              parent={request.parent}
-              entry={request.entry}
-              mapId={request.mapId}
-              graphId={request.graphId}
-              // Two answers and one membership test, and each is here for its own
-              // reason. `authorInEmbeddedMap` is every way this canvas is not
-              // being authored *except* an embedded edit; `authorOnCanvas` adds
-              // that one, so it is false the moment any embedding is editing —
-              // and the membership test is that same fact read the other way
-              // round, reinstating the one embedding that owns the edit. Which
-              // embedding it is never leaves this component, so it could not be
-              // an answer.
-              //
-              // The two live edits are this canvas's own and read at same-render
-              // freshness; the answers `App` holds are a frame behind them, since
-              // each is reported up through an effect.
-              enabled={embeddedAuthoringEnabled({
-                readOnly: request.readOnly,
-                portalEditing: embeddingIsPortalEditing(
-                  request.parent,
-                  portalNodesById,
-                  editingPortals,
-                ),
-                authorInEmbeddedMap: availability.authorInEmbeddedMap,
-                authorOnCanvas: availability.authorOnCanvas,
-                thisEmbeddingEditing: editingEmbeddingIds.has(request.parent.id),
-                hostBodyEditing: bodyEditing,
-                hostTitleEditing: resourceAuthoring.titleEditing,
-              })}
-              framing={
-                portalDraft.get(request.parent.data.resourceId) ??
-                request.parent.data.spaceContent?.framing
-              }
-              bounds={request.bounds}
-              absolute={request.absolute}
-              drawnAbsolute={request.drawnAbsolute}
-              tiltCenter={request.tiltCenter}
-              publish={publishEmbedded}
-            />
-          ),
-        )}
-        {/*
+  const canvas = (
+    <ReactFlow
+      ref={canvasRef}
+      nodes={canvasNodes}
+      edges={canvasEdges}
+      nodeTypes={nodeTypes}
+      edgeTypes={canvasEdgeTypes}
+      onNodesChange={changeCanvasNodes}
+      {...embeddedEvents}
+      onEdgesChange={onEdgesChange}
+      // Edge Authoring's own properties, named one by one rather than spread, so
+      // no property order below can silently replace one of its handlers.
+      onConnect={onEmbeddedConnect}
+      onConnectStart={onEmbeddedConnectStart}
+      onConnectEnd={onEmbeddedConnectEnd}
+      isValidConnection={isEmbeddedConnectionValid}
+      onMouseMove={onMouseMove}
+      onEdgeMouseEnter={onEdgeMouseEnter}
+      onEdgeMouseLeave={onEdgeMouseLeave}
+      onDragOver={onExternalDragOver}
+      onDrop={onExternalDrop}
+      edgesReconnectable={edgesReconnectable}
+      edgesFocusable={edgesFocusable}
+      // Passed through rather than copied: `useKeyPress` has this value in the
+      // dependency array of its listener effect, so a fresh array per render
+      // re-attaches React Flow's `keydown`/`keyup` on `document`.
+      deleteKeyCode={deleteKeyCode}
+      multiSelectionKeyCode={multiSelectionKeyCode}
+      selectionKeyCode={selectionKeyCode}
+      selectionOnDrag={selectionOnDrag}
+      onKeyDown={handleKeyDown}
+      // Programmatically focusable, and deliberately not a tab stop. React Flow's
+      // native Edge Escape calls `blur()`, which leaves focus on `body` — not an
+      // authoring context — and its pane carries no `tabindex`, so there is
+      // nothing for the repair to focus without this. Negative, so the canvas
+      // never becomes a stop a keyboard author has to pass through.
+      tabIndex={-1}
+      fitView={openingFraming === undefined}
+      fitViewOptions={OVERVIEW_FIT}
+      // Nothing on a Resource answers a double click. The Title is a
+      // one-activation control, so the second click of a pair lands in the field
+      // the first one opened — and that field, like the control, carries
+      // `.nopan`, the one class React Flow's zoom filter exempts. The Resource body
+      // carries no such class, so a double click there would zoom the canvas
+      // while meaning nothing to the Resource. Off for the whole canvas rather than
+      // per node, so the gesture does not change meaning two pixels away from a
+      // Resource.
+      zoomOnDoubleClick={false}
+      // While presenting the arrow keys control traversal, so React Flow must not
+      // also read them as moving or selecting a node.
+      nodesDraggable={availability.dragNodes}
+      nodesFocusable={availability.selectNodes}
+      elementsSelectable={availability.selectNodes}
+      // Half of a pair, and useless without the other half. React Flow resolves
+      // this into `NodeProps.isConnectable` and hands it to the node, enforcing
+      // nothing itself on a handle it did not render — so `ResourceNode` forwards it
+      // to the four authoring handles, and only then does this line mean
+      // anything beyond whether the connection line draws.
+      //
+      // **Not `authorOnCanvas`**: presenting deliberately keeps this one
+      // gesture, and `authoring-availability.ts` records why.
+      nodesConnectable={availability.connectOnCanvas}
+      // **The placement fact, deliberately not an availability answer.** The
+      // withheld form of this description is a sentence about placement, so the
+      // only condition that may gate it is whether placement resolved. Any
+      // other withdrawal — presenting, a live chrome rename — would leave the
+      // description saying "pending" about a placement that is not.
+      ariaLabelConfig={placementReady ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
+      // No `connectionMode`: the default is Strict, and every legal drop here is
+      // already source-to-target. Loose only adds source-to-source, which the
+      // authoring handles refuse via `isConnectableEnd` and the graph ports via
+      // `pointer-events: none` — so it would advertise a capability the design forbids.
+      connectionLineStyle={connectionLineStyle}
+      connectionLineComponent={GraphConnectionLine}
+      minZoom={0.2}
+      // Presenting draws one resource full-screen, which is far closer than React
+      // Flow's default ceiling of 2. See `MAX_ZOOM` — without it the camera sits
+      // outside its own extent and the first wheel tick yanks it back.
+      maxZoom={MAX_ZOOM}
+    >
+      <Background gap={24} />
+      <GraphHeadMarkers />
+      <svg aria-hidden="true" width={0} height={0}>
+        <defs>
+          {embeddedRequests.map(({ parent, absolute, bounds, tiltCenter }) => (
+            <clipPath key={parent.id} id={embeddedClipId(parent.id)} clipPathUnits="userSpaceOnUse">
+              <rect
+                x={absolute.x + bounds.left}
+                y={absolute.y + bounds.top}
+                width={Math.max(0, bounds.right - bounds.left)}
+                height={Math.max(0, bounds.bottom - bounds.top)}
+                // The window leans with the Resource it is cut out of. Written as
+                // SVG's own `rotate(angle cx cy)`, which carries its centre and
+                // so needs none of the `transform-box` reasoning the Edge layer
+                // does — this `<clipPath>` lives in a 0x0 `<svg>` of its own,
+                // where a view box would mean nothing.
+                transform={
+                  tiltCenter === undefined
+                    ? undefined
+                    : `rotate(${CANVAS_RESOURCE_DRAG_TILT_DEGREES} ${tiltCenter.x} ${tiltCenter.y})`
+                }
+              />
+            </clipPath>
+          ))}
+        </defs>
+      </svg>
+      {embeddedRequests.map((request) =>
+        request.entry === undefined ? null : (
+          <EmbeddedMapAuthoring
+            commandOutcomes={commandOutcomes}
+            key={`${request.parent.id}:${request.mapId}`}
+            parent={request.parent}
+            entry={request.entry}
+            mapId={request.mapId}
+            graphId={request.graphId}
+            // Two answers and one membership test, and each is here for its own
+            // reason. `authorInEmbeddedMap` is every way this canvas is not
+            // being authored *except* an embedded edit; `authorOnCanvas` adds
+            // that one, so it is false the moment any embedding is editing —
+            // and the membership test is that same fact read the other way
+            // round, reinstating the one embedding that owns the edit. Which
+            // embedding it is never leaves this component, so it could not be
+            // an answer.
+            //
+            // The two live edits are this canvas's own and read at same-render
+            // freshness; the answers `App` holds are a frame behind them, since
+            // each is reported up through an effect.
+            enabled={embeddedAuthoringEnabled({
+              readOnly: request.readOnly,
+              portalEditing: embeddingIsPortalEditing(
+                request.parent,
+                portalNodesById,
+                editingPortals,
+              ),
+              authorInEmbeddedMap: availability.authorInEmbeddedMap,
+              authorOnCanvas: availability.authorOnCanvas,
+              thisEmbeddingEditing: editingEmbeddingIds.has(request.parent.id),
+              hostBodyEditing: bodyEditing,
+              hostTitleEditing: resourceAuthoring.titleEditing,
+            })}
+            framing={
+              portalDraft.get(request.parent.data.resourceId) ??
+              request.parent.data.spaceContent?.framing
+            }
+            bounds={request.bounds}
+            absolute={request.absolute}
+            drawnAbsolute={request.drawnAbsolute}
+            tiltCenter={request.tiltCenter}
+            publish={publishEmbedded}
+          />
+        ),
+      )}
+      {/*
         A failed read is announced on the Space Resource that asked for it, named by
         the Title the author gave that Resource: the canvas can hold several
         embeddings, and a sentence naming none of them says nothing about which
         one is empty. Drawn from the standing requests, so a Resource that is Closed
         takes its announcement with it.
       */}
-        {embeddedRequests.flatMap(({ parent, spaceId }) => {
-          const message = embeddedFailures.get(spaceId);
-          return message === undefined
-            ? []
-            : [
-                <span key={parent.id} role="alert" className="canvas-refusal">
-                  {`${titleName(parent.data.title)}: ${message}`}
-                </span>,
-              ];
-        })}
-        {/*
+      {embeddedRequests.flatMap(({ parent, spaceId }) => {
+        const message = embeddedFailures.get(spaceId);
+        return message === undefined
+          ? []
+          : [
+              <span key={parent.id} role="alert" className="canvas-refusal">
+                {`${titleName(parent.data.title)}: ${message}`}
+              </span>,
+            ];
+      })}
+      {/*
         The sentence a refused canvas command leaves behind. Placed and styled
         exactly like Edge Authoring's `gesture` refusal, because it is the same
         case: the press is over, and there is no surface left to attach it to.
       */}
-        {commandRefusal !== null && (
-          <span role="alert" className="canvas-refusal" data-testid="canvas-command-refusal">
-            {commandRefusal}
-          </span>
-        )}
-        <ZoomSlider />
-        {graphs.length > 0 && (
-          <GraphHud
-            spaceTitle={spaceTitle}
-            mapTitle={mapTitle}
-            graphs={graphs}
-            colorByGraphId={colorByGraphId}
-            activeGraphId={activeGraphId}
-          />
-        )}
-        <OverviewCamera presenting={presenting} />
-        <PresentingCamera activeResourceId={activeResourceId} />
-        <OpeningFramingCamera framing={openingFraming} />
-        {edgeSurface.layer}
-        <ResourceConnect
-          connecting={openConnect}
-          placed={placedResources}
-          edgeAuthoring={edgeAuthoring}
-          projectedNodes={projectedNodes}
-          onClose={() => setConnecting(null)}
+      {commandRefusal !== null && (
+        <span role="alert" className="canvas-refusal" data-testid="canvas-command-refusal">
+          {commandRefusal}
+        </span>
+      )}
+      <ZoomSlider />
+      {graphs.length > 0 && (
+        <GraphHud
+          spaceTitle={spaceTitle}
+          mapTitle={mapTitle}
+          graphs={graphs}
+          colorByGraphId={colorByGraphId}
+          activeGraphId={activeGraphId}
         />
-      </ReactFlow>
+      )}
+      <OverviewCamera presenting={presenting} />
+      <PresentingCamera activeResourceId={activeResourceId} />
+      <OpeningFramingCamera framing={openingFraming} />
+      {edgeSurface.layer}
+      <ResourceConnect
+        connecting={openConnect}
+        placed={placedResources}
+        edgeAuthoring={edgeAuthoring}
+        projectedNodes={projectedNodes}
+        onClose={() => setConnecting(null)}
+      />
+    </ReactFlow>
+  );
+  return edgeSurface.provide(
+    <GraphConnectionLineHeadShape headShape={preview.headShape}>
+      {canvas}
     </GraphConnectionLineHeadShape>,
   );
 }

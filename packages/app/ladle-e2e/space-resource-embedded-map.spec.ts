@@ -294,11 +294,29 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
   });
   const hostBefore = await hostGraphEdgeCount(page, parent);
   const shownBefore = await embeddedGraphEdgeCount(page, parent);
+  const shownEdge = page.locator(
+    '.react-flow__edge[data-id^="00000000-0000-4000-8000-000000000005:"]',
+  );
+  const shownStroke = await shownEdge
+    .locator('path')
+    .first()
+    .evaluate((el) => getComputedStyle(el).stroke);
   await storage.hover();
   await connectHandles(
     page,
     authoringHandle(storage, 'source', 'right'),
     authoringHandle(intake, 'target', 'left'),
+    async () => {
+      // The preview is drawn as the Graph the Edge joins — the shown Overview,
+      // `diamond` in its own colour — not as the containing Graph 1.
+      const preview = page.locator('.react-flow__connection-path');
+      await expect(preview).toHaveCSS('stroke', shownStroke);
+      const head = page.locator(
+        'marker#graph-authoring-connection-head [data-slot="graph-head-shape"]',
+      );
+      await expect(head).toHaveAttribute('data-head-shape', 'diamond');
+      await expect(head).toHaveCSS('fill', shownStroke);
+    },
   );
   await expect.poll(() => hostGraphEdgeCount(page, parent)).toBe(hostBefore);
   await expect.poll(() => embeddedGraphEdgeCount(page, parent)).toBe(shownBefore + 1);
@@ -545,7 +563,7 @@ test(
  * An Open Space Resource's Graph list marks each row with the mark the canvas
  * HUD's key draws, in the colour and head shape the target draws that Graph's
  * Edges in — read off the embedded Edge on screen — and its Map list carries
- * no mark. The target's Overview stores no head shape, so both draw the arrow.
+ * no mark. The target's Overview stores `diamond`, so both draw it.
  */
 test(
   "an Open Space Resource's Graph rows draw the Graph's legend mark",
@@ -563,7 +581,7 @@ test(
       .locator('[data-slot="graph-head-shape"]')
       .first()
       .getAttribute('data-head-shape');
-    expect(edgeHeadShape).toBe('arrow');
+    expect(edgeHeadShape).toBe('diamond');
 
     // Opened from the keyboard, as `exerciseSpaceResourceContextMenus` opens
     // these lists: the rail can sit under the Dock at this viewport.

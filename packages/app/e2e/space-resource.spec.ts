@@ -772,10 +772,25 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
   // A self-Edge is legal (ADR 0032) and the one in-view Resource is the pair the
   // host camera still frames. A second Resource authored on the target canvas sits
   // outside that window, and Playwright's box is the layout box, not the clip.
+  const sourceHandle = authoringHandle(embedded, 'source', 'right');
+  // The embedded handles are drawn in the shown Graph's colour, which is what
+  // the preview must be drawn in too; that Graph stores no head shape.
+  await expect(sourceHandle).toHaveCSS('opacity', '1');
+  const shownColor = await sourceHandle.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
   await connectHandles(
     page,
-    authoringHandle(embedded, 'source', 'right'),
+    sourceHandle,
     authoringHandle(embedded, 'target', 'left'),
+    async () => {
+      await expect(page.locator('.react-flow__connection-path')).toHaveCSS('stroke', shownColor);
+      const head = page.locator(
+        'marker#graph-authoring-connection-head [data-slot="graph-head-shape"]',
+      );
+      await expect(head).toHaveAttribute('data-head-shape', 'arrow');
+      await expect(head).toHaveCSS('fill', shownColor);
+    },
   );
   await settled(page);
   expect(await hostGraphEdgeCount(page, parent)).toBe(hostBefore);

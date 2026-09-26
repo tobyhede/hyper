@@ -6,7 +6,7 @@ import {
   activeGraph,
   boxOf,
   graphChoices,
-  graphLegendSwatchColor,
+  graphLegendLineStroke,
   mapChoices,
   openResource,
   resourceControls,
@@ -120,7 +120,7 @@ test(
   async ({ page }) => {
     await page.goto('/');
     await activateGraph(page, 'Long');
-    const graphColor = await graphLegendSwatchColor(page, 'Long');
+    const graphColor = await graphLegendLineStroke(page, 'Long');
 
     const resource = nodeByTitle(page, 'A').first();
     const controls = await resourceControls(page, resource);
