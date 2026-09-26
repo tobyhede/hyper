@@ -457,18 +457,6 @@ describe('projectGraphEdges', () => {
       ]);
     });
 
-    it('namespaces the marker by the canvas the Edges are drawn in', () => {
-      const markersIn = (flowId: string) =>
-        projectGraphEdges(shared, colors, { flowId }).map((e) => e.markerEnd);
-
-      expect(markersIn('host')).toEqual([
-        'host__graph-head-00000000-0000-4000-8000-000000000201',
-        'host__graph-head-00000000-0000-4000-8000-000000000202',
-        'host__graph-head-00000000-0000-4000-8000-000000000203',
-      ]);
-      expect(markersIn('other')[0]).toBe('other__graph-head-00000000-0000-4000-8000-000000000201');
-    });
-
     it('moves the centre to whichever Graph becomes active', () => {
       const centred = (activeGraphId: string) => {
         const edges = projectGraphEdges(shared, colors, {

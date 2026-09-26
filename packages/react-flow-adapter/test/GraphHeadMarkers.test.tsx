@@ -23,9 +23,8 @@ const edge = (graphId: typeof RED, source: string, target: string) => ({
 const drawn = [edge(RED, A!, B!), edge(RED, B!, C!), edge(BLUE, A!, B!)];
 const colors = { [RED]: '#d62728', [BLUE]: '#1f77b4' };
 
-const canvas = (flowId?: string) => {
-  const options = flowId === undefined ? {} : { flowId };
-  const edges = projectGraphEdges(drawn, colors, { ...options, headShapes: { [RED]: 'dot' } });
+const canvas = () => {
+  const edges = projectGraphEdges(drawn, colors, { headShapes: { [RED]: 'dot' } });
   return (
     <ReactFlowProvider initialEdges={edges}>
       <GraphHeadMarkers />
@@ -54,21 +53,5 @@ describe('GraphHeadMarkers', () => {
     // All in one hidden `<defs>`, as React Flow draws its own markers.
     expect(container.querySelectorAll('defs')).toHaveLength(1);
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-  });
-
-  it('keeps two canvases on one page from naming each other’s markers', () => {
-    const { container } = render(
-      <>
-        {canvas('host')}
-        {canvas('other')}
-      </>,
-    );
-
-    expect(markersIn(container).map((marker) => marker.id)).toEqual([
-      `host__graph-head-${RED}`,
-      `host__graph-head-${BLUE}`,
-      `other__graph-head-${RED}`,
-      `other__graph-head-${BLUE}`,
-    ]);
   });
 });

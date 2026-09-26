@@ -392,11 +392,6 @@ export interface ProjectGraphEdgesOptions {
   activeGraphId?: GraphId | null;
   /** What each Graph's Edges end in (ADR 0105). */
   headShapes?: HeadShapeByGraphId;
-  /**
-   * The React Flow `id` of the canvas these Edges are drawn in, which
-   * namespaces each Graph's head marker. Absent for a canvas that sets none.
-   */
-  flowId?: string;
 }
 
 /**
@@ -443,7 +438,7 @@ export function projectGraphEdges(
       animated: false,
       // Its Graph's one head marker, which `GraphHeadMarkers` draws once for
       // the canvas and React Flow hands the Edge as `url('#…')`.
-      markerEnd: graphHeadMarkerId(edge.graphId, options.flowId),
+      markerEnd: graphHeadMarkerId(edge.graphId),
       style: {
         stroke: color,
         strokeWidth: isActiveGraph ? 3 : 2,

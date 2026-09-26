@@ -8,12 +8,12 @@ import { FALLBACK_GRAPH_COLOR, GraphHeadMarker } from '@project/ui';
  * `markerEnd` (ADR 0105).
  *
  * One per Graph, because every Edge of a Graph ends in the same head shape in
- * the same colour. `flowId` is the React Flow `id` of the canvas the Edges are
- * drawn in, and prefixes the id the way React Flow prefixes its own markers, so
- * two canvases on one page never resolve each other's.
+ * the same colour. Keyed by the Graph's UUID alone, which is unique on the page
+ * because a page draws Graph Edges in one `<ReactFlow>`: an embedded Map's
+ * Edges are the host flow's own, and the same Graph drawn twice there names the
+ * same marker with the same content.
  */
-export const graphHeadMarkerId = (graphId: GraphId, flowId?: string): string =>
-  `${flowId === undefined ? '' : `${flowId}__`}graph-head-${graphId}`;
+export const graphHeadMarkerId = (graphId: GraphId): string => `graph-head-${graphId}`;
 
 /** A marker named by id — the form a head marker takes — rather than one of React Flow's own. */
 const isMarkerId = (marker: EdgeMarkerType | undefined): marker is string =>
