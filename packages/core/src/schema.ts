@@ -121,6 +121,59 @@ export const spaceResourceFrontmatterSchema = z.object({
     .optional(),
 });
 
+/** The refusal code for an image URL an Image Resource may not hold; the application owns the wording. */
+export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
+
+/**
+ * The root-relative URL of an image the host stores: `/images/<id>`, where the
+ * id is the SHA-256 of the image's bytes spelled as unpadded base64url
+ * (ADR 0106). Forty-three characters, and only the canonical spelling: the
+ * last one carries four bits of the digest and two zero bits, so it is one of
+ * the sixteen characters whose low two bits are clear.
+ */
+const STORED_IMAGE_PATH = /^\/images\/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/u;
+
+/**
+ * Whether an Image Resource may hold this URL (ADR 0106): an `https:` or
+ * `http:` URL, or the root-relative URL of a stored image. `data:` is refused
+ * because it would put the picture's bytes back in the document, every other
+ * scheme because the Resource shows a picture from the web, and every other
+ * relative form because it would resolve against whatever page drew it.
+ */
+export const isAcceptedImageUrl = (url: string): boolean => {
+  if (url.startsWith('/')) return STORED_IMAGE_PATH.test(url);
+  if (!URL.canParse(url)) return false;
+  const { protocol } = new URL(url);
+  return protocol === 'https:' || protocol === 'http:';
+};
+
+const imageUrlSchema = z.string().refine(isAcceptedImageUrl, {
+  message: 'An image URL must be https:, http:, or the /images/<id> of a stored image',
+  params: { code: IMAGE_URL_UNSUPPORTED },
+});
+
+/**
+ * The size of the picture in pixels, as measured when its URL was set
+ * (ADR 0106). A first Open reads it; nothing else does.
+ */
+const imageNaturalSizeSchema = z.object({
+  width: z.number().positive().finite(),
+  height: z.number().positive().finite(),
+});
+
+/**
+ * A Resource that shows a picture from its URL (ADR 0106). It owns the URL and
+ * not the bytes, so nothing here says where the picture is stored; the natural
+ * size is absent when the picture did not load when its URL was set.
+ */
+export const imageResourceFrontmatterSchema = z.object({
+  id: idSchema,
+  title: resourceTitleSchema,
+  kind: z.literal('image'),
+  url: imageUrlSchema,
+  naturalSize: imageNaturalSizeSchema.optional(),
+});
+
 const defaultMarkdownKind = (value: unknown): unknown =>
   typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
     ? { ...value, kind: 'markdown' }
@@ -138,6 +191,7 @@ export const resourceFrontmatterSchema = z.preprocess(
     markdownResourceFrontmatterSchema,
     referenceResourceFrontmatterSchema,
     spaceResourceFrontmatterSchema,
+    imageResourceFrontmatterSchema,
   ]),
 );
 
@@ -150,12 +204,16 @@ export const importReferenceResourceFrontmatterSchema = referenceResourceFrontma
 export const importSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
+export const importImageResourceFrontmatterSchema = imageResourceFrontmatterSchema.extend({
+  id: uuidSchema.optional(),
+});
 export const importResourceFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
     importMarkdownResourceFrontmatterSchema,
     importReferenceResourceFrontmatterSchema,
     importSpaceResourceFrontmatterSchema,
+    importImageResourceFrontmatterSchema,
   ]),
 );
 
@@ -170,6 +228,9 @@ export const referenceResourceSchema = referenceResourceFrontmatterSchema;
 /** A resource that embeds one selected view of another Space (ADR 0068). */
 export const spaceResourceSchema = spaceResourceFrontmatterSchema;
 
+/** A resource that shows a picture from its URL (ADR 0106). */
+export const imageResourceSchema = imageResourceFrontmatterSchema;
+
 /**
  * A resource parsed from its file (ADR 0020). A markdown resource carries the file body
  * that stores its content; a reference resource carries only the pointer to its target's
@@ -180,6 +241,7 @@ export const resourceSchema = z.discriminatedUnion('kind', [
   markdownResourceSchema,
   referenceResourceSchema,
   spaceResourceSchema,
+  imageResourceSchema,
 ]);
 
 /** The refusal code for a multi-line Edge Title; the application owns the wording. */
@@ -230,11 +292,24 @@ export const graphEdgeSchema = z
     path: ['titleHidden'],
   });
 
+/**
+ * What a Graph's Edges draw at their heads, the `to` end (ADR 0105). Closed and
+ * without `none`: a Graph is directed, so every head shape shows direction.
+ */
+export const GRAPH_HEAD_SHAPES = ['arrow', 'vee', 'dot', 'diamond'] as const;
+
+export const graphHeadShapeSchema = z.enum(GRAPH_HEAD_SHAPES);
+
 export const graphSchema = z.object({
   id: idSchema,
   title: z.string().min(1),
   // Optional CSS color for this graph's edges; falls back to a palette by order.
   color: z.string().min(1).optional(),
+  /**
+   * Optional, as `color` is: every creation gesture writes `arrow`, and a
+   * Graph with none stored draws as `arrow` (`graphHeadShape`).
+   */
+  headShape: graphHeadShapeSchema.optional(),
   /**
    * Possibly none. A graph *is* its edges, but it is not minted by drawing
    * one: creating a map creates its initial empty active graph in the same
@@ -403,10 +478,12 @@ export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 export const markdownResourceDocumentSchema = markdownResourceSchema.omit({ id: true });
 export const referenceResourceDocumentSchema = referenceResourceSchema.omit({ id: true });
 export const spaceResourceDocumentSchema = spaceResourceSchema.omit({ id: true });
+export const imageResourceDocumentSchema = imageResourceSchema.omit({ id: true });
 export const resourceDocumentSchema = z.discriminatedUnion('kind', [
   markdownResourceDocumentSchema,
   referenceResourceDocumentSchema,
   spaceResourceDocumentSchema,
+  imageResourceDocumentSchema,
 ]);
 
 /** A complete, fully identified snapshot of one Space, exchanged at persistence seams. */

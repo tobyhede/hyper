@@ -47,6 +47,7 @@ const FRONTS = [
   { label: 'markdown', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
   { label: 'reference', kind: 'reference', glyph: 'Reference Resource', border: 'dotted' },
   { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid' },
+  { label: 'image', kind: 'image', glyph: 'Image Resource', border: 'solid' },
   // The creation ghost is not a Resource and takes the Markdown treatment, which is
   // why it is checked against the Markdown kind and glyph rather than its own.
   { label: 'creation ghost', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
@@ -128,6 +129,31 @@ test(
     const rungs = await sizesOf(ladder.locator('.canvas-resource__title-line'));
     expect(rungs[0]! > rungs[1]!).toBe(true);
     expect(rungs[1]! > rungs[2]!).toBe(true);
+  },
+);
+
+/**
+ * A Closed Image Resource looks like any Resource (ADR 0106): its Title and its
+ * kind glyph at the one Closed size, and no picture — the Closed front draws no
+ * thumbnail, so no `img` element is mounted on it at all.
+ */
+test(
+  'a Closed Image Resource draws its Title and kind at the Closed size, and no picture',
+  { tag: '@parity:image-resource-closed-front-draws-title-and-kind' },
+  async ({ page }) => {
+    await page.goto('/?story=components--resource--front&mode=preview');
+
+    const image = specimen(page, 'image · one line').getByRole('article');
+    await expect(image).toHaveAttribute('data-kind', 'image');
+    await expect(image.getByRole('heading', { name: 'Strategies' })).toBeVisible();
+    await expect(image.getByRole('img', { name: 'Image Resource' })).toBeVisible();
+    await expect(image.locator('img')).toHaveCount(0);
+
+    const markdown = specimen(page, 'markdown · one line').getByRole('article');
+    const pictured = await image.boundingBox();
+    const closed = await markdown.boundingBox();
+    expect(pictured?.width).toBeCloseTo(closed?.width ?? 0, 0);
+    expect(pictured?.height).toBeCloseTo(closed?.height ?? 0, 0);
   },
 );
 

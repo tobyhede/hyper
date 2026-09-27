@@ -50,6 +50,16 @@ type MarkdownOperations = Mutable<
 >;
 type ReferenceFront = Mutable<Extract<CanvasResourceFront, { kind: 'reference' }>>;
 type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
+type ImageFront = Mutable<Extract<CanvasResourceFront, { kind: 'image' }>>;
+
+/**
+ * The front each kind draws, keyed by the domain union so a kind added to it
+ * fails to build here rather than drawing as Markdown.
+ */
+const frontOfKind = (
+  kind: ResourceFlowNode['data']['kind'],
+  fronts: Record<ResourceFlowNode['data']['kind'], CanvasResourceFront>,
+): CanvasResourceFront => fronts[kind];
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -164,8 +174,17 @@ export function ResourceNode({
   if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
   if (data.spaceRail !== undefined) spaceFront.spaceRail = data.spaceRail;
   if (data.portal !== undefined) spaceFront.portal = data.portal;
-  const front: CanvasResourceFront =
-    data.kind === 'reference' ? referenceFront : data.kind === 'space' ? spaceFront : markdownFront;
+  // Closed, an Image Resource draws its Title and kind and no thumbnail (ADR 0106).
+  const imageFront: ImageFront = { kind: 'image', open: data.open === true };
+  if (data.onEditResource !== undefined) {
+    imageFront.onOpenChange = data.onEditResource;
+  }
+  const front = frontOfKind(data.kind, {
+    markdown: markdownFront,
+    reference: referenceFront,
+    space: spaceFront,
+    image: imageFront,
+  });
 
   /**
    * Whether this Resource's anchors are also affordances.

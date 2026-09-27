@@ -35,6 +35,7 @@ const DELETES_THE_RESOURCE =
 const DELETION_DESCRIPTIONS = {
   markdown: DELETES_THE_RESOURCE,
   reference: DELETES_THE_RESOURCE,
+  image: DELETES_THE_RESOURCE,
   space: `${DELETES_THE_RESOURCE} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`,
 } satisfies Record<Resource['kind'], string>;
 

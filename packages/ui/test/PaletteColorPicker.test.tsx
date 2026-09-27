@@ -1,19 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import {
-  PaletteColorPicker,
-  PaletteColorSwatchGrid,
-  type PaletteColorEntry,
-} from '../src/PaletteColorPicker';
+import { PaletteColorPicker, type PaletteColorEntry } from '../src/PaletteColorPicker';
 
 const entries: readonly PaletteColorEntry[] = [
   { color: '#1f77b4', label: 'Blue' },
   { color: '#ff7f0e', label: 'Orange' },
 ];
 
-const tableauEntries: readonly PaletteColorEntry[] = [
-  { color: '#ffbb78', label: 'Orange light' },
-  { color: '#c5b0d5', label: 'Purple light' },
+const threeEntries: readonly PaletteColorEntry[] = [
+  ...entries,
+  { color: '#2ca02c', label: 'Green' },
 ];
 
 beforeAll(() => {
@@ -39,23 +36,35 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
+const mountOpen = (
+  value: string,
+  { onValueChange = vi.fn(), onOpenChange = vi.fn(), palette = entries } = {},
+) => {
+  render(
+    <PaletteColorPicker
+      entries={palette}
+      value={value}
+      onValueChange={onValueChange}
+      open
+      onOpenChange={onOpenChange}
+      trigger="Pick colour"
+      aria-label="Graph colour"
+    />,
+  );
+  return {
+    onValueChange,
+    onOpenChange,
+    group: screen.getByRole('group', { name: 'Graph colour' }),
+  };
+};
+
+const swatch = (group: HTMLElement, name: string) => within(group).getByRole('button', { name });
+
 describe('PaletteColorPicker', () => {
-  it('invokes onValueChange and closes when a swatch is chosen', () => {
-    const onValueChange = vi.fn();
-    const onOpenChange = vi.fn();
+  it('invokes onValueChange and closes when a swatch is pressed', () => {
+    const { onValueChange, onOpenChange, group } = mountOpen('#1f77b4');
 
-    render(
-      <PaletteColorPicker
-        entries={entries}
-        value="#1f77b4"
-        onValueChange={onValueChange}
-        open
-        onOpenChange={onOpenChange}
-        trigger="Pick colour"
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Orange' }));
+    fireEvent.click(swatch(group, 'Orange'));
 
     expect(onValueChange).toHaveBeenCalledWith('#ff7f0e');
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -79,54 +88,49 @@ describe('PaletteColorPicker', () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(true);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('radio', { name: 'Orange' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Orange' })).toBeInTheDocument();
   });
 
-  it('marks the current value as selected', () => {
-    render(
-      <PaletteColorPicker
-        entries={entries}
-        value="#ff7f0e"
-        onValueChange={() => undefined}
-        open
-        trigger="Pick colour"
-      />,
-    );
+  it('marks the current colour as pressed, and no other', () => {
+    const { group } = mountOpen('#ff7f0e');
 
-    expect(screen.getByRole('radio', { name: 'Orange' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: 'Blue' })).toHaveAttribute('aria-checked', 'false');
+    expect(swatch(group, 'Orange')).toHaveAttribute('aria-pressed', 'true');
+    expect(swatch(group, 'Blue')).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('draws one radio per palette entry', () => {
-    const fullPalette = Array.from({ length: 20 }, (_, index) => ({
-      color: `#${index.toString(16).padStart(6, '0')}`,
-      label: `Slot ${index}`,
-    }));
+  it('keeps the choice when the current colour is pressed again, and closes', () => {
+    const { onValueChange, onOpenChange, group } = mountOpen('#ff7f0e');
 
-    render(
-      <PaletteColorSwatchGrid
-        entries={fullPalette}
-        value="#000000"
-        onValueChange={() => undefined}
-        aria-label="Graph colour"
-      />,
-    );
+    fireEvent.click(swatch(group, 'Orange'));
 
-    expect(screen.getAllByRole('radio')).toHaveLength(20);
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('is one tab stop whose arrows move focus without pressing', async () => {
+    const { onValueChange, group } = mountOpen('#ff7f0e', { palette: threeEntries });
+
+    expect(
+      within(group)
+        .getAllByRole('button')
+        .filter((each) => each.getAttribute('tabindex') === '0'),
+    ).toHaveLength(1);
+
+    act(() => swatch(group, 'Orange').focus());
+    fireEvent.keyDown(swatch(group, 'Orange'), { key: 'ArrowRight' });
+    await waitFor(() => expect(swatch(group, 'Green')).toHaveFocus());
+    fireEvent.keyDown(swatch(group, 'Green'), { key: 'ArrowRight' });
+    await waitFor(() => expect(swatch(group, 'Blue')).toHaveFocus());
+
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(swatch(group, 'Orange')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('names swatches for accessibility without drawing visible labels', () => {
-    render(
-      <PaletteColorSwatchGrid
-        entries={tableauEntries}
-        value="#ffbb78"
-        onValueChange={() => undefined}
-        aria-label="Graph colour"
-      />,
-    );
+    const { group } = mountOpen('#1f77b4');
 
-    const orangeLight = screen.getByRole('radio', { name: 'Orange light' });
-    expect(orangeLight).toHaveAttribute('title', 'Orange light');
-    expect(orangeLight).toHaveTextContent('');
+    const orange = swatch(group, 'Orange');
+    expect(orange).toHaveAttribute('title', 'Orange');
+    expect(orange).toHaveTextContent('');
   });
 });

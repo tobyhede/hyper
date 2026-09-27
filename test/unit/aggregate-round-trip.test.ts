@@ -287,6 +287,86 @@ describe('exporting and importing one complete aggregate', () => {
     expect(stored?.document.maps?.[0]?.graphs[0]?.edges).toEqual([edge]);
   });
 
+  it("preserves a Graph's head shape, and leaves an absent one absent", async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const [meta, ...targets] = completeAggregate();
+    if (meta === undefined) throw new Error('The aggregate names no Meta Space');
+    const diamondHeaded: SpaceSnapshot = {
+      ...meta,
+      document: {
+        ...meta.document,
+        maps: meta.document.maps?.map((map) => ({
+          ...map,
+          graphs: map.graphs.map((graph) => ({ ...graph, headShape: 'diamond' as const })),
+        })),
+      },
+    };
+
+    await exportTo(repositoryHolding([diamondHeaded, ...targets]), destination);
+    const written = await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8');
+    // Written between the colour and the Edges, the order the Graph declares.
+    expect(written).toMatch(/"color": "#1f77b4",\s*"headShape": "diamond",\s*"edges"/);
+    const reimported = await importFrom(destination);
+
+    const stored = await storedSnapshots(reimported);
+    expect(
+      stored.find(({ id }) => id === META_SPACE_ID)?.document.maps?.[0]?.graphs[0]?.headShape,
+    ).toBe('diamond');
+    for (const target of stored.filter(({ id }) => id !== META_SPACE_ID)) {
+      for (const graph of target.document.maps?.flatMap((map) => map.graphs) ?? []) {
+        expect(graph).not.toHaveProperty('headShape');
+      }
+    }
+  });
+
+  /*
+   * The aggregate carries an Image Resource's URL and nothing else of its
+   * picture (ADR 0106): no bytes go to disk, and the URL, with the natural size
+   * the Resource recorded, comes back as it went out.
+   */
+  it('round-trips an Image Resource by its URL', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const IMAGE_ID = uuidSchema.parse('12121212-1212-4212-8212-121212121212');
+    const STORED_ID = uuidSchema.parse('13131313-1313-4313-8313-131313131313');
+    const images = [
+      {
+        id: IMAGE_ID,
+        document: {
+          title: 'Figure',
+          kind: 'image' as const,
+          url: 'https://example.com/figure.png',
+          naturalSize: { width: 640, height: 480 },
+        },
+      },
+      {
+        id: STORED_ID,
+        document: {
+          title: 'Stored',
+          kind: 'image' as const,
+          url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+        },
+      },
+    ];
+    const [meta, ...targets] = completeAggregate();
+    if (meta === undefined) throw new Error('The aggregate names no Meta Space');
+    const pictured: SpaceSnapshot = { ...meta, resources: [...meta.resources, ...images] };
+
+    await exportTo(repositoryHolding([pictured, ...targets]), destination);
+    const reimported = await importFrom(destination);
+
+    const stored = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
+    expect(stored?.resources.filter(({ document }) => document.kind === 'image')).toEqual(images);
+    expect(await readFile(join(destination, META_SPACE_ID, 'resources', `${STORED_ID}.md`), 'utf8'))
+      .toBe(`---
+id: ${STORED_ID}
+title: Stored
+kind: image
+url: /images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU
+---
+
+`);
+  });
+
   it('re-exports over its own output without changing a byte', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const source = repositoryHolding(completeAggregate());

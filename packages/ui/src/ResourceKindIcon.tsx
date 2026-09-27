@@ -18,6 +18,7 @@ const KIND_NAMES = {
   markdown: 'Markdown Resource',
   reference: 'Reference Resource',
   space: 'Space Resource',
+  image: 'Image Resource',
 } satisfies Record<Resource['kind'], string>;
 
 /**
@@ -28,6 +29,7 @@ const KIND_NAMES = {
 const REFERENCE_NAMES = {
   markdown: 'Reference to a Markdown Resource',
   space: 'Reference to a Space Resource',
+  image: 'Reference to an Image Resource',
 } satisfies Record<ResourceBaseKind, string>;
 
 /**

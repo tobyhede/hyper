@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
-import { expectMenuGroups, resourceActions } from '../e2e/graph';
+import { boxOf, expectMenuGroups, graphLegendMarkLine, resourceActions } from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -176,16 +176,15 @@ test(
 
     const menu = await disclose(page, 'Active Graph: Long');
     await menu.getByRole('menuitem', { name: 'Colour…' }).click();
-    const submenu = page.getByRole('radiogroup', { name: 'Graph colour' });
-    await submenu.getByRole('radio', { name: 'Green', exact: true }).click();
+    const submenu = page.getByRole('group', { name: 'Graph colour' });
+    await submenu.getByRole('menuitemradio', { name: 'Green', exact: true }).click();
 
     const reopened = await disclose(page, 'Active Graph: Long');
     await reopened.getByRole('menuitem', { name: 'Colour…' }).click();
-    const palette = page.getByRole('radiogroup', { name: 'Graph colour' });
-    await expect(palette.getByRole('radio', { name: 'Green', exact: true })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
+    const palette = page.getByRole('group', { name: 'Graph colour' });
+    await expect(
+      palette.getByRole('menuitemradio', { name: 'Green', exact: true }),
+    ).toHaveAttribute('aria-checked', 'true');
   },
 );
 
@@ -238,7 +237,7 @@ test(
     await expectMenuGroups(menu, [
       ['Long', 'Mid', 'Short'],
       ['New Graph'],
-      ['Colour…', 'Rename', 'Copy link to Graph'],
+      ['Colour…', 'Shape…', 'Rename', 'Copy link to Graph'],
       ['Delete Long'],
     ]);
 
@@ -595,9 +594,9 @@ test(
 
     const menu = await disclose(page, `Active Graph: ${graphTitle}`);
     await menu.getByRole('menuitem', { name: 'Colour…' }).click({ delay: 120 });
-    const group = page.getByRole('radiogroup', { name: 'Graph colour' });
-    await expect(group.getByRole('radio')).toHaveCount(20);
-    await group.getByRole('radio', { name: 'Orange', exact: true }).click();
+    const group = page.getByRole('group', { name: 'Graph colour' });
+    await expect(group.getByRole('menuitemradio')).toHaveCount(20);
+    await group.getByRole('menuitemradio', { name: 'Orange', exact: true }).click();
     await expect(group).toHaveCount(0);
     await expect(page.getByRole('menu')).toHaveCount(0);
 
@@ -606,6 +605,104 @@ test(
     expect(finalStroke).toBe('rgb(255, 127, 14)');
   },
 );
+
+/**
+ * Shape… sits under Colour… and opens the four head shapes, drawn in the
+ * Graph's colour, with the one its Edges end in marked (ADR 0105). Long stores
+ * none, so the arrow is current.
+ */
+test(
+  'Shape… changes the Active Graph head shape and closes the menu',
+  { tag: '@parity:command-dock-changes-graph-head-shape' },
+  async ({ page }) => {
+    await page.goto(story('default'));
+
+    const menu = await disclose(page, 'Active Graph: Long');
+    const items = await menu.getByRole('menuitem').allInnerTexts();
+    expect(items.indexOf('Shape…')).toBe(items.indexOf('Colour…') + 1);
+    const trigger = menu.getByRole('menuitem', { name: 'Shape…' });
+    await expect(trigger.locator('[data-slot="graph-head-shape"]')).toHaveAttribute(
+      'data-head-shape',
+      'arrow',
+    );
+    const colour = await menu
+      .getByRole('menuitem', { name: 'Colour…' })
+      .locator('svg')
+      .first()
+      .getAttribute('stroke');
+
+    await trigger.click({ delay: 120 });
+    const group = page.getByRole('group', { name: 'Graph head shape' });
+    await expect(group.getByRole('menuitemradio')).toHaveCount(4);
+    expect(
+      await group
+        .getByRole('menuitemradio')
+        .evaluateAll((radios) => radios.map((radio) => radio.getAttribute('aria-label'))),
+    ).toEqual(['Arrow', 'Vee', 'Dot', 'Diamond']);
+    await expect(group.getByRole('menuitemradio', { name: 'Arrow', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    for (const glyph of await group.locator('[data-slot="graph-head-shape"]').all())
+      await expect(glyph).toHaveAttribute('fill', colour ?? '');
+    // The check marking the current head shape leaves its glyph clear to read.
+    const current = group.getByRole('menuitemradio', { name: 'Arrow', exact: true });
+    const glyphBox = await boxOf(current.locator('[data-slot="graph-head-shape"]'), 'Arrow glyph');
+    const checkBox = await boxOf(current.locator('.lucide-check'), 'current head shape check');
+    const overlap = (a: number, aSize: number, b: number, bSize: number) =>
+      Math.max(0, Math.min(a + aSize, b + bSize) - Math.max(a, b));
+    expect(
+      overlap(glyphBox.x, glyphBox.width, checkBox.x, checkBox.width) *
+        overlap(glyphBox.y, glyphBox.height, checkBox.y, checkBox.height),
+    ).toBe(0);
+
+    await group.getByRole('menuitemradio', { name: 'Diamond', exact: true }).click();
+    await expect(group).toHaveCount(0);
+    await expect(page.getByRole('menu')).toHaveCount(0);
+
+    const reopened = await disclose(page, 'Active Graph: Long');
+    await expect(
+      reopened.getByRole('menuitem', { name: 'Shape…' }).locator('[data-slot="graph-head-shape"]'),
+    ).toHaveAttribute('data-head-shape', 'diamond');
+  },
+);
+
+/**
+ * Colour… and Shape… are the menu's own radio items, so the arrows move the
+ * highlight without choosing and ArrowLeft closes the submenu onto the item
+ * that opened it, from any swatch.
+ */
+test('the arrows move through Colour… and Shape… without choosing, and ArrowLeft closes them', async ({
+  page,
+}) => {
+  await page.goto(story('default'));
+
+  for (const [item, choices] of [
+    ['Colour…', 'Graph colour'],
+    ['Shape…', 'Graph head shape'],
+  ] as const) {
+    const menu = await disclose(page, 'Active Graph: Long');
+    const trigger = menu.getByRole('menuitem', { name: item });
+    await trigger.click({ delay: 120 });
+    const items = page.getByRole('group', { name: choices }).getByRole('menuitemradio');
+    const checked = await items.evaluateAll((all) =>
+      all.map((each) => each.getAttribute('aria-checked')),
+    );
+    await items.nth(1).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(items.nth(2)).toBeFocused();
+    expect(
+      await items.evaluateAll((all) => all.map((each) => each.getAttribute('aria-checked'))),
+    ).toEqual(checked);
+
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('group', { name: choices })).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+  }
+});
 
 test(
   'a new Space names its initial Map and empty Graph and cannot present',
@@ -1185,23 +1282,32 @@ test(
 );
 
 /**
- * A Graph row is marked with the line the canvas HUD's key draws, in that
- * Graph's colour, and with no Graph glyph.
- * The list and the key are compared on screen in the same page — colour and
- * box — so the two cannot drift apart without this failing. The Graph identity
+ * A Graph row is marked with the mark the canvas HUD's key draws — a line in
+ * that Graph's colour ending in its head shape — and with no Graph glyph.
+ * The list and the key are compared on screen in the same page — colour, head
+ * shape and box — so the two cannot drift apart without this failing. The
+ * fixture's Long stores no head shape and draws the arrow. The Graph identity
  * and Colour… keep the coloured glyph; the Map list is unmarked.
  */
 test(
-  'the Graph list marks each row with the colour line the HUD key draws',
-  { tag: '@parity:graph-choice-rows-draw-the-graph-colour-line' },
+  'the Graph list marks each row with the legend mark the HUD key draws',
+  { tag: '@parity:graph-choice-rows-draw-the-graph-legend-mark' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const mark = (row: Locator) =>
-      row.locator('[data-slot="graph-color-line"]').evaluateAll((els) =>
+      row.locator('[data-slot="graph-legend-mark"]').evaluateAll((els) =>
         els.map((el) => {
           const style = getComputedStyle(el);
-          return { color: style.backgroundColor, width: style.width, height: style.height };
+          const line = el.querySelector('[data-slot="graph-legend-mark-line"]');
+          const head = el.querySelector('[data-slot="graph-head-shape"]');
+          return {
+            color: line === null ? null : getComputedStyle(line).stroke,
+            headShape: head?.getAttribute('data-head-shape') ?? null,
+            headColor: head === null ? null : getComputedStyle(head).fill,
+            width: style.width,
+            height: style.height,
+          };
         }),
       );
     // The key draws once the canvas has projected the Space, which is after
@@ -1225,21 +1331,28 @@ test(
     await expect(rows).toHaveCount(key.length);
     expect(await mark(rows)).toEqual(key);
     expect(new Set(key.map((line) => line.color)).size).toBe(key.length);
-    // No Graph glyph: an unchosen row draws its line and its title, and the
+    expect(key.every((line) => line.headColor === line.color)).toBe(true);
+    expect(key.map((line) => line.headShape)).toEqual(['arrow', 'dot', 'diamond']);
+    // No Graph glyph: an unchosen row draws its mark and its title, and the
     // chosen row adds only the list's own radio indicator.
-    await expect(rows.and(page.locator('[aria-checked="false"]')).locator('svg')).toHaveCount(0);
+    await expect(
+      rows
+        .and(page.locator('[aria-checked="false"]'))
+        .locator('svg:not([data-slot="graph-legend-mark"] svg)'),
+    ).toHaveCount(0);
 
     // The identity and Colour… keep the glyph, in the Active Graph's colour.
     const colour = menu.getByRole('menuitem', { name: 'Colour…' });
     // The first glyph is the Graph's; the second is the submenu's own chevron.
     await expect(colour.locator('svg').first()).toHaveCSS('stroke', identityStroke);
-    await expect(
-      rows.and(page.locator('[aria-checked="true"]')).locator('[data-slot="graph-color-line"]'),
-    ).toHaveCSS('background-color', identityStroke);
+    await expect(graphLegendMarkLine(rows.and(page.locator('[aria-checked="true"]')))).toHaveCSS(
+      'stroke',
+      identityStroke,
+    );
 
     // The Map list, drawn by the same component, is unchanged.
     await page.keyboard.press('Escape');
     const maps = await disclose(page, 'Map: Collection 1');
-    await expect(maps.locator('[data-slot="graph-color-line"]')).toHaveCount(0);
+    await expect(maps.locator('[data-slot="graph-legend-mark"]')).toHaveCount(0);
   },
 );

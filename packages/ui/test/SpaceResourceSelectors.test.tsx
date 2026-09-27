@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { type ReactNode } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   SpaceResourceSelectors,
@@ -57,7 +57,7 @@ const clusters = (
     { id: 'l1', title: 'Collection 1' },
     { id: 'l2', title: 'Collection 2' },
   ],
-  graphs: [{ id: 'g1', title: 'Long', color: '#1f77b4' }],
+  graphs: [{ id: 'g1', title: 'Long', color: '#1f77b4', headShape: 'arrow' }],
   mapId: 'l1',
   graphId: 'g1',
   onMapChange: vi.fn(),
@@ -201,11 +201,11 @@ describe('SpaceResourceSelectors', () => {
   });
 
   /**
-   * A Map creation's refusal is the containing canvas's notice, so the rail
-   * reports no sentence of its own for it; it learns only whether the caret
-   * went on. A Graph creation still answers the sentence the rail reports.
+   * A Map or Graph creation's refusal is the containing canvas's notice, so
+   * the rail reports no sentence of its own for either; each creation
+   * answers only whether the caret went on.
    */
-  it('reports no sentence of its own for a Map creation, and a Graph creation’s refusal', async () => {
+  it('reports no sentence of its own for a Map or a Graph creation', async () => {
     const onReport = vi.fn();
     mount(
       clusters({
@@ -218,13 +218,14 @@ describe('SpaceResourceSelectors', () => {
         },
         graphCommands: {
           onRename: () => null,
-          onCreate: () => Promise.resolve('Graph refused.'),
-          onDelete: () => Promise.resolve(null),
+          onCreate: () => Promise.resolve(false),
+          onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
-          deleteDisabled: false,
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],
           onRecolor: () => null,
+          headShape: 'arrow',
+          onChangeHeadShape: () => null,
         },
       }),
     );
@@ -241,7 +242,45 @@ describe('SpaceResourceSelectors', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'New Graph' }));
       await Promise.resolve();
     });
-    await waitFor(() => expect(onReport).toHaveBeenLastCalledWith('Graph refused.'));
+    await waitFor(() => expect(screen.getByTestId('space-resource-graph')).toBeEnabled());
+    expect(onReport).toHaveBeenLastCalledWith(null);
+    expect(onReport).not.toHaveBeenCalledWith(expect.any(String));
+  });
+
+  /**
+   * A Graph deletion's refusal is the containing canvas's notice too, and a
+   * Graph Delete the application withholds is drawn unavailable from the same
+   * field that would press it.
+   */
+  it('reports no sentence of its own for a Graph deletion, and draws a withheld one unavailable', async () => {
+    const onReport = vi.fn();
+    const graphCommands = {
+      onRename: () => null,
+      onCreate: () => Promise.resolve(false),
+      onDelete: () => Promise.resolve(),
+      onCopyLink: () => Promise.resolve(null),
+      color: '#1f77b4',
+      colors: [{ color: '#1f77b4', label: 'Blue' }],
+      onRecolor: () => null,
+      headShape: 'arrow' as const,
+      onChangeHeadShape: () => null,
+    };
+    const { unmount } = mount(clusters({ onReport, graphCommands }));
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Long' }));
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByTestId('space-resource-graph')).toBeEnabled());
+    expect(onReport).not.toHaveBeenCalledWith(expect.any(String));
+    unmount();
+
+    mount(clusters({ graphCommands: { ...graphCommands, onDelete: null } }));
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    expect(screen.getByRole('menuitem', { name: 'Delete Long' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('draws a selection the target no longer holds as unavailable', () => {
@@ -298,18 +337,19 @@ describe('SpaceResourceSelectors', () => {
     expect(screen.queryByText(/Copy permanent link/)).not.toBeInTheDocument();
   });
 
-  it('groups the Graph menu into New Graph, Colour… with Rename and Copy link, then Delete', () => {
+  it('groups the Graph menu into New Graph, Colour… and Shape… with Rename and Copy link, then Delete', () => {
     mount(
       clusters({
         graphCommands: {
           onRename: () => null,
-          onCreate: () => Promise.resolve(null),
-          onDelete: () => Promise.resolve(null),
+          onCreate: () => Promise.resolve(false),
+          onDelete: () => Promise.resolve(),
           onCopyLink: () => Promise.resolve(null),
-          deleteDisabled: false,
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],
           onRecolor: () => null,
+          headShape: 'arrow',
+          onChangeHeadShape: () => null,
         },
       }),
     );
@@ -329,6 +369,7 @@ describe('SpaceResourceSelectors', () => {
       'Long',
       'New Graph',
       'Colour…',
+      'Shape…',
       'Rename',
       'Copy link to Graph',
       'Delete Long',
@@ -337,16 +378,54 @@ describe('SpaceResourceSelectors', () => {
   });
 
   /**
-   * A Graph row says which colour its Edges are drawn in with the same line
-   * the canvas HUD's key draws, and no Graph glyph: the list is already a list
-   * of Graphs, so a glyph on every row said nothing the caption does not.
+   * Shape… hands the choice to the application, which holds any refusal, as
+   * Colour… does, and the menu closes behind the choice.
    */
-  it('marks each Graph row with a line in that Graph’s colour and no glyph', () => {
+  it('changes the Graph head shape from Shape…, closing the menu', async () => {
+    const onChangeHeadShape = vi.fn();
+    mount(
+      clusters({
+        graphCommands: {
+          onRename: () => null,
+          onCreate: () => Promise.resolve(false),
+          onDelete: () => Promise.resolve(),
+          onCopyLink: () => Promise.resolve(null),
+          color: '#1f77b4',
+          colors: [{ color: '#1f77b4', label: 'Blue' }],
+          onRecolor: () => null,
+          headShape: 'dot',
+          onChangeHeadShape,
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId('space-resource-graph'));
+    const trigger = screen.getByRole('menuitem', { name: 'Shape…' });
+    expect(trigger.querySelector('[data-head-shape]')).toHaveAttribute('data-head-shape', 'dot');
+    fireEvent.click(trigger);
+    const grid = await screen.findByRole('group', { name: 'Graph head shape' });
+    expect(within(grid).getByRole('menuitemradio', { name: 'Dot' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    fireEvent.click(within(grid).getByRole('menuitemradio', { name: 'Diamond' }));
+
+    expect(onChangeHeadShape).toHaveBeenCalledWith('diamond');
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+  });
+
+  /**
+   * A Graph row says how its Edges are drawn with the same mark the canvas
+   * HUD's key draws — a line in the Graph's colour ending in its head shape —
+   * and no Graph glyph: the list is already a list of Graphs, so a glyph on
+   * every row said nothing the caption does not.
+   */
+  it('marks each Graph row with its colour and head shape and no glyph', () => {
     mount(
       clusters({
         graphs: [
-          { id: 'g1', title: 'Long', color: '#1f77b4' },
-          { id: 'g2', title: 'Short', color: '#ff7f0e' },
+          { id: 'g1', title: 'Long', color: '#1f77b4', headShape: 'arrow' },
+          { id: 'g2', title: 'Short', color: '#ff7f0e', headShape: 'vee' },
         ],
       }),
     );
@@ -354,12 +433,22 @@ describe('SpaceResourceSelectors', () => {
     const rows = screen.getAllByRole('menuitemradio');
 
     expect(rows).toHaveLength(2);
-    const lines = rows.map((row) => row.querySelector('[data-slot="graph-color-line"]'));
-    expect(lines[0]).toHaveStyle({ backgroundColor: '#1f77b4' });
-    expect(lines[1]).toHaveStyle({ backgroundColor: '#ff7f0e' });
-    // The unchosen row draws nothing else; the chosen one draws only the
-    // radio indicator the menu marks the chosen member with.
-    expect(rows[1]?.querySelector('svg')).toBeNull();
+    const marks = rows.map((row) => row.querySelector('[data-slot="graph-legend-mark"]'));
+    expect(marks[0]?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+      'stroke',
+      '#1f77b4',
+    );
+    expect(marks[0]).toHaveAttribute('data-head-shape', 'arrow');
+    expect(marks[1]?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+      'stroke',
+      '#ff7f0e',
+    );
+    expect(marks[1]).toHaveAttribute('data-head-shape', 'vee');
+    // The unchosen row draws nothing but its mark; the chosen one adds only
+    // the radio indicator the menu marks the chosen member with.
+    expect(rows[1]?.querySelectorAll('svg:not([data-slot="graph-legend-mark"] svg)')).toHaveLength(
+      0,
+    );
   });
 
   it('leaves the Map rows unmarked', () => {
@@ -367,6 +456,6 @@ describe('SpaceResourceSelectors', () => {
     fireEvent.click(screen.getByTestId('space-resource-map'));
 
     for (const row of screen.getAllByRole('menuitemradio'))
-      expect(row.querySelector('[data-slot="graph-color-line"]')).toBeNull();
+      expect(row.querySelector('[data-slot="graph-legend-mark"]')).toBeNull();
   });
 });

@@ -23,7 +23,7 @@ export { SpaceResourceSelectors } from './SpaceResourceSelectors';
 export type {
   CanvasSpaceResourceChoice,
   CanvasSpaceResourceGraphChoice,
-  CanvasSpaceResourceMapCommands,
+  CanvasSpaceResourceCommands,
   CanvasSpaceResourceGraphCommands,
   CanvasSpaceResourceSelection,
   SpaceResourceSelectorsProps,
@@ -95,19 +95,23 @@ export type {
   EntityActionsProps,
   EntityActionsTriggerProps,
 } from './EntityActionsMenu';
-export { FALLBACK_GRAPH_COLOR, graphColor } from './graph-color';
-export { GraphColorLine } from './GraphColorLine';
-export type { GraphColorLineProps } from './GraphColorLine';
 export {
-  PaletteColorPicker,
-  PaletteColorSwatchGrid,
-  paletteSwatchPanelClassName,
-} from './PaletteColorPicker';
-export type {
-  PaletteColorEntry,
-  PaletteColorPickerProps,
-  PaletteColorSwatchGridProps,
-} from './PaletteColorPicker';
+  FALLBACK_GRAPH_COLOR,
+  graphAppearance,
+  graphColor,
+  type GraphAppearance,
+} from './graph-color';
+export { GraphLegendMark } from './GraphLegendMark';
+export type { GraphLegendMarkProps } from './GraphLegendMark';
+export {
+  GRAPH_HEAD_SHAPE_FRAME,
+  GRAPH_HEAD_SHAPE_LABELS,
+  GraphHeadMarker,
+  GraphHeadShapeGlyph,
+} from './GraphHeadShape';
+export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
+export { PaletteColorPicker } from './PaletteColorPicker';
+export type { PaletteColorEntry, PaletteColorPickerProps } from './PaletteColorPicker';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
   AbandonEditIcon,
@@ -127,6 +131,7 @@ export {
   EntityActionsIcon,
   FitViewIcon,
   GraphIcon,
+  ImageIcon,
   MapIcon,
   MarkdownIcon,
   OpenIndependentlyIcon,

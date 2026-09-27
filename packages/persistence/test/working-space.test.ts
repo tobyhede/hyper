@@ -78,7 +78,15 @@ describe('loadWorkingSpace', () => {
               title: 'Map 1',
               kind: 'positioned',
               positions: {},
-              graphs: [{ id: GRAPH, title: 'Graph 1', color: nextGraphColor([]), edges: [] }],
+              graphs: [
+                {
+                  id: GRAPH,
+                  title: 'Graph 1',
+                  color: nextGraphColor([]),
+                  headShape: 'arrow',
+                  edges: [],
+                },
+              ],
               activeGraph: GRAPH,
             },
           ],

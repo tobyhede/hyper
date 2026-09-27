@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { selfEdgeAttachment } from '../src/edge-attachment';
 import { RoutedEdge, useEdgeAttachment } from '../src/RoutedEdge';
 import type { RoutedFlowEdge } from '../src/RoutedEdge';
+import { uuid } from './uuid';
 
 /**
  * React Flow is the system boundary, so the store is stood in for and the
@@ -28,7 +29,9 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     useInternalNode: (id: string) => nodes.get(id),
     /** React Flow's own `<path>`, stood in for so a test can read the curve the
      *  Edge asked for. */
-    BaseEdge: ({ path }: { path: string }) => <div data-testid="edge-path" data-d={path} />,
+    BaseEdge: ({ path, markerEnd }: { path: string; markerEnd?: string }) => (
+      <div data-testid="edge-path" data-d={path} data-marker-end={markerEnd} />
+    ),
   };
 });
 
@@ -112,5 +115,54 @@ describe('RoutedEdge', () => {
     const path = screen.getByTestId('edge-path').getAttribute('data-d') ?? '';
     expect(path.startsWith('M130,158')).toBe(true);
     expect(path.endsWith('130,488')).toBe(true);
+  });
+});
+
+describe("an Edge's head", () => {
+  const DOTTED = {
+    graphId: uuid('00000000-0000-4000-8000-000000000001'),
+    laneOffset: 8,
+    laneReach: 8,
+    endTrim: 0.2,
+    headShape: 'dot',
+  } as const;
+
+  // React Flow resolves the Edge object's `markerEnd` and hands the custom
+  // Edge the reference; the marker itself is the canvas's (`GraphHeadMarkers`).
+  it('ends its line in the marker React Flow hands it, and draws none itself', () => {
+    nodes.clear();
+    nodes.set('above', rect(0, 0));
+    nodes.set('below', rect(0, 500));
+
+    const { container } = render(
+      <svg>
+        <RoutedEdge
+          {...edgeProps('above', 'below')}
+          data={DOTTED}
+          markerEnd="url('#graph-head-00000000-0000-4000-8000-000000000001')"
+          style={{ stroke: '#2ca02c', opacity: 0.4 }}
+        />
+      </svg>,
+    );
+
+    expect(screen.getByTestId('edge-path')).toHaveAttribute(
+      'data-marker-end',
+      "url('#graph-head-00000000-0000-4000-8000-000000000001')",
+    );
+    expect(container.querySelector('marker')).toBeNull();
+  });
+
+  it('ends in nothing when React Flow hands it no marker', () => {
+    nodes.clear();
+    nodes.set('above', rect(0, 0));
+    nodes.set('below', rect(0, 500));
+
+    render(
+      <svg>
+        <RoutedEdge {...edgeProps('above', 'below')} data={DOTTED} style={{ stroke: '#1f77b4' }} />
+      </svg>,
+    );
+
+    expect(screen.getByTestId('edge-path')).not.toHaveAttribute('data-marker-end');
   });
 });

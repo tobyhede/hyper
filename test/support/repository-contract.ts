@@ -1,4 +1,10 @@
-import { uuidSchema, type GraphEdge, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  uuidSchema,
+  type GraphEdge,
+  type GraphHeadShape,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import {
   AggregateInvariantError,
@@ -918,6 +924,55 @@ export const spaceRepositoryContract = (
     });
   });
 
+  /**
+   * An Image Resource owns a URL and an optional natural size (ADR 0106), and
+   * both reach the store and come back as they went in — through
+   * initialization, through a commit that changes the URL and the size, and
+   * across a fresh repository host where the harness has one.
+   */
+  it(`${name} stores and reloads an Image Resource unchanged`, async () => {
+    await withHarness(async (repository) => {
+      const image = {
+        id: SECOND_RESOURCE_ID,
+        document: {
+          title: 'Figure',
+          kind: 'image' as const,
+          url: 'https://example.com/figure.png',
+          naturalSize: { width: 640, height: 480.5 },
+        },
+      };
+      const first: SpaceSnapshot = {
+        ...space(SPACE_ID, 'Pictures', [RESOURCE_ID]),
+        resources: [resource(RESOURCE_ID, 'Pictures resource'), image],
+      };
+      await seed(repository, first);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+
+      const replaced: SpaceSnapshot = {
+        ...first,
+        resources: [
+          resource(RESOURCE_ID, 'Pictures resource'),
+          {
+            id: SECOND_RESOURCE_ID,
+            document: {
+              title: 'Figure',
+              kind: 'image',
+              url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+            },
+          },
+        ],
+      };
+      await expect(commitUpdate(repository, replaced, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(replaced, 1n, null));
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(replaced, 1n, null)] },
+      });
+    });
+  });
+
   it(`${name} refuses a topology-preserving update when stored Spaces have no Meta identity`, async (context) => {
     await withMissingMetaHarness(context, async (repository, removeMetaIdentity) => {
       const first = space(SPACE_ID, 'One', [RESOURCE_ID]);
@@ -992,6 +1047,38 @@ export const spaceRepositoryContract = (
       await expect(repository.loadAggregate()).resolves.toEqual({
         kind: 'loaded',
         aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(shown, 1n, null)] },
+      });
+    });
+  });
+
+  it(`${name} keeps a Graph's head shape through initialization, commit and load`, async () => {
+    await withHarness(async (repository) => {
+      const withHeadShape = (headShape: GraphHeadShape): SpaceSnapshot => {
+        const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
+        return {
+          ...base,
+          document: {
+            ...base.document,
+            maps: (base.document.maps ?? []).map((map) => ({
+              ...map,
+              graphs: map.graphs.map((graph) => ({ ...graph, headShape })),
+            })),
+          },
+        };
+      };
+      const dotted = withHeadShape('dot');
+
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [dotted] });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(dotted, 0n, null));
+
+      const diamond = withHeadShape('diamond');
+      await expect(commitUpdate(repository, diamond, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(diamond, 1n, null));
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(diamond, 1n, null)] },
       });
     });
   });
