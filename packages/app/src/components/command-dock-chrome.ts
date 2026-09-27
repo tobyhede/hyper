@@ -3,7 +3,16 @@
  * clusters draws. The application builds it (`dock-chrome.ts`) and the Dock's
  * modules draw it, and both read the one declaration here.
  */
-import type { Graph, GraphId, Map, MapId, Resource, ResourceId, UUID } from '@project/core';
+import type {
+  Graph,
+  GraphHeadShape,
+  GraphId,
+  Map,
+  MapId,
+  Resource,
+  ResourceId,
+  UUID,
+} from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { ExitOutcome } from '../dock-model';
 import type { MapMemberships } from '../map-memberships';
@@ -293,6 +302,14 @@ export interface DockGraph {
    * are one Graph authoring answer (`graph-authoring-commands.ts`).
    */
   readonly onRecolor: ((color: string) => void) | null;
+  /** The head shape the Active Graph's Edges draw, which Shape… marks as current. */
+  readonly activeHeadShape: GraphHeadShape;
+  /**
+   * Store the Active Graph's head shape, which every one of its Edges ends in
+   * (ADR 0105), or `null` while Shape… may not run — exactly when
+   * {@link DockGraph.onRecolor} is.
+   */
+  readonly onChangeHeadShape: ((headShape: GraphHeadShape) => void) | null;
   /**
    * Create an empty Graph in the drawn Map, which becomes the Active Graph,
    * or `null` while New Graph may not run. One field, like

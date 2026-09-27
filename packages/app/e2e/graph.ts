@@ -335,15 +335,49 @@ export async function graphChoices(page: Page): Promise<Locator> {
 export async function openGraphColourPicker(page: Page): Promise<void> {
   const menu = await graphMenu(page);
   await menu.getByRole('menuitem', { name: 'Colour…' }).click({ delay: 120 });
-  const group = page.getByRole('radiogroup', { name: 'Graph colour' });
-  await expect(group.getByRole('radio')).toHaveCount(20);
-  await expect(group.getByRole('radio', { name: 'Orange', exact: true })).toBeVisible();
+  const group = page.getByRole('group', { name: 'Graph colour' });
+  await expect(group.getByRole('menuitemradio')).toHaveCount(20);
+  await expect(group.getByRole('menuitemradio', { name: 'Orange', exact: true })).toBeVisible();
 }
 
 /** Recolour the Active Graph through the swatch popover. */
 export async function recolorActiveGraph(page: Page, label: string): Promise<void> {
   await openGraphColourPicker(page);
-  await page.getByRole('radio', { name: label, exact: true }).click();
+  await page
+    .getByRole('group', { name: 'Graph colour' })
+    .getByRole('menuitemradio', { name: label, exact: true })
+    .click();
+}
+
+/** Open Shape…, the Active Graph's four head shapes, from the Graph menu. */
+export async function openGraphHeadShapePicker(page: Page): Promise<Locator> {
+  const menu = await graphMenu(page);
+  await menu.getByRole('menuitem', { name: 'Shape…' }).click({ delay: 120 });
+  const group = page.getByRole('group', { name: 'Graph head shape' });
+  await expect(group.getByRole('menuitemradio')).toHaveCount(4);
+  return group;
+}
+
+/** Choose the Active Graph's head shape by the name Shape… reads it by. */
+export async function changeActiveGraphHeadShape(page: Page, label: string): Promise<void> {
+  const group = await openGraphHeadShapePicker(page);
+  await group.getByRole('menuitemradio', { name: label, exact: true }).click();
+}
+
+/**
+ * The head shape an Edge's drawn line ends in, read from the marker its path
+ * names as `marker-end`.
+ */
+export async function drawnHeadShape(edge: Locator): Promise<string | null> {
+  return edge.evaluate((element) => {
+    const path = element.querySelector('.react-flow__edge-path');
+    const id = /^url\('#(.+)'\)$/.exec(path?.getAttribute('marker-end') ?? '')?.[1];
+    const marker = id === undefined ? null : document.getElementById(id);
+    return (
+      marker?.querySelector('[data-slot="graph-head-shape"]')?.getAttribute('data-head-shape') ??
+      null
+    );
+  });
 }
 
 /**

@@ -3,6 +3,7 @@ import {
   type ResourceId,
   type Graph,
   type GraphEdge,
+  type GraphHeadShape,
   type GraphId,
   type Map,
   type MapId,
@@ -10,6 +11,7 @@ import {
   type ResourcePlacement,
   COLLAPSED_RESOURCE_SIZE,
   EDGE_TITLE_ONE_LINE,
+  graphHeadShape,
   isOneLineEdgeTitle,
   RESOURCE_TITLE_REQUIRED,
   normalizeTitle,
@@ -194,6 +196,11 @@ export type AuthoringCompletion =
   | { readonly kind: 'added-graph' }
   | { readonly kind: 'renamed-graph'; readonly graphId: GraphId; readonly title: string }
   | { readonly kind: 'recolored-graph'; readonly graphId: GraphId; readonly color: string }
+  | {
+      readonly kind: 'changed-graph-head-shape';
+      readonly graphId: GraphId;
+      readonly headShape: GraphHeadShape;
+    }
   | { readonly kind: 'deleted-graph'; readonly graphId: GraphId }
   | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge }
   /**
@@ -246,6 +253,7 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
+  | { readonly kind: 'changed-graph-head-shape' }
   | { readonly kind: 'deleted-graph' }
   | { readonly kind: 'deleted-edge' }
   | { readonly kind: 'titled-edge' }
@@ -463,7 +471,13 @@ export type EmbeddedResourceCompletion = Extract<
 export type EmbeddedContextCompletion = Extract<
   AuthoringCompletion,
   {
-    kind: 'renamed-map' | 'added-graph' | 'renamed-graph' | 'recolored-graph' | 'deleted-graph';
+    kind:
+      | 'renamed-map'
+      | 'added-graph'
+      | 'renamed-graph'
+      | 'recolored-graph'
+      | 'changed-graph-head-shape'
+      | 'deleted-graph';
   }
 >;
 
@@ -1355,6 +1369,7 @@ export function createSpaceAuthoring({
     } else if (
       completion.kind === 'renamed-graph' ||
       completion.kind === 'recolored-graph' ||
+      completion.kind === 'changed-graph-head-shape' ||
       completion.kind === 'deleted-graph' ||
       completion.kind === 'deleted-edge' ||
       completion.kind === 'titled-edge' ||
@@ -1382,6 +1397,11 @@ export function createSpaceAuthoring({
       } else if (completion.kind === 'recolored-graph') {
         if (completion.color === graph.color) return UNCHANGED;
         writeGraphs(replacing({ ...graph, color: completion.color }));
+      } else if (completion.kind === 'changed-graph-head-shape') {
+        // Against the drawn head shape, so choosing arrow on a Graph that
+        // stores none is the arrow it already draws (ADR 0105).
+        if (completion.headShape === graphHeadShape(graph)) return UNCHANGED;
+        writeGraphs(replacing({ ...graph, headShape: completion.headShape }));
       } else if (completion.kind === 'deleted-graph') {
         // Every Map resolves an Active Graph, so the last one cannot go
         // (ADR 0040). Removing its Edges is the author's way to empty it.

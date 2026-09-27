@@ -379,6 +379,53 @@ describe.each(contexts)('Graph recolour through $name', ({ setup }) => {
   });
 });
 
+describe.each(contexts)('Graph head shape change through $name', ({ setup }) => {
+  it('completes the change', async () => {
+    const { authored, mapId, graphId, commands } = await setup();
+    const change = commands.map(mapId).graph(graphId).changeHeadShape;
+    expect(change.available).toBe(true);
+    expect(change.invoke('vee')).toEqual({ kind: 'completed' });
+    expect(graphOf(authored, mapId, graphId)?.headShape).toBe('vee');
+  });
+
+  it('answers arrow on a Graph that stores no head shape as unchanged', async () => {
+    const { authored, mapId, graphId, commands } = await setup();
+    expect(graphOf(authored, mapId, graphId)?.headShape).toBeUndefined();
+    expect(commands.map(mapId).graph(graphId).changeHeadShape.invoke('arrow')).toEqual({
+      kind: 'unchanged',
+    });
+  });
+
+  it('answers a refusal with the complete Graph report, which command outcomes holds', async () => {
+    const { authored, mapId, graphId, commands, outcomes, answerNext } = await setup();
+    answerNext(() => ({ kind: 'refused', refusal: { code: 'graph-not-owned' } }));
+    const report = { title: 'Graph unchanged', message: 'That Graph is not one this Map owns.' };
+    const change = commands.map(mapId).graph(graphId).changeHeadShape;
+    expect(outcomes.run('graph-edit', () => change.invoke('dot'))).toEqual({
+      kind: 'refused',
+      report,
+    });
+    expect(graphOf(authored, mapId, graphId)?.headShape).toBeUndefined();
+    expect(outcomes.getState().notices.get('graph-edit')).toEqual(report);
+  });
+
+  it('is withdrawn exactly when recolour is, and a stale invocation authors nothing', async () => {
+    const { authored, mapId, graphId, commands, outcomes, withdraw } = await setup();
+    const change = commands.map(mapId).graph(graphId).changeHeadShape;
+    const working = authored.session.getState().working;
+    const publications = publicationsOf(authored);
+    withdraw();
+    expect(outcomes.run('graph-edit', () => change.invoke('dot'))).toEqual({
+      kind: 'unavailable',
+    });
+    expect(publications.count()).toBe(0);
+    expect(authored.session.getState().working).toBe(working);
+    const graph = commands.map(mapId).graph(graphId);
+    expect(graph.changeHeadShape.available).toBe(false);
+    expect(graph.recolor.available).toBe(false);
+  });
+});
+
 describe.each(contexts)('Graph creation through $name', ({ setup }) => {
   it('creates one empty Graph in the addressed Map and answers its Map and Graph', async () => {
     const { authored, mapId, commands } = await setup();

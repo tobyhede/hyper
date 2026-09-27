@@ -183,8 +183,8 @@ test('recolouring the active Graph from the Graph menu persists at phone width',
   await graph.focus();
   await page.keyboard.press('Enter');
   await page.getByRole('menuitem', { name: 'Colour…' }).click();
-  const palette = page.getByRole('radiogroup', { name: 'Graph colour' });
-  await expect(palette.getByRole('radio', { name: 'Green', exact: true })).toHaveAttribute(
+  const palette = page.getByRole('group', { name: 'Graph colour' });
+  await expect(palette.getByRole('menuitemradio', { name: 'Green', exact: true })).toHaveAttribute(
     'aria-checked',
     'true',
   );

@@ -4,11 +4,12 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Shape… sits directly under Colour… in the Graph menu, disabled whenever Colour… is.
-- [ ] The submenu offers exactly the four shapes, sized like the colour swatches, in the Graph's colour, with the current one marked.
-- [ ] Choosing a different shape is one Edit, and the canvas redraws the Graph's Edges with it.
-- [ ] Choosing the current shape produces no Edit (`unchanged`).
-- [ ] The Open Space Resource's Graph menu offers Shape… and it changes the target Space's Graph, as recolour does there.
-- [ ] Ladle story and application proof for the submenu (ADR 0052); `pnpm ui:catalog:check` passes.
+- [x] Shape… sits directly under Colour… in the Graph menu, disabled whenever Colour… is.
+- [x] The submenu offers exactly the four shapes, sized like the colour swatches, in the Graph's colour, with the current one marked.
+- [x] Choosing a different shape is one Edit, and the canvas redraws the Graph's Edges with it.
+- [x] Choosing the current shape produces no Edit (`unchanged`).
+- [x] The Open Space Resource's Graph menu offers Shape… and it changes the target Space's Graph, as recolour does there.
+- [x] Ladle story and application proof for the submenu (ADR 0052); `pnpm ui:catalog:check` passes.
+- [x] Colour… and Shape… are one `SwatchMenuRadioGroup`, the Graph menu's own `menuitemradio` items drawn as swatches, so both keep Base UI Menu's keyboard: the arrows move the highlight without choosing, and ArrowLeft closes the submenu. This replaced the hand-rolled `SwatchGrid`, which had changed Colour…'s keyboard without meeting the radio pattern its roles announced. `PaletteColorPicker`'s popover is a single-select `ToggleGroup`.

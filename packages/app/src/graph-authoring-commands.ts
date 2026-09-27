@@ -1,4 +1,4 @@
-import type { GraphId, MapId } from '@project/core';
+import type { GraphHeadShape, GraphId, MapId } from '@project/core';
 import {
   UNAVAILABLE,
   completionOutcome,
@@ -48,6 +48,13 @@ export type GraphRename = Capability<(title: string) => EditOutcome>;
 export type GraphRecolor = Capability<(color: string) => EditOutcome>;
 
 /**
+ * Store one Graph's head shape, which every one of its Edges ends in
+ * (ADR 0105). Available exactly when {@link GraphRecolor} is: both change how
+ * the Graph's Edges are drawn, and the Graph menu withdraws them together.
+ */
+export type GraphChangeHeadShape = Capability<(headShape: GraphHeadShape) => EditOutcome>;
+
+/**
  * Create one empty Graph in a Map: asynchronous, because an embedded creation
  * waits for the Spaces it writes to save before and after it.
  */
@@ -66,6 +73,7 @@ export type GraphDelete = Capability<() => Promise<EditOutcome<CompletedContextE
 export interface GraphCommands {
   readonly rename: GraphRename;
   readonly recolor: GraphRecolor;
+  readonly changeHeadShape: GraphChangeHeadShape;
   readonly delete: GraphDelete;
 }
 
@@ -216,6 +224,20 @@ const graphAuthoringCommands = (
             recolors()
               ? completionOutcome(
                   context.complete(mapId, { kind: 'recolored-graph', graphId, color }),
+                  UNCHANGED_TITLE,
+                )
+              : UNAVAILABLE,
+        },
+        changeHeadShape: {
+          available: recolors(),
+          invoke: (headShape) =>
+            recolors()
+              ? completionOutcome(
+                  context.complete(mapId, {
+                    kind: 'changed-graph-head-shape',
+                    graphId,
+                    headShape,
+                  }),
                   UNCHANGED_TITLE,
                 )
               : UNAVAILABLE,

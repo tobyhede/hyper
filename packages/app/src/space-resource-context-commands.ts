@@ -1,4 +1,11 @@
-import type { ResourceDocument, GraphId, MapId, UUID } from '@project/core';
+import {
+  graphHeadShape,
+  type ResourceDocument,
+  type GraphHeadShape,
+  type GraphId,
+  type MapId,
+  type UUID,
+} from '@project/core';
 import {
   graphColor,
   type CanvasSpaceResourceCommands,
@@ -116,6 +123,13 @@ export function spaceResourceContextCommands(
       onRecolor: offered(addressedGraph.recolor, (recolor) => (color: string) => {
         commandOutcomes.run('graph-edit', () => recolor(color));
       }),
+      headShape: graphHeadShape(graph),
+      onChangeHeadShape: offered(
+        addressedGraph.changeHeadShape,
+        (change) => (headShape: GraphHeadShape) => {
+          commandOutcomes.run('graph-edit', () => change(headShape));
+        },
+      ),
       // Graph authoring orders the creation and the selection write, and the
       // containing canvas holds its report. The rail does not continue into
       // the new Graph's name, so the caret never goes there, and the creation

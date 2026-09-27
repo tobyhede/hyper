@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import type { GraphHeadShape } from '@project/core';
 import { DropdownMenuItem } from './components/dropdown-menu';
 import { ChoiceMenu, ChoiceMenuTrigger, type ChoiceMenuChoice } from './ChoiceMenu';
 import { GraphColorLine } from './GraphColorLine';
@@ -48,14 +49,22 @@ export interface CanvasSpaceResourceCommands {
   readonly onCopyLink: () => Promise<string | null>;
 }
 
-/** A Graph's commands: the shared ones, and its colour, which a Map does not carry. */
+/**
+ * A Graph's commands: the shared ones, and how its Edges are drawn — its
+ * colour and head shape — which a Map does not carry.
+ */
 export interface CanvasSpaceResourceGraphCommands extends CanvasSpaceResourceCommands {
   readonly color: string;
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: ((color: string) => void) | null;
+  readonly headShape: GraphHeadShape;
+  readonly onChangeHeadShape: ((headShape: GraphHeadShape) => void) | null;
 }
 
-type GraphPalette = Pick<CanvasSpaceResourceGraphCommands, 'color' | 'colors' | 'onRecolor'>;
+type GraphAppearance = Pick<
+  CanvasSpaceResourceGraphCommands,
+  'color' | 'colors' | 'onRecolor' | 'headShape' | 'onChangeHeadShape'
+>;
 
 /**
  * The two choices an Open Space Resource publishes, and what is available to make
@@ -145,7 +154,7 @@ export function SpaceResourceSelectors({
       <SpaceResourceSelector
         label="Graph"
         commands={graphCommands}
-        palette={graphCommands}
+        appearance={graphCommands}
         onBusy={setBusy}
         renaming={renaming === 'Graph'}
         onRenaming={(editing) => setRenaming(editing ? 'Graph' : null)}
@@ -168,8 +177,8 @@ export function SpaceResourceSelectors({
 interface SpaceResourceSelectorProps {
   readonly onBusy: (busy: boolean) => void;
   readonly commands: CanvasSpaceResourceCommands | undefined;
-  /** A Graph's colour commands; a Map has none. */
-  readonly palette?: GraphPalette | undefined;
+  /** How a Graph's Edges are drawn, and the commands that change it; a Map has none. */
+  readonly appearance?: GraphAppearance | undefined;
   readonly renaming: boolean;
   readonly onRenaming: (editing: boolean) => void;
   readonly onReport: (message: string | null) => void;
@@ -222,7 +231,7 @@ interface SpaceResourceSelectorProps {
 function SpaceResourceSelector({
   onBusy,
   commands,
-  palette,
+  appearance,
   renaming,
   onRenaming,
   onReport,
@@ -257,7 +266,8 @@ function SpaceResourceSelector({
   const rename = disabled || selected === undefined ? null : (commands?.onRename ?? null);
   const create = disabled ? null : (commands?.onCreate ?? null);
   const remove = disabled ? null : (commands?.onDelete ?? null);
-  const recolor = disabled ? null : (palette?.onRecolor ?? null);
+  const recolor = disabled ? null : (appearance?.onRecolor ?? null);
+  const changeHeadShape = disabled ? null : (appearance?.onChangeHeadShape ?? null);
   const renameItem = (
     <DropdownMenuItem
       className="gap-2"
@@ -376,18 +386,27 @@ function SpaceResourceSelector({
         }
       >
         {commands !== undefined &&
-          (palette !== undefined ? (
+          (appearance !== undefined ? (
             <GraphMenuActions
               {...commonCommands}
               onCreate={onCreate}
               onDelete={onDelete}
-              color={palette.color}
-              colors={palette.colors}
+              color={appearance.color}
+              colors={appearance.colors}
               onRecolor={
                 recolor === null
                   ? null
                   : (color) => {
                       recolor(color);
+                      setMenuOpen(false);
+                    }
+              }
+              headShape={appearance.headShape}
+              onChangeHeadShape={
+                changeHeadShape === null
+                  ? null
+                  : (headShape) => {
+                      changeHeadShape(headShape);
                       setMenuOpen(false);
                     }
               }
