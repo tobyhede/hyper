@@ -94,6 +94,43 @@ describe('CanvasResource kind and interaction state', () => {
     expect(screen.getByRole('img', { name: 'Reference Resource' })).toBeVisible();
   });
 
+  /**
+   * A Closed Image Resource looks like any Resource (ADR 0106): its Title and
+   * its kind, and no thumbnail — the picture it shows from its URL is drawn
+   * only when it is Open.
+   */
+  it('presents a Closed Image Resource by its Title and kind alone, with no picture', () => {
+    render(
+      <CanvasResource
+        front={{ kind: 'image', open: false }}
+        state="rest"
+        title="Figure"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    const resource = screen.getByRole('article', { name: 'Figure' });
+    expect(resource).toHaveAttribute('data-kind', 'image');
+    expect(screen.getByRole('heading', { name: 'Figure' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Image Resource' })).toBeVisible();
+    expect(resource.querySelector('img')).toBeNull();
+  });
+
+  it('offers an Image Resource the shared Open operation', () => {
+    const onOpenChange = vi.fn(() => 'completed' as const);
+    render(
+      <CanvasResource
+        front={{ kind: 'image', open: false, onOpenChange }}
+        state="selected"
+        title="Figure"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Figure' }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+
   it('offers a Reference Resource the shared Open operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(

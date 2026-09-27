@@ -8,6 +8,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  Image as ImageGlyph,
   LayoutGrid,
   LogIn,
   Maximize,
@@ -156,6 +157,11 @@ export const MarkdownIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <StickyNote size={size} />
 );
 
+/** The Resource kind that shows a picture from its URL (ADR 0106). */
+export const ImageIcon = ({ size = 14 }: { size?: number | undefined }) => (
+  <ImageGlyph size={size} />
+);
+
 /**
  * The isometric cube shared by Spaces and Space Resources.
  *
@@ -233,11 +239,11 @@ export const SpaceResourceIcon = SpaceIcon;
 /**
  * The Resource kinds that own what they draw, and so have a glyph of their own.
  *
- * A Reference Resource is deliberately absent: it is not a third silhouette but a badge on
- * one of these two.
+ * A Reference Resource is deliberately absent: it is not another silhouette but a badge on
+ * one of these.
  *
  * **Subtracted from the domain union rather than restated as its own.** Written
- * out as `'markdown' | 'space'` it would be a second list agreeing with
+ * out as `'markdown' | 'space' | 'image'` it would be a second list agreeing with
  * `Resource['kind']` only by hand, so a kind added to the domain would leave
  * every record keyed by this type exhaustive and wrong. Derived, the addition lands here, and
  * {@link BASE_GLYPHS} fails to build until the new kind has a silhouette.
@@ -253,6 +259,7 @@ interface BaseGlyphProps {
 export const BASE_GLYPHS = {
   markdown: MarkdownIcon,
   space: SpaceResourceIcon,
+  image: ImageIcon,
 } satisfies Record<ResourceBaseKind, ComponentType<BaseGlyphProps>>;
 
 /**

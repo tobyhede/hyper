@@ -219,6 +219,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'Every Resource front draws its kind glyph, its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
   },
   {
+    id: 'image-resource-closed-front-draws-title-and-kind',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'Front',
+    claim:
+      'A Closed Image Resource draws its Title and the image kind glyph at the one Closed size, and no picture (ADR 0106).',
+  },
+  {
     id: 'canvas-resource-shows-kind-treatment',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Kinds',

@@ -131,6 +131,7 @@ export {
   EntityActionsIcon,
   FitViewIcon,
   GraphIcon,
+  ImageIcon,
   MapIcon,
   MarkdownIcon,
   OpenIndependentlyIcon,

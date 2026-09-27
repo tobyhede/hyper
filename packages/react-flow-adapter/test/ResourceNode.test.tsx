@@ -349,6 +349,28 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
   });
 
+  it('renders a Closed Image Resource by its Title and kind, with no Markdown to edit', () => {
+    const onEditResource = vi.fn();
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'image',
+          selected: true,
+          body: 'must not render',
+          onEditResource,
+          onBeginBodyEditing: vi.fn(),
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'image');
+    expect(screen.getByRole('img', { name: 'Image Resource' })).toBeVisible();
+    expect(screen.queryByText('must not render')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
+    screen.getByRole('button', { name: 'Open Resource A' }).click();
+    expect(onEditResource).toHaveBeenCalledWith(true);
+  });
+
   it('renders a Space Resource through an explicit non-Markdown front', () => {
     const onEditResource = vi.fn();
     const onBeginBodyEditing = vi.fn();

@@ -3,6 +3,7 @@ import type { ZodIssue } from 'zod';
 import {
   EDGE_TITLE_ONE_LINE,
   GRAPH_HEAD_SHAPES,
+  IMAGE_URL_UNSUPPORTED,
   graphEdgeSchema,
   graphSchema,
   resourceFrontmatterSchema,
@@ -709,5 +710,79 @@ describe('an Edge Title', () => {
       ]),
     );
     expect(result.success).toBe(false);
+  });
+});
+
+describe('an Image Resource', () => {
+  const IMAGE = {
+    id: '00000000-0000-4000-8000-000000000011',
+    title: 'Figure',
+    kind: 'image',
+  };
+  /** The unpadded base64url SHA-256 of the empty string, a real stored-image id. */
+  const STORED_ID = '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU';
+
+  /** Whether a refusal carries the domain's identity for an image URL it does not accept. */
+  const refusesUrl = (issues: readonly ZodIssue[]): boolean =>
+    issues.some(
+      (issue) => issue.code === 'custom' && issue.params?.['code'] === IMAGE_URL_UNSUPPORTED,
+    );
+
+  it.each([
+    'https://example.com/figure.png',
+    'http://example.com/figure.png',
+    `/images/${STORED_ID}`,
+  ])('parses an image URL it accepts: %s', (url) => {
+    expect(resourceSchema.parse({ ...IMAGE, url })).toEqual({ ...IMAGE, url });
+    expect(resourceFrontmatterSchema.parse({ ...IMAGE, url })).toEqual({ ...IMAGE, url });
+  });
+
+  it.each([
+    'data:image/png;base64,iVBORw0KGgo=',
+    'javascript:alert(1)',
+    'ftp://example.com/figure.png',
+    'figure.png',
+    './figure.png',
+    '../images/figure.png',
+    '//example.com/figure.png',
+    '/files/figure.png',
+    '/images/',
+    `/images/${STORED_ID}.png`,
+    `/images/${STORED_ID.slice(1)}`,
+    `/images/${STORED_ID}=`,
+    '',
+  ])('refuses an image URL it does not accept, naming the rule: %j', (url) => {
+    const result = resourceSchema.safeParse({ ...IMAGE, url });
+    expect(result.success).toBe(false);
+    expect(refusesUrl(result.error?.issues ?? [])).toBe(true);
+  });
+
+  it('refuses an Image Resource with no URL', () => {
+    expect(resourceSchema.safeParse(IMAGE).success).toBe(false);
+  });
+
+  it('records a natural size when one is given, and none otherwise', () => {
+    const url = 'https://example.com/figure.png';
+    const measured = { ...IMAGE, url, naturalSize: { width: 640, height: 480.5 } };
+    expect(resourceSchema.parse(measured)).toEqual(measured);
+    expect(resourceSchema.parse({ ...IMAGE, url })).not.toHaveProperty('naturalSize');
+  });
+
+  it.each([0, -1, Number.POSITIVE_INFINITY, Number.NaN])(
+    'refuses a natural size with a dimension of %s',
+    (dimension) => {
+      const url = 'https://example.com/figure.png';
+      for (const naturalSize of [
+        { width: dimension, height: 480 },
+        { width: 640, height: dimension },
+      ]) {
+        expect(resourceSchema.safeParse({ ...IMAGE, url, naturalSize }).success).toBe(false);
+      }
+    },
+  );
+
+  it('gives an Image Resource no body — it owns its URL, not its bytes', () => {
+    const image = resourceSchema.parse({ ...IMAGE, url: 'https://example.com/a.png', body: 'x' });
+    expect('body' in image).toBe(false);
   });
 });
