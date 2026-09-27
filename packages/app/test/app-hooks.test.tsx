@@ -680,7 +680,7 @@ describe('useDockChrome', () => {
   it("creates a markdown Resource on the drawing Map from the Create cluster's press", () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
-    act(() => chrome?.resources.onCreate('markdown'));
+    act(() => chrome?.resources.onCreate({ kind: 'markdown' }));
     expect(placedIds(opened)).toContain(CREATED);
   });
 

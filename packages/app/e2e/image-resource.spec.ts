@@ -1,18 +1,19 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { readFileSync } from 'node:fs';
-import { encodeCompactUuid, OPEN_RESOURCE_CHROME, uuidSchema } from '@project/core';
-import type { Locator } from '@playwright/test';
-import { expect, test, type Page } from './fixtures';
+import { encodeCompactUuid, OPEN_RESOURCE_CHROME, uuidSchema, type UUID } from '@project/core';
+import { decodeLoadedSpace } from '@project/persistence';
+import { expect, test, type Locator, type Page } from './fixtures';
 import {
   activeResource,
   boxOf,
+  createResource,
   openResource,
   presentControl,
   selectedCanvas,
   settled,
 } from './graph';
-import { seedPositionedMap } from './seed';
+import { SEEDED_MAP_ID, seedPositionedMap } from './seed';
 
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
 const FIGURE_URL = 'https://example.com/figure.png';
@@ -30,8 +31,8 @@ interface Pictures {
 
 /**
  * Open a Space holding one Markdown Resource and a Closed Image Resource beside
- * it, whose recorded natural size is 400×300. No gesture creates an Image
- * Resource yet, so it joins through the same HTTP commit the browser makes.
+ * it, whose recorded natural size is 400×300. It joins through the same HTTP
+ * commit the browser makes, so its natural size is one no gesture measured.
  */
 async function openPictures(
   page: Page,
@@ -289,3 +290,248 @@ test(
       });
   },
 );
+
+/** Three small PNGs, each a size the created Resource is expected to record. */
+const PICTURES = [
+  {
+    name: 'diagram.png',
+    size: { width: 3, height: 2 },
+    base64:
+      'iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAEElEQVR4nGP4z8AAQQxwFgBB0gX7h/C5SAAAAABJRU5ErkJggg==',
+  },
+  {
+    name: 'square.png',
+    size: { width: 4, height: 4 },
+    base64:
+      'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGP4z8AARwzEcQCukw/x0F8jngAAAABJRU5ErkJggg==',
+  },
+  {
+    name: 'strip.png',
+    size: { width: 5, height: 1 },
+    base64:
+      'iVBORw0KGgoAAAANSUhEUgAAAAUAAAABCAIAAACZnPOkAAAADUlEQVR4nGP4z8CAjAAs4wT8bOOiaQAAAABJRU5ErkJggg==',
+  },
+] as const;
+
+const [FIRST_PICTURE] = PICTURES;
+
+/** A Space opened on a seeded Map holding one Markdown Resource, for a gesture to create beside. */
+async function openForCreation(page: Page): Promise<UUID> {
+  const seeded = await seedPositionedMap(page, 'Pictures', (snapshot) => {
+    const markdown = snapshot.resources.find(({ document }) => document.kind === 'markdown');
+    if (markdown === undefined) throw new Error('The opened Space holds no Markdown Resource.');
+    return { [markdown.id]: { x: 0, y: 0, open: false } };
+  });
+  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toContainText('Pictures');
+  await settled(page);
+  return seeded.snapshot.id;
+}
+
+/** The stored Space's Image Resources, with where the seeded Map places each. */
+async function storedImages(page: Page, spaceId: UUID) {
+  const response = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(response.ok()).toBe(true);
+  const { snapshot } = decodeLoadedSpace(await response.json());
+  const positions = snapshot.document.maps?.find(({ id }) => id === SEEDED_MAP_ID)?.positions;
+  return snapshot.resources.flatMap(({ id, document }) =>
+    document.kind === 'image' ? [{ document, at: positions?.[id] }] : [],
+  );
+}
+
+/** The stored Space's revision, which any Edit a gesture completed would have moved. */
+async function storedRevision(page: Page, spaceId: UUID): Promise<bigint> {
+  const response = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(response.ok()).toBe(true);
+  return decodeLoadedSpace(await response.json()).revision;
+}
+
+const titleNumber = (title: string): number => Number(/^Resource (\d+)$/u.exec(title)?.[1]);
+
+/** The visible canvas's empty pane, where a drop or a paste is the canvas's own. */
+const pane = (page: Page): Locator => page.locator('.react-flow__pane:visible').first();
+
+test('choosing a file from the Dock creates an Image Resource titled Resource N at the stored URL', async ({
+  page,
+}) => {
+  const spaceId = await openForCreation(page);
+
+  const chooser = page.waitForEvent('filechooser');
+  await createResource(page, 'Image Resource');
+  await (
+    await chooser
+  ).setFiles({
+    name: FIRST_PICTURE.name,
+    mimeType: 'image/png',
+    buffer: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+  });
+
+  // The caret lands in the new Resource's Title, which is `Resource N` and
+  // never the file's name.
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue(/^Resource \d+$/u);
+  await title.press('Escape');
+
+  await expect.poll(async () => (await storedImages(page, spaceId)).length).toBe(1);
+  const [created] = await storedImages(page, spaceId);
+  expect(created?.document).toMatchObject({
+    kind: 'image',
+    url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
+    naturalSize: FIRST_PICTURE.size,
+  });
+  expect(created?.document.title).toMatch(/^Resource \d+$/u);
+});
+
+test('cancelling the file picker creates nothing', async ({ page }) => {
+  const spaceId = await openForCreation(page);
+  const before = await storedRevision(page, spaceId);
+  const resources = page.locator('.react-flow__node:visible');
+  const count = await resources.count();
+
+  const chooser = page.waitForEvent('filechooser');
+  await createResource(page, 'Image Resource');
+  await (await chooser).setFiles([]);
+
+  await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
+  await expect(resources).toHaveCount(count);
+  expect(await storedImages(page, spaceId)).toEqual([]);
+  expect(await storedRevision(page, spaceId)).toBe(before);
+});
+
+test('dropping three images creates three Resources in one Edit, numbered in order, in a row', async ({
+  page,
+}) => {
+  const spaceId = await openForCreation(page);
+  const commits: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/spaces') {
+      commits.push(request.url());
+    }
+  });
+
+  const box = await boxOf(pane(page), 'the canvas pane');
+  const dataTransfer = await page.evaluateHandle((pictures) => {
+    const transfer = new DataTransfer();
+    for (const { name, base64 } of pictures) {
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      transfer.items.add(new File([bytes], name, { type: 'image/png' }));
+    }
+    return transfer;
+  }, PICTURES);
+  const at = { clientX: box.x + box.width / 2, clientY: box.y + box.height * 0.75 };
+  await pane(page).dispatchEvent('dragover', { dataTransfer, ...at });
+  await pane(page).dispatchEvent('drop', { dataTransfer, ...at });
+
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.press('Escape');
+
+  await expect.poll(async () => (await storedImages(page, spaceId)).length).toBe(3);
+  // Read left to right: the store keeps Resources in its own order, and the row
+  // is the order the files were dropped in.
+  const created = (await storedImages(page, spaceId)).toSorted(
+    (left, right) => (left.at?.x ?? 0) - (right.at?.x ?? 0),
+  );
+  // Titled with three successive numbers, in the order the files were dropped.
+  const numbers = created.map(({ document }) => titleNumber(document.title));
+  expect(numbers).toEqual([numbers[0], (numbers[0] ?? 0) + 1, (numbers[0] ?? 0) + 2]);
+  expect(created.map(({ document }) => document.naturalSize)).toEqual(
+    PICTURES.map(({ size }) => size),
+  );
+  // In a row from the drop point: one height, rising left to right.
+  const [first, second, third] = created.map(({ at: placed }) => placed);
+  expect(new Set([first?.y, second?.y, third?.y]).size).toBe(1);
+  expect((second?.x ?? 0) - (first?.x ?? 0)).toBeGreaterThan(0);
+  expect((third?.x ?? 0) - (second?.x ?? 0)).toBe((second?.x ?? 0) - (first?.x ?? 0));
+  // One Edit: the three arrived in one commit. V1 has no Undo; one Edit is
+  // what a single Undo would reverse.
+  expect(commits).toHaveLength(1);
+});
+
+/** Paste text on the canvas, as a clipboard paste the focused canvas receives. */
+async function pasteOnCanvas(page: Page, text: string): Promise<void> {
+  const box = await boxOf(pane(page), 'the canvas pane');
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.75);
+  await pane(page).evaluate((element, pasted) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/plain', pasted);
+    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true }));
+  }, text);
+}
+
+test('pasting an image URL on the canvas creates an Image Resource holding it, titled Resource N', async ({
+  page,
+}) => {
+  await page.route('https://example.com/a.png', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+    }),
+  );
+  const spaceId = await openForCreation(page);
+
+  await pasteOnCanvas(page, 'https://example.com/a.png');
+
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await expect(title).toHaveValue(/^Resource \d+$/u);
+  await title.press('Escape');
+  await expect.poll(async () => (await storedImages(page, spaceId)).length).toBe(1);
+  const [created] = await storedImages(page, spaceId);
+  expect(created?.document).toMatchObject({
+    kind: 'image',
+    url: 'https://example.com/a.png',
+    naturalSize: FIRST_PICTURE.size,
+  });
+  expect(created?.document.title).toMatch(/^Resource \d+$/u);
+});
+
+test('pasting an unreachable image URL still creates the Resource, with no recorded size', async ({
+  page,
+}) => {
+  await page.route('https://example.com/gone.png', (route) => route.abort());
+  const spaceId = await openForCreation(page);
+
+  await pasteOnCanvas(page, 'https://example.com/gone.png');
+
+  await expect(page.getByRole('textbox', { name: 'Resource title' })).toBeFocused();
+  await expect.poll(async () => (await storedImages(page, spaceId)).length).toBe(1);
+  const [created] = await storedImages(page, spaceId);
+  expect(created?.document).toEqual({
+    title: expect.stringMatching(/^Resource \d+$/u),
+    kind: 'image',
+    url: 'https://example.com/gone.png',
+  });
+});
+
+for (const refused of [
+  {
+    file: { name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not a picture') },
+    sentence: 'notes.txt is not a PNG, JPEG, WebP or GIF image.',
+  },
+  {
+    file: {
+      name: 'huge.png',
+      mimeType: 'image/png',
+      buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+    },
+    sentence: 'huge.png is larger than 10 MB, the largest image that can be stored.',
+  },
+]) {
+  test(`choosing ${refused.file.name} reports its refusal and creates nothing`, async ({
+    page,
+  }) => {
+    const spaceId = await openForCreation(page);
+
+    const chooser = page.waitForEvent('filechooser');
+    await createResource(page, 'Image Resource');
+    await (await chooser).setFiles(refused.file);
+
+    const notice = page.getByRole('alert').filter({ hasText: 'Image not created' });
+    await expect(notice).toContainText(refused.sentence);
+    await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
+    expect(await storedImages(page, spaceId)).toEqual([]);
+  });
+}

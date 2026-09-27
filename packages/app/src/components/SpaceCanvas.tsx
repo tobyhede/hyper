@@ -6,8 +6,10 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type ClipboardEvent as ReactClipboardEvent,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
 } from 'react';
 import {
   Background,
@@ -24,6 +26,7 @@ import {
   useStore,
 } from '@xyflow/react';
 import {
+  isAcceptedImageUrl,
   titleName,
   uuidSchema,
   type Resource,
@@ -167,6 +170,16 @@ const focusedResource = (
   return nodes.find((node) => node.id === id)?.data.resourceId ?? null;
 };
 
+/** Whether a drag carries files the canvas would take, over somewhere that is the canvas's. */
+const carriesDroppableFiles = (
+  event: ReactDragEvent<HTMLDivElement>,
+  authorOnCanvas: boolean,
+): boolean =>
+  authorOnCanvas &&
+  event.dataTransfer.types.includes('Files') &&
+  event.target instanceof Element &&
+  event.target.closest(NOT_A_CANVAS_COMMAND) === null;
+
 export interface SpaceCanvasProps {
   /** Where a Space Resource rail's Map report is held. */
   readonly commandOutcomes: CommandOutcomes;
@@ -240,6 +253,16 @@ export interface SpaceCanvasProps {
    * anchor — authoring the Space Resource that frames it.
    */
   onPlaceSpace: (spaceId: UUID, anchor: { readonly x: number; readonly y: number }) => void;
+  /**
+   * Image files dropped on the canvas, with the authored top-left anchor the
+   * first of them lands at (ADR 0106).
+   */
+  onDropImages: (
+    files: readonly File[],
+    anchor: { readonly x: number; readonly y: number },
+  ) => void;
+  /** An image URL pasted on the canvas, with the authored top-left anchor at the pointer. */
+  onPasteImageUrl: (url: string, anchor: { readonly x: number; readonly y: number }) => void;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *
@@ -336,6 +359,8 @@ export function SpaceCanvas({
   onAddResource,
   onAddExistingResource,
   onPlaceSpace,
+  onDropImages,
+  onPasteImageUrl,
   nameOnCreation,
   authoring,
   spaceSession,
@@ -1174,8 +1199,64 @@ export function SpaceCanvas({
     [embeddedPublications, isValidConnection],
   );
 
+  /**
+   * Where a collapsed Resource centred on a screen point is anchored: its
+   * top-left in canvas units, which is what every drop and paste authors.
+   */
+  const anchorAt = useCallback(
+    (x: number, y: number) => {
+      const point = screenToFlowPosition({ x, y });
+      return { x: point.x - RESOURCE_SIZE.width / 2, y: point.y - RESOURCE_SIZE.height / 2 };
+    },
+    [screenToFlowPosition],
+  );
+
+  /**
+   * The pointer's last position over the canvas, for a paste, which carries
+   * none of its own; `null` once it leaves, when a paste lands at the canvas's
+   * centre instead.
+   */
+  const pointer = useRef<{ readonly x: number; readonly y: number } | null>(null);
+  const trackPointer = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      pointer.current = { x: event.clientX, y: event.clientY };
+      onMouseMove(event);
+    },
+    [onMouseMove],
+  );
+  const forgetPointer = useCallback(() => {
+    pointer.current = null;
+  }, []);
+
+  /**
+   * A pasted image URL creates an Image Resource at the pointer (ADR 0106).
+   * Text pasted into a field is the field's, so only a paste the canvas or a
+   * Resource on it received is read, and only text an Image Resource may hold.
+   */
+  const onPaste = useCallback(
+    (event: ReactClipboardEvent<HTMLDivElement>) => {
+      if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
+      if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
+      const url = event.clipboardData.getData('text/plain').trim();
+      if (!isAcceptedImageUrl(url)) return;
+      event.preventDefault();
+      const rect = event.currentTarget.getBoundingClientRect();
+      const at = pointer.current ?? {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
+      onPasteImageUrl(url, anchorAt(at.x, at.y));
+    },
+    [availability.authorOnCanvas, onPasteImageUrl, anchorAt],
+  );
+
   const onExternalDragOver = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
+      if (carriesDroppableFiles(event, availability.authorOnCanvas)) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+        return;
+      }
       const { types } = event.dataTransfer;
       if (
         !availability.authorOnCanvas ||
@@ -1192,6 +1273,13 @@ export function SpaceCanvas({
 
   const onExternalDrop = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
+      // Files first: a drop from the desktop carries no Resources list type,
+      // and the browser would otherwise open the file in place of the Space.
+      if (carriesDroppableFiles(event, availability.authorOnCanvas)) {
+        event.preventDefault();
+        onDropImages([...event.dataTransfer.files], anchorAt(event.clientX, event.clientY));
+        return;
+      }
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
       if (event.target.closest('.react-flow__pane') === null) return;
       // Each source under its own type, so a drop is read as what the list
@@ -1212,7 +1300,14 @@ export function SpaceCanvas({
       if (resourceId.success) onAddExistingResource(resourceId.data, anchor);
       else if (spaceId.success) onPlaceSpace(spaceId.data, anchor);
     },
-    [availability.authorOnCanvas, onAddExistingResource, onPlaceSpace, screenToFlowPosition],
+    [
+      availability.authorOnCanvas,
+      onAddExistingResource,
+      onPlaceSpace,
+      onDropImages,
+      anchorAt,
+      screenToFlowPosition,
+    ],
   );
 
   const embeddedEvents = useMemo(() => {
@@ -1243,7 +1338,9 @@ export function SpaceCanvas({
       onConnectStart={onEmbeddedConnectStart}
       onConnectEnd={onEmbeddedConnectEnd}
       isValidConnection={isEmbeddedConnectionValid}
-      onMouseMove={onMouseMove}
+      onMouseMove={trackPointer}
+      onMouseLeave={forgetPointer}
+      onPaste={onPaste}
       onEdgeMouseEnter={onEdgeMouseEnter}
       onEdgeMouseLeave={onEdgeMouseLeave}
       onDragOver={onExternalDragOver}

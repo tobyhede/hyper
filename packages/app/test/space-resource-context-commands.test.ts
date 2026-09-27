@@ -5,6 +5,7 @@ import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/pers
 import { createOpenSpaces } from '../src/open-spaces';
 import { spaceResourceContextCommands } from '../src/space-resource-context-commands';
 import { recordingHistory } from './browser-history';
+import { unusedImageSources } from './image-sources';
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
@@ -91,6 +92,7 @@ async function setup(available = true) {
     control,
   );
   const spaces = createOpenSpaces({
+    images: unusedImageSources,
     backend,
     metaSpaceId: META,
     metaSpaceTitle: meta.document.title,

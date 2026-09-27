@@ -21,6 +21,7 @@ import {
 } from '../src/map-authoring-commands';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
+import { unusedImageSources } from './image-sources';
 
 /** Where these tests' Map creations continue; what it names is not under test here. */
 const CONTINUE_IN_NAME: MapCreateContinuation = {
@@ -96,6 +97,7 @@ const target: SpaceSnapshot = {
 
 const openSpaces = (control?: MemorySpaceBackendTestControl) =>
   createOpenSpaces({
+    images: unusedImageSources,
     backend: new MemorySpaceBackend(
       META,
       [meta, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),

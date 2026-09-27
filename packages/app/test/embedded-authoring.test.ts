@@ -5,6 +5,7 @@ import { composeApp } from '../src/compose-app';
 import { createEmbeddedAuthoring } from '../src/embedded-authoring';
 import type { OpenSpace } from '../src/open-spaces';
 import { openTestSpace } from './opened-space';
+import { unusedImageSources } from './image-sources';
 
 /**
  * What an embedded canvas does with a completion it does not support.
@@ -51,6 +52,7 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const opened = openTestSpace(MemorySpaceBackend.asMeta(loaded), loaded);
   return {
+    images: unusedImageSources,
     id: SPACE_ID,
     session: opened.spaceSession,
     app: composeApp({ spaceSession: opened.spaceSession, reportObserverError }),

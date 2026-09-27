@@ -8,6 +8,7 @@ import { createOpenSpaces } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
 import { openTestSpace } from './opened-space';
 import { node, settled } from './render-adapter-fixtures';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Authored placement has one home, the session's snapshot. Every assertion
@@ -173,6 +174,7 @@ describe('Entering draws the entered Map’s geometry', () => {
       { snapshot: otherSnapshot, revision: 0n, exportedRevision: null },
     ]);
     const spaces = createOpenSpaces({
+      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: metaSnapshot.document.title,

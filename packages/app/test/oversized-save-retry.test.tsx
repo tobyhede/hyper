@@ -11,6 +11,7 @@ import {
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Through the application: a save over the request size limit is explained by the Dock's notice rather than a dialog, keeps every
@@ -114,6 +115,7 @@ const opened = async (stored: SpaceSnapshot) => {
     { snapshot: stored, revision: 3n, exportedRevision: null },
   ]);
   const openSpaces = createOpenSpaces({
+    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',

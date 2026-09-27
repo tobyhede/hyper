@@ -6,6 +6,7 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
+import { unusedImageSources } from './image-sources';
 
 /**
  * React Flow positions the whole graph with one viewport transform, and derives
@@ -111,6 +112,7 @@ describe('graph viewport', () => {
     let view: RenderResult | undefined;
     mountSpace(
       {
+        images: unusedImageSources,
         id: runtime(local).id,
         session,
         app: composeApp({ spaceSession: session }),

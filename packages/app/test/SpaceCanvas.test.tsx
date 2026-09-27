@@ -196,6 +196,8 @@ async function mountGraph(
         onAddResource={addResource}
         onAddExistingResource={addExistingResource}
         onPlaceSpace={placeSpace}
+        onDropImages={() => undefined}
+        onPasteImageUrl={() => undefined}
         nameOnCreation={null}
         authoring={testedAuthoring}
         spaceSession={spaceSession}

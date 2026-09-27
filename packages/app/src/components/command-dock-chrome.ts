@@ -344,24 +344,34 @@ export interface DockGraph {
 }
 
 /**
- * The two kinds Create offers, in the order the cluster draws them.
+ * The three kinds Create offers, in the order the cluster draws them.
  *
  * **`reference` is not one of them.** A Reference Resource is always created
  * *from* the Resource it points at, which supplies the Target (ADR 0089), so
  * the gesture is a row in that Resource's own command menu and there is
  * nothing here for it to be a peer of.
  */
-export const RESOURCE_KINDS = ['markdown', 'space'] as const;
+export const RESOURCE_KINDS = ['markdown', 'space', 'image'] as const;
 
 /**
  * A kind the Create cluster draws a control for.
  *
  * Named rather than written inline at the prop, because it is the type the
- * *dispatch* is held to: `dock-chrome.ts` answers every press through a record over
- * this, so a kind added above has to say what pressing it does before the
- * application compiles.
+ * *dispatch* is held to: `dock-chrome.ts` answers every creation by a switch
+ * over {@link DockCreation}, so a kind added above has to say what creating it
+ * does before the application compiles.
  */
 export type DockResourceKind = (typeof RESOURCE_KINDS)[number];
+
+/**
+ * One Create, as the cluster reports it. An Image Resource's control opens the
+ * file picker first, so what it reports is the files chosen there; a cancelled
+ * picker reports nothing (ADR 0106).
+ */
+export type DockCreation =
+  | { readonly kind: 'markdown' }
+  | { readonly kind: 'space' }
+  | { readonly kind: 'image'; readonly files: readonly File[] };
 
 /**
  * What the Resources list draws and what activating a row does.
@@ -452,7 +462,7 @@ export interface DockResources {
    * split button with a hidden default. This is *Create*, distinct from adding
    * an existing Resource, which is what the list above is for.
    */
-  readonly onCreate: (kind: DockResourceKind) => void;
+  readonly onCreate: (creation: DockCreation) => void;
   /** Whether each Create peer may run — the kinds withdraw independently when in flight. */
   readonly createDisabled: Readonly<Record<DockResourceKind, boolean>>;
 }

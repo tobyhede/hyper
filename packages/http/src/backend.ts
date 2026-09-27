@@ -6,8 +6,12 @@ import {
   decodeProblemDetails,
   decodeSpaceSummaries,
   decodeLoadedSpace,
+  decodeStoredImageUrl,
   encodeCommitRequest,
+  isImageRefusal,
+  MAX_IMAGE_BYTES,
   problemCodeForType,
+  type ImageStoring,
   type CommitResult,
   type LoadedSpace,
   type ProblemDetails,
@@ -99,6 +103,31 @@ export class HttpSpaceBackend implements SpaceBackend {
       async (response) => {
         if (!response.ok) throw new Error(`Unable to load aggregate: HTTP ${response.status}`);
         return decodeLoadedAggregate(await response.json());
+      },
+    );
+  }
+
+  /**
+   * Send an image to the host's store (ADR 0106), answering the URL it is
+   * stored at or the refusal the host named. The host decides from the bytes;
+   * an image over the size limit is answered here without sending it, because
+   * the host could only refuse it after reading all of it. Throws when the
+   * host cannot be reached or answers anything else.
+   */
+  storeImage(image: Blob): Promise<ImageStoring> {
+    if (image.size > MAX_IMAGE_BYTES) {
+      return Promise.resolve({ kind: 'refused', code: 'image-too-large' });
+    }
+    return this.#timedRequest(
+      (client) => client.images.$post(undefined, { init: { body: image } }),
+      async (response): Promise<ImageStoring> => {
+        if (response.ok)
+          return { kind: 'stored', url: decodeStoredImageUrl(await response.json()) };
+        if (hasProblemDetailsMediaType(response)) {
+          const code = problemCodeForType(decodeProblemDetails(await response.json()).type);
+          if (isImageRefusal(code)) return { kind: 'refused', code };
+        }
+        throw new Error(`Unable to store an image: HTTP ${response.status}`);
       },
     );
   }

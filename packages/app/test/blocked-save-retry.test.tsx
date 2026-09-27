@@ -5,6 +5,7 @@ import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/pers
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Through the application: a coordinated save whose
@@ -92,6 +93,7 @@ const blockedSequence = async () => {
     control,
   );
   const openSpaces = createOpenSpaces({
+    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',
@@ -164,6 +166,7 @@ const blockedTarget = async () => {
     control,
   );
   const openSpaces = createOpenSpaces({
+    images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',

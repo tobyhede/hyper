@@ -7,6 +7,7 @@ import {
 } from '@project/persistence';
 import {
   describeAuthoringRefusal,
+  describeImageRefusal,
   describeSpaceResourceCreationBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
@@ -15,6 +16,7 @@ import { failureMessage } from './failure-message';
 import { TitledBreak, type CompletedContextEdit, type EditOutcome } from './authoring-commands';
 import { GRAPH_REPORT_TITLES } from './graph-authoring-commands';
 import { MAP_REPORT_TITLES } from './map-authoring-commands';
+import type { ImageCreationResult } from './image-creation';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
@@ -143,6 +145,13 @@ const CHANNELS = {
     words: 'described',
     title: 'Reference Resource not created',
   },
+  // Storing and measuring a picture outlast the press, so the Map may change
+  // before the answer arrives; the answer is still about the author's gesture.
+  'image-create': {
+    resetsOnMapChange: false,
+    words: 'described',
+    title: 'Image not created',
+  },
   // Enter, Exit and Open reach *another* Space's session, and each can fail
   // for a reason that is not a refusal — a Space that cannot be re-composed, a
   // backend that will not answer. This notice is what tells the author the
@@ -173,6 +182,7 @@ export const COMMAND_CHANNELS = [
   'map-delete',
   'space-resource-create',
   'reference-create',
+  'image-create',
   'space-command',
   'graph-create',
   'graph-edit',
@@ -283,6 +293,10 @@ interface CommandSignatures {
   readonly 'reference-create': {
     readonly result: AuthoringResult;
     readonly options: [options?: CommandContinuation<Completed<AuthoringResult>>];
+  };
+  readonly 'image-create': {
+    readonly result: ImageCreationResult;
+    readonly options: [options?: CommandContinuation<Completed<ImageCreationResult>>];
   };
   readonly 'space-enter': {
     readonly result: OpenSpace;
@@ -417,6 +431,20 @@ const COMMANDS: CommandDefinitions = {
       return { kind: 'clear', continuation: options?.continueAt?.(result) ?? null };
     },
     broke: brokeOn('reference-create'),
+  },
+  'image-create': {
+    channel: 'image-create',
+    settle: (result, options) => {
+      if (result.kind === 'refused') {
+        return notice(described('image-create')(describeAuthoringRefusal(result.refusal)));
+      }
+      if (result.kind === 'not-stored') {
+        return notice(described('image-create')(describeImageRefusal(result.code, result.name)));
+      }
+      if (result.kind !== 'completed') return CLEAR;
+      return { kind: 'clear', continuation: options?.continueAt?.(result) ?? null };
+    },
+    broke: brokeOn('image-create'),
   },
   'space-enter': {
     channel: 'space-command',

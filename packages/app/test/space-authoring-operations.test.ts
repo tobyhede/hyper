@@ -240,6 +240,102 @@ describe('Add Resource', () => {
   });
 });
 
+describe('Create Image Resources', () => {
+  const STORED = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
+  const THIRD_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000033');
+
+  it('creates one Image Resource titled Resource N, recording its URL and natural size', () => {
+    const { authoring, session } = openPositioned();
+
+    expect(
+      authoring.complete({
+        kind: 'created-images',
+        images: [{ url: STORED, naturalSize: { width: 640, height: 480 } }],
+        anchor: CENTRE,
+        placement: 'avoidingOverlap',
+      }),
+    ).toEqual({ kind: 'completed', createdResourceId: MINTED });
+
+    expect(session.getState().working.resources[2]).toEqual({
+      id: MINTED,
+      document: {
+        title: 'Resource 1',
+        kind: 'image',
+        url: STORED,
+        naturalSize: { width: 640, height: 480 },
+      },
+    });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual(CENTRE);
+  });
+
+  it('records no natural size for an image that did not load', () => {
+    const { authoring, session } = openPositioned();
+
+    authoring.complete({
+      kind: 'created-images',
+      images: [{ url: 'https://example.com/a.png' }],
+      anchor: CENTRE,
+      placement: 'exact',
+    });
+
+    expect(session.getState().working.resources[2]?.document).toEqual({
+      title: 'Resource 1',
+      kind: 'image',
+      url: 'https://example.com/a.png',
+    });
+  });
+
+  it('creates several in one Edit, numbered in order, in a row from the anchor', () => {
+    const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED, THIRD_MINTED));
+    const commits: number[] = [];
+    session.subscribe(() => commits.push(session.getState().working.resources.length));
+
+    expect(
+      authoring.complete({
+        kind: 'created-images',
+        images: [
+          { url: 'https://example.com/1.png' },
+          { url: 'https://example.com/2.png' },
+          { url: 'https://example.com/3.png' },
+        ],
+        anchor: { x: 100, y: 200 },
+        placement: 'exact',
+      }),
+    ).toEqual({ kind: 'completed', createdResourceId: MINTED });
+
+    const { resources } = session.getState().working;
+    expect(resources.slice(2).map(({ id, document }) => [id, document.title])).toEqual([
+      [MINTED, 'Resource 1'],
+      [SECOND_MINTED, 'Resource 2'],
+      [THIRD_MINTED, 'Resource 3'],
+    ]);
+    const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
+    // Side by side, one collapsed width and a gap apart, all on the anchor's row.
+    expect([MINTED, SECOND_MINTED, THIRD_MINTED].map((id) => positions[id])).toEqual([
+      { x: 100, y: 200, open: false },
+      { x: 400, y: 200, open: false },
+      { x: 700, y: 200, open: false },
+    ]);
+    // One Edit: the working Space moved once, from two Resources to five.
+    expect(new Set(commits.filter((count) => count !== 2))).toEqual(new Set([5]));
+  });
+
+  it('refuses a URL an Image Resource may not hold rather than throwing on intake', () => {
+    const { authoring, session } = openPositioned();
+    const before = session.getState().working;
+
+    expect(
+      authoring.complete({
+        kind: 'created-images',
+        images: [{ url: 'data:image/png;base64,AAAA' }],
+        anchor: CENTRE,
+        placement: 'exact',
+      }),
+    ).toEqual({ kind: 'refused', refusal: { code: 'image-url-unsupported' } });
+    expect(session.getState().working).toBe(before);
+  });
+});
+
 describe('Edit Resource', () => {
   /**
    * A blank title is refused *at the interface*, not only at the field that

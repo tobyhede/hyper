@@ -1,5 +1,5 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
-import type { SaveBlock, SpaceSessionState } from '@project/persistence';
+import type { ImageRefusal, SaveBlock, SpaceSessionState } from '@project/persistence';
 import type { ConnectionResult } from './connection-completion';
 import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
@@ -31,6 +31,21 @@ type PresentedAuthoringRefusal =
  * differently would be a difference nothing could explain.
  */
 const MAP_NO_LONGER_IN_SPACE = 'This Map is no longer part of the Space.';
+
+/**
+ * Application-owned copy for the host refusing to store an image (ADR 0106),
+ * naming the file it refused.
+ */
+export const describeImageRefusal = (code: ImageRefusal, name: string): string => {
+  switch (code) {
+    case 'image-too-large':
+      return `${name} is larger than 10 MB, the largest image that can be stored.`;
+    case 'image-format-unsupported':
+      return `${name} is not a PNG, JPEG, WebP or GIF image.`;
+    case 'image-svg-unsupported':
+      return `${name} is an SVG image, which cannot be stored yet. Use PNG, JPEG, WebP or GIF.`;
+  }
+};
 
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
@@ -66,6 +81,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'A Resource title is required.';
     case 'map-title-required':
       return 'A Map title is required.';
+    case 'image-url-unsupported':
+      return 'An image URL must start with https: or http:.';
     case 'space-title-required':
       return 'A Space title is required.';
     case 'space-must-keep-map':

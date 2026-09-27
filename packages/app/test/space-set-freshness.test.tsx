@@ -6,6 +6,7 @@ import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { createResource, unavailable } from './command-dock';
+import { unusedImageSources } from './image-sources';
 
 /**
  * The Spaces the Resources list offers, across every open Space.
@@ -181,6 +182,7 @@ describe('the Spaces a Resources list offers', () => {
       [meta, home, other].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
     );
     const spaces = createOpenSpaces({
+      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: meta.document.title,

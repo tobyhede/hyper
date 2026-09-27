@@ -1,7 +1,18 @@
 import { newUuid, type SpaceSnapshot, type UUID } from '@project/core';
 import { MemorySpaceBackend, type MemorySpaceBackendTestControl } from '@project/persistence';
 import { productDestinationPath } from '@project/http';
+import type { ImageSources } from '#src/image-creation';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '#src/open-spaces';
+
+/**
+ * The catalogue has no host to store an image in, so a story that chooses a
+ * file meets the application's own break notice; nothing a story shows is
+ * measured.
+ */
+const catalogueImages: ImageSources = {
+  store: () => Promise.reject(new Error('The catalogue has no image store.')),
+  measure: () => Promise.resolve(undefined),
+};
 
 /** Fixture data and an isolated history adapter; all session behavior is production's. */
 export function storySpaces(
@@ -22,6 +33,7 @@ export function storySpaces(
     metaSpaceId,
     metaSpaceTitle: meta.document.title,
     newId: newUuid,
+    images: catalogueImages,
     history: {
       pathname: () => pathname,
       href: () => `https://example.test${pathname}`,

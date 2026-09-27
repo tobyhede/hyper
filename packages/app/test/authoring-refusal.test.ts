@@ -23,6 +23,7 @@ const EVERY_REFUSAL = {
   'space-resource-target-immutable': { code: 'space-resource-target-immutable' },
   'resource-title-required': { code: 'resource-title-required' },
   'map-title-required': { code: 'map-title-required' },
+  'image-url-unsupported': { code: 'image-url-unsupported' },
   'space-title-required': { code: 'space-title-required' },
   'reference-target-not-found': { code: 'reference-target-not-found', targetId: TARGET_ID },
   'reference-target-must-own-content': {

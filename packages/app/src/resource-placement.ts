@@ -16,6 +16,7 @@ import {
   describeSpaceResourceBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
+import { createImageResources, type ImageOrigin } from './image-creation';
 import { resolveMap } from './map-resolution';
 import type { OpenSpace } from './open-spaces';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from './resource';
@@ -98,6 +99,12 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
   readonly createSpaceResource: () => void;
   /** Whether a Create Space Resource is between its press and its installed Edit. */
   readonly creatingSpaceResource: boolean;
+  /** Create Image Resource from the files the Dock's picker chose, at the visible centre. */
+  readonly createImagesFromFiles: (files: readonly File[]) => void;
+  /** Image files dropped on the canvas: one Image Resource each, in a row from the drop point. */
+  readonly dropImages: (files: readonly File[], anchor: MapPosition) => void;
+  /** An image URL pasted on the canvas: one Image Resource at the pointer. */
+  readonly pasteImageUrl: (url: string, anchor: MapPosition) => void;
   /** Create Reference, from the Resource it points at. */
   readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
   /** A drag from the Resources list began over a Resource row. */
@@ -122,7 +129,7 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
  * or the Space under it changes.
  */
 export function useResourcePlacement(
-  { app, session: spaceSession, spaceResources }: OpenSpace,
+  { app, session: spaceSession, spaceResources, images }: OpenSpace,
   { map, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
 ): ResourcePlacementCommands {
   const { reportVisibleCentre, centreAnchor } = useVisibleCentre();
@@ -328,6 +335,52 @@ export function useResourcePlacement(
     });
   }, [authoring, centreAnchor, continuation]);
 
+  /**
+   * Every Image Resource gesture: store and measure what it brought, then one
+   * Edit, continuing in the first created Resource's Title (ADR 0106). A
+   * refusal to store a file is said on the Image notice and creates nothing.
+   */
+  const createImages = useCallback(
+    (origin: ImageOrigin, anchor: MapPosition, placementMode: 'exact' | 'avoidingOverlap') => {
+      void commandOutcomes.run(
+        'image-create',
+        () => createImageResources({ images, authoring }, origin, anchor, placementMode),
+        {
+          continueAt: ({ createdResourceId }) =>
+            createdResourceId === undefined
+              ? null
+              : {
+                  target: { kind: 'resource', resourceId: createdResourceId },
+                  select: true,
+                  then: 'rename',
+                },
+        },
+      );
+    },
+    [commandOutcomes, images, authoring],
+  );
+
+  const createImagesFromFiles = useCallback(
+    (files: readonly File[]) => {
+      if (files.length === 0) return;
+      createImages({ kind: 'files', files }, centreAnchor(), 'avoidingOverlap');
+    },
+    [createImages, centreAnchor],
+  );
+
+  const dropImages = useCallback(
+    (files: readonly File[], anchor: MapPosition) => {
+      if (files.length === 0) return;
+      createImages({ kind: 'files', files }, anchor, 'exact');
+    },
+    [createImages],
+  );
+
+  const pasteImageUrl = useCallback(
+    (url: string, anchor: MapPosition) => createImages({ kind: 'url', url }, anchor, 'exact'),
+    [createImages],
+  );
+
   const resourcesDrag = useRef<ResourcesDrag | null>(null);
   useEffect(() => {
     resourcesDrag.current = null;
@@ -383,6 +436,9 @@ export function useResourcePlacement(
     createSpaceResource,
     creatingSpaceResource,
     createReferenceFrom,
+    createImagesFromFiles,
+    dropImages,
+    pasteImageUrl,
     startResourceDrag,
     startSpaceDrag,
     endDrag,

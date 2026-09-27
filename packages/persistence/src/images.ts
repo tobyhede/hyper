@@ -46,6 +46,17 @@ export interface StoredImage {
  */
 export type ImageRefusal = 'image-too-large' | 'image-format-unsupported' | 'image-svg-unsupported';
 
+/** What storing an image answered the browser: the URL it is stored at, or why not. */
+export type ImageStoring =
+  | { readonly kind: 'stored'; readonly url: string }
+  | { readonly kind: 'refused'; readonly code: ImageRefusal };
+
+/** Whether a problem code is one of the refusals storing an image answers. */
+export const isImageRefusal = (code: string): code is ImageRefusal =>
+  code === 'image-too-large' ||
+  code === 'image-format-unsupported' ||
+  code === 'image-svg-unsupported';
+
 export type ImageAdmission =
   | { readonly kind: 'admitted'; readonly image: StoredImage }
   | { readonly kind: 'refused'; readonly code: ImageRefusal };

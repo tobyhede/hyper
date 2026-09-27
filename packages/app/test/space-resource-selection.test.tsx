@@ -20,6 +20,7 @@ import { mountSpace } from './space-mounting';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { selectResource } from './resource-selection';
+import { unusedImageSources } from './image-sources';
 
 /**
  * The two selections an Open Space Resource authors.
@@ -234,6 +235,7 @@ function mount(value: SpaceSnapshot = created): SpaceSession {
   let view: RenderResult | undefined;
   mountSpace(
     {
+      images: unusedImageSources,
       id: runtime(value).id,
       session,
       app: composeApp({ spaceSession: session }),

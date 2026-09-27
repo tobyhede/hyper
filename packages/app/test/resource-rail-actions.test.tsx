@@ -23,6 +23,7 @@ import { expectMenuGroups } from './menu-assertions';
 import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
+import { unusedImageSources } from './image-sources';
 
 /**
  * A Resource's own commands belong to the Resource (ADR 0073, ADR 0082).
@@ -182,12 +183,7 @@ function mount(
   const app = composeApp({ spaceSession: session, spaceResources });
   prepare?.(app);
   mountSpace(
-    {
-      id: runtime(mounted).id,
-      session,
-      app,
-      spaceResources,
-    },
+    { images: unusedImageSources, id: runtime(mounted).id, session, app, spaceResources },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);

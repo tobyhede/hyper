@@ -168,7 +168,7 @@ const imageUrlSchema = z.string().refine(isAcceptedImageUrl, {
  * The size of the picture in pixels, as measured when its URL was set
  * (ADR 0106). A first Open reads it; nothing else does.
  */
-const imageNaturalSizeSchema = z.object({
+export const imageNaturalSizeSchema = z.object({
   width: z.number().positive().finite(),
   height: z.number().positive().finite(),
 });
