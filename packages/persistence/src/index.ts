@@ -60,6 +60,24 @@ export {
  * this package ships — it is public surface. The shared backend *suite* imports
  * vitest and only a test runner can execute it, so it stays behind the
  * `./test-support` subpath instead. */
+/* The images the host stores beside Spaces and outside the aggregate
+ * (ADR 0106): the admission rule the storing route and fixture seeding share,
+ * and the store every repository under `src/` implements. */
+export {
+  admitImage,
+  IMAGE_COLLECTION_PATH,
+  imageIdOf,
+  imagePath,
+  isImageId,
+  isImageMediaType,
+  MAX_IMAGE_BYTES,
+  type ImageAdmission,
+  type ImageId,
+  type ImageMediaType,
+  type ImageRefusal,
+  type ImageStore,
+  type StoredImage,
+} from './images';
 export { MemorySpaceBackend, MemorySpaceBackendTestControl } from './memory';
 export * from './observable-state';
 /* The id order every in-memory double answers reads in, stated once.

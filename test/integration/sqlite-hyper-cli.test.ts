@@ -218,6 +218,8 @@ describe('hyper:sqlite CLI', () => {
           replaceAggregate: (input, expected) => repository.replaceAggregate(input, expected),
           markExported: (id, revision) => repository.markExported(id, revision),
           commit: (request) => repository.commit(request),
+          storeImage: (image) => repository.storeImage(image),
+          loadImage: (id) => repository.loadImage(id),
           loadMetaSpaceId: async () => {
             const read = await repository.loadMetaSpaceId();
             await repository.replaceAggregate(

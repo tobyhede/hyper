@@ -27,6 +27,8 @@ const rejectingRepository = (error: Error): SpaceRepository => ({
   loadMetaSpaceId: () => Promise.reject(error),
   replaceAggregate: () => Promise.reject(error),
   markExported: () => Promise.reject(error),
+  storeImage: () => Promise.reject(error),
+  loadImage: () => Promise.reject(error),
 });
 
 const openingTarget = (

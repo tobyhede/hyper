@@ -142,6 +142,11 @@ export const postgresTarget = (databaseUrl: string, sink: StatementSink): Postgr
           orm.Space.where({ id: spaceId })
             .deleteCount()
             .then(() => undefined),
+        deleteImages: async () => {
+          for (const { id } of await orm.Image.select('id').all()) {
+            await orm.Image.where({ id }).deleteCount();
+          }
+        },
       }),
     close: () => database.close(),
   };

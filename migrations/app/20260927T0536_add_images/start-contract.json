@@ -4,10 +4,6 @@
   "target": "postgres",
   "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
-    "images": {
-      "model": "Image",
-      "namespace": "public"
-    },
     "repository_state": {
       "model": "RepositoryState",
       "namespace": "public"
@@ -25,57 +21,6 @@
     "namespaces": {
       "public": {
         "models": {
-          "Image": {
-            "fields": {
-              "bytes": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/bytea@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz@1",
-                  "kind": "scalar"
-                }
-              },
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "mediaType": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {},
-            "storage": {
-              "fields": {
-                "bytes": {
-                  "column": "bytes"
-                },
-                "createdAt": {
-                  "column": "created_at"
-                },
-                "id": {
-                  "column": "id"
-                },
-                "mediaType": {
-                  "column": "media_type"
-                }
-              },
-              "namespaceId": "public",
-              "table": "images"
-            }
-          },
           "RepositoryState": {
             "fields": {
               "metaSpaceId": {
@@ -311,42 +256,6 @@
       "public": {
         "entries": {
           "table": {
-            "images": {
-              "columns": {
-                "bytes": {
-                  "codecId": "pg/bytea@1",
-                  "nativeType": "bytea",
-                  "nullable": false
-                },
-                "created_at": {
-                  "codecId": "pg/timestamptz@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "media_type": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": []
-            },
             "repository_state": {
               "columns": {
                 "meta_space_id": {
@@ -531,7 +440,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:d4a0693a3c0aa69bb8e801dc1c840c9703fc5e6200b70d78ead42496a89737ce",
+    "storageHash": "sha256:0a1d0e875a03edce09456c6716c79931aa35b795c9bcf011f205571631d97a0c",
     "types": {
       "Uuid": {
         "codecId": "pg/uuid@1",

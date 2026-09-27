@@ -7,6 +7,7 @@ import {
   problemCatalogue,
   type HyperProblemCode,
   type SpaceCommit,
+  type ImageStore,
   type StoredSpaceRepository,
 } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
@@ -29,7 +30,11 @@ const updateCommit = (next = snapshot): SpaceCommit => ({
   changes: [{ kind: 'update', spaceId: SPACE_ID, snapshot: next, expectedRevision: 0n }],
 });
 
-const repository = (overrides: Partial<StoredSpaceRepository> = {}): StoredSpaceRepository => ({
+const repository = (
+  overrides: Partial<StoredSpaceRepository & ImageStore> = {},
+): StoredSpaceRepository & ImageStore => ({
+  storeImage: () => Promise.reject(new Error('This repository stores no images')),
+  loadImage: () => Promise.resolve(undefined),
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(loaded),
   loadAggregate: () =>

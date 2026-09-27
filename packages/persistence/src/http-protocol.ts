@@ -31,6 +31,26 @@ export const problemCatalogue = {
     title: 'Payload too large',
     status: 413,
   },
+  'invalid-image-id': {
+    type: 'https://hyper.dev/problems/invalid-image-id',
+    title: 'Invalid image id',
+    status: 400,
+  },
+  'image-too-large': {
+    type: 'https://hyper.dev/problems/image-too-large',
+    title: 'Image too large',
+    status: 413,
+  },
+  'image-format-unsupported': {
+    type: 'https://hyper.dev/problems/image-format-unsupported',
+    title: 'Image format unsupported',
+    status: 415,
+  },
+  'image-svg-unsupported': {
+    type: 'https://hyper.dev/problems/image-svg-unsupported',
+    title: 'SVG image unsupported',
+    status: 415,
+  },
   'not-found': { type: 'https://hyper.dev/problems/not-found', title: 'Not found', status: 404 },
   'method-not-allowed': {
     type: 'https://hyper.dev/problems/method-not-allowed',

@@ -1,6 +1,11 @@
 import { newUuid, uuidSchema, type UUID } from '@project/core';
 import {
+  admitImage,
   COMMIT_OUTCOME_WIRE,
+  IMAGE_COLLECTION_PATH,
+  imagePath,
+  isImageId,
+  MAX_IMAGE_BYTES,
   decodeCommitRequest,
   encodeCommitConflict,
   encodeCommitRefusal,
@@ -12,6 +17,8 @@ import {
   classifyStoredFailure,
   problemCatalogue,
   type HyperProblemCode,
+  type ImageRefusal,
+  type ImageStore,
   type ProblemError,
   type CommitRequestJson,
   type StoredSpaceRepository,
@@ -50,6 +57,26 @@ const SPACE_AGGREGATE_PATH = '/api/aggregate';
 // finished routing by then, so its own pattern is no longer available to ask,
 // and this must keep matching what `SPACE_RESOURCE_PATH` registers.
 const SPACE_RESOURCE_PATTERN = /^\/api\/spaces\/([^/]+)$/;
+const IMAGE_RESOURCE_PATH = `${IMAGE_COLLECTION_PATH}/:id`;
+// The image path as a matcher, for the same reason as `SPACE_RESOURCE_PATTERN`.
+const IMAGE_RESOURCE_PATTERN = /^\/images\/([^/]+)$/;
+
+/**
+ * How a stored image is served. Its id is the digest of its bytes, so the
+ * representation at one URL never changes and any cache may keep it for as
+ * long as it likes. `nosniff` holds a browser to the media type the bytes were
+ * admitted as.
+ */
+const STORED_IMAGE_HEADERS = {
+  'Cache-Control': 'public, max-age=31536000, immutable',
+  'X-Content-Type-Options': 'nosniff',
+} as const;
+
+const IMAGE_REFUSAL_DETAIL = {
+  'image-too-large': `Send an image no larger than ${MAX_IMAGE_BYTES} bytes.`,
+  'image-format-unsupported': 'Send a PNG, JPEG, WebP or GIF image.',
+  'image-svg-unsupported': 'Send the image as PNG, JPEG, WebP or GIF; an SVG is not stored.',
+} as const satisfies Readonly<Record<ImageRefusal, string>>;
 
 export interface SpaceHttpAppOptions {
   logError?: (message: string, error: unknown) => void;
@@ -146,44 +173,70 @@ const drainRejectedBody = async (
   }
 };
 
+/** What arrived of a body read against a size limit. */
+type BoundedBody =
+  | { readonly kind: 'read'; readonly chunks: readonly Uint8Array[]; readonly size: number }
+  | { readonly kind: 'oversized' };
+
 /**
- * One size policy: count the bytes that arrive, and never consult the declared
- * length. Hono's `bodyLimit` cannot serve here for two independent reasons.
- * It *trusts* `Content-Length` when present — comparing and returning without
- * reading a byte, so an understated length would smuggle any body through. And
- * on overflow it abandons a **locked** reader without consuming the rest, so
- * nothing downstream can drain the request: Node's own `_dump()` cannot resume a
- * stream the web wrapper holds, the socket dies with the 413, and a keep-alive
- * client loses the connection. Both are pinned by tests — the size cases in this
- * package, the connection reuse in `vite-hono-host.test.ts`.
+ * One size policy, for every body a route reads: count the bytes that arrive,
+ * and never consult the declared length. Hono's `bodyLimit` cannot serve here
+ * for two independent reasons. It *trusts* `Content-Length` when present —
+ * comparing and returning without reading a byte, so an understated length
+ * would smuggle any body through. And on overflow it abandons a **locked**
+ * reader without consuming the rest, so nothing downstream can drain the
+ * request: Node's own `_dump()` cannot resume a stream the web wrapper holds,
+ * the socket dies with the 413, and a keep-alive client loses the connection.
+ * Both are pinned by tests — the size cases in this package, the connection
+ * reuse in `vite-hono-host.test.ts`.
  *
  * Do not add a declared-length pre-check. The bound does not need one —
  * counting catches an honest over-declaration too, only later — and trusting
  * the header would answer 413 for a body a client had not sent.
- *
- * The cost is the fast path: every legitimate commit is buffered and re-read.
  */
-const requireBoundedCommitBody = createMiddleware(async (context, next) => {
-  const body = context.req.raw.body;
-  if (body === null) {
-    return next();
-  }
+const readBoundedBody = async (
+  body: ReadableStream<Uint8Array> | null,
+  limit: number,
+): Promise<BoundedBody> => {
+  if (body === null) return { kind: 'read', chunks: [], size: 0 };
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
   for (;;) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) return { kind: 'read', chunks, size };
     size += value.byteLength;
-    if (size > MAX_COMMIT_BODY_BYTES) {
+    if (size > limit) {
       // Free what was buffered before draining, so an oversized body never costs
-      // more than the cap in memory no matter how much more of it arrives.
+      // more than the limit in memory no matter how much more of it arrives.
       chunks.length = 0;
       await drainRejectedBody(reader);
-      return rejectOversizedBody(context);
+      return { kind: 'oversized' };
     }
     chunks.push(value);
   }
+};
+
+const concatenate = (chunks: readonly Uint8Array[], size: number): Uint8Array<ArrayBuffer> => {
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+};
+
+/**
+ * `readBoundedBody` at the commit cap, handing the rest of the chain a request
+ * whose body is what was counted. The cost is the fast path: every legitimate
+ * commit is buffered and re-read.
+ */
+const requireBoundedCommitBody = createMiddleware(async (context, next) => {
+  const read = await readBoundedBody(context.req.raw.body, MAX_COMMIT_BODY_BYTES);
+  if (read.kind === 'oversized') return rejectOversizedBody(context);
+  if (context.req.raw.body === null) return next();
+  const { chunks } = read;
 
   // Rebuilding the request calls the *global* `Request` constructor on whatever
   // the host handed in, so a host whose request objects are not its own globals'
@@ -210,9 +263,13 @@ const requireBoundedCommitBody = createMiddleware(async (context, next) => {
   return next();
 });
 
-const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
+const hasIdentityEncoding = (context: Context): boolean => {
   const contentEncoding = context.req.header('Content-Encoding');
-  if (contentEncoding !== undefined && contentEncoding.trim().toLowerCase() !== 'identity') {
+  return contentEncoding === undefined || contentEncoding.trim().toLowerCase() === 'identity';
+};
+
+const requireSupportedRequestMedia = createMiddleware(async (context, next) => {
+  if (!hasIdentityEncoding(context)) {
     return problem(context, 'unsupported-media-type', 'Send the request without content encoding.');
   }
   const contentType = context.req.header('Content-Type');
@@ -292,6 +349,15 @@ const validateSpaceId = validator('param', (value, context) => {
     : problem(context, 'invalid-space-id', 'Use a UUID for the Space id.');
 });
 
+const INVALID_IMAGE_ID_DETAIL = 'Use the unpadded base64url SHA-256 of the image for its id.';
+
+const validateImageId = validator('param', (value, context) => {
+  const id = value['id'];
+  return id !== undefined && isImageId(id)
+    ? { id }
+    : problem(context, 'invalid-image-id', INVALID_IMAGE_ID_DETAIL);
+});
+
 /**
  * The answer for a request naming a path on the contract that no handler will
  * serve. Two callers reach it and they must agree, which is why it is one
@@ -314,6 +380,21 @@ const unservedContractPath = (context: Context): Response | undefined => {
   if (context.req.path === SPACE_AGGREGATE_PATH) {
     context.header('Allow', 'GET');
     return problem(context, 'method-not-allowed', 'Use GET for the aggregate resource.');
+  }
+  if (context.req.path === IMAGE_COLLECTION_PATH) {
+    context.header('Allow', 'POST');
+    return problem(context, 'method-not-allowed', 'Use POST to store an image.');
+  }
+  const image = IMAGE_RESOURCE_PATTERN.exec(context.req.path);
+  if (image !== null) {
+    if (!isImageId(image[1] ?? '')) {
+      return problem(context, 'invalid-image-id', INVALID_IMAGE_ID_DETAIL);
+    }
+    // A stored image is a real representation, so HEAD is served — by Hono,
+    // from the GET handler — rather than refused.
+    if (context.req.method === 'HEAD') return undefined;
+    context.header('Allow', 'GET, HEAD');
+    return problem(context, 'method-not-allowed', 'Use GET or HEAD for a stored image.');
   }
   const resource = SPACE_RESOURCE_PATTERN.exec(context.req.path);
   if (resource === null) {
@@ -364,7 +445,7 @@ const applyTransportPolicy = createMiddleware(async (context, next) => {
 });
 
 export const createSpaceHttpApp = (
-  repository: StoredSpaceRepository,
+  repository: StoredSpaceRepository & ImageStore,
   options: SpaceHttpAppOptions = {},
 ) => {
   const logError = options.logError ?? defaultLogError;
@@ -499,6 +580,50 @@ export const createSpaceHttpApp = (
         return context.json(encodeLoadedSpace(loaded), 200);
       } catch (error) {
         invokeLogError(logError, `Failed to load space ${id}`, error);
+        return storedFailureProblem(context, error);
+      }
+    })
+    // The body is the image, and the bytes decide what it is: neither its
+    // declared type nor a filename is read (ADR 0106).
+    .post(IMAGE_COLLECTION_PATH, async (context) => {
+      if (!hasIdentityEncoding(context)) {
+        return problem(
+          context,
+          'unsupported-media-type',
+          'Send the image without content encoding.',
+        );
+      }
+      const read = await readBoundedBody(context.req.raw.body, MAX_IMAGE_BYTES);
+      const admission =
+        read.kind === 'oversized'
+          ? ({ kind: 'refused', code: 'image-too-large' } as const)
+          : await admitImage(concatenate(read.chunks, read.size));
+      if (admission.kind === 'refused') {
+        return problem(context, admission.code, IMAGE_REFUSAL_DETAIL[admission.code]);
+      }
+      const url = imagePath(admission.image.id);
+      try {
+        const outcome = await repository.storeImage(admission.image);
+        context.header('Location', url);
+        return outcome === 'stored' ? context.json({ url }, 201) : context.json({ url }, 200);
+      } catch (error) {
+        invokeLogError(logError, 'Failed to store an image', error);
+        return storedFailureProblem(context, error);
+      }
+    })
+    .get(IMAGE_RESOURCE_PATH, validateImageId, async (context) => {
+      const { id } = context.req.valid('param');
+      try {
+        const image = await repository.loadImage(id);
+        if (image === undefined) {
+          return problem(context, 'not-found', `Choose an image that is stored; ${id} is not.`);
+        }
+        return context.body(image.bytes, 200, {
+          ...STORED_IMAGE_HEADERS,
+          'Content-Type': image.mediaType,
+        });
+      } catch (error) {
+        invokeLogError(logError, `Failed to load image ${id}`, error);
         return storedFailureProblem(context, error);
       }
     });
