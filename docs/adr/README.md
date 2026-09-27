@@ -45,6 +45,7 @@ under `superseded/`.
 | [0097](0097-a-multi-space-edit-is-judged-against-what-it-commits.md) | A multi-Space Edit is derived and judged with `decideCommit` against the stored Spaces plus its participants' working Spaces. |
 | [0099](0099-the-barrier-waits-only-for-commits-in-flight.md) | The coordination barrier pauses, then awaits only in-flight commits; one recovery rule covers both deletion cascades, reading stored and working state. |
 | [0106](0106-an-image-resource-owns-a-url-not-bytes.md) | An Image Resource owns a URL, not bytes. The host stores images at `/images/<sha256>`, named for what they are and outside the aggregate. The repo-state rule is deliberately waived for the picture. |
+| [0107](0107-an-open-image-resource-is-the-open-markdown-front.md) | An Open Image Resource is the Open Markdown Resource front with its image as content; the first-Open rule adds that front's chrome, one Title line reserved (refines 0106). |
 
 ## Layout, View and Graph
 

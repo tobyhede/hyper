@@ -1,0 +1,44 @@
+/* The room an Image Resource's picture is drawn in. It takes the whole of that
+   room and the picture sits centred inside it. */
+.resource-image {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* `scale-down` is `contain` that never enlarges: a picture larger than its room
+   shrinks to fit it whole, and a smaller one is drawn at its natural size rather
+   than blurred up to fill the room. */
+.resource-image__picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: scale-down;
+}
+
+/* The failed-image state is drawn on the Resource's own paper, so it takes the
+   Resource's text roles rather than the chrome's. */
+.resource-image--failed {
+  color: var(--canvas-resource-title-color);
+}
+
+.resource-image__url {
+  max-width: 100%;
+  color: var(--canvas-resource-muted-color);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* A presented Resource stacks its name over its content; a picture takes the room
+   left below the name rather than overflowing the frame. */
+.resource--full:has(> .resource-image) {
+  display: flex;
+  flex-direction: column;
+}

@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { titleName } from '@project/core';
+import { ResourceImage } from './ResourceImage';
 
-export interface ResourceContentProps {
+interface ResourceContentTitle {
   /**
    * The Resource's Title, whole. Presenting draws its **name** — the first line —
    * because the Title ladder belongs to the Resource front and nothing else
@@ -11,8 +12,11 @@ export interface ResourceContentProps {
    * frame around it.
    */
   title: string;
-  markdown: string;
 }
+
+/** A presented Resource draws its Markdown, or an Image Resource's picture (ADR 0107). */
+export type ResourceContentProps = ResourceContentTitle &
+  ({ markdown: string; imageUrl?: never } | { imageUrl: string; markdown?: never });
 
 interface RenderedMarkdownProps {
   readonly markdown: string;
@@ -51,11 +55,16 @@ export function RenderedMarkdown({ markdown, className }: RenderedMarkdownProps)
  * `<iframe src=javascript:>` would otherwise run in the app's origin. Do not
  * insert parsed Markdown without passing it through DOMPurify.
  */
-export function ResourceContent({ title, markdown }: ResourceContentProps) {
+export function ResourceContent(props: ResourceContentProps) {
+  const name = titleName(props.title);
   return (
     <article className="resource resource--full" data-testid="resource-content">
-      <h2 className="resource__title">{titleName(title)}</h2>
-      <RenderedMarkdown className="resource__body" markdown={markdown} />
+      <h2 className="resource__title">{name}</h2>
+      {props.imageUrl === undefined ? (
+        <RenderedMarkdown className="resource__body" markdown={props.markdown} />
+      ) : (
+        <ResourceImage key={props.imageUrl} url={props.imageUrl} name={name} />
+      )}
     </article>
   );
 }

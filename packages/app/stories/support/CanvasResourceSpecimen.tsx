@@ -30,7 +30,7 @@ export function CanvasResourceSpecimen({
         : kind === 'space'
           ? { kind: 'space', open: false }
           : kind === 'image'
-            ? { kind: 'image', open: false }
+            ? { kind: 'image', url: 'https://example.com/figure.png', open: false }
             : { kind: 'markdown', source: '', open: false };
   return <CanvasResource front={front} title={title} state={state} graphColor={graphColor} />;
 }

@@ -74,11 +74,6 @@ export const uncataloguedComponents = [
     reason:
       'Without a consumer since ADR 0089 retired the Space Resource creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Map or a Graph is `ChoiceMenu`\'s and choosing a Resource is the Resources list\'s everywhere that remains.',
   },
-  {
-    module: 'packages/ui/src/components/empty.tsx',
-    reason:
-      'Deliberately without a consumer, for the same reason as `Command.tsx` above. A shadcn registry primitive for an empty result set — the combobox empty message comes from Base UI’s own `ComboboxEmpty`, not from here.',
-  },
 ] as const;
 
 /**

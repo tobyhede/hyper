@@ -408,6 +408,11 @@ export interface CanvasResourceNodeSpecimenProps {
   readonly zoom?: number | undefined;
   readonly title?: string;
   readonly body?: string;
+  /**
+   * Draw the fixture Resource as an Image Resource showing this URL, as the
+   * projection hands `ResourceNode` one (ADR 0106, ADR 0107).
+   */
+  readonly imageUrl?: string;
   readonly readOnly?: boolean;
   /** Whether the specimen can be moved by a pointer; see {@link StoryCanvasProps.draggable}. */
   readonly draggable?: boolean;
@@ -431,6 +436,7 @@ export function CanvasResourceNodeSpecimen({
   zoom,
   title,
   body,
+  imageUrl,
   readOnly = false,
   draggable = false,
 }: CanvasResourceNodeSpecimenProps) {
@@ -462,6 +468,10 @@ export function CanvasResourceNodeSpecimen({
   if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
   if (body !== undefined) data.body = body;
+  if (imageUrl !== undefined) {
+    data.kind = 'image';
+    data.imageUrl = imageUrl;
+  }
   // The editor is the state, so a specimen that asks to be renaming supplies
   // what ends the edit along with it.
   if (editingTitle) {

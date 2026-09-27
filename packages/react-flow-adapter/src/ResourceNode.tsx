@@ -174,8 +174,13 @@ export function ResourceNode({
   if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
   if (data.spaceRail !== undefined) spaceFront.spaceRail = data.spaceRail;
   if (data.portal !== undefined) spaceFront.portal = data.portal;
-  // Closed, an Image Resource draws its Title and kind and no thumbnail (ADR 0106).
-  const imageFront: ImageFront = { kind: 'image', open: data.open === true };
+  // Closed, an Image Resource draws its Title and kind and no thumbnail (ADR 0106);
+  // Open, its picture is the content the Markdown front would draw (ADR 0107).
+  const imageFront: ImageFront = {
+    kind: 'image',
+    url: data.imageUrl ?? '',
+    open: data.open === true,
+  };
   if (data.onEditResource !== undefined) {
     imageFront.onOpenChange = data.onEditResource;
   }
@@ -492,7 +497,11 @@ export function ResourceNode({
       )}
       {data.showContent ? (
         <div className="rf-resource-node__content">
-          <ResourceContent title={data.title} markdown={data.body ?? ''} />
+          {data.imageUrl === undefined ? (
+            <ResourceContent title={data.title} markdown={data.body ?? ''} />
+          ) : (
+            <ResourceContent title={data.title} imageUrl={data.imageUrl} />
+          )}
         </div>
       ) : titleEditor !== undefined ? (
         <CanvasResource

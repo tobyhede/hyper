@@ -218,6 +218,11 @@ export type ResourceNodeData = {
    *  a Resource resolved into one set and not the other would draw an empty
    *  document over a working editor rather than fail. */
   body?: string;
+  /**
+   * The picture to draw when an Image Resource is Open or presented, resolved as
+   * `body` is and absent otherwise (ADR 0106, ADR 0107).
+   */
+  imageUrl?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
   activeGraphId: GraphId | null;
   /** The active Graph's colour, used by graph-independent authoring handles. */
@@ -379,6 +384,7 @@ export function projectResourceNodes(
     }
     if (content?.kind === 'space') node.data.spaceContent = content;
     if (body !== undefined) node.data.body = body;
+    if ((showContent || open) && resource.kind === 'image') node.data.imageUrl = resource.url;
     if (open) {
       node.data.open = true;
       node.zIndex = 10;

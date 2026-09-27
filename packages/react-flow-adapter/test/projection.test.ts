@@ -9,7 +9,7 @@ import {
   OTHER_GRAPH_OPACITY,
   ROUTED_EDGE_TYPE,
 } from '../src/index';
-import { referenceFile, resourceFile } from './resource-files';
+import { imageFile, referenceFile, resourceFile } from './resource-files';
 import { DETACHED_END_TRIM, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
 
@@ -265,6 +265,36 @@ describe('projectResourceNodes', () => {
       open: true,
       body: '## Authored once',
     });
+  });
+
+  it('carries an Image Resource URL when it is Open or presented, and not when Closed', () => {
+    const imageId = uuid('00000000-0000-4000-8000-000000000008');
+    const url = 'https://example.com/harbour.png';
+    const withImage = load(
+      spaceFile([
+        {
+          id: '00000000-0000-4000-8000-000000000004',
+          title: 'Main',
+          edges: [{ from: '00000000-0000-4000-8000-000000000002', to: imageId }],
+        },
+      ]),
+      [
+        resourceFile('00000000-0000-4000-8000-000000000002', 'Opening'),
+        imageFile(imageId, 'Harbour', url),
+      ],
+    );
+    const imageNode = (options: Parameters<typeof projectResourceNodes>[1]) =>
+      projectResourceNodes(withImage, options).find((node) => node.id === imageId)?.data;
+
+    expect(imageNode({})?.imageUrl).toBeUndefined();
+    expect(imageNode({ openResourceIds: new Set([imageId]) })).toMatchObject({
+      kind: 'image',
+      open: true,
+      imageUrl: url,
+    });
+    expect(imageNode({ activeResourceId: imageId, showActiveResourceContent: true })).toMatchObject(
+      { showContent: true, imageUrl: url },
+    );
   });
 });
 

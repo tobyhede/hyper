@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Story } from '@ladle/react';
-import { uuidSchema, type Map, type Resource } from '@project/core';
+import { OPEN_RESOURCE_CHROME, uuidSchema, type Map, type Resource } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import { CanvasResource, type CanvasResourceFront, type CanvasResourceState } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
@@ -10,6 +10,7 @@ import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { CanvasResourceNodeSpecimen } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
 import { authoredSpace } from '../support/spaces';
+import harbour from '../support/images/harbour-400x300.png';
 import '../support/inventory.css';
 
 export default { title: 'Components/Resource' };
@@ -436,6 +437,65 @@ export const OpenReference: Story = () => {
 };
 OpenReference.storyName = 'Open Reference Resource';
 OpenReference.meta = { iframed: true };
+
+/**
+ * An Open Image Resource is the Open Markdown front with its picture as the
+ * content (ADR 0107). Three specimens at one canvas unit per pixel: a 400×300
+ * picture at the size its first Open writes — the picture plus the front's
+ * chrome — the same picture in a Resource resized larger, where it keeps its
+ * natural size rather than being enlarged, and a URL that does not load.
+ */
+export const OpenImage: Story = () => {
+  const [open, setOpen] = useState(true);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
+  const firstOpen = {
+    width: 400 + OPEN_RESOURCE_CHROME.width,
+    height: 300 + OPEN_RESOURCE_CHROME.height,
+  };
+  return (
+    <div className="flex flex-wrap items-start gap-8 p-8">
+      <section aria-label="First Open" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">400×300 at its first Open</p>
+        <CanvasResourceNodeSpecimen
+          title="Harbour"
+          imageUrl={harbour}
+          open={open}
+          onOpenChange={changeOpen}
+          nodeSize={open ? firstOpen : closedFrame}
+          zoom={1}
+          stageClassName="inv-resource-node-stage--large"
+        />
+      </section>
+      <section aria-label="Resized larger" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">400×300 in a Resource resized larger</p>
+        <CanvasResourceNodeSpecimen
+          title="Harbour, larger"
+          imageUrl={harbour}
+          open
+          nodeSize={{ width: 600, height: 440 }}
+          zoom={1}
+          stageClassName="inv-resource-node-stage--large"
+        />
+      </section>
+      <section aria-label="Failed image" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">a URL that does not load</p>
+        <CanvasResourceNodeSpecimen
+          title="Missing"
+          imageUrl="/images/missing-picture.png"
+          open
+          nodeSize={firstOpen}
+          zoom={1}
+          stageClassName="inv-resource-node-stage--large"
+        />
+      </section>
+    </div>
+  );
+};
+OpenImage.storyName = 'Open Image Resource';
+OpenImage.meta = { iframed: true };
 
 /**
  * Enter is the Space Resource's kind command (ADR 0073, ADR 0068): it sits on the

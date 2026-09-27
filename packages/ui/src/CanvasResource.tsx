@@ -38,6 +38,7 @@ import {
 import './canvas-resource.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
+import { ResourceImage } from './ResourceImage';
 
 /**
  * What a Resource front draws beyond its shared Title (ADR 0051): a kind-owned
@@ -83,9 +84,12 @@ export type CanvasResourceFront =
     }
   | {
       readonly kind: 'image';
+      /** The image URL this Resource owns (ADR 0106). */
+      readonly url: string;
       /**
        * Authored Map state; an Image Resource Opens through the shared Resource
-       * operation. Closed, it draws its Title and kind and no thumbnail (ADR 0106).
+       * operation. Closed, it draws its Title and kind and no thumbnail; Open, it
+       * is the Open Markdown front with its image as the content (ADR 0107).
        */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -120,6 +124,11 @@ export type CanvasResourceFront =
         readonly onEditingChange: (editing: boolean) => void;
       };
     };
+
+/** What a content area draws, and whether the Map has it Open. */
+type OpenableContent =
+  | { readonly kind: 'markdown'; readonly source: string; readonly open: boolean }
+  | { readonly kind: 'image'; readonly url: string; readonly open: boolean };
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
@@ -294,13 +303,18 @@ export function CanvasResource(props: CanvasResourceProps) {
   const name = titleName(title);
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
-  /** The kinds that draw a Markdown document below their Title. */
-  const contentFront =
+  /**
+   * The content the kinds with a content area draw above their Title: a Markdown
+   * document, or an Image Resource's picture in the same place (ADR 0107).
+   */
+  const contentFront: OpenableContent | undefined =
     front.kind === 'markdown'
-      ? front
+      ? { kind: 'markdown', source: front.source, open: front.open }
       : front.kind === 'reference' && front.target.kind === 'markdown'
-        ? { ...front, source: front.target.source }
-        : undefined;
+        ? { kind: 'markdown', source: front.target.source, open: front.open }
+        : front.kind === 'image'
+          ? { kind: 'image', url: front.url, open: front.open }
+          : undefined;
   /**
    * The kinds that carry authored Open/Closed state — every kind but the
    * creation ghost, which is not a Resource yet and so has no Map to author it
@@ -609,13 +623,17 @@ export function CanvasResource(props: CanvasResourceProps) {
           className="canvas-resource__content"
           data-presence={contentPresence.state}
         >
-          <ResourceContentEditProvider value={setContentEdit}>
-            <MarkdownResourceBody
-              source={contentFront.source}
-              ariaLabel={`Markdown source of ${name}`}
-              {...markdownBodyProps}
-            />
-          </ResourceContentEditProvider>
+          {contentFront.kind === 'image' ? (
+            <ResourceImage key={contentFront.url} url={contentFront.url} name={name} />
+          ) : (
+            <ResourceContentEditProvider value={setContentEdit}>
+              <MarkdownResourceBody
+                source={contentFront.source}
+                ariaLabel={`Markdown source of ${name}`}
+                {...markdownBodyProps}
+              />
+            </ResourceContentEditProvider>
+          )}
         </div>
       )}
     </Card>

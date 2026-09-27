@@ -18,6 +18,16 @@ describe('ResourceContent', () => {
     expect(container.querySelectorAll('li')).toHaveLength(2);
   });
 
+  it('presents an Image Resource as its name and its image, the name as the text alternative', () => {
+    render(<ResourceContent title={'Harbour\nAt dusk'} imageUrl="https://example.com/h.png" />);
+
+    expect(screen.getByRole('heading', { name: 'Harbour' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Harbour' })).toHaveAttribute(
+      'src',
+      'https://example.com/h.png',
+    );
+  });
+
   /**
    * The Title ladder is the Resource front's and nothing else's (ADR 0083). A
    * presented Resource is a different surface with a different frame around it, so
