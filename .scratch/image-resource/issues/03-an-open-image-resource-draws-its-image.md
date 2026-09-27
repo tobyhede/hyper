@@ -4,13 +4,17 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-human
+**Status:** resolved
 
-- [ ] The Open front is the Open Markdown Resource front with the image as its content (ADR 0107); the chrome the first Open adds is one constant, and a test fails if it and the stylesheet disagree.
-- [ ] With a recorded 400×300, the first Open's image area is 400×300 and the Open Size is that plus the chrome; 4000×3000 gives an image area of 1280×960; 16×16 gives the Closed size.
-- [ ] With no recorded natural size, the first Open uses the default Open Size.
-- [ ] Opening is one synchronous Edit; nothing waits on a network load.
-- [ ] Reopening after Close returns to the remembered Open Size, not a new measurement.
-- [ ] An unreachable URL draws the failed-image state with the URL; its Open Size follows the recorded natural size, if any, not whether the image loads now.
-- [ ] The `img` carries the Resource's name as its alternative text.
-- [ ] Ladle story and application proof for the Open front and the failed-image state (ADR 0052).
+- [x] The Open front is the Open Markdown Resource front with the image as its content (ADR 0107); the chrome the first Open adds is one constant, and a test fails if it and the stylesheet disagree.
+- [x] With a recorded 400×300, the first Open's image area is 400×300 and the Open Size is that plus the chrome; 4000×3000 gives an image area of 1280×960; 16×16 gives the Closed size.
+- [x] With no recorded natural size, the first Open uses the default Open Size.
+- [x] Opening is one synchronous Edit; nothing waits on a network load.
+- [x] Reopening after Close returns to the remembered Open Size, not a new measurement.
+- [x] An unreachable URL draws the failed-image state with the URL; its Open Size follows the recorded natural size, if any, not whether the image loads now.
+- [x] The `img` carries the Resource's name as its alternative text.
+- [x] Ladle story and application proof for the Open front and the failed-image state (ADR 0052).
+
+## Comments
+
+**2026-09-27, resolved (PR #316).** The prototype of four borders was rejected in favour of the human's decision, recorded as ADR 0107: an Open Image Resource is the Open Markdown Resource front with the image as its content. The chrome is `OPEN_RESOURCE_CHROME` in `packages/core/src/resource-geometry.ts`, held to the stylesheet by `packages/ui/test/open-resource-chrome.test.ts`. The image is `object-fit: scale-down`, so a small picture is never enlarged. Presenting is proved by unit and projection tests, not in a browser. Replace in the failed-image state is ticket 05.
