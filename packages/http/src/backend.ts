@@ -193,6 +193,10 @@ const commitFailureForProblem = (problem: ProblemDetails, response: Response): C
     case 'invalid-space-id':
     case 'unsupported-media-type':
     case 'method-not-allowed':
+    case 'invalid-image-id':
+    case 'image-too-large':
+    case 'image-format-unsupported':
+    case 'image-svg-unsupported':
       return protocolFailure({ kind: 'unexpected-problem', problemCode: code });
   }
 };

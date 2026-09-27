@@ -1,0 +1,43 @@
+[
+  {
+    "id": "table.images",
+    "label": "Create table images",
+    "summary": "Creates table images with required columns",
+    "operationClass": "additive",
+    "target": {
+      "id": "sqlite",
+      "details": {
+        "schema": "main",
+        "objectType": "table",
+        "name": "images"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"images\" does not exist",
+        "sql": "SELECT COUNT(*) = 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "images"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"images\"",
+        "sql": "CREATE TABLE \"images\" (\n  \"bytes\" BLOB NOT NULL,\n  \"created_at\" TEXT NOT NULL DEFAULT (datetime('now')),\n  \"id\" TEXT NOT NULL,\n  \"media_type\" TEXT NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"images\" exists",
+        "sql": "SELECT COUNT(*) > 0 AS \"result\" FROM \"sqlite_master\" WHERE (\"type\" = ? AND \"name\" = ?)",
+        "params": [
+          "table",
+          "images"
+        ]
+      }
+    ]
+  }
+]

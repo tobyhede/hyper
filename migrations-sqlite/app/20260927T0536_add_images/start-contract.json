@@ -1,94 +1,39 @@
 {
   "schemaVersion": "1",
   "targetFamily": "sql",
-  "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "target": "sqlite",
+  "profileHash": "sha256:3cc333ecad9f3f4c7229370a9d2c37e908cdce0f8d2e9fb132d50605b024eff2",
   "roots": {
-    "images": {
-      "model": "Image",
-      "namespace": "public"
-    },
     "repository_state": {
       "model": "RepositoryState",
-      "namespace": "public"
+      "namespace": "__unbound__"
     },
     "resources": {
       "model": "Resource",
-      "namespace": "public"
+      "namespace": "__unbound__"
     },
     "spaces": {
       "model": "Space",
-      "namespace": "public"
+      "namespace": "__unbound__"
     }
   },
   "domain": {
     "namespaces": {
-      "public": {
+      "__unbound__": {
         "models": {
-          "Image": {
-            "fields": {
-              "bytes": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/bytea@1",
-                  "kind": "scalar"
-                }
-              },
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz@1",
-                  "kind": "scalar"
-                }
-              },
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "mediaType": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {},
-            "storage": {
-              "fields": {
-                "bytes": {
-                  "column": "bytes"
-                },
-                "createdAt": {
-                  "column": "created_at"
-                },
-                "id": {
-                  "column": "id"
-                },
-                "mediaType": {
-                  "column": "media_type"
-                }
-              },
-              "namespaceId": "public",
-              "table": "images"
-            }
-          },
           "RepositoryState": {
             "fields": {
               "metaSpaceId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/uuid@1",
+                  "codecId": "sqlite/text@1",
                   "kind": "scalar"
                 }
               },
               "singletonId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/int4@1",
+                  "codecId": "sqlite/integer@1",
                   "kind": "scalar"
                 }
               }
@@ -106,7 +51,7 @@
                 },
                 "to": {
                   "model": "Space",
-                  "namespace": "public"
+                  "namespace": "__unbound__"
                 }
               }
             },
@@ -119,7 +64,7 @@
                   "column": "singleton_id"
                 }
               },
-              "namespaceId": "public",
+              "namespaceId": "__unbound__",
               "table": "repository_state"
             }
           },
@@ -128,35 +73,35 @@
               "createdAt": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/timestamptz@1",
+                  "codecId": "sqlite/datetime@1",
                   "kind": "scalar"
                 }
               },
               "document": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/jsonb@1",
+                  "codecId": "sqlite/json@1",
                   "kind": "scalar"
                 }
               },
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/uuid@1",
+                  "codecId": "sqlite/text@1",
                   "kind": "scalar"
                 }
               },
               "spaceId": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/uuid@1",
+                  "codecId": "sqlite/text@1",
                   "kind": "scalar"
                 }
               },
               "updatedAt": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/timestamptz@1",
+                  "codecId": "sqlite/datetime@1",
                   "kind": "scalar"
                 }
               }
@@ -174,7 +119,7 @@
                 },
                 "to": {
                   "model": "Space",
-                  "namespace": "public"
+                  "namespace": "__unbound__"
                 }
               }
             },
@@ -196,7 +141,7 @@
                   "column": "updated_at"
                 }
               },
-              "namespaceId": "public",
+              "namespaceId": "__unbound__",
               "table": "resources"
             }
           },
@@ -205,42 +150,42 @@
               "createdAt": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/timestamptz@1",
+                  "codecId": "sqlite/datetime@1",
                   "kind": "scalar"
                 }
               },
               "document": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/jsonb@1",
+                  "codecId": "sqlite/json@1",
                   "kind": "scalar"
                 }
               },
               "exportedRevision": {
                 "nullable": true,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "sqlite/text@1",
                   "kind": "scalar"
                 }
               },
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/uuid@1",
+                  "codecId": "sqlite/text@1",
                   "kind": "scalar"
                 }
               },
               "revision": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/text@1",
+                  "codecId": "sqlite/text@1",
                   "kind": "scalar"
                 }
               },
               "updatedAt": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/timestamptz@1",
+                  "codecId": "sqlite/datetime@1",
                   "kind": "scalar"
                 }
               }
@@ -258,7 +203,7 @@
                 },
                 "to": {
                   "model": "RepositoryState",
-                  "namespace": "public"
+                  "namespace": "__unbound__"
                 }
               },
               "resources": {
@@ -273,7 +218,7 @@
                 },
                 "to": {
                   "model": "Resource",
-                  "namespace": "public"
+                  "namespace": "__unbound__"
                 }
               }
             },
@@ -298,7 +243,7 @@
                   "column": "updated_at"
                 }
               },
-              "namespaceId": "public",
+              "namespaceId": "__unbound__",
               "table": "spaces"
             }
           }
@@ -308,60 +253,23 @@
   },
   "storage": {
     "namespaces": {
-      "public": {
+      "__unbound__": {
         "entries": {
           "table": {
-            "images": {
-              "columns": {
-                "bytes": {
-                  "codecId": "pg/bytea@1",
-                  "nativeType": "bytea",
-                  "nullable": false
-                },
-                "created_at": {
-                  "codecId": "pg/timestamptz@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "media_type": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": []
-            },
             "repository_state": {
               "columns": {
                 "meta_space_id": {
-                  "codecId": "pg/uuid@1",
-                  "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "singleton_id": {
-                  "codecId": "pg/int4@1",
+                  "codecId": "sqlite/integer@1",
                   "default": {
                     "kind": "literal",
                     "value": 1
                   },
-                  "nativeType": "int4",
+                  "nativeType": "integer",
                   "nullable": false
                 }
               },
@@ -372,14 +280,14 @@
                     "columns": [
                       "meta_space_id"
                     ],
-                    "namespaceId": "public",
+                    "namespaceId": "__unbound__",
                     "tableName": "repository_state"
                   },
                   "target": {
                     "columns": [
                       "id"
                     ],
-                    "namespaceId": "public",
+                    "namespaceId": "__unbound__",
                     "tableName": "spaces"
                   }
                 }
@@ -402,38 +310,32 @@
             "resources": {
               "columns": {
                 "created_at": {
-                  "codecId": "pg/timestamptz@1",
+                  "codecId": "sqlite/datetime@1",
                   "default": {
                     "expression": "now()",
                     "kind": "function"
                   },
-                  "nativeType": "timestamptz",
+                  "nativeType": "text",
                   "nullable": false
                 },
                 "document": {
-                  "codecId": "pg/jsonb@1",
-                  "nativeType": "jsonb",
+                  "codecId": "sqlite/json@1",
+                  "nativeType": "text",
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "pg/uuid@1",
-                  "default": {
-                    "expression": "gen_random_uuid()",
-                    "kind": "function"
-                  },
-                  "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "space_id": {
-                  "codecId": "pg/uuid@1",
-                  "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "updated_at": {
-                  "codecId": "pg/timestamptz@1",
-                  "nativeType": "timestamptz",
+                  "codecId": "sqlite/datetime@1",
+                  "nativeType": "text",
                   "nullable": false
                 }
               },
@@ -444,14 +346,14 @@
                     "columns": [
                       "space_id"
                     ],
-                    "namespaceId": "public",
+                    "namespaceId": "__unbound__",
                     "tableName": "resources"
                   },
                   "target": {
                     "columns": [
                       "id"
                     ],
-                    "namespaceId": "public",
+                    "namespaceId": "__unbound__",
                     "tableName": "spaces"
                   }
                 }
@@ -473,36 +375,31 @@
             "spaces": {
               "columns": {
                 "created_at": {
-                  "codecId": "pg/timestamptz@1",
+                  "codecId": "sqlite/datetime@1",
                   "default": {
                     "expression": "now()",
                     "kind": "function"
                   },
-                  "nativeType": "timestamptz",
+                  "nativeType": "text",
                   "nullable": false
                 },
                 "document": {
-                  "codecId": "pg/jsonb@1",
-                  "nativeType": "jsonb",
+                  "codecId": "sqlite/json@1",
+                  "nativeType": "text",
                   "nullable": false
                 },
                 "exported_revision": {
-                  "codecId": "pg/text@1",
+                  "codecId": "sqlite/text@1",
                   "nativeType": "text",
                   "nullable": true
                 },
                 "id": {
-                  "codecId": "pg/uuid@1",
-                  "default": {
-                    "expression": "gen_random_uuid()",
-                    "kind": "function"
-                  },
-                  "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "codecId": "sqlite/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "revision": {
-                  "codecId": "pg/text@1",
+                  "codecId": "sqlite/text@1",
                   "default": {
                     "kind": "literal",
                     "value": "0"
@@ -511,8 +408,8 @@
                   "nullable": false
                 },
                 "updated_at": {
-                  "codecId": "pg/timestamptz@1",
-                  "nativeType": "timestamptz",
+                  "codecId": "sqlite/datetime@1",
+                  "nativeType": "text",
                   "nullable": false
                 }
               },
@@ -527,21 +424,13 @@
             }
           }
         },
-        "id": "public",
-        "kind": "postgres-schema"
+        "id": "__unbound__"
       }
     },
-    "storageHash": "sha256:d4a0693a3c0aa69bb8e801dc1c840c9703fc5e6200b70d78ead42496a89737ce",
-    "types": {
-      "Uuid": {
-        "codecId": "pg/uuid@1",
-        "kind": "codec-instance",
-        "nativeType": "uuid"
-      }
-    }
+    "storageHash": "sha256:301f96a6f8786de4f7a45c0b1574e7bed9dd2868a5e445510fe32d0d29973001"
   },
   "execution": {
-    "executionHash": "sha256:26bc77f03788a526b20f8ac61c5d438d7c0bdb48156350feb364c8f0e868f393",
+    "executionHash": "sha256:5282b6091e26ba5dfb56feeb9a788d9f937328a35816f953b05008ddddb77b7c",
     "mutations": {
       "defaults": [
         {
@@ -555,7 +444,7 @@
           },
           "ref": {
             "column": "updated_at",
-            "namespace": "public",
+            "namespace": "__unbound__",
             "table": "resources"
           }
         },
@@ -570,7 +459,7 @@
           },
           "ref": {
             "column": "updated_at",
-            "namespace": "public",
+            "namespace": "__unbound__",
             "table": "spaces"
           }
         }
@@ -578,20 +467,12 @@
     }
   },
   "capabilities": {
-    "postgres": {
-      "distinctOn": true,
+    "sql": {
+      "foreignKeys": true,
       "jsonAgg": true,
-      "lateral": true,
       "limit": true,
       "orderBy": true,
       "returning": true
-    },
-    "sql": {
-      "defaultInInsert": true,
-      "enums": true,
-      "lateral": true,
-      "returning": true,
-      "scalarList": true
     }
   },
   "extensionPacks": {},

@@ -42,16 +42,27 @@ const defaultPreviewLoader = async (modulePath: string): Promise<unknown> =>
 type Next = (error?: unknown) => void;
 
 /**
+ * The collections the Fetch application serves whole: the API, and the stored
+ * images (ADR 0106), which live outside `/api` because an image's URL is
+ * recorded on a Resource and read by the browser directly.
+ */
+const APPLICATION_COLLECTIONS = ['/api', '/images'] as const;
+
+/**
  * Node's parser is more permissive than the URL parser: it accepts request
  * targets that are not valid URL references — `//[` among them, an empty IPv6
  * host — and hands them to middleware verbatim. `new URL` throws on those, and
  * this runs synchronously inside the request handler, so the throw escapes the
  * middleware entirely; the host never answers and the socket hangs. A target we
- * cannot parse is certainly not one of our API paths, so it belongs to Vite.
+ * cannot parse is certainly not one of the application's paths, so it belongs
+ * to Vite.
  */
-const isApiRequest = (request: IncomingMessage): boolean => {
+const isApplicationRequest = (request: IncomingMessage): boolean => {
   const pathname = URL.parse(request.url ?? '/', 'http://hyper.invalid')?.pathname;
-  return pathname === '/api' || (pathname?.startsWith('/api/') ?? false);
+  if (pathname === undefined) return false;
+  return APPLICATION_COLLECTIONS.some(
+    (collection) => pathname === collection || pathname.startsWith(`${collection}/`),
+  );
 };
 
 const pathname = (request: IncomingMessage): string | undefined =>
@@ -144,7 +155,7 @@ const installMiddleware = (
       });
   });
   register((request, response, next) => {
-    if (isApiRequest(request)) {
+    if (isApplicationRequest(request)) {
       void host.then(({ handle }) => handle(request, response)).catch(next);
       return;
     }

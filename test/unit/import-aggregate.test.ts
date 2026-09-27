@@ -4,10 +4,12 @@ import { join } from 'node:path';
 import { uuidSchema, type UUID } from '@project/core';
 import type {
   AggregateLoadResult,
+  ImageId,
   LoadedSpace,
   RepositoryCommitResult,
   SpaceCommit,
   SpaceSummary,
+  StoredImage,
 } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importAggregate } from '../../src/import/import-aggregate';
@@ -63,6 +65,14 @@ class RecordingRepository implements SpaceRepository {
 
   commit(request: SpaceCommit): Promise<RepositoryCommitResult> {
     return this.#stored.commit(request);
+  }
+
+  storeImage(image: StoredImage): Promise<'stored' | 'existing'> {
+    return this.#stored.storeImage(image);
+  }
+
+  loadImage(id: ImageId): Promise<StoredImage | undefined> {
+    return this.#stored.loadImage(id);
   }
 
   loadAggregate(): Promise<AggregateLoadResult> {

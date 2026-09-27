@@ -3,6 +3,7 @@ import { uuidSchema } from '@project/core';
 import {
   encodeCommitRequest,
   type LoadedSpace,
+  type ImageStore,
   type StoredSpaceRepository,
 } from '@project/persistence';
 import { spaceBackendContract } from '@project/persistence/test-support';
@@ -35,7 +36,11 @@ const loaded: LoadedSpace = {
   exportedRevision: 3n,
 };
 
-const repository = (overrides: Partial<StoredSpaceRepository> = {}): StoredSpaceRepository => ({
+const repository = (
+  overrides: Partial<StoredSpaceRepository & ImageStore> = {},
+): StoredSpaceRepository & ImageStore => ({
+  storeImage: () => Promise.reject(new Error('This repository stores no images')),
+  loadImage: () => Promise.resolve(undefined),
   listSpaces: () => Promise.resolve([{ id: SPACE_ID, title: 'One' }]),
   loadSpace: () => Promise.resolve(undefined),
   loadAggregate: () =>

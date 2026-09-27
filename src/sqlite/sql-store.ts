@@ -1,6 +1,7 @@
 import type { SqlTables } from '../persistence/sql-store';
 import {
   asOrderable,
+  buildImageTable,
   buildRepositoryStateTable,
   buildSpaceTable,
   buildResourceTable,
@@ -231,6 +232,7 @@ export const sqliteSqlStore = (database: SqliteDatabase) => {
           (spaceId: string, keepIds: readonly string[]) =>
             deleteResourcesExcept(handle.orm, spaceId, keepIds),
         ),
+        Image: buildImageTable(handle.orm.Image),
         RepositoryState: buildRepositoryStateTable(handle.orm.RepositoryState),
       };
     },

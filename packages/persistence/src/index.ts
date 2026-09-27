@@ -54,6 +54,23 @@ export {
   decodeStoredRevision,
   encodeStoredRevision,
 } from './revision-codec';
+/* The images the host stores beside Spaces and outside the aggregate
+ * (ADR 0106): the admission rule the storing route and fixture seeding share,
+ * and the store every repository under `src/` implements. */
+export {
+  admitImage,
+  IMAGE_COLLECTION_PATH,
+  imagePath,
+  isImageId,
+  isImageMediaType,
+  MAX_IMAGE_BYTES,
+  type ImageAdmission,
+  type ImageId,
+  type ImageMediaType,
+  type ImageRefusal,
+  type ImageStore,
+  type StoredImage,
+} from './images';
 /* Two test-facing helpers, two doors, and the difference is what they are.
  * `MemorySpaceBackendTestControl` is named by `MemorySpaceBackend`'s public
  * constructor, so a caller that cannot import it cannot construct the adapter

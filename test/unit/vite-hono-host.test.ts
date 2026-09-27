@@ -14,6 +14,7 @@ import {
   decodeLoadedSpace,
   decodeProblemDetails,
   encodeCommitRequest,
+  type ImageStore,
   type StoredSpaceRepository,
 } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -55,7 +56,9 @@ interface RunningHost {
 
 const hosts: RunningHost[] = [];
 
-const repository = (): StoredSpaceRepository => ({
+const repository = (): StoredSpaceRepository & ImageStore => ({
+  storeImage: () => Promise.reject(new Error('This repository stores no images')),
+  loadImage: () => Promise.resolve(undefined),
   listSpaces: () => Promise.resolve([]),
   loadSpace: () => Promise.resolve(undefined),
   loadAggregate: () =>
@@ -202,6 +205,34 @@ describe('Vite Hono host', () => {
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe('<main>Vite application</main>');
   });
+
+  it.each(['development', 'preview'] as const)(
+    'stores and serves an image through the %s host rather than Vite',
+    async (hook) => {
+      const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x2a]);
+      const { host } = await startHost(
+        createSpaceHost(new MemorySpaceRepository(), newUuid),
+        (_request, response) => {
+          response.end('<main>Vite fallback</main>');
+        },
+        hook,
+      );
+
+      const stored = await fetch(`${host.url}/images`, { method: 'POST', body: png });
+      expect(stored.status).toBe(201);
+      const url = stored.headers.get('location');
+      expect(url).toMatch(/^\/images\/[\w-]{43}$/u);
+      const served = await fetch(`${host.url}${url ?? ''}`);
+
+      expect(served.status).toBe(200);
+      expect(served.headers.get('content-type')).toBe('image/png');
+      expect(new Uint8Array(await served.arrayBuffer())).toEqual(png);
+      expect((await fetch(`${host.url}/images/not-an-id`)).status).toBe(400);
+      await expect(
+        fetch(`${host.url}/images-gallery.html`).then((response) => response.text()),
+      ).resolves.toBe('<main>Vite fallback</main>');
+    },
+  );
 
   it('redirects root to the compact Meta Space URL without a second read of it', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };

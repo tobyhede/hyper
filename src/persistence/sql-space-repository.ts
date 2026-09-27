@@ -9,14 +9,17 @@ import {
   decideCommit,
   decodeStoredRevision,
   encodeStoredRevision,
+  isImageMediaType,
   RevisionCodecError,
   type AggregateLoadResult,
+  type ImageId,
   type LoadedAggregate,
   type LoadedSpace,
   type RepositoryCommitResult,
   type SpaceChange,
   type SpaceCommit,
   type SpaceSummary,
+  type StoredImage,
 } from '@project/persistence';
 import { isDeepStrictEqual } from 'node:util';
 import { classifyInitializedAggregate } from './aggregate-lifecycle';
@@ -389,6 +392,43 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     } catch (error) {
       throw new AggregateInvariantError(`Stored Space ${id} does not parse`, { cause: error });
     }
+  }
+
+  /**
+   * Insert the image, and answer a losing insert as the image already being
+   * there: its id is its content, so a row under that id holds these bytes.
+   * Outside any transaction, so a losing insert aborts nothing else.
+   */
+  storeImage(image: StoredImage): Promise<'stored' | 'existing'> {
+    return this.#naming(() =>
+      this.#store.serialise(async () => {
+        try {
+          await this.#store.tables(this.#store.orm).Image.create(image);
+          return 'stored';
+        } catch (error) {
+          if (this.#store.isDuplicateKey(error, 'images')) return 'existing';
+          throw error;
+        }
+      }),
+    );
+  }
+
+  /**
+   * One stored image, its bytes copied into a view this repository owns: a
+   * driver may hand back a `Buffer` over its own pooled memory.
+   */
+  loadImage(id: ImageId): Promise<StoredImage | undefined> {
+    return this.#naming(() =>
+      this.#store.serialise(async () => {
+        const row = await this.#store.tables(this.#store.orm).Image.find(id);
+        if (row === null) return undefined;
+        const { mediaType } = row;
+        if (!isImageMediaType(mediaType)) {
+          throw new AggregateInvariantError(`Stored image ${id} has media type ${mediaType}`);
+        }
+        return { id, mediaType, bytes: new Uint8Array(row.bytes) };
+      }),
+    );
   }
 
   loadAggregate(): Promise<AggregateLoadResult> {

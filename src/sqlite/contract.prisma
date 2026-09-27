@@ -32,3 +32,12 @@ model Resource {
   @@index([spaceId])
   @@map("resources")
 }
+
+model Image {
+  id        String   @id
+  mediaType String   @map("media_type")
+  bytes     Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("images")
+}
