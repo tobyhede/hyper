@@ -312,9 +312,14 @@ export async function mapChoices(page: Page): Promise<Locator> {
   return (await mapMenu(page)).getByRole('menuitemradio');
 }
 
-/** The Graph the Dock is naming as active, or nothing when none is. */
+/**
+ * The Graph the Dock is naming as active, or nothing when none is.
+ *
+ * Through {@link dock}, whose role query skips the Docks of open Spaces that
+ * are mounted but not shown; a test id alone would match those too.
+ */
 export function activeGraph(page: Page): Locator {
-  return page.getByTestId('active-graph');
+  return dock(page).getByTestId('active-graph');
 }
 
 /** Emphasise one Graph by title. Activating is never an Edit (ADR 0028). */

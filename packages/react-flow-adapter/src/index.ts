@@ -37,7 +37,7 @@ export {
 // A test of the rule imports it from its own module.
 export { GraphHud } from './GraphHud';
 export { GraphHeadMarkers } from './GraphHeadMarkers';
-export { GraphConnectionLine } from './GraphConnectionLine';
+export { GraphConnectionLine, GraphConnectionLineHeadShape } from './GraphConnectionLine';
 export { ZoomSlider } from './ZoomSlider';
 export type { ZoomSliderProps } from './ZoomSlider';
 export type { GraphHudProps } from './GraphHud';

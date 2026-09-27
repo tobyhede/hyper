@@ -16,6 +16,7 @@ import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
 import { expectEmbeddedResourceToFollowDrag } from './support/embedded-drag';
 import {
+  activateGraph,
   authoringHandle,
   boxOf,
   connectHandles,
@@ -23,6 +24,7 @@ import {
   dragBy,
   expectResourceFillsNode,
   FIXTURE_ORDINARY_SPACE_COUNT,
+  graphLegendLineStroke,
   graphLegendMarkLine,
   nodeByTitle,
   selectCanvas,
@@ -761,6 +763,11 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
   page,
 }) => {
   const parent = await openSpaceResourceOnItsMap(page);
+  // The host's Active Graph is made to differ from the shown one in both colour
+  // and head shape — the fixture's `Short` stores `diamond`, the created target's
+  // one Graph stores none — so a preview drawn from the host's Graph is caught.
+  await activateGraph(page, 'Short');
+  const hostColor = await graphLegendLineStroke(page, 'Short');
   await beginPortalEdit(page, parent);
   const embedded = embeddedNodes(page);
   await expect(embedded).toHaveCount(1);
@@ -770,10 +777,26 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
   // A self-Edge is legal (ADR 0032) and the one in-view Resource is the pair the
   // host camera still frames. A second Resource authored on the target canvas sits
   // outside that window, and Playwright's box is the layout box, not the clip.
+  const sourceHandle = authoringHandle(embedded, 'source', 'right');
+  // The embedded handles are drawn in the shown Graph's colour, which is what
+  // the preview must be drawn in too; that Graph stores no head shape.
+  await expect(sourceHandle).toHaveCSS('opacity', '1');
+  const shownColor = await sourceHandle.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  expect(shownColor).not.toBe(hostColor);
   await connectHandles(
     page,
-    authoringHandle(embedded, 'source', 'right'),
+    sourceHandle,
     authoringHandle(embedded, 'target', 'left'),
+    async () => {
+      await expect(page.locator('.react-flow__connection-path')).toHaveCSS('stroke', shownColor);
+      const head = page.locator(
+        'marker#graph-authoring-connection-head [data-slot="graph-head-shape"]',
+      );
+      await expect(head).toHaveAttribute('data-head-shape', 'arrow');
+      await expect(head).toHaveCSS('fill', shownColor);
+    },
   );
   await settled(page);
   expect(await hostGraphEdgeCount(page, parent)).toBe(hostBefore);

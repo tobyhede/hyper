@@ -5,6 +5,7 @@ import { Placement } from '@project/graph';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { authoringAvailability } from '../authoring-availability';
 import { canvasProjection } from '../canvas-projection';
+import { connectionAppearance } from '../colors';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
 import { createEmbeddedAuthoring } from '../embedded-authoring';
 import {
@@ -263,6 +264,8 @@ export function EmbeddedMapAuthoring({
         });
         return result.kind === 'completed';
       },
+      connectionAppearance: () =>
+        connectionAppearance(pending?.visibleGraphs ?? [], pending?.colors ?? {}, graphId),
       changeNodes: (changes) => {
         const local = changes.flatMap((change): NodeChange<ResourceFlowNode>[] => {
           if (change.type === 'add' || change.type === 'replace') return [];
@@ -302,6 +305,7 @@ export function EmbeddedMapAuthoring({
     entry,
     mapId,
     graphId,
+    pending,
     left,
     top,
     right,
