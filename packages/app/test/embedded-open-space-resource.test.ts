@@ -62,7 +62,7 @@ const openSpaceResource = (
     readonly position?: { readonly x: number; readonly y: number };
     readonly width?: number;
     readonly height?: number;
-    readonly kind?: Resource['kind'];
+    readonly kind?: Exclude<Resource['kind'], 'image'>;
     readonly open?: boolean;
   } = {},
 ): ResourceFlowNode => ({

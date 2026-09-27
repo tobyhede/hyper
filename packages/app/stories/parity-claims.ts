@@ -226,6 +226,20 @@ export const parityClaims: readonly ParityClaim[] = [
       'A Closed Image Resource draws its Title and the image kind glyph at the one Closed size, and no picture (ADR 0106).',
   },
   {
+    id: 'open-image-resource-draws-its-image',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'OpenImage',
+    claim:
+      "An Open Image Resource is the Open Markdown front with its picture as the content: the picture fills the content area above the Title footer, contained and never enlarged past its natural size, named by the Resource, and its first Open holds a recorded picture at its own size plus the Open front's chrome (ADR 0106).",
+  },
+  {
+    id: 'open-image-resource-shows-failed-state',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'OpenImage',
+    claim:
+      'An Open Image Resource whose picture does not load keeps its Title and draws the failed-image state naming the URL (ADR 0106).',
+  },
+  {
     id: 'canvas-resource-shows-kind-treatment',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Kinds',

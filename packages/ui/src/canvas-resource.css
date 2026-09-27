@@ -298,10 +298,12 @@
 
 /* A Title is the same bottom passenger before, during and after the React Flow
    wrapper moves. Opening adds the content surface above it; it never switches
-   the Title's layout in the middle of that motion. Both kinds that draw content
-   claim it, so an Open Reference Resource reads exactly as an Open Markdown Resource does
-   (ADR 0070) — the `space` kind has no content front to sit above a Title. */
-.canvas-resource:is([data-kind='markdown'], [data-kind='reference']) .canvas-resource__body {
+   the Title's layout in the middle of that motion. Every kind that draws content
+   claims it, so an Open Reference Resource (ADR 0070) and an Open Image Resource
+   read exactly as an Open Markdown Resource does — the `space` kind has no
+   content front to sit above a Title. */
+.canvas-resource:is([data-kind='markdown'], [data-kind='reference'], [data-kind='image'])
+  .canvas-resource__body {
   order: 2;
   flex: none;
   margin-top: auto;

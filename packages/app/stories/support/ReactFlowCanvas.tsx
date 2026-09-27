@@ -388,7 +388,7 @@ export function MapCanvasFixture({
   );
 }
 
-export interface CanvasResourceNodeSpecimenProps {
+interface CanvasResourceNodeSpecimenBaseProps {
   readonly resourceId?: ResourceId;
   readonly selected?: boolean;
   readonly editingTitle?: boolean;
@@ -414,6 +414,16 @@ export interface CanvasResourceNodeSpecimenProps {
 }
 
 /**
+ * The fixture Resource keeps its own kind, or is drawn as an Image Resource
+ * showing `imageUrl`, as the projection hands `ResourceNode` one.
+ */
+export type CanvasResourceNodeSpecimenProps = CanvasResourceNodeSpecimenBaseProps &
+  (
+    | { readonly kind?: undefined; readonly imageUrl?: never }
+    | { readonly kind: 'image'; readonly imageUrl: string }
+  );
+
+/**
  * A typed one-node React Flow harness. It supplies fixture state only; ResourceNode
  * remains responsible for presentation state, controls, handles and geometry.
  */
@@ -431,6 +441,8 @@ export function CanvasResourceNodeSpecimen({
   zoom,
   title,
   body,
+  kind,
+  imageUrl,
   readOnly = false,
   draggable = false,
 }: CanvasResourceNodeSpecimenProps) {
@@ -462,6 +474,10 @@ export function CanvasResourceNodeSpecimen({
   if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
   if (body !== undefined) data.body = body;
+  if (kind === 'image') {
+    data.kind = kind;
+    data.imageUrl = imageUrl;
+  }
   // The editor is the state, so a specimen that asks to be renaming supplies
   // what ends the edit along with it.
   if (editingTitle) {

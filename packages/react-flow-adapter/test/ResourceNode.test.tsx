@@ -6,7 +6,12 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { vi } from 'vitest';
 import { ResourceNode } from '../src/ResourceNode';
 import { ConnectionEndEligibilityContext } from '../src/connection-end-eligibility';
-import type { ResourceFlowNode, ResourceNodeData, ResourceTitleEditor } from '../src/projection';
+import type {
+  ResourceFlowNode,
+  ResourceNodeData,
+  ResourceNodeKind,
+  ResourceTitleEditor,
+} from '../src/projection';
 import { uuid } from './uuid';
 
 /**
@@ -184,12 +189,14 @@ interface Overrides {
   /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
   isConnectable?: boolean;
   title?: string;
-  kind?: ResourceNodeData['kind'];
+  kind?: Exclude<ResourceNodeData['kind'], 'image'>;
   titleEditor?: ResourceTitleEditor;
   onEditResource?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
   open?: boolean;
   body?: string;
+  /** Draws the Resource as an Image Resource showing this URL, overriding `kind`. */
+  imageUrl?: string;
   onBeginBodyEditing?: () => void;
   bodyEditor?: ResourceNodeData['bodyEditor'];
   resize?: ResourceNodeData['resize'];
@@ -209,16 +216,19 @@ function props({
   onBeginTitleEditing,
   open,
   body,
+  imageUrl,
   onBeginBodyEditing,
   bodyEditor,
   resize,
   readOnly = false,
   connectionAuthoringEnabled,
 }: Overrides = {}): NodeProps<ResourceFlowNode> {
+  const nodeKind: ResourceNodeKind =
+    imageUrl === undefined ? { kind } : { kind: 'image', imageUrl };
   const data: ResourceFlowNode['data'] = {
     resourceId,
     title,
-    kind,
+    ...nodeKind,
     active: false,
     selectedForAuthoring,
     showContent: false,
@@ -354,7 +364,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
     render(
       <ResourceNode
         {...props({
-          kind: 'image',
+          imageUrl: 'https://example.com/harbour.png',
           selected: true,
           body: 'must not render',
           onEditResource,
@@ -369,6 +379,19 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
     screen.getByRole('button', { name: 'Open Resource A' }).click();
     expect(onEditResource).toHaveBeenCalledWith(true);
+  });
+
+  it("keeps drawing a Closing Image Resource's picture while its content fades out", () => {
+    const imageUrl = 'https://example.com/harbour.png';
+    const { rerender } = render(<ResourceNode {...props({ imageUrl, open: true })} />);
+
+    // The data the projection hands a Closed Image Resource: its URL, not Open.
+    rerender(<ResourceNode {...props({ imageUrl, open: false })} />);
+
+    const content = document.querySelector('.canvas-resource__content');
+    expect(content).toHaveAttribute('data-presence', 'leaving');
+    expect(screen.getByRole('img', { name: 'A' })).toHaveAttribute('src', imageUrl);
+    expect(screen.queryByTestId('resource-image-failed')).toBeNull();
   });
 
   it('renders a Space Resource through an explicit non-Markdown front', () => {

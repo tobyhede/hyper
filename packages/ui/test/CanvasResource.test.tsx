@@ -7,6 +7,8 @@ import {
   type CanvasResourceFront,
 } from '../src';
 
+const FIGURE_URL = 'https://example.com/figure.png';
+
 /**
  * Base UI's menus position themselves by measuring, and jsdom ships no pointer
  * capture. The stubs are for the entity-action menus this file opens; the
@@ -102,7 +104,7 @@ describe('CanvasResource kind and interaction state', () => {
   it('presents a Closed Image Resource by its Title and kind alone, with no picture', () => {
     render(
       <CanvasResource
-        front={{ kind: 'image', open: false }}
+        front={{ kind: 'image', url: FIGURE_URL, open: false }}
         state="rest"
         title="Figure"
         graphColor="#ffc53d"
@@ -120,7 +122,7 @@ describe('CanvasResource kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        front={{ kind: 'image', open: false, onOpenChange }}
+        front={{ kind: 'image', url: FIGURE_URL, open: false, onOpenChange }}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -129,6 +131,63 @@ describe('CanvasResource kind and interaction state', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource Figure' }));
     expect(onOpenChange).toHaveBeenCalledWith(true);
+  });
+
+  it('draws an Open Image Resource as the Open Markdown front with its image as the content', () => {
+    render(
+      <CanvasResource
+        front={{ kind: 'image', url: FIGURE_URL, open: true }}
+        state="rest"
+        title={'Figure\nFrom the north mole'}
+        graphColor="#ffc53d"
+      />,
+    );
+
+    const resource = screen.getByRole('article', { name: 'Figure' });
+    const image = screen.getByRole('img', { name: 'Figure' });
+    expect(image).toHaveAttribute('src', FIGURE_URL);
+    // The Markdown front's content area, and the Title ladder in its footer.
+    expect(image.closest('.canvas-resource__content')).not.toBeNull();
+    expect(resource.querySelector('.canvas-resource__body')).toHaveTextContent(
+      'FigureFrom the north mole',
+    );
+    expect(screen.queryByRole('img', { name: 'Image Resource' })).toBeNull();
+  });
+
+  it('names the URL when an Open Image Resource cannot load its image, keeping the Title', () => {
+    render(
+      <CanvasResource
+        front={{ kind: 'image', url: FIGURE_URL, open: true }}
+        state="rest"
+        title="Figure"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    fireEvent.error(screen.getByRole('img', { name: 'Figure' }));
+
+    expect(screen.queryByRole('img', { name: 'Figure' })).toBeNull();
+    expect(screen.getByText('Image did not load')).toBeVisible();
+    expect(screen.getByText(FIGURE_URL)).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Figure' })).toBeVisible();
+  });
+
+  it('offers Close and Title editing on an Open Image Resource, and no content Edit', () => {
+    const onOpenChange = vi.fn(() => 'completed' as const);
+    render(
+      <CanvasResource
+        front={{ kind: 'image', url: FIGURE_URL, open: true, onOpenChange }}
+        state="selected"
+        title="Figure"
+        graphColor="#ffc53d"
+        onBeginTitleEdit={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Edit Title Figure' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Edit Resource Figure' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Figure' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('offers a Reference Resource the shared Open operation', () => {

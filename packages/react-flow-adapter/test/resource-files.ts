@@ -22,3 +22,10 @@ export function referenceFile(id: string, title: string, target: string): Resour
     text: `---\nid: ${id}\ntitle: ${title}\nkind: reference\ntarget: ${target}\n---\n`,
   };
 }
+
+export function imageFile(id: string, title: string, url: string): ResourceFile {
+  return {
+    path: `resources/${id}.md`,
+    text: `---\nid: ${id}\ntitle: ${title}\nkind: image\nurl: ${url}\n---\n`,
+  };
+}

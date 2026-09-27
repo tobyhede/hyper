@@ -2,6 +2,8 @@ import {
   COLLAPSED_RESOURCE_SIZE,
   DEFAULT_OPEN_SIZE,
   DEFAULT_SPACE_RESOURCE_OPEN_SIZE,
+  IMAGE_FIRST_OPEN_BOUND,
+  OPEN_RESOURCE_CHROME,
   titleName,
   type Graph,
   type Map,
@@ -332,11 +334,38 @@ const roomBetween = (from: Extent, to: Extent): Extent => {
 };
 
 /**
+ * The Open Size a Resource takes the first time it Opens, which is its kind's
+ * choice (ADR 0066, ADR 0106).
+ *
+ * A Space Resource draws a whole Map and opens larger. An Image Resource with a
+ * recorded natural size opens to hold it at one pixel per canvas unit, scaled
+ * down proportionally to fit {@link IMAGE_FIRST_OPEN_BOUND}, plus
+ * {@link OPEN_RESOURCE_CHROME}, and never smaller than the Closed size on either
+ * axis. Read from the document alone, so Opening never waits on a load.
+ */
+const firstOpenSize = (document: ResourceDocument | undefined): Extent => {
+  if (document?.kind === 'space') return DEFAULT_SPACE_RESOURCE_OPEN_SIZE;
+  if (document?.kind !== 'image' || document.naturalSize === undefined) return DEFAULT_OPEN_SIZE;
+  const natural = document.naturalSize;
+  const scale = Math.min(
+    1,
+    IMAGE_FIRST_OPEN_BOUND.width / natural.width,
+    IMAGE_FIRST_OPEN_BOUND.height / natural.height,
+  );
+  const fitted = (axis: keyof Extent): number =>
+    Math.max(
+      COLLAPSED_RESOURCE_SIZE[axis],
+      Math.round(natural[axis] * scale) + OPEN_RESOURCE_CHROME[axis],
+    );
+  return { width: fitted('width'), height: fitted('height') };
+};
+
+/**
  * Open a Resource in one Map, moving the Resources clear of it by the room it
  * now takes (ADR 0084, ADR 0093).
  *
- * It Opens at the Open Size it remembers (ADR 0066), or at the default for its
- * kind — a Space Resource draws a whole Map and opens larger. The room it
+ * It Opens at the Open Size it remembers (ADR 0066), or at its kind's
+ * {@link firstOpenSize}. The room it
  * takes is that size's growth, so the Close that reverses this reads the same
  * number back off the entry. `unchanged` for a Resource already Open.
  */
@@ -346,9 +375,8 @@ function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotE
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   if (at.open) return UNCHANGED;
-  const kind = snapshot.resources.find((resource) => resource.id === resourceId)?.document.kind;
-  const openSize =
-    at.openSize ?? (kind === 'space' ? DEFAULT_SPACE_RESOURCE_OPEN_SIZE : DEFAULT_OPEN_SIZE);
+  const document = snapshot.resources.find((resource) => resource.id === resourceId)?.document;
+  const openSize = at.openSize ?? firstOpenSize(document);
   return withPlacement(
     snapshot,
     mapId,

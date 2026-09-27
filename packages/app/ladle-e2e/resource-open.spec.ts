@@ -770,3 +770,83 @@ test(
     expect(mark.y + mark.height).toBeLessThan(face.y + face.height / 2);
   },
 );
+
+const openImageStory = '/?story=components--resource--open-image-resource&mode=preview';
+
+/**
+ * An Open Image Resource is the Open Markdown front with its picture as the
+ * content. Drawn at one canvas unit per pixel, the first-Open size —
+ * the picture plus `OPEN_RESOURCE_CHROME` — leaves a content area the picture's
+ * own size, which is the drawn half of the check `open-resource-chrome.test.ts`
+ * makes against the stylesheet. In a Resource resized larger the picture keeps
+ * its natural size rather than being enlarged.
+ */
+test(
+  'an Open Image Resource draws its picture at its own size in the Markdown front',
+  { tag: '@parity:open-image-resource-draws-its-image' },
+  async ({ page }) => {
+    await page.goto(openImageStory);
+    const first = page.getByRole('region', { name: 'First Open' });
+    const resource = first.getByRole('article', { name: 'Harbour' });
+    const picture = resource.getByRole('img', { name: 'Harbour' });
+    await expect(picture).toBeVisible();
+    await expect
+      .poll(() =>
+        picture.evaluate((image) =>
+          image instanceof HTMLImageElement && image.complete ? image.naturalWidth : 0,
+        ),
+      )
+      .toBe(400);
+    await expect(resource.locator('.canvas-resource__content img')).toHaveCount(1);
+    await expect(resource.getByRole('heading', { name: 'Harbour' })).toBeVisible();
+
+    const pictureBox = await picture.boundingBox();
+    const titleBox = await resource.locator('.canvas-resource__body').boundingBox();
+    if (pictureBox === null || titleBox === null)
+      throw new Error('Open Image Resource drew no content');
+    expect(pictureBox.width).toBeCloseTo(400, 0);
+    expect(pictureBox.height).toBeGreaterThanOrEqual(299.5);
+    expect(pictureBox.height).toBeLessThanOrEqual(301);
+    expect(pictureBox.y + pictureBox.height).toBeLessThanOrEqual(titleBox.y + 1);
+
+    // Larger than the picture, the content area draws it at its natural size.
+    const larger = page
+      .getByRole('region', { name: 'Resized larger' })
+      .getByRole('img', { name: 'Harbour, larger' });
+    await expect(larger).toBeVisible();
+    const drawn = await larger.evaluate((image) => {
+      if (!(image instanceof HTMLImageElement)) return null;
+      const box = image.getBoundingClientRect();
+      const scale = Math.min(box.width / image.naturalWidth, box.height / image.naturalHeight, 1);
+      return {
+        fit: getComputedStyle(image).objectFit,
+        scale,
+        roomy: box.width > image.naturalWidth,
+      };
+    });
+    expect(drawn).toEqual({ fit: 'scale-down', scale: 1, roomy: true });
+
+    // Close and Title editing are the Markdown front's, and there is no content Edit.
+    const node = first.locator('.react-flow__node');
+    await selectResource(node);
+    const toolbar = await resourceToolbar(page, node);
+    await expect(toolbar.getByRole('button', { name: 'Close Resource Harbour' })).toBeVisible();
+    await expect(toolbar.getByRole('button', { name: /Edit Resource/ })).toHaveCount(0);
+  },
+);
+
+/** A picture that will not load keeps the Title and names its URL (ADR 0106). */
+test(
+  'an Open Image Resource whose picture does not load names its URL and keeps its Title',
+  { tag: '@parity:open-image-resource-shows-failed-state' },
+  async ({ page }) => {
+    await page.goto(openImageStory);
+    const resource = page
+      .getByRole('region', { name: 'Failed image' })
+      .getByRole('article', { name: 'Missing' });
+    await expect(resource.getByText('Image did not load')).toBeVisible();
+    await expect(resource.getByText('/images/missing-picture.png')).toBeVisible();
+    await expect(resource.getByRole('img', { name: 'Missing' })).toHaveCount(0);
+    await expect(resource.getByRole('heading', { name: 'Missing' })).toBeVisible();
+  },
+);

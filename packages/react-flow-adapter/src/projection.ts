@@ -42,9 +42,26 @@ export type ResourceTitleEditor = {
   onCancel: () => void;
 };
 
+/**
+ * What kind of Resource a node draws, drawn as a persistent glyph on the Front.
+ *
+ * Carried rather than inferred from whether this node's content resolved
+ * elsewhere: that answers the Resource's kind by proxy, which is exactly what
+ * goes wrong for the next kind that resolves its content elsewhere too.
+ *
+ * An Image Resource carries its URL whether it is Closed, Open or presented, and
+ * no other kind carries one. The URL is the Resource's own field rather than
+ * content ADR 0006 keeps off every node, and the Open front's content stays
+ * mounted while it fades out on Close, drawing the picture from this URL until
+ * it unmounts.
+ */
+export type ResourceNodeKind =
+  | { kind: Exclude<Resource['kind'], 'image'>; imageUrl?: never }
+  | { kind: 'image'; imageUrl: string };
+
 /** Data carried by each custom resource node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
-export type ResourceNodeData = {
+export type ResourceNodeData = ResourceNodeKind & {
   /** Reports rendered title geometry by placement, including embedded placements. */
   onBodyHeightChange?: (id: string, height: number | null) => void;
   resourceId: ResourceId;
@@ -53,14 +70,6 @@ export type ResourceNodeData = {
   readOnly: boolean;
   /** False withholds hover-reveal; omitted or true offers the host-canvas handles. */
   connectionAuthoringEnabled?: boolean;
-  /**
-   * What kind of Resource this is, drawn as a persistent glyph on the Front.
-   *
-   * Carried rather than inferred from whether this node's content resolved
-   * elsewhere: that answers the Resource's kind by proxy, which is exactly what
-   * goes wrong for the next kind that resolves its content elsewhere too.
-   */
-  kind: Resource['kind'];
   /**
    * Opens or Closes this Resource, absent where Resource-level authoring is
    * withheld: this Resource is outside the working Space, or the canvas is not
@@ -306,6 +315,9 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
   ]);
 }
 
+const nodeKind = (resource: Resource): ResourceNodeKind =>
+  resource.kind === 'image' ? { kind: 'image', imageUrl: resource.url } : { kind: resource.kind };
+
 /**
  * Map resources → React Flow resource nodes, each declaring the four anchors an Edge
  * may attach to on every side. The resource id is the React Flow node id.
@@ -348,7 +360,7 @@ export function projectResourceNodes(
         resourceId: resource.id,
         title: resource.title,
         readOnly: options.readOnly ?? false,
-        kind: resource.kind,
+        ...nodeKind(resource),
         active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         showContent,

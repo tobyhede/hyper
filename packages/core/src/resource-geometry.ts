@@ -3,6 +3,23 @@ export const COLLAPSED_RESOURCE_SIZE = { width: 260, height: 146 } as const;
 
 /** The concrete Open Size recorded when a Resource first Opens (ADR 0066). */
 export const DEFAULT_OPEN_SIZE = { width: 560, height: 420 } as const;
+
+/**
+ * The room an Open Resource's front takes around its content area, in canvas
+ * units, where its commands float outside it: the edge on both sides across;
+ * and down, the edge, the paper above the content, the content divider, a Title
+ * footer of one line and the edge again. An Image Resource's first Open adds it
+ * to the picture (ADR 0106), so the number is the domain's and the stylesheet
+ * draws to it: across exactly, and down within one unit, rounded up so the
+ * picture is never scaled down to fit. `packages/ui/test/open-resource-chrome.test.ts`
+ * holds the stylesheet to it and `packages/app/e2e/image-resource.spec.ts`
+ * measures the drawn front against it.
+ */
+export const OPEN_RESOURCE_CHROME = { width: 8, height: 59 } as const;
+
+/** The largest content area an Image Resource first Opens to (ADR 0106). */
+export const IMAGE_FIRST_OPEN_BOUND = { width: 1280, height: 960 } as const;
+
 /** Room for an Open target Resource, its neighbours and the Space Resource's own Title. */
 export const DEFAULT_SPACE_RESOURCE_OPEN_SIZE = { width: 960, height: 720 } as const;
 

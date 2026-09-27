@@ -74,11 +74,6 @@ export const uncataloguedComponents = [
     reason:
       'Without a consumer since ADR 0089 retired the Space Resource creation pane, whose target-Space field was the last one. `CLAUDE.md` records that this primitive has spent a while with none before and came back; keeping it is also what closes the "one flow asking two ways" seam `docs/agents/ui.md` records, since choosing a Map or a Graph is `ChoiceMenu`\'s and choosing a Resource is the Resources list\'s everywhere that remains.',
   },
-  {
-    module: 'packages/ui/src/components/empty.tsx',
-    reason:
-      'Deliberately without a consumer, for the same reason as `Command.tsx` above. A shadcn registry primitive for an empty result set — the combobox empty message comes from Base UI’s own `ComboboxEmpty`, not from here.',
-  },
 ] as const;
 
 /**
@@ -114,6 +109,11 @@ export const handRolledStyles = [
     block: 'resource',
     reason:
       "`ResourceContent`'s base appearance plus the container-query typography that scales a presented Resource with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
+  },
+  {
+    block: 'resource-image',
+    reason:
+      "Named only by the `.resource` block's rule that stacks a presented Image Resource's name over its picture: the presented frame is `.resource--full`'s, so the rule that lays it out lives with that block rather than in the picture's stylesheet. `ResourceImage`'s own appearance is in `packages/ui/src/resource-image.css`, beside the component.",
   },
   {
     block: 'canvas-resource',
