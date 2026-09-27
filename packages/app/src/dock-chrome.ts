@@ -1,5 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { Graph, GraphId, Map as SpaceMap, Resource, ResourceId, UUID } from '@project/core';
+import {
+  graphHeadShape,
+  type Graph,
+  type GraphHeadShape,
+  type GraphId,
+  type Map as SpaceMap,
+  type Resource,
+  type ResourceId,
+  type UUID,
+} from '@project/core';
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSessionState } from '@project/persistence';
 import { FALLBACK_GRAPH_COLOR, type EntityActionGroup } from '@project/ui';
@@ -319,6 +328,7 @@ export function useDockChrome(
       active: activeGraph,
       colorByGraphId: projection.colors,
       activeColor: projection.colors[activeGraph.id] ?? FALLBACK_GRAPH_COLOR,
+      activeHeadShape: graphHeadShape(activeGraph),
       onActivate: location.activateGraph,
       // Each is the press built from the capability that answers it, addressed
       // to the Active Graph. A refused rename is said twice: inline, where the
@@ -331,6 +341,12 @@ export function useDockChrome(
       onRecolor: offered(activeGraphCommands.recolor, (recolor) => (color: string) => {
         commandOutcomes.run('graph-edit', () => recolor(color));
       }),
+      onChangeHeadShape: offered(
+        activeGraphCommands.changeHeadShape,
+        (change) => (headShape: GraphHeadShape) => {
+          commandOutcomes.run('graph-edit', () => change(headShape));
+        },
+      ),
       // The Edit makes the new Graph Active on this canvas; the caret stays
       // where it was.
       onCreate: offered(mapGraphCommands.create, (create) => () => {

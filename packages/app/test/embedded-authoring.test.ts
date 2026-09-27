@@ -176,6 +176,7 @@ describe('a completion an embedded Map does not support', () => {
     { kind: 'added-graph' },
     { kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Renamed Graph' },
     { kind: 'recolored-graph', graphId: GRAPH_ID, color: '#aec7e8' },
+    { kind: 'changed-graph-head-shape', graphId: GRAPH_ID, headShape: 'vee' },
     { kind: 'deleted-graph', graphId: GRAPH_ID },
   ] as const)('does not forward a Map or Graph Edit: $kind', (completion) => {
     const { composition, reported } = embedded();

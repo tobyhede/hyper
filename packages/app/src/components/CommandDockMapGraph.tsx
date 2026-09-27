@@ -254,6 +254,15 @@ function GraphIdentityMenu({
                 onOpenChange(false);
               }
         }
+        headShape={graph.activeHeadShape}
+        onChangeHeadShape={
+          graph.onChangeHeadShape === null
+            ? null
+            : (headShape) => {
+                graph.onChangeHeadShape?.(headShape);
+                onOpenChange(false);
+              }
+        }
         onCreate={graph.onCreate}
         onCopyLink={graph.onCopyLink}
         onDelete={graph.onDelete}

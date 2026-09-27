@@ -439,7 +439,7 @@ test(
     await expectMenuGroups(menu, [
       ['Long', 'Mid', 'Short'],
       ['New Graph'],
-      ['Colour…', 'Rename', 'Copy link to Graph'],
+      ['Colour…', 'Shape…', 'Rename', 'Copy link to Graph'],
       ['Delete Long'],
     ]);
 

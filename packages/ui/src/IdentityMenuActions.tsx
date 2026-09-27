@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import {
-  PaletteColorSwatchGrid,
-  paletteSwatchPanelClassName,
-  type PaletteColorEntry,
-} from './PaletteColorPicker';
+import { GRAPH_HEAD_SHAPES, type GraphHeadShape } from '@project/core';
+import { GRAPH_HEAD_SHAPE_LABELS, GraphHeadShapeIcon } from './GraphHeadShape';
+import { PaletteColorSwatch, type PaletteColorEntry } from './PaletteColorPicker';
+import { SwatchMenuRadioGroup, swatchPanelClassName } from './SwatchMenu';
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -81,6 +80,11 @@ export function MapMenuActions({
   );
 }
 
+const HEAD_SHAPE_ENTRIES = GRAPH_HEAD_SHAPES.map((value) => ({
+  value,
+  label: GRAPH_HEAD_SHAPE_LABELS[value],
+}));
+
 export interface GraphMenuActionsProps {
   readonly title: string;
   readonly renameItem: ReactNode;
@@ -96,6 +100,10 @@ export interface GraphMenuActionsProps {
   readonly colors: readonly PaletteColorEntry[];
   /** Store the Graph's colour, or `null` while Colour… may not run. */
   readonly onRecolor: ((color: string) => void) | null;
+  /** The head shape the Graph's Edges draw — its stored one, else the default. */
+  readonly headShape: GraphHeadShape;
+  /** Store the Graph's head shape, or `null` while Shape… may not run. */
+  readonly onChangeHeadShape: ((headShape: GraphHeadShape) => void) | null;
 }
 
 /**
@@ -103,10 +111,11 @@ export interface GraphMenuActionsProps {
  * named.
  *
  * The same grouping grammar as {@link MapMenuActions} — make one, this one,
- * remove this one — with Colour… heading the group of commands on the Graph
- * you are on, the one command a Graph carries that a Map does not. Copy link
- * to Graph copies the within-Map address; this menu offers no separate
- * permanent address for the Graph itself.
+ * remove this one — with Colour… and Shape… heading the group of commands on
+ * the Graph you are on, the two a Graph carries that a Map does not: how its
+ * Edges are drawn (ADR 0104, ADR 0105). Shape… is withdrawn exactly when
+ * Colour… is. Copy link to Graph copies the within-Map address; this menu
+ * offers no separate permanent address for the Graph itself.
  */
 export function GraphMenuActions({
   title,
@@ -114,6 +123,8 @@ export function GraphMenuActions({
   color,
   colors,
   onRecolor,
+  headShape,
+  onChangeHeadShape,
   onCreate,
   onCopyLink,
   onDelete,
@@ -137,13 +148,33 @@ export function GraphMenuActions({
             <GraphIcon color={color} size={14} />
             Colour…
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className={paletteSwatchPanelClassName}>
-            <PaletteColorSwatchGrid
-              entries={colors}
+          <DropdownMenuSubContent className={swatchPanelClassName}>
+            <SwatchMenuRadioGroup
+              entries={colors.map((entry) => ({ value: entry.color, label: entry.label }))}
               value={color}
               onValueChange={(next) => onRecolor?.(next)}
               disabled={onRecolor === null}
               aria-label="Graph colour"
+              renderSwatch={(swatch) => <PaletteColorSwatch color={swatch} />}
+            />
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="gap-2" disabled={onChangeHeadShape === null}>
+            <GraphHeadShapeIcon headShape={headShape} color={color} className="size-[14px]" />
+            Shape…
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className={swatchPanelClassName}>
+            <SwatchMenuRadioGroup
+              entries={HEAD_SHAPE_ENTRIES}
+              value={headShape}
+              onValueChange={(next) => onChangeHeadShape?.(next)}
+              disabled={onChangeHeadShape === null}
+              aria-label="Graph head shape"
+              checkPlacement="corner"
+              renderSwatch={(swatch) => (
+                <GraphHeadShapeIcon headShape={swatch} color={color} className="size-full" />
+              )}
             />
           </DropdownMenuSubContent>
         </DropdownMenuSub>

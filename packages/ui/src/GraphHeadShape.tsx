@@ -1,4 +1,5 @@
 import type { GraphHeadShape } from '@project/core';
+import { cn } from './lib/utils';
 
 /**
  * The four head shapes a Graph's Edges end in (ADR 0105), drawn once here for
@@ -81,5 +82,34 @@ export function GraphHeadMarker({ id, headShape, color }: GraphHeadMarkerProps) 
     >
       <GraphHeadShapeGlyph headShape={headShape} color={color} />
     </marker>
+  );
+}
+
+/**
+ * The part of the glyph frame every head shape occupies, centred: the glyphs
+ * lie behind their tip at the origin, so the full frame would draw each one in
+ * its left half.
+ */
+const HEAD_SHAPE_ICON_VIEW_BOX = '-9 -5 10 10';
+
+export interface GraphHeadShapeIconProps {
+  readonly headShape: GraphHeadShape;
+  /** The Graph's resolved colour. */
+  readonly color: string;
+  /** A Tailwind `size-*` class; the icon fills the box it is given. */
+  readonly className?: string;
+}
+
+/** One head shape on its own, centred in a square box — a swatch or a menu glyph. */
+export function GraphHeadShapeIcon({ headShape, color, className }: GraphHeadShapeIconProps) {
+  return (
+    <svg
+      aria-hidden
+      data-slot="graph-head-shape-icon"
+      viewBox={HEAD_SHAPE_ICON_VIEW_BOX}
+      className={cn('size-4', className)}
+    >
+      <GraphHeadShapeGlyph headShape={headShape} color={color} />
+    </svg>
   );
 }

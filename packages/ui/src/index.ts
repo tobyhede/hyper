@@ -105,16 +105,8 @@ export {
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
 export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
-export {
-  PaletteColorPicker,
-  PaletteColorSwatchGrid,
-  paletteSwatchPanelClassName,
-} from './PaletteColorPicker';
-export type {
-  PaletteColorEntry,
-  PaletteColorPickerProps,
-  PaletteColorSwatchGridProps,
-} from './PaletteColorPicker';
+export { PaletteColorPicker } from './PaletteColorPicker';
+export type { PaletteColorEntry, PaletteColorPickerProps } from './PaletteColorPicker';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
   AbandonEditIcon,
