@@ -5,6 +5,8 @@
  * `@project/http`'s, and each repository under `src/` implements the store.
  */
 
+import { isStoredImageId } from '@project/core';
+
 /** The largest image the host stores, in bytes: 10 MiB. */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
@@ -17,15 +19,13 @@ export const isImageMediaType = (value: string): value is ImageMediaType =>
   IMAGE_MEDIA_TYPES.some((type) => type === value);
 
 /**
- * The SHA-256 of an image's bytes, spelled as unpadded base64url: forty-three
- * characters, the last carrying the digest's final four bits and two zero bits,
- * so exactly one spelling names each digest.
+ * The SHA-256 of an image's bytes, spelled as unpadded base64url. The spelling
+ * is `@project/core`'s `isStoredImageId`, the rule an Image Resource's stored
+ * image URL is held to as well; this narrows a string that passes it.
  */
 export type ImageId = string & { readonly imageId: unique symbol };
 
-const IMAGE_ID = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/u;
-
-export const isImageId = (value: string): value is ImageId => IMAGE_ID.test(value);
+export const isImageId = (value: string): value is ImageId => isStoredImageId(value);
 
 /** The collection stored images are addressed under. */
 export const IMAGE_COLLECTION_PATH = '/images';

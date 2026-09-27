@@ -26,6 +26,8 @@ export const SEEDED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000
 
 /**
  * Seed the opened Space with a single positioned Map, then read it back.
+ * `addedResources` join the Space in the same commit, for a Resource no
+ * gesture creates yet; `positionsFor` sees them.
  *
  * What it buys a test is an app that opens in an authored Map rather than an
  * default Map. This goes through the same HTTP boundary the browser uses
@@ -37,6 +39,7 @@ export async function seedPositionedMap(
   page: Page,
   title: string,
   positionsFor: (snapshot: SpaceSnapshot) => Record<string, ResourcePlacement>,
+  addedResources: SpaceSnapshot['resources'] = [],
 ): Promise<HttpLoadedSpace> {
   const summariesResponse = await page.request.get('/api/spaces');
   expect(summariesResponse.ok()).toBe(true);
@@ -53,17 +56,21 @@ export async function seedPositionedMap(
   // `/api/spaces/:id` response — the server producing it is this same
   // codebase, not third-party JSON.
   const loaded = (await loadedResponse.json()) as HttpLoadedSpace;
+  const held: SpaceSnapshot = {
+    ...loaded.snapshot,
+    resources: [...loaded.snapshot.resources, ...addedResources],
+  };
 
   const snapshot: SpaceSnapshot = {
-    ...loaded.snapshot,
+    ...held,
     document: {
-      ...loaded.snapshot.document,
+      ...held.document,
       maps: [
         {
           id: SEEDED_MAP_ID,
           title,
           kind: 'positioned',
-          positions: positionsFor(loaded.snapshot),
+          positions: positionsFor(held),
           graphs: [{ id: SEEDED_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
       ],

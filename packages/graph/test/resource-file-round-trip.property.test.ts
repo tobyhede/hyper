@@ -35,6 +35,24 @@ const bodyArb = fc
   )
   .map((lines) => lines.join('\n'));
 
+const BASE64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+/**
+ * The URLs an Image Resource may hold (ADR 0106): a web URL, or the
+ * `/images/<id>` of a stored image, whose last character carries two zero bits.
+ */
+const imageUrlArb = fc.oneof(
+  fc.webUrl({ validSchemes: ['https', 'http'], withQueryParameters: true, withFragments: true }),
+  fc
+    .tuple(
+      fc.string({ unit: fc.constantFrom(...Array.from(BASE64URL)), minLength: 42, maxLength: 42 }),
+      fc.constantFrom(...Array.from('AEIMQUYcgkosw048')),
+    )
+    .map(([head, last]) => `/images/${head}${last}`),
+);
+
+const dimensionArb = fc.double({ min: 1e-6, max: 1e6, noNaN: true });
+
 const resourceArb: fc.Arbitrary<Resource> = fc.oneof(
   fc.record(
     {
@@ -63,6 +81,16 @@ const resourceArb: fc.Arbitrary<Resource> = fc.oneof(
     map: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
     graph: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
   }),
+  fc.record(
+    {
+      id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+      title: line,
+      kind: fc.constant('image' as const),
+      url: imageUrlArb,
+      naturalSize: fc.record({ width: dimensionArb, height: dimensionArb }),
+    },
+    { requiredKeys: ['id', 'title', 'kind', 'url'] },
+  ),
 );
 
 describe('resource file round-trip', () => {

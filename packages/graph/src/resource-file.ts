@@ -30,7 +30,8 @@ export type ParseImportResourceFileResult =
   { ok: true; resource: ImportResource } | { ok: false; errors: ResourceFileError[] };
 
 type ResourceFileFailure = { ok: false; errors: ResourceFileError[] };
-type Frontmatter = { kind: 'markdown' } | { kind: 'reference' } | { kind: 'space' };
+type Frontmatter =
+  { kind: 'markdown' } | { kind: 'reference' } | { kind: 'space' } | { kind: 'image' };
 type DecodedCandidate<T extends Frontmatter> = T extends { kind: 'markdown' }
   ? T & { body: string }
   : T;
