@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -15,6 +16,11 @@ const FIXTURE_SPACES = [
   { id: DEEP_DIVE_ID, title: 'Deep dive' },
   { id: NOTES_ID, title: 'Authoring notes' },
 ] as const;
+/** The tracked fixture image, and the URL its SHA-256 gives it (ADR 0106). */
+const HARBOUR = readFileSync(
+  new URL('../../packages/app/fixture-images/harbour-400x300.png', import.meta.url),
+);
+const HARBOUR_URL = '/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
 const startRuntime = async (options: E2eHttpRuntimeOptions) => {
   const app = await createApp(options);
   return new HttpSpaceBackend('http://hyper.test', {
@@ -67,6 +73,16 @@ describe('e2e HTTP runtime', () => {
         location: `/spaces/${encodeCompactUuid(FIXTURE_ID)}`,
       },
     });
+  });
+
+  it('serves the tracked fixture images before any request stores one', async () => {
+    const app = await createApp({ catalog: 'fixture', startup: true });
+
+    const response = await app.fetch(new Request(`http://hyper.test${HARBOUR_URL}`));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('image/png');
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(new Uint8Array(HARBOUR));
   });
 
   it('creates an independent empty catalog', async () => {

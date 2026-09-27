@@ -16,6 +16,8 @@ import {
 import { SEEDED_MAP_ID, seedPositionedMap } from './seed';
 
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
+const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const HARBOUR_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000076');
 const FIGURE_URL = 'https://example.com/figure.png';
 /** A tracked 400×300 picture, served in place of the external URL so nothing reaches the network. */
 const HARBOUR = readFileSync(
@@ -621,3 +623,37 @@ for (const refused of [
     expect(await storedImages(page, spaceId)).toEqual([]);
   });
 }
+
+/**
+ * The tracked fixture's Image Resource shows a stored image the host seeded from
+ * a tracked file before serving (ADR 0106), so it draws with every request that
+ * leaves the host refused.
+ */
+test('the tracked fixture draws its Open Image Resource with no network', async ({ page }) => {
+  const escaped: string[] = [];
+  await page.route(
+    (url) => url.hostname !== '127.0.0.1' && url.hostname !== 'localhost',
+    (route) => {
+      escaped.push(route.request().url());
+      return route.abort();
+    },
+  );
+  await page.goto(`/spaces/${encodeCompactUuid(DEEP_DIVE_ID)}`);
+  await expect(selectedCanvas(page)).toContainText('Deep dive');
+  await settled(page);
+
+  const resource = page
+    .locator(`.react-flow__node[data-id="${HARBOUR_ID}"]`)
+    .getByRole('article', { name: 'Harbour' });
+  await expect(resource).toHaveAttribute('data-open', 'true');
+  const picture = resource.getByRole('img', { name: 'Harbour' });
+  await expect(picture).toHaveAttribute('src', /^\/images\/[A-Za-z0-9_-]{43}$/u);
+  await expect
+    .poll(() =>
+      picture.evaluate((image) =>
+        image instanceof HTMLImageElement && image.complete ? image.naturalWidth : 0,
+      ),
+    )
+    .toBe(400);
+  expect(escaped).toEqual([]);
+});

@@ -66,7 +66,7 @@ describe.each([
     'fixture/00000000-0000-4000-8000-000000000070',
     deepDiveJson,
     {
-      resources: 3,
+      resources: 4,
       maps: 1,
       graphs: 1,
       unreached: { 'Deep dive': [] },

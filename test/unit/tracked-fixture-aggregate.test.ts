@@ -1,6 +1,11 @@
+import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { titleName, uuidSchema, type Resource, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
-import { describe, expect, it } from 'vitest';
+import { isImageId } from '@project/persistence';
+import { afterEach, describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
@@ -97,5 +102,64 @@ describe('tracked fixture aggregate', () => {
         expect(resource.body.trim().length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+const STORED_IMAGE_PREFIX = '/images/';
+const trackedFixture = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })),
+  );
+});
+
+/** A copy of the tracked fixture, so a test can add to it without touching the tracked files. */
+const copyOfTrackedFixture = async (): Promise<string> => {
+  const root = await mkdtemp(join(tmpdir(), 'hyper-fixture-'));
+  temporaryDirectories.push(root);
+  const copy = join(root, 'fixture');
+  await cp(trackedFixture, copy, { recursive: true });
+  return copy;
+};
+
+describe('tracked fixture images', () => {
+  it('seeds an Open Image Resource whose stored image loads from the repository', async () => {
+    const repository = new MemorySpaceRepository();
+    await importFixture(repository);
+    const loaded = await repository.loadAggregate();
+    if (loaded.kind !== 'loaded') throw new Error('expected loaded aggregate');
+
+    const opened = loaded.aggregate.spaces.flatMap(({ snapshot }) =>
+      snapshot.resources.flatMap(({ id, document }) =>
+        document.kind === 'image' &&
+        document.url.startsWith(STORED_IMAGE_PREFIX) &&
+        (snapshot.document.maps ?? []).some((map) => map.positions[id]?.open === true)
+          ? [document.url]
+          : [],
+      ),
+    );
+    expect(opened.length).toBeGreaterThan(0);
+
+    for (const url of opened) {
+      const id = url.slice(STORED_IMAGE_PREFIX.length);
+      if (!isImageId(id)) throw new Error(`${url} does not name a stored image`);
+      const image = await repository.loadImage(id);
+      expect(image?.mediaType).toBe('image/png');
+    }
+  });
+
+  it('refuses to seed a fixture naming a stored image no tracked file produces', async () => {
+    const copy = await copyOfTrackedFixture();
+    const unknown = `${STORED_IMAGE_PREFIX}${'A'.repeat(43)}`;
+    await writeFile(
+      join(copy, '00000000-0000-4000-8000-000000000080', 'resources', 'unknown-picture.md'),
+      `---\nid: 00000000-0000-4000-8000-0000000000f0\ntitle: Unknown picture\nkind: image\nurl: ${unknown}\n---\n`,
+    );
+
+    const repository = new MemorySpaceRepository();
+    await expect(importFixture(repository, copy)).rejects.toThrow(unknown);
+    await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 });
