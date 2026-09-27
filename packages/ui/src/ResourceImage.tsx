@@ -4,7 +4,7 @@ import { ImageIcon } from './icons';
 import './resource-image.css';
 
 export interface ResourceImageProps {
-  /** The image URL the Image Resource owns (ADR 0106). */
+  /** The image URL the Image Resource owns. */
   readonly url: string;
   /** The Resource's name, which is the image's text alternative. */
   readonly name: string;
@@ -15,9 +15,8 @@ export interface ResourceImageProps {
  * never scaled past its natural size, or — when the picture will not load — the
  * failed-image state naming the URL.
  *
- * Drawn wherever the Resource's content is: the Open front's content area and the
- * presented Resource. A failed load is a fact about this mount, not the Space,
- * so a caller that changes the URL keys this on it to try again.
+ * A failed load is a fact about this mount, not the Space, so a caller that
+ * changes the URL keys this on it to try again.
  */
 export function ResourceImage({ url, name }: ResourceImageProps) {
   const [failed, setFailed] = useState(false);

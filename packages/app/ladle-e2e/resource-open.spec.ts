@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { resourceToolbar, selectResource } from '../e2e/graph';
+import { expectPictureAtOwnSize, expectPictureLoaded, HARBOUR_SIZE } from '../e2e/image';
 
 const openCloseStory = '/?story=components--resource--open-and-close&mode=preview';
 const markdownStory = '/?story=components--resource--editing--markdown&mode=preview';
@@ -790,24 +791,10 @@ test(
     const resource = first.getByRole('article', { name: 'Harbour' });
     const picture = resource.getByRole('img', { name: 'Harbour' });
     await expect(picture).toBeVisible();
-    await expect
-      .poll(() =>
-        picture.evaluate((image) =>
-          image instanceof HTMLImageElement && image.complete ? image.naturalWidth : 0,
-        ),
-      )
-      .toBe(400);
+    await expectPictureLoaded(picture, HARBOUR_SIZE.width);
     await expect(resource.locator('.canvas-resource__content img')).toHaveCount(1);
     await expect(resource.getByRole('heading', { name: 'Harbour' })).toBeVisible();
-
-    const pictureBox = await picture.boundingBox();
-    const titleBox = await resource.locator('.canvas-resource__body').boundingBox();
-    if (pictureBox === null || titleBox === null)
-      throw new Error('Open Image Resource drew no content');
-    expect(pictureBox.width).toBeCloseTo(400, 0);
-    expect(pictureBox.height).toBeGreaterThanOrEqual(299.5);
-    expect(pictureBox.height).toBeLessThanOrEqual(301);
-    expect(pictureBox.y + pictureBox.height).toBeLessThanOrEqual(titleBox.y + 1);
+    await expectPictureAtOwnSize(resource, picture, HARBOUR_SIZE);
 
     // Larger than the picture, the content area draws it at its natural size.
     const larger = page

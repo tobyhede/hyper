@@ -10,7 +10,7 @@ import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { CanvasResourceNodeSpecimen } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
 import { authoredSpace } from '../support/spaces';
-import harbour from '../support/images/harbour-400x300.png';
+import harbour from '#fixture-images/harbour-400x300.png';
 import '../support/inventory.css';
 
 export default { title: 'Components/Resource' };

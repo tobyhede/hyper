@@ -1,4 +1,4 @@
-import { cp, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -107,6 +107,9 @@ describe('tracked fixture aggregate', () => {
 
 const STORED_IMAGE_PREFIX = '/images/';
 const trackedFixture = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
+const trackedFixtureImages = fileURLToPath(
+  new URL('../../packages/app/fixture-images', import.meta.url),
+);
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -115,14 +118,15 @@ afterEach(async () => {
   );
 });
 
-/** A copy of the tracked fixture, so a test can add to it without touching the tracked files. */
-const copyOfTrackedFixture = async (): Promise<string> => {
+/** A copy of a tracked directory, so a test can add to it without touching the tracked files. */
+const copyOf = async (tracked: string): Promise<string> => {
   const root = await mkdtemp(join(tmpdir(), 'hyper-fixture-'));
   temporaryDirectories.push(root);
-  const copy = join(root, 'fixture');
-  await cp(trackedFixture, copy, { recursive: true });
+  const copy = join(root, 'copy');
+  await cp(tracked, copy, { recursive: true });
   return copy;
 };
+const copyOfTrackedFixture = (): Promise<string> => copyOf(trackedFixture);
 
 describe('tracked fixture images', () => {
   it('seeds an Open Image Resource whose stored image loads from the repository', async () => {
@@ -159,7 +163,26 @@ describe('tracked fixture images', () => {
     );
 
     const repository = new MemorySpaceRepository();
-    await expect(importFixture(repository, copy)).rejects.toThrow(unknown);
+    await expect(importFixture(repository, { directory: copy })).rejects.toThrow(unknown);
+    await expect(repository.listSpaces()).resolves.toEqual([]);
+  });
+
+  it('ignores the dotfiles and subdirectories a checkout can leave among the tracked images', async () => {
+    const imageDirectory = await copyOf(trackedFixtureImages);
+    await writeFile(join(imageDirectory, '.DS_Store'), 'Bud1 not an image');
+    await mkdir(join(imageDirectory, 'nested'));
+
+    const repository = new MemorySpaceRepository();
+    await importFixture(repository, { imageDirectory });
+    await expect(repository.listSpaces()).resolves.not.toEqual([]);
+  });
+
+  it('refuses to seed when a tracked image file is not an image', async () => {
+    const imageDirectory = await copyOf(trackedFixtureImages);
+    await writeFile(join(imageDirectory, 'notes.txt'), 'not an image');
+
+    const repository = new MemorySpaceRepository();
+    await expect(importFixture(repository, { imageDirectory })).rejects.toThrow('notes.txt');
     await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 });

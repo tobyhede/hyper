@@ -75,13 +75,21 @@ export const importSpaceDirectory = async (
  * storing route uses, and answer the `/images/<id>` URL each one produced. A
  * file admission refuses is a broken fixture, so it throws rather than being
  * skipped.
+ *
+ * Only visible regular files are image files: a dotfile or a subdirectory is
+ * what a checkout or the operating system leaves behind (Finder's `.DS_Store`
+ * is gitignored), not something the fixture tracks.
  */
 const storeFixtureImages = async (
   store: ImageStore,
   directory: string,
 ): Promise<ReadonlySet<string>> => {
   const produced = new Set<string>();
-  for (const name of (await readdir(directory)).sort()) {
+  const names = (await readdir(directory, { withFileTypes: true }))
+    .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+    .map(({ name }) => name)
+    .sort();
+  for (const name of names) {
     const admission = await admitImage(new Uint8Array(await readFile(join(directory, name))));
     if (admission.kind === 'refused') {
       throw new Error(`Fixture image ${join(directory, name)} was refused: ${admission.code}`);
@@ -118,17 +126,23 @@ const unproducedImageUrls = (
  * fixture seeds loads from the host before anything is served; a fixture that
  * names an `/images/<id>` none of those files produces is refused before a
  * Space is stored, so the fixture and its files cannot drift apart (ADR 0054).
+ *
+ * `directory` and `imageDirectory` default to the tracked pair; a test names a
+ * copy of either to seed an altered fixture without touching tracked files.
  */
 export const importFixture = async (
   repository: SpaceRepository,
-  directory: string = fixtureDirectory,
+  {
+    directory = fixtureDirectory,
+    imageDirectory = fixtureImageDirectory,
+  }: { readonly directory?: string; readonly imageDirectory?: string } = {},
 ): Promise<LoadedSpace> => {
   const source = await readAggregate(directory, newUuid);
-  const produced = await storeFixtureImages(repository, fixtureImageDirectory);
+  const produced = await storeFixtureImages(repository, imageDirectory);
   const unproduced = unproducedImageUrls(source.spaces, produced);
   if (unproduced.length > 0) {
     throw new Error(
-      `Fixture ${directory} names stored images no file in ${fixtureImageDirectory} produces: ${unproduced.join(', ')}`,
+      `Fixture ${directory} names stored images no file in ${imageDirectory} produces: ${unproduced.join(', ')}`,
     );
   }
   const initialized = await repository.initializeAggregate({
