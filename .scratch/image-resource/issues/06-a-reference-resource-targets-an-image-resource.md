@@ -2,7 +2,7 @@
 
 **What to build:** Create Reference on an Image Resource creates a Reference Resource whose Open front draws the Target's image read-only, through the same content front as the Image Resource minus Replace (ADR 0070, ADR 0106). `resolveContentResource` resolves an image Target in one hop like the others. The Reference Resource's own first Open reads the Target's recorded natural size by the same rule, synchronously.
 
-**Blocked by:** 03
+**Blocked by:** 03, 05
 
 **Status:** ready-for-agent
 
