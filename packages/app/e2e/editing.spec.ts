@@ -32,6 +32,9 @@ import {
   newMap,
   newGraph,
   openGraphColourPicker,
+  openGraphHeadShapePicker,
+  changeActiveGraphHeadShape,
+  drawnHeadShape,
   settleNewMapName,
   nodeByTitle,
   positionOf,
@@ -1747,11 +1750,10 @@ test(
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     await openGraphColourPicker(page);
-    const palette = page.getByRole('radiogroup', { name: 'Graph colour' });
-    await expect(palette.getByRole('radio', { name: 'Green', exact: true })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
+    const palette = page.getByRole('group', { name: 'Graph colour' });
+    await expect(
+      palette.getByRole('menuitemradio', { name: 'Green', exact: true }),
+    ).toHaveAttribute('aria-checked', 'true');
   },
 );
 
@@ -2452,10 +2454,14 @@ test('drawing between existing Resources persists one active-Graph Edge and sele
     // `toBeAttached`, not `toBeVisible`: a connection drawn between two Resources
     // whose centres share a row is a horizontal `path`, and a zero-height
     // bounding box is what Playwright calls hidden. What the assertion is about
-    // is the line's colour and its arrow, both read below.
+    // is the line's colour and its head shape, both read below.
     await expect(preview).toBeAttached();
     await expect(preview).toHaveCSS('stroke', activeGraphColor);
     await expect(preview).toHaveAttribute('marker-end', /url/);
+    // The Active Graph stores no head shape, so the preview ends in the arrow.
+    const head = connectionPreviewHead(page);
+    await expect(head).toHaveAttribute('data-head-shape', 'arrow');
+    await expect(head).toHaveCSS('fill', activeGraphColor);
   });
 
   await expect(page.locator('.react-flow__edge')).toHaveCount(initialEdgeCount + 1);
@@ -2469,6 +2475,54 @@ test('drawing between existing Resources persists one active-Graph Edge and sele
     '1',
   );
   await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);
+});
+
+/** The head shape the connection preview ends in, through the marker its path names. */
+const connectionPreviewHead = (page: Page): Locator =>
+  page.locator('marker#graph-authoring-connection-head [data-slot="graph-head-shape"]');
+
+/**
+ * The preview ends in the head shape of the Graph the Edge will join, in that
+ * Graph's colour (ADR 0105) — so activating a Graph with a different head
+ * shape changes the next preview. The tracked fixture's Mid stores `dot` and
+ * Short `diamond`.
+ */
+test('the connection preview ends in the Active Graph’s head shape', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await addExistingResource(page, 'E');
+  const source = nodeByTitle(page, 'A').first();
+  const target = nodeByTitle(page, 'E').first();
+  await expect(target).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+
+  let revision = 1;
+  for (const [title, headShape] of [
+    ['Mid', 'dot'],
+    ['Short', 'diamond'],
+  ] as const) {
+    await activateGraph(page, title);
+    await expect(activeGraph(page)).toContainText(title);
+    await settled(page);
+    await source.hover();
+    const sourceHandle = authoringHandle(source, 'source', 'right');
+    const targetHandle = authoringHandle(target, 'target', 'top');
+    await expect(sourceHandle).toHaveCSS('opacity', '1');
+    const graphColor = await sourceHandle.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    );
+
+    await connectHandles(page, sourceHandle, targetHandle, async () => {
+      const head = connectionPreviewHead(page);
+      await expect(head).toHaveAttribute('data-head-shape', headShape);
+      await expect(head).toHaveCSS('fill', graphColor);
+    });
+    revision += 1;
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+      'data-revision',
+      String(revision),
+    );
+  }
 });
 
 test('an authored Edge is immediately available when presenting the Graph', async ({ page }) => {
@@ -3512,6 +3566,52 @@ test('Copy link to Target on a Reference Resource copies its Target’s own addr
       })}`,
     );
 });
+
+/**
+ * Shape… is one Edit that the canvas redraws the Active Graph's Edges with,
+ * and choosing the head shape the Graph already has is no Edit (ADR 0105).
+ * Long stores none, so it draws — and Shape… marks — the arrow.
+ */
+test(
+  'changing the Active Graph head shape redraws its Edges and persists',
+  { tag: '@parity:command-dock-changes-graph-head-shape' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+    const longAToB = page.locator(
+      '.react-flow__edge[data-id="00000000-0000-4000-8000-000000000023::00000000-0000-4000-8000-000000000002::00000000-0000-4000-8000-000000000003"]',
+    );
+    expect(await drawnHeadShape(longAToB)).toBe('arrow');
+    const status = page.getByTestId('persistence-status');
+    const revision = (await status.getAttribute('data-revision')) ?? '';
+
+    const current = await openGraphHeadShapePicker(page);
+    await expect(
+      current.getByRole('menuitemradio', { name: 'Arrow', exact: true }),
+    ).toHaveAttribute('aria-checked', 'true');
+    await current.getByRole('menuitemradio', { name: 'Arrow', exact: true }).click();
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await settled(page);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', revision);
+
+    // One revision past the start: the Arrow choice committed nothing.
+    await changeActiveGraphHeadShape(page, 'Vee');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(status).toHaveAttribute('data-revision', String(Number(revision) + 1));
+    await expect.poll(() => drawnHeadShape(longAToB)).toBe('vee');
+
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    await expect.poll(() => drawnHeadShape(longAToB)).toBe('vee');
+    const reopened = await openGraphHeadShapePicker(page);
+    await expect(reopened.getByRole('menuitemradio', { name: 'Vee', exact: true })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  },
+);
 
 test(
   'recolouring the Active Graph persists through the swatch picker',

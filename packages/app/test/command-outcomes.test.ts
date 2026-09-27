@@ -9,8 +9,7 @@ import {
 } from '../src/command-outcomes';
 import type { PendingContinuation } from '../src/continuation';
 import { composeApp } from '../src/compose-app';
-import type { CoordinatedContextDeleteResult } from '../src/coordinated-context-delete';
-import type { CompletedMapEdit } from '../src/map-authoring-commands';
+import type { CompletedContextEdit, EditOutcome } from '../src/authoring-commands';
 import type { AuthoringResult } from '../src/space-authoring';
 import type {
   SpaceResourceCreationResult,
@@ -114,8 +113,12 @@ const MAP_GONE = 'This Map is no longer part of the Space.';
 const mapReport: CommandNotice = { title: 'Map not created', message: 'Try a different name.' };
 const refusedMap = { kind: 'refused', report: mapReport } as const;
 const createdMap = { kind: 'completed', mapId: MAP_B, graphId: GRAPH_B } as const;
+const graphReport = { title: 'Graph unchanged', message: 'A Graph title is required.' };
+const refusedGraph = { kind: 'refused', report: graphReport } as const;
+const graphCreateReport = { title: 'Graph not created', message: MAP_GONE };
+const refusedGraphCreate = { kind: 'refused', report: graphCreateReport } as const;
 /** New Map's continuation, in the name of the Map the creation made. */
-const inTheName = ({ mapId }: CompletedMapEdit): PendingContinuation => ({
+const inTheName = ({ mapId }: CompletedContextEdit): PendingContinuation => ({
   target: { kind: 'control', name: 'map-name', scope: { id: 'rail', subject: mapId } },
   select: false,
   then: 'rename',
@@ -125,10 +128,8 @@ const inTheName = ({ mapId }: CompletedMapEdit): PendingContinuation => ({
  * the completion's move.
  */
 const DOCK = { completionMovesMap: true } as const;
-const refusedGraphDelete: CoordinatedContextDeleteResult = {
-  kind: 'error',
-  message: 'Graph refused.',
-};
+const graphDeleteReport = { title: 'Graph not deleted', message: MAP_GONE };
+const refusedGraphDelete = { kind: 'refused', report: graphDeleteReport } as const;
 const completedAuthoring: AuthoringResult = { kind: 'completed' };
 const unchangedAuthoring: AuthoringResult = { kind: 'unchanged' };
 const queuedAuthoring: AuthoringResult = { kind: 'queued' };
@@ -141,7 +142,8 @@ async function refuseOnEveryChannel(outcomes: ReturnType<typeof open>['outcomes'
   outcomes.run('map-create', () => refusedMap, { continueAt: inTheName, completionMovesMap: true });
   outcomes.run('map-manage', () => refusedMap);
   outcomes.run('map-delete', () => refusedMap, DOCK);
-  outcomes.run('graph-edit', () => refusedAuthoring);
+  outcomes.run('graph-create', () => refusedGraphCreate);
+  outcomes.run('graph-edit', () => refusedGraph);
   outcomes.run('graph-delete', () => refusedGraphDelete);
   outcomes.run('resource-delete', () => refusedAuthoring);
   outcomes.run('resource-remove', () => refusedAuthoring);
@@ -183,15 +185,23 @@ describe('titles and sentences', () => {
     });
   });
 
-  it('publishes a refused Graph Edit under "Graph unchanged"', () => {
+  it('publishes a refused Graph Edit’s complete report on "graph-edit"', () => {
     const { outcomes } = open();
 
-    expect(outcomes.run('graph-edit', () => refusedAuthoring)).toBe(refusedAuthoring);
+    expect(outcomes.run('graph-edit', () => refusedGraph)).toBe(refusedGraph);
 
-    expect(notice(outcomes, 'graph-edit')).toEqual({
-      title: 'Graph unchanged',
-      message: MAP_GONE,
-    });
+    expect(notice(outcomes, 'graph-edit')).toEqual(graphReport);
+  });
+
+  it('publishes a refused Graph creation’s complete report on "graph-create"', async () => {
+    const { outcomes } = open();
+
+    await expect(
+      outcomes.run('graph-create', () => Promise.resolve(refusedGraphCreate)),
+    ).resolves.toBe(refusedGraphCreate);
+
+    expect(notice(outcomes, 'graph-create')).toEqual(graphCreateReport);
+    expect(notice(outcomes, 'graph-edit')).toBeNull();
   });
 
   it('publishes a refused Reference Resource creation under its own title', () => {
@@ -250,7 +260,7 @@ describe('the Map-change reset', () => {
   it('clears exactly the channels a Map change resets', async () => {
     const { outcomes, navigation } = open();
     await refuseOnEveryChannel(outcomes);
-    expect(outcomes.getState().notices.size).toBe(10);
+    expect(outcomes.getState().notices.size).toBe(11);
 
     navigation.selectMap(MAP_B);
 
@@ -439,30 +449,44 @@ describe('a thrown operation', () => {
     });
   });
 
-  it('says a thrown Graph Edit and Reference Resource creation in the words the failure carries', () => {
+  it('says a thrown value that cannot be spelled, synchronously and asynchronously', async () => {
     const { outcomes, reported } = open();
-    const graphFailure = new Error('recolour broke');
+    const failure: unknown = Object.create(null);
+    const said = { title: 'Graph unchanged', message: 'An unexpected failure occurred.' };
+
+    const answered = outcomes.run('graph-edit', () => {
+      throw failure;
+    });
+
+    expect(answered).toBe(COMMAND_BROKE);
+    expect(notice(outcomes, 'graph-edit')).toEqual(said);
+    outcomes.dismiss('graph-edit');
+    await expect(
+      outcomes.run('graph-edit', async () => {
+        await Promise.resolve();
+        throw failure;
+      }),
+    ).resolves.toBe(COMMAND_BROKE);
+    expect(notice(outcomes, 'graph-edit')).toEqual(said);
+    expect(reported).toEqual([failure, failure]);
+  });
+
+  it('says a thrown Reference Resource creation in the words the failure carries', () => {
+    const { outcomes, reported } = open();
     const referenceFailure = new Error('reference broke');
 
-    outcomes.run('graph-edit', () => {
-      throw graphFailure;
-    });
     outcomes.run('reference-create', () => {
       throw referenceFailure;
     });
 
-    expect(reported).toEqual([graphFailure, referenceFailure]);
-    expect(notice(outcomes, 'graph-edit')).toEqual({
-      title: 'Graph unchanged',
-      message: 'recolour broke',
-    });
+    expect(reported).toEqual([referenceFailure]);
     expect(notice(outcomes, 'reference-create')).toEqual({
       title: 'Reference Resource not created',
       message: 'reference broke',
     });
   });
 
-  it('reports a Map command throw and leaves its channel clear', () => {
+  it('reports a Map command throw and says it in the words the failure carries', () => {
     const { outcomes, reported } = open();
     const failure = new Error('map broke');
 
@@ -475,7 +499,77 @@ describe('a thrown operation', () => {
     );
 
     expect(reported).toEqual([failure]);
-    expect(notice(outcomes, 'map-delete')).toBeNull();
+    expect(notice(outcomes, 'map-delete')).toEqual({
+      title: 'Map not deleted',
+      message: 'map broke',
+    });
+  });
+
+  it('reports a thrown Map rename and says it in the words the failure carries', () => {
+    const { outcomes, reported } = open();
+    const failure = new Error('rename broke');
+
+    const answered = outcomes.run('map-manage', () => {
+      throw failure;
+    });
+
+    expect(answered).toBe(COMMAND_BROKE);
+    expect(reported).toEqual([failure]);
+    expect(notice(outcomes, 'map-manage')).toEqual({
+      title: 'Map unchanged',
+      message: 'rename broke',
+    });
+  });
+
+  it('reports a thrown Map creation and says it without continuing', async () => {
+    const { outcomes, reported, continuation } = open();
+    const failure = new Error('creation broke');
+    const continueAt = vi.fn(inTheName);
+
+    await expect(
+      outcomes.run('map-create', () => Promise.reject(failure), {
+        continueAt,
+        completionMovesMap: true,
+      }),
+    ).resolves.toBe(COMMAND_BROKE);
+
+    expect(reported).toEqual([failure]);
+    expect(continueAt).not.toHaveBeenCalled();
+    expect(continuation.getState().pending).toBeNull();
+    expect(notice(outcomes, 'map-create')).toEqual({
+      title: 'Map not created',
+      message: 'creation broke',
+    });
+  });
+
+  it('reports a Graph Edit throw and says it in the words the failure carries', () => {
+    const { outcomes, reported } = open();
+    const failure = new Error('recolour broke');
+
+    outcomes.run('graph-edit', () => {
+      throw failure;
+    });
+
+    expect(reported).toEqual([failure]);
+    expect(notice(outcomes, 'graph-edit')).toEqual({
+      title: 'Graph unchanged',
+      message: 'recolour broke',
+    });
+  });
+
+  it('reports a Graph creation throw and says it in the words the failure carries', async () => {
+    const { outcomes, reported } = open();
+    const failure = new Error('creation broke');
+
+    await expect(outcomes.run('graph-create', () => Promise.reject(failure))).resolves.toBe(
+      COMMAND_BROKE,
+    );
+
+    expect(reported).toEqual([failure]);
+    expect(notice(outcomes, 'graph-create')).toEqual({
+      title: 'Graph not created',
+      message: 'creation broke',
+    });
   });
 });
 
@@ -566,25 +660,19 @@ describe('space-command', () => {
 });
 
 describe('graph-delete', () => {
-  it('publishes the coordinated helper\'s message under "Graph not deleted"', async () => {
+  it('publishes a refused Graph deletion’s complete report on "graph-delete"', async () => {
     const { outcomes } = open();
 
     const result = await outcomes.run('graph-delete', () => Promise.resolve(refusedGraphDelete));
 
     expect(result).toBe(refusedGraphDelete);
-    expect(notice(outcomes, 'graph-delete')).toEqual({
-      title: 'Graph not deleted',
-      message: 'Graph refused.',
-    });
+    expect(notice(outcomes, 'graph-delete')).toEqual(graphDeleteReport);
+    expect(notice(outcomes, 'graph-edit')).toBeNull();
   });
 
   it('answers a completed delete to the caller and leaves the channel clear', async () => {
     const { outcomes } = open();
-    const completed: CoordinatedContextDeleteResult = {
-      kind: 'completed',
-      mapId: MAP_A,
-      graphId: GRAPH_A,
-    };
+    const completed: CompletedContextEdit = { kind: 'completed', mapId: MAP_A, graphId: GRAPH_A };
     outcomes.run('graph-delete', () => refusedGraphDelete);
 
     await expect(outcomes.run('graph-delete', () => Promise.resolve(completed))).resolves.toBe(
@@ -608,7 +696,7 @@ describe('graph-delete', () => {
 
   it('discards a delete pressed on one Map that settles under another', async () => {
     const { outcomes, navigation } = open();
-    const pending = deferred<CoordinatedContextDeleteResult>();
+    const pending = deferred<EditOutcome<CompletedContextEdit>>();
     const running = outcomes.run('graph-delete', () => pending.promise);
 
     navigation.selectMap(MAP_B);
@@ -618,7 +706,7 @@ describe('graph-delete', () => {
     expect(notice(outcomes, 'graph-delete')).toBeNull();
   });
 
-  it('says a thrown delete in the words the failure carries, and reports it', async () => {
+  it('reports a thrown delete and says it in the words the failure carries', async () => {
     const { outcomes, reported } = open();
     const failure = new Error('lifecycle broke');
 

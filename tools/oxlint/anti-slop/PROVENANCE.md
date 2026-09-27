@@ -25,6 +25,15 @@ test red rather than going unnoticed.
   so the same omission-behind-an-empty-object idiom reached JSX props
   (`<Foo {...(x ? {} : {y})} />`) unflagged. Pinned by
   `test/unit/anti-slop/no-conditional-empty-object-spread.test.ts`.
+- `rules/no-shape-in-symbol-names.ts`: added an `allowedCompounds` option.
+  A name is split into words at camel-case boundaries and `_`/`-`; the words
+  of a listed compound (its last word optionally plural) are exempt, and any
+  other word containing "shape" is still reported. So a configured domain term
+  (`head shape`, ADR 0105) can be written as `headShape`, `GraphHeadShape` or
+  `GRAPH_HEAD_SHAPES`, while `overheadShape` or `bulkheadShapes` is reported.
+  The option is read once per file, in a `before` hook. Upstream
+  takes no options. Pinned by
+  `test/unit/anti-slop/no-shape-in-symbol-names.test.ts`.
 
 See `.scratch/anti-slop/research.md` and `.scratch/anti-slop/spec.md` for the
 adoption decision and migration plan.

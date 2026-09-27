@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { Map, Graph, SpaceSnapshot } from '@project/core';
-import { authoredSnapshot, sparseAuthoredSnapshot } from '../stories/support/spaces';
+import { authoredSnapshotWithGraphHeads, sparseAuthoredSnapshot } from '../stories/support/spaces';
+import { graphLegendMarkLine } from '../e2e/graph';
 
 /** The canvas HUD, on the rendered stories. */
 
@@ -115,11 +116,13 @@ test(
   async ({ page }) => {
     await page.goto(story('surfaces--graph-hud--retained'));
 
-    const map = openingMapOf(authoredSnapshot);
+    const map = openingMapOf(authoredSnapshotWithGraphHeads);
     const titles = map.graphs.map((graph) => graph.title);
     const active = activeGraphOf(map);
 
-    await expect(page.getByTestId('hud-space')).toHaveText(authoredSnapshot.document.title);
+    await expect(page.getByTestId('hud-space')).toHaveText(
+      authoredSnapshotWithGraphHeads.document.title,
+    );
     await expect(page.getByTestId('hud-map')).toHaveText(map.title);
     await expect(page.getByTestId('canvas-identity').getByRole('button')).toHaveCount(0);
 
@@ -153,10 +156,19 @@ test(
     await expect(key.locator('li[data-active="true"]')).toHaveCount(1);
     await expect(key.locator('li[data-active="true"]')).toHaveText(active.title);
     await expect(key.locator('li[data-active="false"]')).toHaveCount(titles.length - 1);
-    const stripes = await items
-      .locator('[aria-hidden="true"]')
-      .evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor));
-    expect(new Set(stripes).size).toBe(titles.length);
+    const lines = await graphLegendMarkLine(items).evaluateAll((els) =>
+      els.map((el) => getComputedStyle(el).stroke),
+    );
+    expect(new Set(lines).size).toBe(titles.length);
+
+    // Each mark ends in its own Graph's head shape, a Graph storing none
+    // drawing the arrow — so the Space must store distinct shapes to prove it.
+    const heads = await items
+      .locator('[data-slot="graph-legend-mark"] [data-slot="graph-head-shape"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute('data-head-shape')));
+    expect(heads).toEqual(map.graphs.map((graph) => graph.headShape ?? 'arrow'));
+    expect(new Set(heads).size).toBe(titles.length);
+    expect(map.graphs.some((graph) => graph.headShape === undefined)).toBe(true);
   },
 );
 

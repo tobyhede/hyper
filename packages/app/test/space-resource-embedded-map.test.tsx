@@ -437,6 +437,40 @@ describe('the Map an Open Space Resource draws', () => {
   });
 
   /**
+   * A refused rail Graph rename is answered as a Map rename is: the editor
+   * holds the draft open, and the containing canvas's command outcomes hold
+   * the report as "Graph unchanged". The rail says no sentence of its own.
+   */
+  it('holds a refused rail Graph rename open and reports it on the containing Space', async () => {
+    await mount(
+      home({
+        title: 'Elsewhere',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        map: SELECTED_MAP_ID,
+        graph: SELECTED_GRAPH_ID,
+      }),
+    );
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    fireEvent.click(
+      within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-graph'),
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const editor = await screen.findByRole('textbox', { name: 'Graph name' });
+    fireEvent.change(editor, { target: { value: '' } });
+    fireEvent.keyDown(editor, { key: 'Enter' });
+
+    expect(screen.getByRole('textbox', { name: 'Graph name' })).toHaveAccessibleDescription(
+      'A Graph title is required.',
+    );
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss: Graph unchanged' });
+    expect(screen.getAllByText('A Graph title is required.')).toHaveLength(2);
+    fireEvent.click(dismiss);
+    await waitFor(() => expect(screen.queryByText('Graph unchanged')).not.toBeInTheDocument());
+    expect(screen.getByRole('textbox', { name: 'Graph name' })).toBeInTheDocument();
+  });
+
+  /**
    * A refused rail Map deletion is said once, by the containing canvas's
    * command outcomes: the rail reports no sentence of its own beside the
    * notice, whose dismissal would otherwise leave a second copy behind.

@@ -1,10 +1,8 @@
 import { useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
-import { Check } from 'lucide-react';
 import { cn } from './lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
-
-/** Panel sizing shared by the popover and Dock submenu surfaces that host the grid. */
-export const paletteSwatchPanelClassName = 'nokey w-[6.75rem] p-[0.6rem]';
+import { swatchPanelClassName } from './SwatchMenu';
+import { ToggleGroup, ToggleGroupItem } from './components/toggle-group';
 
 /** One closed-palette slot the picker may offer. */
 export interface PaletteColorEntry {
@@ -12,73 +10,13 @@ export interface PaletteColorEntry {
   readonly label: string;
 }
 
-export interface PaletteColorSwatchGridProps {
-  readonly entries: readonly PaletteColorEntry[];
-  readonly value: string | null | undefined;
-  readonly onValueChange: (color: string) => void;
-  readonly disabled?: boolean;
-  readonly 'aria-label'?: string;
-  readonly className?: string;
-}
-
-/**
- * A closed palette drawn as a swatch grid — shared by the popover and menu surfaces.
- *
- * Deviation: hand-rolled `role="radio"` buttons rather than a registry RadioGroup —
- * the grid mounts inside a popover or submenu panel, not a Menu radio list, and needs
- * a two-column swatch layout. Behaviour is held by `PaletteColorPicker.test.tsx` and
- * the Dock/application recolour parity tests.
- */
-export function PaletteColorSwatchGrid({
-  entries,
-  value,
-  onValueChange,
-  disabled = false,
-  'aria-label': ariaLabel = 'Choose colour',
-  className,
-}: PaletteColorSwatchGridProps) {
+/** One palette colour drawn as a swatch, filling the box it is given. */
+export function PaletteColorSwatch({ color }: { readonly color: string }) {
   return (
-    <div
-      role="radiogroup"
-      aria-label={ariaLabel}
-      className={cn('grid grid-cols-2 gap-[0.35rem]', className)}
-    >
-      {entries.map(({ color, label }) => {
-        const selected = value === color;
-        return (
-          <button
-            key={color}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={label}
-            title={label}
-            disabled={disabled}
-            data-testid={`palette-swatch-${label.replace(/\s+/g, '-').toLowerCase()}`}
-            className={cn(
-              'flex cursor-pointer items-center justify-center rounded-chrome-md border border-transparent p-[0.35rem] transition-[background-color,border-color] hover:border-border hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
-              selected && 'border-border bg-accent',
-            )}
-            onClick={() => onValueChange(color)}
-          >
-            <span
-              aria-hidden
-              className="relative h-[1.35rem] w-[1.35rem] rounded-chrome-sm border border-border/60"
-              style={{ backgroundColor: color }}
-            >
-              {selected ? (
-                <Check
-                  aria-hidden
-                  size={12}
-                  strokeWidth={3}
-                  className="absolute inset-0 m-auto text-foreground drop-shadow-[0_0_1px_rgba(0,0,0,0.85)]"
-                />
-              ) : null}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <span
+      className="size-full rounded-chrome-sm border border-border/60"
+      style={{ backgroundColor: color }}
+    />
   );
 }
 
@@ -126,8 +64,11 @@ export function PaletteColorPicker({
     onOpenChange?.(next);
   };
 
-  const handleSelect = (color: string): void => {
-    onValueChange(color);
+  // A single-select group hands back what is pressed now: the colour pressed,
+  // or nothing when the current colour was pressed again, which keeps it.
+  const handlePressed = (pressed: string[]): void => {
+    const [color] = pressed;
+    if (color !== undefined) onValueChange(color);
     setResolvedOpen(false);
   };
 
@@ -142,14 +83,28 @@ export function PaletteColorPicker({
       >
         {trigger ?? 'Choose colour'}
       </PopoverTrigger>
-      <PopoverContent side={side} align={align} className={paletteSwatchPanelClassName}>
-        <PaletteColorSwatchGrid
-          entries={entries}
-          value={value}
-          onValueChange={handleSelect}
-          disabled={disabled}
+      <PopoverContent side={side} align={align} className={swatchPanelClassName}>
+        <ToggleGroup
           aria-label={ariaLabel}
-        />
+          value={value == null ? [] : [value]}
+          onValueChange={handlePressed}
+          disabled={disabled}
+          className="grid grid-cols-2 gap-[0.35rem]"
+        >
+          {entries.map(({ color, label }) => (
+            <ToggleGroupItem
+              key={color}
+              value={color}
+              aria-label={label}
+              title={label}
+              className="p-[0.35rem]"
+            >
+              <span aria-hidden className="relative flex size-[1.35rem]">
+                <PaletteColorSwatch color={color} />
+              </span>
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
       </PopoverContent>
     </Popover>
   );

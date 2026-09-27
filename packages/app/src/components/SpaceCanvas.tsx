@@ -38,11 +38,13 @@ import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, GraphIcon, type EntityActionGroup } 
 import {
   nodeTypes,
   GraphConnectionLine,
+  GraphHeadMarkers,
+  GraphConnectionLineHeadShape,
   GraphHud,
   ZoomSlider,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
-import { activeGraphColor } from '../colors';
+import { connectionAppearance } from '../colors';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringAvailability } from '../authoring-availability';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
@@ -561,6 +563,12 @@ export function SpaceCanvas({
   );
 
   const embedConnectFrom = useRef<EmbeddedConnectionStart | null>(null);
+  // The embedding a connection in flight started in, as state so the preview
+  // redraws in that embedding's Graph when one starts. The ref above stays the
+  // one `mayOfferEmbedded` reads: Edge Authoring calls it through a ref of its
+  // own that is refreshed after commit, so a closure over this state would
+  // answer from the render before the connection started.
+  const [embeddedConnectionParent, setEmbeddedConnectionParent] = useState<string | null>(null);
   const mayOfferEmbedded = useCallback(
     (resourceId: ResourceId) => {
       const session = embedConnectFrom.current;
@@ -1086,12 +1094,20 @@ export function SpaceCanvas({
     return () => window.removeEventListener('keydown', deleteSelection);
   }, []);
 
+  // The preview is drawn as the Graph the new Edge joins: the target's shown
+  // Graph for a connection between one embedding's Resources, else the Active
+  // Graph.
+  const preview = useMemo(
+    () =>
+      (embeddedConnectionParent === null
+        ? undefined
+        : embeddedPublications.get(embeddedConnectionParent)?.connectionAppearance()) ??
+      connectionAppearance(graphs, colorByGraphId, activeGraphId),
+    [embeddedConnectionParent, embeddedPublications, graphs, colorByGraphId, activeGraphId],
+  );
   const connectionLineStyle = useMemo(
-    () => ({
-      stroke: activeGraphColor(colorByGraphId, activeGraphId),
-      strokeWidth: 3,
-    }),
-    [activeGraphId, colorByGraphId],
+    () => ({ stroke: preview.color, strokeWidth: 3 }),
+    [preview.color],
   );
 
   const {
@@ -1115,9 +1131,11 @@ export function SpaceCanvas({
       const parsed = parseEmbeddedNodeId(params.nodeId ?? '');
       if (parsed !== undefined) {
         embedConnectFrom.current = { parentId: parsed.parentId, from: parsed.resourceId };
+        setEmbeddedConnectionParent(parsed.parentId);
         return;
       }
       embedConnectFrom.current = null;
+      setEmbeddedConnectionParent(null);
       onConnectStart(event, params);
     },
     [onConnectStart],
@@ -1136,6 +1154,7 @@ export function SpaceCanvas({
   const onEmbeddedConnectEnd = useCallback<OnConnectEnd>(
     (event, connection) => {
       embedConnectFrom.current = null;
+      setEmbeddedConnectionParent(null);
       onConnectEnd(event, connection);
     },
     [onConnectEnd],
@@ -1208,7 +1227,7 @@ export function SpaceCanvas({
     return props;
   }, [presenting, embeddedRequests, resumeEmbedded]);
 
-  return edgeSurface.provide(
+  const canvas = (
     <ReactFlow
       ref={canvasRef}
       nodes={canvasNodes}
@@ -1289,6 +1308,7 @@ export function SpaceCanvas({
       maxZoom={MAX_ZOOM}
     >
       <Background gap={24} />
+      <GraphHeadMarkers />
       <svg aria-hidden="true" width={0} height={0}>
         <defs>
           {embeddedRequests.map(({ parent, absolute, bounds, tiltCenter }) => (
@@ -1407,6 +1427,11 @@ export function SpaceCanvas({
         projectedNodes={projectedNodes}
         onClose={() => setConnecting(null)}
       />
-    </ReactFlow>,
+    </ReactFlow>
+  );
+  return edgeSurface.provide(
+    <GraphConnectionLineHeadShape headShape={preview.headShape}>
+      {canvas}
+    </GraphConnectionLineHeadShape>,
   );
 }

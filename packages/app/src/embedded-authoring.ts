@@ -25,11 +25,7 @@ const completeEmbedded = (
     completion.kind === 'edited-resource' ||
     completion.kind === 'settled-resource-movement' ||
     completion.kind === 'removed-resource-from-map' ||
-    completion.kind === 'connected-resources' ||
-    completion.kind === 'renamed-map' ||
-    completion.kind === 'added-graph' ||
-    completion.kind === 'renamed-graph' ||
-    completion.kind === 'recolored-graph'
+    completion.kind === 'connected-resources'
   ) {
     return entry.app.authoring.completeInMap(mapId, completion);
   }
@@ -38,12 +34,13 @@ const completeEmbedded = (
    *
    * The kinds above are the whole of what the surfaces holding this
    * `authoring` produce — `EmbeddedMapAuthoring`, the render adapter's
-   * resize and movement settlements, Canvas Resource Authoring, and the Space
-   * Resource rail's rename / recolor / add-Graph commands. Graph deletion is
-   * not forwarded (`embedded-authoring.test.ts` — "does not forward Graph
-   * deletion, which coordinated lifecycle owns"). Connecting two embedded Resources is
-   * completed here as `connected-resources`; the host Edge Authoring module is
-   * still not composed over this adapter. So any other kind arriving here is a
+   * resize and movement settlements and Canvas Resource Authoring. A Map or
+   * Graph Edit on the Map a Space Resource shows is completed by Map and
+   * Graph authoring through `completeInMap`, never here
+   * (`embedded-authoring.test.ts` — "does not forward a Map or Graph Edit").
+   * Connecting two embedded Resources is completed here as
+   * `connected-resources`; the host Edge Authoring module is still not
+   * composed over this adapter. So any other kind arriving here is a
    * wiring defect, and `AuthoringResult`'s own rule (`space-authoring.ts`) says
    * a broken invariant "throws, or is reported through the non-throwing
    * reporter — dressing a programming defect as a refusal would put it in front
@@ -58,31 +55,11 @@ const completeEmbedded = (
    */
   report(
     new Error(
-      `A ${completion.kind} completion reached an embedded Map, which supports only Open, Close, Edit, Resize, movement, Remove from Map, connecting Resources, renaming the Map, and renaming, recoloring or adding a Graph.`,
+      `A ${completion.kind} completion reached an embedded Map, which supports only Open, Close, Edit, Resize, movement, Remove from Map and connecting Resources.`,
     ),
   );
   return NOTHING_AUTHORED;
 };
-
-/**
- * The map-scoped authoring port: Resource gestures and context commands on
- * the Map a Space Resource shows, completed by the target's sole Space
- * Authoring. Graph deletion is not forwarded here
- * (`embedded-authoring.test.ts` — "does not forward Graph deletion, which
- * coordinated lifecycle owns").
- *
- * The reporter is required with no default (ADR 0016): the composition names
- * the ambient console once and answers it as `ComposedApp.reportObserverError`,
- * so this module never mints a second, invisible one.
- */
-export function completeEmbeddedAuthoring(
-  entry: OpenSpace,
-  mapId: MapId,
-  completion: AuthoringCompletion,
-  reportObserverError: ObserverErrorReporter,
-): AuthoringResult {
-  return completeEmbedded(entry, mapId, completion, createNonThrowingReporter(reportObserverError));
-}
 
 /**
  * One embedded canvas's gestures, completed by the target's sole Space Authoring.
@@ -103,7 +80,7 @@ export function createEmbeddedAuthoring(
     report(new Error('An embedded authoring observer failed.', { cause: error })),
   );
   const complete = (completion: AuthoringCompletion): AuthoringResult =>
-    completeEmbeddedAuthoring(entry, mapId, completion, reportObserverError);
+    completeEmbedded(entry, mapId, completion, report);
   const authoring: RenderAdapterAuthoring = {
     getState: entry.app.authoring.getState,
     complete,

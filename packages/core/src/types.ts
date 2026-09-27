@@ -10,6 +10,7 @@ import type {
   mapSchema,
   positionedMapSchema,
   graphEdgeSchema,
+  graphHeadShapeSchema,
   graphSchema,
   spaceFileSchema,
   spaceDocumentSchema,
@@ -46,6 +47,8 @@ export type ResourceFrontmatter = z.infer<typeof resourceFrontmatterSchema>;
  */
 export type GraphEdge = z.infer<typeof graphEdgeSchema>;
 export type Graph = z.infer<typeof graphSchema>;
+/** One of the four shapes a Graph's Edges draw at their heads (ADR 0105). */
+export type GraphHeadShape = z.infer<typeof graphHeadShapeSchema>;
 export type MapPosition = z.infer<typeof mapPositionSchema>;
 export type ResourcePlacement = z.infer<typeof resourcePlacementSchema>;
 export type PositionedMap = z.infer<typeof positionedMapSchema>;

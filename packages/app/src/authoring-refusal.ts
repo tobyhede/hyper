@@ -47,6 +47,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       if (
         refusal.operation === 'renamed-graph' ||
         refusal.operation === 'recolored-graph' ||
+        refusal.operation === 'changed-graph-head-shape' ||
         refusal.operation === 'deleted-graph'
       )
         return 'Select a Map to manage its Graphs.';

@@ -16,7 +16,6 @@ import type { ResourceResize } from './render-adapter';
 import type { SpaceAuthoring } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
-import { completeEmbeddedAuthoring } from './embedded-authoring';
 import type { CommandOutcomes } from './command-outcomes';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
 import type { SpaceResourceFraming } from './space-resource-framing';
@@ -487,7 +486,6 @@ export function useCanvasResourceAuthoring({
       spaces,
       commandOutcomes,
       completeSpaceResourceSelection,
-      completeEmbedded: completeEmbeddedAuthoring,
       portalEditing,
       onPortalEditingChange,
       contextNotices,

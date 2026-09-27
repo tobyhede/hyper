@@ -7,7 +7,10 @@
  * `SpaceResourceBreak` name their own. It reads a message where there is one and
  * falls back to the value's own spelling where there is not, and it invents
  * nothing else: a rejection is not a refusal, and a refusal code is a stable
- * domain identity (ADR 0057) that nothing caught here answers to.
+ * domain identity (ADR 0057) that nothing caught here answers to. A value with
+ * no spelling — `Object.create(null)`, or one whose `toString` throws — says
+ * {@link UNSPELLED_FAILURE}, because the sentence is spoken from inside a
+ * failure path that must not throw a second time.
  *
  * Its own module because its callers have nothing else in common — a startup
  * that failed to render, a Map deletion that rejected, and a creation whose
@@ -15,6 +18,15 @@
  */
 export type FailureMessage = (failure: unknown) => string;
 
+/** What a thrown value that cannot be spelled says. */
+export const UNSPELLED_FAILURE = 'An unexpected failure occurred.';
+
 /** @see FailureMessage */
-export const failureMessage: FailureMessage = (failure) =>
-  failure instanceof Error ? failure.message : String(failure);
+export const failureMessage: FailureMessage = (failure) => {
+  if (failure instanceof Error) return failure.message;
+  try {
+    return String(failure);
+  } catch {
+    return UNSPELLED_FAILURE;
+  }
+};

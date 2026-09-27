@@ -21,7 +21,7 @@ const target: SpaceResourceTarget = {
     {
       id: TARGET_MAP_ID,
       title: 'Map 1',
-      graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', color: '#1f77b4' }],
+      graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', color: '#1f77b4', headShape: 'arrow' }],
     },
   ],
 };
@@ -33,7 +33,9 @@ const otherTarget: SpaceResourceTarget = {
     {
       id: OTHER_TARGET_MAP_ID,
       title: 'Map 1',
-      graphs: [{ id: OTHER_TARGET_GRAPH_ID, title: 'Graph 1', color: '#1f77b4' }],
+      graphs: [
+        { id: OTHER_TARGET_GRAPH_ID, title: 'Graph 1', color: '#1f77b4', headShape: 'arrow' },
+      ],
     },
   ],
 };

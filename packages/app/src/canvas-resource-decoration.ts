@@ -1,20 +1,17 @@
 import {
   SPACE_RESOURCE_MIN_OPEN_SIZE,
-  type MapId,
   type GraphId,
   type ResourceDocument,
   type ResourceId,
   type UUID,
 } from '@project/core';
-import type { ObserverErrorReporter } from '@project/persistence';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
 import type { EntityActionGroup } from '@project/ui';
 import { buildSpaceResourceRail } from './build-space-resource-rail';
 import type { SpaceResourceRailContext } from './space-resource-context-commands';
 import type { CommandOutcomes } from './command-outcomes';
-import type { OpenSpace, OpenSpaces } from './open-spaces';
+import type { OpenSpaces } from './open-spaces';
 import type { ResourceResize } from './render-adapter';
-import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import type { SpaceResourceTargets } from './space-resource-targets';
 import { snapResourceSizeToClose, RESOURCE_SIZE } from './resource';
@@ -68,12 +65,6 @@ export interface CanvasResourceDecorationContext {
     map: Pick<SpaceResourceTargetMap, 'id'>,
     graphId: GraphId,
   ) => string | null;
-  readonly completeEmbedded: (
-    entry: OpenSpace,
-    mapId: MapId,
-    completion: AuthoringCompletion,
-    reportObserverError: ObserverErrorReporter,
-  ) => AuthoringResult;
   readonly portalEditing: ReadonlySet<ResourceId> | undefined;
   readonly onPortalEditingChange: ((resourceId: ResourceId, editing: boolean) => void) | undefined;
   readonly contextNotices: ReadonlyMap<ResourceId, string>;
@@ -126,7 +117,6 @@ type SpaceResourceDecorationContext = Pick<
   | 'spaces'
   | 'commandOutcomes'
   | 'completeSpaceResourceSelection'
-  | 'completeEmbedded'
   | 'portalEditing'
   | 'onPortalEditingChange'
   | 'contextNotices'
@@ -264,13 +254,6 @@ export function decorateSpaceResourceNode(
           spaces: context.spaces,
           containingSpaceId: context.containingSpaceId,
           commandOutcomes: context.commandOutcomes,
-          complete: (completion) =>
-            context.completeEmbedded(
-              entry,
-              spaceDocument.map,
-              completion,
-              entry.app.reportObserverError,
-            ),
         };
       }
     }

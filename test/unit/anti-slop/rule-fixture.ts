@@ -66,15 +66,21 @@ function isOxlintReport(value: unknown): value is OxlintReport {
  * Lints `source` (a standalone TypeScript fixture) with exactly the given
  * `anti-slop/*` rules enabled and returns every diagnostic those rules
  * raised, in source order. `rules` maps a rule's bare name (no `anti-slop/`
- * prefix) to `"error"` or `"off"`.
+ * prefix) to `"error"`, `"off"`, or `["error", options]`.
  *
  * `extension` selects the fixture's file extension. A rule with a JSX-only
  * visitor needs `'tsx'` — JSX in a `.ts` file is a parse error, so a `.ts`
  * fixture would report zero diagnostics whether the visitor fired or not.
  */
+/** A rule's severity alone, or with the options object oxlint hands the rule. */
+export type RuleSetting = 'error' | 'off' | readonly ['error', RuleOptions];
+
+/** One rule's options, as `.oxlintrc.json` would write them. */
+export type RuleOptions = Readonly<Record<string, boolean | readonly string[]>>;
+
 export function lintFixture(
   source: string,
-  rules: Readonly<Record<string, 'error' | 'off'>>,
+  rules: Readonly<Record<string, RuleSetting>>,
   extension: 'ts' | 'tsx' = 'ts',
 ): readonly RuleDiagnostic[] {
   const dir = mkdtempSync(join(tmpdir(), 'anti-slop-fixture-'));

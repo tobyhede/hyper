@@ -366,13 +366,20 @@ export const parityClaims: readonly ParityClaim[] = [
       'Colour… in the Graph menu opens a palette-bound swatch grid offering every Tableau Classic 20 slot, each named in its accessible label; choosing one recolours the Active Graph.',
   },
   {
+    id: 'command-dock-changes-graph-head-shape',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'Shape… sits directly under Colour… in the Graph menu, its trigger showing the Active Graph’s head shape; it opens the four head shapes as swatches in the Graph’s colour with the current one marked, and choosing one stores it on the Active Graph and closes the menu.',
+  },
+  {
     id: 'palette-color-picker-chooses-a-closed-palette-colour',
     storyFile: 'components/palette-color-picker.stories.tsx',
     storyExport: 'Default',
     claim:
       'A closed palette opens as a swatch grid in a popover; the chosen swatch is visibly selected and choosing one invokes the caller and closes the popover.',
     applicationEvidence:
-      'The Command Dock embeds the shared `PaletteColorSwatchGrid` for Graph recolour in a submenu; this story covers the popover wrapper. `command-dock-recolors-graph-through-swatch-picker` in editing.spec.ts exercises recolour through the real authoring stack.',
+      'The Command Dock draws Graph recolour as the Graph menu’s own swatch radio items (`SwatchMenuRadioGroup`) in a submenu; this story covers the popover wrapper. `command-dock-recolors-graph-through-swatch-picker` in editing.spec.ts exercises recolour through the real authoring stack.',
   },
   {
     id: 'command-dock-edits-identity-names',
@@ -670,7 +677,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',
     claim:
-      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
+      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Shape, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
   },
   {
     id: 'open-space-resource-chooses-its-context-on-the-shared-controls',
@@ -745,17 +752,17 @@ export const parityClaims: readonly ParityClaim[] = [
       'The canvas HUD keys the Graphs of the Map it opens on, not the Graphs of the Space: a Map that owns one Graph draws a key of one, and the Graphs another Map owns are absent from it rather than dimmed.',
   },
   {
-    id: 'graph-choice-rows-draw-the-graph-colour-line',
+    id: 'graph-choice-rows-draw-the-graph-legend-mark',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Each row of the Graph list is marked with the line the canvas HUD’s key draws, in that Graph’s colour and with no Graph glyph, while the Graph identity and Colour… keep the coloured Graph glyph and the Map list carries no mark.',
+      'Each row of the Graph list is marked with the mark the canvas HUD’s key draws — a line in that Graph’s colour ending in its head shape, the arrow where the Graph stores none — with no Graph glyph, while the Graph identity and Colour… keep the coloured Graph glyph and the Map list carries no mark.',
   },
   {
-    id: 'open-space-resource-graph-rows-draw-the-graph-colour-line',
+    id: 'open-space-resource-graph-rows-draw-the-graph-legend-mark',
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',
     claim:
-      'An Open Space Resource’s Graph list marks each row with the same colour line, in the colour the target draws that Graph’s Edges in, and its Map list carries no mark.',
+      'An Open Space Resource’s Graph list marks each row with the same legend mark, in the colour and head shape the target draws that Graph’s Edges in, and its Map list carries no mark.',
   },
 ] as const;

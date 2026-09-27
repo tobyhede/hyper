@@ -1,6 +1,6 @@
 import type { Story } from '@ladle/react';
 import { GraphHudFixture } from '../support/GraphHudFixture';
-import { sparseAuthoredSpace } from '../support/spaces';
+import { authoredSpaceWithGraphHeads, sparseAuthoredSpace } from '../support/spaces';
 
 export default { title: 'Surfaces/Graph HUD' };
 
@@ -14,9 +14,11 @@ export default { title: 'Surfaces/Graph HUD' };
  * viewport, and the framework does the rest.
  *
  * The claim it carries: the key must not disagree with the Command Dock's
- * Graphs about a Graph's title, its colour, or which one is active.
+ * Graphs about a Graph's title, its colour, its head shape, or which one is
+ * active. Mid and Short store `dot` and `diamond`; Long stores none and draws
+ * the arrow.
  */
-export const Retained: Story = () => <GraphHudFixture />;
+export const Retained: Story = () => <GraphHudFixture space={authoredSpaceWithGraphHeads} />;
 Retained.meta = { iframed: true };
 
 /**
