@@ -16,10 +16,9 @@ export const clearHyperContent = async (): Promise<void> => {
       db.orm.public.Space.where({ id: spaceId })
         .deleteCount()
         .then(() => undefined),
-    deleteImages: async () => {
-      for (const { id } of await db.orm.public.Image.select('id').all()) {
-        await db.orm.public.Image.where({ id }).deleteCount();
-      }
-    },
+    deleteImages: async () =>
+      db.orm.public.Image.where((image) => image.id.isNotNull())
+        .deleteCount()
+        .then(() => undefined),
   });
 };

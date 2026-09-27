@@ -21,10 +21,9 @@ export const clearSqliteContent = async (database: SqliteDatabase): Promise<void
       database.orm.Space.where({ id: spaceId })
         .deleteCount()
         .then(() => undefined),
-    deleteImages: async () => {
-      for (const { id } of await database.orm.Image.select('id').all()) {
-        await database.orm.Image.where({ id }).deleteCount();
-      }
-    },
+    deleteImages: async () =>
+      database.orm.Image.where((image) => image.id.isNotNull())
+        .deleteCount()
+        .then(() => undefined),
   });
 };

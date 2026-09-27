@@ -66,7 +66,6 @@ export {
 export {
   admitImage,
   IMAGE_COLLECTION_PATH,
-  imageIdOf,
   imagePath,
   isImageId,
   isImageMediaType,

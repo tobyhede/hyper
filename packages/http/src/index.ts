@@ -59,7 +59,7 @@ const SPACE_AGGREGATE_PATH = '/api/aggregate';
 const SPACE_RESOURCE_PATTERN = /^\/api\/spaces\/([^/]+)$/;
 const IMAGE_RESOURCE_PATH = `${IMAGE_COLLECTION_PATH}/:id`;
 // The image path as a matcher, for the same reason as `SPACE_RESOURCE_PATTERN`.
-const IMAGE_RESOURCE_PATTERN = /^\/images\/([^/]+)$/;
+const IMAGE_RESOURCE_PATTERN = new RegExp(`^${IMAGE_COLLECTION_PATH}/([^/]+)$`);
 
 /**
  * How a stored image is served. Its id is the digest of its bytes, so the
@@ -423,8 +423,9 @@ const normalizeJsonMedia = (response: Response): Response => {
 };
 
 /**
- * What holds for every request whatever route serves it: nothing is cacheable,
- * HEAD never reaches a GET handler, and a JSON response names its charset.
+ * What holds for every request whatever route serves it: nothing is cacheable
+ * unless its handler says otherwise, HEAD reaches a GET handler only where
+ * `unservedContractPath` lets it through, and a JSON response names its charset.
  *
  * Written through `createMiddleware` like its siblings rather than inline in the
  * chain. An inline `use('*')` handler's context carries `any` in its input slot,

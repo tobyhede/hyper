@@ -74,19 +74,39 @@ const GIF89_SIGNATURE = asciiCodes('GIF89a');
 const RIFF_SIGNATURE = asciiCodes('RIFF');
 const WEBP_FORM = asciiCodes('WEBP');
 
-/** How far into a text document an SVG root element is looked for. */
-const SVG_PROBE_BYTES = 1024;
+/** Where the markup opened at `from` ends, past `close`, or -1 when it never closes. */
+const pastClose = (text: string, from: number, close: string): number => {
+  const end = text.indexOf(close, from);
+  return end === -1 ? -1 : end + close.length;
+};
+
+/** Where a doctype opened at `from` ends, past any internal subset it carries. */
+const pastDoctype = (text: string, from: number): number => {
+  const subset = text.indexOf('[', from);
+  const close = text.indexOf('>', from);
+  if (close === -1) return -1;
+  if (subset === -1 || close < subset) return close + 1;
+  const subsetEnd = text.indexOf(']', subset);
+  return subsetEnd === -1 ? -1 : pastClose(text, subsetEnd, '>');
+};
 
 /**
- * Whether the bytes read as an SVG document: markup, after an optional
- * byte-order mark and whitespace, naming an `svg` element near its start.
+ * Whether the bytes read as an SVG document: its root element is `svg`, after
+ * whatever prolog precedes it — whitespace, declarations and processing
+ * instructions, comments and a doctype — however long that prolog is. The
+ * decoder drops a leading byte-order mark.
  */
 const isSvg = (bytes: Uint8Array): boolean => {
-  const text = new TextDecoder('utf-8', { fatal: false })
-    .decode(bytes.subarray(0, SVG_PROBE_BYTES))
-    .replace(/^\uFEFF/u, '')
-    .trimStart();
-  return text.startsWith('<') && /<svg[\s/>]/iu.test(text);
+  const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  let at = 0;
+  while (at !== -1 && at < text.length) {
+    if (/\s/u.test(text.charAt(at))) at += 1;
+    else if (text.startsWith('<?', at)) at = pastClose(text, at + 2, '?>');
+    else if (text.startsWith('<!--', at)) at = pastClose(text, at + 4, '-->');
+    else if (text.slice(at, at + 9).toUpperCase() === '<!DOCTYPE') at = pastDoctype(text, at + 9);
+    else return /^<svg[\s/>]/iu.test(text.slice(at, at + 5));
+  }
+  return false;
 };
 
 const mediaTypeOf = (bytes: Uint8Array): ImageMediaType | 'svg' | undefined => {

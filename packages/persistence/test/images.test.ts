@@ -49,6 +49,7 @@ describe('admitting an image', () => {
     ['a truncated PNG signature', bytes(0x89, 0x50, 0x4e, 0x47)],
     ['a RIFF container that is not WebP', joined(ascii('RIFF'), bytes(0, 0, 0, 0), ascii('WAVE'))],
     ['a PDF', ascii('%PDF-1.7')],
+    ['markup whose root element is not svg', ascii('<html><svg/></html>')],
   ])('refuses %s as an unsupported format', async (_, content) => {
     await expect(admitImage(content)).resolves.toEqual({
       kind: 'refused',
@@ -61,6 +62,11 @@ describe('admitting an image', () => {
     ['an SVG with a declaration', '<?xml version="1.0"?>\n<svg></svg>'],
     ['an SVG after a byte-order mark and whitespace', '\uFEFF  \n<SVG></SVG>'],
     ['an SVG after a doctype', '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" ""><svg/>'],
+    ['an SVG after a long comment', `<?xml version="1.0"?>\n<!--${'x'.repeat(4096)}-->\n<svg/>`],
+    [
+      'an SVG after a doctype with a long internal subset',
+      `<!DOCTYPE svg [\n${'<!ENTITY e "x">\n'.repeat(512)}]>\n<svg/>`,
+    ],
   ])('refuses %s with its own code', async (_, text) => {
     await expect(admitImage(ascii(text))).resolves.toEqual({
       kind: 'refused',

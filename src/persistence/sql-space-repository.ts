@@ -426,7 +426,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
         if (!isImageMediaType(mediaType)) {
           throw new AggregateInvariantError(`Stored image ${id} has media type ${mediaType}`);
         }
-        return { id, mediaType, bytes: Uint8Array.from(row.bytes) };
+        return { id, mediaType, bytes: new Uint8Array(row.bytes) };
       }),
     );
   }

@@ -17,4 +17,5 @@
 
 - The store is `ImageStore` (`packages/persistence/src/images.ts`), which `SpaceRepository` extends and `createSpaceHttpApp` takes beside `StoredSpaceRepository`; `admitImage` is the one admission rule, for the route now and for fixture seeding (07) later. The SQL table is `images` on both databases (`add_images` migrations), and neither aggregate lifecycle door reads or writes it.
 - Refusal codes are Problem Details types: `image-too-large` (413), `image-format-unsupported` (415), `image-svg-unsupported` (415) and `invalid-image-id` (400). Storing answers `{ url }` with `Location`, 201 for new bytes and 200 for bytes already stored.
+- GET serves the bytes with `X-Content-Type-Options: nosniff`, so a browser holds them to the media type admission decided and never renders them as anything else.
 - The id format (`isImageId`) accepts only the canonical final base64url digit, matching ticket 01's `/images/<id>` URL rule in `@project/core`. The two are separate regexes until 01 and 02 meet on the integration branch; folding one into the other is left to that merge.
