@@ -54,12 +54,6 @@ export {
   decodeStoredRevision,
   encodeStoredRevision,
 } from './revision-codec';
-/* Two test-facing helpers, two doors, and the difference is what they are.
- * `MemorySpaceBackendTestControl` is named by `MemorySpaceBackend`'s public
- * constructor, so a caller that cannot import it cannot construct the adapter
- * this package ships — it is public surface. The shared backend *suite* imports
- * vitest and only a test runner can execute it, so it stays behind the
- * `./test-support` subpath instead. */
 /* The images the host stores beside Spaces and outside the aggregate
  * (ADR 0106): the admission rule the storing route and fixture seeding share,
  * and the store every repository under `src/` implements. */
@@ -77,6 +71,12 @@ export {
   type ImageStore,
   type StoredImage,
 } from './images';
+/* Two test-facing helpers, two doors, and the difference is what they are.
+ * `MemorySpaceBackendTestControl` is named by `MemorySpaceBackend`'s public
+ * constructor, so a caller that cannot import it cannot construct the adapter
+ * this package ships — it is public surface. The shared backend *suite* imports
+ * vitest and only a test runner can execute it, so it stays behind the
+ * `./test-support` subpath instead. */
 export { MemorySpaceBackend, MemorySpaceBackendTestControl } from './memory';
 export * from './observable-state';
 /* The id order every in-memory double answers reads in, stated once.

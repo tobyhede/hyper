@@ -129,15 +129,16 @@ export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
  * unpadded base64url (ADR 0106). Forty-three characters, and only the
  * canonical spelling: the last one carries four bits of the digest and two
  * zero bits, so it is one of the sixteen characters whose low two bits are
- * clear. The one rule for it — the stored-image URL below and the host's
- * image store (`@project/persistence`) both read this.
+ * clear.
  */
 const STORED_IMAGE_ID = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/u;
 
 export const isStoredImageId = (value: string): boolean => STORED_IMAGE_ID.test(value);
 
-/** The root-relative URL of an image the host stores: `/images/<id>`. */
-const STORED_IMAGE_PATH_PREFIX = '/images/';
+/** The collection the host stores images under; a stored image's root-relative URL is `/images/<id>`. */
+export const STORED_IMAGE_COLLECTION_PATH = '/images';
+
+const STORED_IMAGE_PATH_PREFIX = `${STORED_IMAGE_COLLECTION_PATH}/`;
 
 /**
  * Whether an Image Resource may hold this URL (ADR 0106): an `https:` or

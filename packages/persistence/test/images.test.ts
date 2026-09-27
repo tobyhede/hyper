@@ -67,6 +67,14 @@ describe('admitting an image', () => {
       'an SVG after a doctype with a long internal subset',
       `<!DOCTYPE svg [\n${'<!ENTITY e "x">\n'.repeat(512)}]>\n<svg/>`,
     ],
+    [
+      'an SVG after a doctype whose identifier holds a bracket',
+      '<!DOCTYPE svg SYSTEM "a[b"><svg/>',
+    ],
+    ['an SVG after a doctype whose identifier holds a >', "<!DOCTYPE svg SYSTEM 'a>b'><svg/>"],
+    ['an SVG after an entity value holding a bracket', '<!DOCTYPE svg [<!ENTITY e "]>">]><svg/>'],
+    ['an SVG after a subset comment holding a quote', "<!DOCTYPE svg [<!-- it's ] -->]><svg/>"],
+    ['an SVG after a subset instruction holding a bracket', '<!DOCTYPE svg [<?pi ]?>]><svg/>'],
   ])('refuses %s with its own code', async (_, text) => {
     await expect(admitImage(ascii(text))).resolves.toEqual({
       kind: 'refused',

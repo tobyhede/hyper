@@ -5,7 +5,7 @@
  * `@project/http`'s, and each repository under `src/` implements the store.
  */
 
-import { isStoredImageId } from '@project/core';
+import { isStoredImageId, STORED_IMAGE_COLLECTION_PATH } from '@project/core';
 
 /** The largest image the host stores, in bytes: 10 MiB. */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -28,7 +28,7 @@ export type ImageId = string & { readonly imageId: unique symbol };
 export const isImageId = (value: string): value is ImageId => isStoredImageId(value);
 
 /** The collection stored images are addressed under. */
-export const IMAGE_COLLECTION_PATH = '/images';
+export const IMAGE_COLLECTION_PATH = STORED_IMAGE_COLLECTION_PATH;
 
 /** An image's root-relative URL: the address an Image Resource records for a stored image. */
 export const imagePath = (id: ImageId): string => `${IMAGE_COLLECTION_PATH}/${id}`;
@@ -80,14 +80,30 @@ const pastClose = (text: string, from: number, close: string): number => {
   return end === -1 ? -1 : end + close.length;
 };
 
-/** Where a doctype opened at `from` ends, past any internal subset it carries. */
+/**
+ * Where a doctype opened at `from` ends, past any internal subset it carries,
+ * or -1 when it never closes. One forward pass: a quoted literal, and inside the
+ * subset a comment or processing instruction, is stepped over whole, so a `[`,
+ * `]`, `>` or quote inside one neither opens nor closes anything.
+ */
 const pastDoctype = (text: string, from: number): number => {
-  const subset = text.indexOf('[', from);
-  const close = text.indexOf('>', from);
-  if (close === -1) return -1;
-  if (subset === -1 || close < subset) return close + 1;
-  const subsetEnd = text.indexOf(']', subset);
-  return subsetEnd === -1 ? -1 : pastClose(text, subsetEnd, '>');
+  let at = from;
+  let inSubset = false;
+  while (at !== -1 && at < text.length) {
+    const character = text.charAt(at);
+    if (character === '"' || character === "'") at = pastClose(text, at + 1, character);
+    else if (inSubset && text.startsWith('<!--', at)) at = pastClose(text, at + 4, '-->');
+    else if (inSubset && text.startsWith('<?', at)) at = pastClose(text, at + 2, '?>');
+    else if (!inSubset && character === '[') {
+      inSubset = true;
+      at += 1;
+    } else if (inSubset && character === ']') {
+      inSubset = false;
+      at += 1;
+    } else if (!inSubset && character === '>') return at + 1;
+    else at += 1;
+  }
+  return -1;
 };
 
 /**
