@@ -29,13 +29,13 @@ const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000105');
 
 type ResourceKind = Resource['kind'];
 
-const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space'];
+const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', 'image'];
 
 /**
  * The same Title on each Resource kind. Every kind writes its Title through the one
  * `resourceTitleSchema`, so a Title that only survived on a Markdown Resource would be
  * a fence or a field-order fault rather than a schema one — which is a result
- * only writing all three out can tell us.
+ * only writing every kind out can tell us.
  */
 function resourceOf(kind: ResourceKind, title: string): Resource {
   switch (kind) {
@@ -45,6 +45,8 @@ function resourceOf(kind: ResourceKind, title: string): Resource {
       return { id: ID, title, kind, target: TARGET };
     case 'space':
       return { id: ID, title, kind, spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID };
+    case 'image':
+      return { id: ID, title, kind, url: 'https://example.com/figure.png' };
   }
 }
 

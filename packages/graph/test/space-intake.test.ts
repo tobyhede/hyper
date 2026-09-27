@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { type Resource, type ResourcePlacement } from '@project/core';
-import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
+import {
+  loadSpace,
+  loadSpaceSnapshot,
+  serializeResourceFile,
+  type LoadSpaceResult,
+} from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
 import { referenceFile, resourceFile, uuid } from './resource-files';
 
@@ -56,7 +61,9 @@ const viaFiles: Loader = ({ resources, ...structure }) =>
               path: `resources/${resource.id}.md`,
               text: `---\nid: ${resource.id}\ntitle: ${resource.title}\nkind: space\nspaceId: ${resource.spaceId}\nmap: ${resource.map}\ngraph: ${resource.graph}\n---\n`,
             }
-          : resourceFile(resource.id, resource.title, resource.body),
+          : resource.kind === 'image'
+            ? { path: `resources/${resource.id}.md`, text: serializeResourceFile(resource) }
+            : resourceFile(resource.id, resource.title, resource.body),
     ),
   );
 
@@ -254,6 +261,23 @@ describe.each([
       expect(space.graphs).toEqual([]);
       expect(space.maps).toEqual([]);
       expect(space.lookup.resource(A)?.title).toBe('A');
+    });
+
+    it('keeps an Image Resource whole: its URL and its natural size (ADR 0106)', () => {
+      const image: Resource = {
+        id: A,
+        title: 'Figure',
+        kind: 'image',
+        url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+        naturalSize: { width: 640, height: 480 },
+      };
+      const space = loaded(
+        load({
+          resources: [image],
+          maps: [map(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')])],
+        }),
+      );
+      expect(space.lookup.resource(A)).toEqual(image);
     });
 
     it('loads a map whose only graph holds no edges', () => {

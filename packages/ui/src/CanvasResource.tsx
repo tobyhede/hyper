@@ -82,6 +82,15 @@ export type CanvasResourceFront =
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
     }
   | {
+      readonly kind: 'image';
+      /**
+       * Authored Map state; an Image Resource Opens through the shared Resource
+       * operation. Closed, it draws its Title and kind and no thumbnail (ADR 0106).
+       */
+      readonly open: boolean;
+      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+    }
+  | {
       readonly kind: 'space';
       /** Authored Map state; a Space Resource Opens through the shared Resource operation. */
       readonly open: boolean;

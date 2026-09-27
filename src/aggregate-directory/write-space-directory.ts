@@ -142,6 +142,11 @@ const canonicalResource = (
       map: document.map,
       graph: document.graph,
     };
+  if (document.kind === 'image') {
+    const image: Resource = { ...common, kind: 'image', url: document.url };
+    if (document.naturalSize !== undefined) image.naturalSize = document.naturalSize;
+    return image;
+  }
   return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
 

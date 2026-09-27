@@ -319,6 +319,54 @@ describe('exporting and importing one complete aggregate', () => {
     }
   });
 
+  /*
+   * The aggregate carries an Image Resource's URL and nothing else of its
+   * picture (ADR 0106): no bytes go to disk, and the URL, with the natural size
+   * the Resource recorded, comes back as it went out.
+   */
+  it('round-trips an Image Resource by its URL', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const IMAGE_ID = uuidSchema.parse('12121212-1212-4212-8212-121212121212');
+    const STORED_ID = uuidSchema.parse('13131313-1313-4313-8313-131313131313');
+    const images = [
+      {
+        id: IMAGE_ID,
+        document: {
+          title: 'Figure',
+          kind: 'image' as const,
+          url: 'https://example.com/figure.png',
+          naturalSize: { width: 640, height: 480 },
+        },
+      },
+      {
+        id: STORED_ID,
+        document: {
+          title: 'Stored',
+          kind: 'image' as const,
+          url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+        },
+      },
+    ];
+    const [meta, ...targets] = completeAggregate();
+    if (meta === undefined) throw new Error('The aggregate names no Meta Space');
+    const pictured: SpaceSnapshot = { ...meta, resources: [...meta.resources, ...images] };
+
+    await exportTo(repositoryHolding([pictured, ...targets]), destination);
+    const reimported = await importFrom(destination);
+
+    const stored = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
+    expect(stored?.resources.filter(({ document }) => document.kind === 'image')).toEqual(images);
+    expect(await readFile(join(destination, META_SPACE_ID, 'resources', `${STORED_ID}.md`), 'utf8'))
+      .toBe(`---
+id: ${STORED_ID}
+title: Stored
+kind: image
+url: /images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU
+---
+
+`);
+  });
+
   it('re-exports over its own output without changing a byte', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const source = repositoryHolding(completeAggregate());

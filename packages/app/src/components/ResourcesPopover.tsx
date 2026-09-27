@@ -31,6 +31,7 @@ import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
+  ImageIcon,
   MarkdownIcon,
   ParentIcon,
   PlusIcon,
@@ -89,7 +90,7 @@ const everyFilter = <const T extends readonly ResourcesFilter[]>(
   filters: T & (ResourcesFilter extends T[number] ? unknown : never),
 ): T => filters;
 
-const FILTERS = everyFilter(['markdown', 'reference', 'space', 'spaces']);
+const FILTERS = everyFilter(['markdown', 'image', 'reference', 'space', 'spaces']);
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
 const RESOURCE_FILTERS = FILTERS.filter(
@@ -106,6 +107,7 @@ const ALL_FILTERS: readonly ResourcesFilter[] = FILTERS;
 
 const FILTER_NAMES = {
   markdown: 'Markdown Resources',
+  image: 'Image Resources',
   reference: 'Reference Resources',
   space: 'Space Resources in this Space',
   spaces: 'Spaces in this Meta Space',
@@ -119,6 +121,7 @@ const FILTER_NAMES = {
  */
 const FILTER_GLYPHS = {
   markdown: MarkdownIcon,
+  image: ImageIcon,
   reference: ReferenceIcon,
   space: SpaceResourceIcon,
   spaces: ParentIcon,
@@ -649,6 +652,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
       ).length;
     return {
       markdown: ofKind('markdown'),
+      image: ofKind('image'),
       reference: ofKind('reference'),
       space: ofKind('space'),
       spaces: spaces.filter((space) => matched(space.title)).length,

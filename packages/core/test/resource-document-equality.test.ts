@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ZodRawShape } from 'zod';
-import { markdownResourceDocumentSchema, markdownResourceSchema } from '../src/index';
+import {
+  importImageResourceFrontmatterSchema,
+  imageResourceDocumentSchema,
+  imageResourceSchema,
+  markdownResourceDocumentSchema,
+  markdownResourceSchema,
+} from '../src/index';
 
 /**
  * The stored document is the whole markdown Resource less its id, and something has
@@ -17,8 +23,9 @@ import { markdownResourceDocumentSchema, markdownResourceSchema } from '../src/i
  * rule either could carry, and a runtime assertion inside `core` would be
  * checking its own source at import time.
  *
- * Only the markdown pair is guarded because Markdown is the authorable content
- * document. An Open Reference Resource reuses its Target's renderer read-only.
+ * The markdown pair is guarded because Markdown is the authorable content
+ * document, and the image triple below because its URL rule is content an
+ * author sets. An Open Reference Resource reuses its Target's renderer read-only.
  */
 describe('a stored markdown document is the resource less its id', () => {
   const RESOURCE_ID = '00000000-0000-4000-8000-000000000002';
@@ -120,5 +127,47 @@ describe('a stored markdown document is the resource less its id', () => {
      * empty case.
      */
     expect(examined).toBe(45);
+  });
+});
+
+/**
+ * The Image Resource's URL rule is one rule at every door (ADR 0106): the stored
+ * document, the Resource and the import variant each hold the same instance of
+ * every field schema but the id, so a URL one refuses the others refuse too.
+ */
+describe('an Image Resource is held to one rule at every door', () => {
+  const RESOURCE_ID = '00000000-0000-4000-8000-000000000002';
+
+  it('shares one instance of every rule but the id across document, resource and import', () => {
+    const resourceFieldSchemas: ZodRawShape = imageResourceSchema.shape;
+    const importFieldSchemas: ZodRawShape = importImageResourceFrontmatterSchema.shape;
+    expect(Object.keys(imageResourceDocumentSchema.shape).sort()).toEqual(
+      Object.keys(imageResourceSchema.shape)
+        .filter((key) => key !== 'id')
+        .sort(),
+    );
+    expect(Object.keys(importFieldSchemas).sort()).toEqual(
+      Object.keys(resourceFieldSchemas).sort(),
+    );
+    for (const [field, schema] of Object.entries(imageResourceDocumentSchema.shape)) {
+      expect(schema, `the document's "${field}" is not the resource's`).toBe(
+        resourceFieldSchemas[field],
+      );
+      expect(schema, `the import's "${field}" is not the resource's`).toBe(
+        importFieldSchemas[field],
+      );
+    }
+  });
+
+  it.each([
+    ['https://example.com/a.png', true],
+    ['/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU', true],
+    ['data:image/png;base64,AA==', false],
+    ['a.png', false],
+  ])('answers %j the same way at every door', (url, accepted) => {
+    const document = { title: 'A', kind: 'image', url };
+    expect(imageResourceDocumentSchema.safeParse(document).success).toBe(accepted);
+    expect(imageResourceSchema.safeParse({ ...document, id: RESOURCE_ID }).success).toBe(accepted);
+    expect(importImageResourceFrontmatterSchema.safeParse(document).success).toBe(accepted);
   });
 });
