@@ -125,13 +125,20 @@ export const spaceResourceFrontmatterSchema = z.object({
 export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
 
 /**
- * The root-relative URL of an image the host stores: `/images/<id>`, where the
- * id is the SHA-256 of the image's bytes spelled as unpadded base64url
- * (ADR 0106). Forty-three characters, and only the canonical spelling: the
- * last one carries four bits of the digest and two zero bits, so it is one of
- * the sixteen characters whose low two bits are clear.
+ * The id of an image the host stores: the SHA-256 of its bytes spelled as
+ * unpadded base64url (ADR 0106). Forty-three characters, and only the
+ * canonical spelling: the last one carries four bits of the digest and two
+ * zero bits, so it is one of the sixteen characters whose low two bits are
+ * clear.
  */
-const STORED_IMAGE_PATH = /^\/images\/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/u;
+const STORED_IMAGE_ID = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/u;
+
+export const isStoredImageId = (value: string): boolean => STORED_IMAGE_ID.test(value);
+
+/** The collection the host stores images under; a stored image's root-relative URL is `/images/<id>`. */
+export const STORED_IMAGE_COLLECTION_PATH = '/images';
+
+const STORED_IMAGE_PATH_PREFIX = `${STORED_IMAGE_COLLECTION_PATH}/`;
 
 /**
  * Whether an Image Resource may hold this URL (ADR 0106): an `https:` or
@@ -141,7 +148,12 @@ const STORED_IMAGE_PATH = /^\/images\/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/u;
  * relative form because it would resolve against whatever page drew it.
  */
 export const isAcceptedImageUrl = (url: string): boolean => {
-  if (url.startsWith('/')) return STORED_IMAGE_PATH.test(url);
+  if (url.startsWith('/')) {
+    return (
+      url.startsWith(STORED_IMAGE_PATH_PREFIX) &&
+      isStoredImageId(url.slice(STORED_IMAGE_PATH_PREFIX.length))
+    );
+  }
   if (!URL.canParse(url)) return false;
   const { protocol } = new URL(url);
   return protocol === 'https:' || protocol === 'http:';

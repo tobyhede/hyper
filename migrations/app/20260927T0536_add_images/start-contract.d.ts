@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:d4a0693a3c0aa69bb8e801dc1c840c9703fc5e6200b70d78ead42496a89737ce'>;
+  StorageHashBase<'sha256:0a1d0e875a03edce09456c6716c79931aa35b795c9bcf011f205571631d97a0c'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:26bc77f03788a526b20f8ac61c5d438d7c0bdb48156350feb364c8f0e868f393'>;
 export type ProfileHash =
@@ -45,12 +45,6 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly public: {
-    readonly Image: {
-      readonly id: CodecTypes['pg/text@1']['output'];
-      readonly mediaType: CodecTypes['pg/text@1']['output'];
-      readonly bytes: CodecTypes['pg/bytea@1']['output'];
-      readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    };
     readonly RepositoryState: {
       readonly singletonId: CodecTypes['pg/int4@1']['output'];
       readonly metaSpaceId: CodecTypes['pg/uuid@1']['output'];
@@ -74,12 +68,6 @@ export type FieldOutputTypes = {
 };
 export type FieldInputTypes = {
   readonly public: {
-    readonly Image: {
-      readonly id: CodecTypes['pg/text@1']['input'];
-      readonly mediaType: CodecTypes['pg/text@1']['input'];
-      readonly bytes: CodecTypes['pg/bytea@1']['input'];
-      readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
-    };
     readonly RepositoryState: {
       readonly singletonId: CodecTypes['pg/int4@1']['input'];
       readonly metaSpaceId: CodecTypes['pg/uuid@1']['input'];
@@ -103,12 +91,6 @@ export type FieldInputTypes = {
 };
 export type StorageColumnTypes = {
   readonly public: {
-    readonly images: {
-      readonly bytes: CodecTypes['pg/bytea@1']['output'];
-      readonly created_at: CodecTypes['pg/timestamptz@1']['output'];
-      readonly id: CodecTypes['pg/text@1']['output'];
-      readonly media_type: CodecTypes['pg/text@1']['output'];
-    };
     readonly repository_state: {
       readonly meta_space_id: CodecTypes['pg/uuid@1']['output'];
       readonly singleton_id: CodecTypes['pg/int4@1']['output'];
@@ -132,12 +114,6 @@ export type StorageColumnTypes = {
 };
 export type StorageColumnInputTypes = {
   readonly public: {
-    readonly images: {
-      readonly bytes: CodecTypes['pg/bytea@1']['input'];
-      readonly created_at: CodecTypes['pg/timestamptz@1']['input'];
-      readonly id: CodecTypes['pg/text@1']['input'];
-      readonly media_type: CodecTypes['pg/text@1']['input'];
-    };
     readonly repository_state: {
       readonly meta_space_id: CodecTypes['pg/uuid@1']['input'];
       readonly singleton_id: CodecTypes['pg/int4@1']['input'];
@@ -176,35 +152,6 @@ type ContractBase = Omit<
         readonly kind: 'postgres-schema';
         readonly entries: {
           readonly table: {
-            readonly images: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly media_type: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
-                };
-                readonly bytes: {
-                  readonly nativeType: 'bytea';
-                  readonly codecId: 'pg/bytea@1';
-                  readonly nullable: false;
-                };
-                readonly created_at: {
-                  readonly nativeType: 'timestamptz';
-                  readonly codecId: 'pg/timestamptz@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
-              };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
-            };
             readonly repository_state: {
               columns: {
                 readonly singleton_id: {
@@ -372,43 +319,11 @@ type ContractBase = Omit<
       readonly model: 'RepositoryState';
     };
     readonly resources: { readonly namespace: 'public' & NamespaceId; readonly model: 'Resource' };
-    readonly images: { readonly namespace: 'public' & NamespaceId; readonly model: 'Image' };
   };
   readonly domain: {
     readonly namespaces: {
       readonly public: {
         readonly models: {
-          readonly Image: {
-            readonly fields: {
-              readonly id: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-              readonly mediaType: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
-              readonly bytes: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bytea@1' };
-              };
-              readonly createdAt: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/timestamptz@1' };
-              };
-            };
-            readonly relations: Record<string, never>;
-            readonly storage: {
-              readonly table: 'images';
-              readonly namespaceId: 'public';
-              readonly fields: {
-                readonly id: { readonly column: 'id' };
-                readonly mediaType: { readonly column: 'media_type' };
-                readonly bytes: { readonly column: 'bytes' };
-                readonly createdAt: { readonly column: 'created_at' };
-              };
-            };
-          };
           readonly RepositoryState: {
             readonly fields: {
               readonly singletonId: {

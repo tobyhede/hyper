@@ -2,6 +2,7 @@ import { encodeCompactUuid, spaceSnapshotSchema, uuidSchema } from '@project/cor
 import type { LoadedSpace, SpaceBackend } from '@project/persistence';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  productAddress,
   productDestinationPath,
   resolveProductDestination,
   resolveProductDestinationInSnapshot,
@@ -380,4 +381,15 @@ describe('product destinations', () => {
       ),
     ).resolves.toEqual({ kind: 'unresolved' });
   });
+});
+
+describe('a stored image address', () => {
+  // Stored images are served by the application, not opened as a destination
+  // in it (ADR 0106), so an image URL is not the product's to resolve.
+  it.each(['/images', `/images/${'A'.repeat(43)}`, '/images/not-an-id'])(
+    'classifies %s as outside product addressing',
+    (path) => {
+      expect(productAddress(path)).toEqual({ kind: 'outside' });
+    },
+  );
 });

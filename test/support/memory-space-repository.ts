@@ -6,6 +6,8 @@ import {
   decideCommit,
   readInIdOrder as read,
   type AggregateLoadResult,
+  type ImageId,
+  type StoredImage,
   type LoadedAggregate,
   type LoadedSpace,
   type RepositoryCommitResult,
@@ -36,6 +38,8 @@ const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): Load
 export class MemorySpaceRepository implements SpaceRepository {
   readonly #spaces = new Map<UUID, LoadedSpace>();
   #metaSpaceId: UUID | undefined;
+  /** Stored images, beside the Spaces and untouched by either lifecycle door (ADR 0106). */
+  readonly #images = new Map<ImageId, StoredImage>();
 
   /**
    * Either an uninitialized repository — no Spaces and no Meta identity — or
@@ -165,6 +169,19 @@ export class MemorySpaceRepository implements SpaceRepository {
     if (stored === undefined) return Promise.reject(new Error(`Space ${id} does not exist`));
     this.#spaces.set(id, { ...stored, exportedRevision: revision });
     return Promise.resolve();
+  }
+
+  storeImage(image: StoredImage): Promise<'stored' | 'existing'> {
+    if (this.#images.has(image.id)) return Promise.resolve('existing');
+    this.#images.set(image.id, { ...image, bytes: image.bytes.slice() });
+    return Promise.resolve('stored');
+  }
+
+  loadImage(id: ImageId): Promise<StoredImage | undefined> {
+    const image = this.#images.get(id);
+    return Promise.resolve(
+      image === undefined ? undefined : { ...image, bytes: image.bytes.slice() },
+    );
   }
 
   commit(request: SpaceCommit): Promise<RepositoryCommitResult> {

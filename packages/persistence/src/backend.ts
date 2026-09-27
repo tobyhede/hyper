@@ -91,7 +91,14 @@ export type ProtocolFault =
   | {
       kind: 'unexpected-problem';
       problemCode:
-        'not-found' | 'invalid-space-id' | 'unsupported-media-type' | 'method-not-allowed';
+        | 'not-found'
+        | 'invalid-space-id'
+        | 'unsupported-media-type'
+        | 'method-not-allowed'
+        | 'invalid-image-id'
+        | 'image-too-large'
+        | 'image-format-unsupported'
+        | 'image-svg-unsupported';
     };
 
 export type CommitResult =

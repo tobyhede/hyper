@@ -16,7 +16,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4e4bea125e21acc61505c207378f4b10ce265a4f0c63e176b71f3ddf9986b572'>;
+  StorageHashBase<'sha256:301f96a6f8786de4f7a45c0b1574e7bed9dd2868a5e445510fe32d0d29973001'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:5282b6091e26ba5dfb56feeb9a788d9f937328a35816f953b05008ddddb77b7c'>;
 export type ProfileHash =
@@ -31,12 +31,6 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly __unbound__: {
-    readonly Image: {
-      readonly id: CodecTypes['sqlite/text@1']['output'];
-      readonly mediaType: CodecTypes['sqlite/text@1']['output'];
-      readonly bytes: CodecTypes['sqlite/blob@1']['output'];
-      readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
-    };
     readonly RepositoryState: {
       readonly singletonId: CodecTypes['sqlite/integer@1']['output'];
       readonly metaSpaceId: CodecTypes['sqlite/text@1']['output'];
@@ -60,12 +54,6 @@ export type FieldOutputTypes = {
 };
 export type FieldInputTypes = {
   readonly __unbound__: {
-    readonly Image: {
-      readonly id: CodecTypes['sqlite/text@1']['input'];
-      readonly mediaType: CodecTypes['sqlite/text@1']['input'];
-      readonly bytes: CodecTypes['sqlite/blob@1']['input'];
-      readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
-    };
     readonly RepositoryState: {
       readonly singletonId: CodecTypes['sqlite/integer@1']['input'];
       readonly metaSpaceId: CodecTypes['sqlite/text@1']['input'];
@@ -89,12 +77,6 @@ export type FieldInputTypes = {
 };
 export type StorageColumnTypes = {
   readonly __unbound__: {
-    readonly images: {
-      readonly bytes: CodecTypes['sqlite/blob@1']['output'];
-      readonly created_at: CodecTypes['sqlite/datetime@1']['output'];
-      readonly id: CodecTypes['sqlite/text@1']['output'];
-      readonly media_type: CodecTypes['sqlite/text@1']['output'];
-    };
     readonly repository_state: {
       readonly meta_space_id: CodecTypes['sqlite/text@1']['output'];
       readonly singleton_id: CodecTypes['sqlite/integer@1']['output'];
@@ -118,12 +100,6 @@ export type StorageColumnTypes = {
 };
 export type StorageColumnInputTypes = {
   readonly __unbound__: {
-    readonly images: {
-      readonly bytes: CodecTypes['sqlite/blob@1']['input'];
-      readonly created_at: CodecTypes['sqlite/datetime@1']['input'];
-      readonly id: CodecTypes['sqlite/text@1']['input'];
-      readonly media_type: CodecTypes['sqlite/text@1']['input'];
-    };
     readonly repository_state: {
       readonly meta_space_id: CodecTypes['sqlite/text@1']['input'];
       readonly singleton_id: CodecTypes['sqlite/integer@1']['input'];
@@ -162,35 +138,6 @@ type ContractBase = Omit<
         readonly kind: 'sqlite-namespace';
         readonly entries: {
           readonly table: {
-            readonly images: {
-              columns: {
-                readonly id: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly media_type: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/text@1';
-                  readonly nullable: false;
-                };
-                readonly bytes: {
-                  readonly nativeType: 'blob';
-                  readonly codecId: 'sqlite/blob@1';
-                  readonly nullable: false;
-                };
-                readonly created_at: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'sqlite/datetime@1';
-                  readonly nullable: false;
-                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-                };
-              };
-              primaryKey: { readonly columns: readonly ['id'] };
-              uniques: readonly [];
-              indexes: readonly [];
-              foreignKeys: readonly [];
-            };
             readonly repository_state: {
               columns: {
                 readonly singleton_id: {
@@ -341,43 +288,11 @@ type ContractBase = Omit<
       readonly namespace: '__unbound__' & NamespaceId;
       readonly model: 'Resource';
     };
-    readonly images: { readonly namespace: '__unbound__' & NamespaceId; readonly model: 'Image' };
   };
   readonly domain: {
     readonly namespaces: {
       readonly __unbound__: {
         readonly models: {
-          readonly Image: {
-            readonly fields: {
-              readonly id: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
-              };
-              readonly mediaType: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
-              };
-              readonly bytes: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/blob@1' };
-              };
-              readonly createdAt: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/datetime@1' };
-              };
-            };
-            readonly relations: Record<string, never>;
-            readonly storage: {
-              readonly table: 'images';
-              readonly namespaceId: '__unbound__';
-              readonly fields: {
-                readonly id: { readonly column: 'id' };
-                readonly mediaType: { readonly column: 'media_type' };
-                readonly bytes: { readonly column: 'bytes' };
-                readonly createdAt: { readonly column: 'created_at' };
-              };
-            };
-          };
           readonly RepositoryState: {
             readonly fields: {
               readonly singletonId: {

@@ -7,9 +7,11 @@ import {
 } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import {
+  admitImage,
   AggregateInvariantError,
   createWorkingSpaceLoader,
   REVISION_CEILING,
+  type StoredImage,
 } from '@project/persistence';
 import { expect, it } from 'vitest';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
@@ -2048,4 +2050,82 @@ export const spaceRepositoryContract = (
       });
     });
   }
+
+  /*
+   * The store of images beside Spaces (ADR 0106). It holds content by its
+   * digest, so what is asserted is that the bytes and media type come back
+   * exactly, that the same bytes are stored once, and that neither aggregate
+   * lifecycle door reaches it.
+   */
+  const storedImage = async (bytes: Uint8Array<ArrayBuffer>): Promise<StoredImage> => {
+    const admission = await admitImage(bytes);
+    if (admission.kind !== 'admitted') throw new Error(`Not an image: ${admission.code}`);
+    return admission.image;
+  };
+  const pngBytes = () =>
+    Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0x7f, 0x80]);
+  const gifBytes = () => new TextEncoder().encode('GIF89a\u0001\u0000\u0000');
+
+  it(`${name} stores an image and loads its bytes and media type unchanged`, async () => {
+    await withHarness(async (repository) => {
+      const png = await storedImage(pngBytes());
+      const gif = await storedImage(gifBytes());
+
+      await expect(repository.storeImage(png)).resolves.toBe('stored');
+      await expect(repository.storeImage(gif)).resolves.toBe('stored');
+
+      await expect(repository.loadImage(png.id)).resolves.toEqual({
+        id: png.id,
+        mediaType: 'image/png',
+        bytes: pngBytes(),
+      });
+      await expect(repository.loadImage(gif.id)).resolves.toEqual({
+        id: gif.id,
+        mediaType: 'image/gif',
+        bytes: gifBytes(),
+      });
+    });
+  });
+
+  it(`${name} stores the same bytes once, answering the second store as existing`, async () => {
+    await withHarness(async (repository) => {
+      const image = await storedImage(pngBytes());
+
+      await expect(repository.storeImage(image)).resolves.toBe('stored');
+      await expect(repository.storeImage(await storedImage(pngBytes()))).resolves.toBe('existing');
+      await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+    });
+  });
+
+  it(`${name} answers an image it does not store as absent`, async () => {
+    await withHarness(async (repository) => {
+      const image = await storedImage(pngBytes());
+      await expect(repository.loadImage(image.id)).resolves.toBeUndefined();
+    });
+  });
+
+  it(`${name} keeps stored images outside the aggregate its lifecycle doors replace`, async () => {
+    await withHarness(async (repository) => {
+      const image = await storedImage(pngBytes());
+      await seed(repository, space(SPACE_ID, 'Before', [RESOURCE_ID]));
+      await repository.storeImage(image);
+
+      await expect(
+        repository.replaceAggregate(
+          { metaSpaceId: OTHER_SPACE_ID, spaces: [space(OTHER_SPACE_ID, 'After', [])] },
+          SPACE_ID,
+        ),
+      ).resolves.toMatchObject({ kind: 'replaced' });
+      await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+    });
+  });
+
+  it(`${name} keeps a stored image across a fresh repository host`, async (context) => {
+    await withReopenHarness(context, async (repository, reopen) => {
+      const image = await storedImage(pngBytes());
+      await repository.storeImage(image);
+
+      await expect((await reopen()).loadImage(image.id)).resolves.toEqual(image);
+    });
+  });
 };
