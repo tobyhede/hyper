@@ -2,7 +2,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { GraphHeadShape } from '@project/core';
 import { DropdownMenuItem } from './components/dropdown-menu';
 import { ChoiceMenu, ChoiceMenuTrigger, type ChoiceMenuChoice } from './ChoiceMenu';
-import { GraphColorLine } from './GraphColorLine';
+import { GraphLegendMark } from './GraphLegendMark';
+import type { GraphAppearance } from './graph-color';
 import { ToolbarButton, ToolbarGroup } from './components/toolbar';
 import { MapMenuActions, GraphMenuActions } from './IdentityMenuActions';
 import { MapIcon, EditIcon, GraphIcon } from './icons';
@@ -15,11 +16,12 @@ export interface CanvasSpaceResourceChoice {
   readonly title: string;
 }
 
-/** A Graph a Space Resource can select, carrying the colour its row is marked in. */
-export interface CanvasSpaceResourceGraphChoice extends CanvasSpaceResourceChoice {
-  /** The Graph's resolved colour, through the shared `graphColor` seam. */
-  readonly color: string;
-}
+/**
+ * A Graph a Space Resource can select, carrying the colour and head shape its
+ * row is marked in, resolved together through `graphAppearance`.
+ */
+export interface CanvasSpaceResourceGraphChoice
+  extends CanvasSpaceResourceChoice, GraphAppearance {}
 
 /**
  * The commands on an Open Space Resource rail, in one shape for the Map and
@@ -53,15 +55,15 @@ export interface CanvasSpaceResourceCommands {
  * A Graph's commands: the shared ones, and how its Edges are drawn — its
  * colour and head shape — which a Map does not carry.
  */
-export interface CanvasSpaceResourceGraphCommands extends CanvasSpaceResourceCommands {
-  readonly color: string;
+export interface CanvasSpaceResourceGraphCommands
+  extends CanvasSpaceResourceCommands, GraphAppearance {
   readonly colors: readonly PaletteColorEntry[];
   readonly onRecolor: ((color: string) => void) | null;
-  readonly headShape: GraphHeadShape;
   readonly onChangeHeadShape: ((headShape: GraphHeadShape) => void) | null;
 }
 
-type GraphAppearance = Pick<
+/** How a Graph's Edges are drawn, with the commands that change it. */
+type GraphAppearanceControls = Pick<
   CanvasSpaceResourceGraphCommands,
   'color' | 'colors' | 'onRecolor' | 'headShape' | 'onChangeHeadShape'
 >;
@@ -161,10 +163,10 @@ export function SpaceResourceSelectors({
         onReport={onReport}
         icon={<GraphIcon size={14} />}
         testId="space-resource-graph"
-        choices={graphs.map(({ id, title, color }) => ({
+        choices={graphs.map(({ id, title, color, headShape }) => ({
           id,
           title,
-          icon: <GraphColorLine color={color} />,
+          icon: <GraphLegendMark color={color} headShape={headShape} />,
         }))}
         chosen={graphId}
         disabled={disabled === true || busy}
@@ -178,14 +180,14 @@ interface SpaceResourceSelectorProps {
   readonly onBusy: (busy: boolean) => void;
   readonly commands: CanvasSpaceResourceCommands | undefined;
   /** How a Graph's Edges are drawn, and the commands that change it; a Map has none. */
-  readonly appearance?: GraphAppearance | undefined;
+  readonly appearance?: GraphAppearanceControls | undefined;
   readonly renaming: boolean;
   readonly onRenaming: (editing: boolean) => void;
   readonly onReport: (message: string | null) => void;
   readonly label: string;
   readonly icon: ReactNode;
   readonly testId: string;
-  /** Each row's own mark rides on its choice: a Graph's colour line, and nothing on a Map. */
+  /** Each row's own mark rides on its choice: a Graph's legend mark, and nothing on a Map. */
   readonly choices: readonly ChoiceMenuChoice<string>[];
   readonly chosen: string | null;
   /** Authoring is withdrawn from this canvas; the selection itself is known. */
