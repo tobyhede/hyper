@@ -197,6 +197,35 @@ export const authoredSpace: Space = loaded(loadSpaceSnapshot(authoredSnapshot));
 export const sparseAuthoredSpace: Space = loaded(loadSpaceSnapshot(sparseAuthoredSnapshot));
 
 /**
+ * {@link authoredSnapshot} with `Collection 1`'s Mid and Short storing `dot`
+ * and `diamond` as the tracked fixture's do, and Long storing none so it draws
+ * the arrow. The Graph HUD's `Retained` story draws it, so its key proves each
+ * mark ends in its own Graph's head shape (ADR 0105).
+ */
+export const authoredSnapshotWithGraphHeads: SpaceSnapshot = {
+  ...authoredSnapshot,
+  document: {
+    ...authoredSnapshot.document,
+    maps: (authoredSnapshot.document.maps ?? []).map((map) =>
+      map.id === COLLECTION_ONE
+        ? {
+            ...map,
+            graphs: map.graphs.map((graph) => {
+              if (graph.title === 'Mid') return { ...graph, headShape: 'dot' as const };
+              if (graph.title === 'Short') return { ...graph, headShape: 'diamond' as const };
+              return graph;
+            }),
+          }
+        : map,
+    ),
+  },
+};
+
+export const authoredSpaceWithGraphHeads: Space = loaded(
+  loadSpaceSnapshot(authoredSnapshotWithGraphHeads),
+);
+
+/**
  * {@link sparseAuthoredSnapshot} with eight more Graphs in `Collection 1`, each
  * one Edge from Resource 4 to Resource 1, under titles long enough that ten of
  * them cannot share one line of a tooltip.
@@ -644,7 +673,9 @@ const dockPositions = (count: number): Record<string, ResourcePlacement> =>
  *
  * **No Graph carries a colour**, exactly as `authoredSnapshot` does not: a Graph
  * without one takes a palette slot by order through `graphColorsByGraphId`, so
- * the fixture cannot disagree with the palette the canvas draws.
+ * the fixture cannot disagree with the palette the canvas draws. Mid and Short
+ * store the head shapes the tracked fixture's Graphs of those names do, and
+ * Long stores none, so the Graph lists draw a default beside two stored ones.
  *
  * It **declares where it opens**, so `defaultMap` answers that for the Dock
  * exactly as it does for the app.
@@ -663,8 +694,8 @@ export const commandDockSnapshot: SpaceSnapshot = {
         positions: dockPositions(5),
         graphs: [
           { id: dockId(2), title: 'Long', edges: dockChain(4) },
-          { id: dockId(3), title: 'Mid', edges: dockChain(3) },
-          { id: dockId(4), title: 'Short', edges: dockChain(2) },
+          { id: dockId(3), title: 'Mid', headShape: 'dot', edges: dockChain(3) },
+          { id: dockId(4), title: 'Short', headShape: 'diamond', edges: dockChain(2) },
         ],
       },
       {

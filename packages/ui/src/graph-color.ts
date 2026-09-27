@@ -1,4 +1,4 @@
-import type { Graph } from '@project/core';
+import { graphHeadShape, type Graph, type GraphHeadShape } from '@project/core';
 
 export const FALLBACK_GRAPH_COLOR = '#8a94a6';
 
@@ -13,4 +13,21 @@ export const FALLBACK_GRAPH_COLOR = '#8a94a6';
  */
 export function graphColor(graph: Graph, colorByGraphId: Readonly<Record<string, string>>): string {
   return colorByGraphId[graph.id] ?? graph.color ?? FALLBACK_GRAPH_COLOR;
+}
+
+/** How a Graph's Edges are drawn: the two channels an Edge is told apart by. */
+export interface GraphAppearance {
+  readonly color: string;
+  readonly headShape: GraphHeadShape;
+}
+
+/**
+ * A Graph's resolved colour and head shape, through `graphColor` and core's
+ * `graphHeadShape` — the pair every list naming a Graph marks its row in.
+ */
+export function graphAppearance(
+  graph: Graph,
+  colorByGraphId: Readonly<Record<string, string>>,
+): GraphAppearance {
+  return { color: graphColor(graph, colorByGraphId), headShape: graphHeadShape(graph) };
 }
