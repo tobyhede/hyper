@@ -775,7 +775,7 @@ const openImageStory = '/?story=components--resource--open-image-resource&mode=p
 
 /**
  * An Open Image Resource is the Open Markdown front with its picture as the
- * content (ADR 0107). Drawn at one canvas unit per pixel, the first-Open size —
+ * content. Drawn at one canvas unit per pixel, the first-Open size —
  * the picture plus `OPEN_RESOURCE_CHROME` — leaves a content area the picture's
  * own size, which is the drawn half of the check `open-resource-chrome.test.ts`
  * makes against the stylesheet. In a Resource resized larger the picture keeps

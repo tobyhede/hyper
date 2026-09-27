@@ -111,6 +111,11 @@ export const handRolledStyles = [
       "`ResourceContent`'s base appearance plus the container-query typography that scales a presented Resource with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
   },
   {
+    block: 'resource-image',
+    reason:
+      "Named only by the `.resource` block's rule that stacks a presented Image Resource's name over its picture: the presented frame is `.resource--full`'s, so the rule that lays it out lives with that block rather than in the picture's stylesheet. `ResourceImage`'s own appearance is in `packages/ui/src/resource-image.css`, beside the component.",
+  },
+  {
     block: 'canvas-resource',
     reason:
       "Two rules, both adapter and application state rather than appearance: React Flow's \"this is the actively presented Resource\" fact, and the lean an embedded Resource is given while the Resource framing it is dragged — which is the application's, because only it knows which Resource frames which. `CanvasResource`'s own appearance is in `packages/ui/src/canvas-resource.css`, beside the component.",

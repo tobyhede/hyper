@@ -4,19 +4,25 @@ import DOMPurify from 'dompurify';
 import { titleName } from '@project/core';
 import { ResourceImage } from './ResourceImage';
 
-interface ResourceContentTitle {
+/**
+ * What a Resource's content area draws: a Markdown document, or an Image
+ * Resource's picture in the same place. The Open front and the presented
+ * Resource both draw one.
+ */
+export type ResourceContentBody =
+  | { readonly kind: 'markdown'; readonly source: string }
+  | { readonly kind: 'image'; readonly url: string };
+
+export interface ResourceContentProps {
   /**
    * The Resource's Title, whole. Presenting draws its **name** — the first line —
    * because the Title ladder belongs to the Resource front and nothing else
    * (ADR 0083), and a presented Resource is a different surface with a different
    * frame around it.
    */
-  title: string;
+  readonly title: string;
+  readonly content: ResourceContentBody;
 }
-
-/** A presented Resource draws its Markdown, or an Image Resource's picture (ADR 0107). */
-export type ResourceContentProps = ResourceContentTitle &
-  ({ markdown: string; imageUrl?: never } | { imageUrl: string; markdown?: never });
 
 interface RenderedMarkdownProps {
   readonly markdown: string;
@@ -40,7 +46,7 @@ export function RenderedMarkdown({ markdown, className }: RenderedMarkdownProps)
 }
 
 /**
- * Renders a resource's title and its Markdown content, **parsed**, for presenting.
+ * Renders a resource's title and its content, Markdown **parsed**, for presenting.
  *
  * An Open Resource draws its body through {@link RenderedMarkdown} as well, and
  * editing swaps that body for `MarkdownSourceEditor`, the one place source is
@@ -55,15 +61,15 @@ export function RenderedMarkdown({ markdown, className }: RenderedMarkdownProps)
  * `<iframe src=javascript:>` would otherwise run in the app's origin. Do not
  * insert parsed Markdown without passing it through DOMPurify.
  */
-export function ResourceContent(props: ResourceContentProps) {
-  const name = titleName(props.title);
+export function ResourceContent({ title, content }: ResourceContentProps) {
+  const name = titleName(title);
   return (
     <article className="resource resource--full" data-testid="resource-content">
       <h2 className="resource__title">{name}</h2>
-      {props.imageUrl === undefined ? (
-        <RenderedMarkdown className="resource__body" markdown={props.markdown} />
+      {content.kind === 'markdown' ? (
+        <RenderedMarkdown className="resource__body" markdown={content.source} />
       ) : (
-        <ResourceImage key={props.imageUrl} url={props.imageUrl} name={name} />
+        <ResourceImage key={content.url} url={content.url} name={name} />
       )}
     </article>
   );

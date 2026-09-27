@@ -3,7 +3,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from '../src/components/ResourcesPopover';
 import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
@@ -56,6 +56,7 @@ const resourceNode = (
   title: string,
   id: typeof RESOURCE_ID = RESOURCE_ID,
   selected = false,
+  kind: Exclude<ResourceNodeData['kind'], 'image'> = 'markdown',
 ): ResourceFlowNode => ({
   id,
   type: 'resource',
@@ -67,7 +68,7 @@ const resourceNode = (
     resourceId: id,
     title,
     readOnly: false,
-    kind: 'markdown',
+    kind,
     active: false,
     selectedForAuthoring: false,
     showContent: false,
@@ -414,14 +415,7 @@ it.each(['Enter', ' '])('opens a focused Reference Resource with %s', async (key
 
 describe.each([
   ['Resource', resourceNode('A'), RESOURCE_ID],
-  [
-    'Reference Resource',
-    {
-      ...resourceNode('A again', REFERENCE_ID),
-      data: { ...resourceNode('A again', REFERENCE_ID).data, kind: 'reference' as const },
-    },
-    REFERENCE_ID,
-  ],
+  ['Reference Resource', resourceNode('A again', REFERENCE_ID, false, 'reference'), REFERENCE_ID],
 ] as const)('a focused %s while placement is pending', (_kind, projected, id) => {
   it.each(['Enter', ' '])('does not open with %s', async (key) => {
     const { openResource } = await mountGraph([projected], undefined, undefined, false);

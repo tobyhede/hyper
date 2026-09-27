@@ -339,9 +339,9 @@ const roomBetween = (from: Extent, to: Extent): Extent => {
  *
  * A Space Resource draws a whole Map and opens larger. An Image Resource with a
  * recorded natural size opens to hold it at one pixel per canvas unit, scaled
- * down proportionally to fit {@link IMAGE_FIRST_OPEN_BOUND}, inside the Open
- * Markdown front's chrome (ADR 0107), and never smaller than the Closed size on
- * either axis. Read from the document alone, so Opening never waits on a load.
+ * down proportionally to fit {@link IMAGE_FIRST_OPEN_BOUND}, plus
+ * {@link OPEN_RESOURCE_CHROME}, and never smaller than the Closed size on either
+ * axis. Read from the document alone, so Opening never waits on a load.
  */
 const firstOpenSize = (document: ResourceDocument | undefined): Extent => {
   if (document?.kind === 'space') return DEFAULT_SPACE_RESOURCE_OPEN_SIZE;
@@ -352,16 +352,12 @@ const firstOpenSize = (document: ResourceDocument | undefined): Extent => {
     IMAGE_FIRST_OPEN_BOUND.width / natural.width,
     IMAGE_FIRST_OPEN_BOUND.height / natural.height,
   );
-  return {
-    width: Math.max(
-      COLLAPSED_RESOURCE_SIZE.width,
-      Math.round(natural.width * scale) + OPEN_RESOURCE_CHROME.width,
-    ),
-    height: Math.max(
-      COLLAPSED_RESOURCE_SIZE.height,
-      Math.round(natural.height * scale) + OPEN_RESOURCE_CHROME.height,
-    ),
-  };
+  const fitted = (axis: keyof Extent): number =>
+    Math.max(
+      COLLAPSED_RESOURCE_SIZE[axis],
+      Math.round(natural[axis] * scale) + OPEN_RESOURCE_CHROME[axis],
+    );
+  return { width: fitted('width'), height: fitted('height') };
 };
 
 /**

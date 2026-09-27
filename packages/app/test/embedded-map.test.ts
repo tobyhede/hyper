@@ -79,15 +79,18 @@ async function projection(open = false) {
   );
 }
 
-const parent = (source: ResourceFlowNode, width = 1000, height = 1000): ResourceFlowNode => ({
-  ...source,
-  id: PARENT,
-  width,
-  height,
-  position: { x: 800, y: 900 },
-  zIndex: 10,
-  data: { ...source.data, resourceId: PARENT, kind: 'space' },
-});
+const parent = (source: ResourceFlowNode, width = 1000, height = 1000): ResourceFlowNode => {
+  if (source.data.kind === 'image') throw new Error('The fixture parent is not an Image Resource');
+  return {
+    ...source,
+    id: PARENT,
+    width,
+    height,
+    position: { x: 800, y: 900 },
+    zIndex: 10,
+    data: { ...source.data, resourceId: PARENT, kind: 'space' },
+  };
+};
 
 async function draw(open = false, width = 1000, height = 1000) {
   const projected = await projection(open);

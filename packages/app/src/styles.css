@@ -423,6 +423,13 @@ body {
   font-size: 1.3rem;
 }
 
+/* A presented Image Resource stacks its name over its picture; the picture takes
+   the room left below the name rather than overflowing the frame. */
+.resource--full:has(> .resource-image) {
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---- The Resource reached during traversal ---- */
 /* Presenting draws the active resource's content instead of its title (ADR 0027).
    Same box as every other resource — the Resource's 16:9 frame, which the camera then

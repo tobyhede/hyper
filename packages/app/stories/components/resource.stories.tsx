@@ -440,7 +440,7 @@ OpenReference.meta = { iframed: true };
 
 /**
  * An Open Image Resource is the Open Markdown front with its picture as the
- * content (ADR 0107). Three specimens at one canvas unit per pixel: a 400×300
+ * content. Three specimens at one canvas unit per pixel: a 400×300
  * picture at the size its first Open writes — the picture plus the front's
  * chrome — the same picture in a Resource resized larger, where it keeps its
  * natural size rather than being enlarged, and a URL that does not load.
@@ -461,6 +461,7 @@ export const OpenImage: Story = () => {
         <p className="text-xs text-muted-foreground">400×300 at its first Open</p>
         <CanvasResourceNodeSpecimen
           title="Harbour"
+          kind="image"
           imageUrl={harbour}
           open={open}
           onOpenChange={changeOpen}
@@ -473,6 +474,7 @@ export const OpenImage: Story = () => {
         <p className="text-xs text-muted-foreground">400×300 in a Resource resized larger</p>
         <CanvasResourceNodeSpecimen
           title="Harbour, larger"
+          kind="image"
           imageUrl={harbour}
           open
           nodeSize={{ width: 600, height: 440 }}
@@ -484,6 +486,7 @@ export const OpenImage: Story = () => {
         <p className="text-xs text-muted-foreground">a URL that does not load</p>
         <CanvasResourceNodeSpecimen
           title="Missing"
+          kind="image"
           imageUrl="/images/missing-picture.png"
           open
           nodeSize={firstOpen}

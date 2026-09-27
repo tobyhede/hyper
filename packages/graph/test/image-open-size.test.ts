@@ -9,9 +9,9 @@ import { loadSpaceSnapshot, SnapshotEdit, type SnapshotEditOutcome } from '../sr
 import { uuid } from './resource-files';
 
 /**
- * What an Image Resource first Opens to (ADR 0106, ADR 0107): its recorded
- * natural size at one pixel per canvas unit, scaled down to fit 1280×960, plus
- * the Open Markdown front's chrome, and never smaller than the Closed size.
+ * What an Image Resource first Opens to (ADR 0106): its recorded natural size at
+ * one pixel per canvas unit, scaled down to fit 1280×960, plus the Open front's
+ * chrome, and never smaller than the Closed size.
  */
 
 const SPACE_ID = uuid('00000000-0000-4000-8000-000000000001');

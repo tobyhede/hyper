@@ -3,14 +3,17 @@ export const COLLAPSED_RESOURCE_SIZE = { width: 260, height: 146 } as const;
 
 /** The concrete Open Size recorded when a Resource first Opens (ADR 0066). */
 export const DEFAULT_OPEN_SIZE = { width: 560, height: 420 } as const;
+
 /**
- * What the Open Markdown Resource front draws around its content area, in canvas
- * units: the Resource's edge on both sides across; and down, the edge, the
- * paper above the content, the content divider, a Title footer of one line and
- * the edge again. An Open Image Resource is that front with its image as the
- * content (ADR 0107), so its first Open adds this to the image. Rounded up to
- * the whole unit. `packages/ui/test/open-resource-chrome.test.ts` holds it to
- * the stylesheet.
+ * The room an Open Resource's front takes around its content area, in canvas
+ * units, where its commands float outside it: the edge on both sides across;
+ * and down, the edge, the paper above the content, the content divider, a Title
+ * footer of one line and the edge again. An Image Resource's first Open adds it
+ * to the picture (ADR 0106), so the number is the domain's and the stylesheet
+ * draws to it: across exactly, and down within one unit, rounded up so the
+ * picture is never scaled down to fit. `packages/ui/test/open-resource-chrome.test.ts`
+ * holds the stylesheet to it and `packages/app/e2e/image-resource.spec.ts`
+ * measures the drawn front against it.
  */
 export const OPEN_RESOURCE_CHROME = { width: 8, height: 59 } as const;
 

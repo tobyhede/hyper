@@ -16,6 +16,7 @@ import {
   ResourceContent,
   type CanvasResourceFront,
   type CanvasResourceProps,
+  type ResourceContentBody,
 } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
@@ -52,13 +53,16 @@ type ReferenceFront = Mutable<Extract<CanvasResourceFront, { kind: 'reference' }
 type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
 type ImageFront = Mutable<Extract<CanvasResourceFront, { kind: 'image' }>>;
 
+/** The kinds whose front is built from node data alone; an Image Resource's needs its URL. */
+type FrontKind = Exclude<ResourceFlowNode['data']['kind'], 'image'>;
+
 /**
  * The front each kind draws, keyed by the domain union so a kind added to it
  * fails to build here rather than drawing as Markdown.
  */
 const frontOfKind = (
-  kind: ResourceFlowNode['data']['kind'],
-  fronts: Record<ResourceFlowNode['data']['kind'], CanvasResourceFront>,
+  kind: FrontKind,
+  fronts: Record<FrontKind, CanvasResourceFront>,
 ): CanvasResourceFront => fronts[kind];
 
 /*
@@ -174,22 +178,26 @@ export function ResourceNode({
   if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
   if (data.spaceRail !== undefined) spaceFront.spaceRail = data.spaceRail;
   if (data.portal !== undefined) spaceFront.portal = data.portal;
-  // Closed, an Image Resource draws its Title and kind and no thumbnail (ADR 0106);
-  // Open, its picture is the content the Markdown front would draw (ADR 0107).
-  const imageFront: ImageFront = {
-    kind: 'image',
-    url: data.imageUrl ?? '',
-    open: data.open === true,
+  // Closed, an Image Resource draws its Title and kind and no thumbnail; Open, its
+  // picture is the content the Markdown front would draw.
+  const imageFront = (url: string): ImageFront => {
+    const image: ImageFront = { kind: 'image', url, open: data.open === true };
+    if (data.onEditResource !== undefined) image.onOpenChange = data.onEditResource;
+    return image;
   };
-  if (data.onEditResource !== undefined) {
-    imageFront.onOpenChange = data.onEditResource;
-  }
-  const front = frontOfKind(data.kind, {
-    markdown: markdownFront,
-    reference: referenceFront,
-    space: spaceFront,
-    image: imageFront,
-  });
+  const front =
+    data.kind === 'image'
+      ? imageFront(data.imageUrl)
+      : frontOfKind(data.kind, {
+          markdown: markdownFront,
+          reference: referenceFront,
+          space: spaceFront,
+        });
+  /** What presenting draws: an Image Resource's picture, or the resolved Markdown. */
+  const presentedContent: ResourceContentBody =
+    data.kind === 'image'
+      ? { kind: 'image', url: data.imageUrl }
+      : { kind: 'markdown', source: data.body ?? '' };
 
   /**
    * Whether this Resource's anchors are also affordances.
@@ -497,11 +505,7 @@ export function ResourceNode({
       )}
       {data.showContent ? (
         <div className="rf-resource-node__content">
-          {data.imageUrl === undefined ? (
-            <ResourceContent title={data.title} markdown={data.body ?? ''} />
-          ) : (
-            <ResourceContent title={data.title} imageUrl={data.imageUrl} />
-          )}
+          <ResourceContent title={data.title} content={presentedContent} />
         </div>
       ) : titleEditor !== undefined ? (
         <CanvasResource

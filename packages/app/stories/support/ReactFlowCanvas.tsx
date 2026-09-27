@@ -388,7 +388,7 @@ export function MapCanvasFixture({
   );
 }
 
-export interface CanvasResourceNodeSpecimenProps {
+interface CanvasResourceNodeSpecimenBaseProps {
   readonly resourceId?: ResourceId;
   readonly selected?: boolean;
   readonly editingTitle?: boolean;
@@ -408,15 +408,20 @@ export interface CanvasResourceNodeSpecimenProps {
   readonly zoom?: number | undefined;
   readonly title?: string;
   readonly body?: string;
-  /**
-   * Draw the fixture Resource as an Image Resource showing this URL, as the
-   * projection hands `ResourceNode` one (ADR 0106, ADR 0107).
-   */
-  readonly imageUrl?: string;
   readonly readOnly?: boolean;
   /** Whether the specimen can be moved by a pointer; see {@link StoryCanvasProps.draggable}. */
   readonly draggable?: boolean;
 }
+
+/**
+ * The fixture Resource keeps its own kind, or is drawn as an Image Resource
+ * showing `imageUrl`, as the projection hands `ResourceNode` one.
+ */
+export type CanvasResourceNodeSpecimenProps = CanvasResourceNodeSpecimenBaseProps &
+  (
+    | { readonly kind?: undefined; readonly imageUrl?: never }
+    | { readonly kind: 'image'; readonly imageUrl: string }
+  );
 
 /**
  * A typed one-node React Flow harness. It supplies fixture state only; ResourceNode
@@ -436,6 +441,7 @@ export function CanvasResourceNodeSpecimen({
   zoom,
   title,
   body,
+  kind,
   imageUrl,
   readOnly = false,
   draggable = false,
@@ -468,8 +474,8 @@ export function CanvasResourceNodeSpecimen({
   if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
   if (body !== undefined) data.body = body;
-  if (imageUrl !== undefined) {
-    data.kind = 'image';
+  if (kind === 'image') {
+    data.kind = kind;
     data.imageUrl = imageUrl;
   }
   // The editor is the state, so a specimen that asks to be renaming supplies

@@ -9,7 +9,7 @@ export type { OpenSpaceStatus } from './open-space-status';
 export { StatusBusy, StatusFailure } from './StatusPanel';
 export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { ResourceContent } from './ResourceContent';
-export type { ResourceContentProps } from './ResourceContent';
+export type { ResourceContentBody, ResourceContentProps } from './ResourceContent';
 export { CanvasResource, CANVAS_RESOURCE_DRAG_TILT_DEGREES } from './CanvasResource';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';

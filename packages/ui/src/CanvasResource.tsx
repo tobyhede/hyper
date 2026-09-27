@@ -39,6 +39,7 @@ import './canvas-resource.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import { ResourceImage } from './ResourceImage';
+import type { ResourceContentBody } from './ResourceContent';
 
 /**
  * What a Resource front draws beyond its shared Title (ADR 0051): a kind-owned
@@ -77,7 +78,7 @@ export type CanvasResourceFront =
       readonly kind: 'reference';
       /** The resolved Target content this Reference Resource displays read-only. */
       readonly target:
-        { readonly kind: 'markdown'; readonly source: string } | { readonly kind: 'space' };
+        Extract<ResourceContentBody, { kind: 'markdown' }> | { readonly kind: 'space' };
       /** Authored Map state; a Reference Resource Opens through the shared Resource operation. */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -89,7 +90,7 @@ export type CanvasResourceFront =
       /**
        * Authored Map state; an Image Resource Opens through the shared Resource
        * operation. Closed, it draws its Title and kind and no thumbnail; Open, it
-       * is the Open Markdown front with its image as the content (ADR 0107).
+       * is the Open Markdown front with its image as the content.
        */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -126,9 +127,7 @@ export type CanvasResourceFront =
     };
 
 /** What a content area draws, and whether the Map has it Open. */
-type OpenableContent =
-  | { readonly kind: 'markdown'; readonly source: string; readonly open: boolean }
-  | { readonly kind: 'image'; readonly url: string; readonly open: boolean };
+type OpenableContent = ResourceContentBody & { readonly open: boolean };
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
@@ -305,13 +304,13 @@ export function CanvasResource(props: CanvasResourceProps) {
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   /**
    * The content the kinds with a content area draw above their Title: a Markdown
-   * document, or an Image Resource's picture in the same place (ADR 0107).
+   * document, or an Image Resource's picture in the same place.
    */
   const contentFront: OpenableContent | undefined =
     front.kind === 'markdown'
       ? { kind: 'markdown', source: front.source, open: front.open }
       : front.kind === 'reference' && front.target.kind === 'markdown'
-        ? { kind: 'markdown', source: front.target.source, open: front.open }
+        ? { ...front.target, open: front.open }
         : front.kind === 'image'
           ? { kind: 'image', url: front.url, open: front.open }
           : undefined;

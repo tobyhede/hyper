@@ -300,8 +300,8 @@
    wrapper moves. Opening adds the content surface above it; it never switches
    the Title's layout in the middle of that motion. Every kind that draws content
    claims it, so an Open Reference Resource (ADR 0070) and an Open Image Resource
-   (ADR 0107) read exactly as an Open Markdown Resource does — the `space` kind has
-   no content front to sit above a Title. */
+   read exactly as an Open Markdown Resource does — the `space` kind has no
+   content front to sit above a Title. */
 .canvas-resource:is([data-kind='markdown'], [data-kind='reference'], [data-kind='image'])
   .canvas-resource__body {
   order: 2;

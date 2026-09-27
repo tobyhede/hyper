@@ -267,7 +267,7 @@ describe('projectResourceNodes', () => {
     });
   });
 
-  it('carries an Image Resource URL when it is Open or presented, and not when Closed', () => {
+  it('carries an Image Resource URL whether it is Closed, Open or presented', () => {
     const imageId = uuid('00000000-0000-4000-8000-000000000008');
     const url = 'https://example.com/harbour.png';
     const withImage = load(
@@ -286,7 +286,9 @@ describe('projectResourceNodes', () => {
     const imageNode = (options: Parameters<typeof projectResourceNodes>[1]) =>
       projectResourceNodes(withImage, options).find((node) => node.id === imageId)?.data;
 
-    expect(imageNode({})?.imageUrl).toBeUndefined();
+    // Closed too: the Open front's content stays mounted while it fades out on
+    // Close, and it draws the picture from this URL until it unmounts.
+    expect(imageNode({})).toMatchObject({ kind: 'image', imageUrl: url });
     expect(imageNode({ openResourceIds: new Set([imageId]) })).toMatchObject({
       kind: 'image',
       open: true,

@@ -35,10 +35,3 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-
-/* A presented Resource stacks its name over its content; a picture takes the room
-   left below the name rather than overflowing the frame. */
-.resource--full:has(> .resource-image) {
-  display: flex;
-  flex-direction: column;
-}
