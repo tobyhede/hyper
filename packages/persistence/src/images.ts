@@ -145,12 +145,14 @@ export const imageIdOf = async (bytes: Uint8Array<ArrayBuffer>): Promise<ImageId
 /**
  * Decide whether bytes are stored as an image, from the bytes alone: a declared
  * type is never consulted, so a PNG sent as `text/plain` is a PNG and an SVG
- * sent as `image/png` is an SVG.
+ * sent as `image/png` is an SVG. An admitted image owns a copy of the bytes, so
+ * its id stays their SHA-256 whatever the caller does with its own array.
  */
 export const admitImage = async (bytes: Uint8Array<ArrayBuffer>): Promise<ImageAdmission> => {
   if (bytes.byteLength > MAX_IMAGE_BYTES) return { kind: 'refused', code: 'image-too-large' };
-  const mediaType = mediaTypeOf(bytes);
+  const owned = bytes.slice();
+  const mediaType = mediaTypeOf(owned);
   if (mediaType === 'svg') return { kind: 'refused', code: 'image-svg-unsupported' };
   if (mediaType === undefined) return { kind: 'refused', code: 'image-format-unsupported' };
-  return { kind: 'admitted', image: { id: await imageIdOf(bytes), mediaType, bytes } };
+  return { kind: 'admitted', image: { id: await imageIdOf(owned), mediaType, bytes: owned } };
 };

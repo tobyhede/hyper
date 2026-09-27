@@ -37,6 +37,15 @@ describe('admitting an image', () => {
     });
   });
 
+  it('keeps an admitted image named by its bytes when the caller later changes theirs', async () => {
+    const content = png.slice();
+    const admission = await admitImage(content);
+    content.fill(0);
+    if (admission.kind !== 'admitted') throw new Error('expected the PNG to be admitted');
+    expect(admission.image.id).toBe(expectedId(admission.image.bytes));
+    expect(admission.image.bytes).toEqual(png);
+  });
+
   it('names bytes by the digest every SHA-256 implementation gives them', async () => {
     await expect(imageIdOf(new Uint8Array())).resolves.toBe(
       '47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
