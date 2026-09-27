@@ -1,10 +1,10 @@
 import type { GraphHeadShape, GraphId, MapId } from '@project/core';
 import {
-  UNAVAILABLE,
-  completionOutcome,
+  completeWhile,
   type Capability,
   type CompletedContextEdit,
   type EditOutcome,
+  type ReportTitles,
 } from './authoring-commands';
 import {
   coordinatedCreation,
@@ -14,7 +14,6 @@ import {
   type AuthoredSpace,
   type AuthoringApp,
   type AuthoringContext,
-  type CreationReports,
   type EmbeddedAuthoring,
 } from './authoring-contexts';
 
@@ -105,15 +104,16 @@ export interface GraphAuthoringAvailability {
   readonly delete: () => boolean;
 }
 
-const UNCHANGED_TITLE = 'Graph unchanged';
-
-const CREATION_REPORTS: CreationReports = {
-  notCreated: 'Graph not created',
-  notSaved: 'Graph not saved',
-  notSelected: 'Graph not selected',
+/** Every title Graph authoring reports under. */
+export const GRAPH_REPORT_TITLES: ReportTitles = {
+  creation: {
+    notCreated: 'Graph not created',
+    notSaved: 'Graph not saved',
+    notSelected: 'Graph not selected',
+  },
+  unchanged: 'Graph unchanged',
+  notDeleted: 'Graph not deleted',
 };
-
-const NOT_DELETED = 'Graph not deleted';
 
 /**
  * Create an empty Graph in `mapId`, which the Map makes its Active Graph.
@@ -130,7 +130,7 @@ const createGraph = (
   coordinatedCreation(
     context,
     creates,
-    CREATION_REPORTS,
+    GRAPH_REPORT_TITLES.creation,
     () => context.complete(mapId, { kind: 'added-graph' }),
     ({ createdGraphId }) => {
       if (createdGraphId === undefined) {
@@ -176,7 +176,7 @@ const deleteGraph = (
   deletes: () => boolean,
 ): Promise<EditOutcome<CompletedContextEdit>> => {
   const { app, spaceResources } = context.space;
-  return coordinatedDeletion(context, deletes, NOT_DELETED, () =>
+  return coordinatedDeletion(context, deletes, GRAPH_REPORT_TITLES.notDeleted, () =>
     spaceResources.deleteGraph({
       targetSpaceId: app.currentSpace().id,
       mapId,
@@ -211,36 +211,30 @@ const graphAuthoringCommands = (
         rename: {
           available: renames(),
           invoke: (title) =>
-            renames()
-              ? completionOutcome(
-                  context.complete(mapId, { kind: 'renamed-graph', graphId, title }),
-                  UNCHANGED_TITLE,
-                )
-              : UNAVAILABLE,
+            completeWhile(
+              renames,
+              () => context.complete(mapId, { kind: 'renamed-graph', graphId, title }),
+              GRAPH_REPORT_TITLES.unchanged,
+            ),
         },
         recolor: {
           available: recolors(),
           invoke: (color) =>
-            recolors()
-              ? completionOutcome(
-                  context.complete(mapId, { kind: 'recolored-graph', graphId, color }),
-                  UNCHANGED_TITLE,
-                )
-              : UNAVAILABLE,
+            completeWhile(
+              recolors,
+              () => context.complete(mapId, { kind: 'recolored-graph', graphId, color }),
+              GRAPH_REPORT_TITLES.unchanged,
+            ),
         },
         changeHeadShape: {
           available: recolors(),
           invoke: (headShape) =>
-            recolors()
-              ? completionOutcome(
-                  context.complete(mapId, {
-                    kind: 'changed-graph-head-shape',
-                    graphId,
-                    headShape,
-                  }),
-                  UNCHANGED_TITLE,
-                )
-              : UNAVAILABLE,
+            completeWhile(
+              recolors,
+              () =>
+                context.complete(mapId, { kind: 'changed-graph-head-shape', graphId, headShape }),
+              GRAPH_REPORT_TITLES.unchanged,
+            ),
         },
         delete: {
           available: deletes(),

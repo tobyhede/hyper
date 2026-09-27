@@ -528,6 +528,42 @@ describe('what each context creates in', () => {
     expect(mapsOf(authored)).toHaveLength(before.length + 1);
   });
 
+  it('says a containing save that breaks after the Map is made as not selected, never not created', async () => {
+    const spaces = openSpaces();
+    const source = await spaces.open(META);
+    const authored = await spaces.embed(TARGET);
+    let asked = 0;
+    const commands = embeddedMapAuthoringCommands({
+      target: authored,
+      spaces: {
+        entry: (each) => spaces.entry(each),
+        // The first wait is before the Edit; the second is after the Map is made.
+        waitForPersistence: (each) => {
+          if (each === META && ++asked === 2) return Promise.reject(new Error('the save broke'));
+          return spaces.waitForPersistence(each);
+        },
+      },
+      containingSpaceId: META,
+      select: selectOn(source),
+      available: () => true,
+    });
+    const before = mapsOf(authored);
+    const outcome = await source.app.commandOutcomes.run(
+      'map-create',
+      () => commands.create.invoke(),
+      {
+        ...CONTINUE_IN_NAME,
+        completionMovesMap: false,
+      },
+    );
+    expect(outcome).toEqual({ kind: 'broke' });
+    expect(mapsOf(authored)).toHaveLength(before.length + 1);
+    expect(source.app.commandOutcomes.getState().notices.get('map-create')).toEqual({
+      title: 'Map not selected',
+      message: 'the save broke',
+    });
+  });
+
   it('creates nothing in an embedded target exited while its Spaces were saving', async () => {
     const spaces = openSpaces();
     const source = await spaces.open(META);
