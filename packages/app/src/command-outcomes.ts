@@ -12,7 +12,9 @@ import {
 } from './authoring-refusal';
 import type { Continuation, PendingContinuation } from './continuation';
 import { failureMessage } from './failure-message';
-import type { CompletedContextEdit, EditOutcome } from './authoring-commands';
+import { TitledBreak, type CompletedContextEdit, type EditOutcome } from './authoring-commands';
+import { GRAPH_REPORT_TITLES } from './graph-authoring-commands';
+import { MAP_REPORT_TITLES } from './map-authoring-commands';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
@@ -43,12 +45,16 @@ import type {
  * **Reported channels carry a complete report instead of words.** Map and
  * Graph authoring own the title and message of an Edit's report beside the
  * decision that produced it; a reported command's refused result carries that
- * {@link CommandNotice} whole, and this module owns only its lifetime —
- * staleness, dismissal and the Map-change reset.
+ * {@link CommandNotice} whole, and this module holds it for its lifetime —
+ * staleness, dismissal and the Map-change reset — without describing it.
  *
  * **A throw is never dressed as a refusal** (`CONTEXT.md`, Completion outcome).
- * It reaches the reporter and publishes the command's break sentence, and
- * `run` answers {@link COMMAND_BROKE} in place of a result.
+ * It reaches the reporter, `run` answers {@link COMMAND_BROKE} in place of a
+ * result, and the channel publishes the command's break sentence under its
+ * title — never a refusal's description. The title names what did not happen,
+ * which is as true of a break as of a refusal. On a reported channel it is the
+ * authoring module's own title for that channel, read from the module rather
+ * than restated here.
  *
  * **Discarded work answers nothing a caller can act on.** A settlement that is
  * no longer current answers {@link COMMAND_DISCARDED} in place of the whole
@@ -67,15 +73,16 @@ interface ChannelLifetime {
 }
 
 /**
- * Where a channel's words come from.
+ * A channel's title, and where its refusals' words come from.
  *
- * `described` channels own a fixed title and their commands describe a result
- * in a sentence; `reported` channels take the whole notice from the command's
- * result.
+ * `described` commands describe a refused result in a sentence said under
+ * `title`; `reported` commands take a refusal's whole notice from the result.
+ * Every channel says a throw under `title`.
  */
-type ChannelEntry =
-  | (ChannelLifetime & { readonly words: 'described'; readonly title: string })
-  | (ChannelLifetime & { readonly words: 'reported' });
+interface ChannelEntry extends ChannelLifetime {
+  readonly words: 'described' | 'reported';
+  readonly title: string;
+}
 
 /**
  * One entry per shell notice.
@@ -86,12 +93,32 @@ type ChannelEntry =
  * claimed it moves that Map ({@link MapCompletionClaim}).
  */
 const CHANNELS = {
-  'map-create': { resetsOnMapChange: true, words: 'reported' },
-  'map-manage': { resetsOnMapChange: true, words: 'reported' },
-  'map-delete': { resetsOnMapChange: true, words: 'reported' },
-  'graph-create': { resetsOnMapChange: true, words: 'reported' },
-  'graph-edit': { resetsOnMapChange: true, words: 'reported' },
-  'graph-delete': { resetsOnMapChange: true, words: 'reported' },
+  'map-create': {
+    resetsOnMapChange: true,
+    words: 'reported',
+    title: MAP_REPORT_TITLES.creation.notCreated,
+  },
+  'map-manage': { resetsOnMapChange: true, words: 'reported', title: MAP_REPORT_TITLES.unchanged },
+  'map-delete': {
+    resetsOnMapChange: true,
+    words: 'reported',
+    title: MAP_REPORT_TITLES.notDeleted,
+  },
+  'graph-create': {
+    resetsOnMapChange: true,
+    words: 'reported',
+    title: GRAPH_REPORT_TITLES.creation.notCreated,
+  },
+  'graph-edit': {
+    resetsOnMapChange: true,
+    words: 'reported',
+    title: GRAPH_REPORT_TITLES.unchanged,
+  },
+  'graph-delete': {
+    resetsOnMapChange: true,
+    words: 'reported',
+    title: GRAPH_REPORT_TITLES.notDeleted,
+  },
   'resource-delete': {
     resetsOnMapChange: true,
     words: 'described',
@@ -152,10 +179,25 @@ export const COMMAND_CHANNELS = [
   'graph-delete',
 ] as const satisfies readonly CommandChannel[];
 
-/** The words a described channel says a sentence under. */
-const described =
-  (channel: DescribedChannel) =>
+/** A sentence said under a channel's title. */
+const said =
+  (channel: CommandChannel) =>
   (message: string): CommandNotice => ({ title: CHANNELS[channel].title, message });
+
+/** The words a described channel says a sentence under. */
+const described = (channel: DescribedChannel): ((message: string) => CommandNotice) =>
+  said(channel);
+
+/**
+ * A throw, said in the failure's own words under the channel's title, or
+ * under the one a {@link TitledBreak} names.
+ */
+const brokeOn =
+  (channel: CommandChannel) =>
+  (failure: unknown): CommandNotice =>
+    failure instanceof TitledBreak
+      ? { title: failure.title, message: failure.message }
+      : said(channel)(failureMessage(failure));
 
 /** The one runtime value a channel's sentences may name. */
 export interface CommandSubject {
@@ -280,13 +322,10 @@ interface CommandDefinition<Result, Options extends readonly unknown[]> {
   readonly channel: CommandChannel;
   readonly settle: (result: Result, ...options: Options) => Settlement;
   /**
-   * The break sentence, or `null` where the command's words are reported.
-   *
-   * A Map command reports its own coordination failures as complete reports,
-   * so a throw reaching here is a defect with no sentence this module owns: it
-   * reaches the reporter and leaves the channel clear.
+   * The break sentence. A throw reaches the reporter as well; the sentence is
+   * what tells the author the press did nothing.
    */
-  readonly broke: CommandBreak<Options> | null;
+  readonly broke: CommandBreak<Options>;
   /**
    * Whether this result is a completion its run claimed moves the Map, which
    * exempts it from the Map check — the one case staleness reads a result.
@@ -311,7 +350,7 @@ const claimedMove = (result: EditOutcome, { completionMovesMap }: MapCompletionC
 const reportedCommand = (channel: ReportedChannel): CommandDefinition<EditOutcome, []> => ({
   channel,
   settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
-  broke: null,
+  broke: brokeOn(channel),
 });
 
 const authoringCommand = (channel: DescribedChannel): CommandDefinition<AuthoringResult, []> => ({
@@ -320,27 +359,21 @@ const authoringCommand = (channel: DescribedChannel): CommandDefinition<Authorin
     result.kind === 'refused'
       ? notice(described(channel)(describeAuthoringRefusal(result.refusal)))
       : CLEAR,
-  broke: (failure) => described(channel)(failureMessage(failure)),
+  broke: brokeOn(channel),
 });
 
 const COMMANDS: CommandDefinitions = {
   'map-create': {
-    channel: 'map-create',
+    ...reportedCommand('map-create'),
     settle: (result, { continueAt }) => {
       if (result.kind === 'refused') return notice(result.report);
       if (result.kind !== 'completed') return CLEAR;
       return { kind: 'clear', continuation: continueAt(result) };
     },
-    broke: null,
     movedMap: claimedMove,
   },
   'map-manage': reportedCommand('map-manage'),
-  'map-delete': {
-    channel: 'map-delete',
-    settle: (result) => (result.kind === 'refused' ? notice(result.report) : CLEAR),
-    broke: null,
-    movedMap: claimedMove,
-  },
+  'map-delete': { ...reportedCommand('map-delete'), movedMap: claimedMove },
   // A creation's completion activates the new Graph in the Map it was pressed
   // on, and never moves the Map, so it needs no claim; where the caret goes
   // after it is the surface's, which neither the Dock nor the rail spends.
@@ -356,7 +389,7 @@ const COMMANDS: CommandDefinitions = {
       result.kind === 'refused'
         ? notice(described('resource-delete')(describeSpaceResourceRefusal(result.refusal)))
         : CLEAR,
-    broke: (failure) => described('resource-delete')(failureMessage(failure)),
+    broke: brokeOn('resource-delete'),
   },
   'resource-remove': authoringCommand('resource-remove'),
   'space-resource-create': {
@@ -383,7 +416,7 @@ const COMMANDS: CommandDefinitions = {
       if (result.kind !== 'completed') return CLEAR;
       return { kind: 'clear', continuation: options?.continueAt?.(result) ?? null };
     },
-    broke: (failure) => described('reference-create')(failureMessage(failure)),
+    broke: brokeOn('reference-create'),
   },
   'space-enter': {
     channel: 'space-command',
@@ -597,7 +630,7 @@ export function createCommandOutcomes({
   ): CommandBroke | CommandDiscarded => {
     reportBreak(failure);
     if (!current(at, false)) return COMMAND_DISCARDED;
-    write(at.channel, definition.broke?.(failure, ...options) ?? null);
+    write(at.channel, definition.broke(failure, ...options));
     return COMMAND_BROKE;
   };
 

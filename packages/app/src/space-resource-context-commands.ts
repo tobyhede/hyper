@@ -60,9 +60,9 @@ export function spaceResourceContextCommands(
   // Each press is built from the capability that answers its availability,
   // so the rail draws a command unavailable exactly when invoking it would be.
   const mapCommands: CanvasSpaceResourceCommands = {
-    // The containing canvas's command outcomes hold the report: the notice
-    // is drawn by the Space the author is looking at, not by the target. The
-    // editor holds a refused draft open on the report's sentence.
+    // The containing canvas's command outcomes hold a refusal's or a break's
+    // notice: it is drawn by the Space the author is looking at, not by the
+    // target. The editor holds a refused draft open on the refusal's sentence.
     onRename: offered(
       addressed.rename,
       (rename) => (title: string) =>
@@ -96,8 +96,9 @@ export function spaceResourceContextCommands(
     }),
     // Map authoring waits for both Spaces, repoints every Space Resource that
     // selected the Map — this one included — and leaves the target's canvas
-    // on the survivor; the containing canvas holds a refusal. The canvas it
-    // leaves is the target's, not the containing one, so it claims no move.
+    // on the survivor; the containing canvas holds a refusal or a break. The
+    // canvas it leaves is the target's, not the containing one, so it claims
+    // no move.
     onDelete: offered(addressed.delete, (remove) => async () => {
       await commandOutcomes.run('map-delete', remove, { completionMovesMap: false });
     }),
@@ -113,8 +114,9 @@ export function spaceResourceContextCommands(
       color: graphColor(graph, graphColorsByGraphId(space)),
       colors: GRAPH_PALETTE_ENTRIES,
       // Graph authoring completes both in the target; the containing canvas's
-      // command outcomes hold a refusal, and the rail says no sentence of its
-      // own. A refused rename is also the editor's, which holds the draft open.
+      // command outcomes hold a refusal or a break, and the rail says no
+      // sentence of its own. A refused rename is also the editor's, which holds
+      // the draft open.
       onRename: offered(
         addressedGraph.rename,
         (rename) => (title: string) =>
@@ -140,7 +142,8 @@ export function spaceResourceContextCommands(
       }),
       // Graph authoring waits for both Spaces, repoints every Space Resource
       // that selected the Graph — this one included — and leaves the target's
-      // canvas on the survivor; the containing canvas holds a refusal.
+      // canvas on the survivor; the containing canvas holds a refusal or a
+      // break.
       onDelete: offered(addressedGraph.delete, (remove) => async () => {
         await commandOutcomes.run('graph-delete', remove);
       }),

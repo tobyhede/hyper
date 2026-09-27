@@ -449,6 +449,28 @@ describe('a thrown operation', () => {
     });
   });
 
+  it('says a thrown value that cannot be spelled, synchronously and asynchronously', async () => {
+    const { outcomes, reported } = open();
+    const failure: unknown = Object.create(null);
+    const said = { title: 'Graph unchanged', message: 'An unexpected failure occurred.' };
+
+    const answered = outcomes.run('graph-edit', () => {
+      throw failure;
+    });
+
+    expect(answered).toBe(COMMAND_BROKE);
+    expect(notice(outcomes, 'graph-edit')).toEqual(said);
+    outcomes.dismiss('graph-edit');
+    await expect(
+      outcomes.run('graph-edit', async () => {
+        await Promise.resolve();
+        throw failure;
+      }),
+    ).resolves.toBe(COMMAND_BROKE);
+    expect(notice(outcomes, 'graph-edit')).toEqual(said);
+    expect(reported).toEqual([failure, failure]);
+  });
+
   it('says a thrown Reference Resource creation in the words the failure carries', () => {
     const { outcomes, reported } = open();
     const referenceFailure = new Error('reference broke');
@@ -464,7 +486,7 @@ describe('a thrown operation', () => {
     });
   });
 
-  it('reports a Map command throw and leaves its channel clear', () => {
+  it('reports a Map command throw and says it in the words the failure carries', () => {
     const { outcomes, reported } = open();
     const failure = new Error('map broke');
 
@@ -477,10 +499,50 @@ describe('a thrown operation', () => {
     );
 
     expect(reported).toEqual([failure]);
-    expect(notice(outcomes, 'map-delete')).toBeNull();
+    expect(notice(outcomes, 'map-delete')).toEqual({
+      title: 'Map not deleted',
+      message: 'map broke',
+    });
   });
 
-  it('reports a Graph Edit throw and leaves its channel clear', () => {
+  it('reports a thrown Map rename and says it in the words the failure carries', () => {
+    const { outcomes, reported } = open();
+    const failure = new Error('rename broke');
+
+    const answered = outcomes.run('map-manage', () => {
+      throw failure;
+    });
+
+    expect(answered).toBe(COMMAND_BROKE);
+    expect(reported).toEqual([failure]);
+    expect(notice(outcomes, 'map-manage')).toEqual({
+      title: 'Map unchanged',
+      message: 'rename broke',
+    });
+  });
+
+  it('reports a thrown Map creation and says it without continuing', async () => {
+    const { outcomes, reported, continuation } = open();
+    const failure = new Error('creation broke');
+    const continueAt = vi.fn(inTheName);
+
+    await expect(
+      outcomes.run('map-create', () => Promise.reject(failure), {
+        continueAt,
+        completionMovesMap: true,
+      }),
+    ).resolves.toBe(COMMAND_BROKE);
+
+    expect(reported).toEqual([failure]);
+    expect(continueAt).not.toHaveBeenCalled();
+    expect(continuation.getState().pending).toBeNull();
+    expect(notice(outcomes, 'map-create')).toEqual({
+      title: 'Map not created',
+      message: 'creation broke',
+    });
+  });
+
+  it('reports a Graph Edit throw and says it in the words the failure carries', () => {
     const { outcomes, reported } = open();
     const failure = new Error('recolour broke');
 
@@ -489,10 +551,13 @@ describe('a thrown operation', () => {
     });
 
     expect(reported).toEqual([failure]);
-    expect(notice(outcomes, 'graph-edit')).toBeNull();
+    expect(notice(outcomes, 'graph-edit')).toEqual({
+      title: 'Graph unchanged',
+      message: 'recolour broke',
+    });
   });
 
-  it('reports a Graph creation throw and leaves its channel clear', async () => {
+  it('reports a Graph creation throw and says it in the words the failure carries', async () => {
     const { outcomes, reported } = open();
     const failure = new Error('creation broke');
 
@@ -501,7 +566,10 @@ describe('a thrown operation', () => {
     );
 
     expect(reported).toEqual([failure]);
-    expect(notice(outcomes, 'graph-create')).toBeNull();
+    expect(notice(outcomes, 'graph-create')).toEqual({
+      title: 'Graph not created',
+      message: 'creation broke',
+    });
   });
 });
 
@@ -638,7 +706,7 @@ describe('graph-delete', () => {
     expect(notice(outcomes, 'graph-delete')).toBeNull();
   });
 
-  it('reports a thrown delete and leaves its channel clear', async () => {
+  it('reports a thrown delete and says it in the words the failure carries', async () => {
     const { outcomes, reported } = open();
     const failure = new Error('lifecycle broke');
 
@@ -647,7 +715,10 @@ describe('graph-delete', () => {
     );
 
     expect(reported).toEqual([failure]);
-    expect(notice(outcomes, 'graph-delete')).toBeNull();
+    expect(notice(outcomes, 'graph-delete')).toEqual({
+      title: 'Graph not deleted',
+      message: 'lifecycle broke',
+    });
   });
 });
 

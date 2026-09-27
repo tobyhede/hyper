@@ -2,12 +2,14 @@ import type { GraphId, MapId, UUID } from '@project/core';
 import type { SpaceResourceContextDeletionResult } from '@project/persistence';
 import {
   PERSISTENCE_UNSETTLED,
+  TitledBreak,
   UNAVAILABLE,
   type CompletedContextEdit,
   type EditOutcome,
 } from './authoring-commands';
 import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './authoring-refusal';
 import type { ComposedApp } from './compose-app';
+import { failureMessage } from './failure-message';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
@@ -212,6 +214,18 @@ export interface CreationReports {
   readonly notSelected: string;
 }
 
+/**
+ * A step after a creation's Edit completed: a throw from it is re-thrown as a
+ * {@link TitledBreak} under `title`, so it is never said as not created.
+ */
+const after = async <Value>(title: string, step: () => Value | Promise<Value>): Promise<Value> => {
+  try {
+    return await step();
+  } catch (failure) {
+    throw new TitledBreak(title, failureMessage(failure), { cause: failure });
+  }
+};
+
 /** A completion as Space Authoring answers it, which a creation reads what it made off. */
 export type CompletedAuthoring = Extract<AuthoringResult, { readonly kind: 'completed' }>;
 
@@ -223,7 +237,8 @@ export type CompletedAuthoring = Extract<AuthoringResult, { readonly kind: 'comp
  * saved there; only then is the Space Resource pointed at what it made and the
  * containing Space saved — so a stored Resource never names a Map or Graph its
  * target has not stored. A failure after the Edit completes is not reported as
- * not created, because it was.
+ * not created, because it was: a refusal or an unsettled save says which step
+ * failed, and a throw is re-thrown under that step's title ({@link after}).
  *
  * A creation queued behind a running completion has made nothing yet, so
  * there is nothing to answer; it throws, as `made` throws where a completion
@@ -256,17 +271,19 @@ export const coordinatedCreation = async (
     case 'completed':
       break;
   }
-  const created = made(result);
+  const created = await after(reports.notSelected, () => made(result));
   const { coordination } = context;
   if (coordination === null) return created;
-  if (!(await coordination.targetSaved())) {
+  if (!(await after(reports.notSaved, coordination.targetSaved))) {
     return { kind: 'refused', report: { title: reports.notSaved, message: PERSISTENCE_UNSETTLED } };
   }
-  const refusal = coordination.select(created.mapId, created.graphId);
+  const refusal = await after(reports.notSelected, () =>
+    coordination.select(created.mapId, created.graphId),
+  );
   if (refusal !== null) {
     return { kind: 'refused', report: { title: reports.notSelected, message: refusal } };
   }
-  return (await coordination.containingSaved())
+  return (await after(reports.notSelected, coordination.containingSaved))
     ? created
     : { kind: 'refused', report: { title: reports.notSelected, message: PERSISTENCE_UNSETTLED } };
 };

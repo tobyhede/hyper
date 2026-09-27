@@ -502,6 +502,17 @@ describe.each(contexts)('Graph creation through $name', ({ setup }) => {
     await expect(commands.map(mapId).create.invoke()).rejects.toThrow(/no Graph/);
   });
 
+  it('says a completed creation that names no Graph as not selected, never not created', async () => {
+    const { mapId, commands, outcomes, answerNext } = await setup();
+    answerNext(() => ({ kind: 'completed' }));
+    const create = commands.map(mapId).create;
+    expect(await outcomes.run('graph-create', () => create.invoke())).toEqual({ kind: 'broke' });
+    expect(outcomes.getState().notices.get('graph-create')).toEqual({
+      title: 'Graph not selected',
+      message: 'A completed Graph creation named no Graph.',
+    });
+  });
+
   it('says a throw as a break, never as a refusal', async () => {
     const { mapId, commands, outcomes, answerNext, reported } = await setup();
     const failure = new Error('creation broke');
@@ -511,7 +522,10 @@ describe.each(contexts)('Graph creation through $name', ({ setup }) => {
     const create = commands.map(mapId).create;
     expect(await outcomes.run('graph-create', () => create.invoke())).toEqual({ kind: 'broke' });
     expect(reported).toContain(failure);
-    expect(outcomes.getState().notices.has('graph-create')).toBe(false);
+    expect(outcomes.getState().notices.get('graph-create')).toEqual({
+      title: 'Graph not created',
+      message: 'creation broke',
+    });
   });
 });
 
@@ -642,6 +656,75 @@ describe('what each context creates in', () => {
     await spaces.exit(TARGET);
     expect(await creating).toEqual({ kind: 'unavailable' });
     expect(authored.session.getState().working).toBe(before);
+  });
+
+  /**
+   * An embedded creation whose wait on `spaceId` rejects the second time it
+   * is asked — the first is the wait before the Edit, so the Graph is made
+   * before the rejection — said on the containing canvas's channel.
+   */
+  const breakingAfterCreation = async (spaceId: typeof META) => {
+    const reported: unknown[] = [];
+    const spaces = openSpaces(undefined, (error) => reported.push(error));
+    const source = await spaces.open(META);
+    const authored = await spaces.embed(TARGET);
+    const failure = new Error('the save broke');
+    let asked = 0;
+    const commands = embeddedGraphAuthoringCommands({
+      target: authored,
+      spaces: {
+        entry: (each) => spaces.entry(each),
+        waitForPersistence: (each) => {
+          if (each === spaceId && ++asked === 2) return Promise.reject(failure);
+          return spaces.waitForPersistence(each);
+        },
+      },
+      containingSpaceId: META,
+      select: selectOn(source),
+      available: () => true,
+    });
+    const create = commands.map(SECOND_MAP).create;
+    const outcome = await source.app.commandOutcomes.run('graph-create', () => create.invoke());
+    return { outcome, source, authored, reported, failure };
+  };
+
+  it('says a target save that breaks after the Graph is made as not saved, never not created', async () => {
+    const { outcome, source, authored, reported, failure } = await breakingAfterCreation(TARGET);
+    expect(outcome).toEqual({ kind: 'broke' });
+    expect(graphsOf(authored, SECOND_MAP)).toHaveLength(3);
+    // The reporter hears the break, carrying the failure itself.
+    expect(reported).toContainEqual(expect.objectContaining({ cause: failure }));
+    expect(source.app.commandOutcomes.getState().notices.get('graph-create')).toEqual({
+      title: 'Graph not saved',
+      message: 'the save broke',
+    });
+  });
+
+  it('says a containing save that breaks after the Graph is made as not selected, never not created', async () => {
+    const { outcome, source, authored, reported, failure } = await breakingAfterCreation(META);
+    expect(outcome).toEqual({ kind: 'broke' });
+    expect(graphsOf(authored, SECOND_MAP)).toHaveLength(3);
+    // The reporter hears the break, carrying the failure itself.
+    expect(reported).toContainEqual(expect.objectContaining({ cause: failure }));
+    expect(source.app.commandOutcomes.getState().notices.get('graph-create')).toEqual({
+      title: 'Graph not selected',
+      message: 'the save broke',
+    });
+  });
+
+  it('says a selection write that throws after the Graph is made as not selected, never not created', async () => {
+    const { source, authored, commands } = await embedded(undefined, () => {
+      throw new Error('the selection broke');
+    });
+    const create = commands.map(SECOND_MAP).create;
+    expect(await source.app.commandOutcomes.run('graph-create', () => create.invoke())).toEqual({
+      kind: 'broke',
+    });
+    expect(graphsOf(authored, SECOND_MAP)).toHaveLength(3);
+    expect(source.app.commandOutcomes.getState().notices.get('graph-create')).toEqual({
+      title: 'Graph not selected',
+      message: 'the selection broke',
+    });
   });
 });
 
@@ -834,7 +917,10 @@ describe.each(contexts)('Graph deletion through $name', ({ setup }) => {
     const remove = commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete;
     expect(await outcomes.run('graph-delete', () => remove.invoke())).toEqual({ kind: 'broke' });
     expect(reported).toContain(failure);
-    expect(outcomes.getState().notices.has('graph-delete')).toBe(false);
+    expect(outcomes.getState().notices.get('graph-delete')).toEqual({
+      title: 'Graph not deleted',
+      message: 'deletion broke',
+    });
   });
 });
 

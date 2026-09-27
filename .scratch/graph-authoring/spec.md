@@ -1,6 +1,6 @@
 # Graph Edits through one authoring command interface
 
-Status: resolved — tickets `01`–`05` all shipped. No live work remains here; the out-of-scope list below is what is left.
+Status: resolved — tickets `01`–`05` all shipped. The 2026-09-26 PR #308 review changed what a thrown Map or Graph Edit says (see **Review fix** below); the verification recorded in `issues/05` predates that change; the section records its own. The out-of-scope list below is what is left.
 
 Graph Edits — create, rename, recolour and delete — move behind one Graph authoring module with two private adapters, one for the Command Dock over the Space on the canvas and one for an Open Space Resource over the target Space it embeds. It is the second instance of the shape `.scratch/command-outcomes/issues/06`–`09` gave Map Edits (`packages/app/src/map-authoring-commands.ts`), so the capability vocabulary that module declares under Map names moves into a shared module first and both instances spend it.
 
@@ -47,7 +47,7 @@ A new module, `packages/app/src/authoring-commands.ts`, holds the context-neutra
 - `graph-edit` keeps rename and recolour under "Graph unchanged"; `graph-delete` keeps "Graph not deleted".
 - **The rail says no local sentence** for a Graph refusal; the containing canvas's command outcomes say it (ticket 09's rule for Maps).
 - **A refused rename is said twice**, inline where the editor holds the draft and as the `graph-edit` notice — ticket 09's deliberate exception for Map rename, now applied to Graph rename on both surfaces. Today the Dock's Graph rename is inline only.
-- A throw is a break: it reaches the reporter and is never dressed as a refusal.
+- A throw is a break: it reaches the reporter, `run` answers `broke` rather than `refused`, and it is never dressed as a refusal. It is said on its channel under that channel's title in the failure's own words, as every described channel says one (see **Review fix**).
 
 ### What stays outside
 
@@ -66,6 +66,16 @@ Which Graph is active, Copy link, where the caret goes, and how a report is draw
 3. Graph creation through both context adapters.
 4. Graph deletion through both context adapters.
 5. Contract the old Graph command interface.
+
+## Review fix (2026-09-26, PR #308)
+
+**Decision (the user):** a thrown Map or Graph Edit shows the author a notice. Leaving the channel clear on a throw — what `command-outcomes/issues/06` decided as `broke: null`, and tickets 02–04 here carried to the Graph channels — left the author with a press that did nothing and nothing said; the user judged that "surely not the expected or correct behaviour", and asked for Maps and Graphs to be fixed together on this branch rather than split out to the command-outcomes workstream. That makes the change in scope here for Map channels too, although ticket 01 moved no behaviour.
+
+**What "never dressed as a refusal" means after it.** A break is not a refusal in three ways the author can see or the code can test: `run` answers `broke`, so `renameDraftAnswer` closes a rename editor instead of holding the draft open as the author's mistake; the message is the failure's own words (`failureMessage`), never a refusal code's description; and the reporter hears it. The title is shared with the channel's refusals — "Graph not created", "Map not deleted" — because it names what did not happen, which is true of both. That is how every described channel (`resource-delete`, `reference-create`, `space-command`, ...) already says a throw. A title that tells a break apart from a refusal would be a change for every channel, not these six, and is not decided.
+
+**Shape.** Each authoring module exports its titles once (`MAP_REPORT_TITLES`, `GRAPH_REPORT_TITLES`, typed by `ReportTitles` in `authoring-commands.ts`); command outcomes' `CHANNELS` reads a reported channel's `title` from them rather than restating it, so a refusal and a break on one channel cannot drift. Every channel entry has one `title`; `words` says only whether refusals are described or reported. `command-outcomes.test.ts` holds a throw on each of the six reported channels ("a thrown operation", and the `graph-delete` block); `graph-authoring-commands.test.ts` holds it end to end for creation and deletion.
+
+**Verification (2026-09-27, rebased on `main` after #308/#309).** `pnpm verify` green (257 files, 3562 passed, 19 skipped). `pnpm e2e` green (234 passed). `pnpm e2e:ladle` not run: no component or story changed.
 
 ## Out of scope
 

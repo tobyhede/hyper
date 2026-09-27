@@ -1,10 +1,10 @@
 import type { MapId } from '@project/core';
 import {
-  UNAVAILABLE,
-  completionOutcome,
+  completeWhile,
   type Capability,
   type CompletedContextEdit,
   type EditOutcome,
+  type ReportTitles,
 } from './authoring-commands';
 import {
   coordinatedCreation,
@@ -14,7 +14,6 @@ import {
   type AuthoredSpace,
   type AuthoringApp,
   type AuthoringContext,
-  type CreationReports,
   type EmbeddedAuthoring,
 } from './authoring-contexts';
 
@@ -90,13 +89,16 @@ export interface MapAuthoringAvailability {
   readonly delete: () => boolean;
 }
 
-const CREATION_REPORTS: CreationReports = {
-  notCreated: 'Map not created',
-  notSaved: 'Map not saved',
-  notSelected: 'Map not selected',
+/** Every title Map authoring reports under. */
+export const MAP_REPORT_TITLES: ReportTitles = {
+  creation: {
+    notCreated: 'Map not created',
+    notSaved: 'Map not saved',
+    notSelected: 'Map not selected',
+  },
+  unchanged: 'Map unchanged',
+  notDeleted: 'Map not deleted',
 };
-
-const NOT_DELETED = 'Map not deleted';
 
 /**
  * The Map a completed `created-map` made, read where the Edit left it.
@@ -123,7 +125,7 @@ const createMap = (
   return coordinatedCreation(
     context,
     creates,
-    CREATION_REPORTS,
+    MAP_REPORT_TITLES.creation,
     () => app.authoring.complete({ kind: 'created-map' }),
     () => recoverCreatedMap(app),
   );
@@ -160,7 +162,7 @@ const deleteMap = (
   deletes: () => boolean,
 ): Promise<EditOutcome<CompletedContextEdit>> => {
   const { app, spaceResources } = context.space;
-  return coordinatedDeletion(context, deletes, NOT_DELETED, () =>
+  return coordinatedDeletion(context, deletes, MAP_REPORT_TITLES.notDeleted, () =>
     spaceResources.deleteMap({
       targetSpaceId: app.currentSpace().id,
       mapId,
@@ -193,12 +195,11 @@ const mapAuthoringCommands = (
         rename: {
           available: renames(),
           invoke: (title) =>
-            renames()
-              ? completionOutcome(
-                  context.complete(mapId, { kind: 'renamed-map', mapId, title }),
-                  'Map unchanged',
-                )
-              : UNAVAILABLE,
+            completeWhile(
+              renames,
+              () => context.complete(mapId, { kind: 'renamed-map', mapId, title }),
+              MAP_REPORT_TITLES.unchanged,
+            ),
         },
         delete: {
           available: deletes(),

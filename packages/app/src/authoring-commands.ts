@@ -1,6 +1,7 @@
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { CommandBroke, CommandDiscarded, CommandNotice } from './command-outcomes';
 import type { GraphId, MapId } from '@project/core';
+import type { CreationReports } from './authoring-contexts';
 import type { AuthoringResult } from './space-authoring';
 
 /**
@@ -11,9 +12,10 @@ import type { AuthoringResult } from './space-authoring';
  * invocation answers an {@link EditOutcome}, and every surface spends a
  * capability through {@link offered}. What the Edit is, which contexts may
  * author it and how its refusal is said are the module's own
- * (`map-authoring-commands.ts`, `graph-authoring-commands.ts`); this module declares only what is the same for
- * all of them, so no module borrows another's names for it. The contexts they
- * author in are defined once as well (`authoring-contexts.ts`).
+ * (`map-authoring-commands.ts`, `graph-authoring-commands.ts`); this module
+ * declares only what is the same for all of them, so no module borrows
+ * another's names for it. The contexts they author in are defined once as
+ * well (`authoring-contexts.ts`).
  *
  * Like the modules that spend it, it imports no continuation, no React and no
  * DOM (an `eslint.config.js` zone holds it).
@@ -40,6 +42,42 @@ export interface CompletedContextEdit {
   readonly kind: 'completed';
   readonly mapId: MapId;
   readonly graphId: GraphId;
+}
+
+/**
+ * Every title an authoring command module says a report under, one set per
+ * module, declared once beside the decisions that report under them.
+ *
+ * Each names what did not happen, which is as true of a throw as of a
+ * refusal, so command outcomes says a broken Edit on each channel under the
+ * matching title (`command-outcomes.ts`, `CHANNELS`, held by
+ * `command-outcomes.test.ts`).
+ */
+export interface ReportTitles {
+  readonly creation: CreationReports;
+  /** A rename, or a Graph recolour, that did not complete. */
+  readonly unchanged: string;
+  readonly notDeleted: string;
+}
+
+/**
+ * A throw that names the title it is said under, where the channel's own
+ * title would say something false.
+ *
+ * A creation that breaks after its Edit completed has made what it was
+ * asked to, so it is said as not saved or not selected rather than under its
+ * channel's "not created". It is still a throw: `run` answers `broke`, the
+ * reporter hears it, and its message is the failure's own, with the failure
+ * itself as its `cause`.
+ */
+export class TitledBreak extends Error {
+  readonly title: string;
+
+  constructor(title: string, message: string, options: ErrorOptions) {
+    super(message, options);
+    this.name = 'TitledBreak';
+    this.title = title;
+  }
 }
 
 /** The answer to a command that is no longer offered, or whose subject has gone. */
@@ -84,6 +122,17 @@ export const completionOutcome = (result: AuthoringResult, title: string): EditO
       return { kind: 'completed' };
   }
 };
+
+/**
+ * A synchronous Edit as its invocation answers it: `unavailable` unless it is
+ * still offered when pressed, and otherwise the completion's outcome, a
+ * refusal reported under `title`.
+ */
+export const completeWhile = (
+  offers: () => boolean,
+  complete: () => AuthoringResult,
+  title: string,
+): EditOutcome => (offers() ? completionOutcome(complete(), title) : UNAVAILABLE);
 
 /**
  * One command a surface offers, and whether it may offer it.
