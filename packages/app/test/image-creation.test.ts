@@ -148,6 +148,43 @@ describe('creating Image Resources from files', () => {
     expect(session.getState().working).toBe(before);
   });
 
+  it('sends nothing when the browser declares a file is not an image', async () => {
+    const { session, authoring } = open(FIRST);
+    const before = session.getState().working;
+    const images = sources({ 'diagram.png': { kind: 'stored', url: STORED_A } }, {});
+
+    const created = await createImageResources(
+      { images, authoring },
+      {
+        kind: 'files',
+        files: [file('diagram.png'), new File(['bytes'], 'notes.pdf', { type: 'application/pdf' })],
+      },
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+    );
+
+    expect(created).toEqual({
+      kind: 'not-stored',
+      code: 'image-format-unsupported',
+      name: 'notes.pdf',
+    });
+    expect(images.sent).toEqual([]);
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('sends a file the browser declares no type for, and leaves it to the host', async () => {
+    const { authoring } = open(FIRST);
+    const images = sources({ picture: { kind: 'stored', url: STORED_A } }, {});
+
+    const created = await createImageResources(
+      { images, authoring },
+      { kind: 'files', files: [new File(['bytes'], 'picture')] },
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+    );
+
+    expect(created).toEqual({ kind: 'completed', createdResourceId: FIRST });
+    expect(images.sent).toEqual(['picture']);
+  });
+
   it('creates nothing for no files', async () => {
     const { session, authoring } = open(FIRST);
     const before = session.getState().working;

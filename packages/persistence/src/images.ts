@@ -60,6 +60,19 @@ export type ImageStoring =
 export const isImageRefusal = (code: string): code is ImageRefusal =>
   IMAGE_REFUSALS.some((refusal) => refusal === code);
 
+/**
+ * The refusal the browser can answer from the media type it declares for a
+ * file, before sending it, or `undefined` when only the bytes can tell.
+ *
+ * A declared type comes from the file's name or the platform, not its bytes,
+ * so this only refuses a type it knows is not stored: a declared image type
+ * or no type at all is sent, and `admitImage` decides from the bytes.
+ */
+export const refusalForDeclaredType = (type: string): ImageRefusal | undefined => {
+  if (type === '' || isImageMediaType(type)) return undefined;
+  return type === 'image/svg+xml' ? 'image-svg-unsupported' : 'image-format-unsupported';
+};
+
 export type ImageAdmission =
   | { readonly kind: 'admitted'; readonly image: StoredImage }
   | { readonly kind: 'refused'; readonly code: ImageRefusal };

@@ -67,6 +67,7 @@ export {
   isImageMediaType,
   isImageRefusal,
   MAX_IMAGE_BYTES,
+  refusalForDeclaredType,
   type ImageAdmission,
   type ImageId,
   type ImageMediaType,

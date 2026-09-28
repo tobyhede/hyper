@@ -1,6 +1,6 @@
 import type { ImageNaturalSize, MapId, MapPosition } from '@project/core';
 import type { PlacementMode } from '@project/graph';
-import type { ImageRefusal, ImageStoring } from '@project/persistence';
+import { refusalForDeclaredType, type ImageRefusal, type ImageStoring } from '@project/persistence';
 import type {
   AuthoringResult,
   CreatedImage,
@@ -44,9 +44,11 @@ export type ImageCreationResult =
   | { readonly kind: 'not-stored'; readonly code: ImageRefusal; readonly name: string };
 
 /**
- * The URL each file is stored at, in order, or the first file the host refused.
+ * The URL each file is stored at, in order, or the first file refused.
  *
- * Every file is sent before any answer is read, so a refused file can leave
+ * A file whose declared type is refused is answered before any file is sent,
+ * so a drop holding one sends nothing. Otherwise every file is sent before any
+ * answer is read, so a refused file can leave
  * the files beside it stored with nothing referencing them. That is the store's
  * standing state rather than a leak: ADR 0106 never deletes a stored image,
  * and an image's id is its content, so sending the same file again stores
@@ -59,6 +61,10 @@ const storeEach = async (
   | { readonly kind: 'stored'; readonly urls: readonly string[] }
   | Extract<ImageCreationResult, { readonly kind: 'not-stored' }>
 > => {
+  for (const file of files) {
+    const code = refusalForDeclaredType(file.type);
+    if (code !== undefined) return { kind: 'not-stored', code, name: file.name };
+  }
   const answers = await Promise.all(files.map((file) => images.store(file)));
   const urls: string[] = [];
   for (const [index, answer] of answers.entries()) {

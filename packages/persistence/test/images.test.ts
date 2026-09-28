@@ -1,6 +1,13 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { admitImage, imageIdOf, imagePath, isImageId, MAX_IMAGE_BYTES } from '../src/images';
+import {
+  admitImage,
+  imageIdOf,
+  imagePath,
+  isImageId,
+  MAX_IMAGE_BYTES,
+  refusalForDeclaredType,
+} from '../src/images';
 
 const bytes = (...values: readonly number[]): Uint8Array<ArrayBuffer> => Uint8Array.from(values);
 const ascii = (text: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(text);
@@ -123,5 +130,11 @@ describe('an image id', () => {
 
   it('is addressed under /images', async () => {
     expect(imagePath(await imageIdOf(png))).toBe(`/images/${expectedId(png)}`);
+  });
+});
+
+describe('refusing a file by the type the browser declares', () => {
+  it('refuses a declared SVG as SVG, as the host would', () => {
+    expect(refusalForDeclaredType('image/svg+xml')).toBe('image-svg-unsupported');
   });
 });
