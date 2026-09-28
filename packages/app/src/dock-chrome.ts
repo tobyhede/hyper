@@ -386,20 +386,28 @@ export function useDockChrome(
         onSpaceDragStart: placement.startSpaceDrag,
         onDragEnd: placement.endDrag,
       },
-      // Both kinds complete their Edit on the press (ADR 0089). An exhaustive
-      // record rather than one arm and a fall-through, so a kind added to the
-      // cluster cannot inherit another kind's press in silence.
-      onCreate: (kind) => {
-        const create = {
-          markdown: placement.addResource,
-          space: placement.createSpaceResource,
-        } satisfies Record<DockResourceKind, () => void>;
-        create[kind]();
+      // Every kind completes its Edit on the press, an Image Resource once its
+      // file is chosen (ADR 0089, ADR 0106). An exhaustive switch rather than
+      // one arm and a fall-through, so a kind added to the cluster cannot
+      // inherit another kind's press in silence.
+      onCreate: (creation) => {
+        switch (creation.kind) {
+          case 'markdown':
+            placement.addResource();
+            return;
+          case 'space':
+            placement.createSpaceResource();
+            return;
+          case 'image':
+            placement.createImagesFromFiles(creation.files);
+            return;
+        }
       },
       createDisabled: {
         markdown: !availability.addResource,
         space: !availability.createSpaceResource,
-      },
+        image: !availability.addResource,
+      } satisfies Record<DockResourceKind, boolean>,
     },
     persistence: {
       state: persistence,

@@ -27,6 +27,7 @@ import {
   unavailable,
 } from './command-dock';
 import { selectResource } from './resource-selection';
+import { unusedImageSources } from './image-sources';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -170,6 +171,7 @@ function mount(value: SpaceSnapshot = snapshot, history?: HistoryApi): SpaceSess
   let view: RenderResult | undefined;
   mountSpace(
     {
+      images: unusedImageSources,
       id: runtime(value).id,
       session,
       app: composeApp({ spaceSession: session }),

@@ -57,6 +57,13 @@ export type SnapshotEditRefusal =
       readonly referenceTitles: readonly string[];
     };
 
+/**
+ * Where a placed Resource lands against the point it was given: `exact` keeps
+ * the aimed point, and `avoidingOverlap` steps off one another Resource in the
+ * Map already occupies exactly ({@link freeAnchor}).
+ */
+export type PlacementMode = 'exact' | 'avoidingOverlap';
+
 /** What a `SnapshotEdit` operation answers. */
 export type SnapshotEditOutcome =
   | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot }
@@ -121,7 +128,7 @@ function createInMap(
   resourceId: UUID,
   document: ResourceDocument,
   position: MapPosition,
-  mode: 'exact' | 'avoidingOverlap',
+  mode: PlacementMode,
 ): SnapshotEditOutcome {
   const maps = snapshot.document.maps ?? [];
   const target = maps.find((map) => map.id === mapId);
@@ -463,7 +470,7 @@ function addToMap(
   mapId: UUID,
   resourceId: UUID,
   position: MapPosition,
-  mode: 'exact' | 'avoidingOverlap',
+  mode: PlacementMode,
 ): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);

@@ -12,6 +12,7 @@ import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
+import { unusedImageSources } from './image-sources';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -148,6 +149,7 @@ const setup = (
     backend,
     history,
     openSpaces: createOpenSpaces({
+      images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: spaces.find(([id]) => id === META_ID)?.[1] ?? 'Meta',
@@ -1249,6 +1251,7 @@ describe('Open Spaces', () => {
       ]);
       const reported: unknown[] = [];
       const spaces = createOpenSpaces({
+        images: unusedImageSources,
         backend,
         metaSpaceId: META_ID,
         metaSpaceTitle: 'Meta',

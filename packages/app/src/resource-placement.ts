@@ -8,7 +8,7 @@ import type {
   ResourcePlacement,
   UUID,
 } from '@project/core';
-import { Placement } from '@project/graph';
+import { Placement, type PlacementMode } from '@project/graph';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { EntityActionOutcome } from '@project/ui';
 import {
@@ -16,6 +16,7 @@ import {
   describeSpaceResourceBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
+import { createImageResources, type ImageOrigin } from './image-creation';
 import { resolveMap } from './map-resolution';
 import type { OpenSpace } from './open-spaces';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from './resource';
@@ -98,6 +99,12 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
   readonly createSpaceResource: () => void;
   /** Whether a Create Space Resource is between its press and its installed Edit. */
   readonly creatingSpaceResource: boolean;
+  /** Create Image Resource from the files the Dock's picker chose, at the visible centre. */
+  readonly createImagesFromFiles: (files: readonly File[]) => void;
+  /** Image files dropped on the canvas: one Image Resource each, in a row from the drop point. */
+  readonly dropImages: (files: readonly File[], anchor: MapPosition) => void;
+  /** An image URL pasted on the canvas: one Image Resource at the pointer. */
+  readonly pasteImageUrl: (url: string, anchor: MapPosition) => void;
   /** Create Reference, from the Resource it points at. */
   readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
   /** A drag from the Resources list began over a Resource row. */
@@ -122,7 +129,7 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
  * or the Space under it changes.
  */
 export function useResourcePlacement(
-  { app, session: spaceSession, spaceResources }: OpenSpace,
+  { app, session: spaceSession, spaceResources, images }: OpenSpace,
   { map, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
 ): ResourcePlacementCommands {
   const { reportVisibleCentre, centreAnchor } = useVisibleCentre();
@@ -328,6 +335,69 @@ export function useResourcePlacement(
     });
   }, [authoring, centreAnchor, continuation]);
 
+  /**
+   * Every Image Resource gesture: store and measure what it brought, then one
+   * Edit on the Map the gesture was made on, continuing in the first created
+   * Resource's Title (ADR 0106). A refusal to store a file is said on the Image
+   * notice and creates nothing.
+   *
+   * The Title is owed only while that Map is still drawn: a continuation to a
+   * Resource on another Map would wait until the author went back there, and
+   * would replace whatever the Map they moved to is owed.
+   */
+  const createImages = useCallback(
+    (origin: ImageOrigin, anchor: MapPosition, placementMode: PlacementMode) => {
+      const target = {
+        mapId: navigation.getState().selectedMapId,
+        anchor,
+        placement: placementMode,
+      };
+      void commandOutcomes.run(
+        'image-create',
+        () => createImageResources({ images, authoring }, origin, target),
+        {
+          continueAt: ({ createdResourceId }) =>
+            createdResourceId === undefined || navigation.getState().selectedMapId !== target.mapId
+              ? null
+              : {
+                  target: { kind: 'resource', resourceId: createdResourceId },
+                  select: true,
+                  then: 'rename',
+                },
+        },
+      );
+    },
+    [commandOutcomes, images, authoring, navigation],
+  );
+
+  /**
+   * Files chosen or dropped. No files is no gesture: a run clears the Image
+   * notice and supersedes a run still in flight, so an empty choice must not
+   * start one.
+   */
+  const createImagesFrom = useCallback(
+    (files: readonly File[], anchor: MapPosition, placementMode: PlacementMode) => {
+      if (files.length === 0) return;
+      createImages({ kind: 'files', files }, anchor, placementMode);
+    },
+    [createImages],
+  );
+
+  const createImagesFromFiles = useCallback(
+    (files: readonly File[]) => createImagesFrom(files, centreAnchor(), 'avoidingOverlap'),
+    [createImagesFrom, centreAnchor],
+  );
+
+  const dropImages = useCallback(
+    (files: readonly File[], anchor: MapPosition) => createImagesFrom(files, anchor, 'exact'),
+    [createImagesFrom],
+  );
+
+  const pasteImageUrl = useCallback(
+    (url: string, anchor: MapPosition) => createImages({ kind: 'url', url }, anchor, 'exact'),
+    [createImages],
+  );
+
   const resourcesDrag = useRef<ResourcesDrag | null>(null);
   useEffect(() => {
     resourcesDrag.current = null;
@@ -383,6 +453,9 @@ export function useResourcePlacement(
     createSpaceResource,
     creatingSpaceResource,
     createReferenceFrom,
+    createImagesFromFiles,
+    dropImages,
+    pasteImageUrl,
     startResourceDrag,
     startSpaceDrag,
     endDrag,

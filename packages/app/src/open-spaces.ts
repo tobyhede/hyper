@@ -15,6 +15,7 @@ import {
 import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
+import type { ImageSources } from './image-creation';
 import {
   createSpaceResourceLifecycle,
   type SpaceResourceAuthoring,
@@ -36,6 +37,11 @@ export interface OpenSpace {
    * able to author a Space Resource.
    */
   readonly spaceResources: SpaceResourceAuthoring;
+  /**
+   * Where an Image Resource's picture is stored and measured (ADR 0106). The
+   * same one on every entry, supplied to Open Spaces when it is composed.
+   */
+  readonly images: ImageSources;
 }
 
 export interface OpenSpacesState {
@@ -220,6 +226,12 @@ export interface OpenSpacesOptions {
    * the one owner that is supposed to name it.
    */
   readonly history: HistoryApi;
+  /**
+   * Where an Image Resource's picture is stored and measured, required with no
+   * default for the reason `history` is: `createSpaceStartup` names the host
+   * and the browser, and a test supplies answers of its own.
+   */
+  readonly images: ImageSources;
   readonly reportObserverError?: ObserverErrorReporter;
 }
 
@@ -338,6 +350,7 @@ export function createOpenSpaces({
   metaSpaceTitle,
   newId,
   history,
+  images,
   reportObserverError,
 }: OpenSpacesOptions): OpenSpaces {
   const report: ObserverErrorReporter =
@@ -528,6 +541,7 @@ export function createOpenSpaces({
         spaceResources,
       }),
       spaceResources,
+      images,
     };
     session.subscribe(() => {
       const state = observable.getState();

@@ -11,6 +11,9 @@ import {
   type ResourcePlacement,
   COLLAPSED_RESOURCE_SIZE,
   EDGE_TITLE_ONE_LINE,
+  IMAGE_URL_UNSUPPORTED,
+  isAcceptedImageUrl,
+  type ImageNaturalSize,
   graphHeadShape,
   isOneLineEdgeTitle,
   RESOURCE_TITLE_REQUIRED,
@@ -24,6 +27,7 @@ import {
   newGraph,
   Placement,
   SnapshotEdit,
+  type PlacementMode,
   type SnapshotEditOutcome,
   type SnapshotEditRefusal,
   type ResolvedMap,
@@ -96,6 +100,15 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
   }
 };
 
+/** One picture an Image Resource is created for: its URL, and its size when it loaded. */
+export interface CreatedImage {
+  readonly url: string;
+  readonly naturalSize?: ImageNaturalSize;
+}
+
+/** The gap between Image Resources a single gesture creates side by side. */
+const IMAGE_ROW_GAP = 40;
+
 /**
  * One completed authored fact, as the interaction that finished knows it.
  *
@@ -160,6 +173,22 @@ export type AuthoringCompletion =
       readonly target: ResourceId;
       readonly title?: string;
       readonly anchor: MapPosition;
+    }
+  /**
+   * Create Image Resources: one per image, in one Edit, each titled
+   * `Resource N` in order and placed in a row from the anchor (ADR 0106). The
+   * caller has already stored or measured each picture; this Edit only
+   * records what it was told.
+   */
+  | {
+      readonly kind: 'created-images';
+      readonly images: readonly CreatedImage[];
+      readonly anchor: MapPosition;
+      /**
+       * `exact` for a drop or a paste, which aimed at their point; a press has
+       * no aimed-at point and steps off one already taken.
+       */
+      readonly placement: PlacementMode;
     }
   /** Add to Map: membership and a first position for a Resource already in the Space. */
   | {
@@ -290,6 +319,8 @@ export type AuthoringRefusal =
   // raises it from the Resource schema, so both ends spell it from one constant.
   | { readonly code: typeof RESOURCE_TITLE_REQUIRED }
   | { readonly code: 'map-title-required' }
+  // Spelt from `@project/core`'s constant, which the Image Resource schema raises too.
+  | { readonly code: typeof IMAGE_URL_UNSUPPORTED }
   /**
    * Rename Space with nothing left after the trim. `spaceFileSchema` declares
    * the title as `z.string().min(1)`, which counts characters, so blank is the
@@ -371,7 +402,7 @@ export interface SpaceAuthoring {
    */
   readonly completeInMap: (
     mapId: UUID,
-    completion: EmbeddedResourceCompletion | EmbeddedContextCompletion,
+    completion: EmbeddedResourceCompletion | EmbeddedContextCompletion | ImagesCompletion,
   ) => AuthoringResult;
   readonly retryPersistence: () => void;
   /**
@@ -466,6 +497,13 @@ export type EmbeddedResourceCompletion = Extract<
       | 'connected-resources';
   }
 >;
+
+/**
+ * Create Image Resources, addressed to the Map the gesture was made on: storing
+ * and measuring outlast the gesture, so the canvas may be drawing another Map
+ * by the time this Edit lands (`image-creation.ts`).
+ */
+export type ImagesCompletion = Extract<AuthoringCompletion, { kind: 'created-images' }>;
 
 /** Commands addressed to the Map shown by a Space Resource. */
 export type EmbeddedContextCompletion = Extract<
@@ -1122,7 +1160,7 @@ export function createSpaceAuthoring({
        * (`exact`); a Resource created from a menu has no aimed-at point and
        * would otherwise stack (`avoidingOverlap`).
        */
-      mode: 'exact' | 'avoidingOverlap',
+      mode: PlacementMode,
     ): { readonly id: ResourceId } | DerivedCompletion => {
       const id = newId();
       const outcome = SnapshotEdit.createInMap(snapshot, mapId, id, document, at, mode);
@@ -1192,6 +1230,28 @@ export function createSpaceAuthoring({
       );
       if ('kind' in created) return created;
       createdResourceId = created.id;
+    } else if (completion.kind === 'created-images') {
+      // Refused here rather than left to intake, which would throw on a URL the
+      // schema will not hold — and the author's paste may not throw.
+      if (completion.images.length === 0) return UNCHANGED;
+      if (completion.images.some(({ url }) => !isAcceptedImageUrl(url))) {
+        return refuse({ code: IMAGE_URL_UNSUPPORTED });
+      }
+      const step = COLLAPSED_RESOURCE_SIZE.width + IMAGE_ROW_GAP;
+      for (const [index, { url, naturalSize }] of completion.images.entries()) {
+        // Titled after the Resources created before it in this same Edit, so a
+        // row of three takes three successive numbers.
+        const document: ResourceDocument = {
+          title: nextResourceTitle(snapshot),
+          kind: 'image',
+          url,
+        };
+        if (naturalSize !== undefined) document.naturalSize = naturalSize;
+        const at = { ...completion.anchor, x: completion.anchor.x + index * step };
+        const created = createResource(document, at, completion.placement);
+        if ('kind' in created) return created;
+        createdResourceId ??= created.id;
+      }
     } else if (completion.kind === 'created-reference') {
       // An empty title mints the same neutral `Resource N` every other created Resource
       // gets; text the author already entered is never overwritten. `??` cannot

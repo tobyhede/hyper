@@ -4,18 +4,33 @@
  * {@link ResourcesControl}.
  */
 import { useContext, useEffect, useId, useRef } from 'react';
-import { ResourceKindIcon, resourceKindName, ToolbarButton, ToolbarGroup } from '@project/ui';
+import {
+  Input,
+  ResourceKindIcon,
+  resourceKindName,
+  ToolbarButton,
+  ToolbarGroup,
+} from '@project/ui';
+import { IMAGE_MEDIA_TYPES } from '@project/persistence';
 import type { MenuSide } from '../dock-placement';
 import { RESOURCES_TRIGGER } from './command-dock-triggers';
 import { DockDisclosureContext, RESOURCES_DISCLOSURE_ID } from './command-dock-shared';
 import {
   RESOURCE_KINDS,
+  type DockCreation,
   type DockResourceKind,
   type DockResources,
   type DockResourcesList,
 } from './command-dock-chrome';
 import { SetTrigger } from './CommandDockParts';
 import { ResourcesPopover } from './ResourcesPopover';
+
+/**
+ * The formats the host stores (ADR 0106), offered to the picker as a
+ * convenience. The host still decides from the bytes, so a file the picker
+ * lets through anyway meets the host's refusal.
+ */
+const PICKED_IMAGE_TYPES = IMAGE_MEDIA_TYPES.join(',');
 
 /**
  * Create Resource, as peer commands in the Resources cluster, one per kind.
@@ -46,9 +61,20 @@ function CreatePeers({
   onCreate,
   disabled,
 }: {
-  readonly onCreate: (kind: DockResourceKind) => void;
+  readonly onCreate: (creation: DockCreation) => void;
   readonly disabled: Readonly<Record<DockResourceKind, boolean>>;
 }) {
+  /* The browser's own file picker, behind the Image Resource's peer. No
+     component in `@project/ui` or the registry chooses a file, and a picker is
+     not something to hand-roll, so the peer is an ordinary toolbar button that
+     opens the native one through the project's `Input`, which stays out of the
+     layout and out of the tab order. A cancelled picker fires no `change`, so
+     it creates nothing. */
+  const picker = useRef<HTMLInputElement | null>(null);
+  const press = (kind: DockResourceKind): void => {
+    if (kind === 'image') picker.current?.click();
+    else onCreate({ kind });
+  };
   return (
     /* **A nested group, and it is what lets the vertical dock pack.** Base UI's
        toolbar group is a plain `role="group"` div with no positional logic, so
@@ -67,7 +93,7 @@ function CreatePeers({
           aria-label={`Create ${resourceKindName(kind)}`}
           title={`Create ${resourceKindName(kind)}`}
           disabled={disabled[kind]}
-          onClick={() => onCreate(kind)}
+          onClick={() => press(kind)}
         >
           {/* Decorative here and nowhere else in the Dock: this button already
               says `Create <kind>`, so a glyph announcing `<kind>` beside it is a
@@ -76,6 +102,21 @@ function CreatePeers({
           <ResourceKindIcon kind={kind} decorative />
         </ToolbarButton>
       ))}
+      <Input
+        ref={picker}
+        type="file"
+        accept={PICKED_IMAGE_TYPES}
+        hidden
+        tabIndex={-1}
+        aria-hidden
+        data-testid="create-image-file"
+        onChange={(event) => {
+          const files = [...(event.currentTarget.files ?? [])];
+          // Cleared so choosing the same file again is still a change.
+          event.currentTarget.value = '';
+          if (files.length > 0) onCreate({ kind: 'image', files });
+        }}
+      />
     </ToolbarGroup>
   );
 }

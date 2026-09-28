@@ -28,6 +28,7 @@ import { mintingIds } from './minting';
 import { openTestSpace } from './opened-space';
 import type { SpaceResourceAuthoring } from '../src/space-resource-lifecycle';
 import { createResource, createResourceControl, unavailable } from './command-dock';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Creating a Space Resource, from the control an author actually has.
@@ -317,12 +318,7 @@ function mount(
   const app = composeApp({ spaceSession: session, reportObserverError });
   let view: RenderResult | undefined;
   mountSpace(
-    {
-      id: runtime(home).id,
-      session,
-      app,
-      spaceResources,
-    },
+    { images: unusedImageSources, id: runtime(home).id, session, app, spaceResources },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);

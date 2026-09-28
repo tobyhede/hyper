@@ -361,6 +361,8 @@ function CanvasHarness({
         onAddResource={() => undefined}
         onAddExistingResource={() => undefined}
         onPlaceSpace={() => undefined}
+        onDropImages={() => undefined}
+        onPasteImageUrl={() => undefined}
         nameOnCreation={null}
         authoring={authoring}
         spaceSession={session}

@@ -6,8 +6,12 @@ import {
   decodeProblemDetails,
   decodeSpaceSummaries,
   decodeLoadedSpace,
+  decodeStoredImageUrl,
   encodeCommitRequest,
+  isImageRefusal,
+  MAX_IMAGE_BYTES,
   problemCodeForType,
+  type ImageStoring,
   type CommitResult,
   type LoadedSpace,
   type ProblemDetails,
@@ -38,26 +42,32 @@ const hasProblemDetailsMediaType = (response: Response): boolean => {
 export interface HttpSpaceBackendOptions {
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
+  /** The budget for sending an image, which may be up to `MAX_IMAGE_BYTES` over the author's uplink. */
+  uploadTimeoutMs?: number;
 }
 
 export class HttpSpaceBackend implements SpaceBackend {
   readonly #baseUrl: string;
   readonly #fetch: typeof globalThis.fetch;
   readonly #timeoutMs: number;
+  readonly #uploadTimeoutMs: number;
 
   constructor(baseUrl = '/', options: HttpSpaceBackendOptions = {}) {
     this.#baseUrl = baseUrl;
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = options.timeoutMs ?? 10_000;
+    // Two minutes carries a full-size image over an uplink of about 0.7 Mbps.
+    this.#uploadTimeoutMs = options.uploadTimeoutMs ?? 120_000;
   }
 
   /** Keep the timeout armed until the untrusted response body is decoded. */
   async #timedRequest<T>(
     request: (client: SpaceHttpClient) => Promise<Response>,
     consume: (response: Response, signal: AbortSignal) => Promise<T>,
+    timeoutMs: number = this.#timeoutMs,
   ): Promise<T> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const client = hc<SpaceHttpApp>(this.#baseUrl, {
         fetch: (input: RequestInfo | URL, init?: RequestInit) =>
@@ -100,6 +110,32 @@ export class HttpSpaceBackend implements SpaceBackend {
         if (!response.ok) throw new Error(`Unable to load aggregate: HTTP ${response.status}`);
         return decodeLoadedAggregate(await response.json());
       },
+    );
+  }
+
+  /**
+   * Send an image to the host's store (ADR 0106), answering the URL it is
+   * stored at or the refusal the host named. The host decides from the bytes;
+   * an image over the size limit is answered here without sending it, because
+   * the host could only refuse it after reading all of it. Throws when the
+   * host cannot be reached or answers anything else.
+   */
+  storeImage(image: Blob): Promise<ImageStoring> {
+    if (image.size > MAX_IMAGE_BYTES) {
+      return Promise.resolve({ kind: 'refused', code: 'image-too-large' });
+    }
+    return this.#timedRequest(
+      (client) => client.images.$post(undefined, { init: { body: image } }),
+      async (response): Promise<ImageStoring> => {
+        if (response.ok)
+          return { kind: 'stored', url: decodeStoredImageUrl(await response.json()) };
+        if (hasProblemDetailsMediaType(response)) {
+          const code = problemCodeForType(decodeProblemDetails(await response.json()).type);
+          if (isImageRefusal(code)) return { kind: 'refused', code };
+        }
+        throw new Error(`Unable to store an image: HTTP ${response.status}`);
+      },
+      this.#uploadTimeoutMs,
     );
   }
 

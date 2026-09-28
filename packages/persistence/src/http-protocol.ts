@@ -1,4 +1,10 @@
-import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  isAcceptedImageUrl,
+  spaceSnapshotSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
 import type {
   AggregateLoadResult,
@@ -741,6 +747,19 @@ export const commitOutcomeDecoder = (
   status: number,
 ): ((value: unknown) => CommitOutcome) | undefined =>
   Object.values(COMMIT_OUTCOME_WIRE).find((entry) => entry.status === status)?.decode;
+
+/**
+ * The URL the host answered for an image it stored: the one member of its
+ * `{ url }` body, held to what an Image Resource may record.
+ */
+export const decodeStoredImageUrl = (value: unknown): string => {
+  const record = exactRecord(value, ['url'], 'stored image');
+  const url = record['url'];
+  if (typeof url !== 'string' || !isAcceptedImageUrl(url)) {
+    throw new Error('stored image url must be one an Image Resource may hold');
+  }
+  return url;
+};
 
 export const decodeSpaceSummaries = (value: unknown): readonly SpaceSummary[] => {
   if (!Array.isArray(value)) throw new Error('space summaries must be an array');

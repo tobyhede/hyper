@@ -16,6 +16,7 @@ export {
   decodeLoadedSpace,
   decodeLoadedAggregate,
   decodeSpaceSummaries,
+  decodeStoredImageUrl,
   encodeCommitRequest,
   encodeCommitConflict,
   encodeCommitRefusal,
@@ -60,15 +61,19 @@ export {
 export {
   admitImage,
   IMAGE_COLLECTION_PATH,
+  IMAGE_MEDIA_TYPES,
   imagePath,
   isImageId,
   isImageMediaType,
+  isImageRefusal,
   MAX_IMAGE_BYTES,
+  refusalForDeclaredType,
   type ImageAdmission,
   type ImageId,
   type ImageMediaType,
   type ImageRefusal,
   type ImageStore,
+  type ImageStoring,
   type StoredImage,
 } from './images';
 /* Two test-facing helpers, two doors, and the difference is what they are.

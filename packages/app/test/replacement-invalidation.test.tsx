@@ -22,6 +22,7 @@ import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { beginRename } from './command-dock';
 import { selectResource } from './resource-selection';
+import { unusedImageSources } from './image-sources';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -147,6 +148,7 @@ async function mountedSpaceApp(local: SpaceSnapshot = LOCAL): Promise<SpaceSessi
   let view: RenderResult | undefined;
   mountSpace(
     {
+      images: unusedImageSources,
       id: runtime(local).id,
       session,
       app: composeApp({ spaceSession: session, spaceResources }),

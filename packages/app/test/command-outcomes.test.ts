@@ -215,6 +215,53 @@ describe('titles and sentences', () => {
     });
   });
 
+  it.each([
+    ['image-too-large', 'huge.png is larger than 10 MB, the largest image that can be stored.'],
+    ['image-format-unsupported', 'notes.txt is not a PNG, JPEG, WebP or GIF image.'],
+    [
+      'image-svg-unsupported',
+      'figure.svg is an SVG image, which cannot be stored yet. Use PNG, JPEG, WebP or GIF.',
+    ],
+  ] as const)(
+    'says a stored image refused as %s in the application’s words, naming the file',
+    async (code, message) => {
+      const { outcomes } = open();
+      const name = message.split(' ')[0] ?? '';
+
+      await outcomes.run('image-create', () =>
+        Promise.resolve({ kind: 'not-stored' as const, code, name }),
+      );
+
+      expect(notice(outcomes, 'image-create')).toEqual({ title: 'Image not created', message });
+    },
+  );
+
+  it('continues a created Image Resource at the first Resource the Edit made', async () => {
+    const { outcomes, continuation } = open();
+
+    await outcomes.run(
+      'image-create',
+      () => Promise.resolve({ kind: 'completed' as const, createdResourceId: CREATED }),
+      {
+        continueAt: ({ createdResourceId }) =>
+          createdResourceId === undefined
+            ? null
+            : {
+                target: { kind: 'resource', resourceId: createdResourceId },
+                select: true,
+                then: 'rename',
+              },
+      },
+    );
+
+    expect(notice(outcomes, 'image-create')).toBeNull();
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'resource', resourceId: CREATED },
+      select: true,
+      then: 'rename',
+    });
+  });
+
   it('publishes a Map report whole, without describing it', () => {
     const { outcomes } = open();
 

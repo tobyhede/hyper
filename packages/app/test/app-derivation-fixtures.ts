@@ -4,6 +4,7 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import type { OpenSpace } from '../src/open-spaces';
 import { openTestSpace } from './opened-space';
+import { unusedImageSources } from './image-sources';
 
 /**
  * One Space for the derivations `App` composes: two Resources placed on its one
@@ -66,6 +67,7 @@ export const openDerivationSpace = (newId: () => UUID = newUuid): OpenSpace => {
     newId,
   );
   return {
+    images: unusedImageSources,
     id: SPACE_ID,
     session: spaceSession,
     app: composeApp({ spaceSession, spaceResources, newId }),

@@ -326,7 +326,7 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
 });
 
 /**
- * Create Resource, as two peers, through the running application.
+ * Create Resource, as three peers, through the running application.
  *
  * The Ladle half of this claim asserts the controls are present, named and
  * ungated; this half asserts what a press of one actually *does*, which the
@@ -369,6 +369,29 @@ test(
     await expect(page.getByRole('menu')).toHaveCount(0);
     await spaceTitle.press('Escape');
     await settled(page);
+
+    // The Image Resource's one press opens the file picker rather than a menu,
+    // and choosing a file completes the Edit and continues in the Title. What
+    // the Resource records is `image-resource.spec.ts`'s.
+    const createImage = page.getByRole('button', { name: 'Create Image Resource', exact: true });
+    await expect(createImage.locator('svg')).toBeVisible();
+    const chooser = page.waitForEvent('filechooser');
+    await createImage.click();
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await (
+      await chooser
+    ).setFiles({
+      name: 'diagram.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAEElEQVR4nGP4z8AAQQxwFgBB0gX7h/C5SAAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    });
+    const imageTitle = page.getByRole('textbox', { name: 'Resource title' });
+    await expect(imageTitle).toBeFocused();
+    await expect(imageTitle).toHaveValue(/^Resource \d+$/u);
+    await imageTitle.press('Escape');
   },
 );
 

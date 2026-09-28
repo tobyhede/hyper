@@ -11,7 +11,7 @@ import { isStoredImageId, STORED_IMAGE_COLLECTION_PATH } from '@project/core';
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 /** The formats the host stores, each identified from the bytes. */
-const IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
+export const IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const;
 export type ImageMediaType = (typeof IMAGE_MEDIA_TYPES)[number];
 
 /** Whether a stored media type is one the host stores images as. */
@@ -44,7 +44,34 @@ export interface StoredImage {
  * SVG has its own because it is not refused as unrecognised: it is left for its
  * own decision (ADR 0106).
  */
-export type ImageRefusal = 'image-too-large' | 'image-format-unsupported' | 'image-svg-unsupported';
+const IMAGE_REFUSALS = [
+  'image-too-large',
+  'image-format-unsupported',
+  'image-svg-unsupported',
+] as const;
+export type ImageRefusal = (typeof IMAGE_REFUSALS)[number];
+
+/** What storing an image answered the browser: the URL it is stored at, or why not. */
+export type ImageStoring =
+  | { readonly kind: 'stored'; readonly url: string }
+  | { readonly kind: 'refused'; readonly code: ImageRefusal };
+
+/** Whether a problem code is one of the refusals storing an image answers. */
+export const isImageRefusal = (code: string): code is ImageRefusal =>
+  IMAGE_REFUSALS.some((refusal) => refusal === code);
+
+/**
+ * The refusal the browser can answer from the media type it declares for a
+ * file, before sending it, or `undefined` when only the bytes can tell.
+ *
+ * A declared type comes from the file's name or the platform, not its bytes,
+ * so this only refuses a type it knows is not stored: a declared image type
+ * or no type at all is sent, and `admitImage` decides from the bytes.
+ */
+export const refusalForDeclaredType = (type: string): ImageRefusal | undefined => {
+  if (type === '' || isImageMediaType(type)) return undefined;
+  return type === 'image/svg+xml' ? 'image-svg-unsupported' : 'image-format-unsupported';
+};
 
 export type ImageAdmission =
   | { readonly kind: 'admitted'; readonly image: StoredImage }

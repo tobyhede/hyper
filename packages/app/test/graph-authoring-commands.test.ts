@@ -23,6 +23,7 @@ import {
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import type { AuthoringResult } from '../src/space-authoring';
 import { recordingHistory } from './browser-history';
+import { unusedImageSources } from './image-sources';
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
@@ -107,6 +108,7 @@ const openSpaces = (
   reportObserverError: ObserverErrorReporter = () => undefined,
 ) =>
   createOpenSpaces({
+    images: unusedImageSources,
     backend: new MemorySpaceBackend(
       META,
       [meta, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),

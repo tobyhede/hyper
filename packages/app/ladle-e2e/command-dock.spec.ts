@@ -850,13 +850,13 @@ test(
  * application cannot mean.
  */
 test(
-  'Create offers both kinds as peers, each named for what it makes',
+  'Create offers the three kinds as peers, each named for what it makes',
   { tag: '@parity:command-dock-creates-each-kind-in-one-press' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const strip = surface(page);
-    for (const kind of ['Markdown Resource', 'Space Resource']) {
+    for (const kind of ['Markdown Resource', 'Space Resource', 'Image Resource']) {
       const control = strip.getByRole('button', { name: `Create ${kind}` });
       await expect(control).toBeVisible();
       // Available, and reached without opening anything first — which is the
@@ -884,6 +884,16 @@ test(
     await expect(title).toBeFocused();
     await title.press('Enter');
     await expect(spaceResources).toHaveCount(before + 1);
+
+    // The Image Resource's one press opens the file picker, and a picker
+    // closed with nothing chosen creates nothing.
+    const images = page.locator('.react-flow__node:visible .canvas-resource[data-kind="image"]');
+    const chooser = page.waitForEvent('filechooser');
+    await strip.getByRole('button', { name: 'Create Image Resource', exact: true }).click();
+    await (await chooser).setFiles([]);
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
+    await expect(images).toHaveCount(0);
   },
 );
 
@@ -914,7 +924,7 @@ test(
     const resources = strip.getByRole('group', { name: 'Resources' });
     const graph = strip.getByRole('group', { name: 'Graph' });
 
-    // One row: the cluster carrying the disclosure and both Creates is no taller
+    // One row: the cluster carrying the disclosure and the three Creates is no taller
     // than the one carrying a name, a disclosure and Present. Left as loose
     // siblings the vertical column auto-places them onto a row each and this is
     // what fails.
@@ -925,8 +935,8 @@ test(
     if (resourcesBox !== null && graphBox !== null)
       expect(Math.abs(resourcesBox.height - graphBox.height)).toBeLessThanOrEqual(1);
 
-    // One pitch: the chevron and both Creates are evenly spaced, so the
-    // disclosure reads as the first of three glyphs. Centres rather than edges,
+    // One pitch: the chevron and the three Creates are evenly spaced, so the
+    // disclosure reads as the first of four glyphs. Centres rather than edges,
     // because the chevron is a 14px glyph inside a padded trigger and the
     // Creates are 14px glyphs inside 28px buttons.
     const centres = await strip.evaluate((root) => {
@@ -935,8 +945,8 @@ test(
       const trigger = cluster.querySelector('[aria-label="Resources"][class*="resources-trigger"]');
       const glyphs = trigger === null ? [] : [...trigger.querySelectorAll('svg')];
       const chevron = glyphs.at(-1);
-      // `button`, because the group wrapping the pair is itself labelled
-      // "Create a Resource" and an attribute prefix match takes it as a third.
+      // `button`, because the group wrapping the peers is itself labelled
+      // "Create a Resource" and an attribute prefix match takes it as another.
       const creates = [...cluster.querySelectorAll('button[aria-label^="Create "]')];
       return [chevron, ...creates]
         .filter((element): element is Element => element !== undefined)
@@ -945,7 +955,7 @@ test(
           return rect.left + rect.width / 2;
         });
     });
-    expect(centres).toHaveLength(3);
+    expect(centres).toHaveLength(4);
     const pitches = centres.slice(1).map((centre, index) => centre - (centres[index] ?? 0));
     for (const pitch of pitches) expect(Math.abs(pitch - (pitches[0] ?? 0))).toBeLessThanOrEqual(1);
   },
