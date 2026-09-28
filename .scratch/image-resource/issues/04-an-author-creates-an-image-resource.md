@@ -4,7 +4,7 @@
 
 **Blocked by:** 01, 02
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] The image glyph sits among the Dock's creation peers; choosing `diagram.png` creates an Image Resource titled `Resource N` whose URL is the stored image's.
 - [x] The created Resource records the image's natural size; an unreachable pasted URL creates one with none.
