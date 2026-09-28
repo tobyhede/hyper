@@ -58,10 +58,13 @@ const measureInBrowser = (url: string): Promise<ImageNaturalSize | undefined> =>
   });
 
 /** The host's image store over HTTP, and the browser measuring what it loads. */
-const browserImageSources = (host: HttpSpaceBackend = new HttpSpaceBackend()): ImageSources => ({
-  store: (image) => host.storeImage(image),
-  measure: measureInBrowser,
-});
+const browserImageSources = (): ImageSources => {
+  const host = new HttpSpaceBackend();
+  return {
+    store: (image) => host.storeImage(image),
+    measure: measureInBrowser,
+  };
+};
 
 /**
  * Compose browser startup around one fixed persistence backend.

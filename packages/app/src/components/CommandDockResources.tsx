@@ -11,6 +11,7 @@ import {
   ToolbarButton,
   ToolbarGroup,
 } from '@project/ui';
+import { IMAGE_MEDIA_TYPES } from '@project/persistence';
 import type { MenuSide } from '../dock-placement';
 import { RESOURCES_TRIGGER } from './command-dock-triggers';
 import { DockDisclosureContext, RESOURCES_DISCLOSURE_ID } from './command-dock-shared';
@@ -23,6 +24,13 @@ import {
 } from './command-dock-chrome';
 import { SetTrigger } from './CommandDockParts';
 import { ResourcesPopover } from './ResourcesPopover';
+
+/**
+ * The formats the host stores (ADR 0106), offered to the picker as a
+ * convenience. The host still decides from the bytes, so a file the picker
+ * lets through anyway meets the host's refusal.
+ */
+const PICKED_IMAGE_TYPES = IMAGE_MEDIA_TYPES.join(',');
 
 /**
  * Create Resource, as peer commands in the Resources cluster, one per kind.
@@ -49,13 +57,6 @@ import { ResourcesPopover } from './ResourcesPopover';
  * Graph cluster — bare glyphs after the disclosure — and a second chevron
  * beside `Resources ⌄` would read as a second disclosure of the same list.
  */
-/**
- * The formats the host stores (ADR 0106), offered to the picker as a
- * convenience. The host still decides from the bytes, so a file the picker
- * lets through anyway meets the host's refusal.
- */
-const PICKED_IMAGE_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
-
 function CreatePeers({
   onCreate,
   disabled,

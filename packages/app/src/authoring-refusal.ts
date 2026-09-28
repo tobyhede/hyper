@@ -1,5 +1,12 @@
 import type { SpaceAggregateError, SpaceError } from '@project/graph';
-import type { ImageRefusal, SaveBlock, SpaceSessionState } from '@project/persistence';
+import {
+  IMAGE_MEDIA_TYPES,
+  MAX_IMAGE_BYTES,
+  type ImageMediaType,
+  type ImageRefusal,
+  type SaveBlock,
+  type SpaceSessionState,
+} from '@project/persistence';
 import type { ConnectionResult } from './connection-completion';
 import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
@@ -33,17 +40,36 @@ type PresentedAuthoringRefusal =
 const MAP_NO_LONGER_IN_SPACE = 'This Map is no longer part of the Space.';
 
 /**
+ * What the author calls each format the host stores. `satisfies` for the reason
+ * the aggregate table below gives: a format added without a name fails here.
+ */
+const IMAGE_FORMAT_NAMES = {
+  'image/png': 'PNG',
+  'image/jpeg': 'JPEG',
+  'image/webp': 'WebP',
+  'image/gif': 'GIF',
+} satisfies Record<ImageMediaType, string>;
+
+const storedFormatNames = IMAGE_MEDIA_TYPES.map((type) => IMAGE_FORMAT_NAMES[type]);
+
+/** The stored formats as one phrase, in the host's order: `PNG, JPEG, WebP or GIF`. */
+const STORED_IMAGE_FORMATS = `${storedFormatNames.slice(0, -1).join(', ')} or ${storedFormatNames.slice(-1).join('')}`;
+
+/** The host's limit as the author reads it: `MAX_IMAGE_BYTES` in units of 1024², written MB. */
+const MAX_IMAGE_MEGABYTES = MAX_IMAGE_BYTES / (1024 * 1024);
+
+/**
  * Application-owned copy for the host refusing to store an image (ADR 0106),
  * naming the file it refused.
  */
 export const describeImageRefusal = (code: ImageRefusal, name: string): string => {
   switch (code) {
     case 'image-too-large':
-      return `${name} is larger than 10 MB, the largest image that can be stored.`;
+      return `${name} is larger than ${MAX_IMAGE_MEGABYTES} MB, the largest image that can be stored.`;
     case 'image-format-unsupported':
-      return `${name} is not a PNG, JPEG, WebP or GIF image.`;
+      return `${name} is not a ${STORED_IMAGE_FORMATS} image.`;
     case 'image-svg-unsupported':
-      return `${name} is an SVG image, which cannot be stored yet. Use PNG, JPEG, WebP or GIF.`;
+      return `${name} is an SVG image, which cannot be stored yet. Use ${STORED_IMAGE_FORMATS}.`;
   }
 };
 

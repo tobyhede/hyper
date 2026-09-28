@@ -170,15 +170,28 @@ const focusedResource = (
   return nodes.find((node) => node.id === id)?.data.resourceId ?? null;
 };
 
-/** Whether a drag carries files the canvas would take, over somewhere that is the canvas's. */
-const carriesDroppableFiles = (
+/**
+ * What a drag carrying files is over. `'place'` is the canvas's empty pane,
+ * which takes the files at the drop point. `'refuse'` is anywhere else the
+ * canvas draws — a Resource, a Map an Open Space Resource draws, a panel — where
+ * placing at the drop point would cover what is there, or author this Map at a
+ * point read from another; the drag is still claimed, with no effect, so the
+ * browser does not open the file in place of the Space. `null` is a drag that
+ * is not the canvas's to answer: no files, no authoring, or a field or control
+ * that takes a drop of its own.
+ */
+const fileDropAt = (
   event: ReactDragEvent<HTMLDivElement>,
   authorOnCanvas: boolean,
-): boolean =>
-  authorOnCanvas &&
-  event.dataTransfer.types.includes('Files') &&
-  event.target instanceof Element &&
-  event.target.closest(NOT_A_CANVAS_COMMAND) === null;
+): 'place' | 'refuse' | null => {
+  if (!authorOnCanvas || !event.dataTransfer.types.includes('Files')) return null;
+  if (!(event.target instanceof Element)) return null;
+  if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return null;
+  return event.target.closest('.react-flow__pane') !== null &&
+    event.target.closest('.react-flow__node') === null
+    ? 'place'
+    : 'refuse';
+};
 
 export interface SpaceCanvasProps {
   /** Where a Space Resource rail's Map report is held. */
@@ -1252,9 +1265,10 @@ export function SpaceCanvas({
 
   const onExternalDragOver = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
-      if (carriesDroppableFiles(event, availability.authorOnCanvas)) {
+      const files = fileDropAt(event, availability.authorOnCanvas);
+      if (files !== null) {
         event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
+        event.dataTransfer.dropEffect = files === 'place' ? 'copy' : 'none';
         return;
       }
       const { types } = event.dataTransfer;
@@ -1275,9 +1289,11 @@ export function SpaceCanvas({
     (event: ReactDragEvent<HTMLDivElement>) => {
       // Files first: a drop from the desktop carries no Resources list type,
       // and the browser would otherwise open the file in place of the Space.
-      if (carriesDroppableFiles(event, availability.authorOnCanvas)) {
+      const files = fileDropAt(event, availability.authorOnCanvas);
+      if (files !== null) {
         event.preventDefault();
-        onDropImages([...event.dataTransfer.files], anchorAt(event.clientX, event.clientY));
+        if (files === 'place')
+          onDropImages([...event.dataTransfer.files], anchorAt(event.clientX, event.clientY));
         return;
       }
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
@@ -1292,22 +1308,11 @@ export function SpaceCanvas({
       // dropped Space Resource is drawn at this size too, so the anchor centres
       // it, is held by `e2e/space-resource.spec.ts` ("dragging a Space from
       // the Resources list places its Space Resource at the drop point").
-      const point = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-      const anchor = {
-        x: point.x - RESOURCE_SIZE.width / 2,
-        y: point.y - RESOURCE_SIZE.height / 2,
-      };
+      const anchor = anchorAt(event.clientX, event.clientY);
       if (resourceId.success) onAddExistingResource(resourceId.data, anchor);
       else if (spaceId.success) onPlaceSpace(spaceId.data, anchor);
     },
-    [
-      availability.authorOnCanvas,
-      onAddExistingResource,
-      onPlaceSpace,
-      onDropImages,
-      anchorAt,
-      screenToFlowPosition,
-    ],
+    [availability.authorOnCanvas, onAddExistingResource, onPlaceSpace, onDropImages, anchorAt],
   );
 
   const embeddedEvents = useMemo(() => {

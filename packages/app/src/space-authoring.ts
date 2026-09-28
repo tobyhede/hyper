@@ -27,6 +27,7 @@ import {
   newGraph,
   Placement,
   SnapshotEdit,
+  type PlacementMode,
   type SnapshotEditOutcome,
   type SnapshotEditRefusal,
   type ResolvedMap,
@@ -187,7 +188,7 @@ export type AuthoringCompletion =
        * `exact` for a drop or a paste, which aimed at their point; a press has
        * no aimed-at point and steps off one already taken.
        */
-      readonly placement: 'exact' | 'avoidingOverlap';
+      readonly placement: PlacementMode;
     }
   /** Add to Map: membership and a first position for a Resource already in the Space. */
   | {
@@ -401,7 +402,7 @@ export interface SpaceAuthoring {
    */
   readonly completeInMap: (
     mapId: UUID,
-    completion: EmbeddedResourceCompletion | EmbeddedContextCompletion,
+    completion: EmbeddedResourceCompletion | EmbeddedContextCompletion | ImagesCompletion,
   ) => AuthoringResult;
   readonly retryPersistence: () => void;
   /**
@@ -496,6 +497,13 @@ export type EmbeddedResourceCompletion = Extract<
       | 'connected-resources';
   }
 >;
+
+/**
+ * Create Image Resources, addressed to the Map the gesture was made on: storing
+ * and measuring outlast the gesture, so the canvas may be drawing another Map
+ * by the time this Edit lands (`image-creation.ts`).
+ */
+export type ImagesCompletion = Extract<AuthoringCompletion, { kind: 'created-images' }>;
 
 /** Commands addressed to the Map shown by a Space Resource. */
 export type EmbeddedContextCompletion = Extract<
@@ -1152,7 +1160,7 @@ export function createSpaceAuthoring({
        * (`exact`); a Resource created from a menu has no aimed-at point and
        * would otherwise stack (`avoidingOverlap`).
        */
-      mode: 'exact' | 'avoidingOverlap',
+      mode: PlacementMode,
     ): { readonly id: ResourceId } | DerivedCompletion => {
       const id = newId();
       const outcome = SnapshotEdit.createInMap(snapshot, mapId, id, document, at, mode);

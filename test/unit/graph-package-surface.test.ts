@@ -89,6 +89,7 @@ const OFFERED_TYPES = [
   'SpaceAggregateLookup',
   'SpaceError',
   'SpaceLookup',
+  'PlacementMode',
   'SnapshotEditOutcome',
   'SnapshotEditRefusal',
 ] as const;

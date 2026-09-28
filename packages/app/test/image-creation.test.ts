@@ -37,8 +37,32 @@ const snapshot: SpaceSnapshot = {
 const open = (...ids: Parameters<typeof mintingIds>) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring } = composeApp({ spaceSession: session, newId: mintingIds(...ids) });
-  return { session, authoring };
+  const { authoring, navigation } = composeApp({
+    spaceSession: session,
+    newId: mintingIds(...ids),
+  });
+  return { session, authoring, navigation };
+};
+
+const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
+const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+
+/** The same Space with a second, empty Map the author can switch to. */
+const twoMaps: SpaceSnapshot = {
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    maps: [
+      ...(snapshot.document.maps ?? []),
+      {
+        id: OTHER_MAP_ID,
+        title: 'Map 2',
+        kind: 'positioned',
+        positions: {},
+        graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
+      },
+    ],
+  },
 };
 
 /**
@@ -81,8 +105,7 @@ describe('creating Image Resources from files', () => {
     const created = await createImageResources(
       { images, authoring },
       { kind: 'files', files: [file('diagram.png'), file('photo.png')] },
-      AT,
-      'exact',
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({ kind: 'completed', createdResourceId: FIRST });
@@ -114,8 +137,7 @@ describe('creating Image Resources from files', () => {
     const created = await createImageResources(
       { images, authoring },
       { kind: 'files', files: [file('diagram.png'), file('notes.txt')] },
-      AT,
-      'exact',
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({
@@ -132,9 +154,83 @@ describe('creating Image Resources from files', () => {
     const images = sources({}, {});
 
     await expect(
-      createImageResources({ images, authoring }, { kind: 'files', files: [] }, AT, 'exact'),
+      createImageResources(
+        { images, authoring },
+        { kind: 'files', files: [] },
+        { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      ),
     ).resolves.toEqual({ kind: 'unchanged' });
     expect(images.sent).toEqual([]);
+    expect(session.getState().working).toBe(before);
+  });
+});
+
+describe('an Image Resource gesture the author moves away from', () => {
+  it('lands on the Map the gesture was made on, and leaves the canvas where the author went', async () => {
+    const loaded = { snapshot: twoMaps, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    const { authoring, navigation } = composeApp({
+      spaceSession: session,
+      newId: mintingIds(FIRST),
+    });
+    const url = 'https://example.com/a.png';
+    let measured: (size: ImageNaturalSize | undefined) => void = () => undefined;
+    const images: ImageSources = {
+      store: () => Promise.reject(new Error('A URL is not stored')),
+      measure: () =>
+        new Promise((resolve) => {
+          measured = resolve;
+        }),
+    };
+
+    const created = createImageResources(
+      { images, authoring },
+      { kind: 'url', url },
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+    );
+    await Promise.resolve();
+    navigation.selectMap(OTHER_MAP_ID);
+    measured(undefined);
+
+    await expect(created).resolves.toEqual({ kind: 'completed', createdResourceId: FIRST });
+    const maps = session.getState().working.document.maps ?? [];
+    expect(maps.find((map) => map.id === MAP_ID)?.positions[FIRST]).toMatchObject(AT);
+    expect(maps.find((map) => map.id === OTHER_MAP_ID)?.positions[FIRST]).toBeUndefined();
+    expect(navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
+  });
+
+  it('creates nothing when the Map the gesture was made on is gone', async () => {
+    const loaded = { snapshot: twoMaps, revision: 0n, exportedRevision: null };
+    const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    const { authoring, navigation } = composeApp({
+      spaceSession: session,
+      newId: mintingIds(FIRST),
+    });
+    const url = 'https://example.com/a.png';
+    let measured: (size: ImageNaturalSize | undefined) => void = () => undefined;
+    const images: ImageSources = {
+      store: () => Promise.reject(new Error('A URL is not stored')),
+      measure: () =>
+        new Promise((resolve) => {
+          measured = resolve;
+        }),
+    };
+
+    const created = createImageResources(
+      { images, authoring },
+      { kind: 'url', url },
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+    );
+    await Promise.resolve();
+    navigation.selectMap(OTHER_MAP_ID);
+    expect(authoring.complete({ kind: 'deleted-map', mapId: MAP_ID }).kind).toBe('completed');
+    const before = session.getState().working;
+    measured(undefined);
+
+    await expect(created).resolves.toEqual({
+      kind: 'refused',
+      refusal: { code: 'map-not-found' },
+    });
     expect(session.getState().working).toBe(before);
   });
 });
@@ -147,8 +243,7 @@ describe('creating an Image Resource from a URL', () => {
     await createImageResources(
       { images: sources({}, { [url]: { width: 32, height: 16 } }), authoring },
       { kind: 'url', url },
-      AT,
-      'exact',
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
     );
 
     expect(session.getState().working.resources[1]?.document).toEqual({
@@ -166,8 +261,7 @@ describe('creating an Image Resource from a URL', () => {
     await createImageResources(
       { images: sources({}, {}), authoring },
       { kind: 'url', url },
-      AT,
-      'exact',
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
     );
 
     expect(session.getState().working.resources[1]?.document).toEqual({

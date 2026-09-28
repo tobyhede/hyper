@@ -449,15 +449,101 @@ test('dropping three images creates three Resources in one Edit, numbered in ord
   expect(commits).toHaveLength(1);
 });
 
-/** Paste text on the canvas, as a clipboard paste the focused canvas receives. */
+/**
+ * Drag a picture over `target` and drop it there, answering whether the
+ * `dragover` was taken and with which effect — a drag nothing takes is one the
+ * browser answers by opening the file in place of the Space.
+ */
+async function dropPictureOn(
+  target: Locator,
+  picture: (typeof PICTURES)[number],
+): Promise<{ readonly taken: boolean; readonly dropEffect: string }> {
+  return target.evaluate((element, { name, base64 }) => {
+    const transfer = new DataTransfer();
+    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    transfer.items.add(new File([bytes], name, { type: 'image/png' }));
+    const box = element.getBoundingClientRect();
+    const init = {
+      dataTransfer: transfer,
+      clientX: box.left + box.width / 2,
+      clientY: box.top + box.height / 2,
+      bubbles: true,
+      cancelable: true,
+    };
+    const over = new DragEvent('dragover', init);
+    element.dispatchEvent(over);
+    const answer = { taken: over.defaultPrevented, dropEffect: transfer.dropEffect };
+    element.dispatchEvent(new DragEvent('drop', init));
+    return answer;
+  }, picture);
+}
+
+test('a picture dropped on a Resource, or on the Map an Open Space Resource draws, creates nothing', async ({
+  page,
+}) => {
+  const spaceId = await openForCreation(page);
+  const uploads: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/images')) {
+      uploads.push(request.url());
+    }
+  });
+
+  await createResource(page, 'Space Resource');
+  const editor = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(editor).toBeFocused();
+  const spaceTitle = await editor.inputValue();
+  await editor.press('Enter');
+  await settled(page);
+  const spaceResource = page
+    .locator('.react-flow__node:visible:not([data-id^="embedded:"])')
+    .filter({ has: page.getByRole('heading', { name: spaceTitle }) });
+  await spaceResource.focus();
+  await spaceResource.press('Enter');
+  const embedded = page.locator('.react-flow__node:visible[data-id^="embedded:"]');
+  await expect(embedded).toHaveCount(1);
+  await settled(page);
+  const markdown = page
+    .locator('.react-flow__node:visible:not([data-id^="embedded:"])')
+    .filter({ has: page.locator('[data-kind="markdown"]') })
+    .filter({ hasNot: page.getByRole('heading', { name: spaceTitle }) });
+
+  const refusals = [
+    await dropPictureOn(markdown, FIRST_PICTURE),
+    await dropPictureOn(spaceResource, FIRST_PICTURE),
+    await dropPictureOn(embedded, FIRST_PICTURE),
+  ];
+
+  // The empty canvas still takes a drop, which is what the refusals above are
+  // measured against: once its Resource exists, any earlier drop that was
+  // taken would already have started storing its picture.
+  const [, square] = PICTURES;
+  await dropPictureOn(pane(page), square);
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.press('Escape');
+  await expect.poll(async () => (await storedImages(page, spaceId)).length).toBe(1);
+  expect(uploads).toHaveLength(1);
+  const [created] = await storedImages(page, spaceId);
+  expect(created?.document.naturalSize).toEqual(square.size);
+  // Each refusal still claims the drag, so the browser does not open the file.
+  expect(refusals).toEqual([
+    { taken: true, dropEffect: 'none' },
+    { taken: true, dropEffect: 'none' },
+    { taken: true, dropEffect: 'none' },
+  ]);
+});
+
+/**
+ * Paste text on the canvas the way an author does: the text on the system
+ * clipboard, a click on the empty pane, and the paste shortcut.
+ */
 async function pasteOnCanvas(page: Page, text: string): Promise<void> {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate((copied) => navigator.clipboard.writeText(copied), text);
   const box = await boxOf(pane(page), 'the canvas pane');
   await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.75);
-  await pane(page).evaluate((element, pasted) => {
-    const clipboardData = new DataTransfer();
-    clipboardData.setData('text/plain', pasted);
-    element.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true }));
-  }, text);
+  await page.keyboard.press('ControlOrMeta+V');
 }
 
 test('pasting an image URL on the canvas creates an Image Resource holding it, titled Resource N', async ({

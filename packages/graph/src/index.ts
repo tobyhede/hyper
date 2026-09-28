@@ -77,7 +77,7 @@ export { positionedStrategy } from './positioned';
 // module that builds them, offered with its outcome and refusal types since a
 // caller has to write both down to handle what an operation answers.
 export { SnapshotEdit } from './snapshot-edits';
-export type { SnapshotEditOutcome, SnapshotEditRefusal } from './snapshot-edits';
+export type { PlacementMode, SnapshotEditOutcome, SnapshotEditRefusal } from './snapshot-edits';
 
 // `graphRenderEdgeId` is offered although no consumer *has* to name an Edge id:
 // it mints the `<graphId>::<from>::<to>` format, and a second producer of it is

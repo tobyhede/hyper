@@ -42,26 +42,32 @@ const hasProblemDetailsMediaType = (response: Response): boolean => {
 export interface HttpSpaceBackendOptions {
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
+  /** The budget for sending an image, which may be up to `MAX_IMAGE_BYTES` over the author's uplink. */
+  uploadTimeoutMs?: number;
 }
 
 export class HttpSpaceBackend implements SpaceBackend {
   readonly #baseUrl: string;
   readonly #fetch: typeof globalThis.fetch;
   readonly #timeoutMs: number;
+  readonly #uploadTimeoutMs: number;
 
   constructor(baseUrl = '/', options: HttpSpaceBackendOptions = {}) {
     this.#baseUrl = baseUrl;
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.#timeoutMs = options.timeoutMs ?? 10_000;
+    // Two minutes carries a full-size image over an uplink of about 0.7 Mbps.
+    this.#uploadTimeoutMs = options.uploadTimeoutMs ?? 120_000;
   }
 
   /** Keep the timeout armed until the untrusted response body is decoded. */
   async #timedRequest<T>(
     request: (client: SpaceHttpClient) => Promise<Response>,
     consume: (response: Response, signal: AbortSignal) => Promise<T>,
+    timeoutMs: number = this.#timeoutMs,
   ): Promise<T> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const client = hc<SpaceHttpApp>(this.#baseUrl, {
         fetch: (input: RequestInfo | URL, init?: RequestInit) =>
@@ -129,6 +135,7 @@ export class HttpSpaceBackend implements SpaceBackend {
         }
         throw new Error(`Unable to store an image: HTTP ${response.status}`);
       },
+      this.#uploadTimeoutMs,
     );
   }
 

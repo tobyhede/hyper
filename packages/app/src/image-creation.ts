@@ -1,6 +1,12 @@
-import type { ImageNaturalSize, MapPosition } from '@project/core';
+import type { ImageNaturalSize, MapId, MapPosition } from '@project/core';
+import type { PlacementMode } from '@project/graph';
 import type { ImageRefusal, ImageStoring } from '@project/persistence';
-import type { AuthoringResult, CreatedImage, SpaceAuthoring } from './space-authoring';
+import type {
+  AuthoringResult,
+  CreatedImage,
+  ImagesCompletion,
+  SpaceAuthoring,
+} from './space-authoring';
 
 /**
  * Where an Image Resource's picture comes from, and how big it is (ADR 0106).
@@ -14,6 +20,13 @@ export interface ImageSources {
   readonly store: (image: Blob) => Promise<ImageStoring>;
   /** Load the picture at a URL, answering its natural size, or `undefined` when it does not load. */
   readonly measure: (url: string) => Promise<ImageNaturalSize | undefined>;
+}
+
+/** Where a gesture was made: the Map it was aimed at, the point, and how that point is kept. */
+export interface ImageTarget {
+  readonly mapId: MapId;
+  readonly anchor: MapPosition;
+  readonly placement: PlacementMode;
 }
 
 /** What one creation gesture brought: the files it dropped or chose, or a URL it pasted. */
@@ -30,7 +43,15 @@ export type ImageCreationResult =
   | AuthoringResult
   | { readonly kind: 'not-stored'; readonly code: ImageRefusal; readonly name: string };
 
-/** The URL each file is stored at, in order, or the first file the host refused. */
+/**
+ * The URL each file is stored at, in order, or the first file the host refused.
+ *
+ * Every file is sent before any answer is read, so a refused file can leave
+ * the files beside it stored with nothing referencing them. That is the store's
+ * standing state rather than a leak: ADR 0106 never deletes a stored image,
+ * and an image's id is its content, so sending the same file again stores
+ * nothing new.
+ */
 const storeEach = async (
   images: ImageSources,
   files: readonly File[],
@@ -60,8 +81,7 @@ const storeEach = async (
 export async function createImageResources(
   { images, authoring }: { readonly images: ImageSources; readonly authoring: SpaceAuthoring },
   origin: ImageOrigin,
-  anchor: MapPosition,
-  placement: 'exact' | 'avoidingOverlap',
+  { mapId, anchor, placement }: ImageTarget,
 ): Promise<ImageCreationResult> {
   let urls: readonly string[];
   if (origin.kind === 'url') {
@@ -77,5 +97,18 @@ export async function createImageResources(
     const naturalSize = sizes[index];
     return naturalSize === undefined ? { url } : { url, naturalSize };
   });
-  return authoring.complete({ kind: 'created-images', images: created, anchor, placement });
+  const completion: ImagesCompletion = {
+    kind: 'created-images',
+    images: created,
+    anchor,
+    placement,
+  };
+  // Addressed to the Map the gesture was made on, because the anchor is a
+  // point on that Map. Storing and measuring outlast the gesture, so the author
+  // may have moved to another Map since. While the canvas still draws it this
+  // is the ordinary Edit; otherwise it writes the Map it was aimed at without
+  // moving the canvas, and a Map that has gone refuses `map-not-found`.
+  return authoring.getState().navigation.selectedMapId === mapId
+    ? authoring.complete(completion)
+    : authoring.completeInMap(mapId, completion);
 }
