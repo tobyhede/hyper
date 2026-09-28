@@ -613,10 +613,16 @@ for (const refused of [
  * a tracked file before serving (ADR 0106), so it draws with every request that
  * leaves the host refused.
  */
-test('the tracked fixture draws its Open Image Resource with no network', async ({ page }) => {
+test('the tracked fixture draws its Open Image Resource with no network', async ({
+  page,
+  e2eServer,
+}) => {
+  const hostUrl = e2eServer.resolvedUrls?.local[0];
+  if (hostUrl === undefined) throw new Error('Vite did not publish a loopback URL');
+  const host = new URL(hostUrl).origin;
   const escaped: string[] = [];
   await page.route(
-    (url) => url.hostname !== '127.0.0.1' && url.hostname !== 'localhost',
+    (url) => url.origin !== host,
     (route) => {
       escaped.push(route.request().url());
       return route.abort();
