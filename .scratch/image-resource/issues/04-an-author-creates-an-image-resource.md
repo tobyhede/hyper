@@ -9,7 +9,7 @@
 - [x] The image glyph sits among the Dock's creation peers; choosing `diagram.png` creates an Image Resource titled `Resource N` whose URL is the stored image's.
 - [x] The created Resource records the image's natural size; an unreachable pasted URL creates one with none.
 - [x] Cancelling the picker produces no Edit.
-- [ ] Dropping three images creates three Resources in one Edit, titled with three successive `Resource N` numbers, and one Undo removes all three.
+- [x] Dropping three images creates three Resources in one Edit (one commit), titled with three successive `Resource N` numbers. V1 has no Undo, so the single commit is what shows the drop is one Edit.
 - [x] Pasting `https://example.com/a.png` creates an Image Resource with that URL titled `Resource N`.
 - [x] An oversized or non-image file reports its refusal and creates nothing.
 - [x] `parity-claims.ts` and the Dock's story cover the new peer (ADR 0052).
