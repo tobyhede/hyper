@@ -13,14 +13,18 @@ import {
   selectedCanvas,
   settled,
 } from './graph';
+import { expectPictureLoaded, HARBOUR_SIZE } from './image';
 import { SEEDED_MAP_ID, seedPositionedMap } from './seed';
 
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
+const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const HARBOUR_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000076');
 const FIGURE_URL = 'https://example.com/figure.png';
-/** A tracked 400×300 picture, served in place of the external URL so nothing reaches the network. */
-const HARBOUR = readFileSync(
-  new URL('../stories/support/images/harbour-400x300.png', import.meta.url),
-);
+/**
+ * The tracked fixture's 400×300 picture, served in place of the external URL so
+ * nothing reaches the network.
+ */
+const HARBOUR = readFileSync(new URL('../fixture-images/harbour-400x300.png', import.meta.url));
 
 interface Pictures {
   /** The Image Resource's Title. */
@@ -56,7 +60,7 @@ async function openPictures(
           title,
           kind: 'image',
           url: FIGURE_URL,
-          naturalSize: { width: 400, height: 300 },
+          naturalSize: HARBOUR_SIZE,
         },
       },
     ],
@@ -178,19 +182,13 @@ test(
 
     const picture = resource.getByRole('img', { name: 'Figure' });
     await expect(picture).toHaveAttribute('src', FIGURE_URL);
-    await expect
-      .poll(() =>
-        picture.evaluate((image) =>
-          image instanceof HTMLImageElement && image.complete ? image.naturalWidth : 0,
-        ),
-      )
-      .toBe(400);
+    await expectPictureLoaded(picture, HARBOUR_SIZE.width);
     await expect(resource.locator('.canvas-resource__content img')).toHaveCount(1);
     await expect(resource.getByRole('heading', { name: 'Figure' })).toBeVisible();
 
     await settled(page);
     const { authored, room, natural, bottom } = await pictureIn(node, picture);
-    expect(natural).toEqual({ width: 400, height: 300 });
+    expect(natural).toEqual(HARBOUR_SIZE);
     const chrome = { width: authored.width - room.width, height: authored.height - room.height };
     expect(chrome.width).toBeCloseTo(OPEN_RESOURCE_CHROME.width, 1);
     expect(chrome.height).toBeLessThanOrEqual(OPEN_RESOURCE_CHROME.height + 0.05);
@@ -223,13 +221,7 @@ test('a longer Title takes its room from the picture, not from the Open Size', a
       height: 300 + OPEN_RESOURCE_CHROME.height,
     });
   const picture = resource.getByRole('img', { name: 'Figure' });
-  await expect
-    .poll(() =>
-      picture.evaluate((image) =>
-        image instanceof HTMLImageElement && image.complete ? image.naturalWidth : 0,
-      ),
-    )
-    .toBe(400);
+  await expectPictureLoaded(picture, HARBOUR_SIZE.width);
 
   await settled(page);
   const { room, natural, bottom } = await pictureIn(node, picture);
@@ -253,13 +245,7 @@ test('presenting an Image Resource draws its picture', async ({ page }) => {
   await expect(content.locator('.resource__title')).toHaveText('Figure');
   const picture = content.getByRole('img', { name: 'Figure' });
   await expect(picture).toHaveAttribute('src', FIGURE_URL);
-  await expect
-    .poll(() =>
-      picture.evaluate((image) =>
-        image instanceof HTMLImageElement && image.complete ? image.naturalWidth : 0,
-      ),
-    )
-    .toBe(400);
+  await expectPictureLoaded(picture, HARBOUR_SIZE.width);
   await expect(picture).toBeVisible();
 });
 
@@ -621,3 +607,37 @@ for (const refused of [
     expect(await storedImages(page, spaceId)).toEqual([]);
   });
 }
+
+/**
+ * The tracked fixture's Image Resource shows a stored image the host seeded from
+ * a tracked file before serving (ADR 0106), so it draws with every request that
+ * leaves the host refused.
+ */
+test('the tracked fixture draws its Open Image Resource with no network', async ({
+  page,
+  e2eServer,
+}) => {
+  const hostUrl = e2eServer.resolvedUrls?.local[0];
+  if (hostUrl === undefined) throw new Error('Vite did not publish a loopback URL');
+  const host = new URL(hostUrl).origin;
+  const escaped: string[] = [];
+  await page.route(
+    (url) => url.origin !== host,
+    (route) => {
+      escaped.push(route.request().url());
+      return route.abort();
+    },
+  );
+  await page.goto(`/spaces/${encodeCompactUuid(DEEP_DIVE_ID)}`);
+  await expect(selectedCanvas(page)).toContainText('Deep dive');
+  await settled(page);
+
+  const resource = page
+    .locator(`.react-flow__node[data-id="${HARBOUR_ID}"]`)
+    .getByRole('article', { name: 'Harbour' });
+  await expect(resource).toHaveAttribute('data-open', 'true');
+  const picture = resource.getByRole('img', { name: 'Harbour' });
+  await expect(picture).toHaveAttribute('src', /^\/images\/[A-Za-z0-9_-]{43}$/u);
+  await expectPictureLoaded(picture, HARBOUR_SIZE.width);
+  expect(escaped).toEqual([]);
+});

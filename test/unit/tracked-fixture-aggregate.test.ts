@@ -1,6 +1,11 @@
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { titleName, uuidSchema, type Resource, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
-import { describe, expect, it } from 'vitest';
+import { isImageId } from '@project/persistence';
+import { afterEach, describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
@@ -97,5 +102,87 @@ describe('tracked fixture aggregate', () => {
         expect(resource.body.trim().length).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+const STORED_IMAGE_PREFIX = '/images/';
+const trackedFixture = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
+const trackedFixtureImages = fileURLToPath(
+  new URL('../../packages/app/fixture-images', import.meta.url),
+);
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map((path) => rm(path, { recursive: true, force: true })),
+  );
+});
+
+/** A copy of a tracked directory, so a test can add to it without touching the tracked files. */
+const copyOf = async (tracked: string): Promise<string> => {
+  const root = await mkdtemp(join(tmpdir(), 'hyper-fixture-'));
+  temporaryDirectories.push(root);
+  const copy = join(root, 'copy');
+  await cp(tracked, copy, { recursive: true });
+  return copy;
+};
+const copyOfTrackedFixture = (): Promise<string> => copyOf(trackedFixture);
+
+describe('tracked fixture images', () => {
+  it('seeds an Open Image Resource whose stored image loads from the repository', async () => {
+    const repository = new MemorySpaceRepository();
+    await importFixture(repository);
+    const loaded = await repository.loadAggregate();
+    if (loaded.kind !== 'loaded') throw new Error('expected loaded aggregate');
+
+    const opened = loaded.aggregate.spaces.flatMap(({ snapshot }) =>
+      snapshot.resources.flatMap(({ id, document }) =>
+        document.kind === 'image' &&
+        document.url.startsWith(STORED_IMAGE_PREFIX) &&
+        (snapshot.document.maps ?? []).some((map) => map.positions[id]?.open === true)
+          ? [document.url]
+          : [],
+      ),
+    );
+    expect(opened.length).toBeGreaterThan(0);
+
+    for (const url of opened) {
+      const id = url.slice(STORED_IMAGE_PREFIX.length);
+      if (!isImageId(id)) throw new Error(`${url} does not name a stored image`);
+      const image = await repository.loadImage(id);
+      expect(image?.mediaType).toBe('image/png');
+    }
+  });
+
+  it('refuses to seed a fixture naming a stored image no tracked file produces', async () => {
+    const copy = await copyOfTrackedFixture();
+    const unknown = `${STORED_IMAGE_PREFIX}${'A'.repeat(43)}`;
+    await writeFile(
+      join(copy, '00000000-0000-4000-8000-000000000080', 'resources', 'unknown-picture.md'),
+      `---\nid: 00000000-0000-4000-8000-0000000000f0\ntitle: Unknown picture\nkind: image\nurl: ${unknown}\n---\n`,
+    );
+
+    const repository = new MemorySpaceRepository();
+    await expect(importFixture(repository, { directory: copy })).rejects.toThrow(unknown);
+    await expect(repository.listSpaces()).resolves.toEqual([]);
+  });
+
+  it('ignores the dotfiles and subdirectories a checkout can leave among the tracked images', async () => {
+    const imageDirectory = await copyOf(trackedFixtureImages);
+    await writeFile(join(imageDirectory, '.DS_Store'), 'Bud1 not an image');
+    await mkdir(join(imageDirectory, 'nested'));
+
+    const repository = new MemorySpaceRepository();
+    await importFixture(repository, { imageDirectory });
+    await expect(repository.listSpaces()).resolves.not.toEqual([]);
+  });
+
+  it('refuses to seed when a tracked image file is not an image', async () => {
+    const imageDirectory = await copyOf(trackedFixtureImages);
+    await writeFile(join(imageDirectory, 'notes.txt'), 'not an image');
+
+    const repository = new MemorySpaceRepository();
+    await expect(importFixture(repository, { imageDirectory })).rejects.toThrow('notes.txt');
+    await expect(repository.listSpaces()).resolves.toEqual([]);
   });
 });

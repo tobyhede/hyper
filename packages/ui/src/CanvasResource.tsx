@@ -85,7 +85,7 @@ export type CanvasResourceFront =
     }
   | {
       readonly kind: 'image';
-      /** The image URL this Resource owns (ADR 0106). */
+      /** The image URL this Resource owns. */
       readonly url: string;
       /**
        * Authored Map state; an Image Resource Opens through the shared Resource

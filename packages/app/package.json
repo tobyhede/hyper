@@ -9,7 +9,8 @@
     "#hooks/*": "./src/hooks/*.ts",
     "#lib/*": "./src/lib/*.ts",
     "#src/entity-actions": "./src/entity-actions.tsx",
-    "#src/*": "./src/*.ts"
+    "#src/*": "./src/*.ts",
+    "#fixture-images/*": "./fixture-images/*"
   },
   "scripts": {
     "dev": "vite",
