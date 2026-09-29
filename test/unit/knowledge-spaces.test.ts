@@ -33,7 +33,7 @@ const adr = (title: string, status: string): string => `# ${title}\n\n${status}\
 const issue = (title: string, status: string, blockers = ''): string =>
   `# ${title}\n\nStatus: ${status}\n${blockers === '' ? '' : `Blocked by: ${blockers}\n`}\nThe work.\n`;
 
-/** A repository holding three ADRs and four issues, one of them settled. */
+/** A repository holding four ADRs and five issues, one of them settled. */
 const repository = (): string => {
   const root = scratch();
   write(root, 'docs/adr/0001-first.md', adr('First', 'Status: accepted'));
@@ -42,6 +42,7 @@ const repository = (): string => {
     'docs/adr/0002-second.md',
     adr('Second', 'Status: accepted\nRefines: 0001, 0099\nSupersedes: 0003\nRelated: 0001'),
   );
+  write(root, 'docs/adr/0004-rename.md', adr('Rename', 'Status: accepted\nRenames: 0001, 0002'));
   write(
     root,
     'docs/adr/superseded/0003-retired.md',
@@ -149,6 +150,7 @@ describe('the ADR Space', () => {
       '0001-first.md',
       '0002-second.md',
       '0003-retired.md',
+      '0004-rename.md',
     ]);
     const retired = readFileSync(join(decisions.directory, 'resources/0003-retired.md'), 'utf8');
     expect(retired).toContain('title: "ADR 0003 (superseded) — Retired"');
@@ -162,6 +164,21 @@ describe('the ADR Space', () => {
     // both ends; 0099 has no Resource; `Related:` is not a dependency.
     expect(edges(decisions, 'Refines')).toEqual(['0001-first -> 0002-second']);
     expect(edges(decisions, 'Supersedes')).toEqual(['0003-retired -> 0002-second']);
+  });
+
+  it('draws Renames as its own Graph and places no ADR by it', () => {
+    const decisions = space(generate(repository()).spaces, 'Architecture decisions');
+
+    expect(edges(decisions, 'Renames')).toEqual([
+      '0001-first -> 0004-rename',
+      '0002-second -> 0004-rename',
+    ]);
+    // The rename ADR has no dependency Edge, so it is packed with the
+    // unconnected ADRs below the placed ones rather than drawn after 0002.
+    const positions = new Map(Object.entries(decisions.document.maps?.[0]?.positions ?? {}));
+    const rename = positions.get(decisions.ids.get('0004-rename.md') ?? '');
+    const second = positions.get(decisions.ids.get('0002-second.md') ?? '');
+    expect(rename?.y).toBeGreaterThan(second?.y ?? 0);
   });
 });
 

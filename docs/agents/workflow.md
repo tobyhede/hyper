@@ -55,7 +55,11 @@ Supersedes: 0004          # this decision replaces that one
 Superseded by: 0009       # added to the old ADR when it is replaced
 Refines: 0002             # narrows or fixes a boundary without replacing
 Refined by: 0005, 0006    # the reverse link, so a reader sees it from either end
+Renames: 0040, 0064       # changes only the words of those decisions
+Renamed by: 0085          # the reverse link on each renamed ADR
 ```
+
+A rename ADR — one that decides vocabulary and re-decides nothing — links to the decisions whose words it changed with `Renames`, never `Refines`. Filed as a refinement, one rename reads as a change to most of the log.
 
 Relationships are recorded from both ends. A reader landing on ADR 0002 must be able to tell it has been refined without having read 0005.
 

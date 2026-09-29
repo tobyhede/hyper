@@ -363,13 +363,15 @@ const writeSpace = (aggregate: string, space: GeneratedSpace): string => {
 const ADR_FILE_PATTERN = /^(\d{4})-(.+)\.md$/u;
 const ADR_HEADING_PATTERN = /^#[ \t]+(.+?)[ \t]*$/u;
 /**
- * `Refines: 0005, 0013` and the three other lineage relations a status block
+ * `Refines: 0005, 0013` and the five other lineage relations a status block
  * writes. They are reciprocal by convention, so each relation is read from both
  * ends and the pair deduplicated, rather than trusting one side to be complete.
  * `Related:` is not a dependency and is not read.
  */
 const ADR_REFINES_PATTERN = /^refines:[ \t]+(.+)$/iu;
 const ADR_REFINED_BY_PATTERN = /^refined by:[ \t]+(.+)$/iu;
+const ADR_RENAMES_PATTERN = /^renames:[ \t]+(.+)$/iu;
+const ADR_RENAMED_BY_PATTERN = /^renamed by:[ \t]+(.+)$/iu;
 const ADR_SUPERSEDES_PATTERN = /^supersedes:[ \t]+(.+)$/iu;
 const ADR_SUPERSEDED_BY_PATTERN = /^superseded by:[ \t]+(.+)$/iu;
 const ADR_NUMBER_PATTERN = /^\d{4}$/u;
@@ -381,6 +383,8 @@ interface AdrDocument {
   readonly body: string;
   readonly refines: readonly string[];
   readonly refinedBy: readonly string[];
+  readonly renames: readonly string[];
+  readonly renamedBy: readonly string[];
   readonly supersedes: readonly string[];
   readonly supersededBy: readonly string[];
 }
@@ -416,6 +420,8 @@ const readAdrsIn = (directory: string, retired: boolean): readonly AdrDocument[]
         body,
         refines: references(lines, ADR_REFINES_PATTERN),
         refinedBy: references(lines, ADR_REFINED_BY_PATTERN),
+        renames: references(lines, ADR_RENAMES_PATTERN),
+        renamedBy: references(lines, ADR_RENAMED_BY_PATTERN),
         supersedes: references(lines, ADR_SUPERSEDES_PATTERN),
         supersededBy: references(lines, ADR_SUPERSEDED_BY_PATTERN),
       },
@@ -433,16 +439,17 @@ const readAdrs = (adrRoot: string): readonly AdrDocument[] =>
   );
 
 const ADR_NAMESPACE = 'adr';
-const ADR_GRAPHS = { refines: 'refines', supersedes: 'supersedes' } as const;
+const ADR_GRAPHS = { refines: 'refines', supersedes: 'supersedes', renames: 'renames' } as const;
 
 /**
- * The ADR record as a Space: one Resource per ADR, and two Graphs of how the
- * decisions depend on each other.
+ * The ADR record as a Space: one Resource per ADR, two Graphs of how the
+ * decisions depend on each other, and a third of which ADRs only renamed the
+ * words of others.
  *
  * An Edge runs from the decision that came first to the one that builds on it,
  * so following a Graph reads the record in the order it was decided. The Map
- * is laid out over both Graphs at once, since together they are the dependency
- * structure.
+ * is laid out over the two dependency Graphs only: a rename touches most of
+ * the log, so placing by it would pull every decision towards the rename ADRs.
  */
 export const adrSpace = (repositoryRoot: string): GeneratedSpace => {
   const adrs = readAdrs(join(repositoryRoot, 'docs', 'adr'));
@@ -470,6 +477,10 @@ export const adrSpace = (repositoryRoot: string): GeneratedSpace => {
     ({ supersedes }) => supersedes,
     ({ supersededBy }) => supersededBy,
   );
+  const renames = lineage(
+    ({ renames }) => renames,
+    ({ renamedBy }) => renamedBy,
+  );
   const identity = identityOf(ADR_NAMESPACE, ADR_GRAPHS.refines);
 
   return {
@@ -490,6 +501,12 @@ export const adrSpace = (repositoryRoot: string): GeneratedSpace => {
         title: 'Supersedes',
         color: '#7f7f7f',
         edges: supersedes,
+      },
+      {
+        id: stableUuid(ADR_NAMESPACE, `graph:${ADR_GRAPHS.renames}`),
+        title: 'Renames',
+        color: '#c5b0d5',
+        edges: renames,
       },
     ],
     positions: layeredPositions([...ids], [...refines, ...supersedes]),

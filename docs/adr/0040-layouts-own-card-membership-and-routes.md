@@ -3,7 +3,8 @@
 Status: accepted
 Supersedes: 0026
 Refines: 0003, 0007, 0014, 0015, 0025, 0028, 0030, 0031, 0033
-Refined by: 0041, 0045, 0085, 0108
+Refined by: 0045, 0108
+Renamed by: 0041, 0085
 Related: 0035
 
 A Space owns Cards and Layouts. A Layout explicitly owns the subset of Space

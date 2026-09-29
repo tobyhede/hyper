@@ -3,7 +3,8 @@
 Status: superseded
 Superseded by: 0079
 Refines: 0025
-Refined by: 0040, 0041, 0053, 0072, 0075
+Refined by: 0040, 0053, 0072, 0075
+Renamed by: 0041
 Related: 0014, 0028, 0030
 
 The renderer for a Space is chosen from two different things: an application-

@@ -4,7 +4,8 @@ Status: superseded
 Superseded by: 0075
 Supersedes: 0013, 0017
 Refines: 0018
-Refined by: 0028, 0029, 0031, 0040, 0041
+Refined by: 0028, 0029, 0031, 0040
+Renamed by: 0041
 Related: 0002, 0005, 0014, 0021, 0027
 
 A space opens its default Layout. A space need not have one: with no Layout, the application renders it through an **app-configured default layout**. These are algorithmic — a grid, cards by name ascending or descending, and whatever further orderings the app offers. They are LayoutStrategies with no Layout data behind them (ADR 0014), and an algorithmic layout cannot be overridden or customised.

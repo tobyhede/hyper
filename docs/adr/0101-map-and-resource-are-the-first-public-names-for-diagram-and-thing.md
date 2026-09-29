@@ -1,7 +1,7 @@
 # Map and Resource are the first-public names for Diagram and Thing
 
 Status: accepted
-Refines: 0085
+Renames: 0085
 Related: 0038, 0041, 0047, 0050, 0054, 0056, 0069, 0092
 
 The first-public domain calls the single addressable piece of a Space a **Resource**, and calls the authored resource-to-rect map a **Map**. Both are exact renames of what ADR 0085 named Thing and Diagram. **Space** and **Graph** are unchanged, so the four nouns are Space, Resource, Graph and Map.
