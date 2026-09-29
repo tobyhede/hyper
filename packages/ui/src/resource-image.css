@@ -35,3 +35,8 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+
+/* The upload target is drawn on the Resource's own paper too. */
+.resource-image-replace {
+  color: var(--canvas-resource-title-color);
+}

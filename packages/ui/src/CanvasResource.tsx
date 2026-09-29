@@ -29,6 +29,7 @@ import {
   EditIcon,
   EntityActionsIcon,
   OpenResourceIcon,
+  ReplaceImageIcon,
 } from './icons';
 import {
   MarkdownResourceBody,
@@ -39,6 +40,7 @@ import './canvas-resource.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import { ResourceImage } from './ResourceImage';
+import { ImageReplaceTarget, type ImageReplaceEditor } from './ImageReplaceTarget';
 import type { ResourceContentBody } from './ResourceContent';
 
 /**
@@ -94,6 +96,13 @@ export type CanvasResourceFront =
        */
       readonly open: boolean;
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+      /** Begin replacing the image: the image kind's counterpart to a Markdown edit. */
+      readonly onBeginEdit?: () => void;
+      /**
+       * Present exactly while the image is being replaced; the content is then
+       * the upload target rather than the picture. Drawn only while Open.
+       */
+      readonly editor?: ImageReplaceEditor;
     }
   | {
       readonly kind: 'space';
@@ -334,7 +343,10 @@ export function CanvasResource(props: CanvasResourceProps) {
   // that is never mounted.
   const contentPresence = usePresence(contentFront?.open === true, contentExitDuration);
   const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
-  const onBeginContentEdit = !readOnly && front.kind === 'markdown' ? front.onBeginEdit : undefined;
+  const onBeginContentEdit =
+    !readOnly && (front.kind === 'markdown' || front.kind === 'image')
+      ? front.onBeginEdit
+      : undefined;
   /**
    * The edit running inside the Markdown front this Resource owns.
    *
@@ -344,10 +356,12 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const [contentEdit, setContentEdit] = useState<ResourceContentEdit | null>(null);
   const visibleContentEdit = readOnly ? null : contentEdit;
+  const imageEditor = !readOnly && front.kind === 'image' && front.open ? front.editor : undefined;
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
-  const actionableEntityActions = entityActions?.some((group) => group.length > 0) === true;
+  const actionableEntityActions =
+    !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const [selectorNotice, setContextNotice] = useState<string | null>(null);
   const contextNotice = props.contextNotice ?? selectorNotice;
   const spaceSelection =
@@ -455,10 +469,16 @@ export function CanvasResource(props: CanvasResourceProps) {
         ) : beginContentEdit !== undefined ? (
           <ResourceRailAction
             ref={editControl}
-            aria-label={`Edit Resource ${name}`}
+            aria-label={
+              front.kind === 'image' ? `Replace image of Resource ${name}` : `Edit Resource ${name}`
+            }
             onClick={beginContentEdit}
           >
-            <EditIcon data-icon="inline-start" />
+            {front.kind === 'image' ? (
+              <ReplaceImageIcon data-icon="inline-start" />
+            ) : (
+              <EditIcon data-icon="inline-start" />
+            )}
           </ResourceRailAction>
         ) : portal !== undefined ? (
           portalEditing ? (
@@ -622,8 +642,17 @@ export function CanvasResource(props: CanvasResourceProps) {
           className="canvas-resource__content"
           data-presence={contentPresence.state}
         >
-          {contentFront.kind === 'image' ? (
-            <ResourceImage key={contentFront.url} url={contentFront.url} name={name} />
+          {contentFront.kind === 'image' && imageEditor !== undefined ? (
+            <ResourceContentEditProvider value={setContentEdit}>
+              <ImageReplaceTarget name={name} editor={imageEditor} />
+            </ResourceContentEditProvider>
+          ) : contentFront.kind === 'image' ? (
+            <ResourceImage
+              key={contentFront.url}
+              url={contentFront.url}
+              name={name}
+              onReplace={onBeginContentEdit}
+            />
           ) : (
             <ResourceContentEditProvider value={setContentEdit}>
               <MarkdownResourceBody
@@ -637,8 +666,8 @@ export function CanvasResource(props: CanvasResourceProps) {
       )}
     </Card>
   );
-  return actionableEntityActions ? (
-    <EntityActions groups={entityActions} render={resource} />
+  return entityActions !== undefined ? (
+    <EntityActions groups={readOnly ? [] : entityActions} render={resource} />
   ) : (
     resource
   );
@@ -729,18 +758,21 @@ interface ContentEditActionsProps {
 function ContentEditActions({ name, edit }: ContentEditActionsProps) {
   return (
     <>
-      <ResourceRailAction
-        holdFocus
-        aria-label={`Save Resource ${name}`}
-        aria-keyshortcuts="Meta+Enter Control+Enter"
-        onClick={edit.onSave}
-      >
-        <CommitEditIcon data-icon="inline-start" />
-      </ResourceRailAction>
+      {edit.onSave !== undefined && (
+        <ResourceRailAction
+          holdFocus
+          aria-label={`Save Resource ${name}`}
+          aria-keyshortcuts="Meta+Enter Control+Enter"
+          onClick={edit.onSave}
+        >
+          <CommitEditIcon data-icon="inline-start" />
+        </ResourceRailAction>
+      )}
       <ResourceRailAction
         holdFocus
         aria-label={`Cancel editing Resource ${name}`}
         aria-keyshortcuts="Escape"
+        disabled={edit.busy === true}
         onClick={edit.onCancel}
       >
         <AbandonEditIcon data-icon="inline-start" />

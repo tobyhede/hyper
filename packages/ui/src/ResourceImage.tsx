@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from './components/empty';
+import { Button } from './Button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from './components/empty';
 import { ImageIcon } from './icons';
 import './resource-image.css';
 
@@ -8,6 +16,11 @@ export interface ResourceImageProps {
   readonly url: string;
   /** The Resource's name, which is the image's text alternative. */
   readonly name: string;
+  /**
+   * Begin replacing the image, offered by the failed-image state. Absent where
+   * the image cannot be replaced — a read-only or presented Resource.
+   */
+  readonly onReplace?: (() => void) | undefined;
 }
 
 /**
@@ -18,7 +31,7 @@ export interface ResourceImageProps {
  * A failed load is a fact about this mount, not the Space, so a caller that
  * changes the URL keys this on it to try again.
  */
-export function ResourceImage({ url, name }: ResourceImageProps) {
+export function ResourceImage({ url, name, onReplace }: ResourceImageProps) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
@@ -30,6 +43,23 @@ export function ResourceImage({ url, name }: ResourceImageProps) {
           <EmptyTitle>Image did not load</EmptyTitle>
           <EmptyDescription className="resource-image__url">{url}</EmptyDescription>
         </EmptyHeader>
+        {onReplace !== undefined && (
+          <EmptyContent>
+            {/* `nodrag nopan` and the stopped press keep a press here off the
+                canvas the Resource is drawn on. */}
+            <Button
+              size="compact"
+              className="nodrag nopan"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onReplace();
+              }}
+            >
+              Replace image
+            </Button>
+          </EmptyContent>
+        )}
       </Empty>
     );
   }

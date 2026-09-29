@@ -9,6 +9,46 @@ import {
 
 const FIGURE_URL = 'https://example.com/figure.png';
 
+it('keeps a pending replacement mounted when its entity actions become unavailable', async () => {
+  const waiting = Promise.withResolvers<string | null>();
+  const front: CanvasResourceFront = {
+    kind: 'image',
+    url: FIGURE_URL,
+    open: true,
+    editor: { accept: 'image/png', onReplace: () => waiting.promise, onEnd: () => undefined },
+  };
+  const { rerender } = render(
+    <CanvasResource
+      state="selected"
+      front={front}
+      title="Figure"
+      graphColor="#ffc53d"
+      entityActions={[[{ id: 'copy', label: 'Copy', onSelect: () => 'done' }]]}
+    />,
+  );
+  const field = screen.getByRole('textbox', { name: 'Image URL' });
+  fireEvent.change(field, { target: { value: 'https://example.com/new.png' } });
+  fireEvent.submit(field);
+  rerender(
+    <CanvasResource
+      state="selected"
+      front={front}
+      title="Figure"
+      graphColor="#ffc53d"
+      entityActions={[]}
+    />,
+  );
+  expect(screen.getByRole('textbox', { name: 'Image URL' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await act(async () => {
+    waiting.resolve('The host refused this image.');
+    await waiting.promise;
+  });
+  expect(screen.getByRole('alert')).toHaveTextContent('The host refused this image.');
+});
+
 /**
  * Base UI's menus position themselves by measuring, and jsdom ships no pointer
  * capture. The stubs are for the entity-action menus this file opens; the
@@ -36,6 +76,25 @@ describe('CanvasResource kind and interaction state', () => {
     expect(
       screen.queryByRole('button', { name: 'Actions for Resource Empty' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('leaves the native context menu and the article role alone when no action is offered', () => {
+    render(
+      <CanvasResource
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="selected"
+        title="Empty"
+        graphColor="#ffc53d"
+        entityActions={[]}
+      />,
+    );
+
+    const article = screen.getByRole('article', { name: 'Empty' });
+    expect(article).not.toHaveAttribute('aria-disabled');
+    // `fireEvent` answers false when a handler prevented the default: an empty
+    // menu must not swallow the browser's own.
+    expect(fireEvent.contextMenu(article)).toBe(true);
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('draws a creation preview without authored Markdown or open state', () => {
@@ -190,6 +249,120 @@ describe('CanvasResource kind and interaction state', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('offers Replace where a Markdown Resource offers Edit, opening a Closed one first', () => {
+    const calls: string[] = [];
+    const onOpenChange = vi.fn(() => {
+      calls.push('open');
+      return 'completed' as const;
+    });
+    const onBeginEdit = vi.fn(() => calls.push('replace'));
+    render(
+      <CanvasResource
+        front={{ kind: 'image', url: FIGURE_URL, open: false, onOpenChange, onBeginEdit }}
+        state="selected"
+        title="Figure"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource Figure' }));
+
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    expect(calls).toEqual(['open', 'replace']);
+    expect(screen.queryByRole('button', { name: 'Edit Resource Figure' })).toBeNull();
+  });
+
+  it('draws the upload target while replacing, with Cancel for Replace and Close unavailable', () => {
+    const onEnd = vi.fn();
+    render(
+      <CanvasResource
+        front={{
+          kind: 'image',
+          url: FIGURE_URL,
+          open: true,
+          onOpenChange: () => 'completed',
+          onBeginEdit: () => undefined,
+          editor: { accept: 'image/png', onReplace: () => Promise.resolve(null), onEnd },
+        }}
+        state="selected"
+        title="Figure"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    expect(screen.getByRole('group', { name: 'Replace image of Figure' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Figure' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Replace image of Resource Figure' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save Resource Figure' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Close Resource Figure' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel editing Resource Figure' }));
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws Cancel unavailable while a replacement is busy', () => {
+    const onEnd = vi.fn();
+    render(
+      <CanvasResource
+        front={{
+          kind: 'image',
+          url: FIGURE_URL,
+          open: true,
+          onOpenChange: () => 'completed',
+          editor: { accept: 'image/png', onReplace: () => new Promise(() => undefined), onEnd },
+        }}
+        state="selected"
+        title="Figure"
+        graphColor="#ffc53d"
+      />,
+    );
+    const field = screen.getByRole('textbox', { name: 'Image URL' });
+    fireEvent.change(field, { target: { value: 'https://example.com/new.png' } });
+    fireEvent.submit(field);
+
+    const cancel = screen.getByRole('button', { name: 'Cancel editing Resource Figure' });
+    expect(cancel).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(cancel);
+    expect(onEnd).not.toHaveBeenCalled();
+  });
+
+  it('offers the same Replace from the failed-image state', () => {
+    const onBeginEdit = vi.fn();
+    render(
+      <CanvasResource
+        front={{ kind: 'image', url: FIGURE_URL, open: true, onBeginEdit }}
+        state="selected"
+        title="Figure"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    fireEvent.error(screen.getByRole('img', { name: 'Figure' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Replace image' }));
+
+    expect(onBeginEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no Replace from the failed-image state of a read-only Resource', () => {
+    render(
+      <CanvasResource
+        front={{ kind: 'image', url: FIGURE_URL, open: true, onBeginEdit: () => undefined }}
+        state="selected"
+        title="Figure"
+        graphColor="#ffc53d"
+        readOnly
+      />,
+    );
+
+    fireEvent.error(screen.getByRole('img', { name: 'Figure' }));
+
+    expect(screen.getByText('Image did not load')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
+  });
+
   it('offers a Reference Resource the shared Open operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
@@ -244,10 +417,13 @@ describe('CanvasResource Open and Close operation', () => {
         title="A"
         graphColor="#ffc53d"
         onBeginTitleEdit={vi.fn()}
+        entityActions={[[{ id: 'remove', label: 'Remove from Map', onSelect: vi.fn() }]]}
       />,
     );
 
     expect(screen.queryByRole('button', { name: /Resource A$/ })).not.toBeInTheDocument();
+    fireEvent.contextMenu(screen.getByRole('article', { name: 'A' }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('withdraws an active body editor when the Resource becomes read-only', () => {
