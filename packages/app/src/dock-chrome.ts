@@ -388,6 +388,9 @@ export function useDockChrome(
         // adding several Resources costs one disclosure, and Escape is the way
         // out to the canvas.
         onAdd: (resource) => placement.addExistingResource(resource.id, centreAnchor(), false),
+        // The confirmation the Resource's own Actions menu arms: a Resource no
+        // Map places has no toolbar, and this list is where it is still named.
+        onDelete: availability.deleteResource ? app.resourceDeletion.arm : undefined,
         onDragStart: placement.startResourceDrag,
         onSpaceDragStart: placement.startSpaceDrag,
         onDragEnd: placement.endDrag,

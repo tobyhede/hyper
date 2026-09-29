@@ -2068,7 +2068,7 @@ test('Delete Resource confirms before removing the Resource from the whole Space
 
   // The dialog is drawn at the App root rather than in the menu that armed it:
   // the menu closes on the press and would take the question with it.
-  const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete B From Space?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
   await expect(resource).toBeVisible();
@@ -2078,13 +2078,56 @@ test('Delete Resource confirms before removing the Resource from the whole Space
   )
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
-  await confirmation.getByRole('button', { name: 'Delete from Space' }).click();
+  await confirmation.getByRole('button', { name: 'Delete' }).click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
   await page.getByRole('button', { name: 'Resources' }).click();
   await expect(page.getByRole('button', { name: 'Add B to Map' })).toHaveCount(0);
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
+
+test(
+  'a Resource the Map no longer places is deleted from the Resources list',
+  { tag: '@parity:resources-popover-offers-delete-from-space-on-a-resource-row' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+
+    await (
+      await resourceActions(page, 'B')
+    )
+      .getByRole('menuitem', { name: 'Remove from Map' })
+      .click();
+    await expect(nodeByTitle(page, 'B')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const add = page.getByRole('button', { name: 'Add B to Map' });
+    const deleteControl = page.getByRole('button', { name: 'Delete B from Space' });
+    await expect(deleteControl).toBeVisible();
+    // On its row's line, not wrapped beneath it.
+    const addBox = await boxOf(add, 'the row');
+    const deleteControlBox = await boxOf(deleteControl, 'the delete control');
+    expect(deleteControlBox.y).toBeGreaterThanOrEqual(addBox.y - 1);
+    expect(deleteControlBox.y + deleteControlBox.height).toBeLessThanOrEqual(
+      addBox.y + addBox.height + 1,
+    );
+    expect(deleteControlBox.x).toBeGreaterThanOrEqual(addBox.x + addBox.width - 1);
+
+    await deleteControl.click();
+    await page
+      .getByRole('alertdialog', { name: 'Delete B From Space?' })
+      .getByRole('button', { name: 'Delete' })
+      .click();
+
+    // The row goes from a list still open, not with the list: its absence alone
+    // would also hold if the confirmation had dismissed the list.
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Resources' })).toBeVisible();
+    await expect(add).toHaveCount(0);
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+  },
+);
 
 test('Delete Resource is withdrawn while presenting', async ({ page }) => {
   await page.goto('/');
@@ -2107,23 +2150,34 @@ test('Delete Resource is withdrawn while presenting', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Actions for Resource B' })).toHaveCount(0);
 });
 
-test('Delete Resource is withdrawn while the selected Resource is Open', async ({ page }) => {
+test('an Open Resource is deleted like any other, and does not withdraw Delete from its neighbours', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
-
-  await expect(
-    (await resourceActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
-  ).toBeVisible();
-  await page.keyboard.press('Escape');
 
   await selectResource(nodeByTitle(page, 'B').first());
   await page.getByRole('button', { name: 'Open Resource B' }).click();
   await expect(page.getByRole('button', { name: 'Close Resource B' })).toBeVisible();
 
   await expect(
-    (await resourceActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
-  ).toHaveCount(0);
+    (await resourceActions(page, 'A')).getByRole('menuitem', { name: 'Delete from Space' }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await (
+    await resourceActions(page, 'B')
+  )
+    .getByRole('menuitem', { name: 'Delete from Space' })
+    .click();
+  await page
+    .getByRole('alertdialog', { name: 'Delete B From Space?' })
+    .getByRole('button', { name: 'Delete' })
+    .click();
+
+  await expect(nodeByTitle(page, 'B')).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
 test('dragging from the Resources list uses transformed canvas coordinates then ordinary Resource dragging', async ({

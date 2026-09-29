@@ -345,7 +345,6 @@ function CanvasHarness({
           presenting,
           editingResourceBody: false,
           editingResourceTitle: false,
-          resourceIsOpen: false,
           editingChromeTitle: covered,
           spaceOnCanvas: true,
           editingEmbeddedMap: false,

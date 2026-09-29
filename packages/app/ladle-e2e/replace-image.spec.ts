@@ -85,6 +85,16 @@ test(
     await expect(selectedCanvas(page)).toHaveAttribute('aria-disabled', 'true');
     await expect(selectedCanvas(page)).not.toHaveAttribute('disabled');
     await expect(next.target.getByRole('button', { name: 'Upload' })).toBeDisabled();
+    // Close stays in its slot, unavailable, for the whole replacement: drawn,
+    // announced unavailable, reachable from the rail, and pressing it does nothing.
+    const busyClose = next.controls.getByRole('button', { name: 'Close Resource Figure' });
+    await expect(busyClose).toBeVisible();
+    await expect(busyClose).toHaveAttribute('aria-disabled', 'true');
+    await busyClose.focus();
+    await expect(busyClose).toBeFocused();
+    await busyClose.dispatchEvent('click');
+    await expect(next.resource).toHaveAttribute('data-open', 'true');
+    await expect(next.target).toHaveAttribute('aria-busy', 'true');
     // Unavailable is not unreachable: the withheld Map name still takes focus.
     await selectedCanvas(page).focus();
     await expect(selectedCanvas(page)).toBeFocused();

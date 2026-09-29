@@ -86,6 +86,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'The Resources list offers the Meta Space’s Spaces interleaved with this Space’s Resources, each row carrying the glyph that says which it is, and the Spaces toggle takes them away without touching the Resources.',
   },
   {
+    id: 'resources-popover-offers-delete-from-space-on-a-resource-row',
+    storyFile: 'surfaces/resources-popover.stories.tsx',
+    storyExport: 'MetaSpaces',
+    claim:
+      'Each Resource row ends in a Delete <name> from Space control on the row’s own line, a Space row keeps that slot empty, and pressing the control asks to delete that Resource rather than adding it to the Map.',
+  },
+  {
     id: 'resources-popover-drags-a-space-onto-the-canvas',
     storyFile: 'surfaces/resources-popover.stories.tsx',
     storyExport: 'MetaSpaces',
@@ -251,7 +258,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      'While image replacement is pending, the target remains mounted with its inputs unavailable, and the Dock’s navigation is drawn unavailable by aria-disabled and stays focusable; its answer releases them.',
+      'While image replacement is pending, the target remains mounted with its inputs unavailable, Close stays drawn but unavailable, and the Dock’s navigation is drawn unavailable by aria-disabled and stays focusable; its answer releases them.',
   },
   {
     id: 'image-resource-replace-refuses-in-the-target',

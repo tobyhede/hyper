@@ -19,8 +19,6 @@ export interface MapView {
   readonly resourcesOutsideMap: readonly Resource[];
   /** Which other Maps hold each Resource. */
   readonly membershipsOutsideMap: MapMemberships;
-  /** Whether any Resource on this Map is Open. */
-  readonly resourceIsOpen: boolean;
 }
 
 /** Resolves one Map of a Space and derives what is drawn from it. */
@@ -33,7 +31,6 @@ export function mapView(space: Space, mapId: MapId): MapView {
     projection: canvasProjection(space, selectedMap),
     resourcesOutsideMap: resourcesOutsideMap(space, selectedMap.map),
     membershipsOutsideMap: otherMapMemberships(space, selectedMap.map.id),
-    resourceIsOpen: Object.values(selectedMap.map.positions).some((at) => at?.open === true),
   };
 }
 
