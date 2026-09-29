@@ -37,7 +37,12 @@ import {
   type UUID,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
-import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, GraphIcon, type EntityActionGroup } from '@project/ui';
+import {
+  CANVAS_RESOURCE_DRAG_TILT_DEGREES,
+  GraphIcon,
+  spaceViewOf,
+  type EntityActionGroup,
+} from '@project/ui';
 import {
   nodeTypes,
   GraphConnectionLine,
@@ -72,6 +77,7 @@ import {
   embeddedAuthoringEnabled,
   editingPortalAncestor,
   embeddingIsPortalEditing,
+  reportsBodyHeight,
 } from '../embedded-open-space-resource';
 import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
@@ -774,13 +780,12 @@ export function SpaceCanvas({
   const canvasNodes = useMemo(
     () =>
       [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) => {
-        const withHeight =
-          node.data.spaceContent === undefined
-            ? node
-            : {
-                ...node,
-                data: { ...node.data, onBodyHeightChange: reportBodyHeight },
-              };
+        const withHeight = reportsBodyHeight(node)
+          ? {
+              ...node,
+              data: { ...node.data, onBodyHeightChange: reportBodyHeight },
+            }
+          : node;
         if (!editingPortals.has(withHeight.data.resourceId) || withHeight.data.kind !== 'space') {
           return withHeight;
         }
@@ -902,7 +907,8 @@ export function SpaceCanvas({
       const drafted = session.portalDraft.get(resourceId);
       if (drafted !== undefined) return drafted;
       const parent = session.portalNodesById.get(parentId);
-      const stored = parent?.data.spaceContent?.framing;
+      const stored =
+        parent === undefined ? undefined : spaceViewOf(parent.data.display)?.view.framing;
       if (stored !== undefined) return stored;
       const published = session.embeddedPublications.get(parentId);
       const request = session.embeddedRequests.find(
@@ -1495,7 +1501,7 @@ export function SpaceCanvas({
             })}
             framing={
               portalDraft.get(request.parent.data.resourceId) ??
-              request.parent.data.spaceContent?.framing
+              spaceViewOf(request.parent.data.display)?.view.framing
             }
             bounds={request.bounds}
             absolute={request.absolute}

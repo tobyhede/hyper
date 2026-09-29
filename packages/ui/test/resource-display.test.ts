@@ -6,6 +6,7 @@ import {
   beginEditing,
   beginReplacing,
   CLOSED_DISPLAY,
+  spaceViewOf,
   type ResourceDisplay,
 } from '../src/resource-display';
 import type { CanvasResourceBodyEditor } from '../src/CanvasResource';
@@ -93,5 +94,26 @@ describe('the display states only a Resource’s own content enters', () => {
         expect(atRest(value)).toBe(value);
       }),
     );
+  });
+});
+
+describe('the Space view a display shows', () => {
+  it('answers the view and how it was reached for an Open or presented Space', () => {
+    for (const shownAs of ['open', 'presented'] as const)
+      for (const reached of ['self', 'reference'] as const)
+        expect(
+          spaceViewOf({ shown: shownAs, content: { kind: 'space', view, via: reached } }),
+        ).toEqual({ view, via: reached });
+  });
+
+  it('answers nothing for a Closed display, or one showing anything but a Space', () => {
+    fc.assert(
+      fc.property(display, (value) => {
+        const drawsSpace =
+          (value.shown === 'open' || value.shown === 'presented') && value.content.kind === 'space';
+        expect(spaceViewOf(value) === undefined).toBe(!drawsSpace);
+      }),
+    );
+    expect(spaceViewOf(CLOSED_DISPLAY)).toBeUndefined();
   });
 });

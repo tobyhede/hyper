@@ -1,4 +1,4 @@
-import type { ResourceContent } from '@project/core';
+import type { ContentVia, ResourceContent, SpaceView } from '@project/core';
 import type { ImageReplaceEditor } from './ImageReplaceTarget';
 import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
 
@@ -99,5 +99,26 @@ export function atRest(display: ResourceDisplay): Exclude<ResourceDisplay, Runni
     case 'open':
     case 'presented':
       return display;
+  }
+}
+
+/**
+ * The Space view an Open or presented Resource shows, and whether it is the
+ * Resource's own or its Target's. A Space reached through a Reference Resource
+ * is drawn read-only (ADR 0070). A Closed display shows no Space.
+ */
+export function spaceViewOf(
+  display: ResourceDisplay,
+): { readonly view: SpaceView; readonly via: ContentVia } | undefined {
+  switch (display.shown) {
+    case 'open':
+    case 'presented':
+      return display.content.kind === 'space'
+        ? { view: display.content.view, via: display.content.via }
+        : undefined;
+    case 'closed':
+    case 'editing':
+    case 'replacing':
+      return undefined;
   }
 }

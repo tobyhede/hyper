@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Resource } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { CLOSED_DISPLAY, type ResourceDisplay } from '@project/ui';
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from '../src/drag-tilt';
 import { embeddedMap } from '../src/embedded-map';
 import {
@@ -9,6 +10,7 @@ import {
   embeddedAuthoringEnabled,
   editingPortalAncestor,
   embeddingIsPortalEditing,
+  reportsBodyHeight,
 } from '../src/embedded-open-space-resource';
 import { fixtureDisplay } from './render-adapter-fixtures';
 
@@ -42,19 +44,25 @@ const lean = (
     DRAG_TILT_RADIANS,
   );
 
-const spaceContent = (
-  resourceId: typeof HOST,
-  spaceId: typeof TARGET,
-  map: typeof MAP,
-  graph: typeof GRAPH = GRAPH,
-): Extract<Resource, { kind: 'space' }> => ({
-  id: resourceId,
-  title: 'Elsewhere',
-  kind: 'space',
-  spaceId,
-  map,
-  graph,
-});
+/**
+ * What a Space Resource, or a Reference Resource to one, shows: its Space view
+ * once Open, reached through the Reference Resource for the second.
+ */
+const spaceDisplay = (
+  open: boolean,
+  kind: Exclude<Resource['kind'], 'image'>,
+  target: { readonly spaceId: typeof TARGET; readonly map: typeof MAP },
+): ResourceDisplay =>
+  open
+    ? {
+        shown: 'open',
+        content: {
+          kind: 'space',
+          view: { ...target, graph: GRAPH, framing: undefined },
+          via: kind === 'reference' ? 'reference' : 'self',
+        },
+      }
+    : CLOSED_DISPLAY;
 
 const openSpaceResource = (
   resourceId: typeof HOST,
@@ -78,11 +86,10 @@ const openSpaceResource = (
     readOnly: false,
     kind: geometry.kind ?? 'space',
     open: geometry.open ?? true,
-    spaceContent: spaceContent(resourceId, target.spaceId, target.map),
     active: false,
     selectedForAuthoring: false,
     showContent: false,
-    display: fixtureDisplay(geometry.open ?? true, geometry.kind ?? 'space', '', target),
+    display: spaceDisplay(geometry.open ?? true, geometry.kind ?? 'space', target),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
   },
@@ -378,6 +385,49 @@ describe('embedded open Space Resource discovery', () => {
         draggingIds: new Set<string>(),
       }),
     ).toEqual([]);
+  });
+});
+
+describe('the body height an embedding is clipped by', () => {
+  it('is known on the first request after a Space Resource Opens, having been reported while Closed', () => {
+    const closed = openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { open: false });
+    expect(reportsBodyHeight(closed)).toBe(true);
+    // What the Closed front's body reports before the Open commit.
+    const bodyHeights = new Map([[HOST, 40]]);
+    const opened = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
+    const [first] = discoverEmbeddedOpenSpaceResources({
+      nodes: [opened],
+      entries: [{ id: TARGET }],
+      publications: new Map(),
+      bodyHeights,
+      draggingIds: new Set<string>(),
+    });
+    // The reserved footer would put the bottom at 396; the measured 40 puts it at 456.
+    expect(first?.bounds).toEqual({ left: 16, top: 16, right: 684, bottom: 456 });
+  });
+
+  it('is reported by a Closed Reference Resource, whose Target may be a Space Resource', () => {
+    expect(
+      reportsBodyHeight(
+        openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { kind: 'reference', open: false }),
+      ),
+    ).toBe(true);
+  });
+
+  it('is not reported by a Resource that can draw no Space', () => {
+    const node = openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { open: false });
+    const markdown = openSpaceResource(
+      HOST,
+      { spaceId: TARGET, map: MAP },
+      { kind: 'markdown', open: false },
+    );
+    expect(reportsBodyHeight(markdown)).toBe(false);
+    expect(
+      reportsBodyHeight({
+        ...node,
+        data: { ...node.data, kind: 'image', imageUrl: 'https://example.test/a.png' },
+      }),
+    ).toBe(false);
   });
 });
 

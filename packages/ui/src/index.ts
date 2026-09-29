@@ -11,7 +11,13 @@ export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { PresentedResource } from './PresentedResource';
 export type { PresentedResourceProps } from './PresentedResource';
 export { CanvasResource, CANVAS_RESOURCE_DRAG_TILT_DEGREES } from './CanvasResource';
-export { atRest, beginEditing, beginReplacing, CLOSED_DISPLAY } from './resource-display';
+export {
+  atRest,
+  beginEditing,
+  beginReplacing,
+  CLOSED_DISPLAY,
+  spaceViewOf,
+} from './resource-display';
 export type { FrontDisplay, OwnContent, ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
