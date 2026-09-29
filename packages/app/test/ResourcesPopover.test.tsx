@@ -57,6 +57,7 @@ function Fixture({
   spaces,
   onAddSpace,
   onSpaceDragStart,
+  onDelete,
 }: {
   readonly resources?: readonly Resource[];
   readonly allResources?: readonly Resource[];
@@ -70,6 +71,7 @@ function Fixture({
     readonly title: string;
   }) => Promise<string | null>;
   readonly onSpaceDragStart?: SpaceDragStart;
+  readonly onDelete?: (resource: Resource) => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -87,6 +89,7 @@ function Fixture({
         spaces={spaces}
         onAddSpace={onAddSpace}
         onSpaceDragStart={onSpaceDragStart}
+        onDelete={onDelete}
       />
     </>
   );
@@ -972,6 +975,19 @@ describe('ResourcesPopover', () => {
 
     expect(screen.queryByText('All Resources are in this Map.')).not.toBeInTheDocument();
     expect(screen.getByText('No matching Resources.')).toBeInTheDocument();
+  });
+
+  it('deletes a Resource from its row without placing it', async () => {
+    const onAdd = vi.fn();
+    const onDelete = vi.fn();
+    render(<Fixture onAdd={onAdd} onDelete={onDelete} />);
+    await openList();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Zulu from Space' }));
+
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledWith(RESOURCES[0]);
+    expect(onAdd).not.toHaveBeenCalled();
   });
 
   it('lists a Reference Resource whose Target is absent from allResources', async () => {

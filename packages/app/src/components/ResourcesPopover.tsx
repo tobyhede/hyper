@@ -26,6 +26,7 @@ import {
   Badge,
   AlertDescription,
   AlertTitle,
+  DeleteIcon,
   ReferenceIcon,
   ResourceKindIcon,
   InputGroup,
@@ -237,6 +238,12 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
    * Absent, every row draws as placed nowhere else.
    */
   readonly memberships?: MapMemberships | undefined;
+  /**
+   * Arm Delete from Space for a Resource row. Absent while deleting is
+   * unavailable, and then no row offers it. A Space row never does: a Space is
+   * not a Resource of this Space.
+   */
+  readonly onDelete?: ((resource: Resource) => void) | undefined;
 }
 
 /**
@@ -941,6 +948,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                 const placed =
                   row.kind === 'resource' ? membershipsOf(memberships, row.resource.id) : [];
                 const description = `${describedBy}-${key}`;
+                const onDelete = placing?.onDelete;
                 return (
                   <li key={key}>
                     {/* **A row is a button, and the drag is the shortcut.** ADR 0082
@@ -1056,6 +1064,16 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                         </span>
                       </TooltipContent>
                     </Tooltip>
+                    {row.kind === 'resource' && onDelete !== undefined ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${name} from Space`}
+                        onClick={() => onDelete(row.resource)}
+                      >
+                        <DeleteIcon />
+                      </Button>
+                    ) : null}
                     {placed.length === 0 ? null : (
                       <span id={description} className="sr-only">
                         {`Also in ${placed.map(describeMembership).join('; ')}`}
