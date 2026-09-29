@@ -26,7 +26,7 @@
  */
 
 /**
- * The nine facts every answer below is derived from.
+ * The ten facts every answer below is derived from.
  *
  * Every Resource creation completes its Edit on activation, so there is no
  * modal creation surface for the rest of the product to stand out of the way
@@ -35,6 +35,16 @@
  * withdrawn for that window rather than swallowing a second press silently.
  */
 export interface AuthoringInProgress {
+  /**
+   * An Image Resource's replacement is being stored, measured and applied.
+   *
+   * It is the application's exclusive operation until its Edit is applied
+   * (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`, "Other
+   * actions while a replacement runs"): every answer is withdrawn except
+   * `editResourceBody`, which is what keeps the replacement's own target mounted
+   * to show its answer.
+   */
+  readonly replacingImage: boolean;
   /**
    * Whether the selected Map's placement is ready for authoring.
    *
@@ -126,6 +136,30 @@ export interface AuthoringAvailability {
 }
 
 export function authoringAvailability(inProgress: AuthoringInProgress): AuthoringAvailability {
+  const availability = availabilityBesideReplacement(inProgress);
+  if (!inProgress.replacingImage) return availability;
+  // The running replacement's target is a live content editor, so it keeps the
+  // one answer that holds such an editor mounted, by the same rule as any other.
+  return {
+    resourcesView: false,
+    chromeTitleEdit: false,
+    entityEdits: false,
+    deleteResource: false,
+    present: false,
+    addResource: false,
+    createSpaceResource: false,
+    createMap: false,
+    authorOnCanvas: false,
+    authorInEmbeddedMap: false,
+    connectOnCanvas: false,
+    dragNodes: false,
+    selectNodes: false,
+    editResourceBody: availability.editResourceBody,
+  };
+}
+
+/** Every answer as it stands when no image replacement is running. */
+function availabilityBesideReplacement(inProgress: AuthoringInProgress): AuthoringAvailability {
   const {
     editable,
     presenting,

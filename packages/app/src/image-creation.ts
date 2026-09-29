@@ -1,6 +1,11 @@
 import type { ImageNaturalSize, MapId, MapPosition } from '@project/core';
 import type { PlacementMode } from '@project/graph';
-import { refusalForDeclaredType, type ImageRefusal, type ImageStoring } from '@project/persistence';
+import {
+  IMAGE_MEDIA_TYPES,
+  refusalForDeclaredType,
+  type ImageRefusal,
+  type ImageStoring,
+} from '@project/persistence';
 import type {
   AuthoringResult,
   CreatedImage,
@@ -22,6 +27,13 @@ export interface ImageSources {
   readonly measure: (url: string) => Promise<ImageNaturalSize | undefined>;
 }
 
+/**
+ * The formats the host stores (ADR 0106), offered to a file picker as a
+ * convenience. The host still decides from the bytes, so a file the picker
+ * lets through anyway meets the host's refusal.
+ */
+export const PICKED_IMAGE_TYPES = IMAGE_MEDIA_TYPES.join(',');
+
 /** Where a gesture was made: the Map it was aimed at, the point, and how that point is kept. */
 export interface ImageTarget {
   readonly mapId: MapId;
@@ -35,11 +47,11 @@ export type ImageOrigin =
   | { readonly kind: 'url'; readonly url: string };
 
 /**
- * What a creation gesture answers: the Edit's own result, or the refusal that
- * stopped a file being stored, named with the file so the sentence can say
- * which one.
+ * What an image gesture answers, creating or replacing: the Edit's own result,
+ * or the refusal that stopped a file being stored, named with the file so the
+ * sentence can say which one.
  */
-export type ImageCreationResult =
+export type ImageEditResult =
   | AuthoringResult
   | { readonly kind: 'not-stored'; readonly code: ImageRefusal; readonly name: string };
 
@@ -54,12 +66,12 @@ export type ImageCreationResult =
  * and an image's id is its content, so sending the same file again stores
  * nothing new.
  */
-const storeEach = async (
+export const storeEach = async (
   images: ImageSources,
   files: readonly File[],
 ): Promise<
   | { readonly kind: 'stored'; readonly urls: readonly string[] }
-  | Extract<ImageCreationResult, { readonly kind: 'not-stored' }>
+  | Extract<ImageEditResult, { readonly kind: 'not-stored' }>
 > => {
   for (const file of files) {
     const code = refusalForDeclaredType(file.type);
@@ -88,7 +100,7 @@ export async function createImageResources(
   { images, authoring }: { readonly images: ImageSources; readonly authoring: SpaceAuthoring },
   origin: ImageOrigin,
   { mapId, anchor, placement }: ImageTarget,
-): Promise<ImageCreationResult> {
+): Promise<ImageEditResult> {
   let urls: readonly string[];
   if (origin.kind === 'url') {
     urls = [origin.url];

@@ -442,3 +442,14 @@ export const describeSpaceResourceBreak: SpaceResourceBreak = (failure) =>
  */
 export const describeSpaceResourceCreationBreak: SpaceResourceBreak = (failure) =>
   `This Resource was not created: ${failureMessage(failure)}`;
+
+/** A replacement's transport or unexpected failure, said beside its upload target. */
+export type ImageReplacementBreak = (failure: unknown) => string;
+
+/** @see ImageReplacementBreak */
+export const describeImageReplacementBreak: ImageReplacementBreak = (failure) =>
+  `This image was not replaced: ${failureMessage(failure)}`;
+
+/** A replacement begun while another still holds the Space, said beside its upload target. */
+export const describeImageReplacementPending = (): string =>
+  'Another image is still being replaced.';

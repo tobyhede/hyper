@@ -70,6 +70,7 @@ const context = (
 ): CanvasResourceDecorationContext => ({
   authorOnCanvas: true,
   bodyEditing: false,
+  imageAccept: 'image/png',
   editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID]),
   openResource: () => 'completed',
   closeResource: () => 'completed',
@@ -132,7 +133,7 @@ describe('decorateSharedResourceNode', () => {
         projectionNode(RESOURCE_ID, 'markdown'),
         context({ resourceEntityActions, authorOnCanvas: false }),
       ).entityActions,
-    ).toBeUndefined();
+    ).toEqual([]);
     expect(
       decorateSharedResourceNode(
         projectionNode(MISSING_RESOURCE_ID, 'markdown'),

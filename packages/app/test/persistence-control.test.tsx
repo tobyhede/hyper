@@ -17,6 +17,71 @@ const SNAPSHOT: SpaceSnapshot = {
 const STORED: LoadedSpace = { snapshot: SNAPSHOT, revision: 5n, exportedRevision: null };
 
 describe('PersistenceControl', () => {
+  it('keeps conflict recovery unavailable during replacement and returns it afterwards', () => {
+    const onAcceptRemote = vi.fn(() => null);
+    const onKeepLocal = vi.fn();
+    const props = {
+      persistence: { kind: 'conflicted' as const, current: STORED, baseline: SNAPSHOT },
+      onAcceptRemote,
+      onKeepLocal,
+    };
+    const { rerender } = render(<PersistenceControl {...props} disabled />);
+    const reload = screen.getByRole('button', { name: 'Reload' });
+    expect(reload).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Keep local and retry' })).toBeDisabled();
+    fireEvent.click(reload);
+    expect(onAcceptRemote).not.toHaveBeenCalled();
+    rerender(<PersistenceControl {...props} disabled={false} />);
+    fireEvent.click(reload);
+    expect(onAcceptRemote).toHaveBeenCalledOnce();
+  });
+
+  // Acknowledging replaces nothing, so a replacement does not hold the modal
+  // dialog over a canvas whose pan and zoom it promises to leave available.
+  it('keeps rejection acknowledgement available during replacement', () => {
+    render(
+      <PersistenceControl
+        disabled
+        persistence={{
+          kind: 'rejected',
+          failure: { kind: 'permanent-failure', code: 'forbidden' },
+        }}
+        onAcceptRemote={() => null}
+        onKeepLocal={() => undefined}
+      />,
+    );
+    const acknowledge = screen.getByRole('button', { name: 'Continue editing' });
+    expect(acknowledge).toBeEnabled();
+    fireEvent.click(acknowledge);
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('draws the way to a blocking Space unavailable during replacement, as its siblings are', () => {
+    const onOpenSpace = vi.fn();
+    render(
+      <PersistenceControl
+        disabled
+        persistence={{
+          kind: 'conflicted',
+          current: STORED,
+          baseline: undefined,
+          blocked: {
+            code: 'persistence-recovery-required',
+            spaceId: TARGET_ID,
+            title: 'Target',
+            recovery: 'resolve-conflict',
+          },
+        }}
+        onAcceptRemote={vi.fn(() => null)}
+        onKeepLocal={vi.fn()}
+        onOpenSpace={onOpenSpace}
+      />,
+    );
+    const open = screen.getByRole('button', { name: 'Open Target' });
+    expect(open).toBeDisabled();
+    fireEvent.click(open);
+    expect(onOpenSpace).not.toHaveBeenCalled();
+  });
   it('explains an aggregate refusal instead of naming its error kinds', () => {
     render(
       <PersistenceControl

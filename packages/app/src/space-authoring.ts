@@ -155,6 +155,18 @@ export type AuthoringCompletion =
       readonly resourceId: ResourceId;
       readonly document: ResourceDocument;
     }
+  /**
+   * Replace image: the Image Resource's URL and the natural size measured when
+   * it was set, absent when the picture did not load (ADR 0106). Identity,
+   * Title, placement, Edges and a remembered Open Size are kept, and the URL it
+   * already holds is `unchanged`.
+   */
+  | {
+      readonly kind: 'replaced-image';
+      readonly resourceId: ResourceId;
+      readonly url: string;
+      readonly naturalSize?: ImageNaturalSize;
+    }
   | {
       readonly kind: 'create-and-connect';
       readonly from: ResourceId;
@@ -1208,6 +1220,28 @@ export function createSpaceAuthoring({
       const resources = [...snapshot.resources];
       resources[resourceIndex] = { id: resource.id, document };
       snapshot = { ...snapshot, resources };
+    } else if (completion.kind === 'replaced-image') {
+      const resourceIndex = snapshot.resources.findIndex(
+        (resource) => resource.id === completion.resourceId,
+      );
+      const resource = snapshot.resources[resourceIndex];
+      if (resource === undefined) return refuse({ code: 'resource-not-found' });
+      if (resource.document.kind !== 'image') return refuse({ code: 'resource-kind-immutable' });
+      if (completion.url === resource.document.url) return UNCHANGED;
+      // A URL the schema will not hold is refused before intake, which answers
+      // it by throwing, and an author's URL may not throw
+      // (`image-replacement.test.ts`, "refuses a URL an Image Resource may not
+      // hold rather than throwing on intake").
+      if (!isAcceptedImageUrl(completion.url)) return refuse({ code: IMAGE_URL_UNSUPPORTED });
+      const document: ResourceDocument = {
+        title: resource.document.title,
+        kind: 'image',
+        url: completion.url,
+      };
+      if (completion.naturalSize !== undefined) document.naturalSize = completion.naturalSize;
+      const resources = [...snapshot.resources];
+      resources[resourceIndex] = { id: resource.id, document };
+      snapshot = { ...snapshot, resources };
     } else if (completion.kind === 'opened-resource') {
       const outcome = SnapshotEdit.open(snapshot, mapId, completion.resourceId);
       if (outcome.kind !== 'completed') return notCompleted(outcome);
@@ -1231,8 +1265,10 @@ export function createSpaceAuthoring({
       if ('kind' in created) return created;
       createdResourceId = created.id;
     } else if (completion.kind === 'created-images') {
-      // Refused here rather than left to intake, which would throw on a URL the
-      // schema will not hold — and the author's paste may not throw.
+      // A URL the schema will not hold is refused before intake, which answers
+      // it by throwing, and an author's paste may not throw
+      // (`space-authoring-operations.test.ts`, "refuses a URL an Image Resource
+      // may not hold rather than throwing on intake").
       if (completion.images.length === 0) return UNCHANGED;
       if (completion.images.some(({ url }) => !isAcceptedImageUrl(url))) {
         return refuse({ code: IMAGE_URL_UNSUPPORTED });

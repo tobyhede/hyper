@@ -176,6 +176,7 @@ async function mountGraph(
         // is a resolved placement.
         availability={authoringAvailability({
           editable,
+          replacingImage: false,
           presenting: false,
           editingResourceBody: false,
           editingResourceTitle: false,

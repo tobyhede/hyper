@@ -633,9 +633,11 @@ function Dock({
 function PersistenceReport({
   persistence,
   edge,
+  disabled,
 }: {
   readonly persistence: DockPersistence;
   readonly edge: DockEdge;
+  readonly disabled: boolean;
 }) {
   const { state } = persistence;
   // An aggregate refusal draws the same dialog a permanent
@@ -650,6 +652,7 @@ function PersistenceReport({
     <>
       {decision ? (
         <PersistenceControl
+          disabled={disabled}
           active={persistence.active}
           persistence={state}
           onAcceptRemote={persistence.onAcceptRemote}
@@ -685,11 +688,13 @@ export function CommandDock({
   chrome,
   container,
   initialEdge,
+  disabled = false,
 }: {
   readonly chrome: DockChrome;
   /** The box the Dock docks to, stated by whoever mounts it. */
   readonly container: RefObject<HTMLElement | null>;
   readonly initialEdge: DockEdge;
+  readonly disabled?: boolean;
 }) {
   const [dock, setDock] = useState<DockPosition>({ edge: initialEdge, along: 'center' });
   const [openId, setOpenId] = useState<string | null>(
@@ -700,6 +705,7 @@ export function CommandDock({
     (chrome.resources.list.disclose ?? null) === null ? null : RESOURCES_DISCLOSURE_ID,
   );
   const renaming = useDockRenaming(chrome);
+  if (disabled && openId !== null) setOpenId(null);
   const vertical = orientationOf(dock.edge) === 'vertical';
   // A rule divides across the dock's own axis, so it runs the other way.
   const divider = vertical ? 'horizontal' : 'vertical';
@@ -714,7 +720,13 @@ export function CommandDock({
           container={container}
           presenting={chrome.graph.presenting}
           label="Command Dock"
-          report={<PersistenceReport persistence={chrome.persistence} edge={dock.edge} />}
+          report={
+            <PersistenceReport
+              persistence={chrome.persistence}
+              edge={dock.edge}
+              disabled={disabled}
+            />
+          }
         >
           {/* Space | Map Graph | Resources.
             The three selections first, then the inventory. Which Space, which
