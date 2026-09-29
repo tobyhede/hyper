@@ -479,7 +479,7 @@ describe.each([
     });
   });
 
-  describe('the graph a map opens active on (ADR 0026)', () => {
+  describe('the graph a map opens active on (ADR 0040)', () => {
     it('accepts any graph the map owns', () => {
       const space = loaded(
         load({
@@ -668,7 +668,7 @@ describe.each([
     });
 
     it('refuses a defaultMap naming no declared Map', () => {
-      // The kind names the field the document actually has (ADR 0055): a kind
+      // The kind names the field the document actually has: a kind
       // and the message beside it naming two different fields would send a
       // consumer matching on the kind to a field the document does not have.
       const errors = refused(load(simple(ABSENT)));

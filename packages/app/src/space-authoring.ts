@@ -1329,9 +1329,10 @@ export function createSpaceAuthoring({
       if (deleted === undefined) {
         return refuse({ code: 'resource-not-found' });
       }
-      // A Space Resource owns the Space it names (ADR 0058), so deleting it deletes
-      // that Space and everything below it — one coordinated multi-Space Edit,
-      // which is Space Resource lifecycle through the session registry and not
+      // The Space Resources naming a Space own it together (ADR 0074), so
+      // deleting the last one deletes that Space and everything below it — one
+      // coordinated multi-Space Edit, which is Space Resource lifecycle through
+      // the session registry and not
       // a single-Space update this seam can make. Completing it here would store
       // a Space whose target is unreachable, and aggregate intake refuses that
       // commit permanently with the Resource already gone from the working state.

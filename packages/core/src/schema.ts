@@ -358,7 +358,7 @@ export const resourcePlacementSchema = z.discriminatedUnion('open', [
 
 /**
  * A map the author wrote: a resource-to-position map and the graphs over it
- * (ADR 0025, ADR 0040).
+ * (ADR 0040).
  *
  * Its position keys **are** its resource membership. A resource the map omits is not in
  * this map — and a position may not name a resource the space does not hold;
@@ -390,7 +390,7 @@ export const positionedMapSchema = z
     graphs: z.array(graphSchema).min(1),
     /**
      * Which graph is active when this map opens. Absent, the **first graph**
-     * is (ADR 0026) — resolved on read, so a hand-authored space needs nothing
+     * is (ADR 0040) — resolved on read, so a hand-authored space needs nothing
      * here, while a file the app wrote names it outright rather than depending
      * on graph order (ADR 0028). That it names a graph *this map* owns needs
      * the whole space in view and is checked in `@project/graph`.
@@ -402,7 +402,7 @@ export const positionedMapSchema = z
 /**
  * A map carried by the space file, discriminated by `kind`. Every Map is
  * authored: an automatic strategy computes placement from the resources and graphs
- * alone, so it has nothing to write down and appears here nowhere (ADR 0025).
+ * alone, so it has nothing to write down and appears here nowhere (ADR 0079).
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
@@ -461,9 +461,8 @@ export const SPACE_FILE_VERSION = 1;
 const spaceFileObjectSchema = z.strictObject({
   version: z.literal(SPACE_FILE_VERSION),
   /**
-   * What names this space. Required today; ADR 0019 makes ids optional and
-   * generated on load, and this is the field that becomes optional — the other
-   * direction would strand every file already carrying one.
+   * What names this space. Required here; an id is optional only in import
+   * input, which mints a missing one (ADR 0030).
    *
    * A space's id is not its title and not its file name: a title is prose the
    * author may reword, and a path is where the file happens to sit.

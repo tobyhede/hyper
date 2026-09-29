@@ -50,7 +50,7 @@ interface SpaceResourceSelection {
 
 /**
  * What a Space Resource pointed at a fixture selects: the Map that Space opens
- * on, and that Map's Active Graph (ADR 0079, ADR 0026).
+ * on, and that Map's Active Graph (ADR 0079, ADR 0040).
  *
  * Derived from the target snapshot rather than written out beside each Space
  * Resource, because a transcribed pair is one that goes stale the moment a
@@ -363,7 +363,7 @@ export const storyGraphIds = (): (() => GraphId) => {
  * several outgoing Edges, and there is no such Resource anywhere in the tracked
  * fixtures — the E2E fixture's Graphs are deliberately all lines too.
  *
- * Each **declares where it opens**, so `defaultMap` and ADR 0026's Active
+ * Each **declares where it opens**, so `defaultMap` and ADR 0040's Active
  * Graph rule answer for a story exactly as they do for the app: the Map named
  * here owns one Graph, and a Map that names no `activeGraph` opens on the
  * first it owns. A story therefore calls `present()` and nothing else to be

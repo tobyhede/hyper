@@ -107,7 +107,7 @@ describe('canvasProjection', () => {
       OTHER_GRAPH_OPACITY,
       1,
     ]);
-    // Emphasis, not filtering: both Graphs are still drawn (ADR 0026).
+    // Emphasis, not filtering: both Graphs are still drawn (ADR 0040).
     expect(emphasised.edges).toHaveLength(2);
   });
 
@@ -148,7 +148,7 @@ describe('canvasProjection', () => {
 
   /*
    * Two Space Resources on one target, selecting one Map at different Graphs
-   * (ADR 0026).
+   * (ADR 0040).
    *
    * Which Edges an embedding draws is the Map's business, and which one it
    * emphasises is the Resource's, so a pair that differs only by stored Graph has

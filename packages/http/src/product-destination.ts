@@ -57,15 +57,15 @@ export const productDestinationPath = (destination: ProductDestination): string 
   if (destination.kind === 'graph') {
     return `${space}/graphs/${encodeCompactUuid(destination.graphId)}`;
   }
-  const map = `${space}/maps/${encodeCompactUuid(destination.mapId)}`;
+  const mapPath = `${space}/maps/${encodeCompactUuid(destination.mapId)}`;
   if (destination.kind === 'presentation') {
-    return `${map}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.resourceId)}`;
+    return `${mapPath}/graphs/${encodeCompactUuid(destination.graphId)}/present/${encodeCompactUuid(destination.resourceId)}`;
   }
   return destination.kind === 'map'
-    ? map
+    ? mapPath
     : destination.kind === 'map-resource'
-      ? `${map}/resources/${encodeCompactUuid(destination.resourceId)}`
-      : `${map}/graphs/${encodeCompactUuid(destination.graphId)}`;
+      ? `${mapPath}/resources/${encodeCompactUuid(destination.resourceId)}`
+      : `${mapPath}/graphs/${encodeCompactUuid(destination.graphId)}`;
 };
 
 type ProductDestinationLoader = Pick<StoredSpaceRepository, 'loadSpace'>;
@@ -134,9 +134,7 @@ const destinationInSnapshot = (
     destination.kind === 'graph' ||
     destination.kind === 'map-graph' ||
     destination.kind === 'presentation'
-      ? snapshot.document.maps?.find((map) =>
-          map.graphs.some(({ id }) => id === destination.graphId),
-        )
+      ? snapshot.document.maps?.find((m) => m.graphs.some(({ id }) => id === destination.graphId))
       : undefined;
   if (
     (destination.kind === 'graph' ||
@@ -152,17 +150,17 @@ const destinationInSnapshot = (
     destination.kind === 'map-graph' ||
     destination.kind === 'presentation'
   ) {
-    const map = snapshot.document.maps?.find(({ id }) => id === destination.mapId);
-    if (map === undefined) return { kind: 'unresolved' };
+    const addressedMap = snapshot.document.maps?.find(({ id }) => id === destination.mapId);
+    if (addressedMap === undefined) return { kind: 'unresolved' };
     if (
       destination.kind === 'map-resource' &&
-      map.positions[destination.resourceId] === undefined
+      addressedMap.positions[destination.resourceId] === undefined
     ) {
       return { kind: 'unresolved' };
     }
     if (
       (destination.kind === 'map-graph' || destination.kind === 'presentation') &&
-      map.id !== graphOwner?.id
+      addressedMap.id !== graphOwner?.id
     ) {
       return { kind: 'unresolved' };
     }

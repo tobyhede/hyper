@@ -85,8 +85,8 @@ describe('space file schema', () => {
   });
 
   it('requires the space to name itself', () => {
-    // Required today; ADR 0019 makes ids optional and generated on load, and
-    // this is the assertion that will change when it does.
+    // An id is optional only in import input (ADR 0030); the space file
+    // itself requires one.
     const { id: _id, ...withoutId } = validSpaceFile;
     const result = spaceFileSchema.safeParse(withoutId);
     expect(result.success).toBe(false);
@@ -595,7 +595,7 @@ describe('space file maps', () => {
 
   it('leaves it absent — the first graph is active', () => {
     // Absent is the meaningful case, not a missing field to be filled in: it is
-    // how a map defers the active graph (ADR 0026).
+    // how a map defers the active graph (ADR 0040).
     const file = spaceFileSchema.parse({ ...validSpaceFile, maps: [working] });
     expect(file.maps?.[0]?.activeGraph).toBeUndefined();
   });

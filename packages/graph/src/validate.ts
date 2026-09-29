@@ -4,8 +4,8 @@ import { repeatedGraphEdges } from './graph-edges';
 /**
  * The resources and maps a reference check reads. Structural so it accepts both
  * a freshly parsed space file (inside `loadSpace`) and an already-built
- * `Space`. `maps` and `defaultMap` are optional: a space may declare
- * neither and open in an automatic view (ADR 0025).
+ * `Space`. `maps` and `defaultMap` are optional: a stored or imported
+ * Space may declare neither until its first working load initializes one (ADR 0079).
  *
  * There is no `graphs` here, and that is the whole of ADR 0040 in one shape: a
  * graph is reached through the map that owns it, so a check written over a
@@ -147,7 +147,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // A map's position keys **are** its resource membership (ADR 0040). They may
     // omit resources — a resource the map leaves out is simply not in this map — but
     // may not name a resource that does not exist, a position left behind by a
-    // deleted resource (ADR 0025).
+    // deleted resource.
     //
     // A key naming a missing resource still joins `members`, which is what keeps
     // this the *only* fault reported for it: an edge into that resource is then a
@@ -205,7 +205,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       });
     }
 
-    // A map also points at one graph — the one that opens active (ADR 0026)
+    // A map also points at one graph — the one that opens active (ADR 0040)
     // — and it must be one the map **owns**. Split the same way the endpoints
     // above are: a graph nothing in the space owns is missing, while one a
     // second map owns exists and is simply not this map's to open on.

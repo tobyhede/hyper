@@ -34,7 +34,7 @@ declare const SPACE_INTAKE: unique symbol;
  * rather than serializing this.
  */
 export interface Space {
-  /** What names this space (ADR 0019). Not its title, and not its file path. */
+  /** What names this space. Not its title, and not its file path. */
   readonly id: UUID;
   readonly title: string;
   readonly resources: readonly Resource[];
@@ -51,9 +51,9 @@ export interface Space {
    */
   readonly graphs: readonly Graph[];
   /**
-   * The positioned maps the author wrote, if any. Empty is the normal state
-   * of a hand-authored space: automatic strategies carry no data, so they are
-   * declared nowhere (ADR 0025).
+   * The positioned maps the author wrote, if any. Empty only for a stored or
+   * imported Space its first working load has not yet initialized (ADR 0079):
+   * automatic strategies carry no data, so they are declared nowhere.
    */
   readonly maps: readonly Map[];
   /** Which Map this Space opens in — one UUID namespace for both variants. */

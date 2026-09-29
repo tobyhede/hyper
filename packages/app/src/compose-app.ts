@@ -169,7 +169,7 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
   const readWorkingSpace = createWorkingSpaceReader();
   const currentSpace = (): Space => readWorkingSpace(spaceSession.getState().working);
   // Which Map this space opens in. It also answers which Graphs are drawn
-  // and which of them opens active (ADR 0026), so it has to resolve before
+  // and which of them opens active (ADR 0040), so it has to resolve before
   // anything that reads the canvas is built.
   const openingSelection = selection ?? requireDefaultMap(currentSpace());
   const navigation = createNavigation(currentSpace, openingSelection);

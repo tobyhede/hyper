@@ -40,11 +40,11 @@ The fixture's shape exists to exercise the behaviours the e2e suite covers:
 - **Reference Resources on a Graph (ADR 0009).** A Reference Resource shows its Target's content under
   its own Title at a distinct position, keeping the fixture acyclic. Graphs
   themselves may contain cycles.
-- **Open shows source (ADR 0011).** A body carries a Markdown marker so opening
-  it can prove the source survives rather than rendering.
+- **Markdown is drawn rendered (ADR 0064).** A body carries a Markdown marker so
+  presenting can prove the markers are consumed rather than drawn verbatim.
 - **A heading in a body is just a heading (ADR 0020).** Title and a leading
   body heading are two different resources and both are drawn once. Asserted while
-  presenting, which is the one surface that draws markdown *rendered* (ADR 0011).
+  presenting.
 - **Open off the selected Graph.** A Resource on the other collection still opens.
 - **Scroll inside the frame (issue 05).** One body is long enough to overflow
   the 16:9 panel at a small viewport.

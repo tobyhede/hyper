@@ -152,7 +152,7 @@ describe('the story Spaces', () => {
   /**
    * The traversal Spaces open where they say, on the one Graph their Map
    * owns — so a presenting story calls `present()` and nothing else, and the
-   * Graph it presents is the one `requireDefaultMap` and ADR 0026 answer rather
+   * Graph it presents is the one `requireDefaultMap` and ADR 0040 answer rather
    * than one the harness picked.
    */
   it('opens each traversal Space on the Map and Graph it declares', () => {

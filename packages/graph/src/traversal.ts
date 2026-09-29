@@ -42,8 +42,8 @@ export function graphEntryResources(graph: Graph): ResourceId[] {
  * drawn: connecting appends, so an author who draws `b → c` and then attaches
  * `a → b` stores the `b` edge first, and starting there would skip `a` — a resource
  * forward traversal never reaches. Which entry, when there are several, is a
- * policy choice and this is the plain one — the same shape as ADR 0026's
- * "absent an `activeGraph`, the first visible graph".
+ * policy choice and this is the plain one — the same shape as a Map's
+ * Active Graph, which is its first Graph when it names none (ADR 0040).
  *
  * **Otherwise the first edge's `from`.** Every resource of a fully cyclic graph is
  * arrived at, so rule 1 has no answer and authoring order is the only tie-break

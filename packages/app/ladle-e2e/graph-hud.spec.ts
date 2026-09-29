@@ -20,7 +20,7 @@ const openingMapOf = (snapshot: SpaceSnapshot): Map => {
   return map;
 };
 
-/** The Graph a Map is active on, falling back to its first (ADR 0026). */
+/** The Graph a Map is active on, falling back to its first (ADR 0040). */
 const activeGraphOf = (map: Map): Graph => {
   const active = map.graphs.find((graph) => graph.id === map.activeGraph) ?? map.graphs[0];
   if (active === undefined) throw new Error('Map owns no Graph.');

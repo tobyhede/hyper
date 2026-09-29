@@ -9,7 +9,7 @@ test('a focused Resource opens with Enter and Space', async ({ page }) => {
   await settled(page);
 
   // The guard that opening did not follow the pointer off the Resource when it
-  // stopped being a gesture (ADR 0036, 0037).
+  // stopped being a gesture (ADR 0036).
   await resource.focus();
   await expect(resource).toBeFocused();
   await page.keyboard.press('Enter');

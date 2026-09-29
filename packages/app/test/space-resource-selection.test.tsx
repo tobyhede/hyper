@@ -374,10 +374,10 @@ describe('an Open Space Resource', () => {
   /**
    * The seed is the Map's own Active Graph where it has one.
    *
-   * A Map answers "which Graph is current here" itself (ADR 0026), and a
+   * A Map answers "which Graph is current here" itself (ADR 0040), and a
    * Space Resource that showed a different one would be disagreeing with the Map
    * it had just been pointed at. The head of the list is the fallback rather
-   * than the rule — which is what ADR 0026 says an absent `activeGraph` means.
+   * than the rule — which is what ADR 0040 says an absent `activeGraph` means.
    */
   it('seeds the Graph from the chosen Map’s Active Graph', async () => {
     const session = mount();

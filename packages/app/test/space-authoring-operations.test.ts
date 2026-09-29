@@ -1590,8 +1590,8 @@ describe('Delete Resource from Space', () => {
   });
 
   /*
-   * A Space Resource owns the Space it names (ADR 0058), so deleting it deletes
-   * that Space and the closure below it — one coordinated multi-Space Edit,
+   * The Space Resources naming a Space own it together (ADR 0074), so deleting
+   * the last one deletes that Space and the closure below it — one coordinated multi-Space Edit,
    * which is the session registry's and not a single-Space update this seam can
    * make. Completing it here stores a Space whose target is unreachable, and
    * aggregate intake refuses that commit permanently with the Resource already gone

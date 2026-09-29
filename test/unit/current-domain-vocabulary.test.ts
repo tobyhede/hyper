@@ -473,11 +473,10 @@ describe('the vocabulary that guard reads', () => {
 });
 
 /**
- * ADR 0055's rename is the same event as ADR 0041's and earns the same guard.
- * Three names each called what draws the canvas after a different interaction
- * or surface — the act of selecting one, the control that offered the choice,
- * and the header that showed which one won — so every new presentation invited
- * a fourth.
+ * What draws the canvas earns the same guard ADR 0041's rename did. Three
+ * retired names each called it after a different interaction or surface — the
+ * act of selecting one, the control that offered the choice, and the header
+ * that showed which one won — so every new presentation invited a fourth.
  *
  * ADR 0079 settles the noun itself: an authored **Map** is the only entity
  * that draws the canvas, its identity is `MapId` in `@project/core`, and
@@ -548,7 +547,7 @@ const RETIRED_RENDERER_NAME = new RegExp(
   ),
 );
 
-describe('the canvas renderer is named once (ADR 0055)', () => {
+describe('the canvas renderer is named once (ADR 0079)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
@@ -959,10 +958,10 @@ describe('the Opener is named once', () => {
 });
 
 /**
- * ADR 0085 makes Map the first-public name for the entity that was a
- * Layout, and states the same completion criterion ADR 0041 did: a repository
- * scan finds the retired name only in historical records and in qualified
- * layout-strategy prose. The ADR's other noun has its own block below.
+ * ADR 0085 retires Layout as the name of the entity ADR 0101 names Map, and
+ * states the same completion criterion ADR 0041 did: a repository scan finds
+ * the retired name only in historical records and in qualified layout-strategy
+ * prose. The ADR's other noun has its own block below.
  *
  * The shape rule transfers from ADR 0041 exactly, and for the same reason: the
  * bare English word is legitimate — a strategy lays resources out, the Command Dock
@@ -980,8 +979,8 @@ describe('the Opener is named once', () => {
  * this file already uses:
  *
  *  - `LayoutStrategy` and everything built on it keeps its name, which ADR 0085
- *    records as a negative in as many words. The word there is the verb: two of
- *    its three implementations read no Map at all, so naming the contract
+ *    records as a negative in as many words and ADR 0101 restates. The word
+ *    there is the verb: `gridStrategy` reads no Map at all, so naming the contract
  *    after the entity would assert a relationship they do not have and would
  *    reintroduce the conflation ADR 0014 exists to correct.
  *  - React's `useLayoutEffect` is a hook, not a domain type, and it is spelled
@@ -1158,7 +1157,7 @@ const withoutQualifiedSpellings = (source: string): string =>
  */
 const FOREIGN_MAP_FILES: readonly string[] = ['packages/ui/src/icons.tsx'];
 
-describe('a Map is named once (ADR 0085)', () => {
+describe('a Map is named once (ADR 0085, ADR 0101)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
@@ -1322,7 +1321,7 @@ describe('a Map is named once (ADR 0085)', () => {
 });
 
 /**
- * ADR 0085 makes Resource the first-public name for the entity that was a Card,
+ * ADR 0085 retires Card as the name of the entity ADR 0101 names Resource,
  * and states the same completion criterion ADR 0041 did: a repository scan
  * finds the retired name only in historical records and in the vendored
  * registry carve-out. The Map block above is the ADR's other noun.
@@ -1331,8 +1330,8 @@ describe('a Map is named once (ADR 0085)', () => {
  * `Object[A-Z]`, `[A-Za-z]Object`, `object[A-Z]` and `OBJECTS?` matches
  * foreign spellings throughout the tree (`RefObject`, `toMatchObject`, oxlint's
  * `ObjectExpression`), and a domain word whose guard needs an exception for
- * each has no guard. ADR 0085 chose Resource over Object on that
- * ground.
+ * each has no guard. ADR 0085 rejected Object on that ground, and ADR 0101
+ * kept the rejection when it chose Resource.
  *
  * **The English words need no exemption.** `cardinality`, `discard` and
  * `wildcard` are all invisible to every arm below, and not by luck: each arm
@@ -1559,7 +1558,7 @@ const RETIRED_RESOURCE_INITIAL_BINDING = new RegExp(
  */
 const MIGRATION_SNAPSHOTS = 'migrations/';
 
-describe('a Resource is named once (ADR 0085)', () => {
+describe('a Resource is named once (ADR 0085, ADR 0101)', () => {
   const scanned = scannableFiles().filter((file) => !file.startsWith(MIGRATION_SNAPSHOTS));
 
   it('reaches the kinds of file this rename actually touched', () => {

@@ -31,7 +31,7 @@ import type { Space } from './space';
  * A Map, and the Graph it opens active on.
  *
  * The Active Graph is resolved once, here, rather than at each reader: it is the
- * Graph the Map names, or its first (ADR 0026). Resolving it does **not**
+ * Graph the Map names, or its first (ADR 0040). Resolving it does **not**
  * fill the authored optional — `map` is the exact authored value, so a
  * snapshot or an export written from it preserves the absence.
  */

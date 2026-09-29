@@ -154,7 +154,8 @@
         "packages/react-flow-adapter/test/ResourceNode.test.tsx",
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
         "packages/react-flow-adapter/test/RoutedEdge.test.tsx",
-        "packages/app/test/cameras.test.tsx"
+        "packages/app/test/cameras.test.tsx",
+        "packages/app/test/canvas-continuation.test.tsx"
       ],
       "rules": {
         "anti-slop/no-module-mocking": "off"

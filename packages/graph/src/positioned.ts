@@ -5,7 +5,7 @@ import type { Placement } from './placement';
  * The positioned strategy: the resources go where the author put them.
  *
  * The only strategy that *reads* geometry rather than computing it — placement is authored content, not an artifact of an algorithm
- * (ADR 0025). It is the one strategy with a **Map** behind it: the Placement
+ * (ADR 0014). It is the one strategy with a **Map** behind it: the Placement
  * it takes is that Map's, and `Placement.fromLayoutStrategyGraph` is this same
  * conversion run backwards. The Placement is read exactly as authored — an Open
  * Resource's neighbours were moved by the Edit that opened it (ADR 0084), so there

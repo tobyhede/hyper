@@ -354,7 +354,7 @@ export function createNavigation(
     // says which.
     //
     // The visible set is read off the resolved Map's own Graphs rather than
-    // recomputed here: one place answers which Graphs a Map draws (ADR 0026,
+    // recomputed here: one place answers which Graphs a Map draws (ADR 0040,
     // ADR 0045), and two would disagree the moment the answers differ.
     //
     // Both refusals throw, and deliberately alike. Neither is reachable through

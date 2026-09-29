@@ -7,7 +7,7 @@ import type { Space } from './space';
  * Each authored `{ from, to }` Edge becomes one connection belonging to its
  * Graph, tagged so the render layer can colour it. This is what lets each Graph
  * draw as its own coloured line across the canvas. It belongs to the
- * **overview** — the view that draws every Graph at once (ADR 0021) — not to
+ * **overview** — a Map drawing every Graph it owns at once (ADR 0040) — not to
  * the domain.
  *
  * It names no anchor for an Edge. An Edge attaches to whichever of a Resource's

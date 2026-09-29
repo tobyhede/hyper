@@ -1302,7 +1302,7 @@ export const spaceRepositoryContract = (
        * Four Space Resources on one target, no two selecting the same pair. Two
        * share a Map and differ by Graph, two share the other Map and
        * differ by Graph, so the round trip has to carry both halves of a
-       * selection rather than a Map with a Graph implied by it (ADR 0026).
+       * selection rather than a Map with a Graph implied by it (ADR 0079).
        */
       const onDefaultMap = spaceResource(SECOND_RESOURCE_ID, OTHER_SPACE_ID, {
         map: MAP_ID,

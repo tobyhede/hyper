@@ -194,7 +194,7 @@ const storedSnapshot = (aggregate: LoadedAggregate, id: UUID): LoadedSpace | und
 
 /**
  * What a Space Resource selects in a Space it is shown: the Map that Space
- * opens on, and that Map's Active Graph (ADR 0079, ADR 0026), both read off
+ * opens on, and that Map's Active Graph (ADR 0079, ADR 0040), both read off
  * `lookup.map` rather than re-derived.
  *
  * `undefined` is the type-level boundary between a snapshot that passed intake

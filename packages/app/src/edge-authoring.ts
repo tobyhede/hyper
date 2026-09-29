@@ -588,7 +588,8 @@ export function createEdgeAuthoring({
           : connections.createAndConnect(from, 'beside-source', projected);
       if (result.kind !== 'completed') return result;
       publish({ refusal: null });
-      // Read after the Edit: a Map with no Graph mints one for its first Edge.
+      // The Edge was written to the Active Graph: connecting with none refuses
+      // `map-active-graph-required`, so a completed connection always has one.
       const graphId = authoring.getState().navigation.activeGraphId;
       if (graphId !== null) {
         continuation.request({

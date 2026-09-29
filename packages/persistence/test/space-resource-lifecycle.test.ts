@@ -1515,7 +1515,7 @@ describe('Space Resource lifecycle', () => {
 
     // The head of `graphs` is what an *unauthored* `activeGraph` falls back to,
     // so a target that has authored one is the case that tells the rule from
-    // the fallback (ADR 0026).
+    // the fallback (ADR 0040).
     const storedMeta = await backend.loadSpace(META_ID);
     expect(storedMeta?.snapshot.resources).toContainEqual({
       id: SPACE_RESOURCE_ID,

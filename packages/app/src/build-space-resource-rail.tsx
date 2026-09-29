@@ -67,7 +67,7 @@ export function buildSpaceResourceRail({
         const map = mapOf(id);
         // The Map's own Active Graph, and the head of its list only where it
         // has authored none — which is what an absent `activeGraph` means
-        // (ADR 0026). Resolved against the Map's Graphs rather than trusted:
+        // (ADR 0040). Resolved against the Map's Graphs rather than trusted:
         // the seed has to be a Graph this Map owns or the aggregate refuses
         // the Resource that names it.
         if (map === undefined) return;

@@ -2,7 +2,7 @@
  * The shape of a resource in the graph, read from `COLLAPSED_RESOURCE_SIZE` in
  * `@project/core` and handed to the stylesheet.
  *
- * A resource draws its title (ADR 0006), so its content is bounded and every resource is
+ * A closed resource draws its title (ADR 0064), so its content is bounded and every closed resource is
  * the same shape. That makes the size a design constant rather than something
  * measured: content adapts to the resource, not the resource to the content. It is why
  * a measured DOM size never decides placement here, the way it must in a layout

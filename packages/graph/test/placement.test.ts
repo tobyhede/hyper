@@ -95,10 +95,9 @@ describe('Placement.fromLayoutStrategyGraph', () => {
 
     const converted = Placement.fromLayoutStrategyGraph(laid);
 
-    // Nothing comes back Open: a converted Map is authored from an
-    // empty Placement, where nothing is (ADR 0025, ADR 0064). A's remembered
-    // Open Size is what conversion drops on the floor, and there is no way back
-    // to it — which is why only a Map with nothing Open may be converted.
+    // Nothing comes back Open: `fromLayoutStrategyGraph` authors from an
+    // empty Placement, where nothing is. A's remembered Open Size is dropped,
+    // and nothing in a laid-out graph can bring it back.
     expect([...converted.values()].every((at) => !at.open)).toBe(true);
     // B's coordinate is untouched, because A being Open does not move it at
     // render time: the Edit that opened A did (ADR 0084).
@@ -159,7 +158,7 @@ describe('Placement.next', () => {
 
   it('adopts the whole rendered map when nothing is authored yet', () => {
     // An automatic strategy authors nothing; capturing its result copies every Resource
-    // already on screen so nothing moves at the moment it happens (ADR 0025).
+    // already on screen so nothing moves at the moment it happens.
     const rendered = at({
       '00000000-0000-4000-8000-000000000002': [10, 20],
       '00000000-0000-4000-8000-000000000003': [300, 40],

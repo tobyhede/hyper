@@ -84,15 +84,14 @@ test('the active resource draws its content rendered, and only that resource doe
 }) => {
   await present(page);
 
-  // Opening shows Markdown source (ADR 0011); presenting is the other half of
-  // that distinction and is where a resource is drawn *rendered*. A's body carries
+  // Presenting draws the active resource's Markdown *rendered*. A's body carries
   // `**A**`, so the markers must be gone and the emphasis present.
   const content = page.getByTestId('resource-content');
   await expect(content).toHaveCount(1);
   await expect(content).not.toContainText('**A**');
   await expect(content.locator('strong')).toHaveText('A');
 
-  // Content is not embedded in every node (ADR 0006) — the other five still draw
+  // A closed Resource draws only its title (ADR 0064) — the other five still draw
   // their titles. Counted inside the nodes: the Alt-drop preview draws the same
   // `CanvasResource`, so an unscoped count would include a Resource that does not exist.
   await expect(page.locator('.react-flow__node').getByTestId('resource')).toHaveCount(5);
@@ -254,7 +253,7 @@ test('returning to the overview restores the space and its gestures', async ({ p
   await expect(page.locator('.react-flow__node').getByTestId('resource')).toHaveCount(6);
 
   // Opening works again — through the Resource's own control, which is the only
-  // pointer graph to it (ADR 0036, 0037).
+  // pointer graph to it (ADR 0036).
   await selectCanvas(page, 'Collection 1');
   // The control is on the Resource's toolbar, drawn while it is selected (ADR 0102).
   const b = await resourceControls(page, nodeByTitle(page, 'B'));

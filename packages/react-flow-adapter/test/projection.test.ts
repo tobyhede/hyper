@@ -101,7 +101,7 @@ describe('projectResourceNodes', () => {
     expect(a.type).toBe('resource');
     expect(a.data.title).toBe('Resource A');
     expect(a.data.active).toBe(false);
-    // ADR 0006: content is loaded when a resource is opened, not embedded per node.
+    // ADR 0064: content is loaded when a resource is opened, not embedded per node.
     expect('markdown' in a.data).toBe(false);
   });
 
