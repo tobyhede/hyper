@@ -117,7 +117,6 @@ export const createApp = (
       {
         editable: hasResourcesOnCanvas,
         presenting,
-        resourceIsOpen: view.resourceIsOpen,
         spaceOnCanvas: active,
         editingEmbeddedMap: canvasRendering.editingEmbeddedMap,
         creatingSpaceResource: placement.creatingSpaceResource,

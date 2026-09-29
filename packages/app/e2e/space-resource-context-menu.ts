@@ -198,21 +198,12 @@ export async function exerciseSpaceResourceEntityMenu(
     resourceNode.getByRole('heading', { name: 'Space Resource', exact: true }),
   ).toBeVisible();
   await menu();
-  // No Delete from Space here: `resourceNode` is Open — both callers reach it
-  // through `openSpaceResourceOnItsMap`, which presses Enter on it so its
-  // Map and Graph menus have something to exercise — and Delete from
-  // Space is withdrawn while any Resource on the Map is Open
-  // (`authoring-availability.ts`'s `deleteResource`), so that Open state cannot
-  // outlive the Resource it names. Delete from Space's presence and effect on a
-  // closed Space Resource are covered by `space-resource.spec.ts`'s "deleting the
-  // last Space Resource deletes the Space it referenced" and "removing a Space
-  // Resource from the Map leaves the Resource and its target Space intact".
   await expectMenuGroups(page.getByRole('menu'), [
     ['Create Reference'],
     ['Connect to Resource'],
     ['Enter', 'Open in New Tab'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
-    ['Remove from Map'],
+    ['Remove from Map', 'Delete from Space'],
   ]);
   await expect(
     (await resourceControls(page, resourceNode)).getByRole('button', { name: /^Enter/ }),

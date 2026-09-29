@@ -403,11 +403,10 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * Delete from Space is withdrawn while a Resource is Open so Open state cannot outlive
-   * the Resource. Remove from Map is the canvas key's availability: it reclaims
-   * the Open room and stays offered.
+   * Opening a Resource withdraws neither removal: each gives back the room the
+   * Open Resource held, and Delete from Space takes its Open state with it.
    */
-  it('still offers Remove from Map while the Resource is Open', async () => {
+  it('offers Remove from Map and Delete from Space while the Resource is Open', async () => {
     const opened = spaceSnapshotSchema.parse({
       ...snapshot,
       document: {
@@ -434,7 +433,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
 
     expect(await screen.findByRole('menuitem', { name: 'Remove from Map' })).toBeVisible();
-    expect(screen.queryByRole('menuitem', { name: 'Delete from Space' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
     await settled(session);
   });
 

@@ -2107,23 +2107,34 @@ test('Delete Resource is withdrawn while presenting', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Actions for Resource B' })).toHaveCount(0);
 });
 
-test('Delete Resource is withdrawn while the selected Resource is Open', async ({ page }) => {
+test('an Open Resource is deleted like any other, and does not withdraw Delete from its neighbours', async ({
+  page,
+}) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   await settled(page);
-
-  await expect(
-    (await resourceActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
-  ).toBeVisible();
-  await page.keyboard.press('Escape');
 
   await selectResource(nodeByTitle(page, 'B').first());
   await page.getByRole('button', { name: 'Open Resource B' }).click();
   await expect(page.getByRole('button', { name: 'Close Resource B' })).toBeVisible();
 
   await expect(
-    (await resourceActions(page, 'B')).getByRole('menuitem', { name: 'Delete from Space' }),
-  ).toHaveCount(0);
+    (await resourceActions(page, 'A')).getByRole('menuitem', { name: 'Delete from Space' }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await (
+    await resourceActions(page, 'B')
+  )
+    .getByRole('menuitem', { name: 'Delete from Space' })
+    .click();
+  await page
+    .getByRole('alertdialog', { name: 'Delete from Space B?' })
+    .getByRole('button', { name: 'Delete from Space' })
+    .click();
+
+  await expect(nodeByTitle(page, 'B')).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
 });
 
 test('dragging from the Resources list uses transformed canvas coordinates then ordinary Resource dragging', async ({

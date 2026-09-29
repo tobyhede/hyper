@@ -16,7 +16,6 @@ const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   presenting: false,
   editingResourceBody: false,
   editingResourceTitle: false,
-  resourceIsOpen: false,
   editingChromeTitle: false,
   spaceOnCanvas: true,
   editingEmbeddedMap: false,
@@ -106,7 +105,6 @@ describe('authoring availability', () => {
         createMap: false,
       },
     ],
-    ['an Open Resource', { resourceIsOpen: true }, { ...ALL_AVAILABLE, deleteResource: false }],
     [
       'a live chrome title edit',
       { editingChromeTitle: true },
@@ -167,14 +165,6 @@ describe('authoring availability', () => {
       });
 
       expect(availability.createSpaceResource).toBe(false);
-      expect(availability.addResource).toBe(true);
-    });
-
-    it('withholds only Delete Resource while a Resource is open', () => {
-      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, resourceIsOpen: true });
-
-      expect(availability.deleteResource).toBe(false);
-      expect(availability.entityEdits).toBe(true);
       expect(availability.addResource).toBe(true);
     });
 
