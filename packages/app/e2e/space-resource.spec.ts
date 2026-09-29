@@ -290,7 +290,7 @@ test('stops offering a Space the moment the last Space Resource referencing it i
     .getByRole('button', { name: 'Actions for Resource Architecture' })
     .click({ delay: 120 });
   await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete from Space' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
 
   // The Space went with its last reference, so the cube goes with it — and the
@@ -524,7 +524,7 @@ test('deleting the last Space Resource deletes the Space it referenced', async (
       'If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.',
     ),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Delete from Space', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
 
   await settled(page);
   await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);

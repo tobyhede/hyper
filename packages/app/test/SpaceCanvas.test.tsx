@@ -179,7 +179,6 @@ async function mountGraph(
           presenting: false,
           editingResourceBody: false,
           editingResourceTitle: false,
-          resourceIsOpen: false,
           editingChromeTitle: !titleEditing,
           spaceOnCanvas: true,
           editingEmbeddedMap: false,

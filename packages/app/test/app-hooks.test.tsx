@@ -393,7 +393,6 @@ describe('useAuthoringAvailability', () => {
   const facts: AuthoringFacts = {
     editable: true,
     presenting: false,
-    resourceIsOpen: false,
     spaceOnCanvas: true,
     editingEmbeddedMap: false,
     creatingSpaceResource: false,
@@ -608,7 +607,6 @@ describe('useDockChrome', () => {
       presenting: false,
       editingResourceBody: false,
       editingResourceTitle: false,
-      resourceIsOpen: false,
       editingChromeTitle: false,
       spaceOnCanvas: true,
       editingEmbeddedMap: false,

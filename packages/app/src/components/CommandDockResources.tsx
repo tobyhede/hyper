@@ -191,6 +191,7 @@ function ResourcesList({
       onAddSpace={list.onAddSpace}
       memberships={list.memberships}
       onAdd={list.onAdd}
+      onDelete={list.onDelete}
       onDragStart={list.onDragStart}
       onSpaceDragStart={list.onSpaceDragStart}
       onDragEnd={list.onDragEnd}
@@ -214,12 +215,13 @@ export function ResourcesControl({
    */
   return (
     <ToolbarGroup aria-label="Resources" className="command-dock__cluster command-dock__resources">
-      {/* **The list carries no commands, and that is the shape rather than a
-          gap in it.** Resources names no one entity — a Resource's own commands are the
-          Resource rail's (ADR 0073) and this Dock deliberately carries none — and
-          its set commands, the Creates, are the peers beside this trigger. Do
-          not repeat Create inside the list: that is a second path to one
-          command.
+      {/* **The list carries one Resource command, Delete from Space, and no
+          other.** Resources names no one entity — a Resource's own commands are the
+          Resource rail's (ADR 0073) — but a Resource the selected Map does not
+          place has no rail, and this list is the one surface still naming it, so
+          without Delete here it could not be deleted at all. Its set commands,
+          the Creates, are the peers beside this trigger. Do not repeat Create
+          inside the list: that is a second path to one command.
 
           It offers Space Resources like any other Resource and does nothing special
           with them: entering one is the canvas Resource's gesture (ADR 0068), not a
