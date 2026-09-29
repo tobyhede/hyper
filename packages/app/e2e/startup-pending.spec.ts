@@ -12,7 +12,7 @@ interface HeldResponses {
  * requests that reach the handler.
  *
  * **The count is as load-bearing as the hold.** `src/main.tsx` is the dev host's
- * entry path rather than a product URL, and `api/spaces` is a wire path — either
+ * entry path rather than a product URL, and `api/aggregate` is a wire path — either
  * can move. A pattern that matches nothing holds nothing, so startup completes
  * before the first assertion and every assertion below it passes against the
  * opened Space instead of the wait: a green run that covers none of what this
@@ -44,7 +44,7 @@ test(
   { tag: '@parity:operational-feedback-startup-pending' },
   async ({ page }) => {
     const bundle = await holdResponses(page, '**/src/main.tsx');
-    const aggregate = await holdResponses(page, '**/api/spaces');
+    const aggregate = await holdResponses(page, '**/api/aggregate');
 
     // `commit` rather than `load`: the point of the first assertion is the
     // served HTML, before the module script it is waiting for.
@@ -68,15 +68,15 @@ test(
     // script was even requested, so the wait for it is here instead.
     await page.waitForLoadState('load');
 
-    const status = page.getByRole('status');
-    await expect(status).toHaveText('Starting…', { timeout: 15_000 });
-    await expect(status.locator('img[src="/infinity-cube-logo.svg"]')).toBeVisible();
-
     await expect
       .poll(aggregate.requests, {
         message: 'no request matched the aggregate pattern, so the second wait was never held',
       })
       .toBeGreaterThan(0);
+    const status = page.getByRole('status');
+    await expect(status).toHaveText('Starting…', { timeout: 15_000 });
+    await expect(status.locator('img[src="/infinity-cube-logo.svg"]')).toBeVisible();
+
     aggregate.release();
 
     await expect(page.getByTestId('space-title')).toBeVisible();
