@@ -65,6 +65,9 @@ function ResourcesPopoverFixture({
 }) {
   const [open, setOpen] = useState(false);
   const [added, setAdded] = useState<readonly string[]>([]);
+  // What Delete from Space was asked for. The application arms a confirmation
+  // the list does not own, so the fixture records the request the row made.
+  const [deleted, setDeleted] = useState<readonly string[]>([]);
   // A completed Add takes the Resource out of the list, which is what the
   // application does: the Resource has joined the Map, so it is no longer
   // outside it. Without that the activated row never unmounts, and every
@@ -95,6 +98,7 @@ function ResourcesPopoverFixture({
             setPlaced((ids) => [...ids, resource.id]);
             return null;
           }}
+          onDelete={(resource) => setDeleted((titles) => [...titles, resource.title])}
           onDragStart={() => undefined}
           spaces={spaces}
           onAddSpace={placeSpace}
@@ -126,6 +130,7 @@ function ResourcesPopoverFixture({
         The canvas behind it
       </button>
       <p className="shrink-0 border-t p-2 text-sm">Added: {added.join(', ')}</p>
+      <p className="shrink-0 p-2 text-sm">Delete requested: {deleted.join(', ')}</p>
     </div>
   );
 }
@@ -158,6 +163,7 @@ function RefusedAdd() {
           });
           return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
         }}
+        onDelete={composed.resourceDeletion.arm}
         onDragStart={() => undefined}
       />
     </div>
