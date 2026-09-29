@@ -17,7 +17,7 @@ const SNAPSHOT: SpaceSnapshot = {
 const STORED: LoadedSpace = { snapshot: SNAPSHOT, revision: 5n, exportedRevision: null };
 
 describe('PersistenceControl', () => {
-  it('keeps conflict recovery unavailable during replacement and returns it afterwards', () => {
+  it('keeps Keep local and retry during a replacement and withholds Reload until it answers', () => {
     const onAcceptRemote = vi.fn(() => null);
     const onKeepLocal = vi.fn();
     const props = {
@@ -25,13 +25,19 @@ describe('PersistenceControl', () => {
       onAcceptRemote,
       onKeepLocal,
     };
-    const { rerender } = render(<PersistenceControl navigate {...props} disabled />);
+    const { rerender } = render(<PersistenceControl navigate {...props} replaceSession={false} />);
     const reload = screen.getByRole('button', { name: 'Reload' });
-    expect(reload).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Keep local and retry' })).toBeDisabled();
+    expect(reload).toHaveAttribute('aria-disabled', 'true');
+    reload.focus();
+    expect(reload).toHaveFocus();
     fireEvent.click(reload);
     expect(onAcceptRemote).not.toHaveBeenCalled();
-    rerender(<PersistenceControl navigate {...props} disabled={false} />);
+    const keepLocal = screen.getByRole('button', { name: 'Keep local and retry' });
+    expect(keepLocal).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(keepLocal);
+    expect(onKeepLocal).toHaveBeenCalledOnce();
+    rerender(<PersistenceControl navigate {...props} replaceSession />);
+    expect(reload).not.toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(reload);
     expect(onAcceptRemote).toHaveBeenCalledOnce();
   });
@@ -42,7 +48,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         navigate
-        disabled
+        replaceSession={false}
         persistence={{
           kind: 'rejected',
           failure: { kind: 'permanent-failure', code: 'forbidden' },

@@ -33,14 +33,15 @@ import {
 import type { StoredSpaceRefusal } from '../space-authoring';
 
 export interface PersistenceControlProps {
-  /**
-   * Draw a conflict's Reload and Keep local and retry unavailable.
-   * Acknowledging a rejection stays available: it only dismisses the dialog,
-   * and the way to a blocking Space follows `navigate` instead.
-   */
-  readonly disabled?: boolean;
   /** Whether going to the blocking Space may run (`AuthoringAvailability.navigate`). */
   readonly navigate: boolean;
+  /**
+   * Whether a conflict's Reload may run (`AuthoringAvailability.replaceSession`):
+   * it replaces the session with the stored Space. Keep local and retry
+   * re-commits the working Space and replaces nothing, and acknowledging a
+   * rejection only dismisses the dialog, so neither is asked this.
+   */
+  readonly replaceSession?: boolean;
   readonly active?: boolean;
   readonly persistence: SpaceSessionState['persistence'];
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
@@ -85,8 +86,8 @@ const rejectionDescription = ({ failure }: Rejection): string =>
  * never shows.
  */
 export function PersistenceControl({
-  disabled = false,
   navigate,
+  replaceSession = true,
   active = true,
   persistence,
   onAcceptRemote,
@@ -112,8 +113,8 @@ export function PersistenceControl({
   if (persistence.kind === 'conflicted') {
     return (
       <ConflictControl
-        disabled={disabled}
         navigate={navigate}
+        replaceSession={replaceSession}
         conflict={persistence}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={onKeepLocal}
@@ -269,15 +270,15 @@ interface RefusedRecovery {
  * conflict.
  */
 function ConflictControl({
-  disabled,
   navigate,
+  replaceSession,
   conflict,
   onAcceptRemote,
   onKeepLocal,
   onOpenSpace,
 }: {
-  readonly disabled: boolean;
   readonly navigate: boolean;
+  readonly replaceSession: boolean;
   readonly conflict: Conflict;
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
@@ -322,7 +323,10 @@ function ConflictControl({
           <Button
             variant="secondary"
             data-testid="persistence-accept-remote"
-            disabled={disabled}
+            // Unavailable rather than unreachable (ADR 0073), as the way to a
+            // blocking Space is.
+            disabled={!replaceSession}
+            focusableWhenDisabled
             onClick={() => {
               const refusal = onAcceptRemote();
               setRefused(refusal === null ? null : { conflict, refusal });
@@ -330,12 +334,7 @@ function ConflictControl({
           >
             Reload
           </Button>
-          <Button
-            variant="default"
-            data-testid="persistence-keep-local"
-            onClick={onKeepLocal}
-            disabled={disabled}
-          >
+          <Button variant="default" data-testid="persistence-keep-local" onClick={onKeepLocal}>
             Keep local and retry
           </Button>
         </AlertDialogFooter>
