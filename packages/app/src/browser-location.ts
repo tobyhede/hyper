@@ -38,7 +38,10 @@ export interface HistoryApi {
  * `false` holds the entry the traversal left: the adapter returns the browser
  * to it and keeps both entries. A promise answers later, for a destination that
  * has to be opened before it is known to be reachable; the adapter holds on a
- * late `false` only while nothing has moved the browser since that traversal.
+ * late `false` only while it has kept no later traversal and written no entry
+ * since. A later traversal it held does not count: the late `false` returns the
+ * browser to the entry the earlier traversal left, even mid-way through that
+ * later traversal's return.
  */
 export type PopStateAnswer = undefined | false | Promise<undefined | false>;
 
@@ -337,8 +340,14 @@ export function createBrowserLocation(
       try {
         await openPath(pathname);
       } catch (error) {
+        // A refusal is answered while this is the latest restoration, wherever
+        // the browser is: a later traversal held at once issues no request and
+        // may have the browser elsewhere until its rewind arrives, and the
+        // adapter is what knows whether anything else has moved it since.
+        if (error instanceof NavigationUnavailableError) {
+          return request === restorationRequest ? false : undefined;
+        }
         if (!current()) return undefined;
-        if (error instanceof NavigationUnavailableError) return false;
         // One rejection refuses two different resources, and only one of them is a
         // destination that failed to resolve. A location outside product
         // addressing refuses to open because it is not an address of ours: the

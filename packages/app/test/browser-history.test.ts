@@ -1,110 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createBrowserHistory, type NativeBrowser } from '../src/browser-history';
+import { createBrowserHistory } from '../src/browser-history';
 import type { PopStateAnswer } from '../src/browser-location';
-
-/**
- * The native history adapter's index arithmetic, against a stand-in browser.
- *
- * The stand-in keeps one session history for one document: `pushState`
- * truncates the entries ahead of the current one, and every traversal — the
- * reader's Back and Forward and the adapter's own `go` — is queued and applied
- * in order by `settle`, firing `popstate` with the arriving entry's state
- * before the next traversal starts. A `go` past either end does nothing.
- *
- * Whether a real browser honours these writes is what
- * `packages/app/e2e/image-resource.spec.ts` proves, which a stand-in cannot.
- */
-
-const ORIGIN = 'https://space.test';
-
-interface Entry {
-  readonly state: unknown;
-  readonly url: URL;
-}
-
-type PopListener = (event: { readonly state: unknown }) => void;
-
-const standInBrowser = (initial: { readonly path: string; readonly state?: unknown }) => {
-  const entries: Entry[] = [{ state: initial.state ?? null, url: new URL(initial.path, ORIGIN) }];
-  let current = 0;
-  const traversals: number[] = [];
-  const listeners = new Set<PopListener>();
-  const at = (): Entry => {
-    const entry = entries[current];
-    if (entry === undefined) throw new Error('The stand-in browser lost its current entry.');
-    return entry;
-  };
-  const browser: NativeBrowser = {
-    history: {
-      get state() {
-        return at().state;
-      },
-      pushState: (state, _unused, url) => {
-        entries.splice(current + 1);
-        entries.push({ state, url: new URL(String(url ?? at().url), at().url) });
-        current += 1;
-      },
-      replaceState: (state, _unused, url) => {
-        entries[current] = { state, url: new URL(String(url ?? at().url), at().url) };
-      },
-      go: (delta = 0) => {
-        traversals.push(delta);
-      },
-    },
-    location: {
-      get pathname() {
-        return at().url.pathname;
-      },
-      get href() {
-        return at().url.href;
-      },
-    },
-    addEventListener: (_type, listener) => {
-      listeners.add(listener);
-    },
-    removeEventListener: (_type, listener) => {
-      listeners.delete(listener);
-    },
-  };
-  return {
-    browser,
-    entries,
-    back: () => traversals.push(-1),
-    forward: () => traversals.push(1),
-    traverse: (delta: number) => traversals.push(delta),
-    /** A same-document entry this adapter did not write, written without a `popstate`. */
-    foreignPush: (path: string) => {
-      entries.splice(current + 1);
-      entries.push({ state: null, url: new URL(path, ORIGIN) });
-      current += 1;
-    },
-    /**
-     * A fragment navigation: the browser writes an entry after the current one
-     * with no state, and fires `popstate` with that state as it arrives.
-     */
-    fragment: (path: string) => {
-      entries.splice(current + 1);
-      entries.push({ state: null, url: new URL(path, ORIGIN) });
-      current += 1;
-      for (const listener of [...listeners]) listener({ state: null });
-    },
-    settle: () => {
-      for (let guard = 0; traversals.length > 0; guard += 1) {
-        if (guard > 100) throw new Error('Traversals did not settle.');
-        const delta = traversals.shift() ?? 0;
-        const target = current + delta;
-        if (delta === 0 || target < 0 || target >= entries.length) continue;
-        current = target;
-        const { state } = at();
-        for (const listener of [...listeners]) listener({ state });
-      }
-    },
-  };
-};
+import { ORIGIN, standInBrowser } from './browser-history';
 
 /** The state the adapter writes for the entry at `index`. */
 const stamp = (index: number) => ({ hyperHistoryIndex: index });
 
+/** The native history adapter's index arithmetic, against the stand-in browser. */
 describe('the native history adapter', () => {
   it('stamps the entry it starts on without moving it, and numbers each push', () => {
     const stand = standInBrowser({ path: '/spaces/a' });
@@ -352,6 +254,46 @@ describe('the native history adapter', () => {
     await Promise.resolve();
     stand.settle();
     expect(history.pathname()).toBe('/a');
+  });
+
+  it('returns to the entry an earlier traversal left when it holds late while a later hold is returning', async () => {
+    const stand = standInBrowser({ path: '/a' });
+    const history = createBrowserHistory(stand.browser);
+    history.push('/b');
+    history.push('/c');
+    const late = Promise.withResolvers<undefined | false>();
+    let answer: PopStateAnswer = late.promise;
+    history.onPopState(() => answer);
+    stand.back();
+    stand.settle();
+    answer = false;
+    stand.back();
+    stand.step();
+    // The Back from /b is held, and its rewind to /b has not arrived when the
+    // Back from /c is refused.
+    expect(history.pathname()).toBe('/a');
+    late.resolve(false);
+    await late.promise;
+    await Promise.resolve();
+    stand.settle();
+    expect(history.pathname()).toBe('/c');
+    expect(stand.entries.map(({ url }) => url.pathname)).toEqual(['/a', '/b', '/c']);
+  });
+
+  it('keeps a traversal whose late hold arrives after an entry was written', async () => {
+    const stand = standInBrowser({ path: '/a' });
+    const history = createBrowserHistory(stand.browser);
+    history.push('/b');
+    const late = Promise.withResolvers<undefined | false>();
+    history.onPopState(() => late.promise);
+    stand.back();
+    stand.settle();
+    history.replace('/d');
+    late.resolve(false);
+    await late.promise;
+    await Promise.resolve();
+    stand.settle();
+    expect(history.pathname()).toBe('/d');
   });
 
   it('asks the listener about a fragment navigation, and numbers its entry after the one it left', () => {
