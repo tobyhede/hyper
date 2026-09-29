@@ -498,6 +498,7 @@ export function useCanvasResourceAuthoring({
     () => ({
       authorOnCanvas: availability.authorOnCanvas,
       bodyEditing,
+      bodyEditorResourceId,
       editableResourceIds,
       openResource,
       closeResource,
@@ -512,6 +513,7 @@ export function useCanvasResourceAuthoring({
     [
       availability.authorOnCanvas,
       bodyEditing,
+      bodyEditorResourceId,
       editableResourceIds,
       openResource,
       closeResource,

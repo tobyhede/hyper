@@ -1052,6 +1052,15 @@ test(
 
     const cancel = controls.getByRole('button', { name: 'Cancel editing Resource Figure' });
     await expect(cancel).toBeDisabled();
+    // Close stays in its slot, unavailable and still reachable, for the whole
+    // replacement rather than vanishing while it is in flight.
+    const close = controls.getByRole('button', { name: 'Close Resource Figure' });
+    await expect(close).toBeVisible();
+    await expect(close).toHaveAttribute('aria-disabled', 'true');
+    await close.focus();
+    await expect(close).toBeFocused();
+    await close.dispatchEvent('click');
+    await expect(target).toBeVisible();
     await expect(target.getByRole('button', { name: 'Upload' })).toBeDisabled();
     await expect(target.getByRole('textbox', { name: 'Image URL' })).toBeDisabled();
     await expect(target).toHaveAttribute('aria-busy', 'true');

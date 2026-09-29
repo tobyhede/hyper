@@ -258,7 +258,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      'While image replacement is pending, the target remains mounted and its inputs and Map navigation are unavailable; completion releases them.',
+      'While image replacement is pending, the target remains mounted, Close stays drawn but unavailable, and its inputs and Map navigation are unavailable; completion releases them.',
   },
   {
     id: 'image-resource-replace-refuses-in-the-target',

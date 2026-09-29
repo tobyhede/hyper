@@ -152,6 +152,38 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.onEditResource).toBeTypeOf('function');
   });
 
+  it('keeps the live content editor’s Close drawn, and inert, while authoring is withdrawn', () => {
+    const openResource = vi.fn(() => 'completed' as const);
+    const closeResource = vi.fn(() => 'completed' as const);
+    const withdrawn = context({
+      authorOnCanvas: false,
+      bodyEditing: true,
+      bodyEditorResourceId: RESOURCE_ID,
+      openResource,
+      closeResource,
+      resourceEntityActions: () => [[]],
+    });
+
+    const patch = decorateSharedResourceNode(
+      projectionNode(RESOURCE_ID, 'markdown', true),
+      withdrawn,
+    );
+    expect(patch.onEditResource).toBeTypeOf('function');
+    expect(patch.onEditResource?.(false)).toBe('retained');
+    expect(patch.onEditResource?.(true)).toBe('retained');
+    expect(closeResource).not.toHaveBeenCalled();
+    expect(openResource).not.toHaveBeenCalled();
+    expect(patch.onBeginTitleEditing).toBeUndefined();
+    expect(patch.resize).toBeUndefined();
+    expect(patch.titleEditor).toBeUndefined();
+    expect(patch.entityActions).toEqual([]);
+
+    expect(
+      decorateSharedResourceNode(projectionNode(REFERENCE_ID, 'markdown', true), withdrawn)
+        .onEditResource,
+    ).toBeUndefined();
+  });
+
   it('withholds every authoring control from a projected Resource absent from the working Space', () => {
     const patch = decorateSharedResourceNode(
       projectionNode(MISSING_RESOURCE_ID, 'markdown', true),
