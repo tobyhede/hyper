@@ -132,12 +132,16 @@ export type ResourceNodeData = ResourceNodeKind & {
    * Independent of `titleEditor` on purpose. Open is what the Map
    * authored and the caret is a gesture the author just made, so a Resource can be
    * Open while its *title* is being renamed (ADR 0064).
+   *
+   * Nothing draws from it; the display's `editing` arm carries the editor that
+   * is drawn.
    */
   bodyEditor?: CanvasResourceBodyEditor;
   /**
    * The running replacement of an Image Resource's image, absent while its
    * picture is at rest. Its presence is the running replacement, as
-   * `bodyEditor`'s is a running body edit.
+   * `bodyEditor`'s is a running body edit. Nothing draws from it; the
+   * display's `replacing` arm carries the replacer that is drawn.
    */
   imageReplacer?: ImageReplaceEditor;
   /**

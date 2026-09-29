@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { CanvasResource, CLOSED_DISPLAY } from '../src';
+import { beginEditing, CanvasResource, CLOSED_DISPLAY } from '../src';
 
 /**
  * The Resource rail's keyboard contract (ADR 0073).
@@ -57,9 +57,12 @@ describe('the Resource rail is one toolbar', () => {
           kind: 'markdown',
           onOpenChange: vi.fn(),
           onBeginEdit: vi.fn(),
-          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
+        display={beginEditing(
+          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
+          { onComplete: vi.fn(), onEnd: vi.fn() },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -94,9 +97,12 @@ describe('the Resource rail is one toolbar', () => {
           kind: 'markdown',
           onOpenChange,
           onBeginEdit: vi.fn(),
-          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
+        display={beginEditing(
+          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
+          { onComplete: vi.fn(), onEnd: vi.fn() },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -191,9 +197,12 @@ describe('the rail says whose command each one is', () => {
           kind: 'markdown',
           onOpenChange: vi.fn(),
           onBeginEdit: vi.fn(),
-          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
+        display={beginEditing(
+          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
+          { onComplete: vi.fn(), onEnd: vi.fn() },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"

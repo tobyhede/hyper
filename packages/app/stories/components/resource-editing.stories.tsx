@@ -2,6 +2,7 @@ import { useRef, useState, type CSSProperties } from 'react';
 import type { Story } from '@ladle/react';
 import { titleName } from '@project/core';
 import {
+  beginEditing,
   Button,
   CanvasResource,
   CLOSED_DISPLAY,
@@ -142,29 +143,28 @@ export const Markdown: Story = () => {
     return 'completed' as const;
   };
   const editing = mode !== 'rendered';
-  const display: FrontDisplay =
+  const shown: FrontDisplay =
     editing || open
       ? { shown: 'open', content: { kind: 'markdown', source, via: 'self' } }
       : CLOSED_DISPLAY;
-  const front: CanvasResourceFront = editing
-    ? {
-        kind: 'markdown',
-        autoFocusEditor: mode === 'focused',
-        editor: {
+  const display = editing
+    ? beginEditing(
+        shown,
+        {
           onComplete: (next) => {
             setSource(next);
             return 'completed';
           },
           onEnd: () => setMode('rendered'),
         },
-        onOpenChange: changeOpen,
-        onBeginEdit: () => setMode('focused'),
-      }
-    : {
-        kind: 'markdown',
-        onOpenChange: changeOpen,
-        onBeginEdit: () => setMode('focused'),
-      };
+        mode === 'focused',
+      )
+    : shown;
+  const front: CanvasResourceFront = {
+    kind: 'markdown',
+    onOpenChange: changeOpen,
+    onBeginEdit: () => setMode('focused'),
+  };
 
   return (
     <div className="flex flex-col items-start gap-3 p-8">

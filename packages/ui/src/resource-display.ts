@@ -1,4 +1,12 @@
 import type { ResourceContent } from '@project/core';
+import type { ImageReplaceEditor } from './ImageReplaceTarget';
+import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
+
+/** A Resource's own content of one kind: never a Target's, reached by reference. */
+export type OwnContent<K extends 'markdown' | 'image'> = Extract<
+  ResourceContent,
+  { readonly kind: K }
+> & { readonly via: 'self' };
 
 /**
  * What a Resource shows now. A Closed Resource carries no content (ADR 0006, as
@@ -7,11 +15,28 @@ import type { ResourceContent } from '@project/core';
  *
  * Presenting and Open are decided between once, where the display is made: a
  * Resource both presented and Open is `presented`.
+ *
+ * `editing` and `replacing` are made only by `beginEditing` and
+ * `beginReplacing`, and carry only the Resource's own content, so a Target's
+ * content reached through a Reference Resource cannot be given an editor or a
+ * replacer (ADR 0070).
  */
 export type ResourceDisplay =
   | { readonly shown: 'closed' }
   | { readonly shown: 'open'; readonly content: ResourceContent }
-  | { readonly shown: 'presented'; readonly content: ResourceContent };
+  | { readonly shown: 'presented'; readonly content: ResourceContent }
+  | {
+      readonly shown: 'editing';
+      readonly content: OwnContent<'markdown'>;
+      readonly editor: MarkdownResourceBodyEditor;
+      /** Whether the editor takes focus when it is drawn. */
+      readonly autoFocus: boolean;
+    }
+  | {
+      readonly shown: 'replacing';
+      readonly content: OwnContent<'image'>;
+      readonly replacer: ImageReplaceEditor;
+    };
 
 /** What a Resource front draws. A presented Resource is drawn by `PresentedResource`. */
 export type FrontDisplay = Exclude<ResourceDisplay, { readonly shown: 'presented' }>;
@@ -20,3 +45,59 @@ export type FrontDisplay = Exclude<ResourceDisplay, { readonly shown: 'presented
 export const CLOSED_DISPLAY: Extract<ResourceDisplay, { readonly shown: 'closed' }> = {
   shown: 'closed',
 };
+
+/**
+ * Edit a Resource's Markdown body. Answers `display` itself unless it is Open
+ * with the Resource's own Markdown, so a caret that lands before the Open
+ * display draws nothing until it arrives.
+ */
+export function beginEditing<D extends ResourceDisplay>(
+  display: D,
+  editor: MarkdownResourceBodyEditor,
+  autoFocus = false,
+): D | Extract<ResourceDisplay, { readonly shown: 'editing' }> {
+  if (display.shown !== 'open') return display;
+  const content = display.content;
+  if (content.kind !== 'markdown' || content.via !== 'self') return display;
+  return {
+    shown: 'editing',
+    content: { kind: content.kind, source: content.source, via: content.via },
+    editor,
+    autoFocus,
+  };
+}
+
+/**
+ * Replace an Image Resource's image. Answers `display` itself unless it is Open
+ * with the Resource's own image.
+ */
+export function beginReplacing<D extends ResourceDisplay>(
+  display: D,
+  replacer: ImageReplaceEditor,
+): D | Extract<ResourceDisplay, { readonly shown: 'replacing' }> {
+  if (display.shown !== 'open') return display;
+  const content = display.content;
+  if (content.kind !== 'image' || content.via !== 'self') return display;
+  return {
+    shown: 'replacing',
+    content: { kind: content.kind, url: content.url, via: content.via },
+    replacer,
+  };
+}
+
+type Running = { readonly shown: 'editing' | 'replacing' };
+
+/** The display with no edit or replacement running: `open`, with the same content. */
+export function atRest(display: FrontDisplay): Exclude<FrontDisplay, Running>;
+export function atRest(display: ResourceDisplay): Exclude<ResourceDisplay, Running>;
+export function atRest(display: ResourceDisplay): Exclude<ResourceDisplay, Running> {
+  switch (display.shown) {
+    case 'editing':
+    case 'replacing':
+      return { shown: 'open', content: display.content };
+    case 'closed':
+    case 'open':
+    case 'presented':
+      return display;
+  }
+}

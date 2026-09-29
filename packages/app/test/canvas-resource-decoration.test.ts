@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SPACE_RESOURCE_MIN_OPEN_SIZE, uuidSchema, type ResourceId } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
+  decorateImageResourceNode,
   decorateMarkdownResourceNode,
   decorateSharedResourceNode,
   decorateSpaceResourceNode,
@@ -263,6 +264,63 @@ describe('decorateMarkdownResourceNode', () => {
       decorateMarkdownResourceNode(projectionNode(RESOURCE_ID, 'markdown', true), context())
         .bodyEditor,
     ).toBeUndefined();
+  });
+
+  it('enters the editing display, focused, on an Open Resource whose caret is live', () => {
+    const markdown = projectionNode(RESOURCE_ID, 'markdown', true);
+    const patch = decorateMarkdownResourceNode(
+      markdown,
+      context({ bodyEditorResourceId: RESOURCE_ID }),
+    );
+    expect(patch.display).toMatchObject({
+      shown: 'editing',
+      content: { kind: 'markdown', via: 'self' },
+      autoFocus: true,
+    });
+    expect(decorateMarkdownResourceNode(markdown, context()).display).toBeUndefined();
+  });
+
+  it('leaves a Closed Resource’s display alone although its caret is live', () => {
+    expect(
+      decorateMarkdownResourceNode(
+        projectionNode(RESOURCE_ID, 'markdown'),
+        context({ bodyEditorResourceId: RESOURCE_ID }),
+      ).display,
+    ).toBeUndefined();
+  });
+});
+
+describe('decorateImageResourceNode', () => {
+  const IMAGE_URL = 'https://example.com/figure.png';
+  const imageNode = (open: boolean): ResourceFlowNode => {
+    const node = projectionNode(RESOURCE_ID, 'markdown', open);
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        kind: 'image',
+        imageUrl: IMAGE_URL,
+        display: open
+          ? { shown: 'open', content: { kind: 'image', url: IMAGE_URL, via: 'self' } }
+          : node.data.display,
+      },
+    };
+  };
+  const replacing = context({
+    bodyEditorResourceId: RESOURCE_ID,
+    replaceResourceImage: () => Promise.resolve(null),
+  });
+
+  it('enters the replacing display on an Open Image Resource whose caret is live', () => {
+    expect(decorateImageResourceNode(imageNode(true), replacing).display).toMatchObject({
+      shown: 'replacing',
+      content: { kind: 'image', url: IMAGE_URL, via: 'self' },
+      replacer: { accept: 'image/png' },
+    });
+  });
+
+  it('leaves a Closed Image Resource’s display alone although its caret is live', () => {
+    expect(decorateImageResourceNode(imageNode(false), replacing).display).toBeUndefined();
   });
 });
 

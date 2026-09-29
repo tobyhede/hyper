@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type ResourceContent } from '@project/core';
 import {
+  beginEditing,
+  beginReplacing,
   CanvasResource,
   CLOSED_DISPLAY,
   type CanvasSpaceResourceSelection,
@@ -28,11 +30,12 @@ const opened = (content: ResourceContent): FrontDisplay => ({ shown: 'open', con
 
 it('keeps a pending replacement mounted when its entity actions become unavailable', async () => {
   const waiting = Promise.withResolvers<string | null>();
-  const front: CanvasResourceFront = {
-    kind: 'image',
-    editor: { accept: 'image/png', onReplace: () => waiting.promise, onEnd: () => undefined },
-  };
-  const display = opened({ kind: 'image', url: FIGURE_URL, via: 'self' });
+  const front: CanvasResourceFront = { kind: 'image' };
+  const display = beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+    accept: 'image/png',
+    onReplace: () => waiting.promise,
+    onEnd: () => undefined,
+  });
   const { rerender } = render(
     <CanvasResource
       state="selected"
@@ -304,9 +307,12 @@ describe('CanvasResource kind and interaction state', () => {
           kind: 'image',
           onOpenChange: () => 'completed',
           onBeginEdit: () => undefined,
-          editor: { accept: 'image/png', onReplace: () => Promise.resolve(null), onEnd },
         }}
-        display={{ shown: 'open', content: { kind: 'image', url: FIGURE_URL, via: 'self' } }}
+        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+          accept: 'image/png',
+          onReplace: () => Promise.resolve(null),
+          onEnd,
+        })}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -333,9 +339,12 @@ describe('CanvasResource kind and interaction state', () => {
         front={{
           kind: 'image',
           onOpenChange: () => 'completed',
-          editor: { accept: 'image/png', onReplace: () => new Promise(() => undefined), onEnd },
         }}
-        display={{ shown: 'open', content: { kind: 'image', url: FIGURE_URL, via: 'self' } }}
+        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+          accept: 'image/png',
+          onReplace: () => new Promise(() => undefined),
+          onEnd,
+        })}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -509,11 +518,15 @@ describe('CanvasResource Open and Close operation', () => {
   });
 
   it('withdraws an active body editor when the Resource becomes read-only', () => {
-    const front: CanvasResourceFront = {
-      kind: 'markdown',
-      editor: { onComplete: vi.fn(), onEnd: vi.fn() },
-    };
-    const display = opened({ kind: 'markdown', source: 'Draft', via: 'self' });
+    const front: CanvasResourceFront = { kind: 'markdown' };
+    const display = beginEditing(
+      opened({ kind: 'markdown', source: 'Draft', via: 'self' }),
+      {
+        onComplete: vi.fn(),
+        onEnd: vi.fn(),
+      },
+      true,
+    );
     const { rerender } = render(
       <CanvasResource
         front={front}
@@ -536,6 +549,31 @@ describe('CanvasResource Open and Close operation', () => {
       />,
     );
 
+    expect(screen.queryByRole('button', { name: 'Save Resource A' })).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute(
+      'data-content-editing',
+      'false',
+    );
+  });
+
+  it('draws rendered Markdown with no editor for a read-only Resource given an editing display', () => {
+    const { container } = render(
+      <CanvasResource
+        readOnly
+        front={{ kind: 'markdown' }}
+        display={beginEditing(
+          opened({ kind: 'markdown', source: '## Authored placement', via: 'self' }),
+          { onComplete: vi.fn(), onEnd: vi.fn() },
+          true,
+        )}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Authored placement' })).toBeVisible();
+    expect(container.querySelector('.markdown-resource-body--editing')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Save Resource A' })).not.toBeInTheDocument();
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute(
       'data-content-editing',
@@ -707,11 +745,17 @@ describe('CanvasResource Open and Close operation', () => {
       <CanvasResource
         front={{
           kind: 'markdown',
-          editor: { onComplete, onEnd },
           onOpenChange: vi.fn(),
           onBeginEdit: onBeginContentEdit,
         }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
+        display={beginEditing(
+          opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
+          {
+            onComplete,
+            onEnd,
+          },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -754,10 +798,16 @@ describe('CanvasResource Open and Close operation', () => {
       <CanvasResource
         front={{
           kind: 'markdown',
-          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
           onOpenChange: vi.fn(),
         }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
+        display={beginEditing(
+          opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
+          {
+            onComplete: vi.fn(),
+            onEnd: vi.fn(),
+          },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -786,10 +836,16 @@ describe('CanvasResource Open and Close operation', () => {
       <CanvasResource
         front={{
           kind: 'markdown',
-          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
           onOpenChange: vi.fn(),
         }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
+        display={beginEditing(
+          opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
+          {
+            onComplete: vi.fn(),
+            onEnd: vi.fn(),
+          },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -1988,8 +2044,15 @@ describe('CanvasResource Close fade', () => {
   it('fades out rendered Markdown, not the editor, when closed while its body is edited', () => {
     const { rerender } = render(
       <CanvasResource
-        front={{ kind: 'markdown', editor: { onComplete: vi.fn(), onEnd: vi.fn() } }}
-        display={{ shown: 'open', content: { kind: 'markdown', source: 'Hello', via: 'self' } }}
+        front={{ kind: 'markdown' }}
+        display={beginEditing(
+          opened({ kind: 'markdown', source: 'Hello', via: 'self' }),
+          {
+            onComplete: vi.fn(),
+            onEnd: vi.fn(),
+          },
+          true,
+        )}
         state="selected"
         title="A"
         graphColor="#ffc53d"

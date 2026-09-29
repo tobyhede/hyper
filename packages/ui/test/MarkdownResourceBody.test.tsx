@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { CanvasResource, type FrontDisplay } from '../src';
+import { beginEditing, CanvasResource, type FrontDisplay } from '../src';
 import { MarkdownResourceBody } from '../src/MarkdownResourceBody';
 
 beforeAll(() => {
@@ -59,19 +59,8 @@ const onResource = (
   props: Partial<Pick<Parameters<typeof MarkdownResourceBody>[0], 'editor'>> = {},
 ) => (
   <CanvasResource
-    front={
-      props.editor === undefined
-        ? {
-            kind: 'markdown',
-            onBeginEdit: vi.fn(),
-          }
-        : {
-            kind: 'markdown',
-            editor: props.editor,
-            onBeginEdit: vi.fn(),
-          }
-    }
-    display={STRATEGIES}
+    front={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+    display={props.editor === undefined ? STRATEGIES : beginEditing(STRATEGIES, props.editor, true)}
     state="rest"
     title="Strategies"
     graphColor="#ffc53d"
@@ -82,19 +71,12 @@ function EditingResource() {
   const [editing, setEditing] = useState(true);
   return (
     <CanvasResource
-      front={
+      front={{ kind: 'markdown', onBeginEdit: () => setEditing(true) }}
+      display={
         editing
-          ? {
-              kind: 'markdown',
-              editor: { onComplete: vi.fn(), onEnd: () => setEditing(false) },
-              onBeginEdit: () => setEditing(true),
-            }
-          : {
-              kind: 'markdown',
-              onBeginEdit: () => setEditing(true),
-            }
+          ? beginEditing(STRATEGIES, { onComplete: vi.fn(), onEnd: () => setEditing(false) }, true)
+          : STRATEGIES
       }
-      display={STRATEGIES}
       state="rest"
       title="Strategies"
       graphColor="#ffc53d"

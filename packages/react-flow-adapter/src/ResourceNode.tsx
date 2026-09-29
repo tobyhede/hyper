@@ -60,7 +60,6 @@ function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
       const front: MarkdownFront = { kind: 'markdown' };
       if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
       if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
-      if (data.bodyEditor !== undefined) front.editor = data.bodyEditor;
       return front;
     }
     case 'image': {
@@ -70,7 +69,6 @@ function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
       const front: ImageFront = { kind: 'image' };
       if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
       if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
-      if (data.imageReplacer !== undefined) front.editor = data.imageReplacer;
       return front;
     }
     case 'reference': {
@@ -366,8 +364,8 @@ export function ResourceNode({
   );
   const toolbarVisible =
     ((visuallySelected && !otherSelected) ||
-      data.bodyEditor !== undefined ||
-      data.imageReplacer !== undefined ||
+      display.shown === 'editing' ||
+      display.shown === 'replacing' ||
       data.portal?.editing === true) &&
     !dragging &&
     !resizeActive;

@@ -13,6 +13,13 @@ import type {
   ResourceTitleEditor,
 } from '../src/projection';
 import type { ResourceContent } from '@project/core';
+import {
+  beginEditing,
+  beginReplacing,
+  type CanvasResourceBodyEditor,
+  type ImageReplaceEditor,
+  type ResourceDisplay,
+} from '@project/ui';
 import { uuid } from './uuid';
 
 /**
@@ -207,8 +214,10 @@ interface Overrides {
   /** Whether presenting draws this Resource, whatever its authored Open state. */
   presented?: boolean;
   onBeginBodyEditing?: () => void;
-  bodyEditor?: ResourceNodeData['bodyEditor'];
-  imageReplacer?: ResourceNodeData['imageReplacer'];
+  /** A running body edit, entered through the display as decoration enters it. */
+  editor?: CanvasResourceBodyEditor;
+  /** A running image replacement, entered through the display as decoration enters it. */
+  replacer?: ImageReplaceEditor;
   resize?: ResourceNodeData['resize'];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
@@ -240,6 +249,16 @@ function ownContent(
   }
 }
 
+/** The display with the given edit or replacement running, where it may run. */
+function running(
+  display: ResourceDisplay,
+  editor: CanvasResourceBodyEditor | undefined,
+  replacer: ImageReplaceEditor | undefined,
+): ResourceDisplay {
+  const editing = editor === undefined ? display : beginEditing(display, editor, true);
+  return replacer === undefined ? editing : beginReplacing(editing, replacer);
+}
+
 function props({
   selected = false,
   selectedForAuthoring = false,
@@ -256,8 +275,8 @@ function props({
   content,
   presented = false,
   onBeginBodyEditing,
-  bodyEditor,
-  imageReplacer,
+  editor,
+  replacer,
   resize,
   readOnly = false,
   connectionAuthoringEnabled,
@@ -271,11 +290,15 @@ function props({
     active: false,
     selectedForAuthoring,
     showContent: presented,
-    display: presented
-      ? { shown: 'presented', content: content ?? ownContent(kind, body, imageUrl) }
-      : open === true
-        ? { shown: 'open', content: content ?? ownContent(kind, body, imageUrl) }
-        : { shown: 'closed' },
+    display: running(
+      presented
+        ? { shown: 'presented', content: content ?? ownContent(kind, body, imageUrl) }
+        : open === true
+          ? { shown: 'open', content: content ?? ownContent(kind, body, imageUrl) }
+          : { shown: 'closed' },
+      editor,
+      replacer,
+    ),
     activeGraphId: graphId,
     activeGraphColor: '#1f77b4',
     readOnly,
@@ -290,8 +313,6 @@ function props({
   if (open !== undefined) data.open = open;
   if (body !== undefined) data.body = body;
   if (onBeginBodyEditing !== undefined) data.onBeginBodyEditing = onBeginBodyEditing;
-  if (bodyEditor !== undefined) data.bodyEditor = bodyEditor;
-  if (imageReplacer !== undefined) data.imageReplacer = imageReplacer;
   if (resize !== undefined) data.resize = resize;
   if (connectionAuthoringEnabled !== undefined)
     data.connectionAuthoringEnabled = connectionAuthoringEnabled;
@@ -442,7 +463,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
           imageUrl,
           open: true,
           selected: true,
-          imageReplacer: {
+          replacer: {
             accept: 'image/png',
             onReplace: () => Promise.resolve(null),
             onEnd: () => undefined,
@@ -666,7 +687,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
       open: true,
       body: 'Body',
       onEditResource: vi.fn(),
-      bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+      editor: { onComplete: vi.fn(), onEnd: vi.fn() },
     });
     const inNode = (node: NodeProps<ResourceFlowNode>) => (
       <div className="react-flow__node" tabIndex={-1}>
@@ -690,11 +711,20 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
           open: true,
           body: 'Body',
           onEditResource: vi.fn(),
-          bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         })}
       />,
     );
     expect(toolbar()).not.toBeNull();
+  });
+
+  it('reads a running edit from the display, not from the node field that carried it', () => {
+    const node = props({ open: true, body: 'Body', onEditResource: vi.fn() });
+    node.data.bodyEditor = { onComplete: vi.fn(), onEnd: vi.fn() };
+    render(<ResourceNode {...node} />);
+
+    expect(toolbar()).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Markdown source of A' })).not.toBeInTheDocument();
   });
 
   it('keeps Cancel visible while an unselected image is being replaced', () => {
@@ -703,7 +733,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
         {...props({
           imageUrl: 'https://example.com/figure.png',
           open: true,
-          imageReplacer: {
+          replacer: {
             accept: 'image/png',
             onReplace: vi.fn(() => Promise.resolve(null)),
             onEnd: vi.fn(),
@@ -1193,7 +1223,7 @@ describe('ResourceNode Open Resource front', () => {
         {...props({
           open: false,
           body: SOURCE,
-          bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         })}
       />,
     );

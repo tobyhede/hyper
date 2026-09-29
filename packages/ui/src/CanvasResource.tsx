@@ -41,9 +41,9 @@ import './canvas-resource.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import { ResourceImage } from './ResourceImage';
-import { ImageReplaceTarget, type ImageReplaceEditor } from './ImageReplaceTarget';
+import { ImageReplaceTarget } from './ImageReplaceTarget';
 import { UnresolvedContent } from './UnresolvedContent';
-import type { FrontDisplay } from './resource-display';
+import { atRest, type FrontDisplay } from './resource-display';
 
 /**
  * What a Resource front offers beyond its shared Title (ADR 0051): a kind-owned
@@ -61,13 +61,6 @@ export type CanvasResourceFront =
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /** Put a caret in this Resource's Markdown source. */
       readonly onBeginEdit?: () => void;
-      /**
-       * Present exactly while the Markdown body holds the canvas caret. Drawn
-       * only while the display is Open with the Resource's own Markdown.
-       */
-      readonly editor?: CanvasResourceBodyEditor;
-      /** Whether a newly supplied body editor takes focus. */
-      readonly autoFocusEditor?: boolean;
     }
   | {
       readonly kind: 'reference';
@@ -80,12 +73,6 @@ export type CanvasResourceFront =
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /** Begin replacing the image: the image kind's counterpart to a Markdown edit. */
       readonly onBeginEdit?: () => void;
-      /**
-       * Present exactly while the image is being replaced; the content is then
-       * the upload target rather than the picture. Drawn only while the display
-       * is Open with the Resource's own image.
-       */
-      readonly editor?: ImageReplaceEditor;
     }
   | {
       readonly kind: 'space';
@@ -135,9 +122,10 @@ export type CanvasResourceState = 'rest' | 'selected' | 'dragging' | 'editing';
 interface CanvasResourceCommonProps {
   readonly front: CanvasResourceFront;
   /**
-   * Whether this Resource is Open, and the content it draws when it is. The
-   * front reads Open from this alone; the Map's authored Open state reaches it
-   * only through the display the projection made from it.
+   * Whether this Resource is Open, the content it draws when it is, and the
+   * body editor or image replacer while one runs. The front reads Open from
+   * this alone; the Map's authored Open state reaches it only through the
+   * display the projection made from it.
    */
   readonly display: FrontDisplay;
   /**
@@ -314,7 +302,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
  * own visual treatment lives in `canvas-resource.css`, colocated with this module.
  */
 export function CanvasResource(props: CanvasResourceProps) {
-  const { front, display, title, graphColor, entityActions, state, readOnly = false } = props;
+  const { front, title, graphColor, entityActions, state, readOnly = false } = props;
   /**
    * What this Resource is called wherever it is *named* rather than drawn.
    *
@@ -326,12 +314,14 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const name = titleName(title);
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
+  /*
+   * Read-only is decided here, once: a read-only Resource draws its content at
+   * rest, and every authoring affordance below reads one of these operations,
+   * each absent on a read-only Resource.
+   */
+  const display = readOnly ? atRest(props.display) : props.display;
   const open = display.shown !== 'closed';
   const content = display.shown === 'closed' ? null : display.content;
-  /*
-   * Read-only is decided here, once: every authoring affordance below reads one
-   * of these operations, and each is absent on a read-only Resource.
-   */
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const openableFront = front.kind === 'preview' ? undefined : front;
   const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
@@ -363,13 +353,13 @@ export function CanvasResource(props: CanvasResourceProps) {
    * The edit running inside the Markdown front this Resource owns.
    *
    * State rather than a second prop because the draft and caret live inside
-   * the body. `front.editor` supplies domain completion; the body publishes
+   * the body. The display's editor supplies domain completion; the body publishes
    * the Save and Cancel closures for its current draft (`resource-content-edit.ts`).
    */
   const [contentEdit, setContentEdit] = useState<ResourceContentEdit | null>(null);
   const visibleContentEdit = readOnly ? null : contentEdit;
-  const imageEditor =
-    contentAuthoring && contentFront?.kind === 'image' ? contentFront.editor : undefined;
+  const imageReplacer =
+    contentAuthoring && display.shown === 'replacing' ? display.replacer : undefined;
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
@@ -406,11 +396,9 @@ export function CanvasResource(props: CanvasResourceProps) {
   if (contentAuthoring && onBeginContentEdit !== undefined && state === 'selected') {
     markdownBodyProps.onBeginEdit = onBeginContentEdit;
   }
-  if (contentAuthoring && contentFront?.kind === 'markdown') {
-    if (contentFront.editor !== undefined) markdownBodyProps.editor = contentFront.editor;
-    if (contentFront.autoFocusEditor !== undefined) {
-      markdownBodyProps.autoFocus = contentFront.autoFocusEditor;
-    }
+  if (contentAuthoring && display.shown === 'editing') {
+    markdownBodyProps.editor = display.editor;
+    markdownBodyProps.autoFocus = display.autoFocus;
   }
 
   /** The content area's one switch over what it draws. */
@@ -427,9 +415,9 @@ export function CanvasResource(props: CanvasResourceProps) {
           </ResourceContentEditProvider>
         );
       case 'image':
-        return imageEditor !== undefined ? (
+        return imageReplacer !== undefined ? (
           <ResourceContentEditProvider value={setContentEdit}>
-            <ImageReplaceTarget name={name} editor={imageEditor} />
+            <ImageReplaceTarget name={name} editor={imageReplacer} />
           </ResourceContentEditProvider>
         ) : (
           <ResourceImage
