@@ -217,7 +217,7 @@ test('Delete Resource confirms at phone width with the pointer', async ({ page }
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
 
-  const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete B From Space?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
   await expect(resource).toBeVisible();
@@ -227,7 +227,7 @@ test('Delete Resource confirms at phone width with the pointer', async ({ page }
   )
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
-  await confirmation.getByRole('button', { name: 'Delete from Space' }).click();
+  await confirmation.getByRole('button', { name: 'Delete' }).click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
   await page.getByRole('button', { name: 'Resources' }).click();
@@ -250,7 +250,7 @@ test('Delete Resource confirms at phone width from the keyboard', async ({ page 
   await expect(page.getByRole('menu')).toBeVisible();
   await page.getByRole('menuitem', { name: 'Delete from Space' }).press('Enter');
 
-  const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete B From Space?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).press('Enter');
   await expect(resource).toBeVisible();
@@ -261,7 +261,7 @@ test('Delete Resource confirms at phone width from the keyboard', async ({ page 
     .getByRole('button', { name: 'Actions for Resource B' })
     .press('Enter');
   await page.getByRole('menuitem', { name: 'Delete from Space' }).press('Enter');
-  await confirmation.getByRole('button', { name: 'Delete from Space' }).press('Enter');
+  await confirmation.getByRole('button', { name: 'Delete' }).press('Enter');
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
   await page.getByRole('button', { name: 'Resources' }).click();

@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { titleName, type Resource } from '@project/core';
+import { shortTitle, type Resource } from '@project/core';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +36,7 @@ import type { FocusFallback, ResourceDeletion } from '../resource-deletion';
  * return rule stands — the rail names none. `ResourcesPopover.test.tsx` holds
  * both halves for the Resources list.
  */
-const DELETES_THE_RESOURCE =
-  'This removes the Resource from the Space, every Map that contains it, and every Edge connected to it.';
+const DELETES_THE_RESOURCE = 'Permanently deletes the Resource from the Space.';
 
 const DELETION_DESCRIPTIONS = {
   markdown: DELETES_THE_RESOURCE,
@@ -80,10 +79,10 @@ export function DeleteResourceConfirmation({
         finalFocus={() => (opener?.isConnected ? opener : (focusFallback?.() ?? true))}
       >
         <AlertDialogHeader>
-          {/* The Resource's **name**, which is how a control names a Resource: the
-              ladder below the name is drawn on the Resource front and nowhere else
-              (ADR 0083). */}
-          <AlertDialogTitle>Delete from Space {titleName(resource.title)}?</AlertDialogTitle>
+          {/* The short Title: a question names the Resource on one line, and marks
+              a Title written on several as shortened rather than presenting its
+              first line as the whole of it. */}
+          <AlertDialogTitle>Delete {shortTitle(resource.title)} From Space?</AlertDialogTitle>
           <AlertDialogDescription>{DELETION_DESCRIPTIONS[resource.kind]}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -101,7 +100,7 @@ export function DeleteResourceConfirmation({
               onConfirm();
             }}
           >
-            Delete from Space
+            Delete
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

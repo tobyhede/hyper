@@ -1042,7 +1042,7 @@ describe('ResourcesPopover', () => {
     });
     fireEvent.click(remove, { detail: 0 });
     const confirmation = await screen.findByRole('alertdialog');
-    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete from Space' }));
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Add Zulu to Map' })).not.toBeInTheDocument();

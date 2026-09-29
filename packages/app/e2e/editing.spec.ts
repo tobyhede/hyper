@@ -2068,7 +2068,7 @@ test('Delete Resource confirms before removing the Resource from the whole Space
 
   // The dialog is drawn at the App root rather than in the menu that armed it:
   // the menu closes on the press and would take the question with it.
-  const confirmation = page.getByRole('alertdialog', { name: 'Delete from Space B?' });
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete B From Space?' });
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole('button', { name: 'Cancel' }).click();
   await expect(resource).toBeVisible();
@@ -2078,7 +2078,7 @@ test('Delete Resource confirms before removing the Resource from the whole Space
   )
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
-  await confirmation.getByRole('button', { name: 'Delete from Space' }).click();
+  await confirmation.getByRole('button', { name: 'Delete' }).click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
   await page.getByRole('button', { name: 'Resources' }).click();
@@ -2116,8 +2116,8 @@ test(
 
     await deleteControl.click();
     await page
-      .getByRole('alertdialog', { name: 'Delete from Space B?' })
-      .getByRole('button', { name: 'Delete from Space' })
+      .getByRole('alertdialog', { name: 'Delete B From Space?' })
+      .getByRole('button', { name: 'Delete' })
       .click();
 
     // The row goes from a list still open, not with the list: its absence alone
@@ -2172,8 +2172,8 @@ test('an Open Resource is deleted like any other, and does not withdraw Delete f
     .getByRole('menuitem', { name: 'Delete from Space' })
     .click();
   await page
-    .getByRole('alertdialog', { name: 'Delete from Space B?' })
-    .getByRole('button', { name: 'Delete from Space' })
+    .getByRole('alertdialog', { name: 'Delete B From Space?' })
+    .getByRole('button', { name: 'Delete' })
     .click();
 
   await expect(nodeByTitle(page, 'B')).toHaveCount(0);
