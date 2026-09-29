@@ -40,14 +40,24 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
     push: (path) => browser.history.pushState({ hyperHistoryIndex: ++index }, '', path),
     replace: (path) => browser.history.replaceState({ hyperHistoryIndex: index }, '', path),
     onPopState: (listener) => {
-      let returning = false;
+      /**
+       * The deltas of the rewinds issued and not yet arrived, oldest first.
+       * The browser is returning to the entry at `index` while any remain.
+       */
+      let rewinds: number[] = [];
+      /** The entry the browser last arrived at while returning. */
+      let at = index;
       /** Counts kept traversals, so a late hold can tell whether it is still the latest. */
       let traversal = 0;
-      /** Return the browser from the entry at `at` to the entry at `from`. */
-      const hold = (from: number, at: number): void => {
+      const rewind = (delta: number): void => {
+        rewinds.push(delta);
+        browser.history.go(delta);
+      };
+      /** Return the browser from the entry at `arrived` to the entry at `from`. */
+      const hold = (from: number, arrived: number): void => {
         index = from;
-        returning = true;
-        browser.history.go(from - at);
+        at = arrived;
+        rewind(from - arrived);
       };
       /** Ask the listener about the arrival at the entry numbered `next`. */
       const arrive = (next: number): void => {
@@ -57,6 +67,14 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
           if (next !== from) hold(from, next);
           return;
         }
+        keep(from, next, answer);
+      };
+      /** Keep the traversal from the entry at `from` to the entry at `next`, holding it on a late `false`. */
+      const keep = (
+        from: number,
+        next: number,
+        answer: undefined | Promise<undefined | false>,
+      ): void => {
         index = next;
         const kept = ++traversal;
         if (answer === undefined) return;
@@ -64,13 +82,42 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
           if (
             late === false &&
             kept === traversal &&
-            !returning &&
+            rewinds.length === 0 &&
             index === next &&
             next !== from
           ) {
             hold(from, next);
           }
         });
+      };
+      /**
+       * Steer a return by the arrival at the entry numbered `next`. The browser
+       * applies the rewinds in the order they were issued, among the
+       * traversals the reader queued before or between them, and a rewind a
+       * reader's traversal has pushed past either end arrives nowhere. So an
+       * arrival whose delta matches an outstanding rewind is taken to be the
+       * oldest such rewind, settling the rewinds older than it; any other
+       * arrival is the reader's, and is asked about like any traversal, ending
+       * the return unless the listener holds it. One more rewind is issued
+       * whenever the rewinds still outstanding would land anywhere but `index`.
+       * Two traversals with the same delta move the browser alike, so mistaking
+       * one for the other is corrected by the next arrival.
+       */
+      const steer = (next: number): void => {
+        const delta = next - at;
+        at = next;
+        const arrived = rewinds.indexOf(delta);
+        if (arrived >= 0) rewinds = rewinds.slice(arrived + 1);
+        else {
+          const answer = listener();
+          if (answer !== false) {
+            rewinds = [];
+            keep(index, next, answer);
+            return;
+          }
+        }
+        const landing = rewinds.reduce((entry, outstanding) => entry + outstanding, next);
+        if (landing !== index) rewind(index - landing);
       };
       /**
        * An entry with no position is taken to be one a fragment navigation has
@@ -84,8 +131,8 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
       const popped = (event: Pick<PopStateEvent, 'state'>): void => {
         const position: unknown = event.state;
         if (!isHistoryPosition(position)) {
-          if (returning) {
-            returning = false;
+          if (rewinds.length > 0) {
+            rewinds = [];
             return;
           }
           browser.history.replaceState({ hyperHistoryIndex: index + 1 }, '', browser.location.href);
@@ -93,9 +140,8 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
           return;
         }
         const next = position.hyperHistoryIndex;
-        if (returning) {
-          if (next === index) returning = false;
-          else browser.history.go(index - next);
+        if (rewinds.length > 0) {
+          steer(next);
           return;
         }
         arrive(next);
