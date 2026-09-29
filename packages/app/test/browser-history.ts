@@ -1,4 +1,4 @@
-import type { NativeBrowser } from '../src/browser-history';
+import type { NativeBrowser, NativeNavigation } from '../src/browser-history';
 import type { HistoryApi, PopStateAnswer } from '../src/browser-location';
 
 export interface HistoryWrite {
@@ -66,9 +66,16 @@ export const recordingHistory = (initial = '/'): RecordingHistory => {
 interface Entry {
   readonly state: unknown;
   readonly url: URL;
+  /** The Navigation API's key, which `replaceState` keeps and every new entry mints. */
+  readonly key: string;
 }
 
 type PopListener = (event: { readonly state: unknown }) => void;
+
+/** A queued traversal: a relative `go`, as the reader's Back and Forward are, or a `traverseTo`. */
+type Traversal =
+  | { readonly by: number }
+  | { readonly key: string; readonly done: PromiseWithResolvers<undefined> };
 
 /**
  * A stand-in browser for the native history adapter.
@@ -79,34 +86,71 @@ type PopListener = (event: { readonly state: unknown }) => void;
  * `settle`, firing `popstate` with the arriving entry's state
  * before the next traversal starts. A `go` past either end does nothing.
  *
+ * With `navigation`, it also offers the part of the Navigation API the adapter
+ * uses, as far as the HTML standard describes it: every entry has a key,
+ * `replaceState` keeps the entry's key, and `traverseTo(key)` joins the same
+ * queue as every other traversal and moves to that entry wherever the browser
+ * is when it applies, firing `popstate` like any traversal. One to the current
+ * entry, at the call or when it applies, moves nothing and fires nothing; one
+ * to a key no entry holds rejects, at the call or when it applies.
+ *
  * Whether a real browser honours these writes is what
- * `packages/app/e2e/image-resource.spec.ts` proves, which a stand-in cannot.
+ * `packages/app/e2e/image-resource.spec.ts` and
+ * `packages/app/e2e/held-traversal.spec.ts` prove, which a stand-in cannot.
  */
-export const standInBrowser = (initial: { readonly path: string; readonly state?: unknown }) => {
-  const entries: Entry[] = [{ state: initial.state ?? null, url: new URL(initial.path, ORIGIN) }];
+export const standInBrowser = (initial: {
+  readonly path: string;
+  readonly state?: unknown;
+  readonly navigation?: boolean;
+}) => {
+  let minted = 0;
+  const mint = (): string => `key-${String(minted++)}`;
+  const entries: Entry[] = [
+    { state: initial.state ?? null, url: new URL(initial.path, ORIGIN), key: mint() },
+  ];
   let current = 0;
-  const traversals: number[] = [];
+  const traversals: Traversal[] = [];
   const listeners = new Set<PopListener>();
   const at = (): Entry => {
     const entry = entries[current];
     if (entry === undefined) throw new Error('The stand-in browser lost its current entry.');
     return entry;
   };
-  const browser: NativeBrowser = {
+  const resolve = (url: string | URL | null | undefined): URL =>
+    new URL(String(url ?? at().url), at().url);
+  const gone = () =>
+    Promise.reject(new DOMException('No entry holds that key.', 'InvalidStateError'));
+  const navigation: NativeNavigation = {
+    get currentEntry() {
+      return { key: at().key };
+    },
+    traverseTo: (key) => {
+      if (key === at().key) {
+        const entry = Promise.resolve(undefined);
+        return { committed: entry, finished: entry };
+      }
+      if (!entries.some((entry) => entry.key === key))
+        return { committed: gone(), finished: gone() };
+      const done = Promise.withResolvers<undefined>();
+      traversals.push({ key, done });
+      return { committed: done.promise, finished: done.promise };
+    },
+  };
+  const withoutNavigation: NativeBrowser = {
     history: {
       get state() {
         return at().state;
       },
       pushState: (state, _unused, url) => {
         entries.splice(current + 1);
-        entries.push({ state, url: new URL(String(url ?? at().url), at().url) });
+        entries.push({ state, url: resolve(url), key: mint() });
         current += 1;
       },
       replaceState: (state, _unused, url) => {
-        entries[current] = { state, url: new URL(String(url ?? at().url), at().url) };
+        entries[current] = { state, url: resolve(url), key: at().key };
       },
-      go: (delta = 0) => {
-        traversals.push(delta);
+      go: (by = 0) => {
+        traversals.push({ by });
       },
     },
     location: {
@@ -124,34 +168,49 @@ export const standInBrowser = (initial: { readonly path: string; readonly state?
       listeners.delete(listener);
     },
   };
+  const browser: NativeBrowser =
+    initial.navigation === true ? { ...withoutNavigation, navigation } : withoutNavigation;
+  /** Where the oldest queued traversal goes, or `undefined` where it goes nowhere. */
+  const destination = (traversal: Traversal): number | undefined => {
+    if ('by' in traversal) {
+      const target = current + traversal.by;
+      return traversal.by === 0 || target < 0 || target >= entries.length ? undefined : target;
+    }
+    const target = entries.findIndex((entry) => entry.key === traversal.key);
+    if (target < 0) {
+      traversal.done.reject(new DOMException('No entry holds that key.', 'InvalidStateError'));
+      return undefined;
+    }
+    traversal.done.resolve(undefined);
+    return target === current ? undefined : target;
+  };
   const step = (): void => {
-    const delta = traversals.shift() ?? 0;
-    const target = current + delta;
-    if (delta === 0 || target < 0 || target >= entries.length) return;
+    const traversal = traversals.shift();
+    const target = traversal === undefined ? undefined : destination(traversal);
+    if (target === undefined) return;
     current = target;
     const { state } = at();
     for (const listener of [...listeners]) listener({ state });
   };
+  const add = (path: string): void => {
+    entries.splice(current + 1);
+    entries.push({ state: null, url: new URL(path, ORIGIN), key: mint() });
+    current += 1;
+  };
   return {
     browser,
     entries,
-    back: () => traversals.push(-1),
-    forward: () => traversals.push(1),
-    traverse: (delta: number) => traversals.push(delta),
+    back: () => traversals.push({ by: -1 }),
+    forward: () => traversals.push({ by: 1 }),
+    traverse: (by: number) => traversals.push({ by }),
     /** A same-document entry this adapter did not write, written without a `popstate`. */
-    foreignPush: (path: string) => {
-      entries.splice(current + 1);
-      entries.push({ state: null, url: new URL(path, ORIGIN) });
-      current += 1;
-    },
+    foreignPush: add,
     /**
      * A fragment navigation: the browser writes an entry after the current one
      * with no state, and fires `popstate` with that state as it arrives.
      */
     fragment: (path: string) => {
-      entries.splice(current + 1);
-      entries.push({ state: null, url: new URL(path, ORIGIN) });
-      current += 1;
+      add(path);
       for (const listener of [...listeners]) listener({ state: null });
     },
     /** Apply the oldest queued traversal alone, leaving any it queues. */
