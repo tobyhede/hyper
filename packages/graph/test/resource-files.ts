@@ -25,6 +25,10 @@ export function referenceFile(id: string, title: string, target: string): Resour
   return file(id, { id, title, kind: 'reference', target }, '');
 }
 
+export function imageFile(id: string, title: string, url: string): ResourceFile {
+  return file(id, { id, title, kind: 'image', url }, '');
+}
+
 /**
  * Loaded resources, for the tests that deliberately build a broken graph and hand it
  * straight to `validateReferences` — `loadSpace` would reject these before they

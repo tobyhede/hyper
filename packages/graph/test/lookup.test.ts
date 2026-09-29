@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace, resolveContentResource, type Space } from '../src/index';
-import { referenceFile, resourceFile, uuid } from './resource-files';
+import { imageFile, referenceFile, resourceFile, uuid } from './resource-files';
 
 function baseSpace(): Space {
   const result = loadSpace(
@@ -15,6 +15,8 @@ function baseSpace(): Space {
           positions: {
             [uuid('00000000-0000-4000-8000-000000000045')]: { x: 0, y: 0, open: false },
             [uuid('00000000-0000-4000-8000-000000000044')]: { x: 320, y: 0, open: false },
+            [uuid('00000000-0000-4000-8000-000000000046')]: { x: 640, y: 0, open: false },
+            [uuid('00000000-0000-4000-8000-000000000047')]: { x: 960, y: 0, open: false },
           },
           graphs: [
             {
@@ -38,6 +40,16 @@ function baseSpace(): Space {
         'The model, again',
         uuid('00000000-0000-4000-8000-000000000045'),
       ),
+      imageFile(
+        uuid('00000000-0000-4000-8000-000000000046'),
+        'Harbour',
+        'https://example.com/harbour.png',
+      ),
+      referenceFile(
+        uuid('00000000-0000-4000-8000-000000000047'),
+        'Harbour, again',
+        uuid('00000000-0000-4000-8000-000000000046'),
+      ),
     ],
   );
   if (!result.ok) throw new Error('fixture should load');
@@ -52,6 +64,23 @@ describe('resolveContentResource', () => {
     );
     expect(resolved?.id).toBe(uuid('00000000-0000-4000-8000-000000000045'));
     expect(resolved?.kind === 'markdown' ? resolved.body : undefined).toBe('The model body.\n');
+  });
+
+  it('resolves a reference resource to an image target in one hop', () => {
+    const resolved = resolveContentResource(
+      baseSpace(),
+      uuid('00000000-0000-4000-8000-000000000047'),
+    );
+    expect(resolved?.id).toBe(uuid('00000000-0000-4000-8000-000000000046'));
+    expect(resolved?.kind === 'image' ? resolved.url : undefined).toBe(
+      'https://example.com/harbour.png',
+    );
+  });
+
+  it('resolves an image resource to itself', () => {
+    expect(
+      resolveContentResource(baseSpace(), uuid('00000000-0000-4000-8000-000000000046'))?.id,
+    ).toBe(uuid('00000000-0000-4000-8000-000000000046'));
   });
 
   it('resolves a markdown resource to itself', () => {
