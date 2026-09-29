@@ -950,7 +950,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                 const description = `${describedBy}-${key}`;
                 const onDelete = placing?.onDelete;
                 return (
-                  <li key={key}>
+                  <li key={key} className="flex items-center gap-1">
                     {/* **A row is a button, and the drag is the shortcut.** ADR 0082
                         binds that everything the surface offers is operable from the
                         keyboard alone, and names this case: a drag may be *a* way to
@@ -988,7 +988,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                                 ? 'true'
                                 : undefined
                             }
-                            className="resources-popover__row w-full justify-start"
+                            className="resources-popover__row min-w-0 flex-1 justify-start"
                             aria-label={`Add ${name} to Map`}
                             aria-describedby={placed.length === 0 ? undefined : description}
                             onDragStart={startDrag}
@@ -1064,7 +1064,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                         </span>
                       </TooltipContent>
                     </Tooltip>
-                    {row.kind === 'resource' && onDelete !== undefined ? (
+                    {onDelete === undefined ? null : row.kind === 'resource' ? (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1073,7 +1073,10 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                       >
                         <DeleteIcon />
                       </Button>
-                    ) : null}
+                    ) : (
+                      // A Space row keeps the slot empty, so every row ends on one edge.
+                      <span aria-hidden="true" className="size-7 shrink-0" />
+                    )}
                     {placed.length === 0 ? null : (
                       <span id={description} className="sr-only">
                         {`Also in ${placed.map(describeMembership).join('; ')}`}

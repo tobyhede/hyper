@@ -2086,6 +2086,39 @@ test('Delete Resource confirms before removing the Resource from the whole Space
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
+test('a Resource the Map no longer places is deleted from the Resources list', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  await (
+    await resourceActions(page, 'B')
+  )
+    .getByRole('menuitem', { name: 'Remove from Map' })
+    .click();
+  await expect(nodeByTitle(page, 'B')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Resources' }).click();
+  const add = page.getByRole('button', { name: 'Add B to Map' });
+  const remove = page.getByRole('button', { name: 'Delete B from Space' });
+  await expect(remove).toBeVisible();
+  // On its row's line, not wrapped beneath it.
+  const addBox = await boxOf(add, 'the row');
+  const removeBox = await boxOf(remove, 'the delete control');
+  expect(removeBox.y).toBeGreaterThanOrEqual(addBox.y - 1);
+  expect(removeBox.y + removeBox.height).toBeLessThanOrEqual(addBox.y + addBox.height + 1);
+  expect(removeBox.x).toBeGreaterThanOrEqual(addBox.x + addBox.width - 1);
+
+  await remove.click();
+  await page
+    .getByRole('alertdialog', { name: 'Delete from Space B?' })
+    .getByRole('button', { name: 'Delete from Space' })
+    .click();
+
+  await expect(add).toHaveCount(0);
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2');
+});
+
 test('Delete Resource is withdrawn while presenting', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
