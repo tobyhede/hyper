@@ -4,11 +4,15 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Markdown, Image and Space Resources resolve to their own content with `via: 'self'`; a Reference Resource resolves to its Target's content with `via: 'reference'`.
-- [ ] A Reference Resource whose Target is missing, or is itself a Reference Resource, resolves to `unresolved` (a table test builds that Space by hand, since intake refuses it).
-- [ ] A property test over Spaces intake accepts: the result is never `unresolved`, `via` is `'self'` exactly for non-Reference Resources, and a Reference Resource's result equals its Target's with `via` changed.
-- [ ] The Space view carries only what an Open Space Resource shows (its Space, Map, Graph and framing), not the Resource.
-- [ ] `graph`'s curated package surface lists the new function.
-- [ ] `pnpm verify` passes.
+- [x] Markdown, Image and Space Resources resolve to their own content with `via: 'self'`; a Reference Resource resolves to its Target's content with `via: 'reference'`.
+- [x] A Reference Resource whose Target is missing, or is itself a Reference Resource, resolves to `unresolved` (a table test builds that Space by hand, since intake refuses it).
+- [x] A property test over Spaces intake accepts: the result is never `unresolved`, `via` is `'self'` exactly for non-Reference Resources, and a Reference Resource's result equals its Target's with `via` changed.
+- [x] The Space view carries only what an Open Space Resource shows (its Space, Map, Graph and framing), not the Resource.
+- [x] `graph`'s curated package surface lists the new function.
+- [x] `pnpm verify` passes.
+
+## Comments
+
+**2026-09-29.** Built. `ContentVia`, `SpaceView` and `ResourceContent` are declared in `packages/core/src/resource-content.ts` and exported whole from core's index. `resolveResourceContent(space, resource)` sits in `packages/graph/src/lookup.ts` beside `resolveContentResource`, which is unchanged; both are in graph's index and in `test/unit/graph-package-surface.test.ts`. `SpaceView.framing` is a required key holding `undefined` for an unframed Space Resource. The table test is in `packages/graph/test/lookup.test.ts`. Its broken Spaces are built by spreading a loaded Space and replacing its `lookup` with one `buildSpaceLookup` builds over the refused Resources. The property test is in `packages/graph/test/graph.property.test.ts`, over `mapsArb` with each generated Resource given a kind. A Space Resource there targets a Space other than its own, which intake requires. Both properties fail when the Reference arm answers `via: 'self'`. `pnpm verify` passed; `pnpm e2e` was not run, since nothing a browser draws changed.

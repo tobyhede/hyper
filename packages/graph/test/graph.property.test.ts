@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { loadSpace, type Space } from '../src/index';
+import type { Resource, UUID } from '@project/core';
+import { loadSpace, resolveResourceContent, serializeResourceFile, type Space } from '../src/index';
 import { resourceFile, uuid } from './resource-files';
 
 /**
@@ -20,6 +21,8 @@ const mapId = (value: number) =>
   uuid(`00000000-0000-4000-8000-${(value + 0x200000).toString(16).padStart(12, '0')}`);
 
 const SPACE = uuid('00000000-0000-4000-8000-000000000001');
+/** Another Space, for a Space Resource to target: none may target its own. */
+const OTHER_SPACE = uuid('00000000-0000-4000-8000-0000000000aa');
 
 /** A Map over the given Resources, owning graphs that chain them. */
 function mapOver(index: number, ids: number[], graphCount: number) {
@@ -249,6 +252,112 @@ describe('what intake refuses, over generated documents', () => {
         expect(result.ok).toBe(false);
         if (result.ok) return;
         expect(result.errors.some((error) => error.kind === 'duplicate-graph-edge')).toBe(true);
+      }),
+    );
+  });
+});
+
+type ContentKind = Resource['kind'];
+
+/** A Resource of the chosen kind that owns its content. */
+function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'reference'>): Resource {
+  const title = `Resource ${index}`;
+  switch (kind) {
+    case 'markdown':
+      return { id, title, kind, body: index % 3 === 0 ? '' : `Body ${index}\n` };
+    case 'image':
+      return { id, title, kind, url: `https://example.com/${index}.png` };
+    case 'space': {
+      const view = { spaceId: OTHER_SPACE, map: mapId(index), graph: graphId(index) };
+      return index % 2 === 0
+        ? { id, title, kind, ...view, framing: { centreX: index, centreY: -index, zoom: 1 } }
+        : { id, title, kind, ...view };
+    }
+  }
+}
+
+/**
+ * The generated document with each Resource given a kind. A Reference Resource
+ * targets an earlier Resource that owns content, since intake refuses a
+ * Reference Resource to a Reference Resource; with none yet, it is Markdown.
+ */
+function withKinds(
+  maps: { ids: number[]; graphs: number }[],
+  kinds: readonly ContentKind[],
+  targets: readonly number[],
+) {
+  const { file } = documentFrom(maps);
+  const owners: UUID[] = [];
+  const resources = [...new Set(maps.flatMap((entry) => entry.ids))].map(
+    (value, index): Resource => {
+      const id = resourceId(value);
+      const chosen = kinds[index % kinds.length] ?? 'markdown';
+      const pick = targets[index % targets.length] ?? 0;
+      const target = owners.length === 0 ? undefined : owners[pick % owners.length];
+      if (chosen === 'reference') {
+        if (target !== undefined) {
+          return { id, title: `Resource ${index}`, kind: 'reference', target };
+        }
+        owners.push(id);
+        return contentOwner(id, index, 'markdown');
+      }
+      owners.push(id);
+      return contentOwner(id, index, chosen);
+    },
+  );
+  return {
+    file,
+    files: resources.map((resource) => ({
+      path: `resources/${resource.id}.md`,
+      text: serializeResourceFile(resource),
+    })),
+  };
+}
+
+const kindsArb = fc.array(fc.constantFrom<ContentKind>('markdown', 'image', 'space', 'reference'), {
+  minLength: 1,
+  maxLength: 8,
+});
+const targetsArb = fc.array(fc.nat(), { minLength: 1, maxLength: 8 });
+
+const acceptedWithKinds = (
+  maps: { ids: number[]; graphs: number }[],
+  kinds: readonly ContentKind[],
+  targets: readonly number[],
+): Space => {
+  const { file, files } = withKinds(maps, kinds, targets);
+  const result = loadSpace(file, files);
+  if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+  return result.space;
+};
+
+describe('resolved content, over generated Spaces of every kind', () => {
+  it('answers self exactly for Resources that own content, and never unresolved', () => {
+    fc.assert(
+      fc.property(mapsArb, kindsArb, targetsArb, (maps, kinds, targets) => {
+        const space = acceptedWithKinds(maps, kinds, targets);
+        for (const resource of space.resources) {
+          const content = resolveResourceContent(space, resource);
+          expect(content.kind).not.toBe('unresolved');
+          expect(content.via === 'self').toBe(resource.kind !== 'reference');
+        }
+      }),
+    );
+  });
+
+  it('answers a Reference Resource with its Target’s content, reached by reference', () => {
+    fc.assert(
+      fc.property(mapsArb, kindsArb, targetsArb, (maps, kinds, targets) => {
+        const space = acceptedWithKinds(maps, kinds, targets);
+        for (const resource of space.resources) {
+          if (resource.kind !== 'reference') continue;
+          const target = space.lookup.resource(resource.target);
+          if (target === undefined) throw new Error('intake accepted a missing Target');
+          expect(resolveResourceContent(space, resource)).toStrictEqual({
+            ...resolveResourceContent(space, target),
+            via: 'reference',
+          });
+        }
       }),
     );
   });

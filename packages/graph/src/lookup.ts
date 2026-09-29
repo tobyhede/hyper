@@ -1,4 +1,13 @@
-import type { Resource, ResourceId, Graph, GraphId, Map, UUID } from '@project/core';
+import type {
+  ContentVia,
+  Resource,
+  ResourceContent,
+  ResourceId,
+  Graph,
+  GraphId,
+  Map,
+  UUID,
+} from '@project/core';
 import type { Space } from './space';
 
 /**
@@ -82,6 +91,48 @@ export function resolveContentResource(
 
   const target = space.lookup.resource(resource.target);
   return suppliesContent(target) ? target : undefined;
+}
+
+/** A Resource that owns its content: every kind but a Reference Resource. */
+type ContentOwner = Exclude<Resource, { kind: 'reference' }>;
+
+function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent {
+  switch (resource.kind) {
+    case 'markdown':
+      return { kind: 'markdown', source: resource.body, via };
+    case 'image':
+      return { kind: 'image', url: resource.url, via };
+    case 'space':
+      return {
+        kind: 'space',
+        view: {
+          spaceId: resource.spaceId,
+          map: resource.map,
+          graph: resource.graph,
+          framing: resource.framing,
+        },
+        via,
+      };
+  }
+}
+
+/**
+ * What `resource` draws as its content. Markdown, Image and Space Resources
+ * answer their own with `via: 'self'`; a Reference Resource answers its
+ * Target's with `via: 'reference'`, following one hop (ADR 0009).
+ *
+ * Total: it takes the Resource rather than an id, so there is nothing to not
+ * find. `unresolved` answers the two states intake refuses and the lookup's
+ * type cannot rule out: a missing Target, and a Target that is itself a
+ * Reference Resource.
+ */
+export function resolveResourceContent(space: Space, resource: Resource): ResourceContent {
+  if (resource.kind !== 'reference') return ownedContent(resource, 'self');
+  const target = space.lookup.resource(resource.target);
+  if (target === undefined || target.kind === 'reference') {
+    return { kind: 'unresolved', via: 'reference' };
+  }
+  return ownedContent(target, 'reference');
 }
 
 /**
