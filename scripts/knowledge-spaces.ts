@@ -538,22 +538,26 @@ export const issueSpace = (scratchRoot: string): GeneratedSpace => {
       })),
   );
   open.sort((left, right) => compareOrdinal(left.issue.path, right.issue.path));
-  const idByReference = new Map<string, string>();
+  // Every file claiming a number, not the first: a blocker naming a number two
+  // tickets claim is ambiguous, and an Edge from each shows that on the canvas
+  // instead of silently choosing one.
+  const idsByReference = new Map<string, string[]>();
   for (const { issue, reference } of open) {
-    if (!idByReference.has(reference)) {
-      idByReference.set(reference, stableUuid(ISSUE_NAMESPACE, `issue:${issue.path}`));
-    }
+    const id = stableUuid(ISSUE_NAMESPACE, `issue:${issue.path}`);
+    const claimed = idsByReference.get(reference);
+    if (claimed === undefined) idsByReference.set(reference, [id]);
+    else claimed.push(id);
   }
   const ids = open.map(({ issue }) => stableUuid(ISSUE_NAMESPACE, `issue:${issue.path}`));
   const blockers = distinctEdges(
     new Set(ids),
     open.flatMap(({ issue }) =>
-      issue.unmetBlockers.flatMap((blocker) => {
-        const from = idByReference.get(blocker);
-        return from === undefined
-          ? []
-          : [{ from, to: stableUuid(ISSUE_NAMESPACE, `issue:${issue.path}`) }];
-      }),
+      issue.unmetBlockers.flatMap((blocker) =>
+        (idsByReference.get(blocker) ?? []).map((from) => ({
+          from,
+          to: stableUuid(ISSUE_NAMESPACE, `issue:${issue.path}`),
+        })),
+      ),
     ),
   );
   const critical = criticalEdgesOf(ids, blockers);

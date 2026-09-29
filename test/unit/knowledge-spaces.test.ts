@@ -200,6 +200,18 @@ describe('the issue Space', () => {
     ]);
     expect(edges(issues, 'Other blockers')).toEqual(['base-01-foundation -> roof-02-paint']);
   });
+
+  it('draws a blocker naming a number two tickets claim from both of them', () => {
+    const root = repository();
+    write(root, '.scratch/base/issues/01-duplicate.md', issue('Duplicate', 'ready-for-agent'));
+    const issues = space(generate(root).spaces, 'Open issues');
+
+    const all = [...edges(issues, 'Critical paths'), ...edges(issues, 'Other blockers')];
+    expect(all.filter((edge) => edge.endsWith('-> base-03-walls')).sort()).toEqual([
+      'base-01-duplicate -> base-03-walls',
+      'base-01-foundation -> base-03-walls',
+    ]);
+  });
 });
 
 describe('criticalEdgesOf', () => {
