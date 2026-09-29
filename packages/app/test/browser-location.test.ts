@@ -8,9 +8,10 @@ import {
 } from '@project/core';
 import { productDestinationPath } from '@project/http';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import { createBrowserLocation } from '../src/browser-location';
+import { createBrowserHistory } from '../src/browser-history';
+import { createBrowserLocation, NavigationUnavailableError } from '../src/browser-location';
 import { composeApp } from '../src/compose-app';
-import { recordingHistory } from './browser-history';
+import { recordingHistory, standInBrowser } from './browser-history';
 
 /**
  * The rules that decide a browser history entry, proved without a DOM.
@@ -112,6 +113,67 @@ const resourcePath = (mapId: MapId, resourceId: ResourceId): string =>
   productDestinationPath({ kind: 'map-resource', spaceId: SPACE_ID, mapId, resourceId });
 
 const deadPath = mapPath(MISSING_MAP_ID);
+
+it('holds Maps, Graphs and browser traversal during replacement, then permits navigation', async () => {
+  const app = compose();
+  const history = recordingHistory(mapPath(MAP_ID));
+  const location = createBrowserLocation(history);
+  location.follow(app);
+  const release = Promise.withResolvers<undefined>();
+  const pending = app.imageReplacement.run(() => release.promise);
+  location.activateGraph(SECOND_GRAPH_ID);
+  location.chooseMap(OTHER_MAP_ID);
+  history.popTo(mapPath(OTHER_MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
+  expect(history.pathname()).toBe(mapPath(MAP_ID));
+  expect(history.writes).toEqual([]);
+  release.resolve(undefined);
+  await pending;
+  history.popTo(mapPath(OTHER_MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
+  history.popTo(mapPath(MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
+  location.dispose();
+});
+
+it('holds a Back refused by a replacement while a later held Back is still returning', async () => {
+  const app = compose();
+  const stand = standInBrowser({ path: mapPath(MAP_ID) });
+  const history = createBrowserHistory(stand.browser);
+  history.push(mapGraphPath(MAP_ID, SECOND_GRAPH_ID));
+  history.push(mapPath(OTHER_MAP_ID));
+  app.navigation.selectMap(OTHER_MAP_ID);
+  const opened: string[] = [];
+  const openings: PromiseWithResolvers<undefined>[] = [];
+  const location = createBrowserLocation(history, undefined, (pathname) => {
+    const opening = Promise.withResolvers<undefined>();
+    opened.push(pathname);
+    openings.push(opening);
+    return opening.promise;
+  });
+  location.follow(app);
+  stand.back();
+  stand.settle();
+  const release = Promise.withResolvers<undefined>();
+  const replacement = app.imageReplacement.run(() => release.promise);
+  // The second Back is held at once, and its rewind has not arrived when the
+  // first Back's destination refuses to open.
+  stand.back();
+  stand.step();
+  expect(history.pathname()).toBe(mapPath(MAP_ID));
+  openings[0]?.reject(new NavigationUnavailableError());
+  // Let the refusal reach the adapter before the browser applies the rewind.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(history.pathname()).toBe(mapPath(MAP_ID));
+  stand.settle();
+  expect(history.pathname()).toBe(mapPath(OTHER_MAP_ID));
+  expect(opened).toEqual([mapGraphPath(MAP_ID, SECOND_GRAPH_ID)]);
+  expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
+  release.resolve(undefined);
+  await replacement;
+  expect(history.pathname()).toBe(mapPath(OTHER_MAP_ID));
+  location.dispose();
+});
 
 describe('the browser location', () => {
   /**

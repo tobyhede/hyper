@@ -3,6 +3,7 @@ import { Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import type {
   CanvasResourceBodyEditor,
+  ImageReplaceEditor,
   CanvasSpaceResourceSelection,
   EntityActionGroup,
 } from '@project/ui';
@@ -80,7 +81,7 @@ export type ResourceNodeData = ResourceNodeKind & {
    * Closes through this same operation (ADR 0070), so a Reference Resource is
    * offered it exactly as a Markdown Resource is. What separates the kinds is
    * `onBeginBodyEditing`, which the application withholds from everything but
-   * `markdown`.
+   * `markdown` and `image`.
    */
   onEditResource?: (open: boolean) => 'completed' | 'retained';
   onBeginTitleEditing?: () => void;
@@ -109,7 +110,10 @@ export type ResourceNodeData = ResourceNodeKind & {
    * An Open Reference Resource draws its immutable Target's content through the same front.
    */
   open?: boolean;
-  /** Present only when activating the Open body may place a caret. */
+  /**
+   * Present only when the Open content may be edited: a Markdown Resource's
+   * body, or an Image Resource's image, which is replaced rather than edited.
+   */
   onBeginBodyEditing?: () => void;
   /**
    * The live body edit, absent on a Resource whose rendered Markdown is at rest.
@@ -130,6 +134,12 @@ export type ResourceNodeData = ResourceNodeKind & {
    * Open while its *title* is being renamed (ADR 0064).
    */
   bodyEditor?: CanvasResourceBodyEditor;
+  /**
+   * The running replacement of an Image Resource's image, absent while its
+   * picture is at rest. Its presence is the running replacement, as
+   * `bodyEditor`'s is a running body edit.
+   */
+  imageReplacer?: ImageReplaceEditor;
   /**
    * Resizing this Open Resource, absent on one that may not be resized.
    *

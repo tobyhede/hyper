@@ -12,7 +12,12 @@ import {
   type SpaceSession,
   type SpaceSessionState,
 } from '@project/persistence';
-import { createBrowserLocation, type BrowserLocation, type HistoryApi } from './browser-location';
+import {
+  createBrowserLocation,
+  NavigationUnavailableError,
+  type BrowserLocation,
+  type HistoryApi,
+} from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 import type { ImageSources } from './image-creation';
@@ -370,6 +375,12 @@ export function createOpenSpaces({
     report,
   );
   const compositions = new Map<UUID, Promise<OpenSpace>>();
+  const assertNavigationAvailable = (): void => {
+    const { activeSpaceId, entries } = observable.getState();
+    if (entries.find((entry) => entry.id === activeSpaceId)?.app.imageReplacement.getState()) {
+      throw new NavigationUnavailableError();
+    }
+  };
   /**
    * Entries that have been the canvas, not merely composed for an embed.
    *
@@ -597,6 +608,7 @@ export function createOpenSpaces({
     if (active !== null && active !== target.id) {
       await registry.waitUntilRetirable(active);
     }
+    assertNavigationAvailable();
     if (retired.has(target)) {
       // The exit is the newer choice and has already taken this Space off the
       // canvas, so there is nothing to reinstate — and nothing to answer with
@@ -632,6 +644,7 @@ export function createOpenSpaces({
     from: UUID | null,
     firstDisplay?: FirstCanvasSeed,
   ): Promise<OpenSpace> => {
+    assertNavigationAvailable();
     // Numbered before the Space is loaded, not after: composition is itself a
     // wait, and a request made first must not be superseded by one made second
     // merely because the second Space was already in hand.
@@ -687,6 +700,7 @@ export function createOpenSpaces({
   };
 
   const openPath: OpenSpaces['openPath'] = async (pathname) => {
+    assertNavigationAvailable();
     const { request, abandon } = beginActivation();
     try {
       return await openResolvedPath(pathname, request);
@@ -726,6 +740,7 @@ export function createOpenSpaces({
   };
 
   const switchTo = async (spaceId: UUID): Promise<OpenSpace> => {
+    assertNavigationAvailable();
     const target = observable.getState().entries.find(({ id }) => id === spaceId);
     if (target === undefined) throw new Error(`Space ${spaceId} is not open`);
     const { request, abandon } = beginActivation();
@@ -751,12 +766,14 @@ export function createOpenSpaces({
     target: OpenSpace,
     confirmation?: RejectedExitConfirmation,
   ): Promise<ExitSpaceResult> => {
+    assertNavigationAvailable();
     // Waiting and retiring cannot be one step: a coordination can raise the
     // barrier in the microtask between them, which makes this Space one of its
     // participants again. So the wait, the reading it justifies and the
     // retirement are one attempt, repeated until the retirement holds.
     for (;;) {
       await registry.waitUntilRetirable(spaceId);
+      assertNavigationAvailable();
       const persistence = target.session.getState().persistence;
       // A blocked recovery offers Retry, so its Edits are still recoverable
       // here and exiting would abandon them, as it would a retryable failure.

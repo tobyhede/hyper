@@ -19,6 +19,23 @@ const answersAfter =
       });
     });
 
+/**
+ * A Fetch that answers headers at once and then never sends the body. Like a
+ * real Fetch, aborting the request's signal errors the body it is streaming.
+ */
+const stallsBody: typeof globalThis.fetch = (_input, init) => {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      init?.signal?.addEventListener('abort', () => {
+        controller.error(new Error('aborted'));
+      });
+    },
+  });
+  return Promise.resolve(
+    new Response(body, { status: 201, headers: { 'content-type': 'application/json' } }),
+  );
+};
+
 describe('the time an image upload is given', () => {
   it('is not the read timeout, so an upload slower than a read still stores', async () => {
     const backend = new HttpSpaceBackend('http://example.test', {
@@ -36,6 +53,15 @@ describe('the time an image upload is given', () => {
     const backend = new HttpSpaceBackend('http://example.test', {
       uploadTimeoutMs: 5,
       fetch: answersAfter(60_000),
+    });
+
+    await expect(backend.storeImage(new Blob([png]))).rejects.toThrow('Request timed out');
+  }, 1000);
+
+  it('still ends an upload whose answer never finishes arriving', async () => {
+    const backend = new HttpSpaceBackend('http://example.test', {
+      uploadTimeoutMs: 5,
+      fetch: stallsBody,
     });
 
     await expect(backend.storeImage(new Blob([png]))).rejects.toThrow('Request timed out');

@@ -495,10 +495,17 @@
       // checker would be the copy that drifts. It decodes through the same
       // named predicate returning a named contract, and passes
       // `no-runtime-typeof` and `no-unsafe-dictionary-type` unaided.
+      // `packages/app/src/browser-history.ts` is the same category: the
+      // browser's `history.state` and `PopStateEvent.state` are typed `any` and
+      // hold entries this adapter did not write, including ones authored before
+      // startup, so `isHistoryPosition` must accept a value before it has a
+      // shape. It is a named predicate returning the named `HistoryPosition`,
+      // and passes the other two rules unaided.
       "files": [
         "scripts/check-typescript-toolchain.ts",
         "test/unit/check-typescript-toolchain.test.ts",
-        "scripts/ui-catalog.ts"
+        "scripts/ui-catalog.ts",
+        "packages/app/src/browser-history.ts"
       ],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"

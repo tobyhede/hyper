@@ -392,6 +392,7 @@ describe('useCanvasRendering', () => {
 describe('useAuthoringAvailability', () => {
   const facts: AuthoringFacts = {
     editable: true,
+    replacingImage: false,
     presenting: false,
     spaceOnCanvas: true,
     editingEmbeddedMap: false,
@@ -575,6 +576,7 @@ describe('useNameOnCreation', () => {
 /** What the leave guard is rendered with. */
 interface LeaveGuardProps {
   readonly kind: SpaceSessionState['persistence']['kind'];
+  readonly replacingImage?: boolean;
 }
 
 describe('useUnsettledLeaveGuard', () => {
@@ -595,6 +597,20 @@ describe('useUnsettledLeaveGuard', () => {
     unmount();
     expect(leave()).toBe(false);
   });
+
+  it('asks before leaving while an image replacement runs, even with persistence settled', () => {
+    const initialProps: LeaveGuardProps = { kind: 'settled', replacingImage: false };
+    const { rerender, unmount } = renderHook(
+      ({ kind, replacingImage }) => useUnsettledLeaveGuard(kind, replacingImage),
+      { initialProps },
+    );
+    expect(leave()).toBe(false);
+    rerender({ kind: 'settled', replacingImage: true });
+    expect(leave()).toBe(true);
+    rerender({ kind: 'settled', replacingImage: false });
+    expect(leave()).toBe(false);
+    unmount();
+  });
 });
 
 describe('useDockChrome', () => {
@@ -604,6 +620,7 @@ describe('useDockChrome', () => {
     const location = { chooseMap: vi.fn(), activateGraph: vi.fn() };
     const availability = authoringAvailability({
       editable: true,
+      replacingImage: false,
       presenting: false,
       editingResourceBody: false,
       editingResourceTitle: false,

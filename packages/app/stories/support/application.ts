@@ -19,6 +19,7 @@ export function storySpaces(
   metaSpaceId: UUID,
   snapshots: readonly SpaceSnapshot[],
   control?: MemorySpaceBackendTestControl,
+  images: ImageSources = catalogueImages,
 ): OpenSpaces {
   const backend = new MemorySpaceBackend(
     metaSpaceId,
@@ -33,7 +34,7 @@ export function storySpaces(
     metaSpaceId,
     metaSpaceTitle: meta.document.title,
     newId: newUuid,
-    images: catalogueImages,
+    images,
     history: {
       pathname: () => pathname,
       href: () => `https://example.test${pathname}`,

@@ -462,11 +462,18 @@ export interface EntityActionsProps {
  * change direct-child and sibling selectors.
  */
 export function EntityActions({ groups, children, className, render }: EntityActionsProps) {
+  const unavailable = !groups.some((group) => group.length > 0);
+  const [open, setOpen] = useState(false);
+  if (unavailable && open) setOpen(false);
   const { report, fire, announcement } = useConfirmation();
   const opener = useRef<HTMLDivElement>(null);
+  // With nothing to offer the trigger stays mounted, so the entity it wraps is
+  // not remounted, but the root is disabled: a right click then reaches the
+  // browser's own menu instead of opening an empty one. No ARIA state goes on
+  // the trigger, which is the wrapped entity's element and keeps its own role.
   return (
     <>
-      <ContextMenu>
+      <ContextMenu open={open && !unavailable} onOpenChange={setOpen} disabled={unavailable}>
         <ContextMenuTrigger
           ref={opener}
           data-slot="entity-actions"

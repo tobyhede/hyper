@@ -1,6 +1,6 @@
 import { useRef, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
+import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell, FieldSet } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
@@ -74,6 +74,10 @@ export const createApp = (
   }
 
   function App() {
+    const replacingImage = useSyncExternalStore(
+      composition.imageReplacement.subscribe,
+      composition.imageReplacement.getState,
+    );
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
     const { session: sessionState, navigation: navigationState, replacementEpoch } = authoringState;
     const { selectedMapId, activeGraphId } = navigationState;
@@ -116,6 +120,7 @@ export const createApp = (
     } = useAuthoringAvailability(
       {
         editable: hasResourcesOnCanvas,
+        replacingImage,
         presenting,
         spaceOnCanvas: active,
         editingEmbeddedMap: canvasRendering.editingEmbeddedMap,
@@ -139,7 +144,7 @@ export const createApp = (
       createReferenceFrom: placement.createReferenceFrom,
       spaces,
     });
-    useUnsettledLeaveGuard(sessionState.persistence.kind);
+    useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
     const spaceResourceTargets = useSpaceResourceTargetTitles(
       spaceResources,
       renderedSpace.resources,
@@ -260,7 +265,14 @@ export const createApp = (
               layout space from that paper: it is absolutely positioned, and
               `.graph-area` is already the positioned box it resolves against. */}
           {dockChrome === null ? null : (
-            <CommandDock chrome={dockChrome} container={graphArea} initialEdge="top" />
+            <FieldSet disabled={replacingImage} className="contents">
+              <CommandDock
+                chrome={dockChrome}
+                container={graphArea}
+                initialEdge="top"
+                disabled={replacingImage}
+              />
+            </FieldSet>
           )}
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />
@@ -316,6 +328,9 @@ export const createApp = (
                 onPlaceSpace={placement.dropSpace}
                 onDropImages={placement.dropImages}
                 onPasteImageUrl={placement.pasteImageUrl}
+                images={opened.images}
+                imageReplacement={composition.imageReplacement}
+                reportObserverError={reportObserverError}
                 nameOnCreation={nameOnCreation}
                 authoring={authoring}
                 spaceSession={spaceSession}

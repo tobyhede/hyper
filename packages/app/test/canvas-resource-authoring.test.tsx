@@ -147,6 +147,7 @@ const mountAuthoring = (
         // content edit.
         availability: authoringAvailability({
           editable: true,
+          replacingImage: false,
           presenting,
           editingResourceBody: false,
           editingResourceTitle: false,
@@ -542,6 +543,7 @@ describe('canvas Resource authoring Space rail', () => {
         nodes: [spaceNode(open, readOnly)],
         availability: authoringAvailability({
           editable: true,
+          replacingImage: false,
           presenting: false,
           editingResourceBody: false,
           editingResourceTitle: false,
@@ -648,6 +650,7 @@ describe('canvas Resource authoring decoration identity', () => {
           nodes: projection,
           availability: authoringAvailability({
             editable: true,
+            replacingImage: false,
             presenting: false,
             editingResourceBody: false,
             editingResourceTitle: false,
@@ -732,5 +735,183 @@ describe('canvas Resource authoring decoration identity', () => {
 
     expect(dataOf(result.current.nodes, RESOURCE_ID)).toBe(markdownData);
     expect(dataOf(result.current.nodes, SPACE_RESOURCE_ID)).toBe(spaceData);
+  });
+});
+
+describe('canvas Resource authoring, replacing an image', () => {
+  const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
+  const OLD_URL = 'https://example.com/old.png';
+  const withImage = spaceSnapshotSchema.parse({
+    id: SPACE_ID,
+    document: {
+      version: 1,
+      title: 'Space',
+      maps: [
+        {
+          id: MAP_ID,
+          title: 'Map',
+          kind: 'positioned',
+          positions: {
+            [IMAGE_ID]: { x: 0, y: 0, open: true, openSize: { width: 640, height: 480 } },
+          },
+          graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
+        },
+      ],
+      defaultMap: MAP_ID,
+    },
+    resources: [{ id: IMAGE_ID, document: { title: 'Figure', kind: 'image', url: OLD_URL } }],
+  });
+  const imageNode: ResourceFlowNode = {
+    id: IMAGE_ID,
+    type: 'resource',
+    position: { x: 0, y: 0 },
+    width: 640,
+    height: 480,
+    data: {
+      resourceId: IMAGE_ID,
+      title: 'Figure',
+      readOnly: false,
+      kind: 'image',
+      imageUrl: OLD_URL,
+      open: true,
+      active: false,
+      selectedForAuthoring: false,
+      showContent: false,
+      activeGraphId: GRAPH_ID,
+      activeGraphColor: '#8a94a6',
+    },
+  };
+  const mountImage = (reportObserverError = vi.fn(), measurementFails = false) => {
+    const loaded = { snapshot: withImage, revision: 0n, exportedRevision: null };
+    const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
+    const { authoring, adapter, imageReplacement } = composeApp({ spaceSession });
+    const hook = renderHook(() =>
+      useCanvasResourceAuthoring({
+        nodes: [imageNode],
+        availability: authoringAvailability({
+          editable: true,
+          replacingImage: false,
+          presenting: false,
+          editingResourceBody: false,
+          editingResourceTitle: false,
+          editingChromeTitle: false,
+          spaceOnCanvas: true,
+          editingEmbeddedMap: false,
+          creatingSpaceResource: false,
+        }),
+        nameOnCreation: null,
+        authoring,
+        spaceSession,
+        resourceResize: adapter.getState().resourceResize,
+        onSelectResource: () => undefined,
+        imageReplacing: {
+          images: {
+            store: () => Promise.reject(new Error('Nothing is stored in this test')),
+            measure: () =>
+              measurementFails
+                ? Promise.reject(new Error('Measurement failed'))
+                : Promise.resolve(undefined),
+          },
+          activity: imageReplacement,
+        },
+        reportObserverError,
+      }),
+    );
+    return { ...hook, spaceSession, imageReplacement };
+  };
+
+  it('installs the upload target when Replace begins on an Open Image Resource', () => {
+    const { result } = mountImage();
+
+    expect(onlyNode(result.current.nodes).data.imageReplacer).toBeUndefined();
+    act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
+
+    expect(onlyNode(result.current.nodes).data.imageReplacer).toBeDefined();
+    expect(result.current.bodyEditing).toBe(true);
+  });
+
+  it('answers a failed upload in the target without rejecting or changing the image', async () => {
+    const report = vi.fn(() => {
+      throw new Error('Broken diagnostic sink');
+    });
+    const { result, spaceSession } = mountImage(report);
+    act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
+    const replacer = onlyNode(result.current.nodes).data.imageReplacer;
+    const before = spaceSession.getState().working;
+    await act(async () => {
+      await expect(
+        replacer?.onReplace({
+          kind: 'files',
+          files: [new File(['bytes'], 'figure.png', { type: 'image/png' })],
+        }),
+      ).resolves.toBe('This image was not replaced: Nothing is stored in this test');
+    });
+    expect(spaceSession.getState().working).toBe(before);
+    expect(report).toHaveBeenCalledWith(new Error('Nothing is stored in this test'));
+    expect(result.current.bodyEditing).toBe(true);
+  });
+
+  it('reports an unexpected measuring rejection in the target without changing the image', async () => {
+    const report = vi.fn();
+    const { result, spaceSession } = mountImage(report, true);
+    act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
+    const before = spaceSession.getState().working;
+    await act(async () => {
+      await expect(
+        onlyNode(result.current.nodes).data.imageReplacer?.onReplace({
+          kind: 'url',
+          url: 'https://example.com/new.png',
+        }),
+      ).resolves.toBe('This image was not replaced: Measurement failed');
+    });
+    expect(report).toHaveBeenCalledWith(new Error('Measurement failed'));
+    expect(spaceSession.getState().working).toBe(before);
+    expect(result.current.bodyEditing).toBe(true);
+  });
+
+  it('answers a replacement begun while another holds the activity in the target, changing nothing', async () => {
+    const { result, spaceSession, imageReplacement } = mountImage();
+    act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
+    const held = Promise.withResolvers<undefined>();
+    const holding = imageReplacement.run(() => held.promise);
+    const before = spaceSession.getState().working;
+
+    await act(async () => {
+      await expect(
+        onlyNode(result.current.nodes).data.imageReplacer?.onReplace({
+          kind: 'url',
+          url: 'https://example.com/new.png',
+        }),
+      ).resolves.toBe('Another image is still being replaced.');
+    });
+    expect(spaceSession.getState().working).toBe(before);
+    expect(imageReplacement.getState()).toBe(true);
+
+    held.resolve(undefined);
+    await holding;
+    expect(imageReplacement.getState()).toBe(false);
+  });
+
+  it('replaces the image from the target in one Edit, and says a refusal in the application’s words', async () => {
+    const { result, spaceSession } = mountImage();
+    act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
+    const replacer = onlyNode(result.current.nodes).data.imageReplacer;
+
+    let refused: string | null | undefined;
+    let replaced: string | null | undefined;
+    await act(async () => {
+      refused = await replacer?.onReplace({ kind: 'url', url: 'data:image/png;base64,AAAA' });
+      replaced = await replacer?.onReplace({ kind: 'url', url: 'https://example.com/new.png' });
+    });
+    expect(refused).toBe('An image URL must start with https: or http:.');
+    expect(replaced).toBeNull();
+
+    expect(spaceSession.getState().working.resources[0]?.document).toEqual({
+      title: 'Figure',
+      kind: 'image',
+      url: 'https://example.com/new.png',
+    });
+    act(() => replacer?.onEnd());
+    expect(onlyNode(result.current.nodes).data.imageReplacer).toBeUndefined();
   });
 });

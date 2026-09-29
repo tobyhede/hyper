@@ -7,11 +7,22 @@ import {
   type ResourceId,
   type GraphId,
 } from '@project/core';
-import type { SpaceSession } from '@project/persistence';
+import {
+  createNonThrowingReporter,
+  type ObserverErrorReporter,
+  type SpaceSession,
+} from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import type { EntityActionGroup } from '@project/ui';
+import type { EntityActionGroup, ImageReplacement } from '@project/ui';
+import { PICKED_IMAGE_TYPES, type ImageSources } from './image-creation';
+import { describeImageReplacement, replaceImage } from './image-replacement';
+import { type ImageReplacementActivity } from './image-replacement-activity';
 import type { AuthoringAvailability } from './authoring-availability';
-import { describeAuthoringRefusal } from './authoring-refusal';
+import {
+  describeAuthoringRefusal,
+  describeImageReplacementBreak,
+  describeImageReplacementPending,
+} from './authoring-refusal';
 import type { ResourceResize } from './render-adapter';
 import type { SpaceAuthoring } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
@@ -21,10 +32,21 @@ import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-re
 import type { SpaceResourceFraming } from './space-resource-framing';
 import {
   applyResourceDataPatch,
+  decorateImageResourceNode,
   decorateMarkdownResourceNode,
   decorateSharedResourceNode,
   decorateSpaceResourceNode,
 } from './canvas-resource-decoration';
+
+/**
+ * Where a replaced image is stored and measured (ADR 0106), and the activity
+ * that keeps one replacement running at a time. One value, so Replace cannot be
+ * offered without the activity that holds navigation and authoring meanwhile.
+ */
+export interface ImageReplacing {
+  readonly images: ImageSources;
+  readonly activity: ImageReplacementActivity;
+}
 
 type Caret =
   | { readonly resourceId: string; readonly field: 'title' }
@@ -96,12 +118,19 @@ export interface CanvasResourceAuthoringInput {
    */
   readonly availability: AuthoringAvailability;
   readonly nameOnCreation: string | null;
-  readonly authoring: Pick<SpaceAuthoring, 'complete'>;
+  readonly authoring: Pick<SpaceAuthoring, 'complete' | 'getState'>;
   readonly spaceSession: SpaceSession;
   readonly resourceResize: ResourceResize;
   readonly onSelectResource: (resourceId: ResourceId) => void;
   readonly onBodyEditingChange?: ((editing: boolean) => void) | undefined;
   readonly onTitleEditingChange?: ((editing: boolean) => void) | undefined;
+  /**
+   * Where a replaced image is stored and measured (ADR 0106), with the activity
+   * that holds navigation and authoring while it runs. Absent offers no Replace
+   * on an Image Resource.
+   */
+  readonly imageReplacing?: ImageReplacing | undefined;
+  readonly reportObserverError?: ObserverErrorReporter | undefined;
   /**
    * What each referenced Space offers a Space Resource to select, keyed by target.
    *
@@ -162,6 +191,8 @@ export function useCanvasResourceAuthoring({
   onSelectResource,
   onBodyEditingChange,
   onTitleEditingChange,
+  imageReplacing,
+  reportObserverError = console.error,
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   portalEditing,
@@ -176,23 +207,31 @@ export function useCanvasResourceAuthoring({
   );
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleResourceId = caret?.field === 'title' ? caret.resourceId : null;
-  const bodyCaretNamesOpenMarkdown =
+  /**
+   * The body caret is on content that can be edited in place: an Open Markdown
+   * Resource's body, or an Open Image Resource's image where images can be
+   * stored, which is replaced rather than edited.
+   */
+  const bodyCaretNamesOpenContent =
     caret?.field === 'body' &&
     nodes.some(
       (node) =>
-        node.id === caret.resourceId && node.data.open === true && node.data.kind === 'markdown',
+        node.id === caret.resourceId &&
+        node.data.open === true &&
+        (node.data.kind === 'markdown' ||
+          (node.data.kind === 'image' && imageReplacing !== undefined)),
     );
 
   if (caret?.field === 'body') {
-    if (bodyCaretNamesOpenMarkdown && !caret.openObserved) {
+    if (bodyCaretNamesOpenContent && !caret.openObserved) {
       setCaret({ ...caret, openObserved: true });
-    } else if (!bodyCaretNamesOpenMarkdown && caret.openObserved) {
+    } else if (!bodyCaretNamesOpenContent && caret.openObserved) {
       setCaret(null);
     }
   }
 
   const bodyEditorResourceId =
-    caret?.field === 'body' && availability.editResourceBody && bodyCaretNamesOpenMarkdown
+    caret?.field === 'body' && availability.editResourceBody && bodyCaretNamesOpenContent
       ? caret.resourceId
       : null;
   const bodyEditing = bodyEditorResourceId !== null;
@@ -291,6 +330,35 @@ export function useCanvasResourceAuthoring({
     },
     [authoring, spaceSession],
   );
+
+  const replaceResourceImage = useMemo(() => {
+    if (imageReplacing === undefined) return undefined;
+    const { images, activity } = imageReplacing;
+    return (resourceId: ResourceId, replacement: ImageReplacement): Promise<string | null> =>
+      // A target mounted while another replacement holds the activity is
+      // answered in its own words rather than by the activity's rejection.
+      activity.getState()
+        ? Promise.resolve(describeImageReplacementPending())
+        : activity.run(async () => {
+            const stored = spaceSession
+              .getState()
+              .working.resources.find((resource) => resource.id === resourceId);
+            if (stored?.document.kind !== 'image') {
+              return describeAuthoringRefusal({ code: 'resource-not-found' });
+            }
+            try {
+              const result = await replaceImage(
+                { images, authoring },
+                { resourceId, url: stored.document.url },
+                replacement,
+              );
+              return describeImageReplacement(result);
+            } catch (failure) {
+              createNonThrowingReporter(reportObserverError)(failure);
+              return describeImageReplacementBreak(failure);
+            }
+          });
+  }, [authoring, imageReplacing, spaceSession, reportObserverError]);
 
   const completeResourceTitle = useCallback(
     (resourceIdInput: string, title: string): string | null => {
@@ -430,6 +498,7 @@ export function useCanvasResourceAuthoring({
     () => ({
       authorOnCanvas: availability.authorOnCanvas,
       bodyEditing,
+      bodyEditorResourceId,
       editableResourceIds,
       openResource,
       closeResource,
@@ -444,6 +513,7 @@ export function useCanvasResourceAuthoring({
     [
       availability.authorOnCanvas,
       bodyEditing,
+      bodyEditorResourceId,
       editableResourceIds,
       openResource,
       closeResource,
@@ -473,6 +543,27 @@ export function useCanvasResourceAuthoring({
       beginBodyEditing,
       bodyEditorResourceId,
       completeResourceBody,
+      clearCaret,
+    ],
+  );
+  const imageContext = useMemo(
+    () => ({
+      authorOnCanvas: availability.authorOnCanvas,
+      bodyEditing,
+      editableResourceIds,
+      beginBodyEditing,
+      bodyEditorResourceId,
+      replaceResourceImage,
+      imageAccept: PICKED_IMAGE_TYPES,
+      clearCaret,
+    }),
+    [
+      availability.authorOnCanvas,
+      bodyEditing,
+      editableResourceIds,
+      beginBodyEditing,
+      bodyEditorResourceId,
+      replaceResourceImage,
       clearCaret,
     ],
   );
@@ -528,6 +619,18 @@ export function useCanvasResourceAuthoring({
     }
     return next;
   }, [withShared, markdownContext]);
+  const imageDecorated = useMemo(() => {
+    const next = new Map<string, ResourceFlowNode>();
+    for (const node of withShared) {
+      if (node.data.kind === 'image') {
+        next.set(
+          node.id,
+          applyResourceDataPatch(node, decorateImageResourceNode(node, imageContext)),
+        );
+      }
+    }
+    return next;
+  }, [withShared, imageContext]);
   const spaceDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
@@ -543,9 +646,13 @@ export function useCanvasResourceAuthoring({
   const decoratedNodes = useMemo(
     () =>
       withShared.map(
-        (node) => markdownDecorated.get(node.id) ?? spaceDecorated.get(node.id) ?? node,
+        (node) =>
+          markdownDecorated.get(node.id) ??
+          imageDecorated.get(node.id) ??
+          spaceDecorated.get(node.id) ??
+          node,
       ),
-    [withShared, markdownDecorated, spaceDecorated],
+    [withShared, markdownDecorated, imageDecorated, spaceDecorated],
   );
 
   return {

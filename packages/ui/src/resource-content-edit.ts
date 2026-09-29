@@ -10,10 +10,19 @@ import { createContext, useContext } from 'react';
  * the Resource can draw them.
  */
 export interface ResourceContentEdit {
-  /** Commit the draft, exactly as `Mod-Enter` does. */
-  readonly onSave: () => void;
+  /**
+   * Commit the draft, exactly as `Mod-Enter` does. Absent where the content
+   * commits itself — a replaced image completes when its picture is given —
+   * so the Resource draws no Save.
+   */
+  readonly onSave?: () => void;
   /** Abandon it, exactly as `Escape` does. */
   readonly onCancel: () => void;
+  /**
+   * The content is waiting on an answer it has to show, so the edit cannot be
+   * ended yet and Cancel is drawn unavailable. Absent means not busy.
+   */
+  readonly busy?: boolean;
 }
 
 /**

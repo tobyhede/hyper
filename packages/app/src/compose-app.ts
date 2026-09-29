@@ -12,6 +12,10 @@ import { createRenderAdapter, type RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
 import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
+import {
+  createImageReplacementActivity,
+  type ImageReplacementActivity,
+} from './image-replacement-activity';
 
 /**
  * What an opened Space is composed of.
@@ -115,6 +119,7 @@ export interface AppCore {
 }
 
 export interface ComposedApp extends AppCore {
+  readonly imageReplacement: ImageReplacementActivity;
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;
   /**
@@ -221,6 +226,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   });
   return {
     ...core,
+    imageReplacement: createImageReplacementActivity(compositionReporter),
     authoring,
     adapter,
     continuation,

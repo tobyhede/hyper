@@ -33,6 +33,12 @@ import {
 import type { StoredSpaceRefusal } from '../space-authoring';
 
 export interface PersistenceControlProps {
+  /**
+   * Draw a conflict's Reload, Keep local and retry and Open of the blocking
+   * Space unavailable, while an image replacement holds the application.
+   * Acknowledging a rejection stays available: it only dismisses the dialog.
+   */
+  readonly disabled?: boolean;
   readonly active?: boolean;
   readonly persistence: SpaceSessionState['persistence'];
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
@@ -77,6 +83,7 @@ const rejectionDescription = ({ failure }: Rejection): string =>
  * never shows.
  */
 export function PersistenceControl({
+  disabled = false,
   active = true,
   persistence,
   onAcceptRemote,
@@ -102,6 +109,7 @@ export function PersistenceControl({
   if (persistence.kind === 'conflicted') {
     return (
       <ConflictControl
+        disabled={disabled}
         conflict={persistence}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={onKeepLocal}
@@ -189,9 +197,11 @@ export function PersistenceNotice({
 function OpenBlockingSpaceButton({
   blocked,
   onOpenSpace,
+  disabled = false,
 }: {
   readonly blocked: SaveBlock | undefined;
   readonly onOpenSpace: OpenBlockingSpace | null;
+  readonly disabled?: boolean;
 }) {
   if (blocked?.code !== 'persistence-recovery-required' || onOpenSpace === null) return null;
   return (
@@ -200,6 +210,7 @@ function OpenBlockingSpaceButton({
         variant="secondary"
         size="compact"
         data-testid="persistence-open-blocking-space"
+        disabled={disabled}
         onClick={() => {
           onOpenSpace(blocked.spaceId, blocked.title);
         }}
@@ -240,11 +251,13 @@ interface RefusedRecovery {
  * conflict.
  */
 function ConflictControl({
+  disabled,
   conflict,
   onAcceptRemote,
   onKeepLocal,
   onOpenSpace,
 }: {
+  readonly disabled: boolean;
   readonly conflict: Conflict;
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
@@ -278,13 +291,18 @@ function ConflictControl({
           <Alert variant="destructive" data-testid="persistence-keep-local-blocked">
             <AlertTitle>Unable to keep local</AlertTitle>
             <AlertDescription>{describeSaveBlock(conflict.blocked)}</AlertDescription>
-            <OpenBlockingSpaceButton blocked={conflict.blocked} onOpenSpace={onOpenSpace} />
+            <OpenBlockingSpaceButton
+              blocked={conflict.blocked}
+              onOpenSpace={onOpenSpace}
+              disabled={disabled}
+            />
           </Alert>
         )}
         <AlertDialogFooter>
           <Button
             variant="secondary"
             data-testid="persistence-accept-remote"
+            disabled={disabled}
             onClick={() => {
               const refusal = onAcceptRemote();
               setRefused(refusal === null ? null : { conflict, refusal });
@@ -292,7 +310,12 @@ function ConflictControl({
           >
             Reload
           </Button>
-          <Button variant="default" data-testid="persistence-keep-local" onClick={onKeepLocal}>
+          <Button
+            variant="default"
+            data-testid="persistence-keep-local"
+            onClick={onKeepLocal}
+            disabled={disabled}
+          >
             Keep local and retry
           </Button>
         </AlertDialogFooter>

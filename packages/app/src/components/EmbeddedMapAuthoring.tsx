@@ -129,6 +129,7 @@ export function EmbeddedMapAuthoring({
     () =>
       authoringAvailability({
         editable: true,
+        replacingImage: false,
         presenting: false,
 
         editingResourceBody: false,

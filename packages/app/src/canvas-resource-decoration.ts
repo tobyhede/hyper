@@ -6,7 +6,7 @@ import {
   type UUID,
 } from '@project/core';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
-import type { EntityActionGroup } from '@project/ui';
+import type { EntityActionGroup, ImageReplacement } from '@project/ui';
 import { buildSpaceResourceRail } from './build-space-resource-rail';
 import type { SpaceResourceRailContext } from './space-resource-context-commands';
 import type { CommandOutcomes } from './command-outcomes';
@@ -28,6 +28,7 @@ export type CanvasResourceDataPatch = Partial<
     | 'entityActions'
     | 'onBeginBodyEditing'
     | 'bodyEditor'
+    | 'imageReplacer'
     | 'spaceRail'
     | 'contextNotice'
     | 'portal'
@@ -53,6 +54,14 @@ export interface CanvasResourceDecorationContext {
   readonly beginBodyEditing: (node: ResourceFlowNode) => void;
   readonly bodyEditorResourceId: string | null;
   readonly completeResourceBody: (resourceId: ResourceId, body: string) => 'completed' | 'retained';
+  /**
+   * Replace an Image Resource's image, answering the sentence for a refusal or
+   * `null` once the replacement is over. Absent where no image can be stored.
+   */
+  readonly replaceResourceImage?:
+    ((resourceId: ResourceId, replacement: ImageReplacement) => Promise<string | null>) | undefined;
+  /** What a replacement's file picker offers. */
+  readonly imageAccept: string;
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
   readonly containingSpaceId: UUID;
@@ -84,6 +93,7 @@ type SharedResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   | 'authorOnCanvas'
   | 'bodyEditing'
+  | 'bodyEditorResourceId'
   | 'editableResourceIds'
   | 'openResource'
   | 'closeResource'
@@ -104,6 +114,18 @@ type MarkdownResourceDecorationContext = Pick<
   | 'beginBodyEditing'
   | 'bodyEditorResourceId'
   | 'completeResourceBody'
+  | 'clearCaret'
+>;
+
+type ImageResourceDecorationContext = Pick<
+  CanvasResourceDecorationContext,
+  | 'authorOnCanvas'
+  | 'bodyEditing'
+  | 'editableResourceIds'
+  | 'beginBodyEditing'
+  | 'bodyEditorResourceId'
+  | 'replaceResourceImage'
+  | 'imageAccept'
   | 'clearCaret'
 >;
 
@@ -138,6 +160,13 @@ export function decorateSharedResourceNode(
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
     patch.onEditResource = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
+  } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {
+    // A live content editor keeps its Close drawn when the canvas withdraws
+    // authoring — a running image replacement withdraws it — so the control
+    // stays in its slot, unavailable, instead of vanishing and returning.
+    // `CanvasResource` draws it disabled while the edit runs; withdrawn, it
+    // also retains rather than running an Open or Close Edit.
+    patch.onEditResource = () => 'retained';
   }
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);
@@ -183,15 +212,19 @@ export function decorateSharedResourceNode(
       onCancel: () => context.clearCaret(),
     };
   }
-  if (
-    context.resourceEntityActions !== undefined &&
-    resourceBelongsToWorkingSpace &&
-    context.authorOnCanvas
-  ) {
+  if (context.resourceEntityActions !== undefined && resourceBelongsToWorkingSpace) {
     // The same gate every other control on the rail takes: these commands are
     // drawn in that rail, so a canvas that has withdrawn authoring would
-    // otherwise reinstate the one cluster that survived it.
-    patch.entityActions = context.resourceEntityActions(node.data.resourceId);
+    // otherwise reinstate the one cluster that survived it. Withdrawn is `[]`,
+    // never `undefined`: `CanvasResource` keeps its `EntityActions` wrapper
+    // mounted for any defined list, so withdrawing authoring does not remount
+    // the Resource and lose a running replacement's target. Held by
+    // `canvas-resource-decoration.test.ts` ('asks for entity actions only where
+    // authoring is on…') and `CanvasResource.test.tsx` ('keeps a pending
+    // replacement mounted when its entity actions become unavailable').
+    patch.entityActions = context.authorOnCanvas
+      ? context.resourceEntityActions(node.data.resourceId)
+      : [];
   }
   return patch;
 }
@@ -217,6 +250,33 @@ export function decorateMarkdownResourceNode(
   ) {
     patch.bodyEditor = {
       onComplete: (body) => context.completeResourceBody(node.data.resourceId, body),
+      onEnd: () => context.clearCaret(),
+    };
+  }
+  return patch;
+}
+
+/**
+ * An Image Resource's Replace, which takes the place a Markdown Resource's body
+ * edit takes, through the same caret (ADR 0064): beginning it, and the running
+ * replacement while the caret is on it.
+ */
+export function decorateImageResourceNode(
+  node: ResourceFlowNode,
+  context: ImageResourceDecorationContext,
+): CanvasResourceDataPatch {
+  const replace = context.replaceResourceImage;
+  if (node.data.kind !== 'image' || replace === undefined) return {};
+  const patch: Mutable<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'imageReplacer'>> = {};
+  const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
+  if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
+    patch.onBeginBodyEditing = () => context.beginBodyEditing(node);
+  }
+  if (resourceBelongsToWorkingSpace && context.bodyEditorResourceId === node.id) {
+    const resourceId = node.data.resourceId;
+    patch.imageReplacer = {
+      accept: context.imageAccept,
+      onReplace: (replacement) => replace(resourceId, replacement),
       onEnd: () => context.clearCaret(),
     };
   }

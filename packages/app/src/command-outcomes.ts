@@ -16,7 +16,7 @@ import { failureMessage } from './failure-message';
 import { TitledBreak, type CompletedContextEdit, type EditOutcome } from './authoring-commands';
 import { GRAPH_REPORT_TITLES } from './graph-authoring-commands';
 import { MAP_REPORT_TITLES } from './map-authoring-commands';
-import type { ImageCreationResult } from './image-creation';
+import type { ImageEditResult } from './image-creation';
 import type { Navigation } from './navigation';
 import type { ExitSpaceResult, OpenSpace, SelectSpaceResult } from './open-spaces';
 import type { AuthoringResult, SpaceAuthoring } from './space-authoring';
@@ -295,8 +295,8 @@ interface CommandSignatures {
     readonly options: [options?: CommandContinuation<Completed<AuthoringResult>>];
   };
   readonly 'image-create': {
-    readonly result: ImageCreationResult;
-    readonly options: [options?: CommandContinuation<Completed<ImageCreationResult>>];
+    readonly result: ImageEditResult;
+    readonly options: [options?: CommandContinuation<Completed<ImageEditResult>>];
   };
   readonly 'space-enter': {
     readonly result: OpenSpace;

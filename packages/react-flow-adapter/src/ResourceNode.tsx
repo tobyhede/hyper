@@ -179,10 +179,13 @@ export function ResourceNode({
   if (data.spaceRail !== undefined) spaceFront.spaceRail = data.spaceRail;
   if (data.portal !== undefined) spaceFront.portal = data.portal;
   // Closed, an Image Resource draws its Title and kind and no thumbnail; Open, its
-  // picture is the content the Markdown front would draw.
+  // picture is the content the Markdown front would draw, and replacing it
+  // takes the place a body edit takes there.
   const imageFront = (url: string): ImageFront => {
     const image: ImageFront = { kind: 'image', url, open: data.open === true };
     if (data.onEditResource !== undefined) image.onOpenChange = data.onEditResource;
+    if (data.onBeginBodyEditing !== undefined) image.onBeginEdit = data.onBeginBodyEditing;
+    if (data.imageReplacer !== undefined) image.editor = data.imageReplacer;
     return image;
   };
   const front =
@@ -408,6 +411,7 @@ export function ResourceNode({
   const toolbarVisible =
     ((visuallySelected && !otherSelected) ||
       data.bodyEditor !== undefined ||
+      data.imageReplacer !== undefined ||
       data.portal?.editing === true) &&
     !dragging &&
     !resizeActive;

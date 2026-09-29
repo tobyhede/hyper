@@ -13,6 +13,7 @@ import {
  */
 const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editable: true,
+  replacingImage: false,
   presenting: false,
   editingResourceBody: false,
   editingResourceTitle: false,
@@ -40,6 +41,13 @@ const ALL_AVAILABLE: AuthoringAvailability = {
 };
 
 describe('authoring availability', () => {
+  it('withdraws other operations while replacing an image but keeps its editor mounted', () => {
+    expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, replacingImage: true })).toEqual(
+      Object.fromEntries(
+        Object.keys(ALL_AVAILABLE).map((key) => [key, key === 'editResourceBody']),
+      ),
+    );
+  });
   it('offers every operation when nothing is in progress', () => {
     expect(authoringAvailability(NOTHING_IN_PROGRESS)).toStrictEqual(ALL_AVAILABLE);
   });

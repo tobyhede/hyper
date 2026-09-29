@@ -341,6 +341,7 @@ function CanvasHarness({
         placementReady={true}
         availability={authoringAvailability({
           editable: true,
+          replacingImage: false,
           presenting,
           editingResourceBody: false,
           editingResourceTitle: false,

@@ -110,6 +110,14 @@ export {
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
 export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
+export { ImageFilePicker } from './ImageFilePicker';
+export { ImageReplaceTarget } from './ImageReplaceTarget';
+export type {
+  ImageReplaceEditor,
+  ImageReplaceTargetProps,
+  ImageReplacement,
+} from './ImageReplaceTarget';
+export type { ImageFilePickerProps } from './ImageFilePicker';
 export { PaletteColorPicker } from './PaletteColorPicker';
 export type { PaletteColorEntry, PaletteColorPickerProps } from './PaletteColorPicker';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
