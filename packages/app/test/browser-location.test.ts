@@ -113,6 +113,28 @@ const resourcePath = (mapId: MapId, resourceId: ResourceId): string =>
 
 const deadPath = mapPath(MISSING_MAP_ID);
 
+it('holds Maps, Graphs and browser traversal during replacement, then permits navigation', async () => {
+  const app = compose();
+  const history = recordingHistory(mapPath(MAP_ID));
+  const location = createBrowserLocation(history);
+  location.follow(app);
+  const release = Promise.withResolvers<undefined>();
+  const pending = app.imageReplacement.run(() => release.promise);
+  location.activateGraph(SECOND_GRAPH_ID);
+  location.chooseMap(OTHER_MAP_ID);
+  history.popTo(mapPath(OTHER_MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
+  expect(history.pathname()).toBe(mapPath(MAP_ID));
+  expect(history.writes).toEqual([]);
+  release.resolve(undefined);
+  await pending;
+  history.popTo(mapPath(OTHER_MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
+  history.popTo(mapPath(MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
+  location.dispose();
+});
+
 describe('the browser location', () => {
   /**
    * Startup reads the location once and composes from it, so the position the

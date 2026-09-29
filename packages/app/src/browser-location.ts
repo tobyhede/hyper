@@ -29,7 +29,25 @@ export interface HistoryApi {
   readonly href: () => string;
   readonly push: (path: string) => void;
   readonly replace: (path: string) => void;
-  readonly onPopState: (listener: () => void) => () => void;
+  readonly onPopState: (listener: () => PopStateAnswer) => () => void;
+}
+
+/**
+ * Whether a traversal the browser has made is kept.
+ *
+ * `false` holds the entry the traversal left: the adapter returns the browser
+ * to it and keeps both entries. A promise answers later, for a destination that
+ * has to be opened before it is known to be reachable; the adapter holds on a
+ * late `false` only while nothing has moved the browser since that traversal.
+ */
+export type PopStateAnswer = undefined | false | Promise<undefined | false>;
+
+/** Navigation refused because the Space on the canvas is mid-way through an exclusive operation. */
+export class NavigationUnavailableError extends Error {
+  constructor() {
+    super('Navigation is unavailable while an image replacement is pending.');
+    this.name = 'NavigationUnavailableError';
+  }
 }
 
 /**
@@ -238,6 +256,7 @@ export function createBrowserLocation(
    * the published projection.
    */
   const deliberateMove = (move: () => void): void => {
+    if (followed?.imageReplacement.getState() === true) return;
     addressedResourceId = null;
     destinationNotFound = false;
     move();
@@ -297,20 +316,29 @@ export function createBrowserLocation(
     settle();
   };
 
+  const navigationHeld = (): boolean => followed?.imageReplacement.getState() === true;
+
   let restorationRequest = 0;
-  const restore = (): void => {
+  const restore = (): PopStateAnswer => {
+    if (navigationHeld()) return false;
     if (openPath === undefined) {
       restoreFollowed();
-      return;
+      return undefined;
     }
     const request = ++restorationRequest;
     const pathname = history.pathname();
-    void openPath(pathname).then(
-      () => {
-        if (request === restorationRequest && history.pathname() === pathname) restoreFollowed();
-      },
-      () => {
-        if (request !== restorationRequest || history.pathname() !== pathname) return;
+    const current = (): boolean =>
+      request === restorationRequest && history.pathname() === pathname;
+    // The lock is read again once the destination has opened, because a
+    // replacement can begin while it is being resolved. Either way the reader
+    // stays where they were, on the entry they left, rather than on a location
+    // the canvas does not show.
+    const opened = async (): Promise<undefined | false> => {
+      try {
+        await openPath(pathname);
+      } catch (error) {
+        if (!current()) return undefined;
+        if (error instanceof NavigationUnavailableError) return false;
         // One rejection refuses two different resources, and only one of them is a
         // destination that failed to resolve. A location outside product
         // addressing refuses to open because it is not an address of ours: the
@@ -326,12 +354,18 @@ export function createBrowserLocation(
             pathname,
           ).kind === 'ignored'
         ) {
-          return;
+          return undefined;
         }
         destinationNotFound = true;
         publish();
-      },
-    );
+        return undefined;
+      }
+      if (!current()) return undefined;
+      if (navigationHeld()) return false;
+      restoreFollowed();
+      return undefined;
+    };
+    return opened();
   };
   const releasePopState = history.onPopState(restore);
 

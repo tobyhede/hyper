@@ -6,6 +6,7 @@ import {
   MemorySpaceBackendTestControl,
   type CommitResult,
 } from '@project/persistence';
+import { NavigationUnavailableError } from '../src/browser-location';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
@@ -158,6 +159,68 @@ const setup = (
     }),
   };
 };
+
+it('holds Space navigation and an Exit already waiting on persistence during replacement', async () => {
+  const control = new MemorySpaceBackendTestControl();
+  const { openSpaces } = setup(control);
+  await openSpaces.open(META_ID);
+  const other = await openSpaces.open(OTHER_ID);
+  const releaseCommit = control.deferNextCommit();
+  other.session.submit(edit(other.session.getState().working));
+  const exiting = openSpaces.exit(OTHER_ID);
+  const held = Promise.withResolvers<undefined>();
+  const replacement = other.app.imageReplacement.run(() => held.promise);
+  await expect(openSpaces.select(META_ID)).rejects.toThrow('Navigation is unavailable');
+  const refusedExit = expect(exiting).rejects.toThrow('Navigation is unavailable');
+  releaseCommit();
+  await refusedExit;
+  expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+  expect(openSpaces.entry(OTHER_ID)).toBe(other);
+  held.resolve(undefined);
+  await replacement;
+  await openSpaces.select(META_ID);
+  expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
+});
+
+it('refuses opening an address and entering a Space during replacement', async () => {
+  const { openSpaces, history } = setup();
+  await openSpaces.open(META_ID);
+  const other = await openSpaces.open(OTHER_ID);
+  const writes = [...history.writes];
+  const held = Promise.withResolvers<undefined>();
+  const replacement = other.app.imageReplacement.run(() => held.promise);
+  const metaPath = productDestinationPath({ kind: 'map', spaceId: META_ID, mapId: META_MAP_ID });
+  await expect(openSpaces.openPath(metaPath)).rejects.toThrow(NavigationUnavailableError);
+  await expect(openSpaces.enter(META_ID)).rejects.toThrow(NavigationUnavailableError);
+  await expect(openSpaces.open(META_ID)).rejects.toThrow(NavigationUnavailableError);
+  expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+  expect(history.writes).toEqual(writes);
+  held.resolve(undefined);
+  await replacement;
+  await openSpaces.enter(META_ID);
+  expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
+});
+
+it('holds a Back to another Space when a replacement starts while that Space opens', async () => {
+  const { openSpaces, history } = setup();
+  await openSpaces.open(META_ID);
+  const metaPath = productDestinationPath({ kind: 'map', spaceId: META_ID, mapId: META_MAP_ID });
+  const other = await openSpaces.open(OTHER_ID);
+  const otherPath = history.pathname();
+  const held = Promise.withResolvers<undefined>();
+  history.popTo(metaPath);
+  // The traversal passed the lock check; the replacement begins while the
+  // destination is still being resolved.
+  const replacement = other.app.imageReplacement.run(() => held.promise);
+  await vi.waitFor(() => expect(history.pathname()).toBe(otherPath));
+  expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+  expect(openSpaces.browserLocation.getState().destinationNotFound).toBe(false);
+  held.resolve(undefined);
+  await replacement;
+  history.popTo(metaPath);
+  await vi.waitFor(() => expect(openSpaces.getState().activeSpaceId).toBe(META_ID));
+  expect(openSpaces.browserLocation.getState().destinationNotFound).toBe(false);
+});
 
 /** Distinct ids for a Space Resource coordination, which mints several per call. */
 const countingIds = (): (() => UUID) => {

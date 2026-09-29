@@ -2,6 +2,7 @@ import { HttpSpaceBackend } from '@project/http';
 import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
 import type { SpaceBackend } from '@project/persistence';
 import type { HistoryApi } from './browser-location';
+import { createBrowserHistory } from './browser-history';
 import type { ImageSources } from './image-creation';
 import type { OpenedApplicationStartup } from './startup';
 import { createOpenSpaces, type OpenSpaces } from './open-spaces';
@@ -15,21 +16,11 @@ export interface SpaceStartup {
 /**
  * The one adapter over the real browser (ADR 0081).
  *
- * `window.history` and `window.location` are named here and in `main.tsx`, and
- * nowhere else in `packages/app/src`: everything above this takes
+ * The native history adapter lives in `browser-history.ts`; everything above this takes
  * {@link HistoryApi}, which is what makes the rules that decide a history entry
  * testable without a DOM.
  */
-const browserHistory = (): HistoryApi => ({
-  pathname: () => window.location.pathname,
-  href: () => window.location.href,
-  push: (path) => window.history.pushState(null, '', path),
-  replace: (path) => window.history.replaceState(null, '', path),
-  onPopState: (listener) => {
-    window.addEventListener('popstate', listener);
-    return () => window.removeEventListener('popstate', listener);
-  },
-});
+const browserHistory = (): HistoryApi => createBrowserHistory(window);
 
 /** How long a picture may take to load before it is taken as one that did not. */
 const MEASURE_TIMEOUT_MS = 10_000;

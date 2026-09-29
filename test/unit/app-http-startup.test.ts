@@ -9,8 +9,9 @@ import { recordingHistory } from '../../packages/app/test/browser-history';
 /**
  * Startup over the recording browser rather than the ambient one.
  *
- * `createSpaceStartup` is the one module that names `window.history` and
- * `window.location`, and it names them as the default third seam (ADR 0081).
+ * `createSpaceStartup` is where the ambient `window` is named: its default
+ * third seam hands it to `createBrowserHistory`, the one adapter that reads
+ * `window.location` and writes `window.history` (ADR 0081).
  * These tests run in the node environment, so each supplies the other adapter —
  * which is what a seam required below the composition root is for.
  */
