@@ -1779,3 +1779,120 @@ describe('CanvasResource Open Markdown body', () => {
     expect(onBeginEdit).toHaveBeenCalledOnce();
   });
 });
+
+describe('CanvasResource Close fade', () => {
+  function leavingContent(): HTMLElement {
+    const article = screen.getByRole('article', { name: 'A' });
+    const content = article.querySelector<HTMLElement>('.canvas-resource__content');
+    if (content === null) throw new Error('The content area is not mounted.');
+    expect(content).toHaveAttribute('data-presence', 'leaving');
+    return content;
+  }
+
+  it('keeps the Markdown it last drew while the content fades out', () => {
+    const { rerender } = render(
+      <CanvasResource
+        front={{ kind: 'markdown', source: '## Hello', open: true }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+    rerender(
+      <CanvasResource
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    expect(leavingContent()).toHaveTextContent('Hello');
+  });
+
+  it('draws the new content when re-opened while leaving', () => {
+    const { rerender } = render(
+      <CanvasResource
+        front={{ kind: 'markdown', source: 'Before', open: true }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+    rerender(
+      <CanvasResource
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+    rerender(
+      <CanvasResource
+        front={{ kind: 'markdown', source: 'After', open: true }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    const content = screen
+      .getByRole('article', { name: 'A' })
+      .querySelector('.canvas-resource__content');
+    expect(content).toHaveAttribute('data-presence', 'entering');
+    expect(content).toHaveTextContent('After');
+    expect(content).not.toHaveTextContent('Before');
+  });
+
+  it('fades out rendered Markdown, not the editor, when closed while its body is edited', () => {
+    const { rerender } = render(
+      <CanvasResource
+        front={{
+          kind: 'markdown',
+          source: 'Hello',
+          open: true,
+          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
+        }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Save Resource A' })).toBeVisible();
+
+    rerender(
+      <CanvasResource
+        front={{ kind: 'markdown', source: '', open: false }}
+        state="selected"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    const content = leavingContent();
+    expect(content).toHaveTextContent('Hello');
+    expect(content.querySelector('.markdown-resource-body--editing')).toBeNull();
+    expect(content.querySelector('.markdown-resource-body__rendered')).not.toBeNull();
+  });
+
+  it('keeps the picture an Image Resource last drew while the content fades out', () => {
+    const { rerender } = render(
+      <CanvasResource
+        front={{ kind: 'image', url: FIGURE_URL, open: true }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+    rerender(
+      <CanvasResource
+        front={{ kind: 'image', url: FIGURE_URL, open: false }}
+        state="rest"
+        title="A"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    expect(leavingContent().querySelector('img')).toHaveAttribute('src', FIGURE_URL);
+  });
+});

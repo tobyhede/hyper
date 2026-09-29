@@ -1,6 +1,7 @@
 import {
   useCallback,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -134,9 +135,6 @@ export type CanvasResourceFront =
         readonly onEditingChange: (editing: boolean) => void;
       };
     };
-
-/** What a content area draws, and whether the Map has it Open. */
-type OpenableContent = ResourceContentBody & { readonly open: boolean };
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
@@ -312,21 +310,41 @@ export function CanvasResource(props: CanvasResourceProps) {
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
   /**
-   * The content the kinds with a content area draw above their Title: a Markdown
-   * document, or an Image Resource's picture in the same place.
+   * The content the kinds with a content area draw above their Title while Open:
+   * a Markdown document, or an Image Resource's picture in the same place. `null`
+   * while Closed, and for the kinds that have no content area.
    */
-  const contentFront: OpenableContent | undefined =
-    front.kind === 'markdown'
-      ? { kind: 'markdown', source: front.source, open: front.open }
-      : front.kind === 'reference' && front.target.kind === 'markdown'
-        ? { ...front.target, open: front.open }
-        : front.kind === 'image'
-          ? { kind: 'image', url: front.url, open: front.open }
+  const openContentKind =
+    front.kind === 'markdown' && front.open
+      ? 'markdown'
+      : front.kind === 'reference' && front.open && front.target.kind === 'markdown'
+        ? 'markdown'
+        : front.kind === 'image' && front.open
+          ? 'image'
           : undefined;
+  const openContentText =
+    front.kind === 'markdown'
+      ? front.source
+      : front.kind === 'reference' && front.target.kind === 'markdown'
+        ? front.target.source
+        : front.kind === 'image'
+          ? front.url
+          : '';
+  // Memoised so the value keeps its identity while unchanged, which `usePresence`
+  // holds it by.
+  const openContent = useMemo<ResourceContentBody | null>(
+    () =>
+      openContentKind === 'markdown'
+        ? { kind: 'markdown', source: openContentText }
+        : openContentKind === 'image'
+          ? { kind: 'image', url: openContentText }
+          : null,
+    [openContentKind, openContentText],
+  );
   /**
    * The kinds that carry authored Open/Closed state — every kind but the
    * creation ghost, which is not a Resource yet and so has no Map to author it
-   * on. It is a wider set than `contentFront` because a Space Resource Opens
+   * on. It is a wider set than `openContent` because a Space Resource Opens
    * without having any Markdown of its own to reveal: what it shows when it
    * opens is its embedded Map, with selection commands on the rail.
    */
@@ -340,8 +358,10 @@ export function CanvasResource(props: CanvasResourceProps) {
   );
   // Follows the *content* front's openness rather than the Resource's, so a Space
   // Resource opening and closing does not run a presence machine over a document
-  // that is never mounted.
-  const contentPresence = usePresence(contentFront?.open === true, contentExitDuration);
+  // that is never mounted. While leaving it draws the content Open last drew,
+  // because a Closed front carries none.
+  const contentPresence = usePresence(openContent, contentExitDuration);
+  const contentLeaving = contentPresence.mounted && contentPresence.state === 'leaving';
   const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
   const onBeginContentEdit =
     !readOnly && (front.kind === 'markdown' || front.kind === 'image')
@@ -356,7 +376,8 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const [contentEdit, setContentEdit] = useState<ResourceContentEdit | null>(null);
   const visibleContentEdit = readOnly ? null : contentEdit;
-  const imageEditor = !readOnly && front.kind === 'image' && front.open ? front.editor : undefined;
+  const imageEditor =
+    !readOnly && !contentLeaving && front.kind === 'image' && front.open ? front.editor : undefined;
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
@@ -389,10 +410,11 @@ export function CanvasResource(props: CanvasResourceProps) {
   // A click on an unselected Resource selects it, as a click on any React Flow node
   // does; editing its Markdown is the next click, or the Edit command (ADR 0102).
   // So the body's edit target is offered only once the Resource is selected.
-  if (onBeginContentEdit !== undefined && state === 'selected') {
+  // Content that is leaving is drawn at rest: no editor and no edit target.
+  if (onBeginContentEdit !== undefined && state === 'selected' && !contentLeaving) {
     markdownBodyProps.onBeginEdit = onBeginContentEdit;
   }
-  if (!readOnly && front.kind === 'markdown' && front.editor !== undefined) {
+  if (!readOnly && !contentLeaving && front.kind === 'markdown' && front.editor !== undefined) {
     markdownBodyProps.editor = front.editor;
   }
   if (!readOnly && front.kind === 'markdown' && front.autoFocusEditor !== undefined) {
@@ -410,9 +432,9 @@ export function CanvasResource(props: CanvasResourceProps) {
 
   useLayoutEffect(() => {
     if (contentControl.current !== null) {
-      contentControl.current.inert = contentPresence.state === 'leaving';
+      contentControl.current.inert = contentLeaving;
     }
-  }, [contentPresence.state]);
+  }, [contentLeaving]);
 
   const onBodyHeightChange = props.onBodyHeightChange;
   useLayoutEffect(() => {
@@ -636,27 +658,27 @@ export function CanvasResource(props: CanvasResourceProps) {
           inset so a Title sits off the Resource's border; a writing surface brings
           its own gutter and padding and has to reach the paper's edges, and
           nesting it would draw one inset inside another. */}
-      {contentFront !== undefined && contentPresence.mounted && (
+      {contentPresence.mounted && (
         <div
           ref={contentControl}
           className="canvas-resource__content"
           data-presence={contentPresence.state}
         >
-          {contentFront.kind === 'image' && imageEditor !== undefined ? (
+          {contentPresence.value.kind === 'image' && imageEditor !== undefined ? (
             <ResourceContentEditProvider value={setContentEdit}>
               <ImageReplaceTarget name={name} editor={imageEditor} />
             </ResourceContentEditProvider>
-          ) : contentFront.kind === 'image' ? (
+          ) : contentPresence.value.kind === 'image' ? (
             <ResourceImage
-              key={contentFront.url}
-              url={contentFront.url}
+              key={contentPresence.value.url}
+              url={contentPresence.value.url}
               name={name}
-              onReplace={onBeginContentEdit}
+              onReplace={contentLeaving ? undefined : onBeginContentEdit}
             />
           ) : (
             <ResourceContentEditProvider value={setContentEdit}>
               <MarkdownResourceBody
-                source={contentFront.source}
+                source={contentPresence.value.source}
                 ariaLabel={`Markdown source of ${name}`}
                 {...markdownBodyProps}
               />
