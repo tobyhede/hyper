@@ -26,7 +26,8 @@ Status: done
 ## Comments
 
 - **The control is absent rather than disabled while deleting is unavailable**: `onDelete` is simply not passed (`dock-chrome.ts`), matching the rail, where Delete from Space is left out of the menu.
-- **The `connect` purpose cannot offer it by construction**: `onDelete` is declared on `ResourcesPlacingProps` only, so no runtime test is written for it.
+- **The `connect` purpose cannot offer it by construction**: `onDelete` is declared on `ResourcesPlacingProps` only, and the `connect` describe in `ResourcesPopover.test.tsx` holds it both ways — a `@ts-expect-error` on `onDelete` and a runtime assertion that no row draws the control.
 - **Space rows keep the control's slot empty** so every row ends on one edge. The row is a flex `<li>` built from Tailwind utilities; no new block was added to `styles.css` or `resources-popover.css`.
 - **`CommandDockResources.tsx`'s "the list carries no commands" note** now names Delete from Space as the one exception and why: a Resource the selected Map does not place has no rail.
-- No `ResourcesPopover` story passes `onDelete`, so no stable-story claim was added.
+- **Every stable `ResourcesPopover` story passes `onDelete`**, as production does in the normal case, and the claim `resources-popover-offers-delete-from-space-on-a-resource-row` holds the row shape in both Ladle and the application.
+- **Closing the confirmation returns the caret to the control that armed it while that control is still connected**, and otherwise to a focus fallback the arming surface names. It is one rule of `DeleteResourceConfirmation` (Base UI `finalFocus`), not a list trick: Cancel or Escape on a row lands back on that row's `Delete <name> from Space`, and a confirmed delete, which takes the row, lands in the list's filter (`onDelete(resource, focusFallback)`, carried on `ResourceDeletionState.focusFallback`). The rail names no fallback, so the primitive's own return rule still decides there; under jsdom that is `body` after both Cancel and Confirm, before and after this change.

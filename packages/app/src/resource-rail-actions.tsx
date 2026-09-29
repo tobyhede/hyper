@@ -157,11 +157,10 @@ export interface ResourceRailInput {
 /**
  * The builder a Resource's rail draws its menu from.
  *
- * Remove from Map follows the canvas key's availability rather than Delete
- * Resource's: Delete is withdrawn while a Resource is Open so Open state cannot
- * outlive the Resource, while Remove reclaims that room and stays offered —
- * `resource-rail-actions.test.tsx` (`still offers Remove from Map while the
- * Resource is Open`).
+ * Remove from Map follows the canvas key's availability and Delete from Space
+ * follows Delete Resource's. Opening a Resource withdraws neither: each gives
+ * back the room the Open Resource held — `resource-rail-actions.test.tsx`
+ * (`offers Remove from Map and Delete from Space while the Resource is Open`).
  */
 export function useResourceRailActions(
   { authoring, commandOutcomes, resourceDeletion }: ComposedApp,

@@ -321,29 +321,6 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * A Resource no Map places has no toolbar to carry Delete from Space, so the
-   * Resources list — the one surface that still names it — offers it there.
-   */
-  it('deletes from the Resources list a Resource the Map no longer places', async () => {
-    const session = mount();
-
-    await selectResource('A');
-    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Map' }));
-    await waitFor(() => {
-      expect(session.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]).toBeUndefined();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete A from Space' }));
-    const confirmation = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
-    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete from Space' }));
-
-    await waitFor(() => expect(resourceIds(session)).toEqual([OTHER_RESOURCE_ID]));
-    await settled(session);
-  });
-
-  /**
    * Remove from Map reports on its own channel rather than Delete from
    * Space's, so a refused removal never reads "Resource not deleted" about a
    * Resource nobody is deleting.
@@ -929,6 +906,39 @@ describe('a Resource’s commands on the canvas rail', () => {
 });
 
 /** Asserted through the Actions menu, not Edge Authoring, to hold the menu-to-Edit wiring. */
+describe('Delete from Space in the Dock’s Resources list', () => {
+  /**
+   * A Resource no Map places has no toolbar to carry Delete from Space, so the
+   * Resources list — the one surface that still names it — offers it there.
+   */
+  it('deletes a Resource the Map no longer places, and drops its row from the list', async () => {
+    const session = mount();
+
+    await selectResource('A');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Map' }));
+    await waitFor(() => {
+      expect(session.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]).toBeUndefined();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
+    const list = await screen.findByRole('dialog', { name: 'Resources' });
+    expect(within(list).getByRole('button', { name: 'Add A to Map' })).toBeVisible();
+    fireEvent.click(within(list).getByRole('button', { name: 'Delete A from Space' }));
+    const confirmation = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete from Space' }));
+
+    await waitFor(() => expect(resourceIds(session)).toEqual([OTHER_RESOURCE_ID]));
+    // The list stays open, so the row's absence is read from a drawn list.
+    expect(list).toBeVisible();
+    expect(within(list).queryByRole('button', { name: 'Add A to Map' })).not.toBeInTheDocument();
+    expect(
+      within(list).queryByRole('button', { name: 'Delete A from Space' }),
+    ).not.toBeInTheDocument();
+    await settled(session);
+  });
+});
+
 describe('Connect to Resource in a Resource’s Actions menu', () => {
   const edgesOf = (session: SpaceSession) =>
     session.getState().working.document.maps?.[0]?.graphs[0]?.edges ?? [];
