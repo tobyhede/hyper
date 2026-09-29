@@ -199,6 +199,7 @@ interface Overrides {
   imageUrl?: string;
   onBeginBodyEditing?: () => void;
   bodyEditor?: ResourceNodeData['bodyEditor'];
+  imageReplacer?: ResourceNodeData['imageReplacer'];
   resize?: ResourceNodeData['resize'];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
@@ -219,6 +220,7 @@ function props({
   imageUrl,
   onBeginBodyEditing,
   bodyEditor,
+  imageReplacer,
   resize,
   readOnly = false,
   connectionAuthoringEnabled,
@@ -247,6 +249,7 @@ function props({
   if (body !== undefined) data.body = body;
   if (onBeginBodyEditing !== undefined) data.onBeginBodyEditing = onBeginBodyEditing;
   if (bodyEditor !== undefined) data.bodyEditor = bodyEditor;
+  if (imageReplacer !== undefined) data.imageReplacer = imageReplacer;
   if (resize !== undefined) data.resize = resize;
   if (connectionAuthoringEnabled !== undefined)
     data.connectionAuthoringEnabled = connectionAuthoringEnabled;
@@ -379,6 +382,33 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
     screen.getByRole('button', { name: 'Open Resource A' }).click();
     expect(onEditResource).toHaveBeenCalledWith(true);
+  });
+
+  it('offers an Image Resource Replace, and draws the upload target while it is replacing', () => {
+    const imageUrl = 'https://example.com/harbour.png';
+    const onBeginBodyEditing = vi.fn();
+    const { rerender } = render(
+      <ResourceNode {...props({ imageUrl, open: true, selected: true, onBeginBodyEditing })} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource A' }));
+    expect(onBeginBodyEditing).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ResourceNode
+        {...props({
+          imageUrl,
+          open: true,
+          selected: true,
+          imageReplacer: {
+            accept: 'image/png',
+            onReplace: () => Promise.resolve(null),
+            onEnd: () => undefined,
+          },
+        })}
+      />,
+    );
+    expect(screen.getByRole('group', { name: 'Replace image of A' })).toBeVisible();
   });
 
   it("keeps drawing a Closing Image Resource's picture while its content fades out", () => {
@@ -516,6 +546,24 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
       />,
     );
     expect(toolbar()).not.toBeNull();
+  });
+
+  it('keeps Cancel visible while an unselected image is being replaced', () => {
+    render(
+      <ResourceNode
+        {...props({
+          imageUrl: 'https://example.com/figure.png',
+          open: true,
+          imageReplacer: {
+            accept: 'image/png',
+            onReplace: vi.fn(() => Promise.resolve(null)),
+            onEnd: vi.fn(),
+          },
+        })}
+      />,
+    );
+    expect(toolbar()).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Cancel editing Resource A' })).toBeVisible();
   });
 });
 
