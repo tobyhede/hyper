@@ -12,6 +12,7 @@ import {
 import { titleName, type Resource, type ResourceId, type UUID } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
+import type { FocusFallback } from '../resource-deletion';
 import {
   describeMembership,
   ON_NO_GRAPH,
@@ -239,11 +240,12 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
    */
   readonly memberships?: MapMemberships | undefined;
   /**
-   * Arm Delete from Space for a Resource row. Absent while deleting is
-   * unavailable, and then no row offers it. A Space row never does: a Space is
-   * not a Resource of this Space.
+   * Arm Delete from Space for a Resource row, naming the filter as where the
+   * caret goes if a completed deletion takes the row away. Absent while
+   * deleting is unavailable, and then no row offers it. A Space row never
+   * does: a Space is not a Resource of this Space.
    */
-  readonly onDelete?: ((resource: Resource) => void) | undefined;
+  readonly onDelete?: ((resource: Resource, focusFallback: FocusFallback) => void) | undefined;
 }
 
 /**
@@ -595,6 +597,10 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
    * filter, which is where a reader adding several Resources is going next, and
    * it is the whole of the custom behaviour here. `ResourcesPopover.test.tsx`
    * and `resources-popover.spec.ts` both hold it.
+   *
+   * It is also the focus fallback a row's Delete from Space names: a confirmed
+   * deletion takes the row, and the Delete that armed it, out of the list, and
+   * the filter outlives it. `ResourcesPopover.test.tsx` holds it.
    */
   const filterField = useRef<HTMLInputElement>(null);
   /**
@@ -1069,7 +1075,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                         variant="ghost"
                         size="icon"
                         aria-label={`Delete ${name} from Space`}
-                        onClick={() => onDelete(row.resource)}
+                        onClick={() => onDelete(row.resource, () => filterField.current)}
                       >
                         <DeleteIcon />
                       </Button>

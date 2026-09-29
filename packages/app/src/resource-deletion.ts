@@ -21,9 +21,18 @@ import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
  * its words and its staleness; this module keeps only the interaction.
  */
 
+/**
+ * Where the caret goes when the confirmation closes and the control that armed
+ * it is no longer in the document. Named by the arming surface; `null` from it,
+ * or no fallback at all, leaves the choice to the dialog primitive.
+ */
+export type FocusFallback = () => HTMLElement | null;
+
 export interface ResourceDeletionState {
   /** The Resource a confirmation is standing over, or `null` when none is. */
   readonly pending: Resource | null;
+  /** The armed question's focus fallback, or `null` when it names none. */
+  readonly focusFallback: FocusFallback | null;
   /** Whether the armed confirmation is running its deletion. */
   readonly deleting: boolean;
 }
@@ -32,7 +41,7 @@ export interface ResourceDeletion {
   readonly getState: () => ResourceDeletionState;
   readonly subscribe: (listener: () => void) => () => void;
   /** Arm the confirmation without deleting anything. Replaces any prior question. */
-  readonly arm: (resource: Resource) => void;
+  readonly arm: (resource: Resource, focusFallback?: FocusFallback) => void;
   /** Dismiss the question without producing an Edit. */
   readonly cancel: () => void;
   /** Start deletion once for the armed Resource. */
@@ -49,7 +58,7 @@ export interface ResourceDeletionDependencies {
   readonly reportObserverError?: ObserverErrorReporter | undefined;
 }
 
-const NONE: ResourceDeletionState = { pending: null, deleting: false };
+const NONE: ResourceDeletionState = { pending: null, focusFallback: null, deleting: false };
 
 export function createResourceDeletion({
   authoring,
@@ -106,9 +115,9 @@ export function createResourceDeletion({
   return {
     getState: observable.getState,
     subscribe: observable.subscribe,
-    arm: (resource) => {
+    arm: (resource, focusFallback) => {
       interactionEpoch += 1;
-      publish({ pending: resource, deleting: false });
+      publish({ pending: resource, focusFallback: focusFallback ?? null, deleting: false });
     },
     cancel: () => {
       if (observable.getState().deleting) return;
@@ -116,11 +125,12 @@ export function createResourceDeletion({
       publish(NONE);
     },
     confirm: () => {
-      const { pending, deleting } = observable.getState();
+      const armed = observable.getState();
+      const { pending, deleting } = armed;
       if (pending === null || deleting) return;
       const resource = pending;
       const atConfirm = interactionEpoch;
-      publish({ pending: resource, deleting: true });
+      publish({ ...armed, deleting: true });
       // Command outcomes answers rather than rejects: a throw has already
       // reached its reporter and its channel by the time this settles.
       void execute(resource).then(() => {

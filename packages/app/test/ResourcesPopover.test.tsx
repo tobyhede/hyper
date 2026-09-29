@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { resourceSchema, uuidSchema, type Resource, type UUID } from '@project/core';
 import {
@@ -7,7 +7,9 @@ import {
   RESOURCE_DRAG_TYPE,
   SPACE_DRAG_TYPE,
 } from '../src/components/ResourcesPopover';
+import { DeleteResourceConfirmation } from '../src/components/DeleteResourceConfirmation';
 import type { SettlePlacement, SettleResource } from '../src/resources-drag';
+import type { FocusFallback } from '../src/resource-deletion';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
@@ -164,6 +166,46 @@ function PlacingFixture({ refusal = null }: { readonly refusal?: string | null }
         }}
         onDragStart={vi.fn()}
       />
+    </>
+  );
+}
+
+/**
+ * The list beside the App-root confirmation a row's Delete arms, in the order
+ * `resource-deletion.ts` answers a confirmed Markdown deletion: the Edit lands
+ * and takes the row away first, and the confirmation stands down after it.
+ */
+function DeletingFixture() {
+  const [open, setOpen] = useState(false);
+  const [outside, setOutside] = useState<readonly Resource[]>(RESOURCES);
+  const [pending, setPending] = useState<{
+    readonly resource: Resource;
+    readonly focusFallback: FocusFallback;
+  } | null>(null);
+  return (
+    <>
+      <button type="button">The canvas behind it</button>
+      <ResourcesPopover
+        resources={outside}
+        allResources={outside}
+        open={open}
+        onOpenChange={setOpen}
+        onAdd={vi.fn()}
+        onDragStart={vi.fn()}
+        onDelete={(resource, focusFallback) => setPending({ resource, focusFallback })}
+      />
+      {pending === null ? null : (
+        <DeleteResourceConfirmation
+          resource={pending.resource}
+          deleting={false}
+          focusFallback={pending.focusFallback}
+          onConfirm={() => {
+            setOutside((rows) => rows.filter(({ id: rowId }) => rowId !== pending.resource.id));
+            queueMicrotask(() => setPending(null));
+          }}
+          onDismiss={() => setPending(null)}
+        />
+      )}
     </>
   );
 }
@@ -986,8 +1028,61 @@ describe('ResourcesPopover', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Zulu from Space' }));
 
     expect(onDelete).toHaveBeenCalledTimes(1);
-    expect(onDelete).toHaveBeenCalledWith(RESOURCES[0]);
+    expect(onDelete).toHaveBeenCalledWith(RESOURCES[0], expect.any(Function));
     expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('puts the caret back in the filter when a confirmed keyboard Delete takes its own row away', async () => {
+    render(<DeletingFixture />);
+    await openList();
+
+    const remove = screen.getByRole('button', { name: 'Delete Zulu from Space' });
+    act(() => {
+      remove.focus();
+    });
+    fireEvent.click(remove, { detail: 0 });
+    const confirmation = await screen.findByRole('alertdialog');
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete from Space' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Add Zulu to Map' })).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Resources' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Search resources' })).toHaveFocus(),
+    );
+  });
+
+  it("returns the caret to the row's Delete when a keyboard Delete is cancelled", async () => {
+    render(<DeletingFixture />);
+    await openList();
+
+    const remove = screen.getByRole('button', { name: 'Delete Zulu from Space' });
+    act(() => {
+      remove.focus();
+    });
+    fireEvent.click(remove, { detail: 0 });
+    const confirmation = await screen.findByRole('alertdialog');
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(remove).toHaveFocus());
+  });
+
+  it("returns the caret to the row's Delete when the confirmation is escaped", async () => {
+    render(<DeletingFixture />);
+    await openList();
+
+    const remove = screen.getByRole('button', { name: 'Delete Zulu from Space' });
+    act(() => {
+      remove.focus();
+    });
+    fireEvent.click(remove, { detail: 0 });
+    const confirmation = await screen.findByRole('alertdialog');
+    fireEvent.keyDown(confirmation, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('dialog', { name: 'Resources' })).toBeInTheDocument();
+    await waitFor(() => expect(remove).toHaveFocus());
   });
 
   it('offers no delete on a Space row, which is not a Resource of this Space', async () => {
@@ -1087,6 +1182,30 @@ describe('ResourcesPopover as a Connect list', () => {
       .map((toggle) => toggle.getAttribute('title'));
     expect(toggles).toHaveLength(resourceSchema.optionsMap.size);
     expect(toggles).not.toContain('Spaces in this Meta Space');
+  });
+
+  it('offers no delete on a Connect row, where choosing a Resource is all the list does', async () => {
+    const onDelete = vi.fn();
+    render(
+      <ResourcesPopover
+        purpose="connect"
+        from="Source"
+        resources={RESOURCES}
+        allResources={RESOURCES}
+        open
+        onOpenChange={vi.fn()}
+        anchor={null}
+        refusalOf={() => null}
+        onConnect={() => null}
+        newResource={{ refusal: null, onConnect: () => null }}
+        // @ts-expect-error Delete from Space is declared on the placing purpose only.
+        onDelete={onDelete}
+      />,
+    );
+    await screen.findByRole('dialog', { name: 'Connect Source' });
+
+    expect(screen.getByRole('button', { name: 'Connect to Zulu' })).toBeInTheDocument();
+    expect(screen.queryAllByRole('button', { name: /^Delete .* from Space$/ })).toEqual([]);
   });
 
   it('keeps a refused Resource listed, unavailable and reachable, with its reason', async () => {

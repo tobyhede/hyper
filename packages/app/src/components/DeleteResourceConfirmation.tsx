@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { titleName, type Resource } from '@project/core';
 import {
   AlertDialog,
@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@project/ui';
-import type { ResourceDeletion } from '../resource-deletion';
+import type { FocusFallback, ResourceDeletion } from '../resource-deletion';
 
 /**
  * What deleting a Resource destroys, said before it happens.
@@ -28,6 +28,13 @@ import type { ResourceDeletion } from '../resource-deletion';
  * The description is exhaustive over the kinds rather than a default plus one
  * exception, so a fourth kind has to decide what its deletion destroys before it
  * compiles.
+ *
+ * **Closing returns the caret to the control that armed it while that control
+ * is still in the document**, whichever answer closed it. A completed deletion
+ * can take that control away with its Resource, so then the caret goes to the
+ * focus fallback the arming surface named, and without one the primitive's own
+ * return rule stands — the rail names none. `ResourcesPopover.test.tsx` holds
+ * both halves for the Resources list.
  */
 const DELETES_THE_RESOURCE =
   'This removes the Resource from the Space, every Map that contains it, and every Edge connected to it.';
@@ -42,14 +49,23 @@ const DELETION_DESCRIPTIONS = {
 export function DeleteResourceConfirmation({
   resource,
   deleting,
+  focusFallback = null,
   onConfirm,
   onDismiss,
 }: {
   readonly resource: Resource;
   readonly deleting: boolean;
+  readonly focusFallback?: FocusFallback | null;
   readonly onConfirm: () => void;
   readonly onDismiss: () => void;
 }) {
+  // Read on the first render, before the dialog moves focus into itself: the
+  // confirmation has no trigger, so what held focus as it opened is the control
+  // that armed it.
+  const [opener] = useState(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement && active !== document.body ? active : null;
+  });
   return (
     <AlertDialog
       open
@@ -60,7 +76,9 @@ export function DeleteResourceConfirmation({
         if (!next && !deleting) onDismiss();
       }}
     >
-      <AlertDialogContent>
+      <AlertDialogContent
+        finalFocus={() => (opener?.isConnected ? opener : (focusFallback?.() ?? true))}
+      >
         <AlertDialogHeader>
           {/* The Resource's **name**, which is how a control names a Resource: the
               ladder below the name is drawn on the Resource front and nowhere else
@@ -91,7 +109,7 @@ export function DeleteResourceConfirmation({
   );
 }
 
-/** The confirmation standing over the Resource a rail has armed for deletion, if any. */
+/** The confirmation standing over the Resource a surface has armed for deletion, if any. */
 export function ArmedResourceDeletion({
   resourceDeletion,
 }: {
@@ -100,7 +118,7 @@ export function ArmedResourceDeletion({
     'getState' | 'subscribe' | 'confirm' | 'cancel'
   >;
 }) {
-  const { pending, deleting } = useSyncExternalStore(
+  const { pending, focusFallback, deleting } = useSyncExternalStore(
     resourceDeletion.subscribe,
     resourceDeletion.getState,
   );
@@ -108,6 +126,7 @@ export function ArmedResourceDeletion({
     <DeleteResourceConfirmation
       resource={pending}
       deleting={deleting}
+      focusFallback={focusFallback}
       onConfirm={resourceDeletion.confirm}
       onDismiss={resourceDeletion.cancel}
     />
