@@ -990,6 +990,23 @@ describe('ResourcesPopover', () => {
     expect(onAdd).not.toHaveBeenCalled();
   });
 
+  it('offers no delete on a Space row, which is not a Resource of this Space', async () => {
+    render(<Fixture spaces={[BLUEPRINT]} onAddSpace={vi.fn()} onDelete={vi.fn()} />);
+    await openList();
+
+    expect(screen.getByRole('button', { name: 'Add Blueprint to Map' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Delete Blueprint from Space' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers no delete on any row while deleting is unavailable', async () => {
+    render(<Fixture />);
+    await openList();
+
+    expect(screen.queryAllByRole('button', { name: /^Delete .* from Space$/ })).toEqual([]);
+  });
+
   it('lists a Reference Resource whose Target is absent from allResources', async () => {
     const dangling: readonly Resource[] = [
       { id: id('000000000005'), title: 'Stray', kind: 'reference', target: id('000000000009') },
