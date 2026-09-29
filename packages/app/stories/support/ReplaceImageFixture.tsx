@@ -27,6 +27,7 @@ const PICTURES_GRAPH = replaceId(1);
 const FIGURE = replaceId(2);
 const MISSING = replaceId(3);
 const PICTURES_REFERENCE = replaceId(4);
+const THUMBNAIL = replaceId(5);
 
 /** The Figure's picture, which the catalogue test serves. */
 export const REPLACE_FIGURE_URL = 'https://example.com/figure.png';
@@ -35,7 +36,13 @@ export const REPLACE_MISSING_URL = 'https://missing.invalid/picture.png';
 /** The URL the catalogue's image store answers every chosen file with. */
 export const REPLACE_STORED_URL = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
 
-/** A Closed Image Resource, and an Open one whose picture will not load. */
+/** A small picture's URL: it first Opens at the minimum Open Size, the Closed size. */
+export const REPLACE_THUMBNAIL_URL = 'https://example.com/thumbnail.png';
+
+/**
+ * Two Closed Image Resources, one of whose picture is small enough to first Open
+ * at the Closed size, and an Open one whose picture will not load.
+ */
 export const picturesSnapshot: SpaceSnapshot = {
   id: replaceId(0xf),
   document: {
@@ -50,6 +57,7 @@ export const picturesSnapshot: SpaceSnapshot = {
         positions: {
           [FIGURE]: { x: 0, y: 0, open: false },
           [MISSING]: { x: 360, y: 0, open: true, openSize: { width: 460, height: 380 } },
+          [THUMBNAIL]: { x: 900, y: 0, open: false },
         },
         graphs: [{ id: PICTURES_GRAPH, title: 'Main', edges: [] }],
         activeGraph: PICTURES_GRAPH,
@@ -67,6 +75,15 @@ export const picturesSnapshot: SpaceSnapshot = {
       },
     },
     { id: MISSING, document: { title: 'Missing', kind: 'image', url: REPLACE_MISSING_URL } },
+    {
+      id: THUMBNAIL,
+      document: {
+        title: 'Thumbnail',
+        kind: 'image',
+        url: REPLACE_THUMBNAIL_URL,
+        naturalSize: { width: 64, height: 64 },
+      },
+    },
   ],
 };
 

@@ -261,6 +261,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'A refused replacement — a data: URL, a dropped file that is not an image, or more than one dropped image — is said in the upload target in the application’s words, and the target stays up with the picture unchanged (ADR 0106).',
   },
   {
+    id: 'image-resource-replace-fits-the-minimum-open-size',
+    storyFile: 'space/replace-image.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'An Image Resource whose small picture first Opens at the minimum Open Size draws its upload target compactly: Upload, the URL field and a refusal all lie inside the content area, and a URL still replaces the picture there (ADR 0106).',
+  },
+  {
     id: 'image-resource-failed-state-offers-replace',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',

@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { nodeByTitle, resourceControls, selectedCanvas } from '../e2e/graph';
 
 /**
@@ -10,12 +10,13 @@ import { nodeByTitle, resourceControls, selectedCanvas } from '../e2e/graph';
 
 const story = '/?story=space--replace-image--default&mode=preview';
 const FIGURE_URL = 'https://example.com/figure.png';
+const THUMBNAIL_URL = 'https://example.com/thumbnail.png';
 const NEW_URL = 'https://example.com/replacement.png';
 const STORED_URL = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
 const HARBOUR = readFileSync(new URL('../fixture-images/harbour-400x300.png', import.meta.url));
 
 const open = async (page: Page): Promise<void> => {
-  for (const url of [FIGURE_URL, NEW_URL, `**${STORED_URL}`]) {
+  for (const url of [FIGURE_URL, THUMBNAIL_URL, NEW_URL, `**${STORED_URL}`]) {
     await page.route(url, (route) =>
       route.fulfill({ status: 200, contentType: 'image/png', body: HARBOUR }),
     );
@@ -192,5 +193,56 @@ test(
     await expect(cancel).toBeVisible();
     await cancel.click();
     await expect(target).toHaveCount(0);
+  },
+);
+
+/** Every part of `part` is drawn inside the content area it belongs to, which clips nothing it holds. */
+const expectWithin = async (part: Locator, content: Locator): Promise<void> => {
+  await expect
+    .poll(async () => {
+      const outer = await content.boundingBox();
+      const inner = await part.boundingBox();
+      if (outer === null || inner === null) return 'not drawn';
+      const overflow = Math.max(
+        outer.x - inner.x,
+        outer.y - inner.y,
+        inner.x + inner.width - (outer.x + outer.width),
+        inner.y + inner.height - (outer.y + outer.height),
+      );
+      return overflow <= 0.5 ? 'within' : `overflows by ${overflow.toFixed(1)}px`;
+    })
+    .toBe('within');
+};
+
+test(
+  'at the minimum Open Size the upload target keeps Upload, the URL field and a refusal inside the content area',
+  { tag: '@parity:image-resource-replace-fits-the-minimum-open-size' },
+  async ({ page }) => {
+    await open(page);
+    const { resource, target } = await beginReplacing(page, 'Thumbnail');
+    // A 64×64 picture first Opens at the Closed size, which is the minimum Open Size.
+    const node = nodeByTitle(page, 'Thumbnail').first();
+    await expect(node).toHaveCSS('width', '260px');
+    await expect(node).toHaveCSS('height', '146px');
+    const content = resource.locator('.canvas-resource__content');
+
+    const upload = target.getByRole('button', { name: 'Upload' });
+    const field = target.getByRole('textbox', { name: 'Image URL' });
+    await expect(upload).toBeFocused();
+    await expectWithin(upload, content);
+    await expectWithin(field, content);
+
+    await field.fill('data:image/png;base64,AAAA');
+    await field.press('Enter');
+    const refusal = target.getByRole('alert');
+    await expect(refusal).toHaveText('An image URL must start with https: or http:.');
+    await expectWithin(upload, content);
+    await expectWithin(field, content);
+    await expectWithin(refusal, content);
+
+    await field.fill(NEW_URL);
+    await field.press('Enter');
+    await expect(target).toHaveCount(0);
+    await expect(resource.getByRole('img', { name: 'Thumbnail' })).toHaveAttribute('src', NEW_URL);
   },
 );

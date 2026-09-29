@@ -46,6 +46,11 @@ export interface ImageReplaceTargetProps {
  * An Image Resource's content while its image is being replaced: shadcn's
  * outline `Empty` with an Upload button at its centre and a URL field beneath
  * it (the registry's `empty-outline` and `empty-input-group` examples).
+ *
+ * A small picture first Opens at the minimum Open Size, whose content area is
+ * far shorter than that layout, so in a short room the target draws compactly
+ * — Upload and the URL field on one row and the refusal beneath them — and
+ * scrolls within the room rather than being clipped by the Resource.
  */
 export function ImageReplaceTarget({ name, editor }: ImageReplaceTargetProps) {
   const [url, setUrl] = useState('');
@@ -111,92 +116,97 @@ export function ImageReplaceTarget({ name, editor }: ImageReplaceTargetProps) {
     else setRefusal(answer);
   };
   return (
-    <Empty
-      role="group"
-      aria-label={`Replace image of ${name}`}
-      aria-busy={busy}
-      aria-disabled={busy}
-      // `nodrag nopan`: a press or a text selection in the target is not a
-      // drag of the Resource or a pan of the canvas it is drawn on.
-      className="resource-image-replace nodrag nopan border border-dashed"
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape') return;
-        event.preventDefault();
-        event.stopPropagation();
-        end();
-      }}
-      // The drop is hand-rolled: no registry component accepts a dropped file
-      // (`interactiveDeviations` in `design-system-inventory.ts`). Both events
-      // stop here so a canvas drawn around the target does not take the file
-      // as well.
-      onDragOver={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        event.dataTransfer.dropEffect = busyNow.current ? 'none' : 'copy';
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const files = Array.from(event.dataTransfer.files);
-        if (files.length > 0) void replace({ kind: 'files', files });
-      }}
-    >
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <ImageIcon size={16} />
-        </EmptyMedia>
-        <EmptyTitle>Replace image</EmptyTitle>
-        <EmptyDescription>Upload a picture, drop one here, or enter its URL.</EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        {/* Withheld while busy without leaving the tab order: a natively
+    // The room is what the compact layout below the full one is measured
+    // against (`resource-image.css`), since a size query cannot read the box it
+    // restyles.
+    <div className="resource-image-replace-room">
+      <Empty
+        role="group"
+        aria-label={`Replace image of ${name}`}
+        aria-busy={busy}
+        aria-disabled={busy}
+        // `nodrag nopan`: a press or a text selection in the target is not a
+        // drag of the Resource or a pan of the canvas it is drawn on.
+        className="resource-image-replace nodrag nopan border border-dashed"
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape') return;
+          event.preventDefault();
+          event.stopPropagation();
+          end();
+        }}
+        // The drop is hand-rolled: no registry component accepts a dropped file
+        // (`interactiveDeviations` in `design-system-inventory.ts`). Both events
+        // stop here so a canvas drawn around the target does not take the file
+        // as well.
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          event.dataTransfer.dropEffect = busyNow.current ? 'none' : 'copy';
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const files = Array.from(event.dataTransfer.files);
+          if (files.length > 0) void replace({ kind: 'files', files });
+        }}
+      >
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <ImageIcon size={16} />
+          </EmptyMedia>
+          <EmptyTitle>Replace image</EmptyTitle>
+          <EmptyDescription>Upload a picture, drop one here, or enter its URL.</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          {/* Withheld while busy without leaving the tab order: a natively
             disabled control that holds focus drops it to the document, where
             neither typing nor Escape reaches the target when the answer is a
             refusal. So the Upload button keeps focus through Base UI's
             `focusableWhenDisabled`, and the field is read-only rather than
             disabled; `busyNow` refuses a second replacement meanwhile. */}
-        <Button
-          ref={upload}
-          size="compact"
-          disabled={busy}
-          focusableWhenDisabled
-          onClick={() => picker.current?.click()}
-        >
-          Upload
-        </Button>
-        <ImageFilePicker
-          ref={picker}
-          accept={editor.accept}
-          data-testid="replace-image-file"
-          onChoose={(files) => {
-            if (files.length > 0) void replace({ kind: 'files', files });
-          }}
-        />
-        <form
-          className="w-full"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void replace({ kind: 'url', url });
-          }}
-        >
-          <InputGroup>
-            <InputGroupInput
-              readOnly={busy}
-              aria-disabled={busy}
-              className="aria-disabled:opacity-50"
-              aria-label="Image URL"
-              aria-invalid={refusal !== null}
-              aria-describedby={refusal === null ? undefined : refusalId}
-              type="text"
-              inputMode="url"
-              placeholder="https://"
-              value={url}
-              onChange={(event) => setUrl(event.currentTarget.value)}
-            />
-          </InputGroup>
-        </form>
-        {refusal !== null && <FieldError id={refusalId}>{refusal}</FieldError>}
-      </EmptyContent>
-    </Empty>
+          <Button
+            ref={upload}
+            size="compact"
+            disabled={busy}
+            focusableWhenDisabled
+            onClick={() => picker.current?.click()}
+          >
+            Upload
+          </Button>
+          <ImageFilePicker
+            ref={picker}
+            accept={editor.accept}
+            data-testid="replace-image-file"
+            onChoose={(files) => {
+              if (files.length > 0) void replace({ kind: 'files', files });
+            }}
+          />
+          <form
+            className="w-full"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void replace({ kind: 'url', url });
+            }}
+          >
+            <InputGroup>
+              <InputGroupInput
+                readOnly={busy}
+                aria-disabled={busy}
+                className="aria-disabled:opacity-50"
+                aria-label="Image URL"
+                aria-invalid={refusal !== null}
+                aria-describedby={refusal === null ? undefined : refusalId}
+                type="text"
+                inputMode="url"
+                placeholder="https://"
+                value={url}
+                onChange={(event) => setUrl(event.currentTarget.value)}
+              />
+            </InputGroup>
+          </form>
+          {refusal !== null && <FieldError id={refusalId}>{refusal}</FieldError>}
+        </EmptyContent>
+      </Empty>
+    </div>
   );
 }

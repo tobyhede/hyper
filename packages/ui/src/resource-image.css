@@ -36,7 +36,64 @@
   overflow-wrap: anywhere;
 }
 
-/* The upload target is drawn on the Resource's own paper too. */
+/* The room the upload target is drawn in: the whole content area, and the size
+   container the compact layout below is chosen against. Size containment is
+   also what lets the room be shorter than the target's full layout. */
+.resource-image-replace-room {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  container: resource-image-replace / size;
+}
+
+/* The upload target is drawn on the Resource's own paper too. It scrolls
+   within its room rather than overflowing it, and `safe` centring keeps the
+   start of an overflowing target reachable. */
 .resource-image-replace {
+  min-height: 0;
+  overflow-y: auto;
+  justify-content: safe center;
   color: var(--canvas-resource-title-color);
+}
+
+/* A room shorter than the full layout — the minimum Open Size's among them —
+   keeps the title and draws Upload and the URL field on one row, the refusal
+   beneath them. */
+@container resource-image-replace (max-height: 18rem) {
+  .resource-image-replace {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .resource-image-replace [data-slot='empty-icon'],
+  .resource-image-replace [data-slot='empty-description'] {
+    display: none;
+  }
+
+  .resource-image-replace [data-slot='empty-content'] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .resource-image-replace [data-slot='empty-content'] > form {
+    flex: 1 1 8rem;
+    width: auto;
+  }
+
+  .resource-image-replace [data-slot='field-error'] {
+    flex-basis: 100%;
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+}
+
+/* The shortest room gives the title up too: the group's name still says what
+   the target is for. */
+@container resource-image-replace (max-height: 7.5rem) {
+  .resource-image-replace [data-slot='empty-header'] {
+    display: none;
+  }
 }

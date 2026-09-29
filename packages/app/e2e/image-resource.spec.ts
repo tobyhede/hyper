@@ -1,7 +1,13 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { readFileSync } from 'node:fs';
-import { encodeCompactUuid, OPEN_RESOURCE_CHROME, uuidSchema, type UUID } from '@project/core';
+import {
+  COLLAPSED_RESOURCE_SIZE,
+  encodeCompactUuid,
+  OPEN_RESOURCE_CHROME,
+  uuidSchema,
+  type UUID,
+} from '@project/core';
 import { decodeLoadedSpace } from '@project/persistence';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {
@@ -34,6 +40,8 @@ interface Pictures {
   readonly title?: string;
   /** Give the seeded Graph an Edge from the Image Resource to itself, so presenting starts there. */
   readonly presentable?: boolean;
+  /** The picture's recorded natural size, which its first Open is sized by. */
+  readonly naturalSize?: { readonly width: number; readonly height: number };
 }
 
 /**
@@ -43,7 +51,7 @@ interface Pictures {
  */
 async function openPictures(
   page: Page,
-  { title = 'Figure', presentable = false }: Pictures = {},
+  { title = 'Figure', presentable = false, naturalSize = HARBOUR_SIZE }: Pictures = {},
 ): Promise<UUID> {
   const seeded = await seedPositionedMap(
     page,
@@ -63,7 +71,7 @@ async function openPictures(
           title,
           kind: 'image',
           url: FIGURE_URL,
-          naturalSize: HARBOUR_SIZE,
+          naturalSize,
         },
       },
     ],
@@ -668,6 +676,73 @@ async function storedFigure(page: Page, spaceId: UUID) {
   const figure = loaded.snapshot.resources.find(({ id }) => id === IMAGE_ID)?.document;
   return { revision: loaded.revision, figure, maps: loaded.snapshot.document.maps };
 }
+
+/** Every part of `part` is drawn inside `content`, the box the Resource does not clip. */
+async function expectWithin(part: Locator, content: Locator): Promise<void> {
+  await expect
+    .poll(async () => {
+      const outer = await content.boundingBox();
+      const inner = await part.boundingBox();
+      if (outer === null || inner === null) return 'not drawn';
+      const overflow = Math.max(
+        outer.x - inner.x,
+        outer.y - inner.y,
+        inner.x + inner.width - (outer.x + outer.width),
+        inner.y + inner.height - (outer.y + outer.height),
+      );
+      return overflow <= 0.5 ? 'within' : `overflows by ${overflow.toFixed(1)}px`;
+    })
+    .toBe('within');
+}
+
+test(
+  'a 64×64 picture Opens at the minimum Open Size, where the upload target keeps its controls and refusal in view and still replaces',
+  { tag: '@parity:image-resource-replace-fits-the-minimum-open-size' },
+  async ({ page }) => {
+    await serveFigure(page);
+    const spaceId = await openPictures(page, { naturalSize: { width: 64, height: 64 } });
+    const { node, controls } = await imageControls(page);
+    await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
+    const resource = node.getByRole('article', { name: 'Figure' });
+    const target = resource.getByRole('group', { name: 'Replace image of Figure' });
+    await expect(target).toBeVisible();
+    await settled(page);
+    const { maps } = await storedFigure(page, spaceId);
+    expect(maps?.[0]?.positions[IMAGE_ID]).toMatchObject({
+      open: true,
+      openSize: COLLAPSED_RESOURCE_SIZE,
+    });
+    const content = resource.locator('.canvas-resource__content');
+    const upload = target.getByRole('button', { name: 'Upload' });
+    const field = target.getByRole('textbox', { name: 'Image URL' });
+    await expect(upload).toBeFocused();
+    await expectWithin(upload, content);
+    await expectWithin(field, content);
+
+    await field.fill('data:image/png;base64,AAAA');
+    await field.press('Enter');
+    const refusal = target.getByRole('alert');
+    await expect(refusal).toHaveText('An image URL must start with https: or http:.');
+    await expectWithin(upload, content);
+    await expectWithin(field, content);
+    await expectWithin(refusal, content);
+
+    await page.route('https://example.com/new.png', (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: HARBOUR }),
+    );
+    await field.fill('https://example.com/new.png');
+    await field.press('Enter');
+    await expect(target).toHaveCount(0);
+    await expect(resource.getByRole('img', { name: 'Figure' })).toHaveAttribute(
+      'src',
+      'https://example.com/new.png',
+    );
+    await settled(page);
+    expect((await storedFigure(page, spaceId)).figure).toMatchObject({
+      url: 'https://example.com/new.png',
+    });
+  },
+);
 
 /** Commits the browser sends, counted from when this is called. */
 function countCommits(page: Page) {
