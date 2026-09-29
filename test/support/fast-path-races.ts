@@ -123,9 +123,9 @@ const markdown = (id: UUID, title: string) => ({
   document: { title, kind: 'markdown' as const, body: title },
 });
 
-const link = (id: UUID, spaceId: UUID, map: UUID, graph: UUID) => ({
+const link = (id: UUID, spaceId: UUID, mapId: UUID, graph: UUID) => ({
   id,
-  document: { title: 'Link', kind: 'space' as const, spaceId, map, graph },
+  document: { title: 'Link', kind: 'space' as const, spaceId, map: mapId, graph },
 });
 
 const meta = (links: readonly ReturnType<typeof link>[]): SpaceSnapshot => ({
@@ -210,9 +210,9 @@ const withoutSelectedGraph: SpaceSnapshot = {
   ...seedA,
   document: {
     ...seedA.document,
-    maps: (seedA.document.maps ?? []).map((map) => ({
-      ...map,
-      graphs: map.graphs.filter((graph) => graph.id !== A_GRAPH),
+    maps: (seedA.document.maps ?? []).map((m) => ({
+      ...m,
+      graphs: m.graphs.filter((graph) => graph.id !== A_GRAPH),
       activeGraph: A_SECOND_GRAPH,
     })),
   },

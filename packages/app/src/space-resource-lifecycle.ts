@@ -121,19 +121,19 @@ export interface SpaceResourceLifecycleOptions {
 }
 
 const targetMap = (
-  map: Map,
+  m: Map,
   colorByGraphId: Readonly<Record<string, string>>,
 ): SpaceResourceTargetMap => {
   const read = {
-    id: map.id,
-    title: map.title,
-    graphs: map.graphs.map((graph) => ({
+    id: m.id,
+    title: m.title,
+    graphs: m.graphs.map((graph) => ({
       id: graph.id,
       title: graph.title,
       ...graphAppearance(graph, colorByGraphId),
     })),
   };
-  return map.activeGraph === undefined ? read : { ...read, activeGraph: map.activeGraph };
+  return m.activeGraph === undefined ? read : { ...read, activeGraph: m.activeGraph };
 };
 
 export function createSpaceResourceLifecycle({
@@ -194,6 +194,6 @@ export function spaceResourceTarget(space: Space): SpaceResourceTarget {
   return {
     id: space.id,
     title: space.title,
-    maps: space.maps.map((map) => targetMap(map, colorByGraphId)),
+    maps: space.maps.map((m) => targetMap(m, colorByGraphId)),
   };
 }

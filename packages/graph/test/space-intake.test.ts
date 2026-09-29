@@ -124,7 +124,7 @@ const graph = (id: string, title: string, edges: readonly EdgeInput[] = []) => (
   edges,
 });
 
-const map = (
+const positionedMap = (
   id: string,
   positions: Record<string, ResourcePlacement>,
   graphs: unknown[],
@@ -136,9 +136,11 @@ const simple = (defaultMap?: string): Document => {
   const document: Document = {
     resources: [markdown(A, 'A'), markdown(B, 'B')],
     maps: [
-      map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-        graph(MAIN, 'Main', [{ from: A, to: B }]),
-      ]),
+      positionedMap(
+        WORKING,
+        { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+        [graph(MAIN, 'Main', [{ from: A, to: B }])],
+      ),
     ],
   };
   return defaultMap === undefined ? document : { ...document, defaultMap };
@@ -173,11 +175,15 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-              graph(ASIDE, 'Aside', [{ from: B, to: A }]),
-            ]),
-            map(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(THIRD, 'Third')]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [
+                graph(MAIN, 'Main', [{ from: A, to: B }]),
+                graph(ASIDE, 'Aside', [{ from: B, to: A }]),
+              ],
+            ),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(THIRD, 'Third')]),
           ],
         }),
       );
@@ -210,7 +216,7 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(
+            positionedMap(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
@@ -229,10 +235,11 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-              graph(ASIDE, 'Aside'),
-            ]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
+            ),
           ],
         }),
       );
@@ -274,7 +281,9 @@ describe.each([
       const space = loaded(
         load({
           resources: [image],
-          maps: [map(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')])],
+          maps: [
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
+          ],
         }),
       );
       expect(space.lookup.resource(A)).toEqual(image);
@@ -286,7 +295,9 @@ describe.each([
       const space = loaded(
         load({
           resources: [markdown(A, 'A')],
-          maps: [map(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')])],
+          maps: [
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
+          ],
         }),
       );
       expect(space.lookup.graph(MAIN)?.graph.edges).toEqual([]);
@@ -299,7 +310,7 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           maps: [
-            map(
+            positionedMap(
               WORKING,
               {
                 [A]: { x: 0, y: 0, open: false },
@@ -327,10 +338,14 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-              graph(ASIDE, 'Alt', [{ from: A, to: B }]),
-            ]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [
+                graph(MAIN, 'Main', [{ from: A, to: B }]),
+                graph(ASIDE, 'Alt', [{ from: A, to: B }]),
+              ],
+            ),
           ],
         }),
       );
@@ -342,12 +357,16 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [
-                { from: A, to: B },
-                { from: A, to: B },
-              ]),
-            ]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [
+                graph(MAIN, 'Main', [
+                  { from: A, to: B },
+                  { from: A, to: B },
+                ]),
+              ],
+            ),
           ],
         }),
       );
@@ -361,12 +380,16 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [
-                { from: A, to: B, title: 'On success' },
-                { from: A, to: B, title: 'On failure' },
-              ]),
-            ]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [
+                graph(MAIN, 'Main', [
+                  { from: A, to: B, title: 'On success' },
+                  { from: A, to: B, title: 'On failure' },
+                ]),
+              ],
+            ),
           ],
         }),
       );
@@ -381,9 +404,11 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [edge]),
-            ]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [edge])],
+            ),
           ],
         }),
       );
@@ -395,9 +420,11 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: A, to: ABSENT }]),
-            ]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
+            ),
           ],
         }),
       );
@@ -417,9 +444,11 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: B, to: C }]),
-            ]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: B, to: C }])],
+            ),
           ],
         }),
       );
@@ -434,10 +463,12 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: A, to: C }]),
-            ]),
-            map(SECOND, { [C]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: C }])],
+            ),
+            positionedMap(SECOND, { [C]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -451,7 +482,7 @@ describe.each([
         load({
           resources: [markdown(A, 'A')],
           maps: [
-            map(
+            positionedMap(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
@@ -469,9 +500,11 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B'), markdown(C, 'C')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-            ]),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: B }])],
+            ),
           ],
         }),
       );
@@ -485,7 +518,7 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(
+            positionedMap(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
@@ -502,7 +535,7 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(
+            positionedMap(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
@@ -524,13 +557,13 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(
+            positionedMap(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
               { activeGraph: ASIDE },
             ),
-            map(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -542,8 +575,8 @@ describe.each([
 
   describe('duplicate identities', () => {
     it('reports one error per repeated graph id, naming every occurrence in order', () => {
-      // Ownership is map-scoped; the *id* is not (ADR 0045). The flatten keys
-      // colour, `<graphId>::out`/`::in` handles and activation on the id alone,
+      // Ownership is map-scoped; the *id* is not (ADR 0108). The flatten keys
+      // colour, render Edge ids and activation on the id alone,
       // and the lookup would drop one of a set in silence. One error, because one
       // id is one fault however many times it appears — and it names where each
       // occurrence is, since that is the only actionable part.
@@ -551,11 +584,14 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-              graph(MAIN, 'Main again'),
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(MAIN, 'Main again')],
+            ),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [
+              graph(MAIN, 'Main a third time'),
             ]),
-            map(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(MAIN, 'Main a third time')]),
           ],
         }),
       );
@@ -573,10 +609,12 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), markdown(B, 'B')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } }, [
-              graph(MAIN, 'Main', [{ from: A, to: B }]),
-            ]),
-            map(
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Main', [{ from: A, to: B }])],
+            ),
+            positionedMap(
               SECOND,
               { [A]: { x: 0, y: 200, open: false }, [B]: { x: 320, y: 200, open: false } },
               [graph(ASIDE, 'Aside', [{ from: B, to: A }])],
@@ -592,8 +630,8 @@ describe.each([
         load({
           resources: [markdown(A, 'A')],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-            map(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
         }),
       );
@@ -685,8 +723,8 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), referenceTo(B, ABSENT)],
           maps: [
-            map(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-            map(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
           ],
           defaultMap: ABSENT,
         }),
@@ -702,7 +740,7 @@ describe.each([
         load({
           resources: [markdown(A, 'A')],
           maps: [
-            map(
+            positionedMap(
               WORKING,
               { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 1, y: 1, open: false } },
               [graph(MAIN, 'Main'), graph(MAIN, 'Main again')],

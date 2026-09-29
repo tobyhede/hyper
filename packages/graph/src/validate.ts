@@ -116,7 +116,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   }
 
   // A graph id is unique across the **space**, although one map owns it
-  // (ADR 0045). The flatten a space-subject view draws keys colour and
+  // (ADR 0108). The flatten a space-subject view draws keys colour and
   // activation on the id alone, and the lookup intake builds would drop one of a
   // pair in silence while both stayed in the collection.
   //
@@ -126,16 +126,18 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   // where to look. Same-map repeats and cross-map ones are the same kind
   // for the same reason — they differ only in where the fix goes.
   const occurrencesByGraphId = new Map<string, GraphOccurrence[]>();
-  for (const map of maps) {
-    map.graphs.forEach((graph, index) => {
+  for (const m of maps) {
+    m.graphs.forEach((graph, index) => {
       const occurrences = occurrencesByGraphId.get(graph.id);
-      if (occurrences === undefined) occurrencesByGraphId.set(graph.id, [{ map, index }]);
-      else occurrences.push({ map, index });
+      if (occurrences === undefined) occurrencesByGraphId.set(graph.id, [{ map: m, index }]);
+      else occurrences.push({ map: m, index });
     });
   }
   for (const [graphId, occurrences] of occurrencesByGraphId) {
     if (occurrences.length < 2) continue;
-    const where = occurrences.map(({ map, index }) => `map "${map.id}" graph ${index}`).join(', ');
+    const where = occurrences
+      .map(({ map: owner, index }) => `map "${owner.id}" graph ${index}`)
+      .join(', ');
     errors.push({
       kind: 'duplicate-graph-id',
       ref: graphId,
@@ -143,7 +145,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     });
   }
 
-  for (const map of maps) {
+  for (const subject of maps) {
     // A map's position keys **are** its resource membership (ADR 0040). They may
     // omit resources — a resource the map leaves out is simply not in this map — but
     // may not name a resource that does not exist, a position left behind by a
@@ -153,14 +155,14 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // this the *only* fault reported for it: an edge into that resource is then a
     // consequence of this fault rather than a second one.
     const members = new Set<string>();
-    for (const key of Object.keys(map.positions)) {
+    for (const key of Object.keys(subject.positions)) {
       const resourceId = uuidSchema.parse(key);
       members.add(resourceId);
       if (!resourceIds.has(resourceId)) {
         errors.push({
           kind: 'map-member-missing-resource',
           ref: resourceId,
-          message: `Map "${map.id}" holds a position for resource "${resourceId}", which the space does not hold`,
+          message: `Map "${subject.id}" holds a position for resource "${resourceId}", which the space does not hold`,
         });
       }
     }
@@ -171,7 +173,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // one naming a resource another map holds is a closure failure, and telling
     // an author which they have is the difference between hunting for a deleted
     // resource and adding a member.
-    for (const graph of map.graphs) {
+    for (const graph of subject.graphs) {
       // Asked once, up front, and read inside the loop below so a graph's
       // diagnostics still arrive in edge order rather than in two passes.
       const repeats = repeatedGraphEdges(graph.edges);
@@ -183,7 +185,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
               ? {
                   kind: 'graph-edge-resource-outside-map',
                   ref: edge[end],
-                  message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a resource of the space but not a member of its map "${map.id}"`,
+                  message: `Graph "${graph.id}" edge ${index} names "${edge[end]}" as its ${end}, which is a resource of the space but not a member of its map "${subject.id}"`,
                 }
               : {
                   kind: 'graph-edge-missing-resource',
@@ -209,19 +211,19 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // — and it must be one the map **owns**. Split the same way the endpoints
     // above are: a graph nothing in the space owns is missing, while one a
     // second map owns exists and is simply not this map's to open on.
-    const activeGraph = map.activeGraph;
-    if (activeGraph !== undefined && !map.graphs.some((g) => g.id === activeGraph)) {
+    const activeGraph = subject.activeGraph;
+    if (activeGraph !== undefined && !subject.graphs.some((g) => g.id === activeGraph)) {
       errors.push(
         occurrencesByGraphId.has(activeGraph)
           ? {
               kind: 'map-active-graph-outside-map',
               ref: activeGraph,
-              message: `Map "${map.id}" opens active on graph "${activeGraph}", which another map owns`,
+              message: `Map "${subject.id}" opens active on graph "${activeGraph}", which another map owns`,
             }
           : {
               kind: 'map-active-graph-missing',
               ref: activeGraph,
-              message: `Map "${map.id}" opens active on graph "${activeGraph}", which no map in the space owns`,
+              message: `Map "${subject.id}" opens active on graph "${activeGraph}", which no map in the space owns`,
             },
       );
     }

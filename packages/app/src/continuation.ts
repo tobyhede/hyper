@@ -98,7 +98,7 @@ export interface ContinuationDependencies {
    *
    * The whole of Space Authoring rather than narrowed getters: Edge Authoring
    * takes it for exactly these two, and manufacturing a port for a dependency
-   * with one in-process implementation is what ADR 0016 forbids.
+   * with one in-process implementation is what ADR 0109 forbids.
    */
   readonly authoring: SpaceAuthoring;
   readonly reportObserverError?: ObserverErrorReporter | undefined;

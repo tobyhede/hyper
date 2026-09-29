@@ -64,7 +64,7 @@ const completeEmbedded = (
 /**
  * One embedded canvas's gestures, completed by the target's sole Space Authoring.
  *
- * The reporter is required with no default (ADR 0016): the composition names
+ * The reporter is required with no default (ADR 0109): the composition names
  * the ambient console once and answers it as `ComposedApp.reportObserverError`,
  * so this module — mounted from a canvas gesture, deep under it — never mints a
  * second, invisible one. One sink serves both of the events it hears about,

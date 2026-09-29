@@ -1024,9 +1024,9 @@ export const spaceRepositoryContract = (
           ...base,
           document: {
             ...base.document,
-            maps: (base.document.maps ?? []).map((map) => ({
-              ...map,
-              graphs: map.graphs.map((graph) => ({ ...graph, edges: [edge] })),
+            maps: (base.document.maps ?? []).map((m) => ({
+              ...m,
+              graphs: m.graphs.map((graph) => ({ ...graph, edges: [edge] })),
             })),
           },
         };
@@ -1061,9 +1061,9 @@ export const spaceRepositoryContract = (
           ...base,
           document: {
             ...base.document,
-            maps: (base.document.maps ?? []).map((map) => ({
-              ...map,
-              graphs: map.graphs.map((graph) => ({ ...graph, headShape })),
+            maps: (base.document.maps ?? []).map((m) => ({
+              ...m,
+              graphs: m.graphs.map((graph) => ({ ...graph, headShape })),
             })),
           },
         };
@@ -1895,17 +1895,17 @@ export const spaceRepositoryContract = (
       await seed(repository, first);
       takeResourceWrites();
 
-      const [map] = first.document.maps ?? [];
-      if (map === undefined) throw new Error('Expected the graphed Space to own a Map');
+      const [firstMap] = first.document.maps ?? [];
+      if (firstMap === undefined) throw new Error('Expected the graphed Space to own a Map');
       const grown: SpaceSnapshot = {
         ...first,
         document: {
           ...first.document,
           maps: [
             {
-              ...map,
+              ...firstMap,
               positions: {
-                ...map.positions,
+                ...firstMap.positions,
                 [RESOURCE_ID]: { x: 40, y: 40, open: false },
                 [OTHER_RESOURCE_ID]: { x: 600, y: 0, open: false },
               },

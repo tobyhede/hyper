@@ -334,7 +334,7 @@ const holdsEdge = (
   { graphId, edge }: EdgeSubject,
 ): boolean =>
   (snapshot.document.maps ?? [])
-    .find((map) => map.id === mapId)
+    .find((m) => m.id === mapId)
     ?.graphs.find((graph) => graph.id === graphId)
     ?.edges.some((held) => held.from === edge.from && held.to === edge.to) === true;
 

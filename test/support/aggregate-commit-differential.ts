@@ -221,8 +221,8 @@ const fixtureFor = ({
     case 'map-internal-update': {
       // Positions, an Edge, and Graph and Map titles and colour: nothing
       // another Space's Space Resource selects.
-      const [map] = selectedParent.document.maps ?? [];
-      if (map === undefined) throw new Error('Generated Space requires a Map');
+      const [firstMap] = selectedParent.document.maps ?? [];
+      if (firstMap === undefined) throw new Error('Generated Space requires a Map');
       const [first, second] = selectedParent.resources;
       const positions = Object.fromEntries(
         selectedParent.resources.map((resource, index) => [
@@ -238,10 +238,10 @@ const fixtureFor = ({
               ...selectedParent.document,
               maps: [
                 {
-                  ...map,
+                  ...firstMap,
                   title: `Map moved ${seed}`,
                   positions,
-                  graphs: map.graphs.map((graph) => ({
+                  graphs: firstMap.graphs.map((graph) => ({
                     ...graph,
                     title: `Graph ${seed}`,
                     color: 'teal',
@@ -261,8 +261,8 @@ const fixtureFor = ({
     case 'selected-graph-replaced': {
       // Every parent's Space Resource selects the shared Space's one Graph, so
       // replacing its id leaves them dangling.
-      const [map] = shared.document.maps ?? [];
-      if (map === undefined) throw new Error('Generated Space requires a Map');
+      const [firstMap] = shared.document.maps ?? [];
+      if (firstMap === undefined) throw new Error('Generated Space requires a Map');
       const replacement = idAt(seed, 250);
       commit = {
         changes: [
@@ -272,7 +272,7 @@ const fixtureFor = ({
               ...shared.document,
               maps: [
                 {
-                  ...map,
+                  ...firstMap,
                   graphs: [{ id: replacement, title: 'Replacement', edges: [] }],
                   activeGraph: replacement,
                 },
@@ -284,8 +284,8 @@ const fixtureFor = ({
       break;
     }
     case 'graph-added': {
-      const [map] = selectedParent.document.maps ?? [];
-      if (map === undefined) throw new Error('Generated Space requires a Map');
+      const [firstMap] = selectedParent.document.maps ?? [];
+      if (firstMap === undefined) throw new Error('Generated Space requires a Map');
       commit = {
         changes: [
           update({
@@ -294,8 +294,8 @@ const fixtureFor = ({
               ...selectedParent.document,
               maps: [
                 {
-                  ...map,
-                  graphs: [...map.graphs, { id: idAt(seed, 251), title: 'Added', edges: [] }],
+                  ...firstMap,
+                  graphs: [...firstMap.graphs, { id: idAt(seed, 251), title: 'Added', edges: [] }],
                 },
               ],
             },

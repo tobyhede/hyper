@@ -224,7 +224,7 @@ export interface OpenSpacesOptions {
   readonly metaSpaceTitle: string;
   readonly newId: () => UUID;
   /**
-   * What the browser is asked for, required with no default (ADR 0016).
+   * What the browser is asked for, required with no default (ADR 0109).
    *
    * `createSpaceStartup` supplies the one adapter over `window`; a test supplies
    * a recording one. A default here would put the ambient browser back behind
@@ -538,7 +538,7 @@ export function createOpenSpaces({
   const buildSession = (session: SpaceSession, selection?: MapId): OpenSpace => {
     const spaceId = session.getState().working.id;
     // Every identity and every observer failure in a composed Space comes from
-    // the seams Open Spaces was given (ADR 0016). Leaving either off here lets
+    // the seams Open Spaces was given (ADR 0109). Leaving either off here lets
     // `composeApp` fall back to the ambient generator and to `console.error`,
     // which is the second, invisible source the one owner exists to prevent.
     const opened = {

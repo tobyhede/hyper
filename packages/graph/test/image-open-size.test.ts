@@ -152,9 +152,9 @@ const withReference = (snapshot: SpaceSnapshot): SpaceSnapshot => ({
   ...snapshot,
   document: {
     ...snapshot.document,
-    maps: (snapshot.document.maps ?? []).map((map) => ({
-      ...map,
-      positions: { ...map.positions, [REFERENCE_ID]: { x: 0, y: 400, open: false } },
+    maps: (snapshot.document.maps ?? []).map((authoredMap) => ({
+      ...authoredMap,
+      positions: { ...authoredMap.positions, [REFERENCE_ID]: { x: 0, y: 400, open: false } },
     })),
   },
   resources: [

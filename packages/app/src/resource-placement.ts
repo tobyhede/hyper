@@ -130,11 +130,11 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
  */
 export function useResourcePlacement(
   { app, session: spaceSession, spaceResources, images }: OpenSpace,
-  { map, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
+  { map: selectedMap, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
 ): ResourcePlacementCommands {
   const { reportVisibleCentre, centreAnchor } = useVisibleCentre();
   const { authoring, adapter, continuation, commandOutcomes, navigation, currentSpace } = app;
-  const mapId: MapId = map.id;
+  const mapId: MapId = selectedMap.id;
 
   /**
    * Framing a Space from the surface that offers it, so a reader who found it in
@@ -234,7 +234,7 @@ export function useResourcePlacement(
    */
   const createReferenceFrom = useCallback(
     (resource: Resource): EntityActionOutcome => {
-      const anchor = referenceAnchor(map.positions[resource.id], centreAnchor);
+      const anchor = referenceAnchor(selectedMap.positions[resource.id], centreAnchor);
       // A refusal takes the standing notice rather than the menu it was pressed
       // in: this command closes its menu, because it moves the caret onto the
       // canvas, so by the time an answer exists there is no row left to swap a
@@ -272,7 +272,7 @@ export function useResourcePlacement(
           return 'done';
       }
     },
-    [map, centreAnchor, commandOutcomes, authoring],
+    [selectedMap, centreAnchor, commandOutcomes, authoring],
   );
 
   /**

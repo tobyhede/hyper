@@ -33,9 +33,8 @@ import {
  *
  * Every optional here is a dependency the collaborator that receives it already
  * declares, and none is invented: anything beyond that turns this into a
- * dependency-injection container, which is the instinct ADR 0016 records as
- * "do not manufacture a port or adapter seam when the dependency has one
- * in-process implementation". Each is spelled `| undefined` on purpose, so a
+ * dependency-injection container, which ADR 0109 rules out: no port or adapter
+ * seam for a dependency with one in-process implementation. Each is spelled `| undefined` on purpose, so a
  * caller holding an optional of its own forwards it straight through instead of
  * rebuilding it behind an `exactOptionalPropertyTypes` conditional spread.
  */
@@ -58,7 +57,7 @@ export interface ComposeCoreDependencies {
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
   /**
    * Mints the identity of every Resource, Map and Graph a completed Edit creates
-   * (ADR 0016).
+   * (ADR 0109).
    *
    * Passed explicitly so `createSpaceAuthoring` cannot fall back to its own and
    * the composition always says where an Edit's identities came from.
@@ -147,7 +146,7 @@ export interface ComposedApp extends AppCore {
    * embedded canvas's own authoring (`embedded-authoring.ts`) is the one —
    * needs the same sink and holds nothing else that could name it. Answering
    * it is what lets that module take its reporter required, with no default of
-   * its own: ADR 0016 puts the ambient `console.error` at the composition, and
+   * its own: ADR 0109 puts the ambient `console.error` at the composition, and
    * a module mounted from a canvas gesture minting a second one is exactly the
    * invisible source the one owner exists to prevent. Resolved here when a
    * caller supplies none, so what is answered is always a function.

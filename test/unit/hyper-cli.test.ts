@@ -794,7 +794,7 @@ describe('runHyper', () => {
    * The fault is produced for real: a directory whose two maps own one graph
    * id, read off disk, identified, and put through domain intake by a real
    * repository. A graph id is unique across the space although one map owns it
-   * (ADR 0045).
+   * (ADR 0108).
    *
    * A duplicate graph id is a whole-Space fault, so it arrives as one
    * `invalid-space-snapshot`, and printing the kind alone would leave an author

@@ -101,7 +101,7 @@ class RecordingRepository implements SpaceRepository {
 
 /**
  * The identities a hand-authored directory leaves out come from here rather than
- * from the ambient generator (ADR 0016), so a test can name what it asserts on
+ * from the ambient generator (ADR 0109), so a test can name what it asserts on
  * and a second run mints the same ids as the first.
  */
 const countingIds = (): (() => UUID) => {

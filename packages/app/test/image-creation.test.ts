@@ -231,8 +231,8 @@ describe('an Image Resource gesture the author moves away from', () => {
 
     await expect(created).resolves.toEqual({ kind: 'completed', createdResourceId: FIRST });
     const maps = session.getState().working.document.maps ?? [];
-    expect(maps.find((map) => map.id === MAP_ID)?.positions[FIRST]).toMatchObject(AT);
-    expect(maps.find((map) => map.id === OTHER_MAP_ID)?.positions[FIRST]).toBeUndefined();
+    expect(maps.find((m) => m.id === MAP_ID)?.positions[FIRST]).toMatchObject(AT);
+    expect(maps.find((m) => m.id === OTHER_MAP_ID)?.positions[FIRST]).toBeUndefined();
     expect(navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
   });
 

@@ -230,14 +230,14 @@ export function spaceEntityActions({
     if (entity.kind === 'graph') {
       // A Map **owns** its Graphs (ADR 0040), so a Graph row always has a
       // within-Map address, which is the only address this menu offers.
-      const { graph, map } = entity;
+      const { graph, map: owningMap } = entity;
       return [
         renameAction({ kind: 'graph', id: graph.id }, graph.title),
         [
           copy(
             COPY_LINK_ACTION_ID,
             COPY_LINK,
-            { kind: 'map-graph', spaceId, mapId: map.id, graphId: graph.id },
+            { kind: 'map-graph', spaceId, mapId: owningMap.id, graphId: graph.id },
             onCopy,
           ),
         ],
@@ -245,7 +245,7 @@ export function spaceEntityActions({
       ];
     }
 
-    const { resource, map } = entity;
+    const { resource, map: containingMap } = entity;
     // A menu row names the Resource, so it says the Resource's name (ADR 0083).
     const permanent: ProductDestination = { kind: 'resource', spaceId, resourceId: resource.id };
     // A Map's members *are* its position keys (ADR 0040). A Resource the Resources
@@ -253,13 +253,13 @@ export function spaceEntityActions({
     // address at all, so the one link it has is its own — and there is nothing
     // left for a permanent link to differ from. Withheld, never shown and
     // refused: `map-resource` would 404 on the address it copied.
-    const placed = map.positions[resource.id] !== undefined;
+    const placed = containingMap.positions[resource.id] !== undefined;
     const resourceAddresses: readonly EntityAction[] = placed
       ? [
           copy(
             COPY_LINK_ACTION_ID,
             RESOURCE_COPY_LINK_IN_MAP,
-            { kind: 'map-resource', spaceId, mapId: map.id, resourceId: resource.id },
+            { kind: 'map-resource', spaceId, mapId: containingMap.id, resourceId: resource.id },
             onCopy,
           ),
           copy(COPY_RESOURCE_LINK_ACTION_ID, RESOURCE_COPY_LINK, permanent, onCopy),

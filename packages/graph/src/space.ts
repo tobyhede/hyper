@@ -40,8 +40,8 @@ export interface Space {
   readonly resources: readonly Resource[];
   /**
    * Every graph in the space, **flattened** across the maps that own them —
-   * maps in declared order, each map's graphs in authored order (ADR
-   * 0045). Derived, never stored: a graph is an owned value of one map (ADR
+   * maps in declared order, each map's graphs in authored order.
+   * Derived, never stored: a graph is an owned value of one map (ADR
    * 0040), and this is the collection a view whose subject is the space's resources
    * draws. Closed for free, since every edge endpoint is a resource of some map
    * and so a resource of the space.
@@ -294,12 +294,12 @@ function buildSpace(input: {
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
 
   // The flatten: maps in declared order, each map's owned graphs in
-  // authored order. Derived and never stored (ADR 0045) — it exists so the
+  // authored order. Derived and never stored (ADR 0108) — it exists so the
   // readers that key colour, handles, render edge ids and activation on a graph
   // id alone keep reading one collection while ownership sits on the map.
   // The reference check above has already refused a repeated id, so the lookup
   // built below can drop nothing.
-  const graphs = maps.flatMap((map) => map.graphs);
+  const graphs = maps.flatMap((m) => m.graphs);
   const built = buildSpaceLookup({ resources, maps });
   if (!built.ok) {
     return {

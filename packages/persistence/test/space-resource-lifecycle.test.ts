@@ -217,10 +217,10 @@ describe('Space Resource lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        maps: metaSnapshot.document.maps?.map((map) => ({
-          ...map,
+        maps: metaSnapshot.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -499,10 +499,10 @@ describe('Space Resource lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        maps: metaSnapshot.document.maps?.map((map) => ({
-          ...map,
+        maps: metaSnapshot.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -572,10 +572,10 @@ describe('Space Resource lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        maps: metaSnapshot.document.maps?.map((map) => ({
-          ...map,
+        maps: metaSnapshot.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -1260,10 +1260,10 @@ describe('Space Resource lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        maps: metaSnapshot.document.maps?.map((map) => ({
-          ...map,
+        maps: metaSnapshot.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -1414,7 +1414,7 @@ describe('Space Resource lifecycle', () => {
     // The Map and the Graph initialization mints, in that order, and only
     // then the Resource's own id. Initialization runs before the Edit rather than
     // inside it, so an id source written in any other order is exhausted at the
-    // draw that proves it (ADR 0016, ADR 0079).
+    // draw that proves it (ADR 0109, ADR 0079).
     const lifecycle = registry.spaceResources(
       idSource([TARGET_MAP_ID, TARGET_GRAPH_ID, SPACE_RESOURCE_ID]),
     );
@@ -2004,9 +2004,9 @@ describe('Space Resource lifecycle', () => {
       ...targetSnapshot,
       document: {
         ...targetSnapshot.document,
-        maps: targetSnapshot.document.maps?.map((map) => ({
-          ...map,
-          graphs: [...map.graphs, { id: SECOND_TARGET_GRAPH_ID, title: 'Graph 2', edges: [] }],
+        maps: targetSnapshot.document.maps?.map((m) => ({
+          ...m,
+          graphs: [...m.graphs, { id: SECOND_TARGET_GRAPH_ID, title: 'Graph 2', edges: [] }],
           activeGraph: SECOND_TARGET_GRAPH_ID,
         })),
       },
@@ -2122,10 +2122,10 @@ describe('Space Resource lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        maps: metaSnapshot.document.maps?.map((map) => ({
-          ...map,
+        maps: metaSnapshot.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -2231,10 +2231,10 @@ describe('Space Resource lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        maps: metaSnapshot.document.maps?.map((map) => ({
-          ...map,
+        maps: metaSnapshot.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -2348,10 +2348,10 @@ describe('Space Resource lifecycle', () => {
       ],
       document: {
         ...metaSnapshot.document,
-        maps: metaSnapshot.document.maps?.map((map) => ({
-          ...map,
+        maps: metaSnapshot.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
@@ -2395,9 +2395,9 @@ describe('Space Resource coordination paths', () => {
     ],
     document: {
       ...metaSnapshot.document,
-      maps: metaSnapshot.document.maps?.map((map) => ({
-        ...map,
-        positions: { ...map.positions, [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false } },
+      maps: metaSnapshot.document.maps?.map((m) => ({
+        ...m,
+        positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false } },
       })),
     },
   };

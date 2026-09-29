@@ -294,7 +294,7 @@ function mount(
   reportObserverError?: ObserverErrorReporter,
   /**
    * The two injections only some tests name: the minter a coordinated Edit
-   * draws its identities from (ADR 0016), and the control that decides what a
+   * draws its identities from (ADR 0109), and the control that decides what a
    * commit answers.
    */
   { newId = newUuid, control }: MountInjections = {},
@@ -686,7 +686,7 @@ describe('Create Space Resource', () => {
    * Reported through the sink the composition was given, not a second one.
    *
    * A surface that answers the reporting requirement with its own
-   * `console.error` puts back exactly the invisible reporter ADR 0016 exists to
+   * `console.error` puts back exactly the invisible reporter ADR 0109 exists to
    * prevent: a host that installed a sink of its own would never see this.
    */
   it('reports a rejected create through the sink the composition was given', async () => {

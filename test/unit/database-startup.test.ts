@@ -39,7 +39,7 @@ const CHILD_GRAPH_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
 
 /**
  * The identities startup is about to mint, named in the order it mints them
- * (ADR 0016). Exhaustion throws rather than falling back to the ambient
+ * (ADR 0109). Exhaustion throws rather than falling back to the ambient
  * generator, so an extra mint is observable at the operation that made it.
  */
 const mintingIds = (...ids: readonly [UUID, ...UUID[]]): (() => UUID) => {

@@ -13,9 +13,9 @@ test(
   async ({ page }) => {
     await page.goto('/');
     const space = page.getByTestId('space-title');
-    const map = page.getByTestId('selected-canvas');
+    const mapControl = page.getByTestId('selected-canvas');
     await expect(space).toBeVisible();
-    await expect(map).toBeVisible();
+    await expect(mapControl).toBeVisible();
     await expect(page.getByTestId('active-graph')).toBeVisible();
     /**
      * **All three read in one frame, and that is the assertion rather than a
@@ -52,12 +52,12 @@ test(
     await expect(page.getByRole('button', { name: /^Space:/ })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Map:/ })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Active Graph:/ })).toHaveCount(1);
-    await map.click({ delay: 120 });
+    await mapControl.click({ delay: 120 });
     await expect(page.getByRole('menu')).toBeVisible();
     await page.getByRole('menuitem', { name: 'Rename' }).click();
     await expect(page.getByRole('textbox', { name: 'Map name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(map).toBeFocused();
+    await expect(mapControl).toBeFocused();
     // The Space's own name owes the caret back too.
     await space.click({ delay: 120 });
     await expect(page.getByRole('menu')).toBeVisible();

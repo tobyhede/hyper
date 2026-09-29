@@ -22,7 +22,10 @@ export interface BuildSpaceResourceRailInput {
   readonly target: SpaceResourceTarget;
   readonly document: Extract<ResourceDocument, { kind: 'space' }> | undefined;
   readonly disabled: boolean;
-  readonly complete: (map: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null;
+  readonly complete: (
+    targetMap: Pick<SpaceResourceTargetMap, 'id'>,
+    graphId: GraphId,
+  ) => string | null;
   readonly onEditingChange?: (editing: boolean) => void;
   readonly onReport: (message: string | null) => void;
   readonly context: SpaceResourceRailContext | undefined;
@@ -37,9 +40,9 @@ export function buildSpaceResourceRail({
   onReport,
   context,
 }: BuildSpaceResourceRailInput) {
-  const selectedMap = target.maps.find((map) => map.id === document?.map);
+  const selectedMap = target.maps.find((m) => m.id === document?.map);
   const mapOf = (id: string): SpaceResourceTargetMap | undefined =>
-    target.maps.find((map) => map.id === id);
+    target.maps.find((m) => m.id === id);
   const commands =
     context === undefined || document === undefined
       ? undefined
@@ -64,19 +67,20 @@ export function buildSpaceResourceRail({
           : null
       }
       onMapChange={(id) => {
-        const map = mapOf(id);
+        const chosen = mapOf(id);
         // The Map's own Active Graph, and the head of its list only where it
         // has authored none — which is what an absent `activeGraph` means
         // (ADR 0040). Resolved against the Map's Graphs rather than trusted:
         // the seed has to be a Graph this Map owns or the aggregate refuses
         // the Resource that names it.
-        if (map === undefined) return;
-        const seed = map.graphs.find((graph) => graph.id === map.activeGraph) ?? map.graphs[0];
+        if (chosen === undefined) return;
+        const seed =
+          chosen.graphs.find((graph) => graph.id === chosen.activeGraph) ?? chosen.graphs[0];
         // A Map owns at least one Graph, so this is the type-level boundary
         // between a validated Space and the ids read out of it, not a Map an
         // author can choose and leave half-selected.
         if (seed === undefined) return;
-        complete(map, seed.id);
+        complete(chosen, seed.id);
       }}
       onGraphChange={(id) => {
         if (selectedMap === undefined) return;

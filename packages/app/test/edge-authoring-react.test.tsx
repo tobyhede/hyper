@@ -209,8 +209,7 @@ function compose({
 const settled = (session: SpaceSession): Promise<void> =>
   waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
 
-const graphsOf = (working: SpaceSnapshot) =>
-  (working.document.maps ?? []).flatMap((map) => map.graphs);
+const graphsOf = (working: SpaceSnapshot) => (working.document.maps ?? []).flatMap((m) => m.graphs);
 
 /** One identity, so the memo under test is not defeated by the test's own input. */
 const NO_OP = () => undefined;
@@ -759,9 +758,9 @@ describe("the app's canvas delete key", () => {
 
       fireEvent.keyDown(focused, { key, bubbles: true });
 
-      const map = session.getState().working.document.maps?.[0];
-      expect(map?.positions[RESOURCE_B]).toBeUndefined();
-      expect(map?.positions[RESOURCE_A]).toBeDefined();
+      const firstMap = session.getState().working.document.maps?.[0];
+      expect(firstMap?.positions[RESOURCE_B]).toBeUndefined();
+      expect(firstMap?.positions[RESOURCE_A]).toBeDefined();
     },
   );
 

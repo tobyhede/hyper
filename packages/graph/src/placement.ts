@@ -93,9 +93,9 @@ const point = (at: PlacementPoint): ResourcePlacement => {
 };
 
 /** The placement a Map holds. */
-function fromMap(map: Map): Placement {
+function fromMap(m: Map): Placement {
   const positions = new Map<ResourceId, ResourcePlacement>();
-  for (const [resourceId, at] of Object.entries(map.positions)) {
+  for (const [resourceId, at] of Object.entries(m.positions)) {
     if (at !== undefined) {
       // SAFETY: `Object.entries` widens this key to `string`, but it was
       // already branded — `mapSchema` declares `positions` as

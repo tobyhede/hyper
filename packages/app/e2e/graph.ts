@@ -78,7 +78,7 @@ export const FIXTURE_EDGE_COUNT =
       maps: readonly { graphs: readonly { edges: readonly unknown[] }[] }[];
     }
   ).maps.reduce(
-    (total, map) => total + map.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
+    (total, m) => total + m.graphs.reduce((edges, graph) => edges + graph.edges.length, 0),
     0,
   );
 

@@ -364,11 +364,11 @@ describe('resource frontmatter schema', () => {
       kind: 'space',
       spaceId: '00000000-0000-4000-8000-000000000007',
     };
-    const map = '00000000-0000-4000-8000-000000000008';
+    const mapId = '00000000-0000-4000-8000-000000000008';
     const graph = '00000000-0000-4000-8000-000000000009';
 
     expect(resourceFrontmatterSchema.safeParse(nested).success).toBe(false);
-    expect(resourceFrontmatterSchema.safeParse({ ...nested, map }).success).toBe(false);
+    expect(resourceFrontmatterSchema.safeParse({ ...nested, map: mapId }).success).toBe(false);
     expect(resourceFrontmatterSchema.safeParse({ ...nested, graph }).success).toBe(false);
   });
 
@@ -404,9 +404,9 @@ describe('space file maps', () => {
 
   it('parses a positioned map and its positions', () => {
     const file = spaceFileSchema.parse({ ...validSpaceFile, maps: [working] });
-    const map = file.maps?.[0];
-    expect(map?.kind).toBe('positioned');
-    expect(map?.positions).toEqual({
+    const parsed = file.maps?.[0];
+    expect(parsed?.kind).toBe('positioned');
+    expect(parsed?.positions).toEqual({
       '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
       '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
     });

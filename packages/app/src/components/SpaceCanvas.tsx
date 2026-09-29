@@ -806,12 +806,12 @@ export function SpaceCanvas({
     [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals],
   );
   const portalNodesById = useMemo(() => {
-    const map = new Map<string, ResourceFlowNode>();
-    for (const node of nodes) map.set(node.id, node);
+    const byId = new Map<string, ResourceFlowNode>();
+    for (const node of nodes) byId.set(node.id, node);
     for (const value of liveEmbeddings) {
-      for (const child of value.nodes) map.set(child.id, child);
+      for (const child of value.nodes) byId.set(child.id, child);
     }
-    return map;
+    return byId;
   }, [nodes, liveEmbeddings]);
   const canvasEdges = useMemo(
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],

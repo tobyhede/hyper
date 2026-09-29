@@ -102,7 +102,7 @@ describe.each([
     if (!result.ok) throw new Error(result.errors.map((e) => e.message).join('\n'));
     expect(result.space.maps).toHaveLength(expected.maps);
     // `space.graphs` is the flatten across those Maps, never a stored
-    // collection beside them (ADR 0045).
+    // collection beside them (ADR 0040).
     expect(result.space.graphs).toHaveLength(expected.graphs);
     expect(result.space.defaultMap).toBe(expected.defaultMap);
   });
@@ -126,15 +126,15 @@ describe.each([
       result.space.resources.map((resource) => [resource.id, titleName(resource.title)]),
     );
     const unreached = Object.fromEntries(
-      result.space.maps.map((map): readonly [string, readonly string[]] => {
-        const endpoints = map.graphs.flatMap((graph) =>
+      result.space.maps.map((m): readonly [string, readonly string[]] => {
+        const endpoints = m.graphs.flatMap((graph) =>
           graph.edges.flatMap((edge) => [edge.from, edge.to]),
         );
-        for (const endpoint of endpoints) expect(map.positions[endpoint]).toBeDefined();
+        for (const endpoint of endpoints) expect(m.positions[endpoint]).toBeDefined();
         const connected = new Set<string>(endpoints);
         return [
-          map.title,
-          Object.keys(map.positions)
+          m.title,
+          Object.keys(m.positions)
             .filter((resource) => !connected.has(resource))
             .map((resource) => nameById.get(resource) ?? resource)
             .sort(),
@@ -149,7 +149,7 @@ describe.each([
 
     // Every Resource is in exactly one Map, so nothing is left over and nothing
     // is in both.
-    const memberships = result.space.maps.flatMap((map) => Object.keys(map.positions));
+    const memberships = result.space.maps.flatMap((m) => Object.keys(m.positions));
     expect(memberships).toHaveLength(expected.resources);
     expect(new Set(memberships).size).toBe(expected.resources);
   });

@@ -369,7 +369,7 @@ export const resourcePlacementSchema = z.discriminatedUnion('open', [
  * map that holds them, ordered, and never shared with a second (ADR 0040).
  * Every edge endpoint of an owned graph names a resource in this map, which
  * again needs the whole space in view. Ownership is map-scoped while a graph
- * id is unique across the *space* (ADR 0045), because the flatten a
+ * id is unique across the *space* (ADR 0108), because the flatten a
  * space-subject view draws keys colour, handles and activation on the id alone.
  *
  * **Strict**, as the space file itself is: a stripped key is a question

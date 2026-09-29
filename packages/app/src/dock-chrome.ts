@@ -108,7 +108,7 @@ export function useDockChrome(
   const { authoring, commandOutcomes, navigation } = app;
   const {
     space,
-    map,
+    map: selectedMap,
     projection,
     activeGraphId,
     presenting,
@@ -254,7 +254,7 @@ export function useDockChrome(
       .find((action) => action.id === id)
       ?.onSelect(null);
   };
-  const mapGraphCommands = graphAuthoring.map(map.id);
+  const mapGraphCommands = graphAuthoring.map(selectedMap.id);
   const activeGraphCommands = mapGraphCommands.graph(activeGraph.id);
   const { placement } = resources;
   const { centreAnchor } = placement;
@@ -292,13 +292,13 @@ export function useDockChrome(
     },
     canvas: {
       maps: space.maps,
-      selected: map,
+      selected: selectedMap,
       onSelect: location.chooseMap,
       // Each Map command is the press built from the capability that answers
       // its availability (`offered`), so the Dock draws a row unavailable
       // exactly when invoking it would answer so — the last Map included.
       onRename: offered(
-        mapAuthoring.map(map.id).rename,
+        mapAuthoring.map(selectedMap.id).rename,
         (rename) => (title: string) =>
           renameDraftAnswer(commandOutcomes.run('map-manage', () => rename(title))),
       ),
@@ -318,10 +318,10 @@ export function useDockChrome(
       didCreateMoveCaret: () => createMapMovedCaret.current,
       // Deleting the drawing Map repoints every Space Resource that selected it
       // and leaves the canvas on the survivor, which is its completion's move.
-      onDelete: offered(mapAuthoring.map(map.id).delete, (remove) => () => {
+      onDelete: offered(mapAuthoring.map(selectedMap.id).delete, (remove) => () => {
         void commandOutcomes.run('map-delete', remove, { completionMovesMap: true });
       }),
-      onCopyLink: runEntityCommand({ kind: 'map', map }, COPY_LINK_ACTION_ID),
+      onCopyLink: runEntityCommand({ kind: 'map', map: selectedMap }, COPY_LINK_ACTION_ID),
     },
     graph: {
       graphs: projection.visibleGraphs,
@@ -357,7 +357,10 @@ export function useDockChrome(
       onDelete: offered(activeGraphCommands.delete, (remove) => () => {
         void commandOutcomes.run('graph-delete', remove);
       }),
-      onCopyLink: runEntityCommand({ kind: 'graph', graph: activeGraph, map }, COPY_LINK_ACTION_ID),
+      onCopyLink: runEntityCommand(
+        { kind: 'graph', graph: activeGraph, map: selectedMap },
+        COPY_LINK_ACTION_ID,
+      ),
       presenting,
       onPresent: navigation.present,
       // An empty Graph has nothing to traverse, which is a fact about the Graph

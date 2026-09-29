@@ -22,7 +22,7 @@ const mintingFrom = <Id extends UUID>(
  * The ids a completed Edit mints, in the order it mints them.
  *
  * Do not reach for `vi.spyOn(crypto, 'randomUUID')` instead: it controls the
- * ambient generator rather than the module that mints from it, and ADR 0016's
+ * ambient generator rather than the module that mints from it, and ADR 0109's
  * grounds against it are general: a constant collides
  * across a property test's cases so it needs a counter, at which point a
  * generator exists anyway; `randomUUID` is an unseedable CSPRNG, so controlling

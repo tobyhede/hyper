@@ -103,11 +103,12 @@ const ordinarySpace = (
 };
 
 const firstMap = (snapshot: SpaceSnapshot) => {
-  const [map] = snapshot.document.maps ?? [];
-  if (map?.kind !== 'positioned') throw new Error(`Space ${snapshot.id} has no positioned Map`);
-  const [graph] = map.graphs;
+  const [positioned] = snapshot.document.maps ?? [];
+  if (positioned?.kind !== 'positioned')
+    throw new Error(`Space ${snapshot.id} has no positioned Map`);
+  const [graph] = positioned.graphs;
   if (graph === undefined) throw new Error(`Space ${snapshot.id} has no Graph`);
-  return { map, graph };
+  return { map: positioned, graph };
 };
 
 export const scenario = (workload: Workload): Scenario => {
@@ -146,14 +147,14 @@ export const scenario = (workload: Workload): Scenario => {
       ],
     },
     resources: referenced.map((target, index) => {
-      const { map, graph } = firstMap(target);
+      const { map: mapId, graph } = firstMap(target);
       return {
         id: spaceResourceIds[index],
         document: {
           title: target.document.title,
           kind: 'space',
           spaceId: target.id,
-          map: map.id,
+          map: mapId.id,
           graph: graph.id,
         },
       };
@@ -188,14 +189,14 @@ const withPositions = (
   snapshot: SpaceSnapshot,
   update: (positions: PositionedMap['positions']) => PositionedMap['positions'],
 ): SpaceSnapshot => {
-  const { map } = firstMap(snapshot);
-  const next = { ...map, positions: update({ ...map.positions }) };
+  const { map: positioned } = firstMap(snapshot);
+  const next = { ...positioned, positions: update({ ...positioned.positions }) };
   return {
     ...snapshot,
     document: {
       ...snapshot.document,
       maps: (snapshot.document.maps ?? []).map((candidate) =>
-        candidate.id === map.id ? next : candidate,
+        candidate.id === positioned.id ? next : candidate,
       ),
     },
   };
@@ -286,7 +287,7 @@ export const applyEdit = (
         height: current.height + 20,
       }));
     case 'add-edge': {
-      const { map, graph } = firstMap(snapshot);
+      const { map: positioned, graph } = firstMap(snapshot);
       // The first other Resource from `index + 2` on, wrapping round, that
       // the subject has no Edge to yet, so repeated samples add a new Edge
       // rather than a duplicate the Graph would refuse.
@@ -300,8 +301,8 @@ export const applyEdit = (
       );
       if (to === undefined) throw new Error(`Resource ${subject.id} has no Edge left to add`);
       const nextMap = {
-        ...map,
-        graphs: map.graphs.map((candidate) =>
+        ...positioned,
+        graphs: positioned.graphs.map((candidate) =>
           candidate.id === graph.id
             ? { ...candidate, edges: [...candidate.edges, { from: subject.id, to: to.id }] }
             : candidate,
@@ -312,7 +313,7 @@ export const applyEdit = (
         document: {
           ...snapshot.document,
           maps: (snapshot.document.maps ?? []).map((candidate) =>
-            candidate.id === map.id ? nextMap : candidate,
+            candidate.id === positioned.id ? nextMap : candidate,
           ),
         },
       };

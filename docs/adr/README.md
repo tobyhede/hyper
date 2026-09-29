@@ -26,6 +26,7 @@ under `superseded/`.
 | ADR | Binds |
 | --- | --- |
 | [0085](0085-thing-and-diagram-are-the-first-public-names-for-card-and-layout.md) | A Card is a Thing and a Layout is a Diagram. `LayoutStrategy` keeps its name. |
+| [0101](0101-map-and-resource-are-the-first-public-names-for-diagram-and-thing.md) | A Resource is a Thing and a Map is a Diagram, renamed exactly. Space, Resource, Graph and Map are the four nouns. |
 | [0001](0001-recursive-spaces.md) | A Card may hold another Space, so Spaces nest. |
 | [0004](0004-cards-are-the-graph.md) | Cards are the graph. Nothing sits between a Card and its position. |
 | [0007](0007-routes-are-the-only-structure.md) | Cards and Graphs are the only structure. There are no separately authored edges. |
@@ -55,11 +56,13 @@ under `superseded/`.
 | [0014](0014-layout-is-the-authored-data-strategy-is-the-behaviour.md) | A Layout is authored data. A LayoutStrategy is behaviour. |
 | [0086](0086-automatic-arrangement-is-an-edit-not-a-render-path.md) | An automatic arrangement is an Edit over a Diagram. No strategy runs at render but the positioned one. |
 | [0087](0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md) | An Edge attaches to one of a Thing's four anchors, on the side facing its neighbour, chosen while drawing. |
+| [0110](0110-an-edge-faces-across-the-larger-gap-between-two-resources.md) | The facing side is on the axis with the larger gap between the two rects, and the centre difference on that axis alone picks the direction. A self-Edge keeps its fixed loop. |
 | [0100](0100-graphs-sharing-a-pair-of-things-run-in-parallel-lanes.md) | Edges joining the same two Things are drawn as parallel translated copies; the Active Graph connects on the centre with its head shape; the others run below it and stop short (their heads: ADR 0105). |
 | [0103](0103-a-lane-is-offset-along-its-curve.md) | A lane is the Edge's curve offset along its normal at a constant distance, over one span of the curve per pair judged at its reach, with one cubic bridge from each end of the span to the lane's point beside its anchor, and the translate only where a pair has no span; its ends and arrowheads stay where a translate puts them and its label sits at the offset midpoint; self-Edges keep their own rule. |
 | [0104](0104-an-edge-may-carry-a-title.md) | An Edge may carry an optional one-line Title, never minted, and `titleHidden: true`; its identity stays `(from, to)` within its Graph. |
 | [0105](0105-a-graphs-edges-share-one-head-shape.md) | A Graph carries one head shape (`arrow`, `vee`, `dot`, `diamond`, default `arrow`), drawn at every drawn Edge's head, including those that stop short (refines 0100); no `none`, no tail shape, no per-Edge override; the legend's line marks end in it. |
 | [0040](0040-layouts-own-card-membership-and-routes.md) | A Layout owns its Card membership and its Graphs. |
+| [0108](0108-graph-identity-is-unique-within-the-space.md) | A Graph id is unique across its Space, although one Map owns the Graph. Lookup, the Graph URL and render keys resolve it without a Map. |
 | [0079](0079-v1-exposes-only-layouts-and-first-open-initializes-one.md) | An authored Layout is the only selectable and addressable canvas context, and first working load initializes one. |
 | [0080](0080-new-spaces-start-complete-and-layoutless-stored-spaces-are-repaired.md) | New Spaces persist their first Card in a complete Layout; first working load repairs stored layoutless Spaces without placing their Cards. |
 | [0015](0015-a-space-may-have-no-routes.md) | A Space may hold no Graph. It then cannot present. |
@@ -74,12 +77,13 @@ under `superseded/`.
 | [0035](0035-space-authoring-owns-the-edit-lifecycle.md) | Space Authoring owns the full Edit lifecycle. |
 | [0042](0042-interaction-drafts-stay-local-and-space-replacement-invalidates-them.md) | An interaction draft stays local, and a Space replacement discards it. |
 | [0057](0057-errors-cross-seams-as-stable-identities.md) | An error crosses a seam as a stable identity, not as prose. |
+| [0109](0109-nondeterminism-is-injected-once-at-composition.md) | A nondeterministic function is a required composition parameter, named at the composition root. Tests own a generator and never mock `crypto.randomUUID`. |
 | [0028](0028-activating-a-route-is-not-an-edit.md) | To activate a Graph is not an Edit. |
 | [0030](0030-postgres-is-the-live-write-model.md) | PostgreSQL is the live write model. Files are imported and exported. |
 | [0018](0018-a-new-space-is-a-single-centered-card.md) | A new Space is one centred Card. |
-| [0054](0054-the-unreleased-prototype-rolls-forward.md) | The prototype is unreleased, so a format change rolls forward and adds no migration. |
+| [0054](0054-the-unreleased-prototype-rolls-forward.md) | The prototype is unreleased, so a document format change rolls forward with its fixtures and adds no versioned reader. Relational schema changes still go through `migrations/app/`. |
 | [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. ADR 0106 excepts an Image Resource's picture. |
-| [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate that CLI hard reset restores. |
+| [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate. The CLI hard reset that restores it is decided but not built (`.scratch/v1-release/issues/16`); today `hyper <path> --dangerous-truncate` (ADR 0094) replaces the aggregate from a directory. |
 | [0078](0078-the-server-side-repository-owns-meta-lifecycle.md) | The server-side repository owns Meta lifecycle; its browser seam does not expose lifecycle administration. |
 | [0094](0094-dangerous-truncate-replaces-whatever-is-stored.md) | `--dangerous-truncate` replaces whatever is stored, valid or not, still authorized by the Meta identity it read. |
 | [0095](0095-sql-databases-share-one-space-repository.md) | PostgreSQL and SQLite share one Space repository and differ only through a small `SqlStore`; revisions are decimal TEXT on both. |
@@ -93,6 +97,7 @@ under `superseded/`.
 | --- | --- |
 | [0034](0034-the-http-application-is-fetch-native.md) | The HTTP application is Fetch-native. |
 | [0069](0069-entities-have-durable-web-addresses.md) | Every Space, Card, Graph and Layout has a durable URL built from its Id (ADR 0079 makes the addressable canvas context a Layout). |
+| [0111](0111-presentation-stays-within-one-space-until-cross-space-edges-are-decided.md) | A presentation URL names Space, Map, Graph and Resource only. The cross-Space query value waits for cross-Space Edges to be decided. |
 | [0081](0081-navigation-answers-its-own-address-and-never-learns-what-a-url-is.md) | Navigation answers its own address. Deciding what URL that address deserves stays in `app`. |
 
 ## Canvas and camera

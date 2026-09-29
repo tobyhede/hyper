@@ -50,7 +50,7 @@ describe('import decoding', () => {
    * parses is the object the wire is handed and the two summarisers are given
    * one issue list. A mint would make them different documents and the parity
    * below would be comparing two values rather than one — so a mint throws
-   * instead of quietly succeeding (ADR 0016: the caller owns identity).
+   * instead of quietly succeeding (ADR 0109: the caller owns identity).
    */
   const unmintable = (): UUID => {
     throw new Error('A fixture left an id out, so the two doors would not see one document.');

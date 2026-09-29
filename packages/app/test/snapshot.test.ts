@@ -117,7 +117,7 @@ it('leaves unrelated maps standing while writing one', () => {
   });
 
   expect(changed.document.maps).toHaveLength(2);
-  expect(changed.document.maps?.map((map) => map.id)).toEqual([MAP_ID, OTHER_MAP_ID]);
+  expect(changed.document.maps?.map((m) => m.id)).toEqual([MAP_ID, OTHER_MAP_ID]);
   expect(changed.document.maps?.[1]).toEqual(withMaps.document.maps?.[1]);
   expect(changed.resources).toEqual(snapshot.resources);
   expect(loadSpaceSnapshot(changed).ok).toBe(true);

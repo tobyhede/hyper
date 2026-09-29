@@ -35,7 +35,7 @@ const asObject = (placement: Placement) => Object.fromEntries(placement);
 
 describe('Placement.fromMap', () => {
   it('reads the positions a Map authored', () => {
-    const map: Map = {
+    const authored: Map = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
       title: 'Map 1',
       kind: 'positioned',
@@ -46,14 +46,14 @@ describe('Placement.fromMap', () => {
       graphs: [],
     };
 
-    expect(asObject(Placement.fromMap(map))).toEqual({
+    expect(asObject(Placement.fromMap(authored))).toEqual({
       [RESOURCE_A]: { x: 10, y: 20, open: false },
       [RESOURCE_B]: { x: 300, y: 40, open: false },
     });
   });
 
   it('carries a Map that authors no resource at all', () => {
-    const map: Map = {
+    const authored: Map = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
       title: 'Map 1',
       kind: 'positioned',
@@ -62,7 +62,7 @@ describe('Placement.fromMap', () => {
     };
 
     // Distinct from having no Map: this one exists and authors nothing yet.
-    expect(Placement.fromMap(map).size).toBe(0);
+    expect(Placement.fromMap(authored).size).toBe(0);
   });
 });
 
@@ -634,7 +634,7 @@ describe('Placement.toPositions', () => {
       '00000000-0000-4000-8000-000000000002': [10, 20],
       '00000000-0000-4000-8000-000000000003': [300, 40],
     });
-    const map: Map = {
+    const authored: Map = {
       id: uuid('00000000-0000-4000-8000-000000000021'),
       title: 'Map 1',
       kind: 'positioned',
@@ -642,7 +642,7 @@ describe('Placement.toPositions', () => {
       graphs: [],
     };
 
-    expect(Placement.equals(Placement.fromMap(map), placement)).toBe(true);
+    expect(Placement.equals(Placement.fromMap(authored), placement)).toBe(true);
   });
 });
 

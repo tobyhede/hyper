@@ -144,8 +144,8 @@ function RefusedAdd() {
   const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
   useSyncExternalStore(session.subscribe, session.getState);
   const space = composed.currentSpace();
-  const map = space.lookup.map(composed.navigation.getState().selectedMapId)?.map;
-  const resources = map === undefined ? [] : resourcesOutsideMap(space, map);
+  const selectedMap = space.lookup.map(composed.navigation.getState().selectedMapId)?.map;
+  const resources = selectedMap === undefined ? [] : resourcesOutsideMap(space, selectedMap);
   const [open, setOpen] = useState(false);
 
   return (
@@ -211,13 +211,13 @@ MetaSpaces.meta = { iframed: true };
  * the colours the canvas draws those Graphs in.
  */
 export const PlacedElsewhere: Story = () => {
-  const { map } = resolveMap(widelyPlacedSpace);
-  const outside = resourcesOutsideMap(widelyPlacedSpace, map);
+  const { map: opening } = resolveMap(widelyPlacedSpace);
+  const outside = resourcesOutsideMap(widelyPlacedSpace, opening);
   return (
     <ResourcesPopoverFixture
       resources={outside}
       allResources={widelyPlacedSpace.resources}
-      memberships={otherMapMemberships(widelyPlacedSpace, map.id)}
+      memberships={otherMapMemberships(widelyPlacedSpace, opening.id)}
     />
   );
 };

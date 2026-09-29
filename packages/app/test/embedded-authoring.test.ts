@@ -64,7 +64,7 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
  * The embedded composition, reporting where its target's composition does.
  *
  * The reporter is taken off the entry rather than handed in beside it, because
- * that is the one `EmbeddedMapAuthoring` spends (ADR 0016) — a recording one
+ * that is the one `EmbeddedMapAuthoring` spends (ADR 0109) — a recording one
  * supplied straight to the factory would prove the argument and not the wiring.
  */
 const embedded = () => {

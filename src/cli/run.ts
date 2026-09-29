@@ -15,7 +15,7 @@ interface RunHyperDependencies {
   repository: SpaceRepository;
   io: CliIo;
   /**
-   * The composition-owned identity source (ADR 0016). Startup mints the Meta
+   * The composition-owned identity source (ADR 0109). Startup mints the Meta
    * Space's own identity and those of its Default Content through it, and
    * import mints the nested ids a hand-authored aggregate leaves out.
    */

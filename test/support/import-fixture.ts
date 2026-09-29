@@ -55,7 +55,7 @@ const seededSpace = (
  * `newUuid` rather than an injected generator because nothing here asserts on an
  * identity: the ids the directory leaves out are filled in so the snapshot can
  * be stored at all, and a test that wants to name one identifies its own
- * snapshot (ADR 0016).
+ * snapshot (ADR 0109).
  */
 export const importSpaceDirectory = async (
   repository: SpaceRepository,

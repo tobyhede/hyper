@@ -108,7 +108,7 @@ function open(
 }
 
 const graphsOf = (snapshot: SpaceSnapshot) =>
-  (snapshot.document.maps ?? []).flatMap((map) => map.graphs);
+  (snapshot.document.maps ?? []).flatMap((m) => m.graphs);
 
 describe('the one Edge interaction draft', () => {
   it('holds at most one draft, whichever kind starts next', () => {
@@ -680,16 +680,16 @@ describe('connecting from the Connect list', () => {
       ...positionedSnapshot,
       document: {
         ...positionedSnapshot.document,
-        maps: (positionedSnapshot.document.maps ?? []).map((map) =>
-          map.id === MAP_ID
+        maps: (positionedSnapshot.document.maps ?? []).map((m) =>
+          m.id === MAP_ID
             ? {
-                ...map,
+                ...m,
                 positions: {
-                  ...map.positions,
+                  ...m.positions,
                   [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
                 },
               }
-            : map,
+            : m,
         ),
       },
     };

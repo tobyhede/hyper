@@ -461,9 +461,9 @@ export function CanvasResourceNodeSpecimen({
   drawn = INVENTORY_MAP,
 }: CanvasResourceNodeSpecimenProps) {
   const drawnSpace = drawn.space;
-  const map = drawnSpace.maps.find((candidate) => candidate.id === drawn.mapId);
+  const selectedMap = drawnSpace.maps.find((candidate) => candidate.id === drawn.mapId);
   const projected = useProjection(
-    drawn === INVENTORY_MAP ? graphIds.long : (map?.activeGraph ?? null),
+    drawn === INVENTORY_MAP ? graphIds.long : (selectedMap?.activeGraph ?? null),
     null,
     drawn,
   );
@@ -474,7 +474,7 @@ export function CanvasResourceNodeSpecimen({
   if (source === undefined) throw new Error(`Missing fixture Resource ${resourceId}`);
 
   const resource = drawnSpace.resources.find((candidate) => candidate.id === resourceId);
-  if (resource === undefined || map === undefined)
+  if (resource === undefined || selectedMap === undefined)
     throw new Error('Missing fixture Resource or Map');
 
   const data: ResourceFlowNode['data'] = {
@@ -485,7 +485,7 @@ export function CanvasResourceNodeSpecimen({
       onCopy: () => true,
       onOpenIndependently: null,
       onRename: null,
-    })({ kind: 'resource', resource, map }),
+    })({ kind: 'resource', resource, map: selectedMap }),
     readOnly,
     onBeginTitleEditing: () => undefined,
   };

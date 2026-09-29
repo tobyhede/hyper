@@ -681,8 +681,8 @@ OpenIndependently.meta = { iframed: true };
  */
 export const RailActions: Story = () => {
   const [copied, setCopied] = useState<string | null>(null);
-  const map = authoredSpace.maps[0];
-  if (map === undefined) throw new Error('RailActions fixture requires an authored Map');
+  const firstMap = authoredSpace.maps[0];
+  if (firstMap === undefined) throw new Error('RailActions fixture requires an authored Map');
   const actions = spaceEntityActions({
     spaceId: authoredSpace.id,
     spaceTitle: authoredSpace.title,
@@ -704,7 +704,7 @@ export const RailActions: Story = () => {
             title={resource.title}
             state={index === 1 ? 'selected' : 'rest'}
             graphColor="#ffc53d"
-            entityActions={actions({ kind: 'resource', resource, map })}
+            entityActions={actions({ kind: 'resource', resource, map: firstMap })}
           />
         ))}
       </div>

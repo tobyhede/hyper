@@ -97,16 +97,16 @@ const positionedSnapshot: SpaceSnapshot = {
 };
 
 const graphsOf = (snapshot: SpaceSnapshot): readonly Graph[] =>
-  (snapshot.document.maps ?? []).flatMap((map) => map.graphs);
+  (snapshot.document.maps ?? []).flatMap((m) => m.graphs);
 
 const mapOf = (snapshot: SpaceSnapshot, mapId: string) =>
-  (snapshot.document.maps ?? []).find((map) => map.id === mapId);
+  (snapshot.document.maps ?? []).find((m) => m.id === mapId);
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
   mapId: MapId = MAP_ID,
   // The ids this Edit will mint, named by the test that asserts on them rather
-  // than taken from the ambient generator (ADR 0016, and `./minting`).
+  // than taken from the ambient generator (ADR 0109, and `./minting`).
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };

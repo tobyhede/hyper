@@ -39,14 +39,14 @@ describe('newSpace', () => {
     const result = loadSpace(file, resourceFiles);
     if (!result.ok) throw new Error('should load');
 
-    const map = result.space.maps[0]!;
+    const onlyMap = result.space.maps[0]!;
     const resource = result.space.resources[0]!;
-    expect(map).toMatchObject({ title: 'Map 1', activeGraph: map.graphs[0]?.id });
-    expect(map.graphs).toMatchObject([{ title: 'Graph 1', edges: [] }]);
+    expect(onlyMap).toMatchObject({ title: 'Map 1', activeGraph: onlyMap.graphs[0]?.id });
+    expect(onlyMap.graphs).toMatchObject([{ title: 'Graph 1', edges: [] }]);
     // An empty Map's first Graph stores the colour the one creation rule picks.
-    expect(map.graphs[0]?.color).toBe(nextGraphColor([]));
-    expect(map.positions[resource.id]).toEqual({ x: 0, y: 0, open: false });
-    expect(result.space.defaultMap).toBe(map.id);
+    expect(onlyMap.graphs[0]?.color).toBe(nextGraphColor([]));
+    expect(onlyMap.positions[resource.id]).toEqual({ x: 0, y: 0, open: false });
+    expect(result.space.defaultMap).toBe(onlyMap.id);
   });
 
   it('mints fresh UUID identity for each new space and its first resource', () => {
