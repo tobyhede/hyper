@@ -13,9 +13,10 @@ import { spaceEntityActions } from '#src/entity-actions';
 import { resourceSizeVars, snapResourceSizeToClose } from '#src/resource';
 import { CanvasResourceSpecimen } from '../support/CanvasResourceSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
-import { CanvasResourceNodeSpecimen } from '../support/ReactFlowCanvas';
+import { requireDefaultMap } from '#src/map-resolution';
+import { CanvasResourceNodeSpecimen, type DrawnMap } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
-import { authoredSpace } from '../support/spaces';
+import { authoredSpace, imageReferenceIds, imageReferenceSpace } from '../support/spaces';
 import harbour from '#fixture-images/harbour-400x300.png';
 import '../support/inventory.css';
 
@@ -519,6 +520,61 @@ export const OpenImage: Story = () => {
 };
 OpenImage.storyName = 'Open Image Resource';
 OpenImage.meta = { iframed: true };
+
+const imageReferenceMap: DrawnMap = {
+  space: imageReferenceSpace,
+  mapId: requireDefaultMap(imageReferenceSpace),
+};
+
+/**
+ * A Reference Resource whose Target is an Image Resource draws the Target's
+ * picture read-only through the same front (ADR 0070, ADR 0106): its own
+ * Title, Close, and no Replace, even where the picture does not load. Both
+ * Resources are in a Space that holds their Image Resource Targets, so what
+ * each draws is resolved from its Target rather than handed to it. Each is at
+ * the size its first Open writes: the Target's recorded 400×300 picture plus
+ * the front's chrome.
+ */
+export const OpenImageReference: Story = () => {
+  const [open, setOpen] = useState(true);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
+  const firstOpen = {
+    width: 400 + OPEN_RESOURCE_CHROME.width,
+    height: 300 + OPEN_RESOURCE_CHROME.height,
+  };
+  return (
+    <div className="flex flex-wrap items-start gap-8 p-8">
+      <section aria-label="Image Target" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">a Reference Resource to a 400×300 picture</p>
+        <CanvasResourceNodeSpecimen
+          drawn={imageReferenceMap}
+          resourceId={imageReferenceIds.harbourReference}
+          open={open}
+          onOpenChange={changeOpen}
+          nodeSize={open ? firstOpen : closedFrame}
+          zoom={1}
+          stageClassName="inv-resource-node-stage--large"
+        />
+      </section>
+      <section aria-label="Failed image Target" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">its Target's picture does not load</p>
+        <CanvasResourceNodeSpecimen
+          drawn={imageReferenceMap}
+          resourceId={imageReferenceIds.missingReference}
+          open
+          nodeSize={firstOpen}
+          zoom={1}
+          stageClassName="inv-resource-node-stage--large"
+        />
+      </section>
+    </div>
+  );
+};
+OpenImageReference.storyName = 'Open Image Reference Resource';
+OpenImageReference.meta = { iframed: true };
 
 /**
  * Enter is the Space Resource's kind command (ADR 0073, ADR 0068): it sits on the

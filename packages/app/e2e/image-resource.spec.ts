@@ -16,6 +16,7 @@ import {
   createResource,
   openResource,
   presentControl,
+  resourceActions,
   resourceControls,
   selectedCanvas,
   selectCanvas,
@@ -1216,3 +1217,82 @@ test('the tracked fixture draws its Open Image Resource with no network', async 
   await expectPictureLoaded(picture, HARBOUR_SIZE.width);
   expect(escaped).toEqual([]);
 });
+
+/**
+ * A Reference Resource targets an Image Resource (ADR 0070, ADR 0106). Created
+ * from the Image Resource's own menu, it is named after it with the caret in
+ * its Title; its first Open writes the size its Target's recorded picture
+ * takes; it draws that picture read-only, with Close and no Replace, not on its
+ * rail and not in its failed-image state; and replacing the Target's image,
+ * through the Target's own Replace, changes what it draws.
+ */
+test(
+  "an Open Reference Resource draws its Image Resource Target's picture read-only",
+  { tag: '@parity:open-reference-draws-target-image-read-only' },
+  async ({ page }) => {
+    const NEW_URL = 'https://example.com/replacement.png';
+    await page.route(FIGURE_URL, (route) => route.abort());
+    await page.route(NEW_URL, (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: HARBOUR }),
+    );
+    const spaceId = await openPictures(page);
+
+    const menu = await resourceActions(page, 'Figure');
+    await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
+    const title = page.getByRole('textbox', { name: 'Resource title' });
+    await expect(title).toBeFocused();
+    await expect(title).toHaveValue('Figure');
+    await title.press('Enter');
+    await expect(title).toHaveCount(0);
+    await settled(page);
+
+    const node = page
+      .locator('.react-flow__node')
+      .filter({ has: page.locator('[data-kind="reference"]') });
+    await expect(node).toHaveCount(1);
+    const referenceId = await node.getAttribute('data-id');
+    if (referenceId === null) throw new Error('The Reference Resource has no id.');
+    const response = await page.request.get(`/api/spaces/${spaceId}`);
+    const stored = decodeLoadedSpace(await response.json()).snapshot.resources.find(
+      ({ id }) => id === referenceId,
+    );
+    expect(stored?.document).toEqual({ title: 'Figure', kind: 'reference', target: IMAGE_ID });
+
+    const reference = page.locator(`.react-flow__node[data-id="${referenceId}"]`);
+    await openResource(reference, 'Figure');
+    const front = reference.getByRole('article', { name: 'Figure' });
+    await expect(front).toHaveAttribute('data-open', 'true');
+    await expect(front).toHaveAttribute('data-kind', 'reference');
+    await expect
+      .poll(() => authoredSize(reference))
+      .toEqual({
+        width: HARBOUR_SIZE.width + OPEN_RESOURCE_CHROME.width,
+        height: HARBOUR_SIZE.height + OPEN_RESOURCE_CHROME.height,
+      });
+
+    // The Target's picture did not load: the Reference Resource names its URL
+    // and offers no Replace, which is the Image Resource's own command.
+    await expect(front.getByText('Image did not load')).toBeVisible();
+    await expect(front.getByText(FIGURE_URL)).toBeVisible();
+    await expect(front.getByRole('button', { name: /Replace/ })).toHaveCount(0);
+    const controls = await resourceControls(page, reference);
+    await expect(controls.getByRole('button', { name: 'Close Resource Figure' })).toBeVisible();
+    await expect(controls.getByRole('button', { name: /^Replace image of Resource/ })).toHaveCount(
+      0,
+    );
+    await expect(controls.getByRole('button', { name: /^Edit Resource/ })).toHaveCount(0);
+
+    // Replacing the Target's image is what changes the Reference Resource's picture.
+    const { target } = await beginReplacing(page);
+    const field = target.getByRole('textbox', { name: 'Image URL' });
+    await field.fill(NEW_URL);
+    await field.press('Enter');
+    await expect(target).toHaveCount(0);
+    const picture = front.getByRole('img', { name: 'Figure' });
+    await expect(picture).toHaveAttribute('src', NEW_URL);
+    await expectPictureLoaded(picture, HARBOUR_SIZE.width);
+    await expect(front.getByText('Image did not load')).toHaveCount(0);
+    await settled(page);
+    expect((await storedFigure(page, spaceId)).figure).toMatchObject({ url: NEW_URL });
+  },
+);

@@ -971,3 +971,81 @@ export const edgeToolbarSnapshot: SpaceSnapshot = {
 };
 
 export const edgeToolbarSpace: Space = loaded(loadSpaceSnapshot(edgeToolbarSnapshot));
+
+/** A reserved block, like {@link MINTED_GRAPH_ID_BASE} and for the same reason. */
+const IMAGE_REFERENCE_ID_BASE = 0x9b0;
+
+const imageReferenceId = (offset: number): UUID =>
+  uuidSchema.parse(
+    `00000000-0000-4000-8000-${(IMAGE_REFERENCE_ID_BASE + offset).toString(16).padStart(12, '0')}`,
+  );
+
+const IMAGE_REFERENCE_MAP = imageReferenceId(0);
+
+/** The ids of the Image Resources and the Reference Resources to them. */
+export const imageReferenceIds = {
+  harbour: imageReferenceId(2),
+  harbourReference: imageReferenceId(3),
+  missing: imageReferenceId(4),
+  missingReference: imageReferenceId(5),
+} as const;
+
+/** Harbour's picture, which the catalogue test serves as a 400×300 image. */
+export const IMAGE_REFERENCE_HARBOUR_URL = 'https://example.com/harbour.png';
+/** A picture under a name that never resolves, so its Reference Resource draws the failed state. */
+export const IMAGE_REFERENCE_MISSING_URL = 'https://missing.invalid/picture.png';
+
+/**
+ * Two Image Resources, each with a Reference Resource to it: one whose picture
+ * loads, and one whose picture never does. A Reference Resource drawn from
+ * this Space resolves its Target's picture through the same intake and
+ * resolution production uses (ADR 0070, ADR 0106).
+ */
+export const imageReferenceSnapshot: SpaceSnapshot = {
+  id: imageReferenceId(0xf),
+  document: {
+    version: 1,
+    title: 'Image references',
+    defaultMap: IMAGE_REFERENCE_MAP,
+    maps: [
+      {
+        id: IMAGE_REFERENCE_MAP,
+        title: 'Pictures',
+        kind: 'positioned',
+        positions: {
+          [imageReferenceIds.harbour]: { x: 0, y: 0, open: false },
+          [imageReferenceIds.harbourReference]: { x: 360, y: 0, open: false },
+          [imageReferenceIds.missing]: { x: 0, y: 200, open: false },
+          [imageReferenceIds.missingReference]: { x: 360, y: 200, open: false },
+        },
+        graphs: [{ id: imageReferenceId(1), title: 'Main', edges: [] }],
+        activeGraph: imageReferenceId(1),
+      },
+    ],
+  },
+  resources: [
+    {
+      id: imageReferenceIds.harbour,
+      document: {
+        title: 'Harbour',
+        kind: 'image',
+        url: IMAGE_REFERENCE_HARBOUR_URL,
+        naturalSize: { width: 400, height: 300 },
+      },
+    },
+    {
+      id: imageReferenceIds.harbourReference,
+      document: { title: 'Harbour, again', kind: 'reference', target: imageReferenceIds.harbour },
+    },
+    {
+      id: imageReferenceIds.missing,
+      document: { title: 'Missing', kind: 'image', url: IMAGE_REFERENCE_MISSING_URL },
+    },
+    {
+      id: imageReferenceIds.missingReference,
+      document: { title: 'Missing, again', kind: 'reference', target: imageReferenceIds.missing },
+    },
+  ],
+};
+
+export const imageReferenceSpace: Space = loaded(loadSpaceSnapshot(imageReferenceSnapshot));

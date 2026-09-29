@@ -45,6 +45,7 @@ const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008')
 const TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const GRAPH_ID_2 = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
+const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
 
 /**
  * Two placed Resources and no Edges.
@@ -98,6 +99,35 @@ const withReference: SpaceSnapshot = spaceSnapshotSchema.parse({
     {
       id: REFERENCE_ID,
       document: { title: 'A reference', kind: 'reference', target: RESOURCE_ID },
+    },
+  ],
+});
+
+/** The same Space with an Image Resource in it, for Create Reference on one. */
+const withImage: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    maps: [
+      {
+        ...snapshot.document.maps?.[0],
+        positions: {
+          ...snapshot.document.maps?.[0]?.positions,
+          [IMAGE_ID]: { x: 0, y: 400, open: false },
+        },
+      },
+    ],
+  },
+  resources: [
+    ...snapshot.resources,
+    {
+      id: IMAGE_ID,
+      document: {
+        title: 'Harbour',
+        kind: 'image',
+        url: 'https://example.com/harbour.png',
+        naturalSize: { width: 400, height: 300 },
+      },
     },
   ],
 });
@@ -794,6 +824,26 @@ describe('a Resource’s commands on the canvas rail', () => {
       kind: 'reference',
       title: 'A space',
     });
+    await settled(session);
+  });
+
+  it('creates a Reference Resource from an Image Resource, named after it with the caret in its Title', async () => {
+    const session = mount(undefined, undefined, withImage);
+    await selectResource('Harbour');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Harbour' }));
+    const row = await screen.findByRole('menuitem', { name: 'Create Reference' });
+    expect(row).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(row);
+
+    await waitFor(() => expect(resourceIds(session)).toHaveLength(4));
+    expect(session.getState().working.resources.at(-1)?.document).toEqual({
+      title: 'Harbour',
+      kind: 'reference',
+      target: IMAGE_ID,
+    });
+    const editor = await screen.findByRole('textbox', { name: 'Resource title' });
+    expect(editor).toHaveValue('Harbour');
+    expect(editor).toHaveFocus();
     await settled(session);
   });
 

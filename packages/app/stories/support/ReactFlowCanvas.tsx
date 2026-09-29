@@ -416,6 +416,12 @@ interface CanvasResourceNodeSpecimenBaseProps {
   readonly readOnly?: boolean;
   /** Whether the specimen can be moved by a pointer; see {@link StoryCanvasProps.draggable}. */
   readonly draggable?: boolean;
+  /**
+   * Which Map of which Space holds the fixture Resource; the inventory's own
+   * when absent. The Resource's Open content is resolved in that Space, so a
+   * Reference Resource draws its real Target.
+   */
+  readonly drawn?: DrawnMap;
 }
 
 /**
@@ -452,24 +458,30 @@ export function CanvasResourceNodeSpecimen({
   content,
   readOnly = false,
   draggable = false,
+  drawn = INVENTORY_MAP,
 }: CanvasResourceNodeSpecimenProps) {
-  const projected = useProjection(graphIds.long);
+  const drawnSpace = drawn.space;
+  const map = drawnSpace.maps.find((candidate) => candidate.id === drawn.mapId);
+  const projected = useProjection(
+    drawn === INVENTORY_MAP ? graphIds.long : (map?.activeGraph ?? null),
+    null,
+    drawn,
+  );
   if (projected === null) return null;
   if (projected instanceof Error) return <PlacementFailure reason={projected} />;
 
   const source = projected.nodes.find(({ id }) => id === resourceId);
   if (source === undefined) throw new Error(`Missing fixture Resource ${resourceId}`);
 
-  const resource = space.resources.find((candidate) => candidate.id === resourceId);
-  const map = space.maps.find((candidate) => candidate.id === mapId);
+  const resource = drawnSpace.resources.find((candidate) => candidate.id === resourceId);
   if (resource === undefined || map === undefined)
     throw new Error('Missing fixture Resource or Map');
 
   const data: ResourceFlowNode['data'] = {
     ...source.data,
     entityActions: spaceEntityActions({
-      spaceId: space.id,
-      spaceTitle: space.title,
+      spaceId: drawnSpace.id,
+      spaceTitle: drawnSpace.title,
       onCopy: () => true,
       onOpenIndependently: null,
       onRename: null,
@@ -482,7 +494,10 @@ export function CanvasResourceNodeSpecimen({
   if (title !== undefined) data.title = title;
   if (kind === 'image') data.kind = kind;
   if (open === true) {
-    data.display = { shown: 'open', content: content ?? resolveResourceContent(space, resource) };
+    data.display = {
+      shown: 'open',
+      content: content ?? resolveResourceContent(drawnSpace, resource),
+    };
   }
   // The editor is the state, so a specimen that asks to be renaming supplies
   // what ends the edit along with it.
