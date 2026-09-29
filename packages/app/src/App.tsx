@@ -122,7 +122,6 @@ export const createApp = (
         editable: hasResourcesOnCanvas,
         replacingImage,
         presenting,
-        resourceIsOpen: view.resourceIsOpen,
         spaceOnCanvas: active,
         editingEmbeddedMap: canvasRendering.editingEmbeddedMap,
         creatingSpaceResource: placement.creatingSpaceResource,

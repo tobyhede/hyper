@@ -12,6 +12,7 @@ import {
 import { titleName, type Resource, type ResourceId, type UUID } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
+import type { FocusFallback } from '../resource-deletion';
 import {
   describeMembership,
   ON_NO_GRAPH,
@@ -26,6 +27,7 @@ import {
   Badge,
   AlertDescription,
   AlertTitle,
+  DeleteIcon,
   ReferenceIcon,
   ResourceKindIcon,
   InputGroup,
@@ -237,6 +239,13 @@ export interface ResourcesPlacingProps extends ResourcesPopoverSurfaceProps {
    * Absent, every row draws as placed nowhere else.
    */
   readonly memberships?: MapMemberships | undefined;
+  /**
+   * Arm Delete from Space for a Resource row, naming the filter as where the
+   * caret goes if a completed deletion takes the row away. Absent while
+   * deleting is unavailable, and then no row offers it. A Space row never
+   * does: a Space is not a Resource of this Space.
+   */
+  readonly onDelete?: ((resource: Resource, focusFallback: FocusFallback) => void) | undefined;
 }
 
 /**
@@ -588,6 +597,10 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
    * filter, which is where a reader adding several Resources is going next, and
    * it is the whole of the custom behaviour here. `ResourcesPopover.test.tsx`
    * and `resources-popover.spec.ts` both hold it.
+   *
+   * It is also the focus fallback a row's Delete from Space names: a confirmed
+   * deletion takes the row, and the Delete that armed it, out of the list, and
+   * the filter outlives it. `ResourcesPopover.test.tsx` holds it.
    */
   const filterField = useRef<HTMLInputElement>(null);
   /**
@@ -941,8 +954,9 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                 const placed =
                   row.kind === 'resource' ? membershipsOf(memberships, row.resource.id) : [];
                 const description = `${describedBy}-${key}`;
+                const onDelete = placing?.onDelete;
                 return (
-                  <li key={key}>
+                  <li key={key} className="flex items-center gap-1">
                     {/* **A row is a button, and the drag is the shortcut.** ADR 0082
                         binds that everything the surface offers is operable from the
                         keyboard alone, and names this case: a drag may be *a* way to
@@ -980,7 +994,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                                 ? 'true'
                                 : undefined
                             }
-                            className="resources-popover__row w-full justify-start"
+                            className="resources-popover__row min-w-0 flex-1 justify-start"
                             aria-label={`Add ${name} to Map`}
                             aria-describedby={placed.length === 0 ? undefined : description}
                             onDragStart={startDrag}
@@ -1056,6 +1070,19 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                         </span>
                       </TooltipContent>
                     </Tooltip>
+                    {onDelete === undefined ? null : row.kind === 'resource' ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${name} from Space`}
+                        onClick={() => onDelete(row.resource, () => filterField.current)}
+                      >
+                        <DeleteIcon />
+                      </Button>
+                    ) : (
+                      // A Space row keeps the slot empty, so every row ends on one edge.
+                      <span aria-hidden="true" className="size-7 shrink-0" />
+                    )}
                     {placed.length === 0 ? null : (
                       <span id={description} className="sr-only">
                         {`Also in ${placed.map(describeMembership).join('; ')}`}

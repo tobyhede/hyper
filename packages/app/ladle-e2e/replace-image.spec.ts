@@ -84,6 +84,16 @@ test(
     await expect(next.target).toHaveAttribute('aria-busy', 'true');
     await expect(selectedCanvas(page)).toBeDisabled();
     await expect(next.target.getByRole('button', { name: 'Upload' })).toBeDisabled();
+    // Close stays in its slot, unavailable, for the whole replacement: drawn,
+    // announced unavailable, reachable from the rail, and pressing it does nothing.
+    const busyClose = next.controls.getByRole('button', { name: 'Close Resource Figure' });
+    await expect(busyClose).toBeVisible();
+    await expect(busyClose).toHaveAttribute('aria-disabled', 'true');
+    await busyClose.focus();
+    await expect(busyClose).toBeFocused();
+    await busyClose.dispatchEvent('click');
+    await expect(next.resource).toHaveAttribute('data-open', 'true');
+    await expect(next.target).toHaveAttribute('aria-busy', 'true');
     await page.clock.runFor(1000);
 
     await expect(next.target).toHaveCount(0);

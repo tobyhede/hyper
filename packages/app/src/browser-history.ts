@@ -34,11 +34,19 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
   const initial: unknown = browser.history.state;
   let index = isHistoryPosition(initial) ? initial.hyperHistoryIndex : 0;
   browser.history.replaceState({ hyperHistoryIndex: index }, '', browser.location.href);
+  /** Counts the entries the application has written, so a late hold can tell whether one was. */
+  let written = 0;
   return {
     pathname: () => browser.location.pathname,
     href: () => browser.location.href,
-    push: (path) => browser.history.pushState({ hyperHistoryIndex: ++index }, '', path),
-    replace: (path) => browser.history.replaceState({ hyperHistoryIndex: index }, '', path),
+    push: (path) => {
+      written += 1;
+      browser.history.pushState({ hyperHistoryIndex: ++index }, '', path);
+    },
+    replace: (path) => {
+      written += 1;
+      browser.history.replaceState({ hyperHistoryIndex: index }, '', path);
+    },
     onPopState: (listener) => {
       /**
        * The deltas of the rewinds issued and not yet arrived, oldest first.
@@ -53,11 +61,16 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
         rewinds.push(delta);
         browser.history.go(delta);
       };
+      /** Issue one more rewind whenever the outstanding ones would land anywhere but `index`. */
+      const correct = (): void => {
+        const landing = rewinds.reduce((entry, outstanding) => entry + outstanding, at);
+        if (landing !== index) rewind(index - landing);
+      };
       /** Return the browser from the entry at `arrived` to the entry at `from`. */
       const hold = (from: number, arrived: number): void => {
         index = from;
         at = arrived;
-        rewind(from - arrived);
+        correct();
       };
       /** Ask the listener about the arrival at the entry numbered `next`. */
       const arrive = (next: number): void => {
@@ -69,7 +82,12 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
         }
         keep(from, next, answer);
       };
-      /** Keep the traversal from the entry at `from` to the entry at `next`, holding it on a late `false`. */
+      /**
+       * Keep the traversal from the entry at `from` to the entry at `next`,
+       * holding it on a late `false` while no later traversal has been kept and
+       * no entry written. A later traversal the listener held is returning the
+       * browser to `next`, so the late hold retargets that return at `from`.
+       */
       const keep = (
         from: number,
         next: number,
@@ -77,16 +95,17 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
       ): void => {
         index = next;
         const kept = ++traversal;
+        const unwritten = written;
         if (answer === undefined) return;
         void answer.then((late) => {
           if (
             late === false &&
             kept === traversal &&
-            rewinds.length === 0 &&
+            unwritten === written &&
             index === next &&
             next !== from
           ) {
-            hold(from, next);
+            hold(from, rewinds.length === 0 ? next : at);
           }
         });
       };
@@ -116,8 +135,7 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
             return;
           }
         }
-        const landing = rewinds.reduce((entry, outstanding) => entry + outstanding, next);
-        if (landing !== index) rewind(index - landing);
+        correct();
       };
       /**
        * An entry with no position is taken to be one a fragment navigation has

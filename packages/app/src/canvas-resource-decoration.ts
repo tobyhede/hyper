@@ -93,6 +93,7 @@ type SharedResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   | 'authorOnCanvas'
   | 'bodyEditing'
+  | 'bodyEditorResourceId'
   | 'editableResourceIds'
   | 'openResource'
   | 'closeResource'
@@ -159,6 +160,13 @@ export function decorateSharedResourceNode(
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
     patch.onEditResource = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
+  } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {
+    // A live content editor keeps its Close drawn when the canvas withdraws
+    // authoring — a running image replacement withdraws it — so the control
+    // stays in its slot, unavailable, instead of vanishing and returning.
+    // `CanvasResource` draws it disabled while the edit runs; withdrawn, it
+    // also retains rather than running an Open or Close Edit.
+    patch.onEditResource = () => 'retained';
   }
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);

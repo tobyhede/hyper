@@ -14,7 +14,7 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
 
 const EDGE = { from: RESOURCE_A, to: RESOURCE_B } as const;
-const NONE = { pending: null, deleting: false };
+const NONE = { pending: null, focusFallback: null, deleting: false };
 
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
@@ -108,6 +108,24 @@ describe('arming and cancellation', () => {
     resourceDeletion.arm(lookupResource(opened, RESOURCE_B));
 
     expect(resourceDeletion.getState().pending?.id).toBe(RESOURCE_B);
+  });
+
+  /**
+   * The fallback belongs to the question it was armed with: it stands through
+   * the deletion, and a question armed without one does not inherit it.
+   */
+  it('carries the arming surface’s focus fallback for the question it was armed with', () => {
+    const opened = open();
+    const { resourceDeletion } = opened;
+    const focusFallback = () => null;
+    resourceDeletion.arm(lookupResource(opened, RESOURCE_A), focusFallback);
+
+    expect(resourceDeletion.getState().focusFallback).toBe(focusFallback);
+    resourceDeletion.confirm();
+    expect(resourceDeletion.getState()).toMatchObject({ deleting: true, focusFallback });
+
+    resourceDeletion.arm(lookupResource(opened, RESOURCE_B));
+    expect(resourceDeletion.getState().focusFallback).toBeNull();
   });
 });
 

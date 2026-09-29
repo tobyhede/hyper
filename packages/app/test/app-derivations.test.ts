@@ -60,11 +60,6 @@ describe('mapView', () => {
     expect(view.projection.visibleGraphs.map(({ id }) => id)).toEqual([GRAPH_ID]);
     expect(view.mapPlacement).toEqual(Placement.fromMap(view.selectedMap.map));
   });
-
-  it('reads whether any Resource on the Map is Open', () => {
-    expect(mapView(space, MAP_ID).resourceIsOpen).toBe(true);
-    expect(mapView(space, OTHER_MAP_ID).resourceIsOpen).toBe(false);
-  });
 });
 
 describe('anchorAt', () => {
