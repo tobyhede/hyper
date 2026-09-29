@@ -300,6 +300,72 @@ describe('projectResourceNodes', () => {
   });
 });
 
+describe('projectResourceNodes display', () => {
+  const imageId = uuid('00000000-0000-4000-8000-000000000008');
+  const referenceId = uuid('00000000-0000-4000-8000-000000000009');
+  const markdownId = uuid('00000000-0000-4000-8000-000000000002');
+  const url = 'https://example.com/harbour.png';
+  const withKinds = load(
+    spaceFile([
+      {
+        id: '00000000-0000-4000-8000-000000000004',
+        title: 'Main',
+        edges: [
+          { from: markdownId, to: imageId },
+          { from: imageId, to: referenceId },
+        ],
+      },
+    ]),
+    [
+      resourceFile(markdownId, 'Opening', '## Authored once'),
+      imageFile(imageId, 'Harbour', url),
+      referenceFile(referenceId, 'Harbour, again', imageId),
+    ],
+  );
+  const display = (id: string, options: Parameters<typeof projectResourceNodes>[1]) =>
+    projectResourceNodes(withKinds, options).find((node) => node.id === id)?.data.display;
+
+  it('carries no content on a Closed Resource', () => {
+    for (const id of [markdownId, imageId, referenceId]) {
+      expect(display(id, {})).toStrictEqual({ shown: 'closed' });
+    }
+  });
+
+  it('carries the resolved content on an Open Resource, its own or its Target’s', () => {
+    const openResourceIds = new Set([markdownId, imageId, referenceId]);
+    expect(display(markdownId, { openResourceIds })).toStrictEqual({
+      shown: 'open',
+      content: { kind: 'markdown', source: '## Authored once', via: 'self' },
+    });
+    expect(display(imageId, { openResourceIds })).toStrictEqual({
+      shown: 'open',
+      content: { kind: 'image', url, via: 'self' },
+    });
+    expect(display(referenceId, { openResourceIds })).toStrictEqual({
+      shown: 'open',
+      content: { kind: 'image', url, via: 'reference' },
+    });
+  });
+
+  it('presents the presented Resource even while it is Open, keeping its authored Open state', () => {
+    const nodes = projectResourceNodes(withKinds, {
+      openResourceIds: new Set([referenceId]),
+      activeResourceId: referenceId,
+      showActiveResourceContent: true,
+    });
+    expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
+      open: true,
+      display: { shown: 'presented', content: { kind: 'image', url, via: 'reference' } },
+    });
+  });
+
+  it('shows the active Resource Open, not presented, while nothing is being presented', () => {
+    expect(
+      display(markdownId, { openResourceIds: new Set([markdownId]), activeResourceId: markdownId }),
+    ).toMatchObject({ shown: 'open' });
+  });
+});
+
 describe('projectGraphEdges', () => {
   const graphRenderEdges = buildGraphRenderEdges(space);
   // Each Graph's one Edge, named by the id `buildGraphRenderEdges` minted for

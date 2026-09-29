@@ -10,6 +10,7 @@ import {
   editingPortalAncestor,
   embeddingIsPortalEditing,
 } from '../src/embedded-open-space-resource';
+import { fixtureDisplay } from './render-adapter-fixtures';
 
 const id = (value: number) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`);
@@ -81,6 +82,7 @@ const openSpaceResource = (
     active: false,
     selectedForAuthoring: false,
     showContent: false,
+    display: fixtureDisplay(geometry.open ?? true, geometry.kind ?? 'space', '', target),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
   },
@@ -283,6 +285,7 @@ describe('embedded open Space Resource discovery', () => {
         active: false,
         selectedForAuthoring: false,
         showContent: false,
+        display: fixtureDisplay(false, 'markdown'),
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
       },
@@ -361,6 +364,7 @@ describe('embedded open Space Resource discovery', () => {
         active: false,
         selectedForAuthoring: false,
         showContent: false,
+        display: fixtureDisplay(true, 'markdown'),
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
       },

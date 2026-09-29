@@ -1,0 +1,9 @@
+/* The notice takes the whole content area, as an Image Resource's picture does,
+   and is drawn on the Resource's own paper, so it takes the Resource's text roles
+   rather than the chrome's. */
+.unresolved-content {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  color: var(--canvas-resource-title-color);
+}

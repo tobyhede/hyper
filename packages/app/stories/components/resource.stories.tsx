@@ -2,7 +2,13 @@ import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import { OPEN_RESOURCE_CHROME, uuidSchema, type Map, type Resource } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
-import { CanvasResource, type CanvasResourceFront, type CanvasResourceState } from '@project/ui';
+import {
+  CanvasResource,
+  CLOSED_DISPLAY,
+  type CanvasResourceFront,
+  type CanvasResourceState,
+  type FrontDisplay,
+} from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { resourceSizeVars, snapResourceSizeToClose } from '#src/resource';
 import { CanvasResourceSpecimen } from '../support/CanvasResourceSpecimen';
@@ -304,19 +310,19 @@ function Instance({
     setOpen(next);
     return 'completed' as const;
   };
-  const front: CanvasResourceFront =
-    kind === 'reference'
-      ? // Every kind Opens and Closes through the one operation (ADR 0070), so the
-        // Reference Resource carries it too.
-        {
-          kind: 'reference',
-          target: { kind: 'markdown', source: 'Markdown content' },
-          open,
-          onOpenChange: changeOpen,
-        }
-      : open
-        ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
-        : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen };
+  // Every kind Opens and Closes through the one operation (ADR 0070), so the
+  // Reference Resource carries it too.
+  const front: CanvasResourceFront = { kind, onOpenChange: changeOpen };
+  const display: FrontDisplay = open
+    ? {
+        shown: 'open',
+        content: {
+          kind: 'markdown',
+          source: 'Markdown content',
+          via: kind === 'reference' ? 'reference' : 'self',
+        },
+      }
+    : CLOSED_DISPLAY;
   const state: Exclude<CanvasResourceState, 'editing'> = dragging
     ? 'dragging'
     : selected
@@ -330,7 +336,13 @@ function Instance({
         tabIndex={-1}
         onClick={() => setSelected(true)}
       >
-        <CanvasResource front={front} state={state} title={title} graphColor="#ffc53d" />
+        <CanvasResource
+          front={front}
+          display={display}
+          state={state}
+          title={title}
+          graphColor="#ffc53d"
+        />
       </div>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
         <input
@@ -513,11 +525,8 @@ export const EnterSpace: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        front={{
-          kind: 'space',
-          open: false,
-          onOpenChange: changeOpen,
-        }}
+        front={{ kind: 'space', onOpenChange: changeOpen }}
+        display={CLOSED_DISPLAY}
         state="selected"
         entityActions={[
           [
@@ -583,11 +592,8 @@ export const OpenIndependently: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        front={{
-          kind: 'space',
-          open: false,
-          onOpenChange: changeOpen,
-        }}
+        front={{ kind: 'space', onOpenChange: changeOpen }}
+        display={CLOSED_DISPLAY}
         state="selected"
         title="Architecture"
         graphColor="#35d6c3"
@@ -629,7 +635,8 @@ export const RailActions: Story = () => {
         {authoredSpace.resources.slice(0, 2).map((resource, index) => (
           <CanvasResource
             key={resource.id}
-            front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => 'retained' }}
+            front={{ kind: 'markdown', onOpenChange: () => 'retained' }}
+            display={CLOSED_DISPLAY}
             title={resource.title}
             state={index === 1 ? 'selected' : 'rest'}
             graphColor="#ffc53d"

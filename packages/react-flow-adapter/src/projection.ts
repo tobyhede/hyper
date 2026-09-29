@@ -1,11 +1,13 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
+import { CLOSED_DISPLAY } from '@project/ui';
 import type {
   CanvasResourceBodyEditor,
   ImageReplaceEditor,
   CanvasSpaceResourceSelection,
   EntityActionGroup,
+  ResourceDisplay,
 } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
@@ -14,7 +16,7 @@ import {
   type GraphHeadShape,
   type GraphId,
 } from '@project/core';
-import { resolveContentResource } from '@project/graph';
+import { resolveContentResource, resolveResourceContent } from '@project/graph';
 import type {
   GraphRenderEdge,
   LayoutStrategyResource,
@@ -51,10 +53,8 @@ export type ResourceTitleEditor = {
  * goes wrong for the next kind that resolves its content elsewhere too.
  *
  * An Image Resource carries its URL whether it is Closed, Open or presented, and
- * no other kind carries one. The URL is the Resource's own field rather than
- * content ADR 0006 keeps off every node, and the Open front's content stays
- * mounted while it fades out on Close, drawing the picture from this URL until
- * it unmounts.
+ * no other kind carries one. Nothing draws from it: what an Open or presented
+ * Image Resource draws is its `display`.
  */
 export type ResourceNodeKind =
   | { kind: Exclude<Resource['kind'], 'image'>; imageUrl?: never }
@@ -216,26 +216,27 @@ export type ResourceNodeData = ResourceNodeKind & {
   contextNotice?: string | null;
   /** The resolved content kind, including a Space Resource reached through a Reference Resource. */
   spaceContent?: Extract<Resource, { kind: 'space' }>;
+  /**
+   * What this Resource shows now: Closed with no content, or Open or presented
+   * with its resolved content, its own or its Target's.
+   *
+   * A Resource both presented and Open is `presented`, decided here and nowhere
+   * else. `open` stays beside it as the Map's authored geometry — z-order,
+   * resize and displacement read it — and never chooses what is drawn.
+   */
+  display: ResourceDisplay;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
   /**
-   * Draw the resource's content rather than its title. ADR 0006 deferred a "show
-   * full content" view and left it a View's choice; presenting is that view (ADR
-   * 0027). Set on the active resource alone, never on the whole graph.
+   * Whether this is the presented Resource: set on the active resource alone,
+   * never on the whole graph (ADR 0027). Nothing draws from it; a presented
+   * Resource's `display` is `presented`.
    */
   showContent: boolean;
-  /** The Markdown to draw when `showContent`, resolved through a reference resource to its
-   *  target's body. Absent otherwise — content is not embedded in every node
-   *  (ADR 0006), which is the constraint that made this per-resource.
-   *
-   *  **An Open Resource carries one too.** ADR 0064 narrows ADR 0006 rather
-   *  than lifting it — an Open Resource carries its source because the author
-   *  asked for that one, not because every Resource does. `openResourceIds` is what
-   *  tells this projection which Resources the Map Opened, and `body` is
-   *  resolved for them in the same pass: `ResourceNode` reads `data.body ?? ''`, so
-   *  a Resource resolved into one set and not the other would draw an empty
-   *  document over a working editor rather than fail. */
+  /** The resolved Markdown of an Open or presented Resource, `''` where its
+   *  content is not Markdown. Nothing draws from it; `display` carries the
+   *  content that is drawn. */
   body?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
   activeGraphId: GraphId | null;
@@ -336,8 +337,9 @@ const nodeKind = (resource: Resource): ResourceNodeKind =>
  * is the Active Graph's, which the composition resolves and passes as
  * `activeGraphColor`.
  *
- * A node carries its resource's *title*, not its content (ADR 0006) — the content is
- * loaded when a resource is opened or presented, not embedded in every node.
+ * A node carries its resource's *title*, not its content (ADR 0006) — a Closed
+ * node's display carries none, and the content is resolved only for a Resource
+ * that is Open or presented.
  */
 export function projectResourceNodes(
   space: Space,
@@ -362,6 +364,11 @@ export function projectResourceNodes(
     const content = resolveContentResource(space, resource.id);
     const body =
       showContent || open ? (content?.kind === 'markdown' ? content.body : '') : undefined;
+    const shown = showContent ? 'presented' : open ? 'open' : 'closed';
+    const display: ResourceDisplay =
+      shown === 'closed'
+        ? CLOSED_DISPLAY
+        : { shown, content: resolveResourceContent(space, resource) };
     const node: ResourceFlowNode = {
       id: resource.id,
       type: 'resource',
@@ -374,6 +381,7 @@ export function projectResourceNodes(
         active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         showContent,
+        display,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
       },

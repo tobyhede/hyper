@@ -7,7 +7,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import { titleLines, titleName } from '@project/core';
+import { titleLines, titleName, type ContentVia, type ResourceContent } from '@project/core';
 import { Button } from './Button';
 import {
   ResourceRailAction,
@@ -42,73 +42,54 @@ import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import { ResourceImage } from './ResourceImage';
 import { ImageReplaceTarget, type ImageReplaceEditor } from './ImageReplaceTarget';
-import type { ResourceContentBody } from './ResourceContent';
+import { UnresolvedContent } from './UnresolvedContent';
+import type { FrontDisplay } from './resource-display';
 
 /**
- * What a Resource front draws beyond its shared Title (ADR 0051): a kind-owned
- * choice, not a kind tag plus an optional field every other kind ignores.
+ * What a Resource front offers beyond its shared Title (ADR 0051): a kind-owned
+ * choice of operations, not a kind tag plus an optional field every other kind
+ * ignores. What it draws, and whether it is Open, is the display's.
  */
-interface CanvasMarkdownResourceFront {
-  readonly kind: 'markdown';
-  /** The Markdown bytes this Resource owns. */
-  readonly source: string;
-  /** Request that authored state open or close this Resource. */
-  readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
-  /** Put a caret in this Resource's Markdown source. */
-  readonly onBeginEdit?: () => void;
-}
-
 export type CanvasResourceFront =
   | {
       /** A creation ghost: Markdown treatment without authored content or open state. */
       readonly kind: 'preview';
     }
-  | (CanvasMarkdownResourceFront & {
-      /** Closed authored state cannot carry a body editor. */
-      readonly open: false;
-      readonly editor?: never;
-      readonly autoFocusEditor?: never;
-    })
-  | (CanvasMarkdownResourceFront & {
-      /** Authored Map state. CanvasResource renders it; it does not own it. */
-      readonly open: true;
-      /** Present exactly while the Markdown body holds the canvas caret. */
+  | {
+      readonly kind: 'markdown';
+      /** Request that authored state open or close this Resource. */
+      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+      /** Put a caret in this Resource's Markdown source. */
+      readonly onBeginEdit?: () => void;
+      /**
+       * Present exactly while the Markdown body holds the canvas caret. Drawn
+       * only while the display is Open with the Resource's own Markdown.
+       */
       readonly editor?: CanvasResourceBodyEditor;
       /** Whether a newly supplied body editor takes focus. */
       readonly autoFocusEditor?: boolean;
-    })
+    }
   | {
       readonly kind: 'reference';
-      /** The resolved Target content this Reference Resource displays read-only. */
-      readonly target:
-        Extract<ResourceContentBody, { kind: 'markdown' }> | { readonly kind: 'space' };
-      /** Authored Map state; a Reference Resource Opens through the shared Resource operation. */
-      readonly open: boolean;
+      /** A Reference Resource Opens through the shared Resource operation (ADR 0070). */
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
     }
   | {
       readonly kind: 'image';
-      /** The image URL this Resource owns. */
-      readonly url: string;
-      /**
-       * Authored Map state; an Image Resource Opens through the shared Resource
-       * operation. Closed, it draws its Title and kind and no thumbnail; Open, it
-       * is the Open Markdown front with its image as the content.
-       */
-      readonly open: boolean;
+      /** An Image Resource Opens through the shared Resource operation. */
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /** Begin replacing the image: the image kind's counterpart to a Markdown edit. */
       readonly onBeginEdit?: () => void;
       /**
        * Present exactly while the image is being replaced; the content is then
-       * the upload target rather than the picture. Drawn only while Open.
+       * the upload target rather than the picture. Drawn only while the display
+       * is Open with the Resource's own image.
        */
       readonly editor?: ImageReplaceEditor;
     }
   | {
       readonly kind: 'space';
-      /** Authored Map state; a Space Resource Opens through the shared Resource operation. */
-      readonly open: boolean;
+      /** A Space Resource Opens through the shared Resource operation. */
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /**
        * What an Open Space Resource offers to author: the target's Maps, the
@@ -136,6 +117,12 @@ export type CanvasResourceFront =
       };
     };
 
+/**
+ * What the content area below the Title draws. A Space Resource's content is
+ * its embedded Map, which the canvas draws as sibling nodes, so it has no arm.
+ */
+type AreaContent = Exclude<ResourceContent, { readonly kind: 'space' }>;
+
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
 
@@ -147,6 +134,12 @@ export type CanvasResourceState = 'rest' | 'selected' | 'dragging' | 'editing';
 
 interface CanvasResourceCommonProps {
   readonly front: CanvasResourceFront;
+  /**
+   * Whether this Resource is Open, and the content it draws when it is. The
+   * front reads Open from this alone; the Map's authored Open state reaches it
+   * only through the display the projection made from it.
+   */
+  readonly display: FrontDisplay;
   /**
    * Where the Resource's command toolbar is drawn, and when.
    *
@@ -286,6 +279,31 @@ const opacityTransitionMs = (element: HTMLElement): number => {
 };
 
 /**
+ * The content the content area draws, or `null` for none, keeping one identity
+ * while its kind, text and `via` are unchanged: `usePresence` holds its value by
+ * identity, and a display is rebuilt on every projection.
+ */
+function useAreaContent(content: ResourceContent | null): AreaContent | null {
+  const kind = content?.kind;
+  const text =
+    content?.kind === 'markdown' ? content.source : content?.kind === 'image' ? content.url : '';
+  const via: ContentVia = content?.via ?? 'self';
+  return useMemo<AreaContent | null>(() => {
+    switch (kind) {
+      case 'markdown':
+        return { kind, source: text, via };
+      case 'image':
+        return { kind, url: text, via };
+      case 'unresolved':
+        return { kind, via: 'reference' };
+      case 'space':
+      case undefined:
+        return null;
+    }
+  }, [kind, text, via]);
+}
+
+/**
  * The one visual Resource front shared by the production canvas and its stories.
  *
  * The deep production module for Markdown and Reference Resource fronts, title
@@ -296,7 +314,7 @@ const opacityTransitionMs = (element: HTMLElement): number => {
  * own visual treatment lives in `canvas-resource.css`, colocated with this module.
  */
 export function CanvasResource(props: CanvasResourceProps) {
-  const { front, title, graphColor, entityActions, state, readOnly = false } = props;
+  const { front, display, title, graphColor, entityActions, state, readOnly = false } = props;
   /**
    * What this Resource is called wherever it is *named* rather than drawn.
    *
@@ -307,66 +325,40 @@ export function CanvasResource(props: CanvasResourceProps) {
    * A reader who wants the rest reads the heading.
    */
   const name = titleName(title);
-  const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
-  /**
-   * The content the kinds with a content area draw above their Title while Open:
-   * a Markdown document, or an Image Resource's picture in the same place. `null`
-   * while Closed, and for the kinds that have no content area.
+  const open = display.shown !== 'closed';
+  const content = display.shown === 'closed' ? null : display.content;
+  /*
+   * Read-only is decided here, once: every authoring affordance below reads one
+   * of these operations, and each is absent on a read-only Resource.
    */
-  const openContentKind =
-    front.kind === 'markdown' && front.open
-      ? 'markdown'
-      : front.kind === 'reference' && front.open && front.target.kind === 'markdown'
-        ? 'markdown'
-        : front.kind === 'image' && front.open
-          ? 'image'
-          : undefined;
-  const openContentText =
-    front.kind === 'markdown'
-      ? front.source
-      : front.kind === 'reference' && front.target.kind === 'markdown'
-        ? front.target.source
-        : front.kind === 'image'
-          ? front.url
-          : '';
-  // Memoised so the value keeps its identity while unchanged, which `usePresence`
-  // holds it by.
-  const openContent = useMemo<ResourceContentBody | null>(
-    () =>
-      openContentKind === 'markdown'
-        ? { kind: 'markdown', source: openContentText }
-        : openContentKind === 'image'
-          ? { kind: 'image', url: openContentText }
-          : null,
-    [openContentKind, openContentText],
-  );
-  /**
-   * The kinds that carry authored Open/Closed state — every kind but the
-   * creation ghost, which is not a Resource yet and so has no Map to author it
-   * on. It is a wider set than `openContent` because a Space Resource Opens
-   * without having any Markdown of its own to reveal: what it shows when it
-   * opens is its embedded Map, with selection commands on the rail.
-   */
+  const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const openableFront = front.kind === 'preview' ? undefined : front;
-  const open = openableFront?.open === true;
+  const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
+  const contentFront =
+    !readOnly && (front.kind === 'markdown' || front.kind === 'image') ? front : undefined;
+  const onBeginContentEdit = contentFront?.onBeginEdit;
+  const spaceFront = !readOnly && front.kind === 'space' && open ? front : undefined;
+  const areaContent = useAreaContent(content);
   const bodyControl = useRef<HTMLDivElement>(null);
   const contentControl = useRef<HTMLDivElement>(null);
   const contentExitDuration = useCallback(
     () => (contentControl.current === null ? 0 : opacityTransitionMs(contentControl.current)),
     [],
   );
-  // Follows the *content* front's openness rather than the Resource's, so a Space
+  // Follows the *content area's* presence rather than the Resource's, so a Space
   // Resource opening and closing does not run a presence machine over a document
   // that is never mounted. While leaving it draws the content Open last drew,
-  // because a Closed front carries none.
-  const contentPresence = usePresence(openContent, contentExitDuration);
+  // because a Closed display carries none.
+  const contentPresence = usePresence(areaContent, contentExitDuration);
   const contentLeaving = contentPresence.mounted && contentPresence.state === 'leaving';
-  const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
-  const onBeginContentEdit =
-    !readOnly && (front.kind === 'markdown' || front.kind === 'image')
-      ? front.onBeginEdit
-      : undefined;
+  /**
+   * Whether the drawn content may be authored here: the Resource's own, and not
+   * leaving. A Target's content, reached through a Reference Resource, is never
+   * edited or replaced from the Reference Resource (ADR 0070).
+   */
+  const contentAuthoring =
+    contentPresence.mounted && !contentLeaving && contentPresence.value.via === 'self';
   /**
    * The edit running inside the Markdown front this Resource owns.
    *
@@ -377,7 +369,7 @@ export function CanvasResource(props: CanvasResourceProps) {
   const [contentEdit, setContentEdit] = useState<ResourceContentEdit | null>(null);
   const visibleContentEdit = readOnly ? null : contentEdit;
   const imageEditor =
-    !readOnly && !contentLeaving && front.kind === 'image' && front.open ? front.editor : undefined;
+    contentAuthoring && contentFront?.kind === 'image' ? contentFront.editor : undefined;
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
@@ -385,10 +377,9 @@ export function CanvasResource(props: CanvasResourceProps) {
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const [selectorNotice, setContextNotice] = useState<string | null>(null);
   const contextNotice = props.contextNotice ?? selectorNotice;
-  const spaceSelection =
-    !readOnly && front.kind === 'space' && front.open ? front.selection : undefined;
-  const spaceRail = !readOnly && front.kind === 'space' && front.open ? front.spaceRail : undefined;
-  const portal = !readOnly && front.kind === 'space' && front.open ? front.portal : undefined;
+  const spaceSelection = spaceFront?.selection;
+  const spaceRail = spaceFront?.spaceRail;
+  const portal = spaceFront?.portal;
   const portalEditing = portal?.editing === true;
   const showActions =
     state !== 'dragging' &&
@@ -410,16 +401,48 @@ export function CanvasResource(props: CanvasResourceProps) {
   // A click on an unselected Resource selects it, as a click on any React Flow node
   // does; editing its Markdown is the next click, or the Edit command (ADR 0102).
   // So the body's edit target is offered only once the Resource is selected.
-  // Content that is leaving is drawn at rest: no editor and no edit target.
-  if (onBeginContentEdit !== undefined && state === 'selected' && !contentLeaving) {
+  // Content that is leaving, or is a Target's, is drawn at rest: no editor and
+  // no edit target.
+  if (contentAuthoring && onBeginContentEdit !== undefined && state === 'selected') {
     markdownBodyProps.onBeginEdit = onBeginContentEdit;
   }
-  if (!readOnly && !contentLeaving && front.kind === 'markdown' && front.editor !== undefined) {
-    markdownBodyProps.editor = front.editor;
+  if (contentAuthoring && contentFront?.kind === 'markdown') {
+    if (contentFront.editor !== undefined) markdownBodyProps.editor = contentFront.editor;
+    if (contentFront.autoFocusEditor !== undefined) {
+      markdownBodyProps.autoFocus = contentFront.autoFocusEditor;
+    }
   }
-  if (!readOnly && front.kind === 'markdown' && front.autoFocusEditor !== undefined) {
-    markdownBodyProps.autoFocus = front.autoFocusEditor;
-  }
+
+  /** The content area's one switch over what it draws. */
+  const drawAreaContent = (value: AreaContent): ReactNode => {
+    switch (value.kind) {
+      case 'markdown':
+        return (
+          <ResourceContentEditProvider value={setContentEdit}>
+            <MarkdownResourceBody
+              source={value.source}
+              ariaLabel={`Markdown source of ${name}`}
+              {...markdownBodyProps}
+            />
+          </ResourceContentEditProvider>
+        );
+      case 'image':
+        return imageEditor !== undefined ? (
+          <ResourceContentEditProvider value={setContentEdit}>
+            <ImageReplaceTarget name={name} editor={imageEditor} />
+          </ResourceContentEditProvider>
+        ) : (
+          <ResourceImage
+            key={value.url}
+            url={value.url}
+            name={name}
+            onReplace={contentAuthoring ? onBeginContentEdit : undefined}
+          />
+        );
+      case 'unresolved':
+        return <UnresolvedContent />;
+    }
+  };
 
   const returnFocus = props.onReturnFocus;
   useLayoutEffect(() => {
@@ -565,7 +588,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       className="canvas-resource"
       data-testid="resource"
       data-kind={visualKind}
-      data-content-kind={front.kind === 'reference' ? front.target.kind : visualKind}
+      data-content-kind={content === null ? visualKind : content.kind}
       data-state={state}
       // Exposes authored state for the Resource's public treatment and evidence.
       // The React Flow wrapper owns the moving rect, while the Markdown Title's
@@ -641,13 +664,9 @@ export function CanvasResource(props: CanvasResourceProps) {
         {/* Withheld while the Resource is read-only for the same reason every other
             authoring affordance is — a read-only surface draws what the Resource
             shows, not what could be changed about it. */}
-        {front.kind === 'space' &&
-          front.open &&
-          !readOnly &&
-          spaceSelection === undefined &&
-          spaceRail === undefined && (
-            <p className="canvas-resource__space-note">Reading the referenced Space…</p>
-          )}
+        {spaceFront !== undefined && spaceSelection === undefined && spaceRail === undefined && (
+          <p className="canvas-resource__space-note">Reading the referenced Space…</p>
+        )}
         {contextNotice !== null && (
           <p role="status" className="canvas-resource__space-note">
             {contextNotice}
@@ -664,26 +683,7 @@ export function CanvasResource(props: CanvasResourceProps) {
           className="canvas-resource__content"
           data-presence={contentPresence.state}
         >
-          {contentPresence.value.kind === 'image' && imageEditor !== undefined ? (
-            <ResourceContentEditProvider value={setContentEdit}>
-              <ImageReplaceTarget name={name} editor={imageEditor} />
-            </ResourceContentEditProvider>
-          ) : contentPresence.value.kind === 'image' ? (
-            <ResourceImage
-              key={contentPresence.value.url}
-              url={contentPresence.value.url}
-              name={name}
-              onReplace={contentLeaving ? undefined : onBeginContentEdit}
-            />
-          ) : (
-            <ResourceContentEditProvider value={setContentEdit}>
-              <MarkdownResourceBody
-                source={contentPresence.value.source}
-                ariaLabel={`Markdown source of ${name}`}
-                {...markdownBodyProps}
-              />
-            </ResourceContentEditProvider>
-          )}
+          {drawAreaContent(contentPresence.value)}
         </div>
       )}
     </Card>

@@ -10,6 +10,7 @@ import {
   useEmbeddedOpenSpaceResources,
   type EmbeddedTargetReader,
 } from '../src/use-embedded-open-space-resources';
+import { fixtureDisplay } from './render-adapter-fixtures';
 
 /** No gesture in flight: the lean is a drag's, and these tests run none. */
 const NO_DRAG: ReadonlySet<string> = new Set();
@@ -46,6 +47,7 @@ const spaceResource = (resourceId: typeof HOST, map: typeof MAP): ResourceFlowNo
     active: false,
     selectedForAuthoring: false,
     showContent: false,
+    display: fixtureDisplay(true, 'space', '', { spaceId: TARGET, map }),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
   },

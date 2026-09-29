@@ -11,7 +11,7 @@ import {
 import { Button } from './Button';
 import { usePublishResourceContentEdit, type ResourceContentEdit } from './resource-content-edit';
 import { Kbd, KbdGroup } from './components/kbd';
-import { RenderedMarkdown } from './ResourceContent';
+import { RenderedMarkdown } from './PresentedResource';
 import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
 import type { MarkdownSourceEditorHandle } from './MarkdownSourceEditor';
 import { cn } from './lib/utils';
@@ -61,7 +61,7 @@ export interface MarkdownResourceBodyProps {
  * The Markdown kind's Open front: rendered Markdown, on the Resource (ADR 0064).
  *
  * **The same rendering as presentation mode.** At rest this reuses
- * `RenderedMarkdown`, the parser and sanitiser beneath `ResourceContent`; an
+ * `RenderedMarkdown`, the parser and sanitiser beneath `PresentedResource`; an
  * Open Resource therefore cannot interpret the same Markdown differently from
  * the Resource reached during traversal. It omits only presentation mode's title
  * and frame, which the surrounding `CanvasResource` already owns.

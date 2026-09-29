@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { CanvasResource } from '../src';
+import { CanvasResource, type FrontDisplay } from '../src';
 import { MarkdownResourceBody } from '../src/MarkdownResourceBody';
 
 beforeAll(() => {
@@ -50,6 +50,11 @@ const body = (props: Partial<Parameters<typeof MarkdownResourceBody>[0]> = {}) =
  * (`resource-content-edit.ts`). Mounted alone, the body keeps its keys and offers no
  * control of its own.
  */
+const STRATEGIES: FrontDisplay = {
+  shown: 'open',
+  content: { kind: 'markdown', source: '# Strategies\n\nNo strategy is privileged.', via: 'self' },
+};
+
 const onResource = (
   props: Partial<Pick<Parameters<typeof MarkdownResourceBody>[0], 'editor'>> = {},
 ) => (
@@ -58,18 +63,15 @@ const onResource = (
       props.editor === undefined
         ? {
             kind: 'markdown',
-            source: '# Strategies\n\nNo strategy is privileged.',
-            open: true,
             onBeginEdit: vi.fn(),
           }
         : {
             kind: 'markdown',
-            source: '# Strategies\n\nNo strategy is privileged.',
-            open: true,
             editor: props.editor,
             onBeginEdit: vi.fn(),
           }
     }
+    display={STRATEGIES}
     state="rest"
     title="Strategies"
     graphColor="#ffc53d"
@@ -84,18 +86,15 @@ function EditingResource() {
         editing
           ? {
               kind: 'markdown',
-              source: '# Strategies\n\nNo strategy is privileged.',
-              open: true,
               editor: { onComplete: vi.fn(), onEnd: () => setEditing(false) },
               onBeginEdit: () => setEditing(true),
             }
           : {
               kind: 'markdown',
-              source: '# Strategies\n\nNo strategy is privileged.',
-              open: true,
               onBeginEdit: () => setEditing(true),
             }
       }
+      display={STRATEGIES}
       state="rest"
       title="Strategies"
       graphColor="#ffc53d"

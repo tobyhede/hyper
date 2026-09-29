@@ -407,7 +407,7 @@ body {
   font-size: 0.95rem;
 }
 
-/* `ResourceContent` always emits `resource resource--full`, so these are its own base
+/* `PresentedResource` always emits `resource resource--full`, so these are its own base
    appearance, and they sit here rather than after the traversal block below on
    purpose. `.resource--full .resource__title` and `.rf-resource-node__content .resource__title`
    have the same specificity, so whichever is written second wins — and with

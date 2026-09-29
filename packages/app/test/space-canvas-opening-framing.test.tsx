@@ -15,6 +15,7 @@ import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
+import { CLOSED_DISPLAY } from '@project/ui';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -89,6 +90,7 @@ function resourceNode(): ResourceFlowNode {
       active: false,
       selectedForAuthoring: false,
       showContent: false,
+      display: CLOSED_DISPLAY,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',
     },

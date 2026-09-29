@@ -1,7 +1,13 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import type { Story } from '@ladle/react';
 import { titleName } from '@project/core';
-import { Button, CanvasResource, type CanvasResourceFront } from '@project/ui';
+import {
+  Button,
+  CanvasResource,
+  CLOSED_DISPLAY,
+  type CanvasResourceFront,
+  type FrontDisplay,
+} from '@project/ui';
 import { resourceSizeVars } from '#src/resource';
 
 export default { title: 'Components/Resource/Editing' };
@@ -27,19 +33,13 @@ function TitleEditingResource({
     return 'completed' as const;
   };
   const group = useRef<HTMLDivElement>(null);
-  const front: CanvasResourceFront = open
+  const front: CanvasResourceFront = { kind: 'markdown', onOpenChange: changeOpen };
+  const display: FrontDisplay = open
     ? {
-        kind: 'markdown',
-        source: '## Open Resource body',
-        open: true,
-        onOpenChange: changeOpen,
+        shown: 'open',
+        content: { kind: 'markdown', source: '## Open Resource body', via: 'self' },
       }
-    : {
-        kind: 'markdown',
-        source: '## Open Resource body',
-        open: false,
-        onOpenChange: changeOpen,
-      };
+    : CLOSED_DISPLAY;
 
   return (
     <div style={open ? openFrame : resourceSizeVars}>
@@ -55,6 +55,7 @@ function TitleEditingResource({
       >
         <CanvasResource
           front={front}
+          display={display}
           title={title}
           graphColor="#ffc53d"
           {...(editing
@@ -141,11 +142,13 @@ export const Markdown: Story = () => {
     return 'completed' as const;
   };
   const editing = mode !== 'rendered';
+  const display: FrontDisplay =
+    editing || open
+      ? { shown: 'open', content: { kind: 'markdown', source, via: 'self' } }
+      : CLOSED_DISPLAY;
   const front: CanvasResourceFront = editing
     ? {
         kind: 'markdown',
-        source,
-        open: true,
         autoFocusEditor: mode === 'focused',
         editor: {
           onComplete: (next) => {
@@ -157,21 +160,11 @@ export const Markdown: Story = () => {
         onOpenChange: changeOpen,
         onBeginEdit: () => setMode('focused'),
       }
-    : open
-      ? {
-          kind: 'markdown',
-          source,
-          open: true,
-          onOpenChange: changeOpen,
-          onBeginEdit: () => setMode('focused'),
-        }
-      : {
-          kind: 'markdown',
-          source,
-          open: false,
-          onOpenChange: changeOpen,
-          onBeginEdit: () => setMode('focused'),
-        };
+    : {
+        kind: 'markdown',
+        onOpenChange: changeOpen,
+        onBeginEdit: () => setMode('focused'),
+      };
 
   return (
     <div className="flex flex-col items-start gap-3 p-8">
@@ -187,7 +180,13 @@ export const Markdown: Story = () => {
         </Button>
       </div>
       <div style={openFrame}>
-        <CanvasResource front={front} state="selected" title="Strategies" graphColor="#ffc53d" />
+        <CanvasResource
+          front={front}
+          display={display}
+          state="selected"
+          title="Strategies"
+          graphColor="#ffc53d"
+        />
       </div>
     </div>
   );

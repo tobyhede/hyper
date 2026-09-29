@@ -478,6 +478,21 @@ export function CanvasResourceNodeSpecimen({
     data.kind = kind;
     data.imageUrl = imageUrl;
   }
+  // What the projection shows an Open fixture Resource: its own content, or a
+  // Reference Resource's Target Markdown.
+  if (open === true) {
+    data.display = {
+      shown: 'open',
+      content:
+        kind === 'image'
+          ? { kind: 'image', url: imageUrl, via: 'self' }
+          : {
+              kind: 'markdown',
+              source: body ?? '',
+              via: data.kind === 'reference' ? 'reference' : 'self',
+            },
+    };
+  }
   // The editor is the state, so a specimen that asks to be renaming supplies
   // what ends the edit along with it.
   if (editingTitle) {

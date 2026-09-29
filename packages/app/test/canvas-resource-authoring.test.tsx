@@ -17,6 +17,7 @@ import {
   NO_SPACE_RESOURCE_TARGETS,
   type SpaceResourceTargets,
 } from '../src/space-resource-targets';
+import { fixtureDisplay } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -109,6 +110,7 @@ const node = (
     active: false,
     selectedForAuthoring: false,
     showContent: false,
+    display: fixtureDisplay(open, kind, 'A source'),
     activeGraphId: GRAPH_ID,
     activeGraphColor: '#8a94a6',
   },
@@ -777,6 +779,7 @@ describe('canvas Resource authoring, replacing an image', () => {
       active: false,
       selectedForAuthoring: false,
       showContent: false,
+      display: { shown: 'open', content: { kind: 'image', url: OLD_URL, via: 'self' } },
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
     },

@@ -6,7 +6,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { Toolbar, ToolbarButton } from '@project/ui';
+import { CLOSED_DISPLAY, Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
@@ -124,6 +124,7 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       active: false,
       selectedForAuthoring: false,
       showContent: false,
+      display: CLOSED_DISPLAY,
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
     },

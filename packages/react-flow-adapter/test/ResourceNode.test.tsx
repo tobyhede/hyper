@@ -12,6 +12,7 @@ import type {
   ResourceNodeKind,
   ResourceTitleEditor,
 } from '../src/projection';
+import type { ResourceContent } from '@project/core';
 import { uuid } from './uuid';
 
 /**
@@ -197,12 +198,46 @@ interface Overrides {
   body?: string;
   /** Draws the Resource as an Image Resource showing this URL, overriding `kind`. */
   imageUrl?: string;
+  /**
+   * The resolved content an Open or presented Resource draws. Defaults to what
+   * the projection resolves for the fixture's own kind: its `body`, its
+   * `imageUrl`, a Space view, or a Target's Markdown for a Reference Resource.
+   */
+  content?: ResourceContent;
+  /** Whether presenting draws this Resource, whatever its authored Open state. */
+  presented?: boolean;
   onBeginBodyEditing?: () => void;
   bodyEditor?: ResourceNodeData['bodyEditor'];
   imageReplacer?: ResourceNodeData['imageReplacer'];
   resize?: ResourceNodeData['resize'];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
+}
+
+/** What the projection resolves for a fixture Resource of `kind`. */
+function ownContent(
+  kind: Exclude<ResourceNodeData['kind'], 'image'>,
+  body: string | undefined,
+  imageUrl: string | undefined,
+): ResourceContent {
+  if (imageUrl !== undefined) return { kind: 'image', url: imageUrl, via: 'self' };
+  switch (kind) {
+    case 'markdown':
+      return { kind: 'markdown', source: body ?? '', via: 'self' };
+    case 'reference':
+      return { kind: 'markdown', source: body ?? '', via: 'reference' };
+    case 'space':
+      return {
+        kind: 'space',
+        view: {
+          spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
+          map: uuid('00000000-0000-4000-8000-0000000000ab'),
+          graph: uuid('00000000-0000-4000-8000-0000000000ac'),
+          framing: undefined,
+        },
+        via: 'self',
+      };
+  }
 }
 
 function props({
@@ -218,6 +253,8 @@ function props({
   open,
   body,
   imageUrl,
+  content,
+  presented = false,
   onBeginBodyEditing,
   bodyEditor,
   imageReplacer,
@@ -233,7 +270,12 @@ function props({
     ...nodeKind,
     active: false,
     selectedForAuthoring,
-    showContent: false,
+    showContent: presented,
+    display: presented
+      ? { shown: 'presented', content: content ?? ownContent(kind, body, imageUrl) }
+      : open === true
+        ? { shown: 'open', content: content ?? ownContent(kind, body, imageUrl) }
+        : { shown: 'closed' },
     activeGraphId: graphId,
     activeGraphColor: '#1f77b4',
     readOnly,
@@ -444,6 +486,113 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.queryByText('must not render')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Open Resource A' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
+  });
+});
+
+describe('ResourceNode draws what the display shows', () => {
+  const FIGURE = 'https://example.com/harbour.png';
+
+  it("draws an Open Reference Resource to an Image Resource as its Target's image, with no Replace", () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          title: 'Harbour, again',
+          open: true,
+          selected: true,
+          content: { kind: 'image', url: FIGURE, via: 'reference' },
+          onEditResource: vi.fn(),
+        })}
+      />,
+    );
+
+    const picture = screen.getByRole('img', { name: 'Harbour, again' });
+    expect(picture).toHaveAttribute('src', FIGURE);
+    expect(screen.getByRole('button', { name: 'Close Resource Harbour, again' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Replace image/u })).toBeNull();
+
+    fireEvent.error(picture);
+    expect(screen.getByTestId('resource-image-failed')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
+  });
+
+  it('draws an unresolved Target as a notice on the Open front', () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          open: true,
+          content: { kind: 'unresolved', via: 'reference' },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
+  });
+
+  /**
+   * The rule between the two: what a Resource draws is the display's, and the
+   * Map's authored Open state is geometry — the resize control, z-order and the
+   * node's own `data-open` — never what is drawn. A Resource both presented and
+   * Open is presented, and keeps its authored Open state.
+   */
+  it('presents a Resource that is also Open, keeping its authored Open state on the node', () => {
+    const { container } = render(
+      <ResourceNode
+        {...props({
+          open: true,
+          presented: true,
+          body: '## Presented body',
+          onEditResource: vi.fn(),
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('resource-content')).toHaveTextContent('Presented body');
+    expect(screen.queryByTestId('resource')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Close Resource A' })).toBeNull();
+    expect(container.querySelector('.rf-resource-node__inner')).toHaveAttribute(
+      'data-open',
+      'true',
+    );
+  });
+
+  it('presents a Reference Resource to an Image Resource as its Target’s image', () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          title: 'Harbour, again',
+          presented: true,
+          content: { kind: 'image', url: FIGURE, via: 'reference' },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('img', { name: 'Harbour, again' })).toHaveAttribute('src', FIGURE);
+  });
+
+  it('presents a Space Resource as its name, with no empty document', () => {
+    const { container } = render(
+      <ResourceNode {...props({ kind: 'space', title: 'Roadmap', presented: true })} />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Roadmap' })).toBeVisible();
+    expect(container.querySelector('.resource__body')).toBeNull();
+  });
+
+  it('presents an unresolved Target as a notice', () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          presented: true,
+          content: { kind: 'unresolved', via: 'reference' },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
   });
 });
 

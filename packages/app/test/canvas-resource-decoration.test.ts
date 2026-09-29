@@ -10,6 +10,7 @@ import {
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
+import { fixtureDisplay } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -52,6 +53,7 @@ const projectionNode = (
     active: false,
     selectedForAuthoring: false,
     showContent: false,
+    display: fixtureDisplay(open, kind),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
   },

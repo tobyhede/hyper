@@ -1,19 +1,11 @@
 import { useMemo } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { titleName } from '@project/core';
+import { titleName, type ResourceContent } from '@project/core';
 import { ResourceImage } from './ResourceImage';
+import { UnresolvedContent } from './UnresolvedContent';
 
-/**
- * What a Resource's content area draws: a Markdown document, or an Image
- * Resource's picture in the same place. The Open front and the presented
- * Resource both draw one.
- */
-export type ResourceContentBody =
-  | { readonly kind: 'markdown'; readonly source: string }
-  | { readonly kind: 'image'; readonly url: string };
-
-export interface ResourceContentProps {
+export interface PresentedResourceProps {
   /**
    * The Resource's Title, whole. Presenting draws its **name** — the first line —
    * because the Title ladder belongs to the Resource front and nothing else
@@ -21,7 +13,8 @@ export interface ResourceContentProps {
    * frame around it.
    */
   readonly title: string;
-  readonly content: ResourceContentBody;
+  /** The Resource's resolved content, its own or its Target's. */
+  readonly content: ResourceContent;
 }
 
 interface RenderedMarkdownProps {
@@ -32,7 +25,7 @@ interface RenderedMarkdownProps {
 /**
  * The one Markdown parser and sanitiser shared by every rendered Resource body.
  *
- * Kept separate from {@link ResourceContent} so an Open Resource can reuse the
+ * Kept separate from {@link PresentedResource} so an Open Resource can reuse the
  * presentation-mode rendering without also drawing presentation mode's title
  * and outer frame.
  */
@@ -61,16 +54,38 @@ export function RenderedMarkdown({ markdown, className }: RenderedMarkdownProps)
  * `<iframe src=javascript:>` would otherwise run in the app's origin. Do not
  * insert parsed Markdown without passing it through DOMPurify.
  */
-export function ResourceContent({ title, content }: ResourceContentProps) {
+export function PresentedResource({ title, content }: PresentedResourceProps) {
   const name = titleName(title);
   return (
     <article className="resource resource--full" data-testid="resource-content">
       <h2 className="resource__title">{name}</h2>
-      {content.kind === 'markdown' ? (
-        <RenderedMarkdown className="resource__body" markdown={content.source} />
-      ) : (
-        <ResourceImage key={content.url} url={content.url} name={name} />
-      )}
+      <PresentedContent name={name} content={content} />
     </article>
   );
+}
+
+/**
+ * The content below a presented Resource's name, one arm per content kind.
+ *
+ * A presented image is never replaced, its own or a Target's, so no arm offers
+ * Replace. A Space Resource draws its name alone: what presenting one should
+ * draw is `resource-content/07`'s open question.
+ */
+function PresentedContent({
+  name,
+  content,
+}: {
+  readonly name: string;
+  readonly content: ResourceContent;
+}) {
+  switch (content.kind) {
+    case 'markdown':
+      return <RenderedMarkdown className="resource__body" markdown={content.source} />;
+    case 'image':
+      return <ResourceImage key={content.url} url={content.url} name={name} />;
+    case 'space':
+      return null;
+    case 'unresolved':
+      return <UnresolvedContent />;
+  }
 }

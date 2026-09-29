@@ -108,7 +108,7 @@ export const handRolledStyles = [
   {
     block: 'resource',
     reason:
-      "`ResourceContent`'s base appearance plus the container-query typography that scales a presented Resource with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
+      "`PresentedResource`'s base appearance plus the container-query typography that scales a presented Resource with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
   },
   {
     block: 'resource-image',
