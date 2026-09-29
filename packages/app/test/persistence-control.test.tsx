@@ -56,11 +56,11 @@ describe('PersistenceControl', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull();
   });
 
-  it('draws the way to a blocking Space unavailable during replacement, as its siblings are', () => {
+  it('draws the way to a blocking Space unavailable while navigation is withheld', () => {
     const onOpenSpace = vi.fn();
     render(
       <PersistenceControl
-        disabled
+        navigate={false}
         persistence={{
           kind: 'conflicted',
           current: STORED,
@@ -78,7 +78,7 @@ describe('PersistenceControl', () => {
       />,
     );
     const open = screen.getByRole('button', { name: 'Open Target' });
-    expect(open).toBeDisabled();
+    expect(open).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(open);
     expect(onOpenSpace).not.toHaveBeenCalled();
   });
@@ -446,6 +446,32 @@ describe('PersistenceNotice', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Target' }));
     expect(onOpenSpace).toHaveBeenCalledWith(TARGET_ID, 'Target');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('withholds opening the blocking Space while navigation is, and keeps Retry', () => {
+    const onRetry = vi.fn();
+    const onOpenSpace = vi.fn();
+    render(
+      <PersistenceNotice
+        persistence={{
+          kind: 'rejected',
+          failure: { kind: 'permanent-failure', code: 'forbidden' },
+          blocked: blockedByTarget,
+        }}
+        onRetry={onRetry}
+        onOpenSpace={onOpenSpace}
+        navigate={false}
+      />,
+    );
+
+    const open = screen.getByRole('button', { name: 'Open Target' });
+    expect(open).toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(open);
+    expect(onOpenSpace).not.toHaveBeenCalled();
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    expect(retry).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(retry);
     expect(onRetry).toHaveBeenCalledOnce();
   });
 

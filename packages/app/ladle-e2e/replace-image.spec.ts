@@ -82,8 +82,13 @@ test(
     await next.target.getByRole('button', { name: 'Upload' }).click();
     await (await chooser).setFiles({ name: 'harbour.png', mimeType: 'image/png', buffer: HARBOUR });
     await expect(next.target).toHaveAttribute('aria-busy', 'true');
-    await expect(selectedCanvas(page)).toBeDisabled();
+    await expect(selectedCanvas(page)).toHaveAttribute('aria-disabled', 'true');
+    await expect(selectedCanvas(page)).not.toHaveAttribute('disabled');
     await expect(next.target.getByRole('button', { name: 'Upload' })).toBeDisabled();
+    // Unavailable is not unreachable: the withheld Map name still takes focus.
+    await selectedCanvas(page).focus();
+    await expect(selectedCanvas(page)).toBeFocused();
+    await next.target.getByRole('button', { name: 'Upload' }).focus();
     await page.clock.runFor(1000);
 
     await expect(next.target).toHaveCount(0);

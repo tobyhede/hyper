@@ -236,6 +236,31 @@ export function selectedCanvas(page: Page): Locator {
 }
 
 /**
+ * Walk a toolbar's arrow order from the first control, reaching each of the
+ * rest in turn with ArrowRight.
+ *
+ * Other items may stand between two of them, so each is given a few presses;
+ * reaching a control proves it is focusable and in the roving order, which a
+ * natively disabled control is not (ADR 0073).
+ */
+export async function expectArrowOrder(
+  page: Page,
+  [first, ...rest]: readonly Locator[],
+): Promise<void> {
+  if (first === undefined) return;
+  await first.focus();
+  await expect(first).toBeFocused();
+  for (const next of rest) {
+    let reached = false;
+    for (let press = 0; press < 6 && !reached; press += 1) {
+      await page.keyboard.press('ArrowRight');
+      reached = await next.evaluate((element) => element === document.activeElement);
+    }
+    expect(reached).toBe(true);
+  }
+}
+
+/**
  * Draw one authored Map, by title.
  *
  * One exclusive choice over authored Maps, with no second control and no

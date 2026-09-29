@@ -14,6 +14,7 @@ import {
   activeResource,
   boxOf,
   createResource,
+  expectArrowOrder,
   openResource,
   presentControl,
   resourceControls,
@@ -1061,20 +1062,28 @@ test(
     await expect(target.getByRole('textbox', { name: 'Image URL' })).toBeDisabled();
     await expect(target).toHaveAttribute('aria-busy', 'true');
     await expect(selectedCanvas(page)).toBeDisabled();
-    // The Dock's four menu buttons are drawn unavailable by `aria-disabled`,
-    // which Playwright's `toBeDisabled` would also accept from a fieldset.
+    // The Dock's navigation is drawn unavailable by `aria-disabled` and stays in
+    // its arrow order, so each withheld command is reached from the keyboard.
     const dockBar = page.getByRole('toolbar', { name: 'Command Dock' }).filter({ visible: true });
     const menuButtons = [
+      dockBar.getByRole('button', { name: /^Spaces\./ }),
       dockBar.getByTestId('space-title'),
       selectedCanvas(page),
       dockBar.getByTestId('active-graph'),
-      dockBar.getByRole('button', { name: /^Spaces\./ }),
     ];
     for (const control of menuButtons) {
       await expect(control).toHaveAttribute('aria-disabled', 'true');
+      await expect(control).not.toHaveAttribute('disabled');
+    }
+    await expectArrowOrder(page, menuButtons);
+    for (const control of menuButtons) {
       await control.click({ force: true, delay: 120 });
       await expect(page.getByRole('menu')).toHaveCount(0);
+      await control.press('Enter');
+      await expect(page.getByRole('menu')).toHaveCount(0);
     }
+    // A withheld command is not a refused one, so nothing is reported.
+    await expect(page.getByRole('alert')).toHaveCount(0);
     await page.evaluate(
       () =>
         new Promise<void>((resolve) => {
@@ -1110,6 +1119,62 @@ test(
     await expect(selectedCanvas(page)).toHaveText('Pictures');
   },
 );
+
+test('a failed save is retried while a replacement is held, and the replacement goes on', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  await openPictures(page);
+  const status = page.getByTestId('persistence-status');
+  const before = BigInt((await status.getAttribute('data-revision')) ?? '');
+  let failing = true;
+  await page.route('**/api/spaces', async (route) => {
+    const request = route.request();
+    if (failing && request.method() === 'POST') return route.abort('failed');
+    return route.continue();
+  });
+  // Opening the Image Resource on its target is the Edit whose save fails.
+  const { target } = await beginReplacing(page);
+  const failure = page.getByTestId('persistence-failure');
+  await expect(failure).toBeVisible();
+
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === '/images',
+    async (route) => {
+      await held;
+      await route.continue();
+    },
+  );
+  const chooser = page.waitForEvent('filechooser');
+  await target.getByRole('button', { name: 'Upload' }).click();
+  await (
+    await chooser
+  ).setFiles({
+    name: FIRST_PICTURE.name,
+    mimeType: 'image/png',
+    buffer: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+  });
+  await expect(target).toHaveAttribute('aria-busy', 'true');
+
+  const retry = failure.getByRole('button', { name: 'Retry', exact: true });
+  await expect(retry).toBeEnabled();
+  failing = false;
+  await retry.click();
+  await expect(failure).toBeHidden();
+  await expect(status).toHaveText('Persisted');
+  await expect(status).toHaveAttribute('data-revision', (before + 1n).toString());
+  // Retry re-committed the working Space and replaced nothing under the target.
+  await expect(target).toHaveAttribute('aria-busy', 'true');
+  await expect(selectedCanvas(page)).toHaveAttribute('aria-disabled', 'true');
+
+  release();
+  await expect(target).toHaveCount(0);
+  await expect(selectedCanvas(page)).not.toHaveAttribute('aria-disabled', 'true');
+});
 
 /**
  * Follow a fragment of the current location, answering whether the browser

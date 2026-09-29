@@ -343,6 +343,7 @@ function OpenerAndOpenSpaces({
                   className="command-dock__crumb nokey"
                   aria-label={`Go to ${opener.title}`}
                   title={`Go to ${opener.title}`}
+                  disabled={menuDisabled}
                   onClick={() => space.onSelect(opener.spaceId, opener.title)}
                 />
               }
@@ -539,10 +540,11 @@ export function SpacesControl({
   readonly side?: MenuSide;
   readonly vertical?: boolean;
   /**
-   * Draw the Space name and Open Spaces unavailable: each reports `aria-disabled`,
-   * keeps its place in the Dock's arrow order and opens nothing (ADR 0073).
-   * `ToolbarButton` supplies that for a menu trigger given `disabled`, which
-   * `toolbar-menu-trigger.test.tsx` in `@project/ui` holds.
+   * Draw the opener's crumb, Open Spaces and the Space name unavailable: each
+   * reports `aria-disabled`, keeps its place in the Dock's arrow order and runs
+   * nothing (ADR 0073). `ToolbarButton` supplies that for a control given
+   * `disabled`, which `toolbar-menu-trigger.test.tsx` in `@project/ui` holds
+   * for a menu trigger.
    */
   readonly menuDisabled?: boolean;
 }) {

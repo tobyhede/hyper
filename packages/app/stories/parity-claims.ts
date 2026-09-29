@@ -251,7 +251,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      'While image replacement is pending, the target remains mounted and its inputs and Map navigation are unavailable; completion releases them.',
+      'While image replacement is pending, the target remains mounted with its inputs unavailable, and the Dock’s navigation is drawn unavailable by aria-disabled and stays focusable; its answer releases them.',
   },
   {
     id: 'image-resource-replace-refuses-in-the-target',
@@ -484,7 +484,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Replacing',
     claim:
-      'While an Image Resource’s replacement is held, the Space, Map and Graph names and Open Spaces each report aria-disabled and open nothing when pressed, and are available again once it ends.',
+      'While an Image Resource’s replacement is held, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed, and are available again once it ends.',
   },
   {
     id: 'command-dock-fits-a-narrow-container',

@@ -1,6 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { productDestinationPath } from '@project/http';
-import { boxOf, expectMenuGroups, graphLegendMarkLine, resourceActions } from '../e2e/graph';
+import {
+  boxOf,
+  expectArrowOrder,
+  expectMenuGroups,
+  graphLegendMarkLine,
+  resourceActions,
+} from '../e2e/graph';
 import { commandDockSnapshot } from '../stories/support/spaces';
 
 /**
@@ -1187,28 +1193,40 @@ test(
  * catalogue navigation while the story owns its own viewport.
  */
 /**
- * The Dock's menu buttons drawn unavailable (ADR 0073).
+ * The Dock's navigation drawn unavailable (ADR 0073).
  *
- * A replacement is held for as long as the story is mounted, so each of the
- * four menu buttons reports `aria-disabled` and a press opens no menu.
+ * A replacement is held for as long as the story is mounted, so the opener's
+ * crumb and the four menu buttons each report `aria-disabled`, stay in the
+ * Dock's arrow order, and a press goes nowhere.
  */
 test(
-  'a held replacement draws the Space, Map, Graph and Open Spaces menu buttons unavailable',
+  "a held replacement draws the Dock's navigation unavailable and keeps it in the arrow order",
   { tag: '@parity:command-dock-draws-its-menu-buttons-unavailable' },
   async ({ page }) => {
     await page.goto(story('replacing'));
 
+    const goTo = surface(page).getByRole('button', { name: /^Go to / });
     const menuButtons = [
+      surface(page).getByRole('button', { name: /^Spaces\./ }),
       surface(page).getByTestId('space-title'),
       surface(page).getByTestId('selected-canvas'),
       surface(page).getByTestId('active-graph'),
-      surface(page).getByRole('button', { name: /^Spaces\./ }),
     ];
-    for (const control of menuButtons) {
+    for (const control of [goTo, ...menuButtons]) {
       await expect(control).toHaveAttribute('aria-disabled', 'true');
+      await expect(control).not.toHaveAttribute('disabled');
+    }
+    await expectArrowOrder(page, [goTo, ...menuButtons]);
+    const title = await surface(page).getByTestId('space-title').textContent();
+    await goTo.click({ force: true });
+    await expect(surface(page).getByTestId('space-title')).toHaveText(title ?? '');
+    for (const control of menuButtons) {
       await control.click({ force: true, delay: 120 });
       await expect(page.getByRole('menu')).toHaveCount(0);
+      await control.press('Enter');
+      await expect(page.getByRole('menu')).toHaveCount(0);
     }
+    await expect(page.getByRole('alert')).toHaveCount(0);
   },
 );
 

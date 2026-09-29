@@ -133,6 +133,17 @@ export interface AuthoringAvailability {
   readonly dragNodes: boolean;
   /** React Flow may focus and select nodes and Edges. */
   readonly selectNodes: boolean;
+  /**
+   * A navigation command may run: choosing a Space, a Map or a Graph, Open
+   * Spaces, the opener's crumb, Exit, and going to a Space that blocks a save.
+   *
+   * The Dock draws each of them unavailable from this answer and nothing else.
+   * The domain refuses the same moves on its own (`open-spaces.ts`'s
+   * `assertNavigationAvailable`, and `browser-location.ts` ignoring a Map or
+   * Graph move and holding Back and Forward), so the drawn state is what an
+   * author sees and never the enforcement.
+   */
+  readonly navigate: boolean;
 }
 
 export function authoringAvailability(inProgress: AuthoringInProgress): AuthoringAvailability {
@@ -154,6 +165,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     connectOnCanvas: false,
     dragNodes: false,
     selectNodes: false,
+    navigate: false,
     editResourceBody: availability.editResourceBody,
   };
 }
@@ -398,6 +410,9 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const dragNodes = editable && !presenting;
   const selectNodes = !presenting;
 
+  /** Only a replacement withholds navigation, which is the branch above. */
+  const navigate = true;
+
   return {
     resourcesView,
     chromeTitleEdit,
@@ -413,5 +428,6 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
     connectOnCanvas,
     dragNodes,
     selectNodes,
+    navigate,
   };
 }

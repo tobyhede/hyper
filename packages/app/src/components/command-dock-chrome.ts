@@ -74,6 +74,16 @@ export interface DockChrome {
    * slot that holds the rename is where it is spent.
    */
   readonly replacementEpoch: number;
+  /**
+   * Whether a navigation command may run — `AuthoringAvailability.navigate`,
+   * handed down unchanged.
+   *
+   * `DockChrome`'s rather than a group's because navigation crosses the groups:
+   * the Space name, Open Spaces and the opener's crumb, the Map and Graph
+   * names, and the notice's way to a blocking Space all draw unavailable from
+   * this one answer, as ADR 0073 asks — announced, focusable and inert.
+   */
+  readonly navigate: boolean;
   readonly space: DockSpace;
   readonly canvas: DockCanvas;
   readonly graph: DockGraph;
@@ -184,6 +194,9 @@ export interface DockSpace {
   readonly onExit: (spaceId: UUID, confirmation?: RejectedExitConfirmation) => void;
   /**
    * Whether this Space can be left at all, which is one question and not two.
+   *
+   * Withheld with every other navigation command while navigation is
+   * unavailable.
    *
    * The meta Space is permanent (`open-spaces.ts`), and every other open Space
    * can be exited. Do not read {@link opener} for this — "is there a Space I was

@@ -39,6 +39,7 @@ const ALL_AVAILABLE: AuthoringAvailability = {
   connectOnCanvas: true,
   dragNodes: true,
   selectNodes: true,
+  navigate: true,
 };
 
 describe('authoring availability', () => {
