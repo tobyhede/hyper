@@ -4,9 +4,9 @@
 
 **Blocked by:** 02
 
-**Status:** needs-info
+**Status:** wontfix
 
-Needs a product decision before it is ready: do Copy link and Open in New Tab stay available during a replacement, and should the same hold while presenting, where a Resource's menu drops them today?
+**Decision (product owner):** Copy link and Open in New Tab are disabled during a replacement, as they are while presenting. That is what the tree already does: the Space, Map and Graph menu buttons are drawn unavailable and do not open (ticket 02), and a Resource's actions menu is disabled while authoring is withdrawn. Nothing here is built. Moving the Dock during a replacement is not covered by this decision.
 
 - [ ] During a held replacement, the Map and Graph menus open, their choice rows are unavailable, and Copy link copies.
 - [ ] During a held replacement, a Resource's Copy link is available.
