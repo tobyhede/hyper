@@ -18,6 +18,7 @@ import {
   spaceFileSchema,
   titleLines,
   titleName,
+  shortTitle,
 } from '../src/index';
 
 const RESOURCE_ID = '00000000-0000-4000-8000-000000000001';
@@ -194,6 +195,20 @@ describe('the first line is the name', () => {
     const title = 'Auth\nHow a session begins';
 
     expect(titleName(title)).toBe(titleLines(title)[0]?.text);
+  });
+});
+
+describe('the short name stands for the whole Title on one line', () => {
+  it('answers a single-line Title unchanged', () => {
+    expect(shortTitle('Auth')).toBe('Auth');
+  });
+
+  it('answers the first line and an ellipsis for a Title written on several', () => {
+    expect(shortTitle('Resource Title\nThat\nSpans\nLines')).toBe('Resource Title…');
+  });
+
+  it('marks a two-line Title as shortened too', () => {
+    expect(shortTitle('Auth\nHow a session begins')).toBe('Auth…');
   });
 });
 

@@ -59,8 +59,6 @@ export interface AuthoringInProgress {
   readonly editingResourceBody: boolean;
   /** A Resource's inline title edit is running on the canvas (ADR 0065). */
   readonly editingResourceTitle: boolean;
-  /** Some Resource of the selected Map is Open (ADR 0064). */
-  readonly resourceIsOpen: boolean;
   /** A Space, Map or Graph rename is running in the Space chrome. */
   readonly editingChromeTitle: boolean;
   /**
@@ -165,7 +163,6 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
     presenting,
     editingResourceBody,
     editingResourceTitle,
-    resourceIsOpen,
     editingChromeTitle,
     spaceOnCanvas,
     editingEmbeddedMap,
@@ -247,18 +244,17 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const entityEdits = chromeTitleEdit && !editingChromeTitle;
 
   /**
-   * Delete Resource is withdrawn wherever the entity Edits are, and for one reason
-   * more.
+   * Delete Resource is withdrawn wherever the entity Edits are.
    *
    * It is a whole-Space authoring action on the *selected* Resource, so it reads
    * what a menu's Edits read — including `editingResourceTitle`, which names the
    * selected Resource, and destroying the subject of a live rename is the edit
-   * answering itself. Withdrawing it while a Resource is open is what keeps the
-   * Map's Open state from outliving the Resource it names: nothing clears that
-   * state on a Delete, so every affordance reading it would stay withdrawn with
-   * no pane left to close.
+   * answering itself. An Open Resource stays deletable: the Open state is its
+   * position entry, which Delete from Space removes from every Map after giving
+   * back the room it held (`snapshot-edits.property.test.ts`, "leaves every
+   * other Resource where a delete before Open would have").
    */
-  const deleteResource = entityEdits && !resourceIsOpen;
+  const deleteResource = entityEdits;
 
   /**
    * Present reads `editingResourceBody` and nothing else about the canvas.

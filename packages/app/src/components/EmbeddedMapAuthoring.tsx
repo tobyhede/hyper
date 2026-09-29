@@ -134,7 +134,6 @@ export function EmbeddedMapAuthoring({
 
         editingResourceBody: false,
         editingResourceTitle: false,
-        resourceIsOpen: false,
         editingChromeTitle: false,
         spaceOnCanvas: enabled,
         creatingSpaceResource: false,

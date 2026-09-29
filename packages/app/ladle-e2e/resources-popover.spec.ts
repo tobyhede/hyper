@@ -91,6 +91,38 @@ test(
 );
 
 test(
+  'a Resource row ends in Delete from Space and a Space row keeps the slot empty',
+  { tag: '@parity:resources-popover-offers-delete-from-space-on-a-resource-row' },
+  async ({ page }) => {
+    await page.goto(story('meta-spaces'));
+    await page.getByRole('button', { name: 'Resources' }).click();
+
+    const row = page.getByRole('button', { name: 'Add Architecture to Map' });
+    const deleteControl = page.getByRole('button', { name: 'Delete Architecture from Space' });
+    await expect(deleteControl).toBeVisible();
+    // On its row's line, after the row, not wrapped beneath it.
+    const rowBox = await row.boundingBox();
+    const deleteBox = await deleteControl.boundingBox();
+    expect(rowBox, 'the row is drawn').not.toBeNull();
+    expect(deleteBox, 'the delete control is drawn').not.toBeNull();
+    if (rowBox === null || deleteBox === null) return;
+    expect(deleteBox.y).toBeGreaterThanOrEqual(rowBox.y - 1);
+    expect(deleteBox.y + deleteBox.height).toBeLessThanOrEqual(rowBox.y + rowBox.height + 1);
+    expect(deleteBox.x).toBeGreaterThanOrEqual(rowBox.x + rowBox.width - 1);
+
+    // A Space is not a Resource of this Space, so there is nothing to delete.
+    await expect(page.getByRole('button', { name: 'Add Blueprint to Map' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Delete Blueprint/ })).toHaveCount(0);
+
+    // The press asks for the delete; it does not add the Resource.
+    await deleteControl.click();
+    await expect(page.getByText('Delete requested: Architecture')).toBeVisible();
+    await expect(page.getByText('Added: Architecture')).toHaveCount(0);
+    await expect(row).toBeVisible();
+  },
+);
+
+test(
   'the filter counts what each switch contributes under the current search',
   { tag: '@parity:resources-popover-counts-what-each-filter-contributes' },
   async ({ page }) => {
@@ -258,8 +290,11 @@ test(
     await expect(tooltip).toContainText('Long');
     await expect(tooltip).toContainText('Short');
 
-    // Resource 4 is the next row. Its ten Graph names wrap inside the tooltip
-    // rather than running past it and the viewport.
+    // Resource 4 is the next row, past Resource 3's Delete from Space control.
+    // Its ten Graph names wrap inside the tooltip rather than running past it
+    // and the viewport.
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Delete Resource 3 from Space' })).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(four).toBeFocused();
     const dots = tooltip.locator('[data-graph-id]');

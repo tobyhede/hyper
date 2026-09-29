@@ -450,7 +450,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
 
     expect(
-      await screen.findByRole('alertdialog', { name: 'Delete from Space Local resource?' }),
+      await screen.findByRole('alertdialog', { name: 'Delete Local resource From Space?' }),
     ).toBeVisible();
 
     await raiseConflict(session);
@@ -458,7 +458,7 @@ describe('accepting a stored Space discards the open Interaction draft', () => {
 
     await replacementLanded();
     expect(
-      screen.queryByRole('alertdialog', { name: 'Delete from Space Local resource?' }),
+      screen.queryByRole('alertdialog', { name: 'Delete Local resource From Space?' }),
     ).not.toBeInTheDocument();
     expect(session.getState().working.resources.map(({ id }) => id)).toEqual([RESOURCE_ID]);
   });

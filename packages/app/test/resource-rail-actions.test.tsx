@@ -403,11 +403,10 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * Delete from Space is withdrawn while a Resource is Open so Open state cannot outlive
-   * the Resource. Remove from Map is the canvas key's availability: it reclaims
-   * the Open room and stays offered.
+   * Opening a Resource withdraws neither removal: each gives back the room the
+   * Open Resource held, and Delete from Space takes its Open state with it.
    */
-  it('still offers Remove from Map while the Resource is Open', async () => {
+  it('offers Remove from Map and Delete from Space while the Resource is Open', async () => {
     const opened = spaceSnapshotSchema.parse({
       ...snapshot,
       document: {
@@ -434,7 +433,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
 
     expect(await screen.findByRole('menuitem', { name: 'Remove from Map' })).toBeVisible();
-    expect(screen.queryByRole('menuitem', { name: 'Delete from Space' })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
     await settled(session);
   });
 
@@ -832,11 +831,11 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
 
     // The press asked rather than deleted, and the question says what goes.
-    const question = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
-    expect(question).toHaveTextContent('every Map that contains it');
+    const question = await screen.findByRole('alertdialog', { name: 'Delete A From Space?' });
+    expect(question).toHaveTextContent('Permanently deletes the Resource from the Space.');
     expect(resourceIds(session)).toEqual([RESOURCE_ID, OTHER_RESOURCE_ID]);
 
-    fireEvent.click(within(question).getByRole('button', { name: 'Delete from Space' }));
+    fireEvent.click(within(question).getByRole('button', { name: 'Delete' }));
 
     await waitFor(() => expect(resourceIds(session)).toEqual([OTHER_RESOURCE_ID]));
     await settled(session);
@@ -858,20 +857,21 @@ describe('a Resource’s commands on the canvas rail', () => {
     await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
-    await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
+    await screen.findByRole('alertdialog', { name: 'Delete A From Space?' });
 
     expect(screen.queryByText('Resource deleted')).not.toBeInTheDocument();
     await settled(session);
   });
 
   /**
-   * The question names the Resource by its **name** (ADR 0083).
+   * The question names the Resource by its **short Title**: the name, with an
+   * ellipsis when lines follow it.
    *
    * A Resource's Title is one or more Title Lines and the front draws the ladder;
    * a dialog title is a sentence, and a line break arriving in one draws as a
    * broken-looking label rather than as an error.
    */
-  it('names the Resource in the question by its name and not by its whole Title', async () => {
+  it('names the Resource in the question by its short Title and not by its whole Title', async () => {
     const session = mount();
     const laddered = 'A\nAnd read this next';
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A' }));
@@ -883,7 +883,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
 
-    const question = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
+    const question = await screen.findByRole('alertdialog', { name: 'Delete A… From Space?' });
     expect(question).not.toHaveTextContent('And read this next');
     fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
@@ -897,7 +897,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     await selectResource('A');
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
-    const question = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
+    const question = await screen.findByRole('alertdialog', { name: 'Delete A From Space?' });
     fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
@@ -907,6 +907,39 @@ describe('a Resource’s commands on the canvas rail', () => {
 });
 
 /** Asserted through the Actions menu, not Edge Authoring, to hold the menu-to-Edit wiring. */
+describe('Delete from Space in the Dock’s Resources list', () => {
+  /**
+   * A Resource no Map places has no toolbar to carry Delete from Space, so the
+   * Resources list — the one surface that still names it — offers it there.
+   */
+  it('deletes a Resource the Map no longer places, and drops its row from the list', async () => {
+    const session = mount();
+
+    await selectResource('A');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Map' }));
+    await waitFor(() => {
+      expect(session.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]).toBeUndefined();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
+    const list = await screen.findByRole('dialog', { name: 'Resources' });
+    expect(within(list).getByRole('button', { name: 'Add A to Map' })).toBeVisible();
+    fireEvent.click(within(list).getByRole('button', { name: 'Delete A from Space' }));
+    const confirmation = await screen.findByRole('alertdialog', { name: 'Delete A From Space?' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(resourceIds(session)).toEqual([OTHER_RESOURCE_ID]));
+    // The list stays open, so the row's absence is read from a drawn list.
+    expect(list).toBeVisible();
+    expect(within(list).queryByRole('button', { name: 'Add A to Map' })).not.toBeInTheDocument();
+    expect(
+      within(list).queryByRole('button', { name: 'Delete A from Space' }),
+    ).not.toBeInTheDocument();
+    await settled(session);
+  });
+});
+
 describe('Connect to Resource in a Resource’s Actions menu', () => {
   const edgesOf = (session: SpaceSession) =>
     session.getState().working.document.maps?.[0]?.graphs[0]?.edges ?? [];
