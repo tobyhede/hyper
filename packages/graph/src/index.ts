@@ -59,10 +59,10 @@ export type {
   LayoutStrategy,
 } from './layout';
 
-// The two content resolutions are the only functions here: identity lookup is
-// reached through `space.lookup`, which the Space carries.
-export { resolveContentResource, resolveResourceContent } from './lookup';
-export type { OwnedGraph, ResolvedContentResource, ResolvedMap, SpaceLookup } from './lookup';
+// Content resolution is the only function here: identity lookup is reached
+// through `space.lookup`, which the Space carries.
+export { resolveResourceContent } from './lookup';
+export type { OwnedGraph, ResolvedMap, SpaceLookup } from './lookup';
 
 export { initializeSpace, newGraph, newSpace } from './new-space';
 export type { InitializeSpaceOptions, NewSpace } from './new-space';

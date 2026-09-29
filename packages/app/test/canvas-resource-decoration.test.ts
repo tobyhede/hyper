@@ -53,7 +53,6 @@ const projectionNode = (
     open,
     active: false,
     selectedForAuthoring: false,
-    showContent: false,
     display: fixtureDisplay(open, kind),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
@@ -115,7 +114,6 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
     expect(patch.onBeginBodyEditing).toBeUndefined();
-    expect(patch.bodyEditor).toBeUndefined();
     expect(patch.spaceRail).toBeUndefined();
   });
 
@@ -253,19 +251,6 @@ describe('decorateMarkdownResourceNode', () => {
     ).toBeUndefined();
   });
 
-  it('installs the body editor only on the Resource whose caret is live', () => {
-    expect(
-      decorateMarkdownResourceNode(
-        projectionNode(RESOURCE_ID, 'markdown', true),
-        context({ bodyEditorResourceId: RESOURCE_ID }),
-      ).bodyEditor,
-    ).toBeDefined();
-    expect(
-      decorateMarkdownResourceNode(projectionNode(RESOURCE_ID, 'markdown', true), context())
-        .bodyEditor,
-    ).toBeUndefined();
-  });
-
   it('enters the editing display, focused, on an Open Resource whose caret is live', () => {
     const markdown = projectionNode(RESOURCE_ID, 'markdown', true);
     const patch = decorateMarkdownResourceNode(
@@ -299,7 +284,6 @@ describe('decorateImageResourceNode', () => {
       data: {
         ...node.data,
         kind: 'image',
-        imageUrl: IMAGE_URL,
         display: open
           ? { shown: 'open', content: { kind: 'image', url: IMAGE_URL, via: 'self' } }
           : node.data.display,

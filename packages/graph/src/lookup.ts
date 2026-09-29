@@ -62,37 +62,6 @@ export interface SpaceLookup {
   graph(id: GraphId): OwnedGraph | undefined;
 }
 
-/**
- * A Resource that supplies Markdown, an image or a Space view, after resolving a
- * Reference Resource.
- */
-export type ResolvedContentResource = Extract<Resource, { kind: 'markdown' | 'image' | 'space' }>;
-
-const suppliesContent = (resource: Resource | undefined): resource is ResolvedContentResource =>
-  resource?.kind === 'markdown' || resource?.kind === 'image' || resource?.kind === 'space';
-
-/**
- * The Resource whose content `resourceId` shows. Markdown, Image and Space Resources
- * resolve to themselves; a reference resource resolves to its target (ADR 0009). Referencing is a single hop —
- * validation guarantees a target is never itself a reference resource — so this follows at
- * most one link. Returns `undefined` if the resource or its target does not resolve.
- *
- * A domain operation rather than an identity lookup, which is why it stays a
- * function beside `SpaceLookup` rather than becoming a fourth method on it: what
- * it answers is *content*, and the hop it follows is Reference Resource semantics.
- */
-export function resolveContentResource(
-  space: Space,
-  resourceId: ResourceId,
-): ResolvedContentResource | undefined {
-  const resource = space.lookup.resource(resourceId);
-  if (suppliesContent(resource)) return resource;
-  if (resource?.kind !== 'reference') return undefined;
-
-  const target = space.lookup.resource(resource.target);
-  return suppliesContent(target) ? target : undefined;
-}
-
 /** A Resource that owns its content: every kind but a Reference Resource. */
 type ContentOwner = Exclude<Resource, { kind: 'reference' }>;
 

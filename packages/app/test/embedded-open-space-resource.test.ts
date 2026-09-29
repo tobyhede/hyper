@@ -88,7 +88,6 @@ const openSpaceResource = (
     open: geometry.open ?? true,
     active: false,
     selectedForAuthoring: false,
-    showContent: false,
     display: spaceDisplay(geometry.open ?? true, geometry.kind ?? 'space', target),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
@@ -291,7 +290,6 @@ describe('embedded open Space Resource discovery', () => {
         open: false,
         active: false,
         selectedForAuthoring: false,
-        showContent: false,
         display: fixtureDisplay(false, 'markdown'),
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
@@ -370,7 +368,6 @@ describe('embedded open Space Resource discovery', () => {
         open: true,
         active: false,
         selectedForAuthoring: false,
-        showContent: false,
         display: fixtureDisplay(true, 'markdown'),
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
@@ -425,7 +422,7 @@ describe('the body height an embedding is clipped by', () => {
     expect(
       reportsBodyHeight({
         ...node,
-        data: { ...node.data, kind: 'image', imageUrl: 'https://example.test/a.png' },
+        data: { ...node.data, kind: 'image' },
       }),
     ).toBe(false);
   });

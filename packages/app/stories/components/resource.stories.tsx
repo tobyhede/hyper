@@ -405,7 +405,7 @@ export const OpenAndClose: Story = () => {
         <CanvasResourceNodeSpecimen
           open={open}
           onOpenChange={changeOpen}
-          body={openMarkdown}
+          content={{ kind: 'markdown', source: openMarkdown, via: 'self' }}
           nodeSize={open ? openFrame : closedFrame}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -418,7 +418,11 @@ export const OpenAndClose: Story = () => {
           open={longOpen}
           onOpenChange={changeLongOpen}
           title="Long Markdown"
-          body={`${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`}
+          content={{
+            kind: 'markdown',
+            source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
+            via: 'self',
+          }}
           nodeSize={longOpen ? openFrame : closedFrame}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -440,7 +444,11 @@ export const OpenReference: Story = () => {
         resourceId={resourceIds.openingReference}
         open={open}
         onOpenChange={changeOpen}
-        body={'## Strategies\n\nNo strategy is privileged.'}
+        content={{
+          kind: 'markdown',
+          source: '## Strategies\n\nNo strategy is privileged.',
+          via: 'reference',
+        }}
         nodeSize={open ? openFrame : closedFrame}
         stageClassName="inv-resource-node-stage--large"
       />
@@ -474,7 +482,7 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Harbour"
           kind="image"
-          imageUrl={harbour}
+          content={{ kind: 'image', url: harbour, via: 'self' }}
           open={open}
           onOpenChange={changeOpen}
           nodeSize={open ? firstOpen : closedFrame}
@@ -487,7 +495,7 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Harbour, larger"
           kind="image"
-          imageUrl={harbour}
+          content={{ kind: 'image', url: harbour, via: 'self' }}
           open
           nodeSize={{ width: 600, height: 440 }}
           zoom={1}
@@ -499,7 +507,7 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Missing"
           kind="image"
-          imageUrl="/images/missing-picture.png"
+          content={{ kind: 'image', url: '/images/missing-picture.png', via: 'self' }}
           open
           nodeSize={firstOpen}
           zoom={1}

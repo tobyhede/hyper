@@ -17,7 +17,6 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
       kind: 'markdown',
       active: false,
       selectedForAuthoring: false,
-      showContent: false,
       display: CLOSED_DISPLAY,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',

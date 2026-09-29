@@ -193,8 +193,8 @@ describe('canvasProjection', () => {
     expect(byId[RESOURCE_A]?.active).toBe(true);
     expect(byId[RESOURCE_B]?.selectedForAuthoring).toBe(true);
     // Presenting draws the Active Resource's content, and only that Resource's (ADR 0027).
-    expect(byId[RESOURCE_A]?.showContent).toBe(true);
-    expect(byId[RESOURCE_B]?.showContent).toBe(false);
+    expect(byId[RESOURCE_A]?.display.shown).toBe('presented');
+    expect(byId[RESOURCE_B]?.display.shown).toBe('closed');
   });
 
   it('draws every Graph a selected Map owns', async () => {

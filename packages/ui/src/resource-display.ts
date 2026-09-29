@@ -54,7 +54,7 @@ export const CLOSED_DISPLAY: Extract<ResourceDisplay, { readonly shown: 'closed'
 export function beginEditing<D extends ResourceDisplay>(
   display: D,
   editor: MarkdownResourceBodyEditor,
-  autoFocus = false,
+  autoFocus: boolean,
 ): D | Extract<ResourceDisplay, { readonly shown: 'editing' }> {
   if (display.shown !== 'open') return display;
   const content = display.content;

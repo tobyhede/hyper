@@ -44,7 +44,7 @@ const shown: fc.Arbitrary<ResourceDisplay> = fc.oneof(
 /** Every display, including the two only the helpers make. */
 const display: fc.Arbitrary<ResourceDisplay> = fc.oneof(
   shown,
-  shown.map((value) => beginEditing(value, editor)),
+  fc.tuple(shown, fc.boolean()).map(([value, autoFocus]) => beginEditing(value, editor, autoFocus)),
   shown.map((value) => beginReplacing(value, replacer)),
 );
 
@@ -64,14 +64,6 @@ describe('the display states only a Resource’s own content enters', () => {
         expect(atRest(editing)).toEqual(value);
       }),
     );
-  });
-
-  it('does not focus a new editor unless asked to', () => {
-    const open: ResourceDisplay = {
-      shown: 'open',
-      content: { kind: 'markdown', source: '', via: 'self' },
-    };
-    expect(beginEditing(open, editor)).toMatchObject({ shown: 'editing', autoFocus: false });
   });
 
   it('begins replacing only an Open own image, and returns to it at rest', () => {

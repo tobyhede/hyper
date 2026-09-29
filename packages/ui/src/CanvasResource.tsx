@@ -358,7 +358,7 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const [contentEdit, setContentEdit] = useState<ResourceContentEdit | null>(null);
   const visibleContentEdit = readOnly ? null : contentEdit;
-  const imageReplacer =
+  const runningReplacer =
     contentAuthoring && display.shown === 'replacing' ? display.replacer : undefined;
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
@@ -415,9 +415,9 @@ export function CanvasResource(props: CanvasResourceProps) {
           </ResourceContentEditProvider>
         );
       case 'image':
-        return imageReplacer !== undefined ? (
+        return runningReplacer !== undefined ? (
           <ResourceContentEditProvider value={setContentEdit}>
-            <ImageReplaceTarget name={name} editor={imageReplacer} />
+            <ImageReplaceTarget name={name} editor={runningReplacer} />
           </ResourceContentEditProvider>
         ) : (
           <ResourceImage

@@ -105,11 +105,9 @@ const node = (
     title: 'A',
     readOnly: false,
     kind,
-    body: 'A source',
     open,
     active: false,
     selectedForAuthoring: false,
-    showContent: false,
     display: fixtureDisplay(open, kind, 'A source'),
     activeGraphId: GRAPH_ID,
     activeGraphColor: '#8a94a6',
@@ -183,7 +181,7 @@ describe('canvas Resource authoring', () => {
     const { result, rerender, spaceSession } = mountAuthoring();
 
     const closed = onlyNode(result.current.nodes);
-    expect(closed.data.bodyEditor).toBeUndefined();
+    expect(closed.data.display.shown).not.toBe('editing');
 
     act(() => {
       expect(closed.data.onEditResource?.(true)).toBe('completed');
@@ -192,7 +190,7 @@ describe('canvas Resource authoring', () => {
     expect(spaceSession.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]?.open).toBe(
       true,
     );
-    expect(result.current.nodes[0]?.data.bodyEditor).toBeUndefined();
+    expect(result.current.nodes[0]?.data.display.shown).not.toBe('editing');
 
     rerender({
       open: true,
@@ -201,7 +199,7 @@ describe('canvas Resource authoring', () => {
       nameOnCreation: null,
       resourceId: RESOURCE_ID,
     });
-    expect(result.current.nodes[0]?.data.bodyEditor).toBeDefined();
+    expect(result.current.nodes[0]?.data.display.shown).toBe('editing');
   });
 
   it('authors Open for a Reference Resource through the same Resource operation', () => {
@@ -235,7 +233,7 @@ describe('canvas Resource authoring', () => {
     expect(reference.data.onEditResource).toBeDefined();
     expect(reference.data.onBeginTitleEditing).toBeDefined();
     expect(reference.data.onBeginBodyEditing).toBeUndefined();
-    expect(reference.data.bodyEditor).toBeUndefined();
+    expect(reference.data.display.shown).not.toBe('editing');
   });
 
   /**
@@ -312,7 +310,7 @@ describe('canvas Resource authoring', () => {
     });
 
     const withdrawn = onlyNode(result.current.nodes);
-    expect(withdrawn.data.bodyEditor).toBeDefined();
+    expect(withdrawn.data.display.shown).toBe('editing');
     expect(withdrawn.data.resize).toBeUndefined();
   });
 
@@ -342,7 +340,7 @@ describe('canvas Resource authoring', () => {
       resourceId: RESOURCE_ID,
     });
     act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
-    expect(onlyNode(result.current.nodes).data.bodyEditor).toBeDefined();
+    expect(onlyNode(result.current.nodes).data.display.shown).toBe('editing');
 
     rerender({
       open: true,
@@ -351,7 +349,7 @@ describe('canvas Resource authoring', () => {
       nameOnCreation: null,
       resourceId: RESOURCE_ID,
     });
-    expect(onlyNode(result.current.nodes).data.bodyEditor).toBeUndefined();
+    expect(onlyNode(result.current.nodes).data.display.shown).not.toBe('editing');
 
     rerender({
       open: true,
@@ -360,7 +358,7 @@ describe('canvas Resource authoring', () => {
       nameOnCreation: null,
       resourceId: RESOURCE_ID,
     });
-    expect(onlyNode(result.current.nodes).data.bodyEditor).toBeDefined();
+    expect(onlyNode(result.current.nodes).data.display.shown).toBe('editing');
   });
 
   /**
@@ -448,7 +446,7 @@ describe('canvas Resource authoring', () => {
       expect(missing.data.onBeginBodyEditing).toBeUndefined();
       expect(missing.data.resize).toBeUndefined();
       expect(missing.data.titleEditor).toBeUndefined();
-      expect(missing.data.bodyEditor).toBeUndefined();
+      expect(missing.data.display.shown).not.toBe('editing');
     },
   );
 
@@ -491,7 +489,7 @@ describe('canvas Resource authoring', () => {
       resourceId: RESOURCE_ID,
     });
 
-    expect(onlyNode(result.current.nodes).data.bodyEditor).toBeUndefined();
+    expect(onlyNode(result.current.nodes).data.display.shown).not.toBe('editing');
     expect(bodyEditingChanged).toHaveBeenLastCalledWith(false);
   });
 
@@ -774,16 +772,17 @@ describe('canvas Resource authoring, replacing an image', () => {
       title: 'Figure',
       readOnly: false,
       kind: 'image',
-      imageUrl: OLD_URL,
       open: true,
       active: false,
       selectedForAuthoring: false,
-      showContent: false,
       display: { shown: 'open', content: { kind: 'image', url: OLD_URL, via: 'self' } },
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
     },
   };
+  /** The replacer an Image Resource's `replacing` display carries, absent at rest. */
+  const replacerOf = (drawn: ResourceFlowNode) =>
+    drawn.data.display.shown === 'replacing' ? drawn.data.display.replacer : undefined;
   const mountImage = (reportObserverError = vi.fn(), measurementFails = false) => {
     const loaded = { snapshot: withImage, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
@@ -826,10 +825,10 @@ describe('canvas Resource authoring, replacing an image', () => {
   it('installs the upload target when Replace begins on an Open Image Resource', () => {
     const { result } = mountImage();
 
-    expect(onlyNode(result.current.nodes).data.imageReplacer).toBeUndefined();
+    expect(replacerOf(onlyNode(result.current.nodes))).toBeUndefined();
     act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
 
-    expect(onlyNode(result.current.nodes).data.imageReplacer).toBeDefined();
+    expect(replacerOf(onlyNode(result.current.nodes))).toBeDefined();
     expect(result.current.bodyEditing).toBe(true);
   });
 
@@ -839,7 +838,7 @@ describe('canvas Resource authoring, replacing an image', () => {
     });
     const { result, spaceSession } = mountImage(report);
     act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
-    const replacer = onlyNode(result.current.nodes).data.imageReplacer;
+    const replacer = replacerOf(onlyNode(result.current.nodes));
     const before = spaceSession.getState().working;
     await act(async () => {
       await expect(
@@ -861,7 +860,7 @@ describe('canvas Resource authoring, replacing an image', () => {
     const before = spaceSession.getState().working;
     await act(async () => {
       await expect(
-        onlyNode(result.current.nodes).data.imageReplacer?.onReplace({
+        replacerOf(onlyNode(result.current.nodes))?.onReplace({
           kind: 'url',
           url: 'https://example.com/new.png',
         }),
@@ -881,7 +880,7 @@ describe('canvas Resource authoring, replacing an image', () => {
 
     await act(async () => {
       await expect(
-        onlyNode(result.current.nodes).data.imageReplacer?.onReplace({
+        replacerOf(onlyNode(result.current.nodes))?.onReplace({
           kind: 'url',
           url: 'https://example.com/new.png',
         }),
@@ -898,7 +897,7 @@ describe('canvas Resource authoring, replacing an image', () => {
   it('replaces the image from the target in one Edit, and says a refusal in the application’s words', async () => {
     const { result, spaceSession } = mountImage();
     act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
-    const replacer = onlyNode(result.current.nodes).data.imageReplacer;
+    const replacer = replacerOf(onlyNode(result.current.nodes));
 
     let refused: string | null | undefined;
     let replaced: string | null | undefined;
@@ -915,6 +914,6 @@ describe('canvas Resource authoring, replacing an image', () => {
       url: 'https://example.com/new.png',
     });
     act(() => replacer?.onEnd());
-    expect(onlyNode(result.current.nodes).data.imageReplacer).toBeUndefined();
+    expect(replacerOf(onlyNode(result.current.nodes))).toBeUndefined();
   });
 });

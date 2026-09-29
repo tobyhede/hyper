@@ -9,10 +9,11 @@ import {
   type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
-import type { ResourceId, GraphId, MapId } from '@project/core';
+import type { ResourceContent, ResourceId, GraphId, MapId } from '@project/core';
 import {
   Placement,
   positionedStrategy,
+  resolveResourceContent,
   type LayoutStrategyGraph,
   type Space,
 } from '@project/graph';
@@ -407,20 +408,27 @@ interface CanvasResourceNodeSpecimenBaseProps {
   readonly stageClassName?: string;
   readonly zoom?: number | undefined;
   readonly title?: string;
-  readonly body?: string;
+  /**
+   * What the specimen draws while Open. Omitted, it draws the fixture
+   * Resource's own resolved content.
+   */
+  readonly content?: ResourceContent;
   readonly readOnly?: boolean;
   /** Whether the specimen can be moved by a pointer; see {@link StoryCanvasProps.draggable}. */
   readonly draggable?: boolean;
 }
 
 /**
- * The fixture Resource keeps its own kind, or is drawn as an Image Resource
- * showing `imageUrl`, as the projection hands `ResourceNode` one.
+ * The fixture Resource keeps its own kind, or is drawn as an Image Resource,
+ * whose Open content is then its own image.
  */
 export type CanvasResourceNodeSpecimenProps = CanvasResourceNodeSpecimenBaseProps &
   (
-    | { readonly kind?: undefined; readonly imageUrl?: never }
-    | { readonly kind: 'image'; readonly imageUrl: string }
+    | { readonly kind?: undefined }
+    | {
+        readonly kind: 'image';
+        readonly content: Extract<ResourceContent, { readonly kind: 'image' }>;
+      }
   );
 
 /**
@@ -440,9 +448,8 @@ export function CanvasResourceNodeSpecimen({
   stageClassName = '',
   zoom,
   title,
-  body,
   kind,
-  imageUrl,
+  content,
   readOnly = false,
   draggable = false,
 }: CanvasResourceNodeSpecimenProps) {
@@ -473,25 +480,9 @@ export function CanvasResourceNodeSpecimen({
   if (openOperationEnabled) data.onEditResource = onOpenChange ?? (() => 'completed');
   if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
-  if (body !== undefined) data.body = body;
-  if (kind === 'image') {
-    data.kind = kind;
-    data.imageUrl = imageUrl;
-  }
-  // What the projection shows an Open fixture Resource: its own content, or a
-  // Reference Resource's Target Markdown.
+  if (kind === 'image') data.kind = kind;
   if (open === true) {
-    data.display = {
-      shown: 'open',
-      content:
-        kind === 'image'
-          ? { kind: 'image', url: imageUrl, via: 'self' }
-          : {
-              kind: 'markdown',
-              source: body ?? '',
-              via: data.kind === 'reference' ? 'reference' : 'self',
-            },
-    };
+    data.display = { shown: 'open', content: content ?? resolveResourceContent(space, resource) };
   }
   // The editor is the state, so a specimen that asks to be renaming supplies
   // what ends the edit along with it.

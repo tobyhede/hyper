@@ -123,7 +123,6 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       kind: 'markdown',
       active: false,
       selectedForAuthoring: false,
-      showContent: false,
       display: CLOSED_DISPLAY,
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',

@@ -32,8 +32,6 @@ export type CanvasResourceDataPatch = Partial<
     | 'titleEditor'
     | 'entityActions'
     | 'onBeginBodyEditing'
-    | 'bodyEditor'
-    | 'imageReplacer'
     | 'display'
     | 'spaceRail'
     | 'contextNotice'
@@ -239,9 +237,7 @@ export function decorateMarkdownResourceNode(
   node: ResourceFlowNode,
   context: MarkdownResourceDecorationContext,
 ): CanvasResourceDataPatch {
-  const patch: Mutable<
-    Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'bodyEditor' | 'display'>>
-  > = {};
+  const patch: Mutable<Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'display'>>> = {};
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (
     resourceBelongsToWorkingSpace &&
@@ -260,7 +256,6 @@ export function decorateMarkdownResourceNode(
       onComplete: (body: string) => context.completeResourceBody(node.data.resourceId, body),
       onEnd: () => context.clearCaret(),
     };
-    patch.bodyEditor = editor;
     // The editor is drawn only once the display is Open with this Resource's
     // own Markdown: a caret that lands before the Open projection draws
     // nothing until it arrives. It takes focus, since the author just asked
@@ -282,9 +277,7 @@ export function decorateImageResourceNode(
 ): CanvasResourceDataPatch {
   const replace = context.replaceResourceImage;
   if (node.data.kind !== 'image' || replace === undefined) return {};
-  const patch: Mutable<
-    Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'imageReplacer' | 'display'>>
-  > = {};
+  const patch: Mutable<Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'display'>>> = {};
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginBodyEditing = () => context.beginBodyEditing(node);
@@ -296,7 +289,6 @@ export function decorateImageResourceNode(
       onReplace: (replacement: ImageReplacement) => replace(resourceId, replacement),
       onEnd: () => context.clearCaret(),
     };
-    patch.imageReplacer = replacer;
     const display = beginReplacing(node.data.display, replacer);
     if (display !== node.data.display) patch.display = display;
   }

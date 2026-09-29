@@ -58,7 +58,7 @@ const resourceNode = (
   title: string,
   id: typeof RESOURCE_ID = RESOURCE_ID,
   selected = false,
-  kind: Exclude<ResourceNodeData['kind'], 'image'> = 'markdown',
+  kind: ResourceNodeData['kind'] = 'markdown',
 ): ResourceFlowNode => ({
   id,
   type: 'resource',
@@ -73,7 +73,6 @@ const resourceNode = (
     kind,
     active: false,
     selectedForAuthoring: false,
-    showContent: false,
     display: CLOSED_DISPLAY,
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
@@ -456,7 +455,6 @@ describe('withdrawing canvas authoring from an Open Resource', () => {
   it('withdraws body editing and resize through the same complete gate', async () => {
     const opened = resourceNode('A', RESOURCE_ID, true);
     opened.data.open = true;
-    opened.data.body = '# A';
     opened.data.display = fixtureDisplay(true, 'markdown', '# A');
     const { view, setTitleEditing } = await mountGraph([opened]);
 
@@ -474,7 +472,6 @@ describe('withdrawing canvas authoring from an Open Resource', () => {
     async (key) => {
       const opened = resourceNode('A', RESOURCE_ID, true);
       opened.data.open = true;
-      opened.data.body = '# A';
       opened.data.display = fixtureDisplay(true, 'markdown', '# A');
       const { openResource } = await mountGraph([opened]);
       fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
@@ -609,7 +606,6 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('routes one resize lifecycle from the control to the canvas capability', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
-    opened.data.body = '# A';
     opened.data.display = fixtureDisplay(true, 'markdown', '# A');
     const onSelectResource = vi.fn();
     const resourceResize: ResourceResize = {

@@ -89,7 +89,6 @@ function resourceNode(): ResourceFlowNode {
       kind: 'markdown',
       active: false,
       selectedForAuthoring: false,
-      showContent: false,
       display: CLOSED_DISPLAY,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',
