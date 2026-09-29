@@ -10,7 +10,10 @@ import {
   createResource,
   openResource,
   presentControl,
+  resourceControls,
   selectedCanvas,
+  selectCanvas,
+  newMap,
   settled,
 } from './graph';
 import { expectPictureLoaded, HARBOUR_SIZE } from './image';
@@ -41,7 +44,7 @@ interface Pictures {
 async function openPictures(
   page: Page,
   { title = 'Figure', presentable = false }: Pictures = {},
-): Promise<void> {
+): Promise<UUID> {
   const seeded = await seedPositionedMap(
     page,
     'Pictures',
@@ -69,6 +72,7 @@ async function openPictures(
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(selectedCanvas(page)).toContainText('Pictures');
   await settled(page);
+  return seeded.snapshot.id;
 }
 
 /** Serve the tracked 400×300 picture at the Image Resource's URL. */
@@ -607,6 +611,402 @@ for (const refused of [
     expect(await storedImages(page, spaceId)).toEqual([]);
   });
 }
+
+/** The node an Image Resource is drawn in, and everything it offers. */
+async function imageControls(page: Page) {
+  const node = page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`);
+  return { node, controls: await resourceControls(page, node) };
+}
+
+test('Replace on a Closed Image Resource opens it on the upload target, and Cancel restores the picture with no Edit', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  await openPictures(page);
+  const { node, controls } = await imageControls(page);
+  const commits: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/spaces') {
+      commits.push(request.url());
+    }
+  });
+
+  await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
+
+  const resource = node.getByRole('article', { name: 'Figure' });
+  await expect(resource).toHaveAttribute('data-open', 'true');
+  const target = resource.getByRole('group', { name: 'Replace image of Figure' });
+  await expect(target).toBeVisible();
+  await expect(target.getByRole('button', { name: 'Upload' })).toBeFocused();
+  await expect(target.getByRole('textbox', { name: 'Image URL' })).toBeVisible();
+  await expect(
+    controls.getByRole('button', { name: 'Replace image of Resource Figure' }),
+  ).toHaveCount(0);
+  await expect(controls.getByRole('button', { name: 'Close Resource Figure' })).toBeDisabled();
+  // Opening was the one Edit; the target itself is not one.
+  await expect.poll(() => commits.length).toBe(1);
+
+  await controls.getByRole('button', { name: 'Cancel editing Resource Figure' }).click();
+  await expect(target).toHaveCount(0);
+  await expectPictureLoaded(resource.getByRole('img', { name: 'Figure' }), HARBOUR_SIZE.width);
+  await expect(
+    controls.getByRole('button', { name: 'Replace image of Resource Figure' }),
+  ).toBeFocused();
+
+  await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
+  await target.getByRole('textbox', { name: 'Image URL' }).press('Escape');
+  await expect(target).toHaveCount(0);
+  await settled(page);
+  expect(commits).toHaveLength(1);
+});
+
+/** The stored Space holding the seeded Image Resource, and where its document now points. */
+async function storedFigure(page: Page, spaceId: UUID) {
+  const response = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(response.ok()).toBe(true);
+  const loaded = decodeLoadedSpace(await response.json());
+  const figure = loaded.snapshot.resources.find(({ id }) => id === IMAGE_ID)?.document;
+  return { revision: loaded.revision, figure, maps: loaded.snapshot.document.maps };
+}
+
+/** Commits the browser sends, counted from when this is called. */
+function countCommits(page: Page) {
+  let commits = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/spaces') {
+      commits += 1;
+    }
+  });
+  return { count: () => commits };
+}
+
+/** Open the Image Resource and begin replacing its image, answering the upload target. */
+async function beginReplacing(page: Page) {
+  const { node, controls } = await imageControls(page);
+  await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
+  const resource = node.getByRole('article', { name: 'Figure' });
+  const target = resource.getByRole('group', { name: 'Replace image of Figure' });
+  await expect(target).toBeVisible();
+  await settled(page);
+  return { resource, target, controls };
+}
+
+test(
+  'uploading a file replaces the image with the stored one in one Edit, keeping the Resource',
+  { tag: '@parity:image-resource-replace-from-the-upload-target' },
+  async ({ page }) => {
+    await serveFigure(page);
+    const spaceId = await openPictures(page);
+    const { resource, target } = await beginReplacing(page);
+    const before = await storedFigure(page, spaceId);
+    await pane(page).click({ position: { x: 20, y: 200 } });
+    await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'Cancel editing Resource Figure' }),
+    ).toBeVisible();
+    const commits = countCommits(page);
+
+    const chooser = page.waitForEvent('filechooser');
+    await target.getByRole('button', { name: 'Upload' }).click();
+    await (
+      await chooser
+    ).setFiles({
+      name: FIRST_PICTURE.name,
+      mimeType: 'image/png',
+      buffer: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+    });
+
+    await expect(target).toHaveCount(0);
+    const picture = resource.getByRole('img', { name: 'Figure' });
+    await expect(picture).toHaveAttribute('src', /^\/images\/[A-Za-z0-9_-]{43}$/u);
+    await expectPictureLoaded(picture, FIRST_PICTURE.size.width);
+    await settled(page);
+    const after = await storedFigure(page, spaceId);
+    expect(after.figure).toEqual({
+      title: 'Figure',
+      kind: 'image',
+      url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
+      naturalSize: FIRST_PICTURE.size,
+    });
+    // Placement, Open Size and Edges are the Map's, and the Map is untouched.
+    expect(after.maps).toEqual(before.maps);
+    // V1 has no Undo; one commit over the revision holding the old URL is the
+    // one Edit an Undo would reverse.
+    expect(commits.count()).toBe(1);
+    expect(after.revision).toBe(before.revision + 1n);
+  },
+);
+
+test(
+  'dropping an image on the upload target replaces the image, and a dropped non-image is refused there',
+  { tag: '@parity:image-resource-replace-refuses-in-the-target' },
+  async ({ page }) => {
+    await serveFigure(page);
+    const spaceId = await openPictures(page);
+    const { resource, target } = await beginReplacing(page);
+    const before = await storedFigure(page, spaceId);
+
+    const drop = (...files: { name: string; type: string; base64: string }[]) =>
+      target.evaluate((element, dropped) => {
+        const transfer = new DataTransfer();
+        for (const { name, type, base64 } of dropped) {
+          const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+          transfer.items.add(new File([bytes], name, { type }));
+        }
+        const init = { dataTransfer: transfer, bubbles: true, cancelable: true };
+        const over = new DragEvent('dragover', init);
+        element.dispatchEvent(over);
+        element.dispatchEvent(new DragEvent('drop', init));
+        return over.defaultPrevented;
+      }, files);
+
+    await drop(
+      { name: 'one.png', type: 'image/png', base64: FIRST_PICTURE.base64 },
+      { name: 'two.png', type: 'image/png', base64: FIRST_PICTURE.base64 },
+    );
+    await expect(target.getByRole('alert')).toHaveText('Use one image at a time.');
+    expect((await storedFigure(page, spaceId)).revision).toBe(before.revision);
+
+    expect(
+      await drop({ name: 'notes.txt', type: 'text/plain', base64: btoa('not a picture') }),
+    ).toBe(true);
+    await expect(target.getByRole('alert')).toHaveText(
+      'notes.txt is not a PNG, JPEG, WebP or GIF image.',
+    );
+    await expect(target).toBeVisible();
+    expect((await storedFigure(page, spaceId)).revision).toBe(before.revision);
+
+    await drop({ name: FIRST_PICTURE.name, type: 'image/png', base64: FIRST_PICTURE.base64 });
+    await expect(target).toHaveCount(0);
+    await expectPictureLoaded(
+      resource.getByRole('img', { name: 'Figure' }),
+      FIRST_PICTURE.size.width,
+    );
+    // The drop was the target's alone: the canvas created no Resource of its own.
+    await expect(page.locator('.react-flow__node:visible')).toHaveCount(2);
+  },
+);
+
+test('entering a new URL replaces the image in one Edit; a data: URL is refused and the same URL changes nothing', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  await page.route('https://example.com/new.png', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+    }),
+  );
+  const spaceId = await openPictures(page);
+  const { resource, target, controls } = await beginReplacing(page);
+  const before = await storedFigure(page, spaceId);
+  const field = target.getByRole('textbox', { name: 'Image URL' });
+
+  await field.fill('data:image/png;base64,AAAA');
+  await field.press('Enter');
+  await expect(target.getByRole('alert')).toHaveText(
+    'An image URL must start with https: or http:.',
+  );
+  await expect(target).toBeVisible();
+
+  await field.fill(FIGURE_URL);
+  await field.press('Enter');
+  await expect(target).toHaveCount(0);
+  await settled(page);
+  expect((await storedFigure(page, spaceId)).revision).toBe(before.revision);
+
+  const commits = countCommits(page);
+  await controls.getByRole('button', { name: 'Replace image of Resource Figure' }).click();
+  await field.fill('https://example.com/new.png');
+  await field.press('Enter');
+  await expect(target).toHaveCount(0);
+  await expect(resource.getByRole('img', { name: 'Figure' })).toHaveAttribute(
+    'src',
+    'https://example.com/new.png',
+  );
+  await settled(page);
+  expect((await storedFigure(page, spaceId)).figure).toEqual({
+    title: 'Figure',
+    kind: 'image',
+    url: 'https://example.com/new.png',
+    naturalSize: FIRST_PICTURE.size,
+  });
+  expect(commits.count()).toBe(1);
+});
+
+test(
+  'the failed-image state offers the same Replace',
+  { tag: '@parity:image-resource-failed-state-offers-replace' },
+  async ({ page }) => {
+    await page.route(FIGURE_URL, (route) => route.abort());
+    await openPictures(page);
+    const { node, controls } = await imageControls(page);
+    await openResource(node, 'Figure');
+    await pane(page).click({ position: { x: 20, y: 200 } });
+    await expect(node).not.toHaveClass(/selected/);
+    const resource = node.getByRole('article', { name: 'Figure' });
+    await expect(resource.getByText('Image did not load')).toBeVisible();
+
+    await resource.getByRole('button', { name: 'Replace image' }).click();
+
+    await expect(resource.getByRole('group', { name: 'Replace image of Figure' })).toBeVisible();
+    await expect(
+      controls.getByRole('button', { name: 'Cancel editing Resource Figure' }),
+    ).toBeVisible();
+    await controls.getByRole('button', { name: 'Cancel editing Resource Figure' }).click();
+    await expect(resource.getByText('Image did not load')).toBeVisible();
+  },
+);
+
+for (const failure of ['HTTP 500', 'network', 'timeout']) {
+  test(`a replacement upload recovers from ${failure} in its target`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await serveFigure(page);
+    const spaceId = await openPictures(page);
+    const { resource, target } = await beginReplacing(page);
+    const before = await storedFigure(page, spaceId);
+    if (failure === 'timeout') await page.clock.install();
+    await page.route('**/images', async (route) => {
+      if (failure === 'network') await route.abort('failed');
+      else if (failure === 'timeout') return;
+      else await route.fulfill({ status: 500, body: 'Unavailable' });
+    });
+    const upload = async () => {
+      const chooser = page.waitForEvent('filechooser');
+      await target.getByRole('button', { name: 'Upload' }).click();
+      await (
+        await chooser
+      ).setFiles({
+        name: FIRST_PICTURE.name,
+        mimeType: 'image/png',
+        buffer: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+      });
+    };
+    await upload();
+    if (failure === 'timeout') {
+      await expect(selectedCanvas(page)).toBeDisabled();
+      await page.clock.fastForward(120_000);
+    }
+    await expect(target.getByRole('alert')).toContainText('This image was not replaced:');
+    await expect(selectedCanvas(page)).toBeEnabled();
+    expect((await storedFigure(page, spaceId)).revision).toBe(before.revision);
+    expect(errors).toEqual([]);
+    await page.unroute('**/images');
+    await upload();
+    await expect(target).toHaveCount(0);
+    await expectPictureLoaded(
+      resource.getByRole('img', { name: 'Figure' }),
+      FIRST_PICTURE.size.width,
+    );
+    expect(errors).toEqual([]);
+  });
+}
+
+test('the same URL retries a failed picture without an Edit', async ({ page }) => {
+  await page.route(FIGURE_URL, (route) => route.abort());
+  const spaceId = await openPictures(page);
+  const { node } = await imageControls(page);
+  await openResource(node, 'Figure');
+  const resource = node.getByRole('article', { name: 'Figure' });
+  await expect(resource.getByText('Image did not load')).toBeVisible();
+  await settled(page);
+  const before = await storedFigure(page, spaceId);
+  const commits = countCommits(page);
+  await page.unroute(FIGURE_URL);
+  await serveFigure(page);
+  await resource.getByRole('button', { name: 'Replace image' }).click();
+  const field = resource.getByRole('textbox', { name: 'Image URL' });
+  await field.fill(FIGURE_URL);
+  await field.press('Enter');
+  // The URL already held is answered `unchanged`, which ends the target; the
+  // picture mounted in its place loads afresh. A refusal would keep the target
+  // up, and an Edit would move the revision.
+  await expect(resource.getByRole('group', { name: 'Replace image of Figure' })).toHaveCount(0);
+  await expectPictureLoaded(resource.getByRole('img', { name: 'Figure' }), HARBOUR_SIZE.width);
+  expect((await storedFigure(page, spaceId)).revision).toBe(before.revision);
+  expect(commits.count()).toBe(0);
+});
+
+test(
+  'a replacement in flight holds the target up and shows its answer there',
+  { tag: '@parity:image-resource-replace-holds-navigation' },
+  async ({ page }) => {
+    await serveFigure(page);
+    await openPictures(page);
+    await newMap(page);
+    const mapName = page.getByRole('textbox', { name: 'Map name' });
+    await mapName.fill('Elsewhere');
+    await mapName.press('Enter');
+    await selectCanvas(page, 'Pictures');
+    await selectCanvas(page, 'Elsewhere');
+    const previousUrl = page.url();
+    await selectCanvas(page, 'Pictures');
+    const heldUrl = page.url();
+    const { target, controls } = await beginReplacing(page);
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // The host's image collection, which a chosen file is sent to.
+    await page.route(
+      (url) => url.pathname === '/images',
+      async (route) => {
+        await held;
+        await route.continue();
+      },
+    );
+
+    const chooser = page.waitForEvent('filechooser');
+    await target.getByRole('button', { name: 'Upload' }).click();
+    await (
+      await chooser
+    ).setFiles({
+      // Declared a PNG, so it is sent, and refused by the host from its bytes.
+      name: 'fake.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('not a picture'),
+    });
+
+    const cancel = controls.getByRole('button', { name: 'Cancel editing Resource Figure' });
+    await expect(cancel).toBeDisabled();
+    await expect(target.getByRole('button', { name: 'Upload' })).toBeDisabled();
+    await expect(target.getByRole('textbox', { name: 'Image URL' })).toBeDisabled();
+    await expect(target).toHaveAttribute('aria-busy', 'true');
+    await expect(selectedCanvas(page)).toBeDisabled();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          let pops = 0;
+          const arrived = () => {
+            if (++pops === 2) {
+              window.removeEventListener('popstate', arrived);
+              resolve();
+            }
+          };
+          window.addEventListener('popstate', arrived);
+          window.history.back();
+        }),
+    );
+    await expect(page).toHaveURL(heldUrl);
+    await expect(selectedCanvas(page)).toHaveText('Pictures');
+    await target.press('Escape');
+    await expect(target).toBeVisible();
+
+    release();
+    await expect(target.getByRole('alert')).toHaveText(
+      'fake.png is not a PNG, JPEG, WebP or GIF image.',
+    );
+    await expect(cancel).toBeEnabled();
+    await expect(selectedCanvas(page)).toBeEnabled();
+    await page.goBack();
+    await expect(page).toHaveURL(previousUrl);
+    await expect(selectedCanvas(page)).toHaveText('Elsewhere');
+    await page.goForward();
+    await expect(selectedCanvas(page)).toHaveText('Pictures');
+  },
+);
 
 /**
  * The tracked fixture's Image Resource shows a stored image the host seeded from

@@ -161,3 +161,27 @@ export const handRolledStyles = [
       'Viewport ownership: the app owns exactly one viewport and never scrolls the page, and the canvas notice is placed over the canvas without covering its controls. `AppShell` owns the chrome; this owns where it sits against a full-bleed canvas.',
   },
 ] as const;
+
+/**
+ * Interactive behaviour written by hand where no `@project/ui` component, shadcn
+ * registry item or Base UI primitive supplies it (`$shadcn-first-ui`, ADR 0047).
+ * Each entry is recorded before the behaviour is written, with the six answers
+ * the skill asks for.
+ */
+export const interactiveDeviations = [
+  {
+    subject: 'packages/ui/src/ImageReplaceTarget.tsx — dropping a file on the upload target',
+    existingHyperComponentConsidered:
+      '`Empty` (outline treatment) with `InputGroup`, `Button` and `ImageFilePicker`, which the target is composed of. None of them accepts a dropped file.',
+    shadcnOrBaseUiConsidered:
+      "shadcn's `empty-outline` and `empty-input-group` examples, which the target follows. The registry has no dropzone component and Base UI has no drop primitive.",
+    productRequirement:
+      "Image Resource ticket 05: while an Image Resource's image is being replaced, the whole content area is a drop target that accepts one image file.",
+    whyCompositionIsInsufficient:
+      'Accepting a drop is HTML drag-and-drop event handling, which no composed component exposes; a variant cannot add it.',
+    customBehaviour:
+      "`dragover` is accepted and `drop` is taken on the `Empty` itself, both stopped so the canvas's own image drop does not also create a Resource; the drop cursor refuses a drop while a replacement is busy; otherwise the dropped files are handed to the same replacement the Upload button starts, and the application refuses anything other than one image in its own words before storing it.",
+    tests:
+      '`packages/ui/test/ImageReplaceTarget.test.tsx` (a dropped file is handed on; the drop does not reach the canvas), `packages/app/ladle-e2e` and `packages/app/e2e/image-resource.spec.ts` (a dropped non-image is refused in the target).',
+  },
+] as const;

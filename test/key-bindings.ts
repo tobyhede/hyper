@@ -42,6 +42,14 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'commit Markdown editing',
   },
   {
+    module: 'packages/ui/src/ImageReplaceTarget.tsx',
+    sourceKey: 'Escape',
+    occurrence: 1,
+    key: 'Escape',
+    surface: 'Image Resource upload target',
+    behaviour: 'cancel replacing the image',
+  },
+  {
     module: 'packages/ui/src/InlineTitleEditor.tsx',
     sourceKey: 'Enter',
     occurrence: 1,

@@ -240,6 +240,34 @@ export const parityClaims: readonly ParityClaim[] = [
       'An Open Image Resource whose picture does not load keeps its Title and draws the failed-image state naming the URL (ADR 0106).',
   },
   {
+    id: 'image-resource-replace-from-the-upload-target',
+    storyFile: 'space/replace-image.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "An Image Resource's toolbar offers Replace where a Markdown Resource offers Edit, opening a Closed one first; the content becomes an upload target — an outline Empty with Upload at its centre and a URL field beneath — Cancel replaces Replace and Close is unavailable, and a new URL or a chosen file replaces the picture in one Edit that keeps the Resource's Title (ADR 0106).",
+  },
+  {
+    id: 'image-resource-replace-holds-navigation',
+    storyFile: 'space/replace-image.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'While image replacement is pending, the target remains mounted and its inputs and Map navigation are unavailable; completion releases them.',
+  },
+  {
+    id: 'image-resource-replace-refuses-in-the-target',
+    storyFile: 'space/replace-image.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      'A refused replacement — a data: URL, a dropped file that is not an image, or more than one dropped image — is said in the upload target in the application’s words, and the target stays up with the picture unchanged (ADR 0106).',
+  },
+  {
+    id: 'image-resource-failed-state-offers-replace',
+    storyFile: 'space/replace-image.stories.tsx',
+    storyExport: 'Default',
+    claim:
+      "An Open Image Resource's failed-image state offers Replace even when unselected, showing the same upload target with Cancel visible (ADR 0106).",
+  },
+  {
     id: 'canvas-resource-shows-kind-treatment',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Kinds',
