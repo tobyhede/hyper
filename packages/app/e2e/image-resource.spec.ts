@@ -929,6 +929,34 @@ test('the same URL retries a failed picture without an Edit', async ({ page }) =
   expect(commits.count()).toBe(0);
 });
 
+/**
+ * Send a file from the upload target and hold the host's answer until the
+ * returned release is called, so the replacement stays in flight.
+ */
+async function uploadHeld(page: Page, target: Locator): Promise<() => void> {
+  const held = Promise.withResolvers<undefined>();
+  // The host's image collection, which a chosen file is sent to.
+  await page.route(
+    (url) => url.pathname === '/images',
+    async (route) => {
+      await held.promise;
+      await route.continue();
+    },
+  );
+  const chooser = page.waitForEvent('filechooser');
+  await target.getByRole('button', { name: 'Upload' }).click();
+  await (
+    await chooser
+  ).setFiles({
+    // Declared a PNG, so it is sent, and refused by the host from its bytes.
+    name: 'fake.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('not a picture'),
+  });
+  await expect(target).toHaveAttribute('aria-busy', 'true');
+  return () => held.resolve(undefined);
+}
+
 test(
   'a replacement in flight holds the target up and shows its answer there',
   { tag: '@parity:image-resource-replace-holds-navigation' },
@@ -945,29 +973,7 @@ test(
     await selectCanvas(page, 'Pictures');
     const heldUrl = page.url();
     const { target, controls } = await beginReplacing(page);
-    let release: () => void = () => undefined;
-    const held = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    // The host's image collection, which a chosen file is sent to.
-    await page.route(
-      (url) => url.pathname === '/images',
-      async (route) => {
-        await held;
-        await route.continue();
-      },
-    );
-
-    const chooser = page.waitForEvent('filechooser');
-    await target.getByRole('button', { name: 'Upload' }).click();
-    await (
-      await chooser
-    ).setFiles({
-      // Declared a PNG, so it is sent, and refused by the host from its bytes.
-      name: 'fake.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from('not a picture'),
-    });
+    const release = await uploadHeld(page, target);
 
     const cancel = controls.getByRole('button', { name: 'Cancel editing Resource Figure' });
     await expect(cancel).toBeDisabled();
@@ -1007,6 +1013,91 @@ test(
     await expect(selectedCanvas(page)).toHaveText('Pictures');
   },
 );
+
+/**
+ * Follow a fragment of the current location, answering whether the browser
+ * fired `popstate` for it; the spec fires `popstate` before `hashchange`.
+ */
+const followFragment = (page: Page, fragment: string) =>
+  page.evaluate(
+    (hash) =>
+      new Promise<boolean>((resolve) => {
+        let popped = false;
+        const heard = () => {
+          popped = true;
+        };
+        window.addEventListener('popstate', heard);
+        window.addEventListener(
+          'hashchange',
+          () => {
+            window.removeEventListener('popstate', heard);
+            resolve(popped);
+          },
+          { once: true },
+        );
+        window.location.hash = hash;
+      }),
+    fragment,
+  );
+
+/**
+ * Traverse by `delta`, answering a read of how many `popstate`s have arrived
+ * since and where the browser is. Each call counts on its own.
+ */
+async function traverseCounting(page: Page, delta: number) {
+  await page.evaluate((by) => {
+    const { dataset } = document.documentElement;
+    const token = String(Number(dataset['popToken'] ?? 0) + 1);
+    dataset['popToken'] = token;
+    dataset['pops'] = '0';
+    window.addEventListener('popstate', () => {
+      if (dataset['popToken'] === token) dataset['pops'] = String(Number(dataset['pops']) + 1);
+    });
+    window.history.go(by);
+  }, delta);
+  return () =>
+    page.evaluate(() => ({
+      pops: Number(document.documentElement.dataset['pops']),
+      url: window.location.href,
+    }));
+}
+
+test('a replacement in flight holds a Back and a Forward across a fragment link', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  await openPictures(page);
+  await newMap(page);
+  const mapName = page.getByRole('textbox', { name: 'Map name' });
+  await mapName.fill('Elsewhere');
+  await mapName.press('Enter');
+  await selectCanvas(page, 'Pictures');
+  await selectCanvas(page, 'Elsewhere');
+  await selectCanvas(page, 'Pictures');
+  const heldUrl = page.url();
+  const fragmentUrl = `${heldUrl}#figure`;
+  // A same-document entry the application did not write, arriving by `popstate`.
+  expect(await followFragment(page, 'figure')).toBe(true);
+  await expect(page).toHaveURL(fragmentUrl);
+  const { target } = await beginReplacing(page);
+  const release = await uploadHeld(page, target);
+
+  // Back across the fragment's entry, to the Elsewhere entry, returns to the fragment's.
+  const afterBack = await traverseCounting(page, -2);
+  await expect.poll(afterBack).toEqual({ pops: 2, url: fragmentUrl });
+  await expect(selectedCanvas(page)).toHaveText('Pictures');
+
+  release();
+  await expect(target.getByRole('alert')).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(heldUrl);
+  const releaseAgain = await uploadHeld(page, target);
+
+  // Forward onto the fragment's entry returns to the entry it left.
+  const afterForward = await traverseCounting(page, 1);
+  await expect.poll(afterForward).toEqual({ pops: 2, url: heldUrl });
+  releaseAgain();
+});
 
 /**
  * The tracked fixture's Image Resource shows a stored image the host seeded from

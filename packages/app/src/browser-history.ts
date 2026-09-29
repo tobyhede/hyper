@@ -49,18 +49,8 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
         returning = true;
         browser.history.go(from - at);
       };
-      const popped = (event: Pick<PopStateEvent, 'state'>): void => {
-        const position: unknown = event.state;
-        if (!isHistoryPosition(position)) {
-          void listener();
-          return;
-        }
-        const next = position.hyperHistoryIndex;
-        if (returning) {
-          if (next === index) returning = false;
-          else browser.history.go(index - next);
-          return;
-        }
+      /** Ask the listener about the arrival at the entry numbered `next`. */
+      const arrive = (next: number): void => {
         const from = index;
         const answer = listener();
         if (answer === false) {
@@ -81,6 +71,34 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
             hold(from, next);
           }
         });
+      };
+      /**
+       * An entry with no position is taken to be one a fragment navigation has
+       * just written: the browser writes it after the current entry and fires
+       * `popstate` as it arrives, so it is numbered and stamped here and then
+       * treated as any traversal. An entry written with no `popstate`, such as
+       * another script's `pushState`, cannot be counted: a rewind across it
+       * misses by one entry, a rewind that lands on it stops there, and a
+       * traversal to it is numbered as though it followed the entry left.
+       */
+      const popped = (event: Pick<PopStateEvent, 'state'>): void => {
+        const position: unknown = event.state;
+        if (!isHistoryPosition(position)) {
+          if (returning) {
+            returning = false;
+            return;
+          }
+          browser.history.replaceState({ hyperHistoryIndex: index + 1 }, '', browser.location.href);
+          arrive(index + 1);
+          return;
+        }
+        const next = position.hyperHistoryIndex;
+        if (returning) {
+          if (next === index) returning = false;
+          else browser.history.go(index - next);
+          return;
+        }
+        arrive(next);
       };
       browser.addEventListener('popstate', popped);
       return () => browser.removeEventListener('popstate', popped);

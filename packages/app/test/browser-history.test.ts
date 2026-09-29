@@ -71,11 +71,21 @@ const standInBrowser = (initial: { readonly path: string; readonly state?: unkno
     back: () => traversals.push(-1),
     forward: () => traversals.push(1),
     traverse: (delta: number) => traversals.push(delta),
-    /** A same-document entry this adapter did not write, such as a fragment link's. */
+    /** A same-document entry this adapter did not write, written without a `popstate`. */
     foreignPush: (path: string) => {
       entries.splice(current + 1);
       entries.push({ state: null, url: new URL(path, ORIGIN) });
       current += 1;
+    },
+    /**
+     * A fragment navigation: the browser writes an entry after the current one
+     * with no state, and fires `popstate` with that state as it arrives.
+     */
+    fragment: (path: string) => {
+      entries.splice(current + 1);
+      entries.push({ state: null, url: new URL(path, ORIGIN) });
+      current += 1;
+      for (const listener of [...listeners]) listener({ state: null });
     },
     settle: () => {
       for (let guard = 0; traversals.length > 0; guard += 1) {
@@ -224,24 +234,81 @@ describe('the native history adapter', () => {
     expect(history.pathname()).toBe('/a');
   });
 
-  it('asks the listener about an entry it did not write, and keeps its own index', () => {
+  it('asks the listener about a fragment navigation, and numbers its entry after the one it left', () => {
     const stand = standInBrowser({ path: '/a' });
     const history = createBrowserHistory(stand.browser);
     history.push('/b');
-    stand.foreignPush('/b#section');
     const heard: string[] = [];
     history.onPopState(() => {
-      heard.push(history.pathname());
+      heard.push(history.href());
       return undefined;
     });
+    stand.fragment('/b#section');
     stand.back();
     stand.settle();
     stand.forward();
     stand.settle();
-    expect(heard).toEqual(['/b', '/b']);
-    // The foreign entry carries no index, so the next push still follows /b's.
+    expect(heard).toEqual([`${ORIGIN}/b#section`, `${ORIGIN}/b`, `${ORIGIN}/b#section`]);
     history.push('/c');
-    expect(stand.entries.at(-1)?.state).toEqual(stamp(2));
+    expect(stand.entries.map(({ state, url }) => [state, url.pathname + url.hash])).toEqual([
+      [stamp(0), '/a'],
+      [stamp(1), '/b'],
+      [stamp(2), '/b#section'],
+      [stamp(3), '/c'],
+    ]);
+  });
+
+  it('rewinds a held Back across a fragment navigation to the fragment entry', () => {
+    const stand = standInBrowser({ path: '/a' });
+    const history = createBrowserHistory(stand.browser);
+    history.push('/b');
+    let hold = false;
+    history.onPopState(() => (hold ? false : undefined));
+    stand.fragment('/b#section');
+    hold = true;
+    stand.traverse(-2);
+    stand.settle();
+    expect(history.href()).toBe(`${ORIGIN}/b#section`);
+  });
+
+  it('rewinds a held Forward onto a fragment entry to the entry it left', () => {
+    const stand = standInBrowser({ path: '/a' });
+    const history = createBrowserHistory(stand.browser);
+    history.push('/b');
+    let hold = false;
+    history.onPopState(() => (hold ? false : undefined));
+    stand.fragment('/b#section');
+    stand.back();
+    stand.settle();
+    hold = true;
+    stand.forward();
+    stand.settle();
+    expect(history.href()).toBe(`${ORIGIN}/b`);
+    hold = false;
+    stand.forward();
+    stand.settle();
+    expect(history.href()).toBe(`${ORIGIN}/b#section`);
+  });
+
+  it('asks nothing of an unnumbered entry a rewind lands on, and asks about the next traversal', () => {
+    const stand = standInBrowser({ path: '/a' });
+    const history = createBrowserHistory(stand.browser);
+    history.push('/b');
+    // Written with no `popstate`, so the adapter cannot count it.
+    stand.foreignPush('/b#section');
+    history.push('/c');
+    let hold = true;
+    const heard: string[] = [];
+    history.onPopState(() => {
+      heard.push(history.href());
+      return hold ? false : undefined;
+    });
+    stand.traverse(-3);
+    stand.settle();
+    hold = false;
+    stand.forward();
+    stand.settle();
+    expect(heard).toEqual([`${ORIGIN}/a`, `${ORIGIN}/c`]);
   });
 
   it('stops listening when released', () => {
