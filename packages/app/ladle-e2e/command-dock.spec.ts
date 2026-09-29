@@ -1186,6 +1186,32 @@ test(
  * would otherwise land on top of the surface under test. Proven by driving real
  * catalogue navigation while the story owns its own viewport.
  */
+/**
+ * The Dock's menu buttons drawn unavailable (ADR 0073).
+ *
+ * A replacement is held for as long as the story is mounted, so each of the
+ * four menu buttons reports `aria-disabled` and a press opens no menu.
+ */
+test(
+  'a held replacement draws the Space, Map, Graph and Open Spaces menu buttons unavailable',
+  { tag: '@parity:command-dock-draws-its-menu-buttons-unavailable' },
+  async ({ page }) => {
+    await page.goto(story('replacing'));
+
+    const menuButtons = [
+      surface(page).getByTestId('space-title'),
+      surface(page).getByTestId('selected-canvas'),
+      surface(page).getByTestId('active-graph'),
+      surface(page).getByRole('button', { name: /^Spaces\./ }),
+    ];
+    for (const control of menuButtons) {
+      await expect(control).toHaveAttribute('aria-disabled', 'true');
+      await control.click({ force: true, delay: 120 });
+      await expect(page.getByRole('menu')).toHaveCount(0);
+    }
+  },
+);
+
 test('Command Dock stories are isolated from the Ladle catalogue', async ({ page }) => {
   await page.goto('/?story=space--command-dock--save-conflict');
 

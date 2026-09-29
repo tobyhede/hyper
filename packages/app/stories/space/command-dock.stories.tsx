@@ -57,6 +57,17 @@ NewSpace.meta = { iframed: true };
 export const Presenting: Story = () => <CommandDockFixture scenario="presenting" />;
 Presenting.meta = { iframed: true };
 
+/**
+ * An Image Resource's replacement in flight, held for as long as the story is
+ * mounted.
+ *
+ * A replacement is the application's exclusive operation, so the Dock's menu
+ * buttons — the Space, Map and Graph names and Open Spaces — are drawn
+ * unavailable, and none of them opens its menu.
+ */
+export const Replacing: Story = () => <CommandDockFixture scenario="replacing" />;
+Replacing.meta = { iframed: true };
+
 /** Container width is fixture furniture; the application's responsive behavior is unchanged. */
 export const Narrow: Story = () => (
   <div className="h-screen w-[390px] overflow-hidden">

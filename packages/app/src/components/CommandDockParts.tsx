@@ -69,6 +69,7 @@ export function IdentitySurface({
   testId,
   triggerTitle,
   onRename,
+  menuDisabled = false,
   children,
 }: {
   readonly icon: ReactNode;
@@ -92,6 +93,13 @@ export function IdentitySurface({
    * {@link DockSpace.onRename}).
    */
   readonly onRename: ((title: string) => string | null) | null;
+  /**
+   * Draw this identity's menu button unavailable: it reports `aria-disabled`,
+   * keeps its place in the Dock's arrow order and opens nothing (ADR 0073).
+   * `ToolbarButton` supplies that for a menu trigger given `disabled`, which
+   * `toolbar-menu-trigger.test.tsx` in `@project/ui` holds.
+   */
+  readonly menuDisabled?: boolean;
   readonly children: (disclosure: IdentityDisclosure) => ReactNode;
 }) {
   /**
@@ -244,6 +252,7 @@ export function IdentitySurface({
               className="nokey command-dock__disclose"
               aria-label={identityDisclosureName(kind, title)}
               title={triggerTitle}
+              disabled={menuDisabled}
               render={<ToolbarButton variant="ghost" size="icon" />}
             />,
           ),
@@ -266,6 +275,7 @@ export function IdentitySurface({
             title={triggerTitle}
             icon={icon}
             name={title}
+            disabled={menuDisabled}
             render={<ToolbarButton variant="ghost" size="compact" />}
           />,
         ),

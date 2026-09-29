@@ -743,15 +743,21 @@ export function CommandDock({
             `useDockDisclosure` — that, and not a convention each control keeps,
             is what makes at most one open. The hook says why the `Menubar` this
             obviously wants cannot be used inside Toolbars. */}
-          <SpacesControl space={chrome.space} side={side} vertical={vertical} />
+          <SpacesControl
+            space={chrome.space}
+            side={side}
+            vertical={vertical}
+            menuDisabled={disabled}
+          />
           <Divider orientation={divider} />
-          <MapControls canvas={chrome.canvas} side={side} />
+          <MapControls canvas={chrome.canvas} side={side} menuDisabled={disabled} />
           <Divider orientation={divider} />
           <GraphControls
             graph={chrome.graph}
             mapTitle={chrome.canvas.selected.title}
             side={side}
             vertical={vertical}
+            menuDisabled={disabled}
           />
           <Divider orientation={divider} />
           <ResourcesControl resources={chrome.resources} side={side} />
