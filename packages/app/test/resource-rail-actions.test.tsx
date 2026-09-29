@@ -321,6 +321,29 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
+   * A Resource no Map places has no toolbar to carry Delete from Space, so the
+   * Resources list — the one surface that still names it — offers it there.
+   */
+  it('deletes from the Resources list a Resource the Map no longer places', async () => {
+    const session = mount();
+
+    await selectResource('A');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove from Map' }));
+    await waitFor(() => {
+      expect(session.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]).toBeUndefined();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete A from Space' }));
+    const confirmation = await screen.findByRole('alertdialog', { name: 'Delete from Space A?' });
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete from Space' }));
+
+    await waitFor(() => expect(resourceIds(session)).toEqual([OTHER_RESOURCE_ID]));
+    await settled(session);
+  });
+
+  /**
    * Remove from Map reports on its own channel rather than Delete from
    * Space's, so a refused removal never reads "Resource not deleted" about a
    * Resource nobody is deleting.
