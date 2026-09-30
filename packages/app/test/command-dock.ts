@@ -247,3 +247,9 @@ export const exitSpaceItem = (spaceTitle: string): HTMLElement => {
   openSpaceMenu(spaceTitle);
   return screen.getByRole('menuitem', { name: 'Exit Space' });
 };
+
+/** Answer the delete confirmation a Delete command asked, with Delete. */
+export const confirmDeletion = (question: string): void => {
+  const confirmation = screen.getByRole('alertdialog', { name: question });
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }));
+};

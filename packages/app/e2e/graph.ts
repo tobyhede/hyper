@@ -374,6 +374,13 @@ export async function deleteActiveGraph(page: Page): Promise<void> {
   await menu.getByRole('menuitem', { name: `Delete ${title}` }).click();
 }
 
+/** Answer the delete confirmation standing over the page with Delete. */
+export async function confirmDeletion(page: Page, question: string): Promise<void> {
+  const confirmation = page.getByRole('alertdialog', { name: question });
+  await confirmation.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(confirmation).toHaveCount(0);
+}
+
 /** The Maps the Space offers, read from the one list that offers them. */
 export async function mapChoices(page: Page): Promise<Locator> {
   return (await mapMenu(page)).getByRole('menuitemradio');

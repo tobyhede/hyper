@@ -18,6 +18,7 @@ import {
   allPositions,
   authoringHandle,
   boxOf,
+  confirmDeletion,
   connectHandles,
   createResource,
   createResourceControl,
@@ -992,6 +993,7 @@ test(
     await expect(selectedCanvas(page)).toContainText('Workshop');
     const menu = await mapMenu(page);
     await menu.getByRole('menuitem', { name: 'Delete Workshop' }).click();
+    await confirmDeletion(page, 'Delete Workshop From Space?');
     await expect(selectedCanvas(page)).toContainText('Collection 1');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await expect(persistence).toHaveAttribute('data-revision', '3');
@@ -1756,6 +1758,37 @@ test(
     ).toHaveAttribute('aria-checked', 'true');
   },
 );
+
+test('Delete Map asks first, and Cancel or Escape keep the Map and return the caret', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+  const question = page.getByRole('alertdialog', { name: 'Delete Collection 1 From Space?' });
+
+  await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
+  await expect(question).toBeVisible();
+  await expect(question).toContainText(
+    'Permanently deletes the Map, its Graphs and their Edges. Its Resources stay in the Space.',
+  );
+  await question.getByRole('button', { name: 'Cancel' }).click();
+  await expect(question).toHaveCount(0);
+  await expect(selectedCanvas(page)).toBeFocused();
+
+  await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
+  await expect(question).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(question).toHaveCount(0);
+  await expect(selectedCanvas(page)).toBeFocused();
+  await expect(selectedCanvas(page)).toContainText('Collection 1');
+
+  await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
+  await confirmDeletion(page, 'Delete Collection 1 From Space?');
+  await expect(selectedCanvas(page)).not.toContainText('Collection 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  await expect(await mapChoices(page)).not.toContainText(['Collection 1']);
+});
 
 test(
   'Delete Graph removes the active Graph and withholds the last one',

@@ -25,7 +25,7 @@ import type {
 import { COPY_LINK_ACTION_ID, type EntityCommandId, type SpaceEntity } from './entity-actions';
 import { offered, renameDraftAnswer } from './authoring-commands';
 import { topLevelGraphAuthoringCommands } from './graph-authoring-commands';
-import { topLevelMapAuthoringCommands } from './map-authoring-commands';
+import { mapDeletionWords, topLevelMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces, RejectedExitConfirmation } from './open-spaces';
 import type { ResourcePlacementCommands } from './resource-placement';
 import type { ResourcesDisclosure } from './resources-disclosure';
@@ -322,10 +322,17 @@ export function useDockChrome(
         });
       }),
       didCreateMoveCaret: () => createMapMovedCaret.current,
-      // Deleting the drawing Map repoints every Space Resource that selected it
-      // and leaves the canvas on the survivor, which is its completion's move.
-      onDelete: offered(mapAuthoring.map(selectedMap.id).delete, (remove) => () => {
-        void commandOutcomes.run('map-delete', remove, { completionMovesMap: true });
+      // Asked first, through the delete confirmation. Deleting the drawing Map
+      // repoints every Space Resource that selected it and leaves the canvas on
+      // the survivor, which is its completion's move.
+      onDelete: offered(mapAuthoring.map(selectedMap.id).delete, (remove) => (focusFallback) => {
+        app.deleteConfirmation.arm({
+          ...mapDeletionWords(selectedMap),
+          run: async () => {
+            await commandOutcomes.run('map-delete', remove, { completionMovesMap: true });
+          },
+          focusFallback,
+        });
       }),
       onCopyLink: runEntityCommand({ kind: 'map', map: selectedMap }, COPY_LINK_ACTION_ID),
     },

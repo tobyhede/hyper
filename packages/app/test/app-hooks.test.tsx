@@ -615,7 +615,7 @@ describe('useUnsettledLeaveGuard', () => {
 
 describe('useDockChrome', () => {
   const chromeFor = (opened: OpenSpace, activeGraphId: DockChromeInput['activeGraphId']) => {
-    const space = derivationSpace();
+    const space = derivationSpace(opened.session.getState().working);
     const view = mapView(space, MAP_ID);
     const location = { chooseMap: vi.fn(), activateGraph: vi.fn() };
     const availability = authoringAvailability({
@@ -724,17 +724,44 @@ describe('useDockChrome', () => {
     expect(chrome?.canvas.didCreateMoveCaret()).toBe(false);
   });
 
-  it('deletes the drawing Map and leaves the survivor', async () => {
+  const mapIds = (opened: OpenSpace) =>
+    opened.session.getState().working.document.maps?.map(({ id }) => id);
+  const noFallback = () => null;
+
+  it('asks before deleting the drawing Map, naming it and what goes with it', () => {
     const opened = openDerivationSpace();
     const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
+    act(() => chrome?.canvas.onDelete?.(noFallback));
+    expect(opened.app.deleteConfirmation.getState().pending).toMatchObject({
+      subject: { kind: 'map', name: 'Map 1' },
+      from: 'Space',
+      description:
+        'Permanently deletes the Map, its Graphs and their Edges. Its Resources stay in the Space.',
+      focusFallback: noFallback,
+    });
+    expect(mapIds(opened)).toEqual([MAP_ID, OTHER_MAP_ID]);
+  });
+
+  it('deletes the drawing Map on Delete and leaves the survivor', async () => {
+    const opened = openDerivationSpace();
+    const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
+    act(() => chrome?.canvas.onDelete?.(noFallback));
     await act(async () => {
-      chrome?.canvas.onDelete?.();
+      opened.app.deleteConfirmation.confirm();
       await Promise.resolve();
     });
     await waitFor(() => {
-      expect(opened.session.getState().working.document.maps?.map(({ id }) => id)).toEqual([
-        OTHER_MAP_ID,
-      ]);
+      expect(mapIds(opened)).toEqual([OTHER_MAP_ID]);
     });
+    await waitFor(() => expect(opened.app.deleteConfirmation.getState().pending).toBeNull());
+  });
+
+  it('leaves the drawing Map standing when the question is cancelled', () => {
+    const opened = openDerivationSpace();
+    const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
+    act(() => chrome?.canvas.onDelete?.(noFallback));
+    act(() => opened.app.deleteConfirmation.cancel());
+    expect(opened.app.deleteConfirmation.getState().pending).toBeNull();
+    expect(mapIds(opened)).toEqual([MAP_ID, OTHER_MAP_ID]);
   });
 });

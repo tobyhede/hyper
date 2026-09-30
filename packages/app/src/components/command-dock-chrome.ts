@@ -14,6 +14,7 @@ import type {
   UUID,
 } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
+import type { FocusFallback } from '../delete-confirmation';
 import type { ExitOutcome } from '../dock-model';
 import type { MapMemberships } from '../map-memberships';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
@@ -272,7 +273,9 @@ export interface DockCanvas {
    */
   readonly didCreateMoveCaret: () => boolean;
   /**
-   * Delete the drawing Map, or `null` while Delete may not run.
+   * Ask to delete the drawing Map, or `null` while Delete may not run. The
+   * press arms the delete confirmation, naming where the caret goes if the
+   * row that pressed it has gone when the question closes.
    *
    * One field for the same reason as {@link DockCanvas.onCreate}. The answer
    * holds two rules, and neither is derivable here without restating it: the
@@ -281,7 +284,7 @@ export interface DockCanvas {
    * (`authoring-availability.ts`). A row that read only the first would press
    * cleanly, run nothing, and report nothing.
    */
-  readonly onDelete: (() => void) | null;
+  readonly onDelete: ((focusFallback: FocusFallback) => void) | null;
   /**
    * Copy the drawing Map's address — the one form a Map has.
    *

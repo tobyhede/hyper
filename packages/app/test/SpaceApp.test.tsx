@@ -34,6 +34,7 @@ import {
   newMap,
   openGraphMenu,
   openMapMenu,
+  confirmDeletion,
   presentControl,
   unavailable,
   waitUntilMapContinuationReady,
@@ -1343,6 +1344,7 @@ describe('Space app Resources list', () => {
 
     openMapMenu(title);
     fireEvent.click(await screen.findByRole('menuitem', { name: `Delete ${title}` }));
+    confirmDeletion(`Delete ${title} From Space?`);
 
     const notice = await screen.findByRole('button', { name: 'Dismiss: Map not deleted' });
     expect(screen.getByText('This Map is no longer part of the Space.')).toBeInTheDocument();
@@ -1492,6 +1494,8 @@ describe('Space app Resources list', () => {
     await waitUntilMapContinuationReady();
     openMapMenu('Workshop');
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Workshop' }));
+    expect(session.getState().working.document.maps).toHaveLength(2);
+    confirmDeletion('Delete Workshop From Space?');
     await waitFor(() => expect(session.getState().working.document.maps).toHaveLength(1));
     expect(session.getState().working.resources).toEqual(base.resources);
     expect(screen.getByTestId('selected-canvas')).toHaveTextContent('Map');

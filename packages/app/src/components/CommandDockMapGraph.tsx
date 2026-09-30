@@ -17,6 +17,7 @@ import {
 } from '@project/ui';
 import type { GraphId, MapId } from '@project/core';
 import { GRAPH_PALETTE_ENTRIES } from '@project/graph';
+import type { FocusFallback } from '../delete-confirmation';
 import type { MenuSide } from '../dock-placement';
 import { identityMenuRestoresFocusOnClose } from './identity-menu-focus-restore';
 import {
@@ -28,6 +29,17 @@ import {
 } from './command-dock-shared';
 import type { DockCanvas, DockGraph } from './command-dock-chrome';
 import { IdentitySurface } from './CommandDockParts';
+
+/**
+ * A Delete row's press, arming the delete confirmation with this cluster's
+ * disclosure as the caret's fallback: the row closes with its menu, so the
+ * control that disclosed it is where the answer returns.
+ */
+const askFromTrigger = (
+  ask: ((focusFallback: FocusFallback) => void) | null,
+  triggerId: string,
+): (() => void) | null =>
+  ask === null ? null : () => ask(() => document.getElementById(triggerId));
 
 /**
  * Map: `[name v]`. Graph: `[name v][>]`.
@@ -116,7 +128,7 @@ function MapIdentityMenu({
         renameItem={renameItem}
         onCreate={canvas.onCreate}
         onCopyLink={canvas.onCopyLink}
-        onDelete={canvas.onDelete}
+        onDelete={askFromTrigger(canvas.onDelete, triggerId)}
       />
     </ChoiceMenu>
   );
