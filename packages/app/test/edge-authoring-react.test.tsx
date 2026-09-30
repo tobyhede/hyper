@@ -350,6 +350,7 @@ function CanvasHarness({
       <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} />
       <SpaceCanvas
         commandOutcomes={commandOutcomes}
+        deleteConfirmation={deleteConfirmation}
         nodes={projection?.nodes ?? []}
         edges={projection?.edges ?? []}
         projectedNodes={null}

@@ -1,4 +1,4 @@
-import { drawnHeadShape, expectMenuGroups, resourceControls } from './graph';
+import { confirmDeletion, drawnHeadShape, expectMenuGroups, resourceControls } from './graph';
 import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
@@ -130,8 +130,30 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(
     (await resourceControls(page, resource)).getByTestId('space-resource-graph'),
   ).toHaveText('Graph 1');
+  // Delete asks first, in the Dock's words, and Cancel or Escape leave the
+  // Graph in place with the caret back on the rail.
+  const graphTrigger = (await resourceControls(page, resource)).getByTestId('space-resource-graph');
+  const graphQuestion = page.getByRole('alertdialog', {
+    name: 'Delete Graph 1 From Target context?',
+  });
   await openMenu('graph');
   await page.getByRole('menuitem', { name: 'Delete Graph 1', exact: true }).click();
+  await expect(graphQuestion).toContainText(
+    'Permanently deletes the Graph and all Edges from the Map.',
+  );
+  await graphQuestion.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(graphQuestion).toHaveCount(0);
+  await expect(graphTrigger).toBeFocused();
+  await openMenu('graph');
+  await page.getByRole('menuitem', { name: 'Delete Graph 1', exact: true }).click();
+  await expect(graphQuestion).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(graphQuestion).toHaveCount(0);
+  await expect(graphTrigger).toBeFocused();
+  await expect(graphTrigger).toHaveText('Graph 1');
+  await openMenu('graph');
+  await page.getByRole('menuitem', { name: 'Delete Graph 1', exact: true }).click();
+  await confirmDeletion(page, 'Delete Graph 1 From Target context?');
   await expect(
     (await resourceControls(page, resource)).getByTestId('space-resource-graph'),
   ).toHaveText('Target path');
@@ -143,8 +165,22 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(
     (await resourceControls(page, resource)).getByTestId('space-resource-map'),
   ).toHaveText('Created from rail');
+  const mapTrigger = (await resourceControls(page, resource)).getByTestId('space-resource-map');
+  const mapQuestion = page.getByRole('alertdialog', {
+    name: 'Delete Created from rail From Space?',
+  });
   await openMenu('map');
   await page.getByRole('menuitem', { name: 'Delete Created from rail', exact: true }).click();
+  await expect(mapQuestion).toContainText(
+    'Permanently deletes the Map, and all Graphs from the Space.',
+  );
+  await page.keyboard.press('Escape');
+  await expect(mapQuestion).toHaveCount(0);
+  await expect(mapTrigger).toBeFocused();
+  await expect(mapTrigger).toHaveText('Created from rail');
+  await openMenu('map');
+  await page.getByRole('menuitem', { name: 'Delete Created from rail', exact: true }).click();
+  await confirmDeletion(page, 'Delete Created from rail From Space?');
   await expect(
     (await resourceControls(page, resource)).getByTestId('space-resource-map'),
   ).toHaveText('Target context');

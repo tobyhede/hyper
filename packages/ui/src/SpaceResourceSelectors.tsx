@@ -46,8 +46,12 @@ export interface CanvasSpaceResourceCommands {
    * name — which is what keeps the menu from taking the caret back on close.
    */
   readonly onCreate: ((renameScope: string) => Promise<boolean>) | null;
-  /** Resolves once the deletion settles. */
-  readonly onDelete: (() => Promise<void>) | null;
+  /**
+   * Ask before deleting. Where the caret returns when the question closes is
+   * the application's; the control that disclosed the row is offered as the
+   * fallback for when the element that held the caret is gone.
+   */
+  readonly onDelete: ((focusFallback: () => HTMLElement | null) => void) | null;
   readonly onCopyLink: () => Promise<string | null>;
 }
 
@@ -309,15 +313,10 @@ function SpaceResourceSelector({
     remove === null
       ? null
       : () => {
-          onBusy(true);
-          void remove()
-            .then(() => {
-              onReport(null);
-            })
-            .catch(() => undefined)
-            .finally(() => {
-              onBusy(false);
-            });
+          // The containing canvas says the outcome; a sentence left on the
+          // rail from an earlier command no longer describes it.
+          onReport(null);
+          remove(() => triggerRef.current);
         };
   const commonCommands = {
     title: selected?.title ?? `No ${label}`,

@@ -95,6 +95,7 @@ const context = (
   spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
   spaces: null,
   commandOutcomes: undefined,
+  deleteConfirmation: undefined,
   completeSpaceResourceSelection: () => null,
   portalEditing: undefined,
   onPortalEditingChange: undefined,

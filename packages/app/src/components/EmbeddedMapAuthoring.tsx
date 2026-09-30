@@ -20,6 +20,7 @@ import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceResourceTargets } from '../space-resource-targets';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { CommandOutcomes } from '../command-outcomes';
+import type { DeleteConfirmation } from '../delete-confirmation';
 import type { EmbeddedPublication } from '../embedded-publication';
 import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-framing';
 import { spaceResourceEmbedCamera } from '../camera';
@@ -31,6 +32,7 @@ const EMPTY_NODES: readonly ResourceFlowNode[] = [];
 /** Reuse production projection and Resource controls over an explicitly addressed target Map. */
 export function EmbeddedMapAuthoring({
   commandOutcomes,
+  deleteConfirmation,
   parent,
   entry,
   mapId,
@@ -44,6 +46,7 @@ export function EmbeddedMapAuthoring({
   publish,
 }: {
   readonly commandOutcomes: CommandOutcomes;
+  readonly deleteConfirmation: DeleteConfirmation;
   readonly parent: ResourceFlowNode;
   readonly entry: OpenSpace;
   readonly mapId: MapId;
@@ -147,6 +150,7 @@ export function EmbeddedMapAuthoring({
   );
   const authoring = useCanvasResourceAuthoring({
     commandOutcomes,
+    deleteConfirmation,
     nodes: state.projection?.nodes ?? EMPTY_NODES,
     availability,
     nameOnCreation: null,

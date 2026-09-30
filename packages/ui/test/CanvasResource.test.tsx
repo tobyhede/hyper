@@ -1547,7 +1547,7 @@ describe('CanvasResource Space front', () => {
               mapCommands: {
                 onRename,
                 onCreate: () => Promise.resolve(false),
-                onDelete: () => Promise.resolve(),
+                onDelete: () => undefined,
                 onCopyLink: () => Promise.resolve(null),
               },
             }),
@@ -1590,7 +1590,7 @@ describe('CanvasResource Space front', () => {
                     reject(new Error('persist failed'));
                   };
                 }),
-              onDelete: () => Promise.resolve(),
+              onDelete: () => undefined,
               onCopyLink: () => Promise.resolve(null),
             },
           }),
@@ -1609,45 +1609,6 @@ describe('CanvasResource Space front', () => {
     );
     await act(async () => {
       rejectCreate();
-      await Promise.resolve();
-    });
-    expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();
-  });
-
-  it('releases busy when deleting a Map rejects', async () => {
-    let rejectDelete: () => void = () => undefined;
-    render(
-      <CanvasResource
-        front={{
-          kind: 'space',
-          selection: selection({
-            mapCommands: {
-              onRename: () => null,
-              onCreate: () => Promise.resolve(false),
-              onDelete: () =>
-                new Promise<void>((_, reject) => {
-                  rejectDelete = () => {
-                    reject(new Error('persist failed'));
-                  };
-                }),
-              onCopyLink: () => Promise.resolve(null),
-            },
-          }),
-        }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="selected"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-    fireEvent.click(screen.getByTestId('space-resource-map'));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Collection 1' }));
-    expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    await act(async () => {
-      rejectDelete();
       await Promise.resolve();
     });
     expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();

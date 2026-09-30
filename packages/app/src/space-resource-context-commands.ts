@@ -15,8 +15,9 @@ import type { CommandOutcomes } from './command-outcomes';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, graphColorsByGraphId } from '@project/graph';
 import { offered, renameDraftAnswer } from './authoring-commands';
-import { embeddedGraphAuthoringCommands } from './graph-authoring-commands';
-import { embeddedMapAuthoringCommands } from './map-authoring-commands';
+import type { DeleteConfirmation, FocusFallback } from './delete-confirmation';
+import { embeddedGraphAuthoringCommands, graphDeletionWords } from './graph-authoring-commands';
+import { embeddedMapAuthoringCommands, mapDeletionWords } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 
@@ -32,11 +33,19 @@ export interface SpaceResourceRailContext {
   readonly containingSpaceId: UUID;
   /** The containing canvas's, where a report from this rail is held. */
   readonly commandOutcomes: CommandOutcomes;
+  /** The containing canvas's, where this rail's Delete Map and Delete Graph ask first. */
+  readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'>;
 }
 
 /** The Dock commands, addressed to the target and the context this Resource stores. */
 export function spaceResourceContextCommands(
-  { entry, spaces, containingSpaceId, commandOutcomes }: SpaceResourceRailContext,
+  {
+    entry,
+    spaces,
+    containingSpaceId,
+    commandOutcomes,
+    deleteConfirmation,
+  }: SpaceResourceRailContext,
   document: Extract<ResourceDocument, { kind: 'space' }>,
   select: (targetMap: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   available: () => boolean,
@@ -94,14 +103,24 @@ export function spaceResourceContextCommands(
           return false;
       }
     }),
-    // Map authoring waits for both Spaces, repoints every Space Resource that
-    // selected the Map — this one included — and leaves the target's canvas
-    // on the survivor; the containing canvas holds a refusal or a break. The
-    // canvas it leaves is the target's, not the containing one, so it claims
-    // no move.
-    onDelete: offered(addressed.delete, (remove) => async () => {
-      await commandOutcomes.run('map-delete', remove, { completionMovesMap: false });
-    }),
+    // Asked first, through the containing canvas's delete confirmation, in
+    // the words the Dock's Delete Map asks. Map authoring waits for both
+    // Spaces, repoints every Space Resource that selected the Map — this one
+    // included — and leaves the target's canvas on the survivor; the
+    // containing canvas holds a refusal or a break. The canvas it leaves is
+    // the target's, not the containing one, so it claims no move.
+    onDelete:
+      targetMap === undefined
+        ? null
+        : offered(addressed.delete, (remove) => (focusFallback: FocusFallback) => {
+            deleteConfirmation.arm({
+              ...mapDeletionWords(targetMap),
+              run: async () => {
+                await commandOutcomes.run('map-delete', remove, { completionMovesMap: false });
+              },
+              focusFallback,
+            });
+          }),
     onCopyLink: () => copyLink(location.href({ kind: 'map', spaceId: entry.id, mapId })),
   };
   if (targetMap === undefined || graph === undefined) return { mapCommands };
@@ -140,12 +159,19 @@ export function spaceResourceContextCommands(
         await commandOutcomes.run('graph-create', create);
         return false;
       }),
-      // Graph authoring waits for both Spaces, repoints every Space Resource
-      // that selected the Graph — this one included — and leaves the target's
+      // Asked first, in the words the Dock's Delete Graph asks. Graph
+      // authoring waits for both Spaces, repoints every Space Resource that
+      // selected the Graph — this one included — and leaves the target's
       // canvas on the survivor; the containing canvas holds a refusal or a
       // break.
-      onDelete: offered(addressedGraph.delete, (remove) => async () => {
-        await commandOutcomes.run('graph-delete', remove);
+      onDelete: offered(addressedGraph.delete, (remove) => (focusFallback: FocusFallback) => {
+        deleteConfirmation.arm({
+          ...graphDeletionWords(graph, targetMap),
+          run: async () => {
+            await commandOutcomes.run('graph-delete', remove);
+          },
+          focusFallback,
+        });
       }),
       onCopyLink: () =>
         copyLink(location.href({ kind: 'map-graph', spaceId: entry.id, mapId, graphId })),

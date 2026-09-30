@@ -289,6 +289,7 @@ export const createApp = (
               />
               <SpaceCanvas
                 commandOutcomes={commandOutcomes}
+                deleteConfirmation={deleteConfirmation}
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but

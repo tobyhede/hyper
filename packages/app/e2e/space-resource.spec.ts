@@ -1,4 +1,4 @@
-import { resourceControls, resourceToolbar, selectResource } from './graph';
+import { confirmDeletion, resourceControls, resourceToolbar, selectResource } from './graph';
 import {
   beginPortalEdit,
   embeddedGraphEdgeCount,
@@ -1416,6 +1416,10 @@ test('deleting the selected Map clears framing; deleting a Graph keeps it', asyn
   expect((await boxOf(embeddedNodes(page), 'framed after new Graph')).y).toBeCloseTo(framed.y, 0);
   await openGraph();
   await page.getByRole('menuitem', { name: /^Delete Graph / }).click();
+  await page
+    .getByRole('alertdialog', { name: /^Delete Graph .+\?$/ })
+    .getByRole('button', { name: 'Delete', exact: true })
+    .click();
   await settled(page);
   expect((await boxOf(embeddedNodes(page), 'framed after Graph delete')).x).toBeCloseTo(
     framed.x,
@@ -1438,6 +1442,7 @@ test('deleting the selected Map clears framing; deleting a Graph keeps it', asyn
   await settled(page);
   await openMap();
   await page.getByRole('menuitem', { name: 'Delete Replacement', exact: true }).click();
+  await confirmDeletion(page, 'Delete Replacement From Space?');
   await settled(page);
   const reset = await boxOf(embeddedNodes(page), 'embedding after Map fallback');
   expect(reset.x).not.toBeCloseTo(framed.x, 0);

@@ -74,7 +74,7 @@ describe('SpaceResourceSelectors', () => {
         mapCommands: {
           onRename,
           onCreate: () => Promise.resolve(false),
-          onDelete: () => Promise.resolve(),
+          onDelete: () => undefined,
           onCopyLink: () => Promise.resolve(null),
         },
       }),
@@ -127,7 +127,7 @@ describe('SpaceResourceSelectors', () => {
                 reject(new Error('persist failed'));
               };
             }),
-          onDelete: () => Promise.resolve(),
+          onDelete: () => undefined,
           onCopyLink: () => Promise.resolve(null),
         },
       }),
@@ -145,34 +145,28 @@ describe('SpaceResourceSelectors', () => {
     expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();
   });
 
-  it('releases busy when deleting a Map rejects', async () => {
-    let rejectDelete: () => void = () => undefined;
+  /**
+   * Delete asks rather than runs: the press hands the application the Map
+   * trigger as the caret's fallback, and the rail does not wait on a deletion
+   * the question has not yet been answered for.
+   */
+  it('asks the application to delete a Map, offering its trigger as the caret fallback', () => {
+    const onDelete = vi.fn<(focusFallback: () => HTMLElement | null) => void>();
     mount(
       clusters({
         mapCommands: {
           onRename: () => null,
           onCreate: () => Promise.resolve(false),
-          onDelete: () =>
-            new Promise<void>((_, reject) => {
-              rejectDelete = () => {
-                reject(new Error('persist failed'));
-              };
-            }),
+          onDelete,
           onCopyLink: () => Promise.resolve(null),
         },
       }),
     );
     fireEvent.click(screen.getByTestId('space-resource-map'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Collection 1' }));
-    expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    await act(async () => {
-      rejectDelete();
-      await Promise.resolve();
-    });
-    expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete.mock.calls[0]?.[0]()).toBe(screen.getByTestId('space-resource-map'));
+    expect(screen.getByTestId('space-resource-map')).toBeEnabled();
   });
 
   /**
@@ -213,13 +207,13 @@ describe('SpaceResourceSelectors', () => {
         mapCommands: {
           onRename: () => null,
           onCreate: () => Promise.resolve(false),
-          onDelete: () => Promise.resolve(),
+          onDelete: () => undefined,
           onCopyLink: () => Promise.resolve(null),
         },
         graphCommands: {
           onRename: () => null,
           onCreate: () => Promise.resolve(false),
-          onDelete: () => Promise.resolve(),
+          onDelete: () => undefined,
           onCopyLink: () => Promise.resolve(null),
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],
@@ -257,7 +251,7 @@ describe('SpaceResourceSelectors', () => {
     const graphCommands = {
       onRename: () => null,
       onCreate: () => Promise.resolve(false),
-      onDelete: () => Promise.resolve(),
+      onDelete: () => undefined,
       onCopyLink: () => Promise.resolve(null),
       color: '#1f77b4',
       colors: [{ color: '#1f77b4', label: 'Blue' }],
@@ -309,7 +303,7 @@ describe('SpaceResourceSelectors', () => {
         mapCommands: {
           onRename: () => null,
           onCreate: () => Promise.resolve(false),
-          onDelete: () => Promise.resolve(),
+          onDelete: () => undefined,
           onCopyLink: () => Promise.resolve(null),
         },
       }),
@@ -343,7 +337,7 @@ describe('SpaceResourceSelectors', () => {
         graphCommands: {
           onRename: () => null,
           onCreate: () => Promise.resolve(false),
-          onDelete: () => Promise.resolve(),
+          onDelete: () => undefined,
           onCopyLink: () => Promise.resolve(null),
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],
@@ -388,7 +382,7 @@ describe('SpaceResourceSelectors', () => {
         graphCommands: {
           onRename: () => null,
           onCreate: () => Promise.resolve(false),
-          onDelete: () => Promise.resolve(),
+          onDelete: () => undefined,
           onCopyLink: () => Promise.resolve(null),
           color: '#1f77b4',
           colors: [{ color: '#1f77b4', label: 'Blue' }],

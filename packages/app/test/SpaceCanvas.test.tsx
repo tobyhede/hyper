@@ -155,7 +155,7 @@ async function mountGraph(
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-  const { authoring, commandOutcomes } = composeApp({ spaceSession });
+  const { authoring, commandOutcomes, deleteConfirmation } = composeApp({ spaceSession });
   const testedAuthoring = {
     ...authoring,
     complete: (completion: Parameters<typeof authoring.complete>[0]) => {
@@ -167,6 +167,7 @@ async function mountGraph(
     <ReactFlowProvider>
       <SpaceCanvas
         commandOutcomes={commandOutcomes}
+        deleteConfirmation={deleteConfirmation}
         nodes={nodes}
         edges={[]}
         projectedNodes={null}
