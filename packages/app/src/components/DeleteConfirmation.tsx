@@ -91,11 +91,10 @@ export function DeleteConfirmation({
             variant="destructive"
             disabled={deleting}
             onClick={(event) => {
-              // `preventBaseUIHandler`, not `preventDefault`: Base UI's
-              // `mergeProps` runs the primitive's own close handler unless the
-              // consumer sets `baseUIHandlerPrevented`, and it never reads
-              // `defaultPrevented`. A deletion may answer a promise, and the
-              // primitive would close the dialog long before a refusal arrived.
+              // The dialog stays open until the deletion settles, which may be
+              // a promise answering a refusal. Base UI's `mergeProps` skips the
+              // primitive's own close handler only when the consumer sets
+              // `baseUIHandlerPrevented`, which `preventBaseUIHandler` does.
               event.preventBaseUIHandler();
               onConfirm();
             }}

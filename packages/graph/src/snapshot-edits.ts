@@ -258,7 +258,8 @@ export interface DeletionReach {
  * What {@link deleteFromSpace} would change for `resourceId`, read before it
  * runs so the question that asks for it can say so. Every Map it names loses
  * the Resource's position, every Graph it names loses at least one Edge, and
- * nothing else is touched — the property test holds the two together.
+ * nothing else is touched; `snapshot-edits.property.test.ts`'s
+ * `deletionReach properties` holds the two together.
  */
 export function deletionReach(maps: readonly Map[], resourceId: UUID): DeletionReach {
   return {
