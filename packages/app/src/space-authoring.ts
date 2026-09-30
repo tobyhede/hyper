@@ -107,10 +107,11 @@ export interface CreatedImage {
 }
 
 /** An Image Resource's document: its Title, its URL, and its natural size when the picture loaded. */
-const imageDocument = (title: string, { url, naturalSize }: CreatedImage): ResourceDocument =>
-  naturalSize === undefined
-    ? { title, kind: 'image', url }
-    : { title, kind: 'image', url, naturalSize };
+const imageDocument = (title: string, { url, naturalSize }: CreatedImage): ResourceDocument => {
+  const document: ResourceDocument = { title, kind: 'image', url };
+  if (naturalSize !== undefined) document.naturalSize = naturalSize;
+  return document;
+};
 
 /** The gap between Image Resources a single gesture creates side by side. */
 const IMAGE_ROW_GAP = 40;

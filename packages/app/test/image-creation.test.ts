@@ -226,6 +226,28 @@ describe('creating Image Resources from files', () => {
     expect(session.getState().working).toBe(before);
   });
 
+  it('names only the declared-type refusals when a drop also holds a file the host would refuse', async () => {
+    const { session, authoring } = open(FIRST);
+    const before = session.getState().working;
+    const images = sources({ 'huge.png': { kind: 'refused', code: 'image-too-large' } }, {});
+
+    const created = await createImageResources(
+      { images, authoring },
+      {
+        kind: 'files',
+        files: [file('huge.png'), new File(['bytes'], 'notes.pdf', { type: 'application/pdf' })],
+      },
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+    );
+
+    expect(created).toEqual({
+      kind: 'not-stored',
+      refusals: [{ code: 'image-format-unsupported', name: 'notes.pdf' }],
+    });
+    expect(images.sent).toEqual([]);
+    expect(session.getState().working).toBe(before);
+  });
+
   it('sends a file the browser declares no type for, and leaves it to the host', async () => {
     const { authoring } = open(FIRST);
     const images = sources({ picture: { kind: 'stored', url: STORED_A } }, {});

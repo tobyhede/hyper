@@ -8,7 +8,6 @@ import {
   type SpaceSessionState,
 } from '@project/persistence';
 import type { ConnectionResult } from './connection-completion';
-import type { RefusedFile } from './image-creation';
 import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
   SpaceResourceRefusal,
@@ -60,8 +59,8 @@ const STORED_IMAGE_FORMATS = `${storedFormatNames.slice(0, -1).join(', ')} or ${
 const MAX_IMAGE_MEGABYTES = MAX_IMAGE_BYTES / (1024 * 1024);
 
 /**
- * Application-owned copy for the host refusing to store an image (ADR 0106),
- * naming the file it refused.
+ * Application-owned copy for an image refused for storing (ADR 0106), naming
+ * the file refused.
  */
 const describeImageRefusal = (code: ImageRefusal, name: string): string => {
   switch (code) {
@@ -74,7 +73,13 @@ const describeImageRefusal = (code: ImageRefusal, name: string): string => {
   }
 };
 
-/** Every file the host refused, a sentence each, in the order the gesture brought them. */
+/** A file refused for storing, named so the sentence can say which. */
+export interface RefusedFile {
+  readonly code: ImageRefusal;
+  readonly name: string;
+}
+
+/** A sentence for each refused file, in the order the gesture brought them. */
 export const describeImageRefusals = (refusals: readonly RefusedFile[]): string =>
   refusals.map(({ code, name }) => describeImageRefusal(code, name)).join(' ');
 
