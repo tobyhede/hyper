@@ -13,6 +13,7 @@ import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
+import { ArmedDeleteConfirmation } from '../src/components/DeleteConfirmation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
@@ -211,6 +212,19 @@ const settled = (session: SpaceSession): Promise<void> =>
 
 const graphsOf = (working: SpaceSnapshot) => (working.document.maps ?? []).flatMap((m) => m.graphs);
 
+/** Answer the delete confirmation standing over the canvas with Delete. */
+const confirmDeletion = async (question: string): Promise<void> => {
+  const confirmation = screen.getByRole('alertdialog', { name: question });
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }));
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+};
+
+/** The Active Graph's Edge still stands, and nothing asked to delete it. */
+const expectUnasked = (session: SpaceSession): void => {
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+};
+
 /** One identity, so the memo under test is not defeated by the test's own input. */
 const NO_OP = () => undefined;
 
@@ -301,6 +315,7 @@ function CanvasHarness({
   currentSpace,
   authoring,
   session,
+  deleteConfirmation,
   covered,
   presenting,
 }: Pick<
@@ -312,6 +327,7 @@ function CanvasHarness({
   | 'currentSpace'
   | 'authoring'
   | 'session'
+  | 'deleteConfirmation'
 > & {
   /** A modal pane is open over the graph, withdrawing everything on it. */
   readonly covered: boolean;
@@ -330,6 +346,8 @@ function CanvasHarness({
         onSelectResource={adapter.getState().selectResource}
         onSelectEdge={adapter.getState().selectEdge}
       />
+      {/* Production's dialog, drawn at the root as `App` draws it. */}
+      <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} />
       <SpaceCanvas
         commandOutcomes={commandOutcomes}
         nodes={projection?.nodes ?? []}
@@ -462,11 +480,28 @@ describe('the Edge toolbar', () => {
     );
   });
 
-  it('deletes the Edge from its Graph and leaves the Graph standing', async () => {
+  it('asks before deleting the Edge, naming it, and runs nothing on Cancel', async () => {
     const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Edge A → B' }));
+
+    const question = screen.getByRole('alertdialog', { name: 'Delete Edge A → B?' });
+    expect(question).toHaveTextContent('Permanently deletes the Edge from its Graph.');
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
+  });
+
+  it('deletes the Edge from its Graph on Delete and leaves the Graph standing', async () => {
+    const { adapter, session } = await mountCanvas();
+    act(() => adapter.getState().selectEdge(SUBJECT));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Edge A → B' }));
+    await confirmDeletion('Delete Edge A → B?');
 
     expect(graphsOf(session.getState().working)).toEqual([
       { id: GRAPH_ID, title: 'Main', edges: [] },
@@ -702,13 +737,31 @@ describe('the Edge toolbar', () => {
 describe("the app's canvas delete key", () => {
   const DELETE_KEYS = ['Backspace', 'Delete'] as const;
 
-  it.each(DELETE_KEYS)('removes the selected Edge when %s is aimed at the canvas', async (key) => {
+  it.each(DELETE_KEYS)(
+    'asks before deleting the selected Edge when %s is aimed at the canvas',
+    async (key) => {
+      const { adapter, session } = await mountCanvas();
+      act(() => adapter.getState().selectEdge(SUBJECT));
+
+      fireEvent.keyDown(canvasElement(), { key });
+      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+      await confirmDeletion('Delete Edge A → B?');
+
+      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([]);
+    },
+  );
+
+  it('leaves the selected Edge and the selection standing when the question is escaped', async () => {
     const { adapter, session } = await mountCanvas();
     act(() => adapter.getState().selectEdge(SUBJECT));
 
-    fireEvent.keyDown(canvasElement(), { key });
+    fireEvent.keyDown(canvasElement(), { key: 'Delete' });
+    const question = screen.getByRole('alertdialog', { name: 'Delete Edge A → B?' });
+    fireEvent.keyDown(question, { key: 'Escape' });
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([]);
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expectUnasked(session);
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
   });
 
   it.each(DELETE_KEYS)(
@@ -719,6 +772,8 @@ describe("the app's canvas delete key", () => {
 
       fireEvent.keyDown(canvasElement(), { key });
 
+      // Remove from Map is not a deletion, so it asks nothing.
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
       const current = session.getState().working;
       expect(current.resources.map(({ id }) => id)).toContain(RESOURCE_A);
       expect(current.document.maps?.[0]?.positions[RESOURCE_A]).toBeUndefined();
@@ -809,7 +864,7 @@ describe("the app's canvas delete key", () => {
 
       fireEvent.keyDown(document.body, { key: 'Delete', [modifier]: true });
 
-      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+      expectUnasked(session);
     },
   );
 
@@ -820,7 +875,7 @@ describe("the app's canvas delete key", () => {
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Edge Title' }), { key });
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    expectUnasked(session);
   });
 
   it.each(DELETE_KEYS)('leaves the Edge standing when %s reaches its toolbar', async (key) => {
@@ -829,7 +884,7 @@ describe("the app's canvas delete key", () => {
 
     fireEvent.keyDown(screen.getByRole('button', { name: 'Edit Edge A → B' }), { key });
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    expectUnasked(session);
   });
 
   it.each(DELETE_KEYS)(
@@ -849,7 +904,7 @@ describe("the app's canvas delete key", () => {
 
       fireEvent.keyDown(screen.getByRole('button', { name: 'Resources' }), { key });
 
-      expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+      expectUnasked(session);
     },
   );
 
@@ -865,7 +920,7 @@ describe("the app's canvas delete key", () => {
 
     fireEvent.keyDown(screen.getByRole(role), { key: 'Delete' });
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    expectUnasked(session);
   });
 
   it('leaves the Edge standing while presenting', async () => {
@@ -874,7 +929,7 @@ describe("the app's canvas delete key", () => {
 
     fireEvent.keyDown(document.body, { key: 'Delete' });
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    expectUnasked(session);
   });
 
   /**
@@ -898,7 +953,7 @@ describe("the app's canvas delete key", () => {
     expect(slider.closest('.nokey')).not.toBeNull();
     fireEvent.keyDown(slider, { key: 'Delete' });
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    expectUnasked(session);
   });
 
   it('leaves the Edge standing when Delete reaches a zoom button', async () => {
@@ -907,7 +962,7 @@ describe("the app's canvas delete key", () => {
 
     fireEvent.keyDown(await screen.findByRole('button', { name: 'Zoom in' }), { key: 'Delete' });
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    expectUnasked(session);
   });
 
   it('observes a pane refusal from the commit that publishes it', async () => {
@@ -918,7 +973,7 @@ describe("the app's canvas delete key", () => {
 
     setCovered(true);
 
-    expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
+    expectUnasked(session);
   });
 });
 

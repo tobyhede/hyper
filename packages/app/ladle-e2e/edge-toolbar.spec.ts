@@ -65,6 +65,11 @@ test(
     await edgeToolbar(page, EDGE_TITLES.fits)
       .getByRole('button', { name: `Delete Edge ${EDGE_TITLES.fits}` })
       .click();
+    // Delete asks first, naming the Edge as its toolbar does.
+    await page
+      .getByRole('alertdialog', { name: `Delete Edge ${EDGE_TITLES.fits}?` })
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click();
 
     await expect(edgeNamed(page, EDGE.fits)).toHaveCount(0);
     await expect(page.locator('.react-flow__edge[tabindex]')).toHaveCount(4);

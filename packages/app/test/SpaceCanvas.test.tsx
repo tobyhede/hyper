@@ -125,6 +125,7 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     beginTitleEdit: () => undefined,
     completeTitle: () => null,
     setTitleHidden: () => false,
+    askToDelete: () => undefined,
     deleteEdge: () => false,
     cancelDraft: () => undefined,
     dispose: () => undefined,

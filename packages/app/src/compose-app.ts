@@ -203,6 +203,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   });
   const adapter = createRenderAdapter(authoring);
   const continuation = createContinuation({ authoring, reportObserverError });
+  const deleteConfirmation = createDeleteConfirmation({ authoring, reportObserverError });
   // The Edge lifecycle, composed once beside the two collaborators it consumes.
   // It owns neither: the render adapter stays authoritative for the projection
   // and the canvas selection, Space Authoring for eligibility and every Edit.
@@ -211,6 +212,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     adapter,
     connections: (connections ?? createConnectionCompletion)({ adapter, authoring }),
     continuation,
+    deleteConfirmation,
     reportObserverError,
   });
   const commandOutcomes = createCommandOutcomes({
@@ -219,7 +221,6 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     continuation,
     reportObserverError: compositionReporter,
   });
-  const deleteConfirmation = createDeleteConfirmation({ authoring, reportObserverError });
   const resourceDeletion = createResourceDeletion({
     authoring,
     currentSpace,

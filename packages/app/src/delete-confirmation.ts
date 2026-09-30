@@ -19,7 +19,7 @@ import {
  * it is no longer in the document. Named by the arming surface; `null` from it,
  * or no fallback at all, leaves the choice to the dialog primitive.
  */
-export type FocusFallback = () => HTMLElement | null;
+export type FocusFallback = () => HTMLElement | SVGElement | null;
 
 /** What the question is about: its kind, and the short Title or name it is asked by. */
 export interface DeleteSubject {

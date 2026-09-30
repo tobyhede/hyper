@@ -641,7 +641,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/edge-toolbar.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Selecting an Active Graph Edge reveals one toolbar named for the Edge — its Title, or From → To — holding Edit, the Title eye and Delete as one `Edge commands` group; Delete removes the Edge from its Graph.',
+      'Selecting an Active Graph Edge reveals one toolbar named for the Edge — its Title, or From → To — holding Edit, the Title eye and Delete as one `Edge commands` group; Delete asks first, then removes the Edge from its Graph.',
   },
   {
     id: 'edge-toolbar-reveals-on-hover',

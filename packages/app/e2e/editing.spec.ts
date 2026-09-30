@@ -150,36 +150,20 @@ async function emptyCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
 }
 
 /**
- * Click one focusable Edge, and answer the accessible name it carries.
+ * Select one focusable Edge by focusing it, and answer the accessible name it
+ * carries. Only the Active Graph's Edges are focusable, and focusing one selects
+ * it.
  *
- * Only the Active Graph's Edges are selectable, and an Edge is an SVG path a few
- * pixels wide, so the point is found by walking the geometry and hit-testing:
- * `elementFromPoint` answers null outside the viewport and `closest` answers null
- * off an Edge, so both are checked rather than assumed.
+ * Not by clicking it: hovering an Edge reveals its chrome, and an untitled
+ * Edge's toolbar is drawn on its midpoint and can cover the whole of a short
+ * Edge, so a press could land on a disabled toolbar button and leave the caret
+ * on the page with the Edge selected.
  */
 async function selectAnEdge(page: Page): Promise<string> {
-  const point = await page
-    .locator('.react-flow__edge[tabindex] .react-flow__edge-path')
-    .evaluateAll((paths) => {
-      for (const path of paths) {
-        // SAFETY: `.react-flow__edge-path` only ever matches the `<path>`
-        // element React Flow's SVG edge renderer draws, so it's always an
-        // `SVGPathElement`.
-        const geometry = path as SVGPathElement;
-        const transform = geometry.getScreenCTM();
-        if (transform === null) continue;
-        const length = geometry.getTotalLength();
-        for (const fraction of [0.5, 0.25, 0.75, 0.4, 0.6]) {
-          const at = geometry.getPointAtLength(length * fraction).matrixTransform(transform);
-          const hit = document.elementFromPoint(at.x, at.y)?.closest('.react-flow__edge');
-          if (hit) return { x: at.x, y: at.y };
-        }
-      }
-      throw new Error('No focusable Edge has a clickable point.');
-    });
-  await page.mouse.click(point.x, point.y);
+  await page.locator('.react-flow__edge[tabindex]').first().focus();
   const selected = page.locator('.react-flow__edge.selected');
   await expect(selected).toHaveCount(1);
+  await expect(selected).toBeFocused();
   return (await selected.getAttribute('aria-label')) ?? '';
 }
 
@@ -2915,11 +2899,13 @@ test('clicking a Resource authoring handle neither opens the Resource nor draws 
 
 /**
  * The app-owned canvas key routes the selected Edge through its authoring
- * operation. React Flow receives `deleteKeyCode={null}` and installs no
- * document-level delete listener of its own.
+ * operation, asking first. React Flow receives `deleteKeyCode={null}` and
+ * installs no document-level delete listener of its own.
  */
 for (const key of ['Backspace', 'Delete'] as const) {
-  test(`${key} removes the selected Edge from its Graph and nothing else`, async ({ page }) => {
+  test(`${key} asks, then removes the selected Edge from its Graph and nothing else`, async ({
+    page,
+  }) => {
     await page.goto('/');
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     // An Edge belongs to a Map's Graph, so an Edge Edit needs one selected.
@@ -2931,9 +2917,33 @@ for (const key of ['Backspace', 'Delete'] as const) {
     await expect(persistence).toHaveAttribute('data-revision', '0');
 
     await selectAnEdge(page);
+    const selected = page.locator('.react-flow__edge.selected');
+    await expect(selected).toHaveCount(1);
     await page.keyboard.press(key);
 
+    // Escape leaves the Edge, its selection and the caret where they were.
+    const question = page.getByRole('alertdialog', { name: /^Delete Edge .+\?$/ });
+    await expect(question).toContainText('Permanently deletes the Edge from its Graph.');
+    // Once the question holds the caret: an Escape that reaches the still
+    // focused Edge is React Flow's, which deselects it.
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.activeElement?.closest('[role="alertdialog"]') != null),
+      )
+      .toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(question).toHaveCount(0);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
+    await expect(selected).toHaveCount(1);
+    await expect(selected).toBeFocused();
+
+    await page.keyboard.press(key);
+    await question.getByRole('button', { name: 'Delete', exact: true }).click();
+    await expect(question).toHaveCount(0);
+
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
+    // The caret lands on the deleted Edge's source Resource, not the page.
+    await expect(page.locator('.react-flow__node:focus')).toHaveCount(1);
     await expect(page.locator('.react-flow__node')).toHaveCount(drawnResources);
     await expect(persistence).toHaveAttribute('data-revision', '1');
     await expect(persistence).toHaveText('Persisted');
@@ -3131,7 +3141,18 @@ test(
     await activateGraph(page, 'Long');
 
     await edgeNamed(page, AB).focus();
-    await edgeToolbar(page, 'A → B').getByRole('button', { name: 'Delete Edge A → B' }).click();
+    const deleteEdge = edgeToolbar(page, 'A → B').getByRole('button', {
+      name: 'Delete Edge A → B',
+    });
+    await deleteEdge.click();
+    const question = page.getByRole('alertdialog', { name: 'Delete Edge A → B?' });
+    await question.getByRole('button', { name: 'Cancel' }).click();
+    await expect(question).toHaveCount(0);
+    await expect(page.locator('.react-flow__edge')).toHaveCount(drawn);
+    await expect(deleteEdge).toBeFocused();
+
+    await deleteEdge.click();
+    await confirmDeletion(page, 'Delete Edge A → B?');
 
     await expect(page.locator('.react-flow__edge')).toHaveCount(drawn - 1);
     await expect(edgeNamed(page, AB)).toHaveCount(0);

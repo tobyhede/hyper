@@ -55,7 +55,10 @@ export function DeleteConfirmation({
   // that armed it.
   const [opener] = useState(() => {
     const active = document.activeElement;
-    return active instanceof HTMLElement && active !== document.body ? active : null;
+    return (active instanceof HTMLElement || active instanceof SVGElement) &&
+      active !== document.body
+      ? active
+      : null;
   });
   return (
     <AlertDialog
@@ -68,7 +71,7 @@ export function DeleteConfirmation({
       }}
     >
       <AlertDialogContent
-        finalFocus={() => (opener?.isConnected ? opener : (focusFallback?.() ?? true))}
+        finalFocus={() => returnFocusTo(opener?.isConnected ? opener : (focusFallback?.() ?? null))}
       >
         <AlertDialogHeader>
           <AlertDialogTitle>
@@ -99,6 +102,19 @@ export function DeleteConfirmation({
     </AlertDialog>
   );
 }
+
+/**
+ * The dialog primitive's final focus for a return target. The primitive
+ * focuses an HTML element itself; an SVG element — an Edge, which is drawn and
+ * focused as one — is focused here and the primitive told to leave it, and no
+ * target leaves the choice to the primitive.
+ */
+const returnFocusTo = (target: HTMLElement | SVGElement | null): HTMLElement | boolean => {
+  if (target === null) return true;
+  if (target instanceof HTMLElement) return target;
+  target.focus();
+  return false;
+};
 
 /** The confirmation standing over whatever a delete command has armed, if anything. */
 export function ArmedDeleteConfirmation({
