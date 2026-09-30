@@ -7,7 +7,7 @@ import {
 } from '@project/persistence';
 import {
   describeAuthoringRefusal,
-  describeImageRefusal,
+  describeImageRefusals,
   describeSpaceResourceCreationBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
@@ -439,7 +439,7 @@ const COMMANDS: CommandDefinitions = {
         return notice(described('image-create')(describeAuthoringRefusal(result.refusal)));
       }
       if (result.kind === 'not-stored') {
-        return notice(described('image-create')(describeImageRefusal(result.code, result.name)));
+        return notice(described('image-create')(describeImageRefusals(result.refusals)));
       }
       if (result.kind !== 'completed') return CLEAR;
       return { kind: 'clear', continuation: options?.continueAt?.(result) ?? null };

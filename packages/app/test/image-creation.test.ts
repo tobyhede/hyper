@@ -142,8 +142,35 @@ describe('creating Image Resources from files', () => {
 
     expect(created).toEqual({
       kind: 'not-stored',
-      code: 'image-format-unsupported',
-      name: 'notes.txt',
+      refusals: [{ code: 'image-format-unsupported', name: 'notes.txt' }],
+    });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('names every file the host refused, in the order they were dropped', async () => {
+    const { session, authoring } = open(FIRST);
+    const before = session.getState().working;
+    const images = sources(
+      {
+        'notes.txt': { kind: 'refused', code: 'image-format-unsupported' },
+        'diagram.png': { kind: 'stored', url: STORED_A },
+        'huge.png': { kind: 'refused', code: 'image-too-large' },
+      },
+      {},
+    );
+
+    const created = await createImageResources(
+      { images, authoring },
+      { kind: 'files', files: [file('notes.txt'), file('diagram.png'), file('huge.png')] },
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+    );
+
+    expect(created).toEqual({
+      kind: 'not-stored',
+      refusals: [
+        { code: 'image-format-unsupported', name: 'notes.txt' },
+        { code: 'image-too-large', name: 'huge.png' },
+      ],
     });
     expect(session.getState().working).toBe(before);
   });
@@ -164,8 +191,58 @@ describe('creating Image Resources from files', () => {
 
     expect(created).toEqual({
       kind: 'not-stored',
-      code: 'image-format-unsupported',
-      name: 'notes.pdf',
+      refusals: [{ code: 'image-format-unsupported', name: 'notes.pdf' }],
+    });
+    expect(images.sent).toEqual([]);
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('names every file the browser declares is not an image, and sends none', async () => {
+    const { session, authoring } = open(FIRST);
+    const before = session.getState().working;
+    const images = sources({ 'diagram.png': { kind: 'stored', url: STORED_A } }, {});
+
+    const created = await createImageResources(
+      { images, authoring },
+      {
+        kind: 'files',
+        files: [
+          new File(['bytes'], 'notes.pdf', { type: 'application/pdf' }),
+          file('diagram.png'),
+          new File(['<svg/>'], 'figure.svg', { type: 'image/svg+xml' }),
+        ],
+      },
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+    );
+
+    expect(created).toEqual({
+      kind: 'not-stored',
+      refusals: [
+        { code: 'image-format-unsupported', name: 'notes.pdf' },
+        { code: 'image-svg-unsupported', name: 'figure.svg' },
+      ],
+    });
+    expect(images.sent).toEqual([]);
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('names only the declared-type refusals when a drop also holds a file the host would refuse', async () => {
+    const { session, authoring } = open(FIRST);
+    const before = session.getState().working;
+    const images = sources({ 'huge.png': { kind: 'refused', code: 'image-too-large' } }, {});
+
+    const created = await createImageResources(
+      { images, authoring },
+      {
+        kind: 'files',
+        files: [file('huge.png'), new File(['bytes'], 'notes.pdf', { type: 'application/pdf' })],
+      },
+      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+    );
+
+    expect(created).toEqual({
+      kind: 'not-stored',
+      refusals: [{ code: 'image-format-unsupported', name: 'notes.pdf' }],
     });
     expect(images.sent).toEqual([]);
     expect(session.getState().working).toBe(before);

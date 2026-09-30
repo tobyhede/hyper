@@ -1,11 +1,7 @@
 import type { ImageNaturalSize, MapId, MapPosition } from '@project/core';
 import type { PlacementMode } from '@project/graph';
-import {
-  IMAGE_MEDIA_TYPES,
-  refusalForDeclaredType,
-  type ImageRefusal,
-  type ImageStoring,
-} from '@project/persistence';
+import { IMAGE_MEDIA_TYPES, refusalForDeclaredType, type ImageStoring } from '@project/persistence';
+import type { RefusedFile } from './authoring-refusal';
 import type {
   AuthoringResult,
   CreatedImage,
@@ -48,23 +44,22 @@ export type ImageOrigin =
 
 /**
  * What an image gesture answers, creating or replacing: the Edit's own result,
- * or the refusal that stopped a file being stored, named with the file so the
- * sentence can say which one.
+ * or the files `storeEach` refused, in the order the gesture brought them.
  */
 export type ImageEditResult =
-  | AuthoringResult
-  | { readonly kind: 'not-stored'; readonly code: ImageRefusal; readonly name: string };
+  AuthoringResult | { readonly kind: 'not-stored'; readonly refusals: readonly RefusedFile[] };
 
 /**
- * The URL each file is stored at, in order, or the first file refused.
+ * The URL each file is stored at, in order, or the files refused.
  *
- * A file whose declared type is refused is answered before any file is sent,
- * so a drop holding one sends nothing. Otherwise every file is sent before any
- * answer is read, so a refused file can leave
- * the files beside it stored with nothing referencing them. That is the store's
- * standing state rather than a leak: ADR 0106 never deletes a stored image,
- * and an image's id is its content, so sending the same file again stores
- * nothing new.
+ * Files whose declared type is refused are answered before any file is sent,
+ * so a drop holding one sends nothing and names only those files: a file the
+ * host would also have refused is not learned of. Otherwise every file is sent
+ * before any answer is read, so every file the host refused is named, and a
+ * refused file can leave the files beside it stored with nothing referencing
+ * them. That is the store's standing state rather than a leak: ADR 0106 never
+ * deletes a stored image, and an image's id is its content, so sending the
+ * same file again stores nothing new.
  */
 export const storeEach = async (
   images: ImageSources,
@@ -73,19 +68,23 @@ export const storeEach = async (
   | { readonly kind: 'stored'; readonly urls: readonly string[] }
   | Extract<ImageEditResult, { readonly kind: 'not-stored' }>
 > => {
-  for (const file of files) {
+  const declaredRefusals = files.flatMap((file): RefusedFile[] => {
     const code = refusalForDeclaredType(file.type);
-    if (code !== undefined) return { kind: 'not-stored', code, name: file.name };
-  }
-  const answers = await Promise.all(files.map((file) => images.store(file)));
+    return code === undefined ? [] : [{ code, name: file.name }];
+  });
+  if (declaredRefusals.length > 0) return { kind: 'not-stored', refusals: declaredRefusals };
+  const answers = await Promise.all(
+    files.map(async (file) => ({ name: file.name, answer: await images.store(file) })),
+  );
   const urls: string[] = [];
-  for (const [index, answer] of answers.entries()) {
-    if (answer.kind === 'refused') {
-      return { kind: 'not-stored', code: answer.code, name: files[index]?.name ?? '' };
-    }
-    urls.push(answer.url);
+  const storedRefusals: RefusedFile[] = [];
+  for (const { name, answer } of answers) {
+    if (answer.kind === 'refused') storedRefusals.push({ code: answer.code, name });
+    else urls.push(answer.url);
   }
-  return { kind: 'stored', urls };
+  return storedRefusals.length > 0
+    ? { kind: 'not-stored', refusals: storedRefusals }
+    : { kind: 'stored', urls };
 };
 
 /**
