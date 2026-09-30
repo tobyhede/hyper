@@ -756,6 +756,53 @@ describe('useDockChrome', () => {
     await waitFor(() => expect(opened.app.deleteConfirmation.getState().pending).toBeNull());
   });
 
+  /** The drawing Map with a second Graph, made Active, so Delete Graph is offered. */
+  const withSecondGraph = () => {
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
+    act(() => chrome?.graph.onCreate?.());
+    return opened;
+  };
+  const graphIds = (opened: OpenSpace) =>
+    opened.session
+      .getState()
+      .working.document.maps?.find(({ id }) => id === MAP_ID)
+      ?.graphs.map(({ id }) => id);
+
+  it('asks before deleting the Active Graph, naming it and its Map', () => {
+    const opened = withSecondGraph();
+    const chrome = chromeFor(opened, CREATED).result.current.chrome;
+    act(() => chrome?.graph.onDelete?.(noFallback));
+    expect(opened.app.deleteConfirmation.getState().pending).toMatchObject({
+      subject: { kind: 'graph', name: chrome?.graph.active.title },
+      from: 'Map 1',
+      description: 'Permanently deletes the Graph and its Edges.',
+      focusFallback: noFallback,
+    });
+    expect(graphIds(opened)).toEqual([GRAPH_ID, CREATED]);
+  });
+
+  it('deletes the Active Graph on Delete and continues on the survivor', async () => {
+    const opened = withSecondGraph();
+    const chrome = chromeFor(opened, CREATED).result.current.chrome;
+    act(() => chrome?.graph.onDelete?.(noFallback));
+    await act(async () => {
+      opened.app.deleteConfirmation.confirm();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(graphIds(opened)).toEqual([GRAPH_ID]));
+    expect(opened.app.navigation.getState().activeGraphId).toBe(GRAPH_ID);
+  });
+
+  it('leaves the Active Graph standing when the question is cancelled', () => {
+    const opened = withSecondGraph();
+    const chrome = chromeFor(opened, CREATED).result.current.chrome;
+    act(() => chrome?.graph.onDelete?.(noFallback));
+    act(() => opened.app.deleteConfirmation.cancel());
+    expect(opened.app.deleteConfirmation.getState().pending).toBeNull();
+    expect(graphIds(opened)).toEqual([GRAPH_ID, CREATED]);
+  });
+
   it('leaves the drawing Map standing when the question is cancelled', () => {
     const opened = openDerivationSpace();
     const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;

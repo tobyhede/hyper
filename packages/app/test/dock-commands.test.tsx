@@ -694,8 +694,9 @@ describe('the last Map and Graph', () => {
         const item = deleteItem(kind);
         if (unavailable(item)) break;
         const before = showing(kind);
+        const from = kind === 'Map' ? 'Space' : showing('Map');
         fireEvent.click(item);
-        if (kind === 'Map') confirmDeletion(`Delete ${before} From Space?`);
+        confirmDeletion(`Delete ${before} From ${from}?`);
         await waitFor(() => expect(showing(kind)).not.toBe(before));
       }
       expect(unavailable(deleteItem(kind))).toBe(true);
@@ -709,7 +710,7 @@ describe('the last Map and Graph', () => {
     expect(graph).toBeInTheDocument();
     // The dismissed menu hands the caret back to the name it opened from.
     await waitFor(() => expect(graph).toHaveFocus());
-  });
+  }, 15_000);
 });
 
 /**

@@ -419,7 +419,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Delete Graph removes the active Graph when the Map owns more than one, and is present but unavailable on the last Graph the Map keeps.',
+      'Delete Graph asks first, then removes the active Graph when the Map owns more than one, and is present but unavailable on the last Graph the Map keeps.',
   },
   {
     id: 'command-dock-copies-graph-destinations',

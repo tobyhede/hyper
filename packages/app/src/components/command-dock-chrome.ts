@@ -333,11 +333,12 @@ export interface DockGraph {
    */
   readonly onCreate: (() => void) | null;
   /**
-   * Delete the Active Graph, or `null` while Delete may not run. One field,
-   * like {@link DockCanvas.onDelete}, and for the same reason: the answer holds
-   * the last-Graph rule (ADR 0079) and the entity-Edit gate together.
+   * Ask to delete the Active Graph, or `null` while Delete may not run. One
+   * field, like {@link DockCanvas.onDelete}, and for the same reason: the
+   * answer holds the last-Graph rule (ADR 0079) and the entity-Edit gate
+   * together. The press arms the delete confirmation, as Delete Map's does.
    */
-  readonly onDelete: (() => void) | null;
+  readonly onDelete: ((focusFallback: FocusFallback) => void) | null;
   /**
    * Copy this Graph's within-Map address — "Copy link to Graph" reproduces
    * what is on screen, so a recipient lands where the sender was.

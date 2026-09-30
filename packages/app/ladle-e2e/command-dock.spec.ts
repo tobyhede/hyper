@@ -217,6 +217,10 @@ test(
     await menu.getByRole('menuitem', { name: 'New Graph' }).click();
     const created = await disclose(page, 'Active Graph: Graph 1');
     await created.getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+    await page
+      .getByRole('alertdialog', { name: 'Delete Graph 1 From Collection 2?' })
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click();
     await expect(page.getByTestId('active-graph').filter({ visible: true })).toContainText('Echo');
   },
 );

@@ -294,7 +294,7 @@ function GraphIdentityMenu({
         }
         onCreate={graph.onCreate}
         onCopyLink={graph.onCopyLink}
-        onDelete={graph.onDelete}
+        onDelete={askFromTrigger(graph.onDelete, triggerId)}
       />
     </ChoiceMenu>
   );

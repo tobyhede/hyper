@@ -167,6 +167,7 @@ test('New Graph activates an empty Graph, and Delete returns to the one before',
 
   const menu = await graphMenu(page);
   await menu.getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+  await confirmDeletion(page, 'Delete Graph 1 From Collection 1?');
   await expect(activeGraph(page)).toContainText('Long');
 });
 

@@ -1790,6 +1790,32 @@ test('Delete Map asks first, and Cancel or Escape keep the Map and return the ca
   await expect(await mapChoices(page)).not.toContainText(['Collection 1']);
 });
 
+test('Delete Graph asks first, and Cancel or Escape keep the Graph and return the caret', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+  await newGraph(page);
+  await expect(activeGraph(page)).toContainText('Graph 1');
+  const question = page.getByRole('alertdialog', { name: 'Delete Graph 1 From Collection 1?' });
+
+  await (await graphMenu(page)).getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+  await expect(question).toBeVisible();
+  await expect(question).toContainText('Permanently deletes the Graph and its Edges.');
+  await question.getByRole('button', { name: 'Cancel' }).click();
+  await expect(question).toHaveCount(0);
+  await expect(activeGraph(page)).toBeFocused();
+
+  await (await graphMenu(page)).getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+  await expect(question).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(question).toHaveCount(0);
+  await expect(activeGraph(page)).toBeFocused();
+  await expect(activeGraph(page)).toContainText('Graph 1');
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+});
+
 test(
   'Delete Graph removes the active Graph and withholds the last one',
   { tag: '@parity:command-dock-deletes-graph' },

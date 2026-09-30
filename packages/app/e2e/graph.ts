@@ -367,11 +367,13 @@ export async function newGraph(page: Page): Promise<void> {
   await menu.getByRole('menuitem', { name: 'New Graph' }).click();
 }
 
-/** Delete the Graph the cluster is showing. */
+/** Delete the Graph the cluster is showing, answering the question it asks. */
 export async function deleteActiveGraph(page: Page): Promise<void> {
   const title = (await activeGraph(page).innerText()).trim();
+  const mapTitle = (await selectedCanvas(page).innerText()).trim();
   const menu = await graphMenu(page);
   await menu.getByRole('menuitem', { name: `Delete ${title}` }).click();
+  await confirmDeletion(page, `Delete ${title} From ${mapTitle}?`);
 }
 
 /** Answer the delete confirmation standing over the page with Delete. */

@@ -24,7 +24,7 @@ import type {
 } from './components/command-dock-chrome';
 import { COPY_LINK_ACTION_ID, type EntityCommandId, type SpaceEntity } from './entity-actions';
 import { offered, renameDraftAnswer } from './authoring-commands';
-import { topLevelGraphAuthoringCommands } from './graph-authoring-commands';
+import { graphDeletionWords, topLevelGraphAuthoringCommands } from './graph-authoring-commands';
 import { mapDeletionWords, topLevelMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces, RejectedExitConfirmation } from './open-spaces';
 import type { ResourcePlacementCommands } from './resource-placement';
@@ -365,10 +365,17 @@ export function useDockChrome(
       onCreate: offered(mapGraphCommands.create, (create) => () => {
         void commandOutcomes.run('graph-create', create);
       }),
-      // Deleting the Active Graph repoints every Space Resource that selected
-      // it and leaves the canvas on the survivor, in the same Map.
-      onDelete: offered(activeGraphCommands.delete, (remove) => () => {
-        void commandOutcomes.run('graph-delete', remove);
+      // Asked first, through the delete confirmation. Deleting the Active Graph
+      // repoints every Space Resource that selected it and leaves the canvas on
+      // the survivor, in the same Map.
+      onDelete: offered(activeGraphCommands.delete, (remove) => (focusFallback) => {
+        app.deleteConfirmation.arm({
+          ...graphDeletionWords(activeGraph, selectedMap),
+          run: async () => {
+            await commandOutcomes.run('graph-delete', remove);
+          },
+          focusFallback,
+        });
       }),
       onCopyLink: runEntityCommand(
         { kind: 'graph', graph: activeGraph, map: selectedMap },
