@@ -6,7 +6,12 @@ import {
   type UUID,
 } from '@project/core';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
-import type { EntityActionGroup, ImageReplacement } from '@project/ui';
+import {
+  beginEditing,
+  beginReplacing,
+  type EntityActionGroup,
+  type ImageReplacement,
+} from '@project/ui';
 import { buildSpaceResourceRail } from './build-space-resource-rail';
 import type { SpaceResourceRailContext } from './space-resource-context-commands';
 import type { CommandOutcomes } from './command-outcomes';
@@ -27,8 +32,7 @@ export type CanvasResourceDataPatch = Partial<
     | 'titleEditor'
     | 'entityActions'
     | 'onBeginBodyEditing'
-    | 'bodyEditor'
-    | 'imageReplacer'
+    | 'display'
     | 'spaceRail'
     | 'contextNotice'
     | 'portal'
@@ -233,7 +237,7 @@ export function decorateMarkdownResourceNode(
   node: ResourceFlowNode,
   context: MarkdownResourceDecorationContext,
 ): CanvasResourceDataPatch {
-  const patch: Mutable<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'bodyEditor'>> = {};
+  const patch: Mutable<Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'display'>>> = {};
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (
     resourceBelongsToWorkingSpace &&
@@ -248,10 +252,16 @@ export function decorateMarkdownResourceNode(
     node.data.kind === 'markdown' &&
     context.bodyEditorResourceId === node.id
   ) {
-    patch.bodyEditor = {
-      onComplete: (body) => context.completeResourceBody(node.data.resourceId, body),
+    const editor = {
+      onComplete: (body: string) => context.completeResourceBody(node.data.resourceId, body),
       onEnd: () => context.clearCaret(),
     };
+    // The editor is drawn only once the display is Open with this Resource's
+    // own Markdown: a caret that lands before the Open projection draws
+    // nothing until it arrives. It takes focus, since the author just asked
+    // to write.
+    const display = beginEditing(node.data.display, editor, true);
+    if (display !== node.data.display) patch.display = display;
   }
   return patch;
 }
@@ -267,18 +277,20 @@ export function decorateImageResourceNode(
 ): CanvasResourceDataPatch {
   const replace = context.replaceResourceImage;
   if (node.data.kind !== 'image' || replace === undefined) return {};
-  const patch: Mutable<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'imageReplacer'>> = {};
+  const patch: Mutable<Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'display'>>> = {};
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginBodyEditing = () => context.beginBodyEditing(node);
   }
   if (resourceBelongsToWorkingSpace && context.bodyEditorResourceId === node.id) {
     const resourceId = node.data.resourceId;
-    patch.imageReplacer = {
+    const replacer = {
       accept: context.imageAccept,
-      onReplace: (replacement) => replace(resourceId, replacement),
+      onReplace: (replacement: ImageReplacement) => replace(resourceId, replacement),
       onEnd: () => context.clearCaret(),
     };
+    const display = beginReplacing(node.data.display, replacer);
+    if (display !== node.data.display) patch.display = display;
   }
   return patch;
 }

@@ -1,9 +1,11 @@
 import fc from 'fast-check';
 import { Position } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
+import { uuidSchema, type Resource, type UUID } from '@project/core';
 import {
   buildGraphRenderEdges,
   loadSpace,
+  serializeResourceFile,
   type LayoutStrategyGraph,
   type ResourceFile,
 } from '@project/graph';
@@ -197,6 +199,113 @@ describe('projection handle invariants', () => {
           expect(new Set(seen).size, `${node.id} handles`).toBe(seen.length);
         }
       }),
+    );
+  });
+});
+
+type GeneratedKind = Resource['kind'];
+
+/**
+ * A generated Space with each Resource given a kind. A Reference Resource
+ * targets an earlier Resource that owns content, since intake refuses a
+ * Reference Resource to a Reference Resource; with none yet, it is Markdown. A
+ * Space Resource targets a Space other than the one it is in.
+ */
+function withKinds(
+  generated: { file: unknown; resourceFiles: ResourceFile[] },
+  kinds: readonly GeneratedKind[],
+) {
+  const owners: UUID[] = [];
+  const resourceFiles = generated.resourceFiles.map((file, index): ResourceFile => {
+    const id = uuidSchema.parse(file.path.slice('resources/'.length, -'.md'.length));
+    const title = `Resource ${index}`;
+    const chosen = kinds[index % kinds.length] ?? 'markdown';
+    const target = owners[index % Math.max(owners.length, 1)];
+    const resource: Resource =
+      chosen === 'reference' && target !== undefined
+        ? { id, title, kind: 'reference', target }
+        : chosen === 'image'
+          ? { id, title, kind: 'image', url: `https://example.com/${index}.png` }
+          : chosen === 'space'
+            ? {
+                id,
+                title,
+                kind: 'space',
+                spaceId: uuidSchema.parse(uuidFrom(900)),
+                map: uuidSchema.parse(uuidFrom(901)),
+                graph: uuidSchema.parse(uuidFrom(902)),
+              }
+            : { id, title, kind: 'markdown', body: `Body ${index}\n` };
+    if (resource.kind !== 'reference') owners.push(id);
+    return { path: file.path, text: serializeResourceFile(resource) };
+  });
+  return { file: generated.file, resourceFiles };
+}
+
+const kindsArb = fc.array(
+  fc.constantFrom<GeneratedKind>('markdown', 'image', 'space', 'reference'),
+  { minLength: 1, maxLength: 8 },
+);
+
+describe('what each node shows', () => {
+  /**
+   * A Resource's own content is of its own kind: the display and the kind the
+   * front is chosen by are made from one Resource, so they cannot disagree for
+   * content that is the Resource's own.
+   */
+  it('draws content of the node’s own kind whenever the content is its own', () => {
+    fc.assert(
+      fc.property(spaceFileArb, kindsArb, (generated, kinds) => {
+        const kinded = withKinds(generated, kinds);
+        const result = loadSpace(kinded.file, kinded.resourceFiles);
+        if (!result.ok) throw new Error(JSON.stringify(result.errors));
+        const space = result.space;
+        const nodes = projectResourceNodes(space, {
+          openResourceIds: new Set(space.resources.map((resource) => resource.id)),
+        });
+
+        for (const node of nodes) {
+          const { display } = node.data;
+          if (display.shown === 'closed') throw new Error('an Open Resource was drawn Closed');
+          if (display.content.via === 'self') expect(display.content.kind).toBe(node.data.kind);
+        }
+      }),
+    );
+  });
+
+  /**
+   * Presenting over Open is decided once, in the projection: a Resource both
+   * presented and Open is presented, and keeps its authored Open state, which
+   * is geometry rather than what it draws.
+   */
+  it('shows the presented Resource as presented, the Open ones as open, and the rest Closed', () => {
+    fc.assert(
+      fc.property(
+        spaceFileArb,
+        fc.array(fc.boolean(), { minLength: 1 }),
+        fc.nat(),
+        (generated, openings, presentedIndex) => {
+          const result = loadSpace(generated.file, generated.resourceFiles);
+          if (!result.ok) throw new Error(JSON.stringify(result.errors));
+          const space = result.space;
+          const ids = space.resources.map((resource) => resource.id);
+          const openIds = new Set(ids.filter((_, index) => openings[index % openings.length]));
+          const presented = ids[presentedIndex % ids.length];
+          const nodes = projectResourceNodes(space, {
+            openResourceIds: openIds,
+            activeResourceId: presented ?? null,
+            showActiveResourceContent: true,
+          });
+
+          for (const node of nodes) {
+            const open = openIds.has(node.data.resourceId);
+            const expected =
+              node.data.resourceId === presented ? 'presented' : open ? 'open' : 'closed';
+            expect(node.data.display.shown).toBe(expected);
+            expect(node.data.open === true).toBe(open);
+          }
+        },
+      ),
     );
   });
 });

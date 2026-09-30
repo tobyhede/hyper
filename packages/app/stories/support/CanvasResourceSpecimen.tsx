@@ -1,4 +1,9 @@
-import { CanvasResource, type CanvasResourceFront, type CanvasResourceState } from '@project/ui';
+import {
+  CanvasResource,
+  CLOSED_DISPLAY,
+  type CanvasResourceFront,
+  type CanvasResourceState,
+} from '@project/ui';
 
 interface CanvasResourceSpecimenProps {
   readonly title: string;
@@ -22,15 +27,14 @@ export function CanvasResourceSpecimen({
   state = 'rest',
   graphColor = '#ffc53d',
 }: CanvasResourceSpecimenProps) {
-  const front: CanvasResourceFront =
-    kind === 'preview'
-      ? { kind: 'preview' }
-      : kind === 'reference'
-        ? { kind: 'reference', target: { kind: 'markdown', source: '' }, open: false }
-        : kind === 'space'
-          ? { kind: 'space', open: false }
-          : kind === 'image'
-            ? { kind: 'image', url: 'https://example.com/figure.png', open: false }
-            : { kind: 'markdown', source: '', open: false };
-  return <CanvasResource front={front} title={title} state={state} graphColor={graphColor} />;
+  const front: CanvasResourceFront = { kind };
+  return (
+    <CanvasResource
+      front={front}
+      display={CLOSED_DISPLAY}
+      title={title}
+      state={state}
+      graphColor={graphColor}
+    />
+  );
 }

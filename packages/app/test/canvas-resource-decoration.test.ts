@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SPACE_RESOURCE_MIN_OPEN_SIZE, uuidSchema, type ResourceId } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
+  decorateImageResourceNode,
   decorateMarkdownResourceNode,
   decorateSharedResourceNode,
   decorateSpaceResourceNode,
@@ -10,6 +11,7 @@ import {
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
+import { fixtureDisplay } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -51,7 +53,7 @@ const projectionNode = (
     open,
     active: false,
     selectedForAuthoring: false,
-    showContent: false,
+    display: fixtureDisplay(open, kind),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
   },
@@ -112,7 +114,6 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
     expect(patch.onBeginBodyEditing).toBeUndefined();
-    expect(patch.bodyEditor).toBeUndefined();
     expect(patch.spaceRail).toBeUndefined();
   });
 
@@ -250,17 +251,60 @@ describe('decorateMarkdownResourceNode', () => {
     ).toBeUndefined();
   });
 
-  it('installs the body editor only on the Resource whose caret is live', () => {
+  it('enters the editing display, focused, on an Open Resource whose caret is live', () => {
+    const markdown = projectionNode(RESOURCE_ID, 'markdown', true);
+    const patch = decorateMarkdownResourceNode(
+      markdown,
+      context({ bodyEditorResourceId: RESOURCE_ID }),
+    );
+    expect(patch.display).toMatchObject({
+      shown: 'editing',
+      content: { kind: 'markdown', via: 'self' },
+      autoFocus: true,
+    });
+    expect(decorateMarkdownResourceNode(markdown, context()).display).toBeUndefined();
+  });
+
+  it('leaves a Closed Resource’s display alone although its caret is live', () => {
     expect(
       decorateMarkdownResourceNode(
-        projectionNode(RESOURCE_ID, 'markdown', true),
+        projectionNode(RESOURCE_ID, 'markdown'),
         context({ bodyEditorResourceId: RESOURCE_ID }),
-      ).bodyEditor,
-    ).toBeDefined();
-    expect(
-      decorateMarkdownResourceNode(projectionNode(RESOURCE_ID, 'markdown', true), context())
-        .bodyEditor,
+      ).display,
     ).toBeUndefined();
+  });
+});
+
+describe('decorateImageResourceNode', () => {
+  const IMAGE_URL = 'https://example.com/figure.png';
+  const imageNode = (open: boolean): ResourceFlowNode => {
+    const node = projectionNode(RESOURCE_ID, 'markdown', open);
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        kind: 'image',
+        display: open
+          ? { shown: 'open', content: { kind: 'image', url: IMAGE_URL, via: 'self' } }
+          : node.data.display,
+      },
+    };
+  };
+  const replacing = context({
+    bodyEditorResourceId: RESOURCE_ID,
+    replaceResourceImage: () => Promise.resolve(null),
+  });
+
+  it('enters the replacing display on an Open Image Resource whose caret is live', () => {
+    expect(decorateImageResourceNode(imageNode(true), replacing).display).toMatchObject({
+      shown: 'replacing',
+      content: { kind: 'image', url: IMAGE_URL, via: 'self' },
+      replacer: { accept: 'image/png' },
+    });
+  });
+
+  it('leaves a Closed Image Resource’s display alone although its caret is live', () => {
+    expect(decorateImageResourceNode(imageNode(false), replacing).display).toBeUndefined();
   });
 });
 

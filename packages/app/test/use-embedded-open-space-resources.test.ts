@@ -2,7 +2,7 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { uuidSchema, type Resource } from '@project/core';
+import { uuidSchema } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { OpenSpace } from '../src/open-spaces';
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
@@ -10,6 +10,7 @@ import {
   useEmbeddedOpenSpaceResources,
   type EmbeddedTargetReader,
 } from '../src/use-embedded-open-space-resources';
+import { fixtureDisplay } from './render-adapter-fixtures';
 
 /** No gesture in flight: the lean is a drag's, and these tests run none. */
 const NO_DRAG: ReadonlySet<string> = new Set();
@@ -20,7 +21,6 @@ const id = (value: number) =>
 const HOST = id(1);
 const TARGET = id(2);
 const MAP = id(3);
-const GRAPH = id(4);
 const OTHER_MAP = id(6);
 
 const spaceResource = (resourceId: typeof HOST, map: typeof MAP): ResourceFlowNode => ({
@@ -35,17 +35,9 @@ const spaceResource = (resourceId: typeof HOST, map: typeof MAP): ResourceFlowNo
     readOnly: false,
     kind: 'space',
     open: true,
-    spaceContent: {
-      id: resourceId,
-      title: 'Elsewhere',
-      kind: 'space',
-      spaceId: TARGET,
-      map,
-      graph: GRAPH,
-    } satisfies Extract<Resource, { kind: 'space' }>,
     active: false,
     selectedForAuthoring: false,
-    showContent: false,
+    display: fixtureDisplay(true, 'space', '', { spaceId: TARGET, map }),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
   },

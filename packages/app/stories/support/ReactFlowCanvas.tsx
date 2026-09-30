@@ -9,10 +9,11 @@ import {
   type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
-import type { ResourceId, GraphId, MapId } from '@project/core';
+import type { ResourceContent, ResourceId, GraphId, MapId } from '@project/core';
 import {
   Placement,
   positionedStrategy,
+  resolveResourceContent,
   type LayoutStrategyGraph,
   type Space,
 } from '@project/graph';
@@ -407,20 +408,33 @@ interface CanvasResourceNodeSpecimenBaseProps {
   readonly stageClassName?: string;
   readonly zoom?: number | undefined;
   readonly title?: string;
-  readonly body?: string;
+  /**
+   * What the specimen draws while Open. Omitted, it draws the fixture
+   * Resource's own resolved content.
+   */
+  readonly content?: ResourceContent;
   readonly readOnly?: boolean;
   /** Whether the specimen can be moved by a pointer; see {@link StoryCanvasProps.draggable}. */
   readonly draggable?: boolean;
+  /**
+   * Which Map of which Space holds the fixture Resource; the inventory's own
+   * when absent. The Resource's Open content is resolved in that Space, so a
+   * Reference Resource draws its real Target.
+   */
+  readonly drawn?: DrawnMap;
 }
 
 /**
- * The fixture Resource keeps its own kind, or is drawn as an Image Resource
- * showing `imageUrl`, as the projection hands `ResourceNode` one.
+ * The fixture Resource keeps its own kind, or is drawn as an Image Resource,
+ * whose Open content is then its own image.
  */
 export type CanvasResourceNodeSpecimenProps = CanvasResourceNodeSpecimenBaseProps &
   (
-    | { readonly kind?: undefined; readonly imageUrl?: never }
-    | { readonly kind: 'image'; readonly imageUrl: string }
+    | { readonly kind?: undefined }
+    | {
+        readonly kind: 'image';
+        readonly content: Extract<ResourceContent, { readonly kind: 'image' }>;
+      }
   );
 
 /**
@@ -440,29 +454,34 @@ export function CanvasResourceNodeSpecimen({
   stageClassName = '',
   zoom,
   title,
-  body,
   kind,
-  imageUrl,
+  content,
   readOnly = false,
   draggable = false,
+  drawn = INVENTORY_MAP,
 }: CanvasResourceNodeSpecimenProps) {
-  const projected = useProjection(graphIds.long);
+  const drawnSpace = drawn.space;
+  const map = drawnSpace.maps.find((candidate) => candidate.id === drawn.mapId);
+  const projected = useProjection(
+    drawn === INVENTORY_MAP ? graphIds.long : (map?.activeGraph ?? null),
+    null,
+    drawn,
+  );
   if (projected === null) return null;
   if (projected instanceof Error) return <PlacementFailure reason={projected} />;
 
   const source = projected.nodes.find(({ id }) => id === resourceId);
   if (source === undefined) throw new Error(`Missing fixture Resource ${resourceId}`);
 
-  const resource = space.resources.find((candidate) => candidate.id === resourceId);
-  const map = space.maps.find((candidate) => candidate.id === mapId);
+  const resource = drawnSpace.resources.find((candidate) => candidate.id === resourceId);
   if (resource === undefined || map === undefined)
     throw new Error('Missing fixture Resource or Map');
 
   const data: ResourceFlowNode['data'] = {
     ...source.data,
     entityActions: spaceEntityActions({
-      spaceId: space.id,
-      spaceTitle: space.title,
+      spaceId: drawnSpace.id,
+      spaceTitle: drawnSpace.title,
       onCopy: () => true,
       onOpenIndependently: null,
       onRename: null,
@@ -473,10 +492,12 @@ export function CanvasResourceNodeSpecimen({
   if (openOperationEnabled) data.onEditResource = onOpenChange ?? (() => 'completed');
   if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
-  if (body !== undefined) data.body = body;
-  if (kind === 'image') {
-    data.kind = kind;
-    data.imageUrl = imageUrl;
+  if (kind === 'image') data.kind = kind;
+  if (open === true) {
+    data.display = {
+      shown: 'open',
+      content: content ?? resolveResourceContent(drawnSpace, resource),
+    };
   }
   // The editor is the state, so a specimen that asks to be renaming supplies
   // what ends the edit along with it.

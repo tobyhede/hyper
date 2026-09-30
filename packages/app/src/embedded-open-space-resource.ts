@@ -6,6 +6,7 @@ import {
   type ResourceId,
 } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { spaceViewOf } from '@project/ui';
 
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from './drag-tilt';
 import type { EmbeddedBounds } from './embedded-map';
@@ -160,6 +161,17 @@ export function embedBounds(
 }
 
 /**
+ * Whether a Resource reports its body height, which clips the Map it embeds.
+ * Keyed by kind rather than by what the Resource shows, because a Closed
+ * Resource shows nothing: a Space Resource, or a Reference Resource that may
+ * target one, reports while Closed so the height is known on the frame it
+ * Opens.
+ */
+export function reportsBodyHeight(node: ResourceFlowNode): boolean {
+  return node.data.kind === 'space' || node.data.kind === 'reference';
+}
+
+/**
  * Nested Open Space Resource embed requests from the current node tree and a
  * publication snapshot. A Map already on the path is skipped so a mutual
  * pair cannot deepen one level per commit.
@@ -188,10 +200,11 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
   for (const item of queue) {
     const { parent, origin, containingDrawn, clip, path } = item;
     if (parent.data.open !== true) continue;
-    const document = parent.data.spaceContent;
-    if (document === undefined) continue;
-    const readOnly = item.readOnly || parent.data.kind === 'reference';
-    const crossing = `${document.spaceId}:${document.map}`;
+    const shown = spaceViewOf(parent.data.display);
+    if (shown === undefined) continue;
+    const { view } = shown;
+    const readOnly = item.readOnly || shown.via === 'reference';
+    const crossing = `${view.spaceId}:${view.map}`;
     if (path.has(crossing)) continue;
     const crossed = new Set(path).add(crossing);
     const authoredPosition = untiltedPosition(parent, origin, containingDrawn, item.tiltCenter);
@@ -219,17 +232,17 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
     requests.push({
       parent: { ...parent, position: authoredPosition },
       readOnly,
-      spaceId: document.spaceId,
-      mapId: document.map,
-      graphId: document.graph,
-      entry: input.entries.find((entry) => entry.id === document.spaceId),
+      spaceId: view.spaceId,
+      mapId: view.map,
+      graphId: view.graph,
+      entry: input.entries.find((entry) => entry.id === view.spaceId),
       absolute: window.absolute,
       drawnAbsolute,
       bounds: window.bounds,
       tiltCenter,
     });
     const published = input.publications.get(parent.id);
-    if (published?.mapId === document.map) {
+    if (published?.mapId === view.map) {
       for (const child of published.nodes)
         queue.push({
           parent: child,

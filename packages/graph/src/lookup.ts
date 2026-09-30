@@ -1,4 +1,13 @@
-import type { Resource, ResourceId, Graph, GraphId, Map, UUID } from '@project/core';
+import type {
+  ContentVia,
+  Resource,
+  ResourceContent,
+  ResourceId,
+  Graph,
+  GraphId,
+  Map,
+  UUID,
+} from '@project/core';
 import type { Space } from './space';
 
 /**
@@ -53,29 +62,46 @@ export interface SpaceLookup {
   graph(id: GraphId): OwnedGraph | undefined;
 }
 
-/** A Resource that supplies Markdown or a Space view, after resolving a Reference Resource. */
-export type ResolvedContentResource = Extract<Resource, { kind: 'markdown' | 'space' }>;
+/** A Resource that owns its content: every kind but a Reference Resource. */
+type ContentOwner = Exclude<Resource, { kind: 'reference' }>;
+
+function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent {
+  switch (resource.kind) {
+    case 'markdown':
+      return { kind: 'markdown', source: resource.body, via };
+    case 'image':
+      return { kind: 'image', url: resource.url, via };
+    case 'space':
+      return {
+        kind: 'space',
+        view: {
+          spaceId: resource.spaceId,
+          map: resource.map,
+          graph: resource.graph,
+          framing: resource.framing,
+        },
+        via,
+      };
+  }
+}
 
 /**
- * The Resource whose content `resourceId` shows. Markdown and Space Resources resolve
- * to themselves; a reference resource resolves to its target (ADR 0009). Referencing is a single hop —
- * validation guarantees a target is never itself a reference resource — so this follows at
- * most one link. Returns `undefined` if the resource or its target does not resolve.
+ * What `resource` draws as its content. Markdown, Image and Space Resources
+ * answer their own with `via: 'self'`; a Reference Resource answers its
+ * Target's with `via: 'reference'`, following one hop (ADR 0009).
  *
- * A domain operation rather than an identity lookup, which is why it stays a
- * function beside `SpaceLookup` rather than becoming a fourth method on it: what
- * it answers is *content*, and the hop it follows is Reference Resource semantics.
+ * Total: it takes the Resource rather than an id, so there is nothing to not
+ * find. `unresolved` answers the two states intake refuses and the lookup's
+ * type cannot rule out: a missing Target, and a Target that is itself a
+ * Reference Resource.
  */
-export function resolveContentResource(
-  space: Space,
-  resourceId: ResourceId,
-): ResolvedContentResource | undefined {
-  const resource = space.lookup.resource(resourceId);
-  if (resource?.kind === 'markdown' || resource?.kind === 'space') return resource;
-  if (resource?.kind !== 'reference') return undefined;
-
+export function resolveResourceContent(space: Space, resource: Resource): ResourceContent {
+  if (resource.kind !== 'reference') return ownedContent(resource, 'self');
   const target = space.lookup.resource(resource.target);
-  return target?.kind === 'markdown' || target?.kind === 'space' ? target : undefined;
+  if (target === undefined || target.kind === 'reference') {
+    return { kind: 'unresolved', via: 'reference' };
+  }
+  return ownedContent(target, 'reference');
 }
 
 /**

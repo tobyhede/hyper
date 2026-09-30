@@ -1,5 +1,5 @@
 import { ViewportPortal, useConnection } from '@xyflow/react';
-import { CanvasResource } from '@project/ui';
+import { CanvasResource, CLOSED_DISPLAY } from '@project/ui';
 import { RESOURCE_SIZE } from '../resource';
 import { dropTarget, newResourceDrop, type ElementDropTarget } from '../edge-authoring';
 
@@ -72,6 +72,7 @@ export function NewResourcePreview({
       >
         <CanvasResource
           front={{ kind: 'preview' }}
+          display={CLOSED_DISPLAY}
           state="rest"
           title={title}
           graphColor="var(--accent)"

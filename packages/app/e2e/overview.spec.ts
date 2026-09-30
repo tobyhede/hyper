@@ -510,10 +510,11 @@ test('a resource shows its title in the graph, and opens to show rendered Markdo
   await expect(controls.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 });
 
-/** The two attributes of a Resource's content as one commit left them. */
+/** A Resource's content as one commit left it: its two attributes and its text. */
 interface PresenceCommit {
   readonly presence: string | null;
   readonly inert: string | null;
+  readonly text: string;
 }
 
 test('the Close action closes an opened resource', async ({ page }) => {
@@ -545,7 +546,9 @@ test('the Close action closes an opened resource', async ({ page }) => {
   // observer then stops, so `inert` arriving a commit later would be recorded
   // here as the `null` it was when `leaving` appeared, and fail. An empty
   // record is a failure too, and a different one: the content never entered
-  // `leaving` at all.
+  // `leaving` at all. The text is read in that same callback, so it is what the
+  // leaving commit drew: a Closed front carries no content, and the fade has to
+  // draw the Markdown the Open one last drew rather than an empty body.
   const leaving = await resource.evaluateHandle((node) => {
     const commits: PresenceCommit[] = [];
     new MutationObserver((_mutations, observer) => {
@@ -553,7 +556,11 @@ test('the Close action closes an opened resource', async ({ page }) => {
       if (content === null) return;
       const presence = content.getAttribute('data-presence');
       if (presence !== 'leaving') return;
-      commits.push({ presence, inert: content.getAttribute('inert') });
+      commits.push({
+        presence,
+        inert: content.getAttribute('inert'),
+        text: content.textContent,
+      });
       observer.disconnect();
     }).observe(node, {
       subtree: true,
@@ -568,7 +575,9 @@ test('the Close action closes an opened resource', async ({ page }) => {
   // the leaving window has closed, so what the observer caught is read once
   // after it rather than polled for.
   await expect(resource.locator('.canvas-resource__content')).toHaveCount(0);
-  expect(await leaving.jsonValue()).toEqual([{ presence: 'leaving', inert: '' }]);
+  expect(await leaving.jsonValue()).toEqual([
+    { presence: 'leaving', inert: '', text: expect.stringMatching(/\S/) },
+  ]);
   await expect(controls.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
 });
 

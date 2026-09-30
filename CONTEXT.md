@@ -59,7 +59,7 @@ The authored view of a target Map owned by a Space Resource, alongside its Map a
 **Reference Resource**:
 A Resource that is a reference to another Resource (its **Target**): a read-only view of that Resource's content. It carries its own Title and chooses its immutable Target when created; it may target a Markdown Resource, an Image Resource or a Space Resource, never itself or another Reference Resource.
 
-A Reference Resource is authorable as a Resource and through the Maps and Graphs that contain it: renamed, moved, connected, Opened, Closed, Resized. An Open Reference Resource renders its Target's content without authoring it; the Target is opened to author that content or its kind-specific configuration.
+A Reference Resource is authorable as a Resource and through the Maps and Graphs that contain it: renamed, moved, connected, Opened, Closed, Resized. An Open Reference Resource renders its Target's content without authoring it — an Image Resource Target's picture is drawn without Replace — and the Target is opened to author that content or its kind-specific configuration. A Reference Resource to an Image Resource first Opens at the size its Target's recorded natural size gives, as the Image Resource itself does.
 _Avoid_: alias, link (as a name for the Resource; Copy link is a command), copy, transclusion, mirror, and Reference as a family Space Resource belongs to (a Space Resource references a Space; it is not a Reference Resource).
 
 ## Graphs

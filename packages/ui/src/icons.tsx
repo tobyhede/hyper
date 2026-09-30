@@ -11,6 +11,7 @@ import {
   Image as ImageGlyph,
   ImageUp,
   LayoutGrid,
+  Link2Off,
   LogIn,
   Maximize,
   Maximize2,
@@ -166,6 +167,11 @@ export const MarkdownIcon = ({ size = 14 }: { size?: number | undefined }) => (
 /** The Resource kind that shows a picture from its URL (ADR 0106). */
 export const ImageIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <ImageGlyph size={size} />
+);
+
+/** Content a Reference Resource cannot reach, because its Target does not resolve. */
+export const UnresolvedTargetIcon = ({ size = 14 }: { size?: number | undefined }) => (
+  <Link2Off size={size} />
 );
 
 /**

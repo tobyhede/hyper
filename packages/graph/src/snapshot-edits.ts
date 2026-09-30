@@ -368,6 +368,26 @@ const firstOpenSize = (document: ResourceDocument | undefined): Extent => {
 };
 
 /**
+ * The document whose kind chooses a Resource's first Open Size.
+ *
+ * A Reference Resource to an Image Resource draws its Target's image, so it
+ * reads its Target's recorded natural size by the same rule, in the same
+ * synchronous Edit (ADR 0070, ADR 0106). A Reference Resource to any other
+ * Target answers its own document, which opens at the default Open Size.
+ */
+const openSizeDocument = (
+  snapshot: SpaceSnapshot,
+  resourceId: UUID,
+): ResourceDocument | undefined => {
+  const documentOf = (id: UUID) =>
+    snapshot.resources.find((resource) => resource.id === id)?.document;
+  const document = documentOf(resourceId);
+  if (document?.kind !== 'reference') return document;
+  const target = documentOf(document.target);
+  return target?.kind === 'image' ? target : document;
+};
+
+/**
  * Open a Resource in one Map, moving the Resources clear of it by the room it
  * now takes (ADR 0084, ADR 0093).
  *
@@ -382,8 +402,7 @@ function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotE
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   if (at.open) return UNCHANGED;
-  const document = snapshot.resources.find((resource) => resource.id === resourceId)?.document;
-  const openSize = at.openSize ?? firstOpenSize(document);
+  const openSize = at.openSize ?? firstOpenSize(openSizeDocument(snapshot, resourceId));
   return withPlacement(
     snapshot,
     mapId,

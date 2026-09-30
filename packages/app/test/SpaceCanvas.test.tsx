@@ -12,6 +12,8 @@ import type { EdgeAuthoring } from '../src/edge-authoring';
 import { RESOURCE_SIZE } from '../src/resource';
 import type { ResourceResize } from '../src/render-adapter';
 import { mountSettled } from './settled-mount';
+import { CLOSED_DISPLAY } from '@project/ui';
+import { fixtureDisplay } from './render-adapter-fixtures';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -56,7 +58,7 @@ const resourceNode = (
   title: string,
   id: typeof RESOURCE_ID = RESOURCE_ID,
   selected = false,
-  kind: Exclude<ResourceNodeData['kind'], 'image'> = 'markdown',
+  kind: ResourceNodeData['kind'] = 'markdown',
 ): ResourceFlowNode => ({
   id,
   type: 'resource',
@@ -71,7 +73,7 @@ const resourceNode = (
     kind,
     active: false,
     selectedForAuthoring: false,
-    showContent: false,
+    display: CLOSED_DISPLAY,
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
   },
@@ -453,7 +455,7 @@ describe('withdrawing canvas authoring from an Open Resource', () => {
   it('withdraws body editing and resize through the same complete gate', async () => {
     const opened = resourceNode('A', RESOURCE_ID, true);
     opened.data.open = true;
-    opened.data.body = '# A';
+    opened.data.display = fixtureDisplay(true, 'markdown', '# A');
     const { view, setTitleEditing } = await mountGraph([opened]);
 
     expect(screen.getByRole('button', { name: 'Edit Markdown source of A' })).toBeVisible();
@@ -470,7 +472,7 @@ describe('withdrawing canvas authoring from an Open Resource', () => {
     async (key) => {
       const opened = resourceNode('A', RESOURCE_ID, true);
       opened.data.open = true;
-      opened.data.body = '# A';
+      opened.data.display = fixtureDisplay(true, 'markdown', '# A');
       const { openResource } = await mountGraph([opened]);
       fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
 
@@ -582,6 +584,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
     const reference = resourceNode('Reference Resource', RESOURCE_ID, false);
     reference.data.kind = 'reference';
     reference.data.open = true;
+    reference.data.display = fixtureDisplay(true, 'reference');
     const { view } = await mountGraph([reference]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
@@ -603,7 +606,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('routes one resize lifecycle from the control to the canvas capability', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
-    opened.data.body = '# A';
+    opened.data.display = fixtureDisplay(true, 'markdown', '# A');
     const onSelectResource = vi.fn();
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
@@ -639,6 +642,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('proposes no node change to React Flow while it resizes', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
+    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -660,6 +664,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('routes loss of an active resize to cancellation', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
+    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -694,6 +699,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('keeps a touch gesture alive across the projection its own frames publish', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
+    opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
       previewResize: vi.fn(),
@@ -707,6 +713,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
 
     const republished = resourceNode('A', RESOURCE_ID, false);
     republished.data.open = true;
+    republished.data.display = fixtureDisplay(true, 'markdown');
     setNodes([republished]);
 
     touchResizeControl('touchmove', 80, 60);

@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { CanvasResource } from '../src';
+import { beginEditing, CanvasResource, type FrontDisplay } from '../src';
 import { MarkdownResourceBody } from '../src/MarkdownResourceBody';
 
 beforeAll(() => {
@@ -50,26 +50,17 @@ const body = (props: Partial<Parameters<typeof MarkdownResourceBody>[0]> = {}) =
  * (`resource-content-edit.ts`). Mounted alone, the body keeps its keys and offers no
  * control of its own.
  */
+const STRATEGIES: FrontDisplay = {
+  shown: 'open',
+  content: { kind: 'markdown', source: '# Strategies\n\nNo strategy is privileged.', via: 'self' },
+};
+
 const onResource = (
   props: Partial<Pick<Parameters<typeof MarkdownResourceBody>[0], 'editor'>> = {},
 ) => (
   <CanvasResource
-    front={
-      props.editor === undefined
-        ? {
-            kind: 'markdown',
-            source: '# Strategies\n\nNo strategy is privileged.',
-            open: true,
-            onBeginEdit: vi.fn(),
-          }
-        : {
-            kind: 'markdown',
-            source: '# Strategies\n\nNo strategy is privileged.',
-            open: true,
-            editor: props.editor,
-            onBeginEdit: vi.fn(),
-          }
-    }
+    front={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+    display={props.editor === undefined ? STRATEGIES : beginEditing(STRATEGIES, props.editor, true)}
     state="rest"
     title="Strategies"
     graphColor="#ffc53d"
@@ -80,21 +71,11 @@ function EditingResource() {
   const [editing, setEditing] = useState(true);
   return (
     <CanvasResource
-      front={
+      front={{ kind: 'markdown', onBeginEdit: () => setEditing(true) }}
+      display={
         editing
-          ? {
-              kind: 'markdown',
-              source: '# Strategies\n\nNo strategy is privileged.',
-              open: true,
-              editor: { onComplete: vi.fn(), onEnd: () => setEditing(false) },
-              onBeginEdit: () => setEditing(true),
-            }
-          : {
-              kind: 'markdown',
-              source: '# Strategies\n\nNo strategy is privileged.',
-              open: true,
-              onBeginEdit: () => setEditing(true),
-            }
+          ? beginEditing(STRATEGIES, { onComplete: vi.fn(), onEnd: () => setEditing(false) }, true)
+          : STRATEGIES
       }
       state="rest"
       title="Strategies"

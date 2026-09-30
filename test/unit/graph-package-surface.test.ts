@@ -23,7 +23,7 @@ import * as graphPackage from '@project/graph';
  * it in the same `SpaceError` union and is offered, so what separates them is
  * the module each belongs to and not how a consumer reaches it.
  *
- * `lookup` offers exactly one function. Identity resolution is reached through
+ * `lookup` offers only its content resolutions. Identity resolution is reached through
  * `space.lookup`, which the Space carries, so no shallow `get*` accessor has a
  * caller to name — and `buildSpaceLookup` is intake's, called by `space` and by
  * nothing outside the package. Its contextual types come with the module, which
@@ -55,7 +55,7 @@ const OFFERED_VALUES = [
   'parseImportResourceFile',
   'positionedStrategy',
   'repeatedGraphEdges',
-  'resolveContentResource',
+  'resolveResourceContent',
   'graphResourceIds',
   'graphStartResource',
   'serializeResourceFile',
@@ -81,7 +81,6 @@ const OFFERED_TYPES = [
   'ParseResourceFileResult',
   'ParseImportResourceFileResult',
   'OwnedGraph',
-  'ResolvedContentResource',
   'ResolvedMap',
   'Space',
   'SpaceAggregate',
