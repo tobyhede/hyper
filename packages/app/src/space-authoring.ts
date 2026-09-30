@@ -106,6 +106,12 @@ export interface CreatedImage {
   readonly naturalSize?: ImageNaturalSize;
 }
 
+/** An Image Resource's document: its Title, its URL, and its natural size when the picture loaded. */
+const imageDocument = (title: string, { url, naturalSize }: CreatedImage): ResourceDocument =>
+  naturalSize === undefined
+    ? { title, kind: 'image', url }
+    : { title, kind: 'image', url, naturalSize };
+
 /** The gap between Image Resources a single gesture creates side by side. */
 const IMAGE_ROW_GAP = 40;
 
@@ -1233,12 +1239,7 @@ export function createSpaceAuthoring({
       // (`image-replacement.test.ts`, "refuses a URL an Image Resource may not
       // hold rather than throwing on intake").
       if (!isAcceptedImageUrl(completion.url)) return refuse({ code: IMAGE_URL_UNSUPPORTED });
-      const document: ResourceDocument = {
-        title: resource.document.title,
-        kind: 'image',
-        url: completion.url,
-      };
-      if (completion.naturalSize !== undefined) document.naturalSize = completion.naturalSize;
+      const document = imageDocument(resource.document.title, completion);
       const resources = [...snapshot.resources];
       resources[resourceIndex] = { id: resource.id, document };
       snapshot = { ...snapshot, resources };
@@ -1274,15 +1275,10 @@ export function createSpaceAuthoring({
         return refuse({ code: IMAGE_URL_UNSUPPORTED });
       }
       const step = COLLAPSED_RESOURCE_SIZE.width + IMAGE_ROW_GAP;
-      for (const [index, { url, naturalSize }] of completion.images.entries()) {
+      for (const [index, image] of completion.images.entries()) {
         // Titled after the Resources created before it in this same Edit, so a
         // row of three takes three successive numbers.
-        const document: ResourceDocument = {
-          title: nextResourceTitle(snapshot),
-          kind: 'image',
-          url,
-        };
-        if (naturalSize !== undefined) document.naturalSize = naturalSize;
+        const document = imageDocument(nextResourceTitle(snapshot), image);
         const at = { ...completion.anchor, x: completion.anchor.x + index * step };
         const created = createResource(document, at, completion.placement);
         if ('kind' in created) return created;

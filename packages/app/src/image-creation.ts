@@ -46,19 +46,23 @@ export type ImageOrigin =
   | { readonly kind: 'files'; readonly files: readonly File[] }
   | { readonly kind: 'url'; readonly url: string };
 
-/**
- * What an image gesture answers, creating or replacing: the Edit's own result,
- * or the refusal that stopped a file being stored, named with the file so the
- * sentence can say which one.
- */
-export type ImageEditResult =
-  | AuthoringResult
-  | { readonly kind: 'not-stored'; readonly code: ImageRefusal; readonly name: string };
+/** A file the host refused to store, named so the sentence can say which. */
+export interface RefusedFile {
+  readonly code: ImageRefusal;
+  readonly name: string;
+}
 
 /**
- * The URL each file is stored at, in order, or the first file refused.
+ * What an image gesture answers, creating or replacing: the Edit's own result,
+ * or every file refused, in the order the gesture brought them.
+ */
+export type ImageEditResult =
+  AuthoringResult | { readonly kind: 'not-stored'; readonly refusals: readonly RefusedFile[] };
+
+/**
+ * The URL each file is stored at, in order, or every file refused.
  *
- * A file whose declared type is refused is answered before any file is sent,
+ * Files whose declared type is refused are answered before any file is sent,
  * so a drop holding one sends nothing. Otherwise every file is sent before any
  * answer is read, so a refused file can leave
  * the files beside it stored with nothing referencing them. That is the store's
@@ -73,19 +77,20 @@ export const storeEach = async (
   | { readonly kind: 'stored'; readonly urls: readonly string[] }
   | Extract<ImageEditResult, { readonly kind: 'not-stored' }>
 > => {
-  for (const file of files) {
+  const declared = files.flatMap((file): RefusedFile[] => {
     const code = refusalForDeclaredType(file.type);
-    if (code !== undefined) return { kind: 'not-stored', code, name: file.name };
-  }
+    return code === undefined ? [] : [{ code, name: file.name }];
+  });
+  if (declared.length > 0) return { kind: 'not-stored', refusals: declared };
   const answers = await Promise.all(files.map((file) => images.store(file)));
   const urls: string[] = [];
+  const refusals: RefusedFile[] = [];
   for (const [index, answer] of answers.entries()) {
-    if (answer.kind === 'refused') {
-      return { kind: 'not-stored', code: answer.code, name: files[index]?.name ?? '' };
-    }
-    urls.push(answer.url);
+    if (answer.kind === 'refused')
+      refusals.push({ code: answer.code, name: files[index]?.name ?? '' });
+    else urls.push(answer.url);
   }
-  return { kind: 'stored', urls };
+  return refusals.length > 0 ? { kind: 'not-stored', refusals } : { kind: 'stored', urls };
 };
 
 /**

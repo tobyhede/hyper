@@ -1,5 +1,5 @@
 import { isAcceptedImageUrl, IMAGE_URL_UNSUPPORTED, type ResourceId } from '@project/core';
-import { describeAuthoringRefusal, describeImageRefusal } from './authoring-refusal';
+import { describeAuthoringRefusal, describeImageRefusals } from './authoring-refusal';
 import { storeEach, type ImageEditResult, type ImageSources } from './image-creation';
 import type { SpaceAuthoring } from './space-authoring';
 import type { ImageReplacement } from '@project/ui';
@@ -71,7 +71,7 @@ export const describeImageReplacement = (result: ImageReplacementResult): string
     case 'refused':
       return describeAuthoringRefusal(result.refusal);
     case 'not-stored':
-      return describeImageRefusal(result.code, result.name);
+      return describeImageRefusals(result.refusals);
     case 'completed':
     case 'unchanged':
     case 'queued':

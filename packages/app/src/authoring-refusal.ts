@@ -8,6 +8,7 @@ import {
   type SpaceSessionState,
 } from '@project/persistence';
 import type { ConnectionResult } from './connection-completion';
+import type { RefusedFile } from './image-creation';
 import type { AuthoringRefusal, StoredSpaceRefusal } from './space-authoring';
 import type {
   SpaceResourceRefusal,
@@ -62,16 +63,20 @@ const MAX_IMAGE_MEGABYTES = MAX_IMAGE_BYTES / (1024 * 1024);
  * Application-owned copy for the host refusing to store an image (ADR 0106),
  * naming the file it refused.
  */
-export const describeImageRefusal = (code: ImageRefusal, name: string): string => {
+const describeImageRefusal = (code: ImageRefusal, name: string): string => {
   switch (code) {
     case 'image-too-large':
       return `${name} is larger than ${MAX_IMAGE_MEGABYTES} MB, the largest image that can be stored.`;
     case 'image-format-unsupported':
       return `${name} is not a ${STORED_IMAGE_FORMATS} image.`;
     case 'image-svg-unsupported':
-      return `${name} is an SVG image, which cannot be stored yet. Use ${STORED_IMAGE_FORMATS}.`;
+      return `${name} is an SVG image, which cannot be stored. Use ${STORED_IMAGE_FORMATS}.`;
   }
 };
+
+/** Every file the host refused, a sentence each, in the order the gesture brought them. */
+export const describeImageRefusals = (refusals: readonly RefusedFile[]): string =>
+  refusals.map(({ code, name }) => describeImageRefusal(code, name)).join(' ');
 
 /** Application-owned copy for a stable Authoring refusal identity. */
 export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): string => {
