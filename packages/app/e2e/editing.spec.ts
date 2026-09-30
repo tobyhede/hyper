@@ -2155,6 +2155,43 @@ test('the rail’s Delete from Space names the Maps and Graphs the deletion reac
   await expect(nodeByTitle(page, 'B')).toBeVisible();
 });
 
+/**
+ * The menu row that armed the question closes with its menu, so the caret
+ * returns to the control that disclosed it — the Resource's Actions trigger —
+ * and, once the Resource and its rail are gone, to the canvas.
+ */
+test('the rail’s Delete from Space returns the caret to a live element', async ({ page }) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete B From Space?' });
+  await (
+    await resourceActions(page, 'B')
+  )
+    .getByRole('menuitem', { name: 'Delete from Space' })
+    .click();
+  await confirmation.getByRole('button', { name: 'Cancel' }).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Actions for Resource B' })).toBeFocused();
+
+  await (
+    await resourceActions(page, 'B')
+  )
+    .getByRole('menuitem', { name: 'Delete from Space' })
+    .click();
+  await confirmation.getByRole('button', { name: 'Delete' }).click();
+  await expect(nodeByTitle(page, 'B')).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const active = document.activeElement;
+        return active === null || active === document.body ? 'BODY' : active.isConnected;
+      }),
+    )
+    .toBe(true);
+});
+
 test(
   'a Resource the Map no longer places is deleted from the Resources list',
   { tag: '@parity:resources-popover-offers-delete-from-space-on-a-resource-row' },

@@ -351,6 +351,41 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
+   * The menu row that armed Delete from Space closes with its menu, so the
+   * question returns the caret to the control that disclosed it — and, once
+   * the Resource and its rail are gone, to the canvas, where a completed Edit
+   * leaves it.
+   */
+  it('returns the caret to the Actions trigger on Cancel and to the canvas on Delete', async () => {
+    const session = mount();
+
+    await selectResource('A');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
+    const question = await screen.findByRole('alertdialog', { name: 'Delete A From Space?' });
+    fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Actions for Resource A' })).toHaveFocus(),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete from Space' }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    );
+    await waitFor(() => expect(resourceIds(session)).toEqual([OTHER_RESOURCE_ID]));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Actions for Resource A' })).toBeNull(),
+    );
+    await waitFor(() => {
+      expect(document.activeElement).not.toBe(document.body);
+      expect(document.activeElement?.isConnected).toBe(true);
+    });
+    await settled(session);
+  });
+
+  /**
    * Remove from Map reports on its own channel rather than Delete from
    * Space's, so a refused removal never reads "Resource not deleted" about a
    * Resource nobody is deleting.

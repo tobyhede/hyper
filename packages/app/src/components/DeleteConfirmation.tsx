@@ -127,14 +127,18 @@ function ReachedList({ list }: { readonly list: DeleteQuestionList }) {
 }
 
 /**
- * The dialog primitive's final focus for a return target. The primitive
- * focuses an HTML element itself; an SVG element — an Edge, which is drawn and
- * focused as one — is focused here and the primitive told to leave it, and no
- * target leaves the choice to the primitive.
+ * The dialog primitive's final focus for a return target: focused here and the
+ * primitive told to leave it, and no target leaves the choice to the primitive.
+ *
+ * Focused here rather than handed back, for two kinds of target. An SVG element
+ * — an Edge, which is drawn and focused as one — is not one the primitive
+ * focuses. And a Delete that ran disables the button that held the caret, which
+ * drops it on `body`; the primitive then returns focus to nothing, so an HTML
+ * element handed back is left unfocused. `resource-rail-actions.test.tsx` and
+ * the rail's e2e case hold the second.
  */
-const returnFocusTo = (target: HTMLElement | SVGElement | null): HTMLElement | boolean => {
+const returnFocusTo = (target: HTMLElement | SVGElement | null): boolean => {
   if (target === null) return true;
-  if (target instanceof HTMLElement) return target;
   target.focus();
   return false;
 };

@@ -11,6 +11,8 @@ import {
 } from '@project/ui';
 import type { AuthoringAvailability } from './authoring-availability';
 import type { ComposedApp } from './compose-app';
+import { canvasElement } from './canvas-element';
+import type { FocusFallback } from './delete-confirmation';
 import { OPEN_INDEPENDENTLY_ACTION_ID, type SpaceEntity } from './entity-actions';
 import type { OpenSpaces } from './open-spaces';
 
@@ -154,6 +156,27 @@ export interface ResourceRailInput {
   readonly spaces: OpenSpaces | null;
 }
 
+/** The Actions trigger on a Resource's rail, while the rail is drawn. */
+const actionsTriggerOf = (resourceId: ResourceId): HTMLElement | null =>
+  document.querySelector<HTMLElement>(
+    `[data-resource-rail-for="${CSS.escape(resourceId)}"] [data-slot="entity-actions-trigger"]`,
+  );
+
+/**
+ * Where Delete from Space's question returns the caret when the menu row that
+ * armed it has closed with its menu: the Resource's Actions trigger while the
+ * Space still holds the Resource, and otherwise the canvas, where a completed
+ * Edit with no subject left leaves it. Read when the question closes, from the
+ * working Space rather than the drawn one, because the rail is still drawn for
+ * a moment after the deletion completes.
+ */
+const railFocusFallback =
+  (currentSpace: ComposedApp['currentSpace'], resourceId: ResourceId): FocusFallback =>
+  () =>
+    (currentSpace().lookup.resource(resourceId) === undefined
+      ? null
+      : actionsTriggerOf(resourceId)) ?? canvasElement();
+
 /**
  * The builder a Resource's rail draws its menu from.
  *
@@ -163,7 +186,7 @@ export interface ResourceRailInput {
  * (`offers Remove from Map and Delete from Space while the Resource is Open`).
  */
 export function useResourceRailActions(
-  { authoring, commandOutcomes, resourceDeletion }: ComposedApp,
+  { authoring, commandOutcomes, currentSpace, resourceDeletion }: ComposedApp,
   {
     space,
     map: selectedMap,
@@ -195,7 +218,9 @@ export function useResourceRailActions(
                   );
                 }
               : null,
-          deleteFromSpace: deleteResource ? () => resourceDeletion.arm(resource) : null,
+          deleteFromSpace: deleteResource
+            ? () => resourceDeletion.arm(resource, railFocusFallback(currentSpace, resourceId))
+            : null,
           enter:
             spaces === null || resource.kind !== 'space'
               ? null
@@ -227,6 +252,7 @@ export function useResourceRailActions(
       spaces,
       authoring,
       commandOutcomes,
+      currentSpace,
       resourceDeletion,
     ],
   );
