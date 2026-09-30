@@ -1,4 +1,4 @@
-import { newUuid, uuidSchema, type UUID } from '@project/core';
+import { uuidSchema, type UUID } from '@project/core';
 import {
   admitImage,
   COMMIT_OUTCOME_WIRE,
@@ -80,7 +80,7 @@ const IMAGE_REFUSAL_DETAIL = {
 
 export interface SpaceHttpAppOptions {
   logError?: (message: string, error: unknown) => void;
-  newId?: () => UUID;
+  newId: () => UUID;
 }
 
 const defaultLogError = (message: string, error: unknown): void => {
@@ -447,11 +447,10 @@ const applyTransportPolicy = createMiddleware(async (context, next) => {
 
 export const createSpaceHttpApp = (
   repository: StoredSpaceRepository & ImageStore,
-  options: SpaceHttpAppOptions = {},
+  options: SpaceHttpAppOptions,
 ) => {
   const logError = options.logError ?? defaultLogError;
-  const newId = options.newId ?? newUuid;
-  const loadWorkingSpace = createWorkingSpaceLoader(repository, newId);
+  const loadWorkingSpace = createWorkingSpaceLoader(repository, options.newId);
   const app = new Hono()
     .use('*', applyTransportPolicy)
     .get(SPACE_COLLECTION_PATH, async (context) => {

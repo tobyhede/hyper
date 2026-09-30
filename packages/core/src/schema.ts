@@ -21,8 +21,8 @@ const idSchema = uuidSchema;
  * Mint a durable identity. The one place a UUID is generated.
  *
  * **Mint, not allocate.** Nothing reserves an id from a registry, and in
- * particular PostgreSQL does not hand them out: a space's id comes from its
- * column default, and every other id — resource, graph, map — is generated here,
+ * particular PostgreSQL does not hand them out: a Space's id comes from its
+ * column default, and every other id — Resource, Graph, Map — is generated here,
  * in whichever process is doing the work.
  *
  * The `crypto` global rather than `node:crypto`, so `core` and the packages
@@ -277,12 +277,12 @@ const edgeTitleSchema = z
   });
 
 /**
- * One edge of a graph: a directed connection from one resource to another (ADR
- * 0032). This is the element an author draws, and the graph is the set of them.
+ * One Edge of a Graph: a directed connection from one Resource to another (ADR
+ * 0032). This is the element an author draws, and the Graph is the set of them.
  *
- * Shape only, as everywhere in this file. Whether both ids name real resources,
- * whether they name resources of the map that owns this graph, and whether an
- * exact edge occurs more than once need the whole Graph/Space in view and are
+ * Shape only, as everywhere in this file. Whether both ids name real Resources,
+ * whether they name Resources of the Map that owns this Graph, and whether an
+ * exact Edge occurs more than once need the whole Graph/Space in view and are
  * checked in `@project/graph`. An Edge's identity is `(from, to)` within its
  * Graph; its Title takes no part in it.
  */
@@ -323,20 +323,20 @@ export const graphSchema = z.object({
    */
   headShape: graphHeadShapeSchema.optional(),
   /**
-   * Possibly none. A graph *is* its edges, but it is not minted by drawing
-   * one: creating a map creates its initial empty active graph in the same
-   * edit, and Add Map produces exactly that — one fresh graph holding no
-   * edges. Deleting a graph's last edge leaves the same shape, and graph
-   * management may not delete the graph itself to avoid it.
+   * Possibly none. A Graph *is* its Edges, but it is not minted by drawing
+   * one: creating a Map creates its initial empty Active Graph in the same
+   * Edit, and Add Map produces exactly that — one fresh Graph holding no
+   * Edges. Deleting a Graph's last Edge leaves the same shape, and Graph
+   * management may not delete the Graph itself to avoid it.
    *
-   * A resource may appear as the `from` of several edges (a fork) and the `to` of
+   * A Resource may appear as the `from` of several Edges (a fork) and the `to` of
    * several (a merge); nothing here constrains that.
    */
   edges: z.array(graphEdgeSchema),
 });
 
 /**
- * Where a positioned map puts a resource, in the map's own coordinate space.
+ * Where a positioned Map puts a Resource, in the Map's own coordinate space.
  * Finite, because JSON decodes an overflowing number such as `1e400` to
  * `Infinity`, which no stored document can encode back.
  */
@@ -357,20 +357,20 @@ export const resourcePlacementSchema = z.discriminatedUnion('open', [
 ]);
 
 /**
- * A map the author wrote: a resource-to-position map and the graphs over it
- * (ADR 0040).
+ * A Map the author wrote: a position for each Resource it holds, and the
+ * Graphs over them (ADR 0040).
  *
- * Its position keys **are** its resource membership. A resource the map omits is not in
- * this map — and a position may not name a resource the space does not hold;
- * that is a reference error, checked in `@project/graph` where the whole space
+ * Its position keys **are** its Resource membership. A Resource the Map omits is not in
+ * this Map — and a position may not name a Resource the Space does not hold;
+ * that is a reference error, checked in `@project/graph` where the whole Space
  * is in view.
  *
- * The graphs are **owned**, not referenced: they are nested values of the one
- * map that holds them, ordered, and never shared with a second (ADR 0040).
- * Every edge endpoint of an owned graph names a resource in this map, which
- * again needs the whole space in view. Ownership is map-scoped while a graph
- * id is unique across the *space* (ADR 0108), because the flatten a
- * space-subject view draws keys colour, handles and activation on the id alone.
+ * The Graphs are **owned**, not referenced: they are nested values of the one
+ * Map that holds them, ordered, and never shared with a second (ADR 0040).
+ * Every Edge endpoint of an owned Graph names a Resource in this Map, which
+ * again needs the whole Space in view. Ownership is Map-scoped while a Graph
+ * id is unique across the *Space* (ADR 0108), because the flatten a
+ * Space-subject view draws keys colour, handles and activation on the id alone.
  *
  * **Strict**, as the space file itself is: a stripped key is a question
  * answered silently, and rejecting says so instead.
@@ -382,32 +382,32 @@ export const positionedMapSchema = z
     kind: z.literal('positioned'),
     positions: z.record(idSchema, resourcePlacementSchema),
     /**
-     * The graphs this map owns, in author order. **At least one**: creating a
-     * map creates its initial graph in the same edit, and graph management
-     * cannot delete the last (ADR 0040), so a map with none is a state no
+     * The Graphs this Map owns, in author order. **At least one**: creating a
+     * Map creates its initial Graph in the same Edit, and Graph management
+     * cannot delete the last (ADR 0040), so a Map with none is a state no
      * gesture produces.
      */
     graphs: z.array(graphSchema).min(1),
     /**
-     * Which graph is active when this map opens. Absent, the **first graph**
-     * is (ADR 0040) — resolved on read, so a hand-authored space needs nothing
+     * Which Graph is active when this Map opens. Absent, the **first Graph**
+     * is (ADR 0040) — resolved on read, so a hand-authored Space needs nothing
      * here, while a file the app wrote names it outright rather than depending
-     * on graph order (ADR 0028). That it names a graph *this map* owns needs
-     * the whole space in view and is checked in `@project/graph`.
+     * on Graph order (ADR 0028). That it names a Graph *this Map* owns needs
+     * the whole Space in view and is checked in `@project/graph`.
      */
     activeGraph: idSchema.optional(),
   })
   .strict();
 
 /**
- * A map carried by the space file, discriminated by `kind`. Every Map is
- * authored: an automatic strategy computes placement from the resources and graphs
+ * A Map carried by the space file, discriminated by `kind`. Every Map is
+ * authored: an automatic strategy computes placement from the Resources and Graphs
  * alone, so it has nothing to write down and appears here nowhere (ADR 0079).
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
  * `kind` defaults to `'positioned'` when absent, the same shape `resourceSchema`
- * uses — here it is for hand-authoring rather than back-compat, so a map can
+ * uses — here it is for hand-authoring rather than back-compat, so a Map can
  * be written as just an id, a title, and its positions.
  */
 const defaultPositionedKind = (value: unknown): unknown =>
@@ -470,10 +470,10 @@ const spaceFileObjectSchema = z.strictObject({
   id: idSchema,
   title: z.string().min(1),
   /**
-   * Optional, and it is what holds the space's graphs — a map owns them
-   * (ADR 0040), so there is no space-level collection to declare beside it. A
-   * space with no maps therefore has no structure yet, which is what a new
-   * space *is*: it renders and it cannot be presented (ADR 0015).
+   * Optional, and it is what holds the Space's Graphs — a Map owns them
+   * (ADR 0040), so there is no Space-level collection to declare beside it. A
+   * Space with no Maps therefore has no structure yet, which is what a new
+   * Space *is*: it renders and it cannot be presented (ADR 0015).
    */
   maps: z.array(mapSchema).optional(),
   /** The durable opening selection, naming one declared Map. */
@@ -541,8 +541,8 @@ export const aggregateFileSchema = z.strictObject({
 
 export const importGraphSchema = graphSchema.extend({ id: uuidSchema.optional() });
 /**
- * A map being imported, with the ids the importer mints left out — its own
- * and those of the graphs it owns. Ownership is not relaxed: an owned graph
+ * A Map being imported, with the ids the importer mints left out — its own
+ * and those of the Graphs it owns. Ownership is not relaxed: an owned Graph
  * still arrives nested, and there is still at least one.
  */
 const importPositionedMapSchema = positionedMapSchema.extend({

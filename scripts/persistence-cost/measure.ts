@@ -40,7 +40,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { cpus, loadavg, platform, release, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { spaceSnapshotSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { newUuid, spaceSnapshotSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES } from '@project/http';
 import { decodeCommitResponse, encodeCommitRequest, type SpaceCommit } from '@project/persistence';
 import {
@@ -221,7 +221,7 @@ const runScenario = async (target: Target, subject: Scenario): Promise<readonly 
   });
   if (seeded.kind !== 'initialized')
     throw new Error(`Seeding ${subject.name} answered ${seeded.kind}`);
-  const app = createSpaceHttpApp(target.repository, { logError: () => undefined });
+  const app = createSpaceHttpApp(target.repository, { newId: newUuid, logError: () => undefined });
   const held = new Map<UUID, Held>(
     subject.spaces.map((snapshot) => [snapshot.id, { snapshot, revision: 0n }]),
   );
@@ -447,7 +447,10 @@ const main = async (): Promise<void> => {
       });
       const edited = oversized.spaces.find((snapshot) => snapshot.id === oversized.editedSpaceId);
       if (edited === undefined) throw new Error('edited Space missing');
-      const app = createSpaceHttpApp(target.repository, { logError: () => undefined });
+      const app = createSpaceHttpApp(target.repository, {
+        newId: newUuid,
+        logError: () => undefined,
+      });
       const result = await post(
         target,
         app,

@@ -1,3 +1,4 @@
+import type { UUID } from '@project/core';
 import {
   encodeProblemDetails,
   MAX_IMAGE_BYTES,
@@ -8,6 +9,11 @@ import {
 } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
+
+/** A request that initializes no Space mints nothing, so any mint is a failure here. */
+const mintsNothing = (): UUID => {
+  throw new Error('This request initializes no Space, so it mints no identity.');
+};
 
 const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01]);
 /** `png`'s SHA-256 as unpadded base64url, computed independently with Node's `crypto`. */
@@ -29,7 +35,7 @@ const backendOverHost = (): HttpSpaceBackend => {
     },
     loadImage: (id) => Promise.resolve(images.get(id)),
   };
-  const app = createSpaceHttpApp(store);
+  const app = createSpaceHttpApp(store, { newId: mintsNothing });
   return new HttpSpaceBackend('http://example.test', {
     fetch: async (input, init) => app.fetch(new Request(input, init)),
   });

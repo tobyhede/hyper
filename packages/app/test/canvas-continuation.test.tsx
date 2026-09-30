@@ -1,34 +1,21 @@
 import { render } from '@testing-library/react';
+import { ReactFlowProvider, useStoreApi, type Node } from '@xyflow/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
+import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import type { Continuation, ContinuationState, PendingContinuation } from '../src/continuation';
 
 /**
  * A `reveal` continuation moves the camera and focuses its Resource, and the
  * focus does not wait on the move.
  *
- * The stubbed `fitView` returns a Promise that never settles, which is what a
- * superseded move answers at the pinned release (ADR 0043). React Flow is mocked
- * rather than mounted, so what is under test is which command the adapter
- * issues and whether it focuses regardless of that command's fate.
+ * React Flow's own provider is mounted without a `<ReactFlow>` inside it, so
+ * there is no pan-zoom instance and the Resource is never measured: the
+ * `fitView` the adapter issues stays queued and its Promise never settles,
+ * which is what a superseded move answers at the pinned release (ADR 0043).
+ * What is under test is which move the adapter queues and whether it focuses
+ * regardless of that move's fate.
  */
-
-const flow = vi.hoisted(() => ({
-  fitView: vi.fn(
-    (_options: { nodes?: { id: string }[]; padding?: number; duration?: number }) =>
-      new Promise<boolean>(() => undefined),
-  ),
-  getNode: vi.fn((id: string) => ({ id })),
-}));
-
-vi.mock('@xyflow/react', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  useReactFlow: () => flow,
-  useStore: <T,>(selector: (state: { edges: never[]; nodes: never[] }) => T): T =>
-    selector({ edges: [], nodes: [] }),
-}));
-
-const { CanvasContinuation } = await import('../src/components/CanvasContinuation');
 
 const RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
@@ -49,7 +36,6 @@ const holding = (pending: PendingContinuation): Continuation => {
 
 afterEach(() => {
   document.body.replaceChildren();
-  flow.fitView.mockClear();
 });
 
 describe('a reveal continuation', () => {
@@ -65,17 +51,26 @@ describe('a reveal continuation', () => {
       then: 'reveal',
     });
     const onSelectResource = vi.fn();
+    const initialNodes: Node[] = [{ id: RESOURCE, position: { x: 0, y: 0 }, data: {} }];
+    let store: ReturnType<typeof useStoreApi> | undefined;
+    const StoreProbe = () => {
+      store = useStoreApi();
+      return null;
+    };
 
     render(
-      <CanvasContinuation
-        continuation={continuation}
-        onSelectResource={onSelectResource}
-        onSelectEdge={vi.fn()}
-      />,
+      <ReactFlowProvider initialNodes={initialNodes}>
+        <StoreProbe />
+        <CanvasContinuation
+          continuation={continuation}
+          onSelectResource={onSelectResource}
+          onSelectEdge={vi.fn()}
+        />
+      </ReactFlowProvider>,
     );
 
-    expect(flow.fitView).toHaveBeenCalledTimes(1);
-    expect(flow.fitView.mock.calls[0]?.[0].nodes).toEqual([{ id: RESOURCE }]);
+    expect(store?.getState().fitViewQueued).toBe(true);
+    expect(store?.getState().fitViewOptions?.nodes).toEqual([{ id: RESOURCE }]);
     expect(onSelectResource).toHaveBeenCalledWith(RESOURCE);
     expect(document.activeElement).toBe(node);
     expect(continuation.getState().pending).toBeNull();

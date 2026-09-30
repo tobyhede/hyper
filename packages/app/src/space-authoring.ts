@@ -1329,13 +1329,16 @@ export function createSpaceAuthoring({
       if (deleted === undefined) {
         return refuse({ code: 'resource-not-found' });
       }
-      // The Space Resources naming a Space own it together (ADR 0074), so
-      // deleting the last one deletes that Space and everything below it — one
-      // coordinated multi-Space Edit, which is Space Resource lifecycle through
-      // the session registry and not
-      // a single-Space update this seam can make. Completing it here would store
-      // a Space whose target is unreachable, and aggregate intake refuses that
-      // commit permanently with the Resource already gone from the working state.
+      // The Space Resources naming a Space own it together (ADR 0074): deleting
+      // one leaves the target to the others, and deleting the last deletes that
+      // Space and everything below it. Which case holds is a count across every
+      // Space, and the last-reference case is one coordinated multi-Space Edit —
+      // Space Resource lifecycle through the session registry. This seam reads
+      // and commits one Space, so it can neither count the references nor
+      // cascade, and it refuses every Space Resource deletion rather than guess.
+      // Completing a last-reference deletion here would store a Space nothing
+      // references, and aggregate intake refuses that commit permanently with
+      // the Resource already gone from the working state.
       // Decided before the module, so a Space Resource a Reference Resource
       // targets still answers this rather than `resource-has-references`.
       if (deleted.kind === 'space') {

@@ -147,14 +147,14 @@ export const scenario = (workload: Workload): Scenario => {
       ],
     },
     resources: referenced.map((target, index) => {
-      const { map: mapId, graph } = firstMap(target);
+      const { map: positioned, graph } = firstMap(target);
       return {
         id: spaceResourceIds[index],
         document: {
           title: target.document.title,
           kind: 'space',
           spaceId: target.id,
-          map: mapId.id,
+          map: positioned.id,
           graph: graph.id,
         },
       };

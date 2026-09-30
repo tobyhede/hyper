@@ -39,19 +39,19 @@ export interface Space {
   readonly title: string;
   readonly resources: readonly Resource[];
   /**
-   * Every graph in the space, **flattened** across the maps that own them —
-   * maps in declared order, each map's graphs in authored order.
-   * Derived, never stored: a graph is an owned value of one map (ADR
-   * 0040), and this is the collection a view whose subject is the space's resources
-   * draws. Closed for free, since every edge endpoint is a resource of some map
-   * and so a resource of the space.
+   * Every Graph in the Space, **flattened** across the Maps that own them —
+   * Maps in declared order, each Map's Graphs in authored order.
+   * Derived, never stored: a Graph is an owned value of one Map (ADR
+   * 0040), and this is the collection a view whose subject is the Space's Resources
+   * draws. Closed for free, since every Edge endpoint is a Resource of some Map
+   * and so a Resource of the Space.
    *
-   * The exact nested values, never copies: a graph read off here and one read
+   * The exact nested values, never copies: a Graph read off here and one read
    * through `lookup.graph` are the same object.
    */
   readonly graphs: readonly Graph[];
   /**
-   * The positioned maps the author wrote, if any. Empty only for a stored or
+   * The positioned Maps the author wrote, if any. Empty only for a stored or
    * imported Space its first working load has not yet initialized (ADR 0079):
    * automatic strategies carry no data, so they are declared nowhere.
    */
@@ -86,7 +86,7 @@ export type SpaceError =
  * ordinary shape check speak.
  *
  * Read before parsing, because a version 2 document does not fail *once* under
- * version 1 — its maps each lack the graphs they now own, so the shape check
+ * version 1 — its Maps each lack the Graphs they now own, so the shape check
  * answers a cascade in which nothing says which version arrived. A version this
  * cannot read at all (absent, not a number) is left to the shape check, whose
  * message for it is already the right one.
@@ -293,10 +293,10 @@ function buildSpace(input: {
   const referenceErrors = validateReferences({ ...input, resources, maps });
   if (referenceErrors.length > 0) return { ok: false, errors: referenceErrors };
 
-  // The flatten: maps in declared order, each map's owned graphs in
+  // The flatten: Maps in declared order, each Map's owned Graphs in
   // authored order. Derived and never stored (ADR 0108) — it exists so the
-  // readers that key colour, handles, render edge ids and activation on a graph
-  // id alone keep reading one collection while ownership sits on the map.
+  // readers that key colour, handles, render edge ids and activation on a Graph
+  // id alone keep reading one collection while ownership sits on the Map.
   // The reference check above has already refused a repeated id, so the lookup
   // built below can drop nothing.
   const graphs = maps.flatMap((m) => m.graphs);

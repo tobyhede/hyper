@@ -1,4 +1,4 @@
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import {
   AggregateInvariantError,
   PersistenceUnavailableError,
@@ -13,6 +13,20 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import { HTTPException } from 'hono/http-exception';
+
+/** A request that initializes no Space mints nothing, so any mint is a failure here. */
+const mintsNothing = (): UUID => {
+  throw new Error('This request initializes no Space, so it mints no identity.');
+};
+
+/** Hands out the ids a first working load mints, in order, then refuses. */
+const mintingIds =
+  (...ids: UUID[]): (() => UUID) =>
+  () => {
+    const id = ids.shift();
+    if (id === undefined) throw new Error('initializer minted too many ids');
+    return id;
+  };
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -88,10 +102,9 @@ describe('commit wire policy', () => {
   // status-only assertion and lose the property the status exists to carry.
   const wireRejection = async (request: RequestInit, code: HyperProblemCode, detail?: string) => {
     const commit = vi.fn();
-    const response = await createSpaceHttpApp(repository({ commit })).request(
-      '/api/spaces',
-      request,
-    );
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request('/api/spaces', request);
 
     const decoded = await expectProblem(response, code, detail);
     expect(commit).not.toHaveBeenCalled();
@@ -147,11 +160,14 @@ describe('commit wire policy', () => {
   it.each(['identity', 'Identity'])(
     'accepts a request declaring %s content encoding',
     async (contentEncoding) => {
-      const response = await createSpaceHttpApp(repository()).request('/api/spaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Encoding': contentEncoding },
-        body: commitBody(),
-      });
+      const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+        '/api/spaces',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Content-Encoding': contentEncoding },
+          body: commitBody(),
+        },
+      );
 
       expect(response.status).toBe(200);
     },
@@ -238,7 +254,7 @@ describe('commit wire policy', () => {
       body: overshoot,
       duplex: 'half',
     };
-    const response = await createSpaceHttpApp(repository()).request(
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
       '/api/spaces',
       streamingRequest,
     );
@@ -262,7 +278,7 @@ describe('commit wire policy', () => {
       body: endless,
       duplex: 'half',
     };
-    const response = await createSpaceHttpApp(repository()).request(
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
       '/api/spaces',
       streamingRequest,
     );
@@ -300,7 +316,7 @@ describe('commit wire policy', () => {
       body: flaky,
       duplex: 'half',
     };
-    const response = await createSpaceHttpApp(repository()).request(
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
       '/api/spaces',
       streamingRequest,
     );
@@ -323,21 +339,27 @@ describe('commit wire policy', () => {
     const body = commitBody(padded(MAX_COMMIT_BODY_BYTES - overhead));
     expect(new TextEncoder().encode(body).byteLength).toBe(MAX_COMMIT_BODY_BYTES);
 
-    const declared = await createSpaceHttpApp(repository()).request('/api/spaces', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': String(MAX_COMMIT_BODY_BYTES),
+    const declared = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+      '/api/spaces',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': String(MAX_COMMIT_BODY_BYTES),
+        },
+        body,
       },
-      body,
-    });
+    );
     expect(declared.status).toBe(200);
 
-    const streamed = await createSpaceHttpApp(repository()).request('/api/spaces', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
+    const streamed = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+      '/api/spaces',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      },
+    );
     expect(streamed.status).toBe(200);
   });
 
@@ -362,7 +384,9 @@ describe('commit wire policy', () => {
         deletedSpaceIds: [],
       }),
     );
-    const response = await createSpaceHttpApp(repository({ commit })).request('/api/spaces', {
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request('/api/spaces', {
       method: 'POST',
       headers: { 'Content-Type': contentType },
       body: commitBody(),
@@ -379,16 +403,9 @@ describe('Space HTTP reads', () => {
     // Which colour initialization stores is persistence's rule, held by its own
     // tests; every creation stores the arrow head shape (ADR 0105).
     const storedColour: unknown = expect.any(String);
-    const ids = [MAP_ID, GRAPH_ID];
     const base = repository();
     const commit = vi.fn((request: Parameters<typeof base.commit>[0]) => base.commit(request));
-    const app = createSpaceHttpApp(repository({ commit }), {
-      newId: () => {
-        const id = ids.shift();
-        if (id === undefined) throw new Error('initializer minted too many ids');
-        return id;
-      },
-    });
+    const app = createSpaceHttpApp(repository({ commit }), { newId: mintingIds(MAP_ID, GRAPH_ID) });
 
     const collection = await app.request('/api/spaces');
     const resource = await app.request(`/api/spaces/${SPACE_ID}`);
@@ -429,7 +446,9 @@ describe('Space HTTP reads', () => {
   });
 
   it('loads the complete aggregate from its own resource', async () => {
-    const response = await createSpaceHttpApp(repository()).request('/api/aggregate');
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+      '/api/aggregate',
+    );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -444,6 +463,7 @@ describe('Space HTTP reads', () => {
   it('returns not found for an absent lazy resource', async () => {
     const response = await createSpaceHttpApp(
       repository({ loadSpace: () => Promise.resolve(undefined) }),
+      { newId: mintsNothing },
     ).request(`/api/spaces/${TARGET_ID}`);
 
     await expectProblem(response, 'not-found');
@@ -454,7 +474,7 @@ describe('Space HTTP reads', () => {
     const logError = vi.fn();
     const response = await createSpaceHttpApp(
       repository({ loadAggregate: () => Promise.reject(failure) }),
-      { logError },
+      { newId: mintsNothing, logError },
     ).request('/api/aggregate');
 
     await expectProblem(response, 'persistence-unavailable');
@@ -483,6 +503,7 @@ describe('Space HTTP reads', () => {
               });
         },
       }),
+      { newId: mintsNothing },
     ).request('/api/aggregate');
 
     expect(response.status).toBe(200);
@@ -509,6 +530,7 @@ describe('Space HTTP reads', () => {
   ])('answers 500 internal-error for $failure', async ({ error }) => {
     const response = await createSpaceHttpApp(
       repository({ loadAggregate: () => Promise.reject(error) }),
+      { newId: mintsNothing },
     ).request('/api/aggregate');
 
     await expectProblem(response, 'internal-error');
@@ -547,7 +569,7 @@ describe('Space HTTP reads', () => {
           return Promise.reject(error);
         },
       }),
-      { logError },
+      { newId: mintsNothing, logError },
     ).request('/api/aggregate');
 
     await expectProblem(response, code);
@@ -584,7 +606,7 @@ describe('Space HTTP reads', () => {
           listSpaces: () => Promise.reject(failure),
           loadSpace: () => Promise.reject(failure),
         }),
-        { logError },
+        { newId: mintsNothing, logError },
       );
 
       await expectProblem(await app.request('/api/spaces'), code, detail);
@@ -598,6 +620,7 @@ describe('Space HTTP reads', () => {
     const response = await createSpaceHttpApp(
       repository({ listSpaces: () => Promise.reject(new Error('database')) }),
       {
+        newId: mintsNothing,
         logError: () => {
           throw new Error('logger');
         },
@@ -613,6 +636,7 @@ describe('Space HTTP reads', () => {
 
     const response = await createSpaceHttpApp(
       repository({ listSpaces: () => Promise.reject(failure) }),
+      { newId: mintsNothing },
     ).request('/api/spaces');
 
     await expectProblem(response, 'persistence-unavailable');
@@ -626,6 +650,7 @@ describe('Space HTTP reads', () => {
   it('returns service unavailable when failure logging itself throws a non-Error', async () => {
     const failure = new PersistenceUnavailableError('repository failure');
     const options = {
+      newId: mintsNothing,
       logError: () => {
         // JavaScript callers can violate the TypeScript convention; that is the regression case.
         // eslint-disable-next-line @typescript-eslint/only-throw-error
@@ -669,7 +694,7 @@ describe('Space HTTP aggregate commit', () => {
     );
 
     const response = await postCommit(
-      createSpaceHttpApp(repository({ commit: commitRepository })),
+      createSpaceHttpApp(repository({ commit: commitRepository }), { newId: mintsNothing }),
       commit,
     );
 
@@ -691,6 +716,7 @@ describe('Space HTTP aggregate commit', () => {
               conflicts: [{ spaceId: SPACE_ID, current: loaded }],
             }),
         }),
+        { newId: mintsNothing },
       ),
     );
 
@@ -717,6 +743,7 @@ describe('Space HTTP aggregate commit', () => {
         repository({
           commit: () => Promise.resolve({ kind: 'aggregate-refused', errors: [error] }),
         }),
+        { newId: mintsNothing },
       ),
     );
 
@@ -731,6 +758,7 @@ describe('Space HTTP aggregate commit', () => {
           commit: () =>
             Promise.resolve({ kind: 'rejected', code: 'invalid-commit', message: 'Duplicate id' }),
         }),
+        { newId: mintsNothing },
       ),
     );
 
@@ -742,7 +770,10 @@ describe('Space HTTP aggregate commit', () => {
     const failure = new PersistenceUnavailableError('database host');
     const logError = vi.fn();
     const response = await postCommit(
-      createSpaceHttpApp(repository({ commit: () => Promise.reject(failure) }), { logError }),
+      createSpaceHttpApp(repository({ commit: () => Promise.reject(failure) }), {
+        newId: mintsNothing,
+        logError,
+      }),
     );
 
     await expectProblem(response, 'persistence-unavailable');
@@ -756,7 +787,10 @@ describe('Space HTTP aggregate commit', () => {
     const failure = new TypeError('Cannot read properties of undefined');
     const logError = vi.fn();
     const response = await postCommit(
-      createSpaceHttpApp(repository({ commit: () => Promise.reject(failure) }), { logError }),
+      createSpaceHttpApp(repository({ commit: () => Promise.reject(failure) }), {
+        newId: mintsNothing,
+        logError,
+      }),
     );
 
     await expectProblem(response, 'internal-error');
@@ -784,7 +818,9 @@ describe('Space HTTP aggregate commit', () => {
     },
   ])('answers 500 internal-error for $failure', async ({ error }) => {
     const response = await postCommit(
-      createSpaceHttpApp(repository({ commit: () => Promise.reject(error) })),
+      createSpaceHttpApp(repository({ commit: () => Promise.reject(error) }), {
+        newId: mintsNothing,
+      }),
     );
 
     await expectProblem(response, 'internal-error');
@@ -844,7 +880,9 @@ describe('Space HTTP commit request policy', () => {
     ],
   ])('rejects %s as an invalid request', async (_name, body, expectedMessage) => {
     const commit = vi.fn();
-    const response = await createSpaceHttpApp(repository({ commit })).request('/api/spaces', {
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request('/api/spaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -863,18 +901,21 @@ describe('Space HTTP commit request policy', () => {
    * nested inside a field the client renders as prose.
    */
   it('describes a schema-invalid snapshot in prose rather than serialized issues', async () => {
-    const response = await createSpaceHttpApp(repository()).request('/api/spaces', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        changes: [
-          {
-            ...encodedChange,
-            snapshot: { ...snapshot, document: { ...snapshot.document, title: '' } },
-          },
-        ],
-      }),
-    });
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+      '/api/spaces',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          changes: [
+            {
+              ...encodedChange,
+              snapshot: { ...snapshot, document: { ...snapshot.document, title: '' } },
+            },
+          ],
+        }),
+      },
+    );
 
     const refusal = await expectProblem(response, 'invalid-request');
     expect(refusal.detail).toContain('snapshot is invalid');
@@ -910,7 +951,9 @@ describe('Space HTTP commit request policy', () => {
     );
     expect(body).toContain('"x":1e400');
 
-    const response = await createSpaceHttpApp(repository({ commit })).request('/api/spaces', {
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request('/api/spaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
@@ -925,7 +968,9 @@ describe('Space HTTP commit request policy', () => {
 
   it('rejects a malformed body without calling the repository', async () => {
     const commit = vi.fn();
-    const response = await createSpaceHttpApp(repository({ commit })).request('/api/spaces', {
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request('/api/spaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{',
@@ -940,7 +985,9 @@ describe('Space HTTP commit request policy', () => {
   // decoder rather than be answered by the size guard.
   it('rejects a media-typed request with no body', async () => {
     const commit = vi.fn();
-    const response = await createSpaceHttpApp(repository({ commit })).request('/api/spaces', {
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request('/api/spaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -956,7 +1003,9 @@ describe('Space HTTP method and path policy', () => {
     ['/api/aggregate', 'GET', 'Use GET for the aggregate resource.'],
     [`/api/spaces/${SPACE_ID}`, 'GET', 'Use GET for a Space resource.'],
   ])('advertises the methods for %s', async (path, allow, detail) => {
-    const response = await createSpaceHttpApp(repository()).request(path, { method: 'DELETE' });
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(path, {
+      method: 'DELETE',
+    });
 
     await expectProblem(response, 'method-not-allowed', detail);
     expect(response.headers.get('allow')).toBe(allow);
@@ -964,14 +1013,13 @@ describe('Space HTTP method and path policy', () => {
 
   it('refuses the retired PUT resource commit', async () => {
     const commit = vi.fn();
-    const response = await createSpaceHttpApp(repository({ commit })).request(
-      `/api/spaces/${SPACE_ID}`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(encodeCommitRequest(updateCommit())),
-      },
-    );
+    const response = await createSpaceHttpApp(repository({ commit }), {
+      newId: mintsNothing,
+    }).request(`/api/spaces/${SPACE_ID}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(encodeCommitRequest(updateCommit())),
+    });
 
     await expectProblem(response, 'method-not-allowed');
     expect(response.headers.get('allow')).toBe('GET');
@@ -979,7 +1027,7 @@ describe('Space HTTP method and path policy', () => {
   });
 
   it('keeps invalid ids distinct from undeclared paths', async () => {
-    const app = createSpaceHttpApp(repository());
+    const app = createSpaceHttpApp(repository(), { newId: mintsNothing });
 
     await expectProblem(await app.request('/api/spaces/not-a-uuid'), 'invalid-space-id');
     await expectProblem(await app.request('/api/unknown'), 'not-found');
@@ -996,7 +1044,9 @@ describe('Space HTTP method and path policy', () => {
     ['the aggregate resource', '/api/aggregate', 'GET'],
     ['a Space resource', `/api/spaces/${SPACE_ID}`, 'GET'],
   ])('does not add an implicit HEAD resource for %s', async (_name, path, allow) => {
-    const response = await createSpaceHttpApp(repository()).request(path, { method: 'HEAD' });
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(path, {
+      method: 'HEAD',
+    });
 
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe(allow);
@@ -1022,9 +1072,12 @@ describe('Space HTTP method and path policy', () => {
     // deleted and left to the GET graph, which answers 200 with nothing.
     ['HEAD', 'HEAD'],
   ])('rejects an invalid path identity for %s', async (_name, method) => {
-    const response = await createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', {
-      method,
-    });
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+      '/api/spaces/not-a-uuid',
+      {
+        method,
+      },
+    );
 
     expect(response.status).toBe(400);
     expect(response.headers.get('allow')).toBeNull();
@@ -1043,9 +1096,12 @@ describe('Space HTTP method and path policy', () => {
   // for a resource that does not exist. A guard returning a refusal here instead
   // would pass every other case in this file.
   it('lets HEAD fall through to not-found for a path off the contract', async () => {
-    const response = await createSpaceHttpApp(repository()).request('/api/unknown', {
-      method: 'HEAD',
-    });
+    const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+      '/api/unknown',
+      {
+        method: 'HEAD',
+      },
+    );
 
     expect(response.status).toBe(404);
     expect(response.headers.get('allow')).toBeNull();
@@ -1061,7 +1117,9 @@ describe('Space HTTP method and path policy', () => {
   it.each(['/', '/api', '/api/spaces/', '/api/aggregate/', '/index.html', '/api/spaces/one/two'])(
     'answers %s outside the declared contract without recursing',
     async (path) => {
-      const response = await createSpaceHttpApp(repository()).request(path);
+      const response = await createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+        path,
+      );
 
       await expectProblem(response, 'not-found', 'Use a declared Space API path.');
     },
@@ -1091,68 +1149,95 @@ describe('Space HTTP response media', () => {
       {
         status: 200,
         contentType: JSON_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request('/api/spaces'),
+        request: () =>
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request('/api/spaces'),
       },
       {
         status: 200,
         contentType: JSON_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request(`/api/spaces/${SPACE_ID}`),
+        request: () =>
+          // The stored Space is mapless, so its first working load mints a Map and a Graph.
+          createSpaceHttpApp(repository(), { newId: mintingIds(MAP_ID, GRAPH_ID) }).request(
+            `/api/spaces/${SPACE_ID}`,
+          ),
       },
       {
         status: 200,
         contentType: JSON_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request('/api/aggregate'),
+        request: () =>
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request('/api/aggregate'),
       },
       {
         status: 404,
         contentType: PROBLEM_MEDIA,
         request: () =>
-          createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(undefined) })).request(
-            `/api/spaces/${SPACE_ID}`,
+          createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(undefined) }), {
+            newId: mintsNothing,
+          }).request(`/api/spaces/${SPACE_ID}`),
+      },
+      {
+        status: 400,
+        contentType: PROBLEM_MEDIA,
+        request: () =>
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+            '/api/spaces/not-a-uuid',
           ),
       },
       {
         status: 400,
         contentType: PROBLEM_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid'),
-      },
-      {
-        status: 400,
-        contentType: PROBLEM_MEDIA,
         request: () =>
-          createSpaceHttpApp(repository()).request('/api/spaces/not-a-uuid', { method: 'DELETE' }),
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+            '/api/spaces/not-a-uuid',
+            { method: 'DELETE' },
+          ),
       },
       {
         status: 404,
         contentType: PROBLEM_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request('/off-contract'),
+        request: () =>
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request('/off-contract'),
       },
       {
         status: 405,
         contentType: PROBLEM_MEDIA,
         request: () =>
-          createSpaceHttpApp(repository()).request('/api/spaces', { method: 'DELETE' }),
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request('/api/spaces', {
+            method: 'DELETE',
+          }),
       },
       {
         status: 200,
         contentType: JSON_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request('/api/spaces', post(commitBody)),
+        request: () =>
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+            '/api/spaces',
+            post(commitBody),
+          ),
       },
       {
         status: 400,
         contentType: PROBLEM_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request('/api/spaces', post('not json')),
+        request: () =>
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+            '/api/spaces',
+            post('not json'),
+          ),
       },
       {
         status: 400,
         contentType: PROBLEM_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request('/api/spaces', post('{}')),
+        request: () =>
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+            '/api/spaces',
+            post('{}'),
+          ),
       },
       {
         status: 415,
         contentType: PROBLEM_MEDIA,
         request: () =>
-          createSpaceHttpApp(repository()).request(
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
             '/api/spaces',
             post('{}', 'text/plain; charset=utf-8'),
           ),
@@ -1160,7 +1245,11 @@ describe('Space HTTP response media', () => {
       {
         status: 413,
         contentType: PROBLEM_MEDIA,
-        request: () => createSpaceHttpApp(repository()).request('/api/spaces', post(oversized)),
+        request: () =>
+          createSpaceHttpApp(repository(), { newId: mintsNothing }).request(
+            '/api/spaces',
+            post(oversized),
+          ),
       },
       // Conflict and refusal encode whole documents rather than a message, so
       // each reaches `context.json` by a different graph than its neighbours —
@@ -1177,6 +1266,7 @@ describe('Space HTTP response media', () => {
                   conflicts: [{ spaceId: SPACE_ID, current: loaded }],
                 }),
             }),
+            { newId: mintsNothing },
           ).request('/api/spaces', post(commitBody)),
       },
       {
@@ -1198,6 +1288,7 @@ describe('Space HTTP response media', () => {
                   ],
                 }),
             }),
+            { newId: mintsNothing },
           ).request('/api/spaces', post(commitBody)),
       },
       {
@@ -1208,7 +1299,7 @@ describe('Space HTTP response media', () => {
             repository({
               listSpaces: () => Promise.reject(new PersistenceUnavailableError('down')),
             }),
-            { logError: (message) => swallowed.push(message) },
+            { newId: mintsNothing, logError: (message) => swallowed.push(message) },
           ).request('/api/spaces'),
       },
     ];
@@ -1239,7 +1330,7 @@ describe('Space HTTP exception containment', () => {
     [503, 'persistence-unavailable'],
     [418, 'internal-error'],
   ] as const)('maps an HTTP %s exception to %s', async (status, code) => {
-    const app = createSpaceHttpApp(repository());
+    const app = createSpaceHttpApp(repository(), { newId: mintsNothing });
     app.get('/throw-http', () => {
       throw new HTTPException(status, { message: `status ${status}` });
     });
@@ -1256,7 +1347,7 @@ describe('Space HTTP exception containment', () => {
    * message, losing the real status and code behind a generic 500.
    */
   it('supplies detail for a message-less HTTP exception', async () => {
-    const app = createSpaceHttpApp(repository());
+    const app = createSpaceHttpApp(repository(), { newId: mintsNothing });
     app.get('/throw-http', () => {
       throw new HTTPException(401);
     });
@@ -1270,6 +1361,7 @@ describe('Space HTTP exception containment', () => {
 
   it('contains a non-HTTP throw even when its log sink also throws', async () => {
     const app = createSpaceHttpApp(repository(), {
+      newId: mintsNothing,
       logError: () => {
         throw new Error('logger failed');
       },

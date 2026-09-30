@@ -1341,6 +1341,13 @@ describe('a Map is named once (ADR 0085, ADR 0101)', () => {
  * convention is how the code is written, not only what ships. It forgives
  * nothing: every sense a foreign library gives the word is a method or a
  * property, never a local.
+ *
+ * A binding here is a declaration that puts a **value** named `map` in scope:
+ * a variable, parameter or destructured element, a function or class
+ * (declared or named as an expression), an enum, a namespace, or an import.
+ * A type alias, interface or type parameter names a type rather than a value,
+ * and an enum member, label or export alias is not a local, so none of those
+ * is read.
  */
 const bindsMap = (node: ts.Node): ts.Identifier | undefined => {
   const named =
@@ -1348,6 +1355,11 @@ const bindsMap = (node: ts.Node): ts.Identifier | undefined => {
     ts.isParameter(node) ||
     ts.isBindingElement(node) ||
     ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isClassDeclaration(node) ||
+    ts.isClassExpression(node) ||
+    ts.isEnumDeclaration(node) ||
+    ts.isModuleDeclaration(node) ||
     ts.isImportSpecifier(node) ||
     ts.isImportClause(node) ||
     ts.isNamespaceImport(node) ||
@@ -1362,7 +1374,7 @@ const mapBindings = (source: string, file = 'scan-source.tsx'): string[] => {
     file,
     source,
     ts.ScriptTarget.Latest,
-    true,
+    false,
     file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const lines = source.split('\n');
@@ -1405,7 +1417,7 @@ describe('no value is bound to a local named after the Map (ADR 0101)', () => {
     expect(found).toEqual([]);
   });
 
-  it('reports the binding in every form a declaration takes', () => {
+  it('reports the binding in every form a value declaration takes', () => {
     const bound = [
       `const map = space.maps[0];`,
       `let map: Map | undefined;`,
@@ -1426,6 +1438,13 @@ describe('no value is bound to a local named after the Map (ADR 0101)', () => {
       // A function named for the builder rather than the value, and an import.
       `function map(id: string) { return { id }; }`,
       `import { map } from 'somewhere';`,
+      // A named function or class expression binds its name inside itself.
+      `space.maps.forEach(function map(m) { visit(m); });`,
+      `const Builder = class map {};`,
+      // The other declarations that bind a value in the enclosing scope.
+      `class map {}`,
+      `enum map { Open, Closed }`,
+      `namespace map { export const id = 1; }`,
     ];
 
     for (const line of bound) {
@@ -1455,6 +1474,11 @@ describe('no value is bound to a local named after the Map (ADR 0101)', () => {
       // The word in a comment or a string is not a binding.
       `// const map = space.maps[0];`,
       `const fixture = 'const map = space.maps[0];';`,
+      // Types, enum members and export aliases put no value named map in scope.
+      `type map = SpaceMap;`,
+      `interface map { id: MapId }`,
+      `enum Kind { map, graph }`,
+      `export { selectedMap as map };`,
     ];
 
     for (const line of kept) {
