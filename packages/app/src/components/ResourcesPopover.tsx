@@ -12,7 +12,7 @@ import {
 import { titleName, type Resource, type ResourceId, type UUID } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
-import type { FocusFallback } from '../resource-deletion';
+import type { FocusFallback } from '../delete-confirmation';
 import {
   describeMembership,
   ON_NO_GRAPH,

@@ -4,8 +4,8 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Delete from Space opens through the general confirmation, with the same title (`Delete {short Title} From Space?`), description, `Cancel` / `Delete` answers and focus behaviour.
-- [ ] The confirmation carries no Resource-specific knowledge beyond what a Resource subject supplies; a new kind of subject needs no change to it.
-- [ ] Existing Delete from Space tests (component, application, e2e) pass unchanged.
+- [x] Delete from Space opens through the general confirmation, with the same title (`Delete {short Title} From Space?`), description, `Cancel` / `Delete` answers and focus behaviour.
+- [x] The confirmation carries no Resource-specific knowledge beyond what a Resource subject supplies; a new kind of subject needs no change to it.
+- [x] Existing Delete from Space tests (component, application, e2e) pass unchanged.

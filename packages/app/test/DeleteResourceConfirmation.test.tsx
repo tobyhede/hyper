@@ -1,14 +1,15 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Resource } from '@project/core';
-import { DeleteResourceConfirmation } from '../src/components/DeleteResourceConfirmation';
+import { DeleteConfirmation } from '../src/components/DeleteConfirmation';
+import { resourceDeletionWords } from '../src/resource-deletion';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
 const ask = (resource: Resource) =>
   render(
-    <DeleteResourceConfirmation
-      resource={resource}
+    <DeleteConfirmation
+      {...resourceDeletionWords(resource)}
       deleting={false}
       onConfirm={() => undefined}
       onDismiss={() => undefined}

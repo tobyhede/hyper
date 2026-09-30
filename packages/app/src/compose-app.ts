@@ -5,6 +5,7 @@ import { createCommandOutcomes, type CommandOutcomes } from './command-outcomes'
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
 import { createContinuation, type Continuation } from './continuation';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
+import { createDeleteConfirmation, type DeleteConfirmation } from './delete-confirmation';
 import { createResourceDeletion, type ResourceDeletion } from './resource-deletion';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 import { createNavigation, type Navigation } from './navigation';
@@ -137,7 +138,9 @@ export interface ComposedApp extends AppCore {
    * Resource deletion, which runs its deletions through it.
    */
   readonly commandOutcomes: CommandOutcomes;
-  /** The Delete Resource confirmation interaction for this Space. */
+  /** The one question every delete command in this Space asks before it runs. */
+  readonly deleteConfirmation: DeleteConfirmation;
+  /** Delete from Space, asked through the delete confirmation. */
   readonly resourceDeletion: ResourceDeletion;
   /**
    * The sink this composition reports through, answered as well as taken.
@@ -216,12 +219,13 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     continuation,
     reportObserverError: compositionReporter,
   });
+  const deleteConfirmation = createDeleteConfirmation({ authoring, reportObserverError });
   const resourceDeletion = createResourceDeletion({
     authoring,
     currentSpace,
+    deleteConfirmation,
     commandOutcomes,
     spaceResources,
-    reportObserverError,
   });
   return {
     ...core,
@@ -231,6 +235,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     continuation,
     edgeAuthoring,
     commandOutcomes,
+    deleteConfirmation,
     resourceDeletion,
     reportObserverError: compositionReporter,
   };
