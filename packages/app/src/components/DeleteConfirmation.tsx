@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useId, useState, useSyncExternalStore } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,6 +11,7 @@ import {
 } from '@project/ui';
 import type {
   DeleteConfirmation as DeleteConfirmationInteraction,
+  DeleteQuestionList,
   DeleteQuestionWords,
   FocusFallback,
 } from '../delete-confirmation';
@@ -26,8 +27,8 @@ import type {
  * be unmounting itself as it reported.
  *
  * The words are the arming command's: the subject's name, what it is deleted
- * from and the one line of what goes. The dialog adds only the question's
- * shape and its two answers.
+ * from, the one line of what goes and any lists of what else it reaches. The
+ * dialog adds only the question's shape and its two answers.
  *
  * **Closing returns the caret to the control that armed it while that control
  * is still in the document**, whichever answer closed it. A completed deletion
@@ -40,6 +41,7 @@ export function DeleteConfirmation({
   subject,
   from,
   description,
+  lists = [],
   deleting,
   focusFallback = null,
   onConfirm,
@@ -80,6 +82,9 @@ export function DeleteConfirmation({
           </AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {lists.map((list) =>
+          list.names.length === 0 ? null : <ReachedList key={list.heading} list={list} />,
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
           <AlertDialogAction
@@ -100,6 +105,24 @@ export function DeleteConfirmation({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+/** One list of what the deletion reaches, named by its heading. */
+function ReachedList({ list }: { readonly list: DeleteQuestionList }) {
+  const headingId = useId();
+  return (
+    <div className="grid gap-1 text-sm">
+      <p id={headingId} className="font-medium">
+        {list.heading}
+      </p>
+      <ul aria-labelledby={headingId} className="list-disc pl-5 text-muted-foreground">
+        {list.names.map((name, index) => (
+          // A name is unique only within its owner, so the position keys it.
+          <li key={index}>{name}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -134,6 +157,7 @@ export function ArmedDeleteConfirmation({
       subject={pending.subject}
       from={pending.from}
       description={pending.description}
+      lists={pending.lists ?? []}
       deleting={deleting}
       focusFallback={pending.focusFallback}
       onConfirm={deleteConfirmation.confirm}

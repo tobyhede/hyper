@@ -1,4 +1,5 @@
-import { shortTitle, type Resource, type UUID } from '@project/core';
+import { shortTitle, type Resource } from '@project/core';
+import { deletionReach, type DeletionReach, type Space } from '@project/graph';
 import type { CommandOutcomes } from './command-outcomes';
 import type {
   DeleteConfirmation,
@@ -40,12 +41,34 @@ const DELETION_DESCRIPTIONS = {
  * What Delete from Space asks about a Resource. The short Title names it on one
  * line and marks a Title written on several as shortened rather than presenting
  * its first line as the whole of it.
+ *
+ * Under the description it lists what the deletion reaches — the Maps that
+ * place the Resource and the Graphs holding an Edge connected to it — each by
+ * its short name. A Graph's name is unique only within its Map, so a Graph is
+ * named with its Map once more than one Map is listed.
  */
-export const resourceDeletionWords = (resource: Resource): DeleteQuestionWords => ({
-  subject: { kind: 'resource', name: shortTitle(resource.title) },
-  from: 'Space',
-  description: DELETION_DESCRIPTIONS[resource.kind],
-});
+export const resourceDeletionWords = (
+  resource: Resource,
+  reach: DeletionReach,
+): DeleteQuestionWords => {
+  const withMap = reach.maps.length > 1;
+  return {
+    subject: { kind: 'resource', name: shortTitle(resource.title) },
+    from: 'Space',
+    description: DELETION_DESCRIPTIONS[resource.kind],
+    lists: [
+      { heading: 'Removed from Maps', names: reach.maps.map((m) => shortTitle(m.title)) },
+      {
+        heading: 'Edges deleted from Graphs',
+        names: reach.graphs.map(({ map: m, graph }) =>
+          withMap
+            ? `${shortTitle(graph.title)} in ${shortTitle(m.title)}`
+            : shortTitle(graph.title),
+        ),
+      },
+    ],
+  };
+};
 
 export interface ResourceDeletionState {
   /** The Resource a confirmation is standing over, or `null` when none is. */
@@ -70,7 +93,8 @@ export interface ResourceDeletion {
 
 export interface ResourceDeletionDependencies {
   readonly authoring: SpaceAuthoring;
-  readonly currentSpace: () => { readonly id: UUID };
+  /** The Space the deletion runs in, read at arming for what it reaches. */
+  readonly currentSpace: () => Pick<Space, 'id' | 'maps'>;
   /** The one confirmation every delete command asks through. */
   readonly deleteConfirmation: DeleteConfirmation;
   /** Where each deletion runs, and where its outcome is told. */
@@ -135,7 +159,7 @@ export function createResourceDeletion({
     subscribe: deleteConfirmation.subscribe,
     arm: (resource, focusFallback) => {
       const question = {
-        ...resourceDeletionWords(resource),
+        ...resourceDeletionWords(resource, deletionReach(currentSpace().maps, resource.id)),
         run: () => execute(resource),
         focusFallback: focusFallback ?? null,
       };

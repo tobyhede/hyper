@@ -127,6 +127,18 @@ describe('arming and cancellation', () => {
     resourceDeletion.arm(lookupResource(opened, RESOURCE_B));
     expect(resourceDeletion.getState().focusFallback).toBeNull();
   });
+
+  it('asks with what the deletion reaches in the Space it is armed over', () => {
+    const opened = open();
+    const { resourceDeletion, deleteConfirmation } = opened;
+
+    resourceDeletion.arm(lookupResource(opened));
+
+    expect(deleteConfirmation.getState().pending?.lists).toEqual([
+      { heading: 'Removed from Maps', names: ['Map 1'] },
+      { heading: 'Edges deleted from Graphs', names: ['Main'] },
+    ]);
+  });
 });
 
 describe('confirmation', () => {

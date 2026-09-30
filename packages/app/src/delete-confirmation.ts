@@ -27,6 +27,14 @@ export interface DeleteSubject {
   readonly name: string;
 }
 
+/** A named list of what else the deletion reaches, drawn under the description. */
+export interface DeleteQuestionList {
+  /** What the list is, which also names it to assistive technology. */
+  readonly heading: string;
+  /** Each entry by its short name, in the order the question gives them. */
+  readonly names: readonly string[];
+}
+
 /** Everything the confirmation says: `Delete {name} From {from}?` and one line under it. */
 export interface DeleteQuestionWords {
   readonly subject: DeleteSubject;
@@ -34,6 +42,8 @@ export interface DeleteQuestionWords {
   readonly from: string | null;
   /** What is permanently deleted, in one line. */
   readonly description: string;
+  /** What else the deletion reaches, list by list; an empty list is not drawn. */
+  readonly lists?: readonly DeleteQuestionList[];
 }
 
 export interface DeleteQuestion extends DeleteQuestionWords {

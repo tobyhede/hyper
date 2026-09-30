@@ -60,6 +60,7 @@ const OFFERED_VALUES = [
   'graphStartResource',
   'serializeResourceFile',
   'SnapshotEdit',
+  'deletionReach',
 ] as const;
 
 const OFFERED_TYPES = [
@@ -88,6 +89,7 @@ const OFFERED_TYPES = [
   'SpaceAggregateLookup',
   'SpaceError',
   'SpaceLookup',
+  'DeletionReach',
   'PlacementMode',
   'SnapshotEditOutcome',
   'SnapshotEditRefusal',

@@ -2129,6 +2129,32 @@ test('Delete Resource confirms before removing the Resource from the whole Space
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
+test('the rail’s Delete from Space names the Maps and Graphs the deletion reaches', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await settled(page);
+
+  await nodeByTitle(page, 'B').click();
+  await (
+    await resourceActions(page, 'B')
+  )
+    .getByRole('menuitem', { name: 'Delete from Space' })
+    .click();
+
+  const confirmation = page.getByRole('alertdialog', { name: 'Delete B From Space?' });
+  await expect(
+    confirmation.getByRole('list', { name: 'Removed from Maps' }).getByRole('listitem'),
+  ).toHaveText(['Collection 1']);
+  await expect(
+    confirmation.getByRole('list', { name: 'Edges deleted from Graphs' }).getByRole('listitem'),
+  ).toHaveText(['Long', 'Mid', 'Short']);
+
+  await confirmation.getByRole('button', { name: 'Cancel' }).click();
+  await expect(nodeByTitle(page, 'B')).toBeVisible();
+});
+
 test(
   'a Resource the Map no longer places is deleted from the Resources list',
   { tag: '@parity:resources-popover-offers-delete-from-space-on-a-resource-row' },

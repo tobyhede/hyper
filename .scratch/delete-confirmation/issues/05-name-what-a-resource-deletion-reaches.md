@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 — One delete confirmation for every kind of subject
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] What a Resource's deletion reaches is a pure domain derivation beside Delete from Space's own Edit, not worked out in the dialog.
-- [ ] A property test holds the derivation to the deletion: every Map it names loses the Resource's position, every Graph it names loses at least one Edge, and no other Map or Graph changes.
-- [ ] A Resource on two Maps with Edges in one Graph lists both Maps and that Graph; one on no Map with no Edges lists neither.
-- [ ] The rail's Delete from Space shows the lists for a placed, connected Resource in the running app.
+- [x] What a Resource's deletion reaches is a pure domain derivation beside Delete from Space's own Edit, not worked out in the dialog.
+- [x] A property test holds the derivation to the deletion: every Map it names loses the Resource's position, every Graph it names loses at least one Edge, and no other Map or Graph changes.
+- [x] A Resource on two Maps with Edges in one Graph lists both Maps and that Graph; one on no Map with no Edges lists neither.
+- [x] The rail's Delete from Space shows the lists for a placed, connected Resource in the running app.

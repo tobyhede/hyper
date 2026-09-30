@@ -242,6 +242,37 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
   };
 }
 
+/** What Delete from Space reaches besides the Resource itself: the Maps and Graphs it changes. */
+export interface DeletionReach {
+  /** The Maps that place the Resource, in declared order: each loses its position. */
+  readonly maps: readonly Map[];
+  /**
+   * The Graphs holding an Edge connected to the Resource, each with the Map that
+   * owns it, in declared order: each loses those Edges. A Graph's name is unique
+   * only within its Map, so the Map travels with it.
+   */
+  readonly graphs: readonly { readonly map: Map; readonly graph: Graph }[];
+}
+
+/**
+ * What {@link deleteFromSpace} would change for `resourceId`, read before it
+ * runs so the question that asks for it can say so. Every Map it names loses
+ * the Resource's position, every Graph it names loses at least one Edge, and
+ * nothing else is touched — the property test holds the two together.
+ */
+export function deletionReach(maps: readonly Map[], resourceId: UUID): DeletionReach {
+  return {
+    maps: maps.filter((m) => Object.hasOwn(m.positions, resourceId)),
+    graphs: maps.flatMap((m) =>
+      m.graphs
+        .filter((graph) =>
+          graph.edges.some((edge) => edge.from === resourceId || edge.to === resourceId),
+        )
+        .map((graph) => ({ map: m, graph })),
+    ),
+  };
+}
+
 /** A width and a height together: an Open Size, or the room between two. */
 type Extent = { readonly width: number; readonly height: number };
 
