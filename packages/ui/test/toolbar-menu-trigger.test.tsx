@@ -75,7 +75,7 @@ function Bar({ unavailable, onChoose }: { unavailable: Unavailable; onChoose?: (
   );
 }
 
-const map = () => screen.getByRole('button', { name: 'Map: Map A' });
+const mapTrigger = () => screen.getByRole('button', { name: 'Map: Map A' });
 const spaces = () => screen.getByRole('button', { name: 'Open Spaces' });
 
 /**
@@ -101,7 +101,7 @@ async function pressEveryWay(control: HTMLElement): Promise<void> {
 }
 
 describe.each([
-  { unavailable: 'choice', subjects: [map] },
+  { unavailable: 'choice', subjects: [mapTrigger] },
   { unavailable: 'dropdown', subjects: [spaces] },
 ] as const)('a menu button drawn unavailable by $unavailable', ({ unavailable, subjects }) => {
   it('reports aria-disabled and is not natively disabled', () => {
@@ -120,7 +120,7 @@ describe.each([
     const after = screen.getByRole('button', { name: 'After' });
 
     before.focus();
-    for (const next of [map, spaces]) {
+    for (const next of [mapTrigger, spaces]) {
       fireEvent.keyDown(document.activeElement ?? document.body, { key: 'ArrowRight' });
       await waitFor(() => expect(next()).toHaveFocus());
     }
@@ -130,7 +130,7 @@ describe.each([
     fireEvent.keyDown(after, { key: 'ArrowLeft' });
     await waitFor(() => expect(spaces()).toHaveFocus());
     fireEvent.keyDown(spaces(), { key: 'ArrowLeft' });
-    await waitFor(() => expect(map()).toHaveFocus());
+    await waitFor(() => expect(mapTrigger()).toHaveFocus());
   });
 
   it('opens nothing on a pointer press, Enter or Space', async () => {
@@ -151,13 +151,13 @@ describe('a menu button that is available', () => {
   it('opens its menu, so the refusal above is the disabled state and not the harness', async () => {
     render(<Bar unavailable="none" />);
 
-    expect(map()).not.toHaveAttribute('aria-disabled', 'true');
-    fireEvent.click(map());
+    expect(mapTrigger()).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(mapTrigger());
     await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
   });
 
   it.each([
-    { name: 'Map: Map A', control: map },
+    { name: 'Map: Map A', control: mapTrigger },
     { name: 'Open Spaces', control: spaces },
   ])('is found open straight after $name is pressed every way', async ({ control }) => {
     render(<Bar unavailable="none" />);

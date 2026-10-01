@@ -1188,10 +1188,13 @@ async function seedPresentationFigure(page: Page): Promise<void> {
   const response = await page.request.get(`/api/spaces/${PRESENTATION_ID}`);
   expect(response.ok()).toBe(true);
   const { snapshot, revision } = decodeLoadedSpace(await response.json());
-  const maps = (snapshot.document.maps ?? []).map((map) =>
-    map.id === OVERVIEW_MAP_ID
-      ? { ...map, positions: { ...map.positions, [IMAGE_ID]: { x: 1272, y: 12, open: false } } }
-      : map,
+  const maps = (snapshot.document.maps ?? []).map((authored) =>
+    authored.id === OVERVIEW_MAP_ID
+      ? {
+          ...authored,
+          positions: { ...authored.positions, [IMAGE_ID]: { x: 1272, y: 12, open: false } },
+        }
+      : authored,
   );
   const commit = await page.request.post('/api/spaces', {
     data: {
