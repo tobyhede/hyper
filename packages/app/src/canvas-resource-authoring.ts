@@ -416,7 +416,7 @@ export function useCanvasResourceAuthoring({
   const completeSpaceResourceSelection = useCallback(
     (
       resourceId: ResourceId,
-      map: Pick<SpaceResourceTargetMap, 'id'>,
+      targetMap: Pick<SpaceResourceTargetMap, 'id'>,
       graphId: GraphId,
     ): string | null =>
       completeEditedSpaceResource(
@@ -426,10 +426,10 @@ export function useCanvasResourceAuthoring({
         (document) => {
           const next: Extract<ResourceDocument, { kind: 'space' }> = {
             ...document,
-            map: map.id,
+            map: targetMap.id,
             graph: graphId,
           };
-          if (document.map !== map.id) delete next.framing;
+          if (document.map !== targetMap.id) delete next.framing;
           return next;
         },
         'The selection is invalid.',

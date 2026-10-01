@@ -140,8 +140,8 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
 
           const others = ids.filter((id) => id !== subject);
           const positionsOf = (snapshot: SpaceSnapshot) => {
-            const map = snapshot.document.maps?.[0];
-            return others.map((id) => map?.positions[id]);
+            const firstMap = snapshot.document.maps?.[0];
+            return others.map((id) => firstMap?.positions[id]);
           };
           expect(positionsOf(deletedAfter.snapshot)).toEqual(positionsOf(deletedBefore.snapshot));
         },
@@ -723,17 +723,17 @@ describe('SnapshotEdit.open, close and resize properties', () => {
 
           // The author drags it past the Open Resource.
           const destination = { x: subject.x + beyond.x, y: subject.y + beyond.y };
-          const map = opened.document.maps?.[0];
-          if (map === undefined) return;
+          const firstMap = opened.document.maps?.[0];
+          if (firstMap === undefined) return;
           const moved: SpaceSnapshot = {
             ...opened,
             document: {
               ...opened.document,
               maps: [
                 {
-                  ...map,
+                  ...firstMap,
                   positions: {
-                    ...map.positions,
+                    ...firstMap.positions,
                     [witnessId]: { ...destination, open: false },
                   },
                 },
@@ -849,7 +849,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
   };
 
   const mapIn = (snapshot: SpaceSnapshot, mapId: UUID) =>
-    snapshot.document.maps?.find((map) => map.id === mapId);
+    snapshot.document.maps?.find((m) => m.id === mapId);
 
   it('removes a Resource from the one Map only, with every Edge incident to it there', () => {
     fc.assert(
@@ -865,15 +865,15 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
 
           const removed = completed(SnapshotEdit.removeFromMap(snapshot, MAP_ID, subject));
 
-          const map = mapIn(removed, MAP_ID);
-          expect(map?.positions[subject]).toBeUndefined();
+          const after = mapIn(removed, MAP_ID);
+          expect(after?.positions[subject]).toBeUndefined();
           expect(
-            map?.graphs
+            after?.graphs
               .flatMap((graph) => graph.edges)
               .some((edge) => edge.from === subject || edge.to === subject),
           ).toBe(false);
           // Graphs stay, empty ones included: deleting a Graph is its own action.
-          expect(map?.graphs.map((graph) => graph.id)).toEqual([GRAPH_ID]);
+          expect(after?.graphs.map((graph) => graph.id)).toEqual([GRAPH_ID]);
           expect(mapIn(removed, OTHER_MAP_ID)).toEqual(mapIn(snapshot, OTHER_MAP_ID));
           expect(removed.resources).toEqual(snapshot.resources);
         },

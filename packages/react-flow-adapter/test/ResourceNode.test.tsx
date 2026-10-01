@@ -6,12 +6,15 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { vi } from 'vitest';
 import { ResourceNode } from '../src/ResourceNode';
 import { ConnectionEndEligibilityContext } from '../src/connection-end-eligibility';
-import type {
-  ResourceFlowNode,
-  ResourceNodeData,
-  ResourceNodeKind,
-  ResourceTitleEditor,
-} from '../src/projection';
+import type { ResourceFlowNode, ResourceNodeData, ResourceTitleEditor } from '../src/projection';
+import type { ResourceContent } from '@project/core';
+import {
+  beginEditing,
+  beginReplacing,
+  type CanvasResourceBodyEditor,
+  type ImageReplaceEditor,
+  type ResourceDisplay,
+} from '@project/ui';
 import { uuid } from './uuid';
 
 /**
@@ -189,20 +192,64 @@ interface Overrides {
   /** What React Flow answers for this node from `nodesConnectable`/`node.connectable`. */
   isConnectable?: boolean;
   title?: string;
-  kind?: Exclude<ResourceNodeData['kind'], 'image'>;
+  kind?: ResourceNodeData['kind'];
   titleEditor?: ResourceTitleEditor;
   onEditResource?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
   open?: boolean;
-  body?: string;
-  /** Draws the Resource as an Image Resource showing this URL, overriding `kind`. */
-  imageUrl?: string;
+  /** The Markdown an Open or presented Markdown or Reference Resource draws. */
+  source?: string;
+  /** The picture an Open or presented Image Resource draws. */
+  url?: string;
+  /**
+   * The resolved content an Open or presented Resource draws. Defaults to what
+   * the projection resolves for the fixture's own kind: its `source`, its
+   * `url`, a Space view, or a Target's Markdown for a Reference Resource.
+   */
+  content?: ResourceContent;
+  /** Whether presenting draws this Resource, whatever its authored Open state. */
+  presented?: boolean;
   onBeginBodyEditing?: () => void;
-  bodyEditor?: ResourceNodeData['bodyEditor'];
-  imageReplacer?: ResourceNodeData['imageReplacer'];
+  /** A running body edit, entered through the display as decoration enters it. */
+  editor?: CanvasResourceBodyEditor;
+  /** A running image replacement, entered through the display as decoration enters it. */
+  replacer?: ImageReplaceEditor;
   resize?: ResourceNodeData['resize'];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
+}
+
+/** What the projection resolves for a fixture Resource of `kind`. */
+function ownContent(kind: ResourceNodeData['kind'], source: string, url: string): ResourceContent {
+  switch (kind) {
+    case 'markdown':
+      return { kind: 'markdown', source, via: 'self' };
+    case 'image':
+      return { kind: 'image', url, via: 'self' };
+    case 'reference':
+      return { kind: 'markdown', source, via: 'reference' };
+    case 'space':
+      return {
+        kind: 'space',
+        view: {
+          spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
+          map: uuid('00000000-0000-4000-8000-0000000000ab'),
+          graph: uuid('00000000-0000-4000-8000-0000000000ac'),
+          framing: undefined,
+        },
+        via: 'self',
+      };
+  }
+}
+
+/** The display with the given edit or replacement running, where it may run. */
+function running(
+  display: ResourceDisplay,
+  editor: CanvasResourceBodyEditor | undefined,
+  replacer: ImageReplaceEditor | undefined,
+): ResourceDisplay {
+  const editing = editor === undefined ? display : beginEditing(display, editor, true);
+  return replacer === undefined ? editing : beginReplacing(editing, replacer);
 }
 
 function props({
@@ -216,24 +263,32 @@ function props({
   onEditResource,
   onBeginTitleEditing,
   open,
-  body,
-  imageUrl,
+  source = '',
+  url = 'https://example.com/harbour.png',
+  content,
+  presented = false,
   onBeginBodyEditing,
-  bodyEditor,
-  imageReplacer,
+  editor,
+  replacer,
   resize,
   readOnly = false,
   connectionAuthoringEnabled,
 }: Overrides = {}): NodeProps<ResourceFlowNode> {
-  const nodeKind: ResourceNodeKind =
-    imageUrl === undefined ? { kind } : { kind: 'image', imageUrl };
   const data: ResourceFlowNode['data'] = {
     resourceId,
     title,
-    ...nodeKind,
+    kind,
     active: false,
     selectedForAuthoring,
-    showContent: false,
+    display: running(
+      presented
+        ? { shown: 'presented', content: content ?? ownContent(kind, source, url) }
+        : open === true
+          ? { shown: 'open', content: content ?? ownContent(kind, source, url) }
+          : { shown: 'closed' },
+      editor,
+      replacer,
+    ),
     activeGraphId: graphId,
     activeGraphColor: '#1f77b4',
     readOnly,
@@ -246,10 +301,7 @@ function props({
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
   if (titleEditor !== undefined) data.titleEditor = titleEditor;
   if (open !== undefined) data.open = open;
-  if (body !== undefined) data.body = body;
   if (onBeginBodyEditing !== undefined) data.onBeginBodyEditing = onBeginBodyEditing;
-  if (bodyEditor !== undefined) data.bodyEditor = bodyEditor;
-  if (imageReplacer !== undefined) data.imageReplacer = imageReplacer;
   if (resize !== undefined) data.resize = resize;
   if (connectionAuthoringEnabled !== undefined)
     data.connectionAuthoringEnabled = connectionAuthoringEnabled;
@@ -367,9 +419,8 @@ describe('ResourceNode canvas Resource state adapter', () => {
     render(
       <ResourceNode
         {...props({
-          imageUrl: 'https://example.com/harbour.png',
+          kind: 'image',
           selected: true,
-          body: 'must not render',
           onEditResource,
           onBeginBodyEditing: vi.fn(),
         })}
@@ -378,17 +429,18 @@ describe('ResourceNode canvas Resource state adapter', () => {
 
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'image');
     expect(screen.getByRole('img', { name: 'Image Resource' })).toBeVisible();
-    expect(screen.queryByText('must not render')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
     screen.getByRole('button', { name: 'Open Resource A' }).click();
     expect(onEditResource).toHaveBeenCalledWith(true);
   });
 
   it('offers an Image Resource Replace, and draws the upload target while it is replacing', () => {
-    const imageUrl = 'https://example.com/harbour.png';
+    const url = 'https://example.com/harbour.png';
     const onBeginBodyEditing = vi.fn();
     const { rerender } = render(
-      <ResourceNode {...props({ imageUrl, open: true, selected: true, onBeginBodyEditing })} />,
+      <ResourceNode
+        {...props({ kind: 'image', url, open: true, selected: true, onBeginBodyEditing })}
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource A' }));
@@ -397,10 +449,11 @@ describe('ResourceNode canvas Resource state adapter', () => {
     rerender(
       <ResourceNode
         {...props({
-          imageUrl,
+          kind: 'image',
+          url,
           open: true,
           selected: true,
-          imageReplacer: {
+          replacer: {
             accept: 'image/png',
             onReplace: () => Promise.resolve(null),
             onEnd: () => undefined,
@@ -412,15 +465,15 @@ describe('ResourceNode canvas Resource state adapter', () => {
   });
 
   it("keeps drawing a Closing Image Resource's picture while its content fades out", () => {
-    const imageUrl = 'https://example.com/harbour.png';
-    const { rerender } = render(<ResourceNode {...props({ imageUrl, open: true })} />);
+    const url = 'https://example.com/harbour.png';
+    const { rerender } = render(<ResourceNode {...props({ kind: 'image', url, open: true })} />);
 
-    // The data the projection hands a Closed Image Resource: its URL, not Open.
-    rerender(<ResourceNode {...props({ imageUrl, open: false })} />);
+    // The data the projection hands a Closed Image Resource: a Closed display.
+    rerender(<ResourceNode {...props({ kind: 'image', open: false })} />);
 
     const content = document.querySelector('.canvas-resource__content');
     expect(content).toHaveAttribute('data-presence', 'leaving');
-    expect(screen.getByRole('img', { name: 'A' })).toHaveAttribute('src', imageUrl);
+    expect(screen.getByRole('img', { name: 'A' })).toHaveAttribute('src', url);
     expect(screen.queryByTestId('resource-image-failed')).toBeNull();
   });
 
@@ -432,7 +485,6 @@ describe('ResourceNode canvas Resource state adapter', () => {
         {...props({
           kind: 'space',
           open: true,
-          body: 'must not render',
           onEditResource,
           onBeginBodyEditing,
         })}
@@ -441,9 +493,115 @@ describe('ResourceNode canvas Resource state adapter', () => {
 
     expect(screen.getByRole('article', { name: 'A' })).toHaveAttribute('data-kind', 'space');
     expect(screen.queryByRole('img', { name: 'Space Resource' })).toBeNull();
-    expect(screen.queryByText('must not render')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Open Resource A' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
+  });
+});
+
+describe('ResourceNode draws what the display shows', () => {
+  const FIGURE = 'https://example.com/harbour.png';
+
+  it("draws an Open Reference Resource to an Image Resource as its Target's image, with no Replace", () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          title: 'Harbour, again',
+          open: true,
+          selected: true,
+          content: { kind: 'image', url: FIGURE, via: 'reference' },
+          onEditResource: vi.fn(),
+        })}
+      />,
+    );
+
+    const picture = screen.getByRole('img', { name: 'Harbour, again' });
+    expect(picture).toHaveAttribute('src', FIGURE);
+    expect(screen.getByRole('button', { name: 'Close Resource Harbour, again' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Replace image/u })).toBeNull();
+
+    fireEvent.error(picture);
+    expect(screen.getByTestId('resource-image-failed')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
+  });
+
+  it('draws an unresolved Target as a notice on the Open front', () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          open: true,
+          content: { kind: 'unresolved', via: 'reference' },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
+  });
+
+  /**
+   * The rule between the two: what a Resource draws is the display's, and the
+   * Map's authored Open state is geometry — the resize control, z-order and the
+   * node's own `data-open` — never what is drawn. A Resource both presented and
+   * Open is presented, and keeps its authored Open state.
+   */
+  it('presents a Resource that is also Open, keeping its authored Open state on the node', () => {
+    const { container } = render(
+      <ResourceNode
+        {...props({
+          open: true,
+          presented: true,
+          source: '## Presented body',
+          onEditResource: vi.fn(),
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('resource-content')).toHaveTextContent('Presented body');
+    expect(screen.queryByTestId('resource')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Close Resource A' })).toBeNull();
+    expect(container.querySelector('.rf-resource-node__inner')).toHaveAttribute(
+      'data-open',
+      'true',
+    );
+  });
+
+  it('presents a Reference Resource to an Image Resource as its Target’s image', () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          title: 'Harbour, again',
+          presented: true,
+          content: { kind: 'image', url: FIGURE, via: 'reference' },
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('img', { name: 'Harbour, again' })).toHaveAttribute('src', FIGURE);
+  });
+
+  it('presents a Space Resource as its name, with no empty document', () => {
+    const { container } = render(
+      <ResourceNode {...props({ kind: 'space', title: 'Roadmap', presented: true })} />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Roadmap' })).toBeVisible();
+    expect(container.querySelector('.resource__body')).toBeNull();
+  });
+
+  it('presents an unresolved Target as a notice', () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          presented: true,
+          content: { kind: 'unresolved', via: 'reference' },
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
   });
 });
 
@@ -500,7 +658,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
         {...props({
           selected: true,
           open: true,
-          body: 'Body',
+          source: 'Body',
           resize,
           onEditResource: vi.fn(),
         })}
@@ -515,9 +673,9 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
   it('returns focus to the Resource when an edit ends on a Resource no longer selected', async () => {
     const running = props({
       open: true,
-      body: 'Body',
+      source: 'Body',
       onEditResource: vi.fn(),
-      bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+      editor: { onComplete: vi.fn(), onEnd: vi.fn() },
     });
     const inNode = (node: NodeProps<ResourceFlowNode>) => (
       <div className="react-flow__node" tabIndex={-1}>
@@ -528,7 +686,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
     await screen.findByRole('button', { name: 'Save Resource A' });
 
     // Save or Cancel ends the edit, and with it the reason the toolbar was drawn.
-    rerender(inNode(props({ open: true, body: 'Body', onEditResource: vi.fn() })));
+    rerender(inNode(props({ open: true, source: 'Body', onEditResource: vi.fn() })));
 
     expect(toolbar()).toBeNull();
     expect(container.querySelector('.react-flow__node')).toHaveFocus();
@@ -539,9 +697,9 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
       <ResourceNode
         {...props({
           open: true,
-          body: 'Body',
+          source: 'Body',
           onEditResource: vi.fn(),
-          bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         })}
       />,
     );
@@ -552,9 +710,10 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
     render(
       <ResourceNode
         {...props({
-          imageUrl: 'https://example.com/figure.png',
+          kind: 'image',
+          url: 'https://example.com/figure.png',
           open: true,
-          imageReplacer: {
+          replacer: {
             accept: 'image/png',
             onReplace: vi.fn(() => Promise.resolve(null)),
             onEnd: vi.fn(),
@@ -741,7 +900,7 @@ describe('ResourceNode readOnly suppresses controls despite a supplied operation
     const onEditResource = vi.fn();
     render(
       <ResourceNode
-        {...props({ selected: true, readOnly: true, open: true, body: 'x', onEditResource })}
+        {...props({ selected: true, readOnly: true, open: true, source: 'x', onEditResource })}
       />,
     );
 
@@ -1011,7 +1170,7 @@ describe('ResourceNode Open Resource front', () => {
   const SOURCE = '# Strategies\n\nNo strategy is privileged.';
 
   it("draws the Resource's rendered Markdown on the Resource, and says the Resource is Open", () => {
-    const { container } = render(<ResourceNode {...props({ open: true, body: SOURCE })} />);
+    const { container } = render(<ResourceNode {...props({ open: true, source: SOURCE })} />);
 
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Strategies' })).toBeVisible();
@@ -1026,7 +1185,7 @@ describe('ResourceNode Open Resource front', () => {
   });
 
   it('draws its title alone until the Map Opens it', () => {
-    const { container } = render(<ResourceNode {...props({ body: SOURCE })} />);
+    const { container } = render(<ResourceNode {...props({ source: SOURCE })} />);
 
     expect(
       screen.queryByRole('button', { name: 'Edit Markdown source of A' }),
@@ -1043,8 +1202,8 @@ describe('ResourceNode Open Resource front', () => {
       <ResourceNode
         {...props({
           open: false,
-          body: SOURCE,
-          bodyEditor: { onComplete: vi.fn(), onEnd: vi.fn() },
+          source: SOURCE,
+          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         })}
       />,
     );
@@ -1064,7 +1223,7 @@ describe('ResourceNode Open Resource front', () => {
           kind: 'reference',
           title: 'Return',
           open: true,
-          body: SOURCE,
+          source: SOURCE,
           selected: true,
           onEditResource: vi.fn(),
         })}
@@ -1084,7 +1243,7 @@ describe('ResourceNode Open Resource front', () => {
       <ResourceNode
         {...props({
           open: true,
-          body: SOURCE,
+          source: SOURCE,
           titleEditor: { onComplete: () => null, onCancel: () => undefined },
         })}
       />,
@@ -1105,7 +1264,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
 
     // One control, not React Flow's eight — a bottom-right-only control cannot
     // move the authored origin by construction, so there is nothing else to draw.
@@ -1126,7 +1285,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel,
     };
-    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.blur(window);
@@ -1144,7 +1303,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.blur(window);
@@ -1169,7 +1328,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
 
     // The press is the gesture: geometry is proposed only from a drag this Resource
     // started, so a move without it proves nothing about the live one.
@@ -1189,7 +1348,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.pointerUp(window);
@@ -1206,14 +1365,14 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ source: SOURCE, resize })} />);
 
     // A Collapsed Resource has no box the author drew, so nothing to resize.
     expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
   });
 
   it('offers no resize control on an Open Resource the composition gave no resize operation', () => {
-    render(<ResourceNode {...props({ open: true, body: SOURCE })} />);
+    render(<ResourceNode {...props({ open: true, source: SOURCE })} />);
     // The capability carries its own floor, so a Resource offered no operation is
     // offered no control either — there is no minimum for this package to guess.
     expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
@@ -1244,7 +1403,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, body: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
 
     // The control owns the hit target's upper layer. The inert mark is its
     // preceding sibling so the later Resource face can occlude their overlap.

@@ -52,9 +52,9 @@ const markdown = (id: UUID, title: string) => ({
   document: { title, kind: 'markdown' as const, body: `# ${title}` },
 });
 
-const spaceLink = (id: UUID, spaceId: UUID, map: UUID, graph: UUID) => ({
+const spaceLink = (id: UUID, spaceId: UUID, mapId: UUID, graph: UUID) => ({
   id,
-  document: { title: 'Link', kind: 'space' as const, spaceId, map, graph },
+  document: { title: 'Link', kind: 'space' as const, spaceId, map: mapId, graph },
 });
 
 const [R0, R1, R2, R3] = T_RESOURCES;
@@ -277,9 +277,9 @@ const replaceAt = <Item>(items: readonly Item[], position: number, next: Item): 
  */
 const selectable = (document: SpaceSnapshot['document']) => ({
   defaultMap: document.defaultMap,
-  maps: new Set((document.maps ?? []).map((map) => map.id)),
+  maps: new Set((document.maps ?? []).map((m) => m.id)),
   owners: new Map(
-    (document.maps ?? []).flatMap((map) => map.graphs.map((graph) => [graph.id, map.id] as const)),
+    (document.maps ?? []).flatMap((m) => m.graphs.map((graph) => [graph.id, m.id] as const)),
   ),
 });
 
@@ -293,10 +293,10 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
   let maps: Maps = snapshot.document.maps ?? [];
   let defaultMap = snapshot.document.defaultMap;
   const resourceIds = snapshot.resources.map((resource) => resource.id);
-  const withMap = (position: number, change: (map: PositionedMap) => PositionedMap | undefined) => {
-    const map = at(maps, position);
-    if (map === undefined) return;
-    const next = change(map);
+  const withMap = (position: number, change: (m: PositionedMap) => PositionedMap | undefined) => {
+    const existing = at(maps, position);
+    if (existing === undefined) return;
+    const next = change(existing);
     if (next !== undefined) maps = replaceAt(maps, position, next);
   };
   ops.forEach((current, opIndex) => {
@@ -304,15 +304,15 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
     switch (current.kind) {
       case 'move':
       case 'place':
-        withMap(current.map, (map) => {
+        withMap(current.map, (m) => {
           const resource = at(resourceIds, current.resource);
           if (resource === undefined) return undefined;
-          const placed = map.positions[resource];
+          const placed = m.positions[resource];
           if ((placed === undefined) !== (current.kind === 'place')) return undefined;
           return {
-            ...map,
+            ...m,
             positions: {
-              ...map.positions,
+              ...m.positions,
               [resource]: { ...(placed ?? { open: false as const }), x: current.x, y: current.y },
             },
           };
@@ -320,9 +320,9 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
         break;
       case 'open':
       case 'close':
-        withMap(current.map, (map) => {
+        withMap(current.map, (m) => {
           const resource = at(resourceIds, current.resource);
-          const placed = resource === undefined ? undefined : map.positions[resource];
+          const placed = resource === undefined ? undefined : m.positions[resource];
           if (resource === undefined || placed === undefined) return undefined;
           const next =
             current.kind === 'open'
@@ -333,23 +333,23 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
                   openSize: { width: current.width, height: current.height },
                 }
               : { ...placed, open: false as const };
-          return { ...map, positions: { ...map.positions, [resource]: next } };
+          return { ...m, positions: { ...m.positions, [resource]: next } };
         });
         break;
       case 'unplace':
-        withMap(current.map, (map) => {
+        withMap(current.map, (m) => {
           const resource = at(resourceIds, current.resource);
-          if (resource === undefined || map.positions[resource] === undefined) return undefined;
-          const { [resource]: _removed, ...positions } = map.positions;
-          return { ...map, positions };
+          if (resource === undefined || m.positions[resource] === undefined) return undefined;
+          const { [resource]: _removed, ...positions } = m.positions;
+          return { ...m, positions };
         });
         break;
       case 'add-edge':
       case 'remove-edge':
       case 'retitle-graph':
       case 'recolor-graph':
-        withMap(current.map, (map) => {
-          const graph = at(map.graphs, current.graph);
+        withMap(current.map, (m) => {
+          const graph = at(m.graphs, current.graph);
           if (graph === undefined) return undefined;
           const edited = (): typeof graph | undefined => {
             if (current.kind === 'add-edge') {
@@ -364,34 +364,34 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
           };
           const next = edited();
           if (next === undefined) return undefined;
-          return { ...map, graphs: replaceAt(map.graphs, current.graph, next) };
+          return { ...m, graphs: replaceAt(m.graphs, current.graph, next) };
         });
         break;
       case 'retitle-map':
-        withMap(current.map, (map) => ({ ...map, title: current.title }));
+        withMap(current.map, (m) => ({ ...m, title: current.title }));
         break;
       case 'activate-graph':
-        withMap(current.map, (map) => {
-          const graph = at(map.graphs, current.graph);
-          return graph === undefined ? undefined : { ...map, activeGraph: graph.id };
+        withMap(current.map, (m) => {
+          const graph = at(m.graphs, current.graph);
+          return graph === undefined ? undefined : { ...m, activeGraph: graph.id };
         });
         break;
       case 'reverse-graphs':
-        withMap(current.map, (map) => ({ ...map, graphs: [...map.graphs].reverse() }));
+        withMap(current.map, (m) => ({ ...m, graphs: [...m.graphs].reverse() }));
         break;
       case 'reverse-maps':
         maps = [...maps].reverse();
         break;
       case 'add-graph':
-        withMap(current.map, (map) => {
-          return { ...map, graphs: [...map.graphs, { id: freshId, title: 'Added', edges: [] }] };
+        withMap(current.map, (m) => {
+          return { ...m, graphs: [...m.graphs, { id: freshId, title: 'Added', edges: [] }] };
         });
         break;
       case 'remove-graph':
-        withMap(current.map, (map) => {
-          if (map.graphs.length < 2) return undefined;
-          const removed = at(map.graphs, current.graph);
-          return { ...map, graphs: map.graphs.filter((graph) => graph !== removed) };
+        withMap(current.map, (m) => {
+          if (m.graphs.length < 2) return undefined;
+          const removed = at(m.graphs, current.graph);
+          return { ...m, graphs: m.graphs.filter((graph) => graph !== removed) };
         });
         break;
       case 'move-graph': {
@@ -400,11 +400,10 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
         const graph = from === undefined ? undefined : at(from.graphs, current.graph);
         if (from === undefined || to === undefined || graph === undefined) break;
         if (from === to || from.graphs.length < 2) break;
-        maps = maps.map((map) => {
-          if (map === from)
-            return { ...map, graphs: map.graphs.filter((owned) => owned !== graph) };
-          if (map === to) return { ...map, graphs: [...map.graphs, graph] };
-          return map;
+        maps = maps.map((m) => {
+          if (m === from) return { ...m, graphs: m.graphs.filter((owned) => owned !== graph) };
+          if (m === to) return { ...m, graphs: [...m.graphs, graph] };
+          return m;
         });
         break;
       }
@@ -425,7 +424,7 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
       case 'remove-map': {
         if (maps.length < 2) break;
         const removed = at(maps, current.map);
-        maps = maps.filter((map) => map !== removed);
+        maps = maps.filter((m) => m !== removed);
         break;
       }
       case 'default-map': {
@@ -435,17 +434,17 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
         break;
       }
       case 'reid-map':
-        withMap(current.map, (map) => {
-          return { ...map, id: freshId };
+        withMap(current.map, (m) => {
+          return { ...m, id: freshId };
         });
         break;
       case 'reid-graph':
-        withMap(current.map, (map) => {
-          const graph = at(map.graphs, current.graph);
+        withMap(current.map, (m) => {
+          const graph = at(m.graphs, current.graph);
           if (graph === undefined) return undefined;
           return {
-            ...map,
-            graphs: replaceAt(map.graphs, current.graph, { ...graph, id: freshId }),
+            ...m,
+            graphs: replaceAt(m.graphs, current.graph, { ...graph, id: freshId }),
           };
         });
         break;
@@ -545,8 +544,8 @@ describe('the SQL fast-path decision', () => {
       ...next,
       document: {
         ...next.document,
-        maps: (next.document.maps ?? []).map((map) =>
-          map.id === T_MAP_1 ? { ...map, activeGraph: T_GRAPH_1B } : map,
+        maps: (next.document.maps ?? []).map((m) =>
+          m.id === T_MAP_1 ? { ...m, activeGraph: T_GRAPH_1B } : m,
         ),
       },
     };

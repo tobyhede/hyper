@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0027
+Refined by: 0044
 Related: 0024
 
 A React Flow camera Promise is not a completion signal. Camera commands are issued and never awaited: nothing chains required behaviour on `setCenter`, `fitView`, `fitBounds` or `zoomTo` settling, with `.then` or with `await`. Work that must follow a move is scheduled by the effect that issued it and cancelled by that effect's own cleanup, so an interrupted move is *replaced* rather than orphaned.

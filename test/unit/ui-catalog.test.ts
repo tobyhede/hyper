@@ -583,7 +583,7 @@ describe('production component coverage', () => {
         [
           {
             module: 'packages/app/src/components/NewReference.tsx',
-            reason: 'Retired by ADR 0058.',
+            reason: 'Retired by ADR 0089.',
           },
         ],
         [],
@@ -591,7 +591,7 @@ describe('production component coverage', () => {
     );
 
     expect(buildUiCatalog(root).uncataloguedComponents).toEqual([
-      { module: 'packages/app/src/components/NewReference.tsx', reason: 'Retired by ADR 0058.' },
+      { module: 'packages/app/src/components/NewReference.tsx', reason: 'Retired by ADR 0089.' },
     ]);
   });
 
@@ -610,7 +610,7 @@ describe('production component coverage', () => {
         [
           {
             module: 'packages/app/src/components/NewReference.tsx',
-            reason: 'Retired by ADR 0058.',
+            reason: 'Retired by ADR 0089.',
           },
         ],
         [],

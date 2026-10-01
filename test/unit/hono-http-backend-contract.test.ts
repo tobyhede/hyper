@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { uuidSchema } from '@project/core';
+import { uuidSchema, type UUID } from '@project/core';
 import {
   encodeCommitRequest,
   type LoadedSpace,
@@ -10,6 +10,11 @@ import { spaceBackendContract } from '@project/persistence/test-support';
 import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 import { RESOURCE_ID, SPACE_ID, oneResourceSnapshot as snapshot } from '../support/space-fixtures';
+
+/** A request that initializes no Space mints nothing, so any mint is a failure here. */
+const mintsNothing = (): UUID => {
+  throw new Error('This request initializes no Space, so it mints no identity.');
+};
 
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
@@ -85,7 +90,9 @@ const appFetch =
 spaceBackendContract('Hono HttpSpaceBackend', ({ spaces, metaSpaceId }) =>
   Promise.resolve({
     backend: new HttpSpaceBackend('http://hyper.test', {
-      fetch: appFetch(createSpaceHttpApp(new MemorySpaceRepository(spaces, metaSpaceId))),
+      fetch: appFetch(
+        createSpaceHttpApp(new MemorySpaceRepository(spaces, metaSpaceId), { newId: mintsNothing }),
+      ),
     }),
     close: () => Promise.resolve(),
   }),
@@ -93,14 +100,16 @@ spaceBackendContract('Hono HttpSpaceBackend', ({ spaces, metaSpaceId }) =>
 
 describe('HttpSpaceBackend', () => {
   it('lists spaces through the typed Hono application contract', async () => {
-    const app = createSpaceHttpApp(repository());
+    const app = createSpaceHttpApp(repository(), { newId: mintsNothing });
     const backend = new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) });
 
     await expect(backend.listSpaces()).resolves.toEqual([{ id: SPACE_ID, title: 'One' }]);
   });
 
   it('loads a space through the typed Hono application contract', async () => {
-    const app = createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(loaded) }));
+    const app = createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(loaded) }), {
+      newId: mintsNothing,
+    });
     const backend = new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) });
 
     await expect(backend.loadSpace(SPACE_ID)).resolves.toEqual(loaded);
@@ -121,6 +130,7 @@ describe('HttpSpaceBackend', () => {
             deletedSpaceIds: [],
           }),
       }),
+      { newId: mintsNothing },
     );
 
     const response = await appFetch(app)(
@@ -159,6 +169,7 @@ describe('HttpSpaceBackend', () => {
             deletedSpaceIds: [],
           }),
       }),
+      { newId: mintsNothing },
     );
     const backend = new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) });
 

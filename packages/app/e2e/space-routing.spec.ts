@@ -302,8 +302,8 @@ test('copy commands distinguish canonical Resource identity from its current Map
   page,
 }) => {
   await installClipboard(page);
-  const map = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
-  await page.goto(map);
+  const mapPath = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
+  await page.goto(mapPath);
   const resource = page.locator(`.react-flow__node[data-id="${RESOURCE_A_ID}"]`);
   await resource.click();
   // The rail reveals on hover, and it is the Resource's own — no Space surface is
@@ -321,7 +321,7 @@ test('copy commands distinguish canonical Resource identity from its current Map
   await copyMatchingFromMenu(page, 'Actions for Resource A', RESOURCE_COPY_LINK_IN_MAP);
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe(`${new URL(page.url()).origin}${map}/resources/${encodeCompactUuid(RESOURCE_A_ID)}`);
+    .toBe(`${new URL(page.url()).origin}${mapPath}/resources/${encodeCompactUuid(RESOURCE_A_ID)}`);
 });
 
 /**
@@ -404,15 +404,15 @@ test('canonical and contextual Graph links restore navigation context without au
 test('activating a Graph pushes a contextual destination restored by Back and Forward', async ({
   page,
 }) => {
-  const map = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
-  const mid = `${map}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
-  await page.goto(map);
+  const mapPath = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
+  const mid = `${mapPath}/graphs/${encodeCompactUuid(MID_GRAPH_ID)}`;
+  await page.goto(mapPath);
 
   const graphs = await graphMenu(page);
   await graphs.getByRole('menuitemradio', { name: 'Mid', exact: true }).click();
   await expect(page).toHaveURL(mid);
   await page.goBack();
-  await expect(page).toHaveURL(map);
+  await expect(page).toHaveURL(mapPath);
   await expect(page.getByRole('button', { name: /^Present / })).toBeVisible();
   await page.goForward();
   await expect(page).toHaveURL(mid);
@@ -431,8 +431,8 @@ test(
   },
   async ({ page }) => {
     await installClipboard(page);
-    const map = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
-    await page.goto(map);
+    const mapPath = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
+    await page.goto(mapPath);
 
     const menu = await graphMenu(page);
     await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
@@ -447,7 +447,7 @@ test(
     await page.keyboard.press('Escape');
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(`${new URL(page.url()).origin}${map}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
+      .toBe(`${new URL(page.url()).origin}${mapPath}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
   },
 );
 
@@ -462,9 +462,9 @@ test('an incompatible contextual Map-and-Graph destination has a real 404', asyn
 test('an exact presentation link starts fresh at its Resource and moves through browser history', async ({
   page,
 }) => {
-  const map = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
-  const atB = `${map}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_B_ID)}`;
-  const atC = `${map}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_C_ID)}`;
+  const mapPath = `/spaces/${encodeCompactUuid(FIXTURE_ID)}/maps/${encodeCompactUuid(FIRST_MAP_ID)}`;
+  const atB = `${mapPath}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_B_ID)}`;
+  const atC = `${mapPath}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}/present/${encodeCompactUuid(RESOURCE_C_ID)}`;
   const before = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)
     .then((response) => response.text());
@@ -491,7 +491,7 @@ test('an exact presentation link starts fresh at its Resource and moves through 
   await page.goForward();
   await expect(page).toHaveURL(atC);
   await page.getByTestId('exit-presenting').click();
-  await expect(page).toHaveURL(`${map}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
+  await expect(page).toHaveURL(`${mapPath}/graphs/${encodeCompactUuid(LONG_GRAPH_ID)}`);
 
   const after = await page.request
     .get(`/api/spaces/${FIXTURE_ID}`)

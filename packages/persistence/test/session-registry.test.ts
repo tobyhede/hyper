@@ -306,13 +306,13 @@ describe('Space session registry', () => {
             ...working,
             document: {
               ...working.document,
-              maps: (working.document.maps ?? []).map((map) =>
-                map.id === MAP
+              maps: (working.document.maps ?? []).map((m) =>
+                m.id === MAP
                   ? {
-                      ...map,
-                      graphs: map.graphs.filter(({ id }) => id !== PREFERRED_GRAPH),
+                      ...m,
+                      graphs: m.graphs.filter(({ id }) => id !== PREFERRED_GRAPH),
                     }
-                  : map,
+                  : m,
               ),
             },
           });
@@ -426,7 +426,7 @@ describe('Space session registry', () => {
             ...working,
             document: {
               ...working.document,
-              maps: (working.document.maps ?? []).filter((map) => map.id !== PREFERRED_MAP),
+              maps: (working.document.maps ?? []).filter((m) => m.id !== PREFERRED_MAP),
             },
           });
         }
@@ -1209,10 +1209,10 @@ describe('Space session registry', () => {
             injected.value = true;
             const working = containingSession.getState().working;
             const document = working.document;
-            const maps = (document.maps ?? []).map((map) => ({
-              ...map,
+            const maps = (document.maps ?? []).map((m) => ({
+              ...m,
               positions: {
-                ...map.positions,
+                ...m.positions,
                 [LATE_REFERENCE_ID]: { x: 300, y: 0, open: false as const },
               },
             }));
@@ -1424,10 +1424,10 @@ describe('Space session registry', () => {
           reads += 1;
           if (reads === readToInject) {
             injected.value = true;
-            const maps = other.snapshot.document.maps.map((map) => ({
-              ...map,
+            const maps = other.snapshot.document.maps.map((m) => ({
+              ...m,
               positions: {
-                ...map.positions,
+                ...m.positions,
                 [LATE_REFERENCE_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
               },
             }));
@@ -1640,7 +1640,7 @@ describe('Space session registry', () => {
             ...working,
             document: {
               ...working.document,
-              maps: (working.document.maps ?? []).filter((map) => map.id !== CONTAINING_MAP),
+              maps: (working.document.maps ?? []).filter((m) => m.id !== CONTAINING_MAP),
             },
           });
         }
@@ -1767,7 +1767,7 @@ describe('Space session registry', () => {
             ...working,
             document: {
               ...working.document,
-              maps: (working.document.maps ?? []).filter((map) => map.id !== CONTAINING_MAP),
+              maps: (working.document.maps ?? []).filter((m) => m.id !== CONTAINING_MAP),
             },
           });
         }

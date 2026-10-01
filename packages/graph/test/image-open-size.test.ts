@@ -144,3 +144,50 @@ describe('the first Open of an Image Resource', () => {
     expect(openSizeOf(reopened)).toEqual({ width: 700, height: 500 });
   });
 });
+
+const REFERENCE_ID = uuid('00000000-0000-4000-8000-000000000006');
+
+/** The same Space with a Reference Resource to the Image Resource placed beside it. */
+const withReference = (snapshot: SpaceSnapshot): SpaceSnapshot => ({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    maps: (snapshot.document.maps ?? []).map((authoredMap) => ({
+      ...authoredMap,
+      positions: { ...authoredMap.positions, [REFERENCE_ID]: { x: 0, y: 400, open: false } },
+    })),
+  },
+  resources: [
+    ...snapshot.resources,
+    {
+      id: REFERENCE_ID,
+      document: { title: 'Harbour, again', kind: 'reference', target: IMAGE_ID },
+    },
+  ],
+});
+
+const referenceOpenSize = (snapshot: SpaceSnapshot) => {
+  const at = placement(snapshot, REFERENCE_ID);
+  if (!at.open) throw new Error('not open');
+  return at.openSize;
+};
+
+describe('the first Open of a Reference Resource to an Image Resource', () => {
+  it("reads its Target's recorded natural size by the same rule", () => {
+    const opened = completed(
+      SnapshotEdit.open(
+        withReference(snapshotWith({ width: 400, height: 300 })),
+        MAP_ID,
+        REFERENCE_ID,
+      ),
+    );
+    expect(contentArea(referenceOpenSize(opened))).toEqual({ width: 400, height: 300 });
+  });
+
+  it('opens at the default Open Size when its Target recorded no natural size', () => {
+    const opened = completed(
+      SnapshotEdit.open(withReference(snapshotWith()), MAP_ID, REFERENCE_ID),
+    );
+    expect(referenceOpenSize(opened)).toEqual(DEFAULT_OPEN_SIZE);
+  });
+});

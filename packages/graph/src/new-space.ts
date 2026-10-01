@@ -115,7 +115,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
 /**
  * The default new Space: `Resource 1` in `New space`.
  *
- * It takes `newId` for the same reason {@link initializeSpace} does (ADR 0016)
+ * It takes `newId` for the same reason {@link initializeSpace} does (ADR 0109)
  * — the four identities it mints are the caller's to control — which is also
  * what lets `defaultContentAggregate` call it, so the starting state has one
  * definition.

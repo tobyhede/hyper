@@ -16,7 +16,7 @@
  */
 import { createInterface } from 'node:readline';
 import { performance } from 'node:perf_hooks';
-import { uuidSchema, type SpaceSnapshot } from '@project/core';
+import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { createSpaceHttpApp } from '@project/http';
 import { decodeCommitResponse, encodeCommitRequest } from '@project/persistence';
 import {
@@ -40,7 +40,7 @@ const target =
   order.sqlitePath === undefined
     ? postgresTarget(requiredDatabaseUrl(), sink)
     : sqliteFileTarget(order.sqlitePath, sink);
-const app = createSpaceHttpApp(target.repository, { logError: () => undefined });
+const app = createSpaceHttpApp(target.repository, { newId: newUuid, logError: () => undefined });
 const spaceId = uuidSchema.parse(order.spaceId);
 
 const loaded = await target.repository.loadSpace(spaceId);

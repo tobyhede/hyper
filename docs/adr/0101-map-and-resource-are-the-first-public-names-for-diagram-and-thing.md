@@ -1,6 +1,6 @@
 # Map and Resource are the first-public names for Diagram and Thing
 
-Status: proposed
+Status: accepted
 Refines: 0085
 Related: 0038, 0041, 0047, 0050, 0054, 0056, 0069, 0092
 

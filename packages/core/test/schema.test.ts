@@ -85,8 +85,8 @@ describe('space file schema', () => {
   });
 
   it('requires the space to name itself', () => {
-    // Required today; ADR 0019 makes ids optional and generated on load, and
-    // this is the assertion that will change when it does.
+    // An id is optional only in import input (ADR 0030); the space file
+    // itself requires one.
     const { id: _id, ...withoutId } = validSpaceFile;
     const result = spaceFileSchema.safeParse(withoutId);
     expect(result.success).toBe(false);
@@ -364,11 +364,11 @@ describe('resource frontmatter schema', () => {
       kind: 'space',
       spaceId: '00000000-0000-4000-8000-000000000007',
     };
-    const map = '00000000-0000-4000-8000-000000000008';
+    const mapId = '00000000-0000-4000-8000-000000000008';
     const graph = '00000000-0000-4000-8000-000000000009';
 
     expect(resourceFrontmatterSchema.safeParse(nested).success).toBe(false);
-    expect(resourceFrontmatterSchema.safeParse({ ...nested, map }).success).toBe(false);
+    expect(resourceFrontmatterSchema.safeParse({ ...nested, map: mapId }).success).toBe(false);
     expect(resourceFrontmatterSchema.safeParse({ ...nested, graph }).success).toBe(false);
   });
 
@@ -404,9 +404,9 @@ describe('space file maps', () => {
 
   it('parses a positioned map and its positions', () => {
     const file = spaceFileSchema.parse({ ...validSpaceFile, maps: [working] });
-    const map = file.maps?.[0];
-    expect(map?.kind).toBe('positioned');
-    expect(map?.positions).toEqual({
+    const parsed = file.maps?.[0];
+    expect(parsed?.kind).toBe('positioned');
+    expect(parsed?.positions).toEqual({
       '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
       '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
     });
@@ -595,7 +595,7 @@ describe('space file maps', () => {
 
   it('leaves it absent — the first graph is active', () => {
     // Absent is the meaningful case, not a missing field to be filled in: it is
-    // how a map defers the active graph (ADR 0026).
+    // how a map defers the active graph (ADR 0040).
     const file = spaceFileSchema.parse({ ...validSpaceFile, maps: [working] });
     expect(file.maps?.[0]?.activeGraph).toBeUndefined();
   });

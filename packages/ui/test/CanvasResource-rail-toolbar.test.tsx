@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { CanvasResource } from '../src';
+import { beginEditing, CanvasResource, CLOSED_DISPLAY } from '../src';
 
 /**
  * The Resource rail's keyboard contract (ADR 0073).
@@ -23,11 +23,10 @@ const openMarkdownResource = () =>
     <CanvasResource
       front={{
         kind: 'markdown',
-        source: 'Markdown',
-        open: true,
         onOpenChange: vi.fn(),
         onBeginEdit: vi.fn(),
       }}
+      display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
       state="rest"
       title="A"
       graphColor="#ffc53d"
@@ -56,12 +55,14 @@ describe('the Resource rail is one toolbar', () => {
       <CanvasResource
         front={{
           kind: 'markdown',
-          source: 'Markdown',
-          open: true,
           onOpenChange: vi.fn(),
           onBeginEdit: vi.fn(),
-          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         }}
+        display={beginEditing(
+          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
+          { onComplete: vi.fn(), onEnd: vi.fn() },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -94,12 +95,14 @@ describe('the Resource rail is one toolbar', () => {
       <CanvasResource
         front={{
           kind: 'markdown',
-          source: 'Markdown',
-          open: true,
           onOpenChange,
           onBeginEdit: vi.fn(),
-          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         }}
+        display={beginEditing(
+          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
+          { onComplete: vi.fn(), onEnd: vi.fn() },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -134,10 +137,12 @@ describe('the Resource rail is one toolbar', () => {
         <CanvasResource
           front={{
             kind: 'markdown',
-            source: 'Markdown',
-            open: true,
             onOpenChange: vi.fn(),
             onBeginEdit: vi.fn(),
+          }}
+          display={{
+            shown: 'open',
+            content: { kind: 'markdown', source: 'Markdown', via: 'self' },
           }}
           state="rest"
           title="A"
@@ -190,12 +195,14 @@ describe('the rail says whose command each one is', () => {
       <CanvasResource
         front={{
           kind: 'markdown',
-          source: 'Markdown',
-          open: true,
           onOpenChange: vi.fn(),
           onBeginEdit: vi.fn(),
-          editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         }}
+        display={beginEditing(
+          { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
+          { onComplete: vi.fn(), onEnd: vi.fn() },
+          true,
+        )}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -217,12 +224,8 @@ describe('the rail says whose command each one is', () => {
   it('draws Reference Resource Open in the shared Resource command group', () => {
     render(
       <CanvasResource
-        front={{
-          kind: 'reference',
-          target: { kind: 'markdown', source: '' },
-          open: false,
-          onOpenChange: () => 'completed',
-        }}
+        front={{ kind: 'reference', onOpenChange: () => 'completed' }}
+        display={CLOSED_DISPLAY}
         state="rest"
         title="A"
         graphColor="#ffc53d"

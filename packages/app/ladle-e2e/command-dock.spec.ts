@@ -234,9 +234,9 @@ test(
   async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(story('default'));
-    const map = commandDockSnapshot.document.maps?.[0];
-    const graph = map?.graphs[0];
-    if (map === undefined || graph === undefined) throw new Error('Missing fixture Graph');
+    const firstMap = commandDockSnapshot.document.maps?.[0];
+    const graph = firstMap?.graphs[0];
+    if (firstMap === undefined || graph === undefined) throw new Error('Missing fixture Graph');
 
     const menu = await disclose(page, 'Active Graph: Long');
     await expect(menu.getByRole('menuitem', { name: /^Copy permanent link/ })).toHaveCount(0);
@@ -251,7 +251,7 @@ test(
     await expect
       .poll(() => page.evaluate(() => navigator.clipboard.readText()))
       .toBe(
-        `https://example.test${productDestinationPath({ kind: 'map-graph', spaceId: commandDockSnapshot.id, mapId: map.id, graphId: graph.id })}`,
+        `https://example.test${productDestinationPath({ kind: 'map-graph', spaceId: commandDockSnapshot.id, mapId: firstMap.id, graphId: graph.id })}`,
       );
   },
 );
@@ -1262,9 +1262,9 @@ test(
   async ({ page }) => {
     await page.goto(story('default'));
     const space = page.getByTestId('space-title').filter({ visible: true });
-    const map = page.getByTestId('selected-canvas').filter({ visible: true });
+    const mapControl = page.getByTestId('selected-canvas').filter({ visible: true });
     await expect(space).toBeVisible();
-    await expect(map).toBeVisible();
+    await expect(mapControl).toBeVisible();
     await expect(page.getByTestId('active-graph').filter({ visible: true })).toBeVisible();
     /**
      * **The three read in one frame, and that is the assertion rather than a
@@ -1312,12 +1312,12 @@ test(
     await expect(page.getByRole('button', { name: /^Space:/ })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Map:/ })).toHaveCount(1);
     await expect(page.getByRole('button', { name: /^Active Graph:/ })).toHaveCount(1);
-    await map.click({ delay: 120 });
+    await mapControl.click({ delay: 120 });
     await expect(page.getByRole('menu')).toBeVisible();
     await page.getByRole('menuitem', { name: 'Rename' }).click();
     await expect(page.getByRole('textbox', { name: 'Map name', exact: true })).toBeFocused();
     await page.keyboard.press('Escape');
-    await expect(map).toBeFocused();
+    await expect(mapControl).toBeFocused();
     // And the Space's: the caret comes back to its name too.
     await space.click({ delay: 120 });
     await expect(page.getByRole('menu')).toBeVisible();

@@ -91,13 +91,13 @@ const canonicalGraphs = (
   });
 
 const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
-  const maps = snapshot.document.maps?.map((map) => {
+  const maps = snapshot.document.maps?.map((m) => {
     const mapBase: Omit<NonNullable<SpaceFile['maps']>[number], 'activeGraph'> = {
-      id: map.id,
-      title: map.title,
-      kind: map.kind,
+      id: m.id,
+      title: m.title,
+      kind: m.kind,
       positions: Object.fromEntries(
-        Object.entries(map.positions)
+        Object.entries(m.positions)
           .sort(([left], [right]) => compareOrdinal(left, right))
           // The point is rebuilt too, not passed through: a stored `{"y":…,"x":…}`
           // would otherwise export in that order. An absent value cannot come off
@@ -109,9 +109,9 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
             return [[id, canonicalPlacement(point)]];
           }),
       ),
-      graphs: canonicalGraphs(map.graphs),
+      graphs: canonicalGraphs(m.graphs),
     };
-    return map.activeGraph === undefined ? mapBase : { ...mapBase, activeGraph: map.activeGraph };
+    return m.activeGraph === undefined ? mapBase : { ...mapBase, activeGraph: m.activeGraph };
   });
   const fileBase: Pick<SpaceFile, 'version' | 'id' | 'title'> = {
     version: SPACE_FILE_VERSION,

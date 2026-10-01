@@ -156,7 +156,7 @@ function outgoingEdgesFrom(
 
 /**
  * Whether a Map draws a Graph — its owned-Graph membership test, and the
- * whole of it (ADR 0045).
+ * whole of it (ADR 0040).
  *
  * Read off the Map rather than decided a second time. Which Graphs a Map
  * draws is the Map's own answer, and a Navigation that computed its own
@@ -354,8 +354,8 @@ export function createNavigation(
     // says which.
     //
     // The visible set is read off the resolved Map's own Graphs rather than
-    // recomputed here: one place answers which Graphs a Map draws (ADR 0026,
-    // ADR 0045), and two would disagree the moment the answers differ.
+    // recomputed here: one place answers which Graphs a Map draws (ADR 0040),
+    // and two would disagree the moment the answers differ.
     //
     // Both refusals throw, and deliberately alike. Neither is reachable through
     // the product — `GraphSelector` is fed the visible Graphs — so each is a

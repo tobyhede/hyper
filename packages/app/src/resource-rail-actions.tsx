@@ -166,7 +166,7 @@ export function useResourceRailActions(
   { authoring, commandOutcomes, resourceDeletion }: ComposedApp,
   {
     space,
-    map,
+    map: selectedMap,
     entityActions,
     availability,
     editingResourceBody,
@@ -183,7 +183,7 @@ export function useResourceRailActions(
       if (resource === undefined) return [];
       return resourceRailGroups(
         resource,
-        entityActions({ kind: 'resource', resource, map }),
+        entityActions({ kind: 'resource', resource, map: selectedMap }),
         connect,
         {
           createReference: addResource ? () => createReferenceFrom(resource) : null,
@@ -217,7 +217,7 @@ export function useResourceRailActions(
     },
     [
       space,
-      map,
+      selectedMap,
       entityActions,
       addResource,
       authorOnCanvas,

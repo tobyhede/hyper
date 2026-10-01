@@ -6,7 +6,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { Toolbar, ToolbarButton } from '@project/ui';
+import { CLOSED_DISPLAY, Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
@@ -123,7 +123,7 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       kind: 'markdown',
       active: false,
       selectedForAuthoring: false,
-      showContent: false,
+      display: CLOSED_DISPLAY,
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
     },
@@ -209,8 +209,7 @@ function compose({
 const settled = (session: SpaceSession): Promise<void> =>
   waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
 
-const graphsOf = (working: SpaceSnapshot) =>
-  (working.document.maps ?? []).flatMap((map) => map.graphs);
+const graphsOf = (working: SpaceSnapshot) => (working.document.maps ?? []).flatMap((m) => m.graphs);
 
 /** One identity, so the memo under test is not defeated by the test's own input. */
 const NO_OP = () => undefined;
@@ -759,9 +758,9 @@ describe("the app's canvas delete key", () => {
 
       fireEvent.keyDown(focused, { key, bubbles: true });
 
-      const map = session.getState().working.document.maps?.[0];
-      expect(map?.positions[RESOURCE_B]).toBeUndefined();
-      expect(map?.positions[RESOURCE_A]).toBeDefined();
+      const firstMap = session.getState().working.document.maps?.[0];
+      expect(firstMap?.positions[RESOURCE_B]).toBeUndefined();
+      expect(firstMap?.positions[RESOURCE_A]).toBeDefined();
     },
   );
 

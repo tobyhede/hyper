@@ -241,7 +241,10 @@ describe('replacing an Image Resource’s image', () => {
 
     await expect(
       replaceImage({ images, authoring }, FIGURE, { kind: 'files', files: [file('notes.txt')] }),
-    ).resolves.toEqual({ kind: 'not-stored', code: 'image-format-unsupported', name: 'notes.txt' });
+    ).resolves.toEqual({
+      kind: 'not-stored',
+      refusals: [{ code: 'image-format-unsupported', name: 'notes.txt' }],
+    });
     expect(session.getState().working).toBe(before);
   });
 
@@ -254,7 +257,10 @@ describe('replacing an Image Resource’s image', () => {
 
     await expect(
       replaceImage({ images, authoring }, FIGURE, { kind: 'files', files: [notes] }),
-    ).resolves.toEqual({ kind: 'not-stored', code: 'image-format-unsupported', name: 'notes.txt' });
+    ).resolves.toEqual({
+      kind: 'not-stored',
+      refusals: [{ code: 'image-format-unsupported', name: 'notes.txt' }],
+    });
     expect(session.getState().working).toBe(before);
   });
 
@@ -349,7 +355,10 @@ describe('what Replace image says', () => {
       describeImageReplacement({ kind: 'refused', refusal: { code: 'image-url-unsupported' } }),
     ).toBe('An image URL must start with https: or http:.');
     expect(
-      describeImageReplacement({ kind: 'not-stored', code: 'image-too-large', name: 'huge.png' }),
+      describeImageReplacement({
+        kind: 'not-stored',
+        refusals: [{ code: 'image-too-large', name: 'huge.png' }],
+      }),
     ).toBe('huge.png is larger than 10 MB, the largest image that can be stored.');
   });
 

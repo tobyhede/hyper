@@ -33,8 +33,8 @@ const identified = {
 };
 
 /** The one map, and the one graph it owns. */
-const map = identified.document.maps[0]!;
-const graph = map.graphs[0]!;
+const onlyMap = identified.document.maps[0]!;
+const graph = onlyMap.graphs[0]!;
 
 /** The same aggregate with its one map replaced. */
 const withMap = (next: unknown) => ({
@@ -105,13 +105,13 @@ describe('import space schema', () => {
    * and neither can one owning none.
    */
   it('rejects an imported map whose graphs are ids rather than owned values', () => {
-    expect(importSpaceSchema.safeParse(withMap({ ...map, graphs: [GRAPH_ID] })).success).toBe(
+    expect(importSpaceSchema.safeParse(withMap({ ...onlyMap, graphs: [GRAPH_ID] })).success).toBe(
       false,
     );
   });
 
   it('rejects an imported map that owns no graphs', () => {
-    expect(importSpaceSchema.safeParse(withMap({ ...map, graphs: [] })).success).toBe(false);
+    expect(importSpaceSchema.safeParse(withMap({ ...onlyMap, graphs: [] })).success).toBe(false);
   });
 
   it('rejects a version 2 document, whose graphs sat beside its maps', () => {
@@ -126,8 +126,8 @@ describe('import space schema', () => {
   it('rejects a non-UUID whenever an import entity id is explicit', () => {
     for (const input of [
       { ...identified, id: 'space' },
-      withMap({ ...map, graphs: [{ ...graph, id: 'main' }] }),
-      withMap({ ...map, id: 'working' }),
+      withMap({ ...onlyMap, graphs: [{ ...graph, id: 'main' }] }),
+      withMap({ ...onlyMap, id: 'working' }),
       { ...identified, resources: [{ ...identified.resources[0], id: 'a' }] },
     ]) {
       expect(importSpaceSchema.safeParse(input).success).toBe(false);
@@ -140,10 +140,12 @@ describe('space snapshot schema', () => {
     expect(spaceSnapshotSchema.parse(identified)).toEqual(identified);
     expect(spaceSnapshotSchema.safeParse({ ...identified, id: undefined }).success).toBe(false);
     expect(
-      spaceSnapshotSchema.safeParse(withMap({ ...map, graphs: [{ ...graph, id: undefined }] }))
+      spaceSnapshotSchema.safeParse(withMap({ ...onlyMap, graphs: [{ ...graph, id: undefined }] }))
         .success,
     ).toBe(false);
-    expect(spaceSnapshotSchema.safeParse(withMap({ ...map, id: undefined })).success).toBe(false);
+    expect(spaceSnapshotSchema.safeParse(withMap({ ...onlyMap, id: undefined })).success).toBe(
+      false,
+    );
     expect(
       spaceSnapshotSchema.safeParse({
         ...identified,

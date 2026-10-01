@@ -1,6 +1,6 @@
 import { createServer } from 'node:net';
 import postgres from '@prisma-next/postgres/runtime';
-import { uuidSchema } from '@project/core';
+import { uuidSchema, type UUID } from '@project/core';
 import { createSpaceHttpApp } from '@project/http';
 import {
   classifyStoredFailure,
@@ -21,6 +21,11 @@ import {
   loopbackPort,
   startRefusingPostgresServer,
 } from '../support/refusing-postgres-server';
+
+/** A request that initializes no Space mints nothing, so any mint is a failure here. */
+const mintsNothing = (): UUID => {
+  throw new Error('This request initializes no Space, so it mints no identity.');
+};
 
 /** Every error on a failure's cause chain, the failure first. */
 const causeChain = (failure: Error | undefined): readonly unknown[] => {
@@ -233,7 +238,7 @@ describe('The Space API over a PostgreSQL server that will not serve it', () => 
   };
 
   it('answers a refused connection on a direct read 503 persistence-unavailable', async () => {
-    const app = createSpaceHttpApp(repository, { logError: () => undefined });
+    const app = createSpaceHttpApp(repository, { newId: mintsNothing, logError: () => undefined });
 
     for (const path of ['/api/spaces', `/api/spaces/${SPACE_ID}`]) {
       const response = await app.request(path);
@@ -252,6 +257,7 @@ describe('The Space API over a PostgreSQL server that will not serve it', () => 
     const refusing = postgres<Contract>(postgresOptionsFor(server.url));
     try {
       const app = createSpaceHttpApp(new SqlSpaceRepository(postgresSqlStore(refusing)), {
+        newId: mintsNothing,
         logError: () => undefined,
       });
 

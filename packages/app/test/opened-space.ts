@@ -40,7 +40,7 @@ export interface TestOpenedSpace {
 export const openTestSpace = (
   backend: SpaceBackend,
   loaded: LoadedSpace,
-  /** Mints the Space, Resource and Map identities a lifecycle Edit creates (ADR 0016). */
+  /** Mints the Space, Resource and Map identities a lifecycle Edit creates (ADR 0109). */
   newId: () => UUID = newUuid,
   /**
    * Where a Spaces-epoch observer's failure goes.

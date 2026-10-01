@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -473,11 +474,10 @@ describe('the vocabulary that guard reads', () => {
 });
 
 /**
- * ADR 0055's rename is the same event as ADR 0041's and earns the same guard.
- * Three names each called what draws the canvas after a different interaction
- * or surface — the act of selecting one, the control that offered the choice,
- * and the header that showed which one won — so every new presentation invited
- * a fourth.
+ * What draws the canvas earns the same guard ADR 0041's rename did. Three
+ * retired names each called it after a different interaction or surface — the
+ * act of selecting one, the control that offered the choice, and the header
+ * that showed which one won — so every new presentation invited a fourth.
  *
  * ADR 0079 settles the noun itself: an authored **Map** is the only entity
  * that draws the canvas, its identity is `MapId` in `@project/core`, and
@@ -548,7 +548,7 @@ const RETIRED_RENDERER_NAME = new RegExp(
   ),
 );
 
-describe('the canvas renderer is named once (ADR 0055)', () => {
+describe('the canvas renderer is named once (ADR 0079)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
@@ -959,10 +959,10 @@ describe('the Opener is named once', () => {
 });
 
 /**
- * ADR 0085 makes Map the first-public name for the entity that was a
- * Layout, and states the same completion criterion ADR 0041 did: a repository
- * scan finds the retired name only in historical records and in qualified
- * layout-strategy prose. The ADR's other noun has its own block below.
+ * ADR 0085 retires Layout as the name of the entity ADR 0101 names Map, and
+ * states the same completion criterion ADR 0041 did: a repository scan finds
+ * the retired name only in historical records and in qualified layout-strategy
+ * prose. The ADR's other noun has its own block below.
  *
  * The shape rule transfers from ADR 0041 exactly, and for the same reason: the
  * bare English word is legitimate — a strategy lays resources out, the Command Dock
@@ -980,8 +980,8 @@ describe('the Opener is named once', () => {
  * this file already uses:
  *
  *  - `LayoutStrategy` and everything built on it keeps its name, which ADR 0085
- *    records as a negative in as many words. The word there is the verb: two of
- *    its three implementations read no Map at all, so naming the contract
+ *    records as a negative in as many words and ADR 0101 restates. The word
+ *    there is the verb: `gridStrategy` reads no Map at all, so naming the contract
  *    after the entity would assert a relationship they do not have and would
  *    reintroduce the conflation ADR 0014 exists to correct.
  *  - React's `useLayoutEffect` is a hook, not a domain type, and it is spelled
@@ -1158,7 +1158,7 @@ const withoutQualifiedSpellings = (source: string): string =>
  */
 const FOREIGN_MAP_FILES: readonly string[] = ['packages/ui/src/icons.tsx'];
 
-describe('a Map is named once (ADR 0085)', () => {
+describe('a Map is named once (ADR 0085, ADR 0101)', () => {
   const scanned = scannableFiles();
 
   it('reaches the kinds of file this rename actually touched', () => {
@@ -1298,7 +1298,7 @@ describe('a Map is named once (ADR 0085)', () => {
       `// it is furniture over the canvas and takes no ${retiredMapLower} space`,
       `const GROUP_${RETIRED_MAP_UPPER} = 'inline-flex items-center gap-1';`,
       // The vocabulary this rename arrived at.
-      `const selectedMap = space.maps.find((map) => map.id === id);`,
+      `const selectedMap = space.maps.find((m) => m.id === id);`,
       `export type MapId = z.infer<typeof uuidSchema>;`,
     ];
 
@@ -1322,7 +1322,173 @@ describe('a Map is named once (ADR 0085)', () => {
 });
 
 /**
- * ADR 0085 makes Resource the first-public name for the entity that was a Card,
+ * ADR 0101 gives the entity a name that is also an Array method, and keeps the
+ * two apart by convention: no value is bound to a local named `map`. A callback
+ * binds the domain initial `(m)` and a longer-lived local takes a descriptive
+ * name, so lowercase bare `map` in code is the method or a property key and
+ * nothing else.
+ *
+ * The rule is about **bindings**, which a line pattern cannot tell from the
+ * other senses: `(map)` is a parameter in a callback and an argument in a
+ * call, `map:` is a parameter annotation, an object key and a property
+ * signature, and `{ map }` is a destructuring binding or an object literal
+ * shorthand. So the source is parsed and the declared names are read off the
+ * tree. A parse also blanks comments and string literals for free, which is
+ * what lets this file quote the violations below without reporting itself.
+ *
+ * It reads every `.ts`/`.tsx` file the repo authors — tests, stories, E2E
+ * specs and scripts as well as implementation source — because the
+ * convention is how the code is written, not only what ships. It forgives
+ * nothing: every sense a foreign library gives the word is a method or a
+ * property, never a local.
+ *
+ * A binding here is a declaration that puts a **value** named `map` in scope:
+ * a variable, parameter or destructured element, a function or class
+ * (declared or named as an expression), an enum, a namespace, or an import.
+ * A type alias, interface or type parameter names a type rather than a value,
+ * and an enum member, label or export alias is not a local, so none of those
+ * is read.
+ */
+const bindsMap = (node: ts.Node): ts.Identifier | undefined => {
+  const named =
+    ts.isVariableDeclaration(node) ||
+    ts.isParameter(node) ||
+    ts.isBindingElement(node) ||
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isClassDeclaration(node) ||
+    ts.isClassExpression(node) ||
+    ts.isEnumDeclaration(node) ||
+    ts.isModuleDeclaration(node) ||
+    ts.isImportSpecifier(node) ||
+    ts.isImportClause(node) ||
+    ts.isNamespaceImport(node) ||
+    ts.isImportEqualsDeclaration(node);
+  if (!named || node.name === undefined || !ts.isIdentifier(node.name)) return undefined;
+  return node.name.text === 'map' ? node.name : undefined;
+};
+
+/** Every binding named `map` in `source`, as `line: text` for a readable failure. */
+const mapBindings = (source: string, file = 'scan-source.tsx'): string[] => {
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const lines = source.split('\n');
+  const found: string[] = [];
+  const visit = (node: ts.Node): void => {
+    const name = bindsMap(node);
+    if (name !== undefined) {
+      const line = sourceFile.getLineAndCharacterOfPosition(name.getStart(sourceFile)).line;
+      found.push(`${line + 1}: ${lines[line]?.trim() ?? ''}`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return found;
+};
+
+describe('no value is bound to a local named after the Map (ADR 0101)', () => {
+  const authored = scannableFiles()
+    .filter(isAuthoredSource)
+    .filter((file) => /\.tsx?$/.test(file));
+
+  it('reaches the kinds of file the convention governs', () => {
+    // Implementation source, a component, a unit test, an E2E spec, a story
+    // and a script. A file list that quietly stopped resolving would report
+    // nothing forever.
+    expect(authored).toContain('packages/app/src/space-authoring.ts');
+    expect(authored).toContain('packages/app/src/components/SpaceCanvas.tsx');
+    expect(authored).toContain('packages/graph/test/graph.property.test.ts');
+    expect(authored).toContain('packages/app/e2e/space-routing.spec.ts');
+    expect(authored).toContain('packages/app/stories/support/spaces.ts');
+    expect(authored).toContain('scripts/persistence-cost/scenarios.ts');
+  });
+
+  it('finds no binding named map in the source the repo authors', () => {
+    const found = authored.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null ? [] : mapBindings(source, file).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('reports the binding in every form a value declaration takes', () => {
+    const bound = [
+      `const map = space.maps[0];`,
+      `let map: Map | undefined;`,
+      `for (const map of space.maps) visit(map);`,
+      // The callback forms, which is where the convention asks for (m).
+      `space.maps.find((map) => map.id === mapId);`,
+      `space.maps.find(map => map.id === mapId);`,
+      `space.maps.find((map: Map) => map.id === mapId);`,
+      `space.maps.forEach(function (map) { visit(map); });`,
+      // A parameter of a declared function, and of a function type.
+      `export function mapResources(space: Space, map: Map) { return map; }`,
+      `type Select = (map: Pick<Map, 'id'>, graphId: GraphId) => void;`,
+      // Destructuring: shorthand, array position and nested.
+      `const { map } = resolveMap(space);`,
+      `const [map] = snapshot.document.maps ?? [];`,
+      `const { resolved: { map } } = input;`,
+      `export function use({ map, presenting }: Input) { return map; }`,
+      // A function named for the builder rather than the value, and an import.
+      `function map(id: string) { return { id }; }`,
+      `import { map } from 'somewhere';`,
+      // A named function or class expression binds its name inside itself.
+      `space.maps.forEach(function map(m) { visit(m); });`,
+      `const Builder = class map {};`,
+      // The other declarations that bind a value in the enclosing scope.
+      `class map {}`,
+      `enum map { Open, Closed }`,
+      `namespace map { export const id = 1; }`,
+    ];
+
+    for (const line of bound) {
+      expect(mapBindings(line), line).toHaveLength(1);
+    }
+  });
+
+  it('stays silent on the method, the property, the builtin and the compounds', () => {
+    const kept = [
+      // The Array method and its sibling, and a lookup's method.
+      `const ids = space.maps.map((m) => m.id);`,
+      `const graphs = space.maps.flatMap((m) => m.graphs);`,
+      `const resolved = space.lookup.map(mapId)?.map;`,
+      // The property key, in every place one is written.
+      `const { map: selectedMap } = input;`,
+      `export interface Input { readonly map: SpaceMap }`,
+      `const document = { kind: 'space', spaceId, map: mapId, graph: graphId };`,
+      `const entity = { kind: 'map', map: selectedMap };`,
+      `const lookup = { map(id: MapId) { return byId.get(id); } };`,
+      `class Lookup { map(id: MapId) { return undefined; } }`,
+      // The builtin and the foreign names ADR 0101 leaves alone.
+      `const byId = new Map<string, Resource>();`,
+      `const seen: ReadonlyMap<string, Map> = new WeakMap() as never;`,
+      // The domain initial and the descriptive names the convention asks for.
+      `const selectedMap = space.maps.find((m) => m.id === id);`,
+      `for (const otherMap of space.maps) visit(otherMap);`,
+      // The word in a comment or a string is not a binding.
+      `// const map = space.maps[0];`,
+      `const fixture = 'const map = space.maps[0];';`,
+      // Types, enum members and export aliases put no value named map in scope.
+      `type map = SpaceMap;`,
+      `interface map { id: MapId }`,
+      `enum Kind { map, graph }`,
+      `export { selectedMap as map };`,
+    ];
+
+    for (const line of kept) {
+      expect(mapBindings(line), line).toEqual([]);
+    }
+  });
+});
+
+/**
+ * ADR 0085 retires Card as the name of the entity ADR 0101 names Resource,
  * and states the same completion criterion ADR 0041 did: a repository scan
  * finds the retired name only in historical records and in the vendored
  * registry carve-out. The Map block above is the ADR's other noun.
@@ -1331,8 +1497,8 @@ describe('a Map is named once (ADR 0085)', () => {
  * `Object[A-Z]`, `[A-Za-z]Object`, `object[A-Z]` and `OBJECTS?` matches
  * foreign spellings throughout the tree (`RefObject`, `toMatchObject`, oxlint's
  * `ObjectExpression`), and a domain word whose guard needs an exception for
- * each has no guard. ADR 0085 chose Resource over Object on that
- * ground.
+ * each has no guard. ADR 0085 rejected Object on that ground, and ADR 0101
+ * kept the rejection when it chose Resource.
  *
  * **The English words need no exemption.** `cardinality`, `discard` and
  * `wildcard` are all invisible to every arm below, and not by luck: each arm
@@ -1559,7 +1725,7 @@ const RETIRED_RESOURCE_INITIAL_BINDING = new RegExp(
  */
 const MIGRATION_SNAPSHOTS = 'migrations/';
 
-describe('a Resource is named once (ADR 0085)', () => {
+describe('a Resource is named once (ADR 0085, ADR 0101)', () => {
   const scanned = scannableFiles().filter((file) => !file.startsWith(MIGRATION_SNAPSHOTS));
 
   it('reaches the kinds of file this rename actually touched', () => {

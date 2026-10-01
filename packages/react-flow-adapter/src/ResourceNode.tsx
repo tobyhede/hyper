@@ -13,10 +13,9 @@ import {
 } from '@xyflow/react';
 import {
   CanvasResource,
-  ResourceContent,
+  PresentedResource,
   type CanvasResourceFront,
   type CanvasResourceProps,
-  type ResourceContentBody,
 } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
@@ -46,24 +45,50 @@ const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position
  *  spread — the props themselves stay readonly to every other caller. The keys
  *  are already optional; this changes nothing but their mutability. */
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
-type MarkdownOperations = Mutable<
-  Pick<Extract<CanvasResourceFront, { kind: 'markdown' }>, 'onOpenChange' | 'onBeginEdit'>
->;
+type MarkdownFront = Mutable<Extract<CanvasResourceFront, { kind: 'markdown' }>>;
 type ReferenceFront = Mutable<Extract<CanvasResourceFront, { kind: 'reference' }>>;
 type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
 type ImageFront = Mutable<Extract<CanvasResourceFront, { kind: 'image' }>>;
 
-/** The kinds whose front is built from node data alone; an Image Resource's needs its URL. */
-type FrontKind = Exclude<ResourceFlowNode['data']['kind'], 'image'>;
-
 /**
- * The front each kind draws, keyed by the domain union so a kind added to it
- * fails to build here rather than drawing as Markdown.
+ * The operations each kind's front offers, by the Resource's own kind. What it
+ * draws is the display's, not the front's.
  */
-const frontOfKind = (
-  kind: FrontKind,
-  fronts: Record<FrontKind, CanvasResourceFront>,
-): CanvasResourceFront => fronts[kind];
+function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
+  switch (data.kind) {
+    case 'markdown': {
+      const front: MarkdownFront = { kind: 'markdown' };
+      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
+      if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
+      return front;
+    }
+    case 'image': {
+      // Closed, an Image Resource draws its Title and kind and no thumbnail; Open,
+      // its picture is the content, and replacing it takes the place a body edit
+      // takes on a Markdown Resource.
+      const front: ImageFront = { kind: 'image' };
+      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
+      if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
+      return front;
+    }
+    case 'reference': {
+      const front: ReferenceFront = { kind: 'reference' };
+      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
+      return front;
+    }
+    case 'space': {
+      // A Space Resource's own front carries nothing it authors of the target: its
+      // Title is the Resource's, its content is the target Space's, and the
+      // composition hands down the rail fragment plus Enter.
+      const front: SpaceFront = { kind: 'space' };
+      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
+      if (data.spaceSelection !== undefined) front.selection = data.spaceSelection;
+      if (data.spaceRail !== undefined) front.spaceRail = data.spaceRail;
+      if (data.portal !== undefined) front.portal = data.portal;
+      return front;
+    }
+  }
+}
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -130,77 +155,8 @@ export function ResourceNode({
     [id, reportBodyHeight],
   );
 
-  const markdownOperations: MarkdownOperations = {};
-  if (data.onEditResource !== undefined) {
-    markdownOperations.onOpenChange = data.onEditResource;
-  }
-  if (data.onBeginBodyEditing !== undefined) {
-    markdownOperations.onBeginEdit = data.onBeginBodyEditing;
-  }
-  const markdownFront: CanvasResourceFront =
-    data.open === true && data.bodyEditor !== undefined
-      ? {
-          kind: 'markdown',
-          source: data.body ?? '',
-          open: true,
-          editor: data.bodyEditor,
-          ...markdownOperations,
-        }
-      : data.open === true
-        ? { kind: 'markdown', source: data.body ?? '', open: true, ...markdownOperations }
-        : {
-            kind: 'markdown',
-            source: data.body ?? '',
-            open: false,
-            ...markdownOperations,
-          };
-  const referenceFront: ReferenceFront = {
-    kind: 'reference',
-    target:
-      data.spaceContent !== undefined
-        ? { kind: 'space' }
-        : { kind: 'markdown', source: data.body ?? '' },
-    open: data.open === true,
-  };
-  if (data.onEditResource !== undefined) {
-    referenceFront.onOpenChange = data.onEditResource;
-  }
-  // A Space Resource's own front carries nothing it authors of the target: its
-  // Title is the Resource's, its content is the target Space's, and the
-  // composition hands down the rail fragment plus Enter.
-  const spaceFront: SpaceFront = {
-    kind: 'space',
-    open: data.open === true,
-  };
-  if (data.onEditResource !== undefined) {
-    spaceFront.onOpenChange = data.onEditResource;
-  }
-  if (data.spaceSelection !== undefined) spaceFront.selection = data.spaceSelection;
-  if (data.spaceRail !== undefined) spaceFront.spaceRail = data.spaceRail;
-  if (data.portal !== undefined) spaceFront.portal = data.portal;
-  // Closed, an Image Resource draws its Title and kind and no thumbnail; Open, its
-  // picture is the content the Markdown front would draw, and replacing it
-  // takes the place a body edit takes there.
-  const imageFront = (url: string): ImageFront => {
-    const image: ImageFront = { kind: 'image', url, open: data.open === true };
-    if (data.onEditResource !== undefined) image.onOpenChange = data.onEditResource;
-    if (data.onBeginBodyEditing !== undefined) image.onBeginEdit = data.onBeginBodyEditing;
-    if (data.imageReplacer !== undefined) image.editor = data.imageReplacer;
-    return image;
-  };
-  const front =
-    data.kind === 'image'
-      ? imageFront(data.imageUrl)
-      : frontOfKind(data.kind, {
-          markdown: markdownFront,
-          reference: referenceFront,
-          space: spaceFront,
-        });
-  /** What presenting draws: an Image Resource's picture, or the resolved Markdown. */
-  const presentedContent: ResourceContentBody =
-    data.kind === 'image'
-      ? { kind: 'image', url: data.imageUrl }
-      : { kind: 'markdown', source: data.body ?? '' };
+  const front = frontOf(data);
+  const display = data.display;
 
   /**
    * Whether this Resource's anchors are also affordances.
@@ -296,19 +252,17 @@ export function ResourceNode({
   const titleEditor = !data.readOnly ? data.titleEditor : undefined;
 
   /*
-   * What an open Resource draws below its title (ADR 0064).
+   * What an open Resource draws below its title is the display (ADR 0064).
    *
    * **Not a fourth arm of the branch below.** It is a prop handed to whichever
    * arm the *title* state selects, so a Resource can be open while it is being
    * renamed — Opening is what the Map authored and the caret is a gesture,
-   * and a branch would have made them exclusive. It is not `showContent`
-   * either: both presenting and Opening draw through the one rendered-Markdown
-   * seam, while the open Resource swaps that display for source only during an
-   * edit.
+   * and a branch would have made them exclusive. Presenting is the branch's
+   * first arm, because the projection has already decided that a presented
+   * Resource is presented whether or not it is Open.
    *
-   * For a Reference Resource, the projection resolves the immutable Target's Markdown source.
-   * `CanvasResource` receives that source and authored open state as one front rather
-   * than receiving body markup from this adapter.
+   * `data.open` is the Map's authored geometry: the resize control and the
+   * node's `data-open` read it, and nothing drawn does.
    */
   const resize = data.resize;
   const resizeOperation = useRef(resize);
@@ -410,8 +364,8 @@ export function ResourceNode({
   );
   const toolbarVisible =
     ((visuallySelected && !otherSelected) ||
-      data.bodyEditor !== undefined ||
-      data.imageReplacer !== undefined ||
+      display.shown === 'editing' ||
+      display.shown === 'replacing' ||
       data.portal?.editing === true) &&
     !dragging &&
     !resizeActive;
@@ -507,14 +461,15 @@ export function ResourceNode({
           />
         </>
       )}
-      {data.showContent ? (
+      {display.shown === 'presented' ? (
         <div className="rf-resource-node__content">
-          <ResourceContent title={data.title} content={presentedContent} />
+          <PresentedResource title={data.title} content={display.content} />
         </div>
       ) : titleEditor !== undefined ? (
         <CanvasResource
           readOnly={data.readOnly}
           front={front}
+          display={display}
           renderToolbar={renderToolbar}
           title={data.title}
           graphColor={data.activeGraphColor}
@@ -528,6 +483,7 @@ export function ResourceNode({
         <CanvasResource
           readOnly={data.readOnly}
           front={front}
+          display={display}
           renderToolbar={renderToolbar}
           title={data.title}
           graphColor={data.activeGraphColor}

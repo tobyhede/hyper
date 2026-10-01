@@ -17,7 +17,7 @@ import type {
   SpaceAuthoring,
 } from '../src/space-authoring';
 
-import { completeDrag, moving, node, settled } from './render-adapter-fixtures';
+import { completeDrag, fixtureDisplay, moving, node, settled } from './render-adapter-fixtures';
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -103,7 +103,7 @@ function connections(
  * above answers what the adapter was *told*; this answers what a Space ends up
  * holding, so the two are not interchangeable.
  *
- * Opens on the selected Map's own map (ADR 0025) — Authoring derives it
+ * Opens on the selected Map's own map — Authoring derives it
  * fresh rather than holding a copy, so there is no separate starting geometry
  * to state.
  */
@@ -589,6 +589,7 @@ describe('render adapter', () => {
     opened.height = 420;
     opened.zIndex = 10;
     opened.data.open = true;
+    opened.data.display = fixtureDisplay(true, 'markdown');
     store.getState().syncProjection([opened], []);
 
     expect(store.getState().projection?.nodes[0]).toMatchObject({
@@ -762,6 +763,7 @@ describe('render adapter', () => {
     opened.height = 420;
     opened.zIndex = 10;
     opened.data.open = true;
+    opened.data.display = fixtureDisplay(true, 'markdown');
     store.getState().syncProjection([opened], []);
 
     expect(store.getState().projection?.nodes[0]).toMatchObject({

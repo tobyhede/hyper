@@ -139,7 +139,7 @@ describe('tracked fixture images', () => {
       snapshot.resources.flatMap(({ id, document }) =>
         document.kind === 'image' &&
         document.url.startsWith(STORED_IMAGE_PREFIX) &&
-        (snapshot.document.maps ?? []).some((map) => map.positions[id]?.open === true)
+        (snapshot.document.maps ?? []).some((m) => m.positions[id]?.open === true)
           ? [document.url]
           : [],
       ),

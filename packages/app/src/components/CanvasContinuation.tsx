@@ -142,10 +142,19 @@ export function CanvasContinuation({
     if (pending.then === 'nothing' || pending.then === 'rename') return;
     if (pending.then === 'reveal' && target.kind === 'resource' && drawn) {
       // The camera, and the only member that touches it: a Resource addressed by
-      // URL is somewhere the reader has never been.
-      void flow
-        .fitView({ nodes: [{ id: target.resourceId }], padding: 0.5, duration: 0 })
-        .then(() => element.focus());
+      // URL is somewhere the reader has never been. The move is issued and the
+      // focus given in the same pass, never chained on the move's Promise, which
+      // does not settle when the move is superseded (ADR 0043).
+      //
+      // `fitView` only queues the move, so the node is focused while still off
+      // screen. `preventScroll` keeps the browser from scrolling React Flow's
+      // wrapper toward it: the camera brings it into view, not the page. A
+      // `:focus-visible` focus still lets React Flow's `autoPanOnNodeFocus`
+      // centre the node at the current zoom first; the queued `fitView` applies
+      // after it and computes its viewport from the node's bounds alone, so the
+      // camera ends where `fitView` puts it.
+      void flow.fitView({ nodes: [{ id: target.resourceId }], padding: 0.5, duration: 0 });
+      element.focus({ preventScroll: true });
       return;
     }
     // Only when the completed projection has left focus nowhere. An author who

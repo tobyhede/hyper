@@ -1,6 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { loadSpace, type Space } from '../src/index';
+import type { Resource, UUID } from '@project/core';
+import { loadSpace, resolveResourceContent, serializeResourceFile, type Space } from '../src/index';
 import { resourceFile, uuid } from './resource-files';
 
 /**
@@ -20,6 +21,8 @@ const mapId = (value: number) =>
   uuid(`00000000-0000-4000-8000-${(value + 0x200000).toString(16).padStart(12, '0')}`);
 
 const SPACE = uuid('00000000-0000-4000-8000-000000000001');
+/** Another Space, for a Space Resource to target: none may target its own. */
+const OTHER_SPACE = uuid('00000000-0000-4000-8000-0000000000aa');
 
 /** A Map over the given Resources, owning graphs that chain them. */
 function mapOver(index: number, ids: number[], graphCount: number) {
@@ -81,7 +84,7 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        expect(space.graphs).toEqual(space.maps.flatMap((map) => map.graphs));
+        expect(space.graphs).toEqual(space.maps.flatMap((m) => m.graphs));
       }),
     );
   });
@@ -90,7 +93,7 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        const nested = space.maps.flatMap((map) => map.graphs);
+        const nested = space.maps.flatMap((m) => m.graphs);
         space.graphs.forEach((graph, index) => {
           expect(graph).toBe(nested[index]);
         });
@@ -102,9 +105,9 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        for (const map of space.maps) {
-          const owner = space.lookup.map(map.id);
-          for (const graph of map.graphs) {
+        for (const m of space.maps) {
+          const owner = space.lookup.map(m.id);
+          for (const graph of m.graphs) {
             const owned = space.lookup.graph(graph.id);
             expect(owned?.graph).toBe(graph);
             expect(owned?.owner).toBe(owner);
@@ -118,10 +121,10 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        for (const map of space.maps) {
-          const resolved = space.lookup.map(map.id);
+        for (const m of space.maps) {
+          const resolved = space.lookup.map(m.id);
           expect(resolved).toBeDefined();
-          expect(map.graphs).toContain(resolved?.activeGraph);
+          expect(m.graphs).toContain(resolved?.activeGraph);
         }
       }),
     );
@@ -131,9 +134,9 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        for (const map of space.maps) {
-          const members = new Set(Object.keys(map.positions));
-          for (const graph of map.graphs) {
+        for (const m of space.maps) {
+          const members = new Set(Object.keys(m.positions));
+          for (const graph of m.graphs) {
             for (const edge of graph.edges) {
               expect(members.has(edge.from)).toBe(true);
               expect(members.has(edge.to)).toBe(true);
@@ -148,7 +151,7 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, fc.nat(), fc.nat(), (maps, rawTarget, rawHost) => {
         const { file, resources } = documentFrom(maps);
-        const all = file.maps.flatMap((map) => map.graphs.map((graph) => ({ map, graph })));
+        const all = file.maps.flatMap((m) => m.graphs.map((graph) => ({ map: m, graph })));
         const target = all[rawTarget % all.length]!;
         // The host map is an independent draw, so the repeat lands in its own
         // owner and in another map across the run. Deriving both from one
@@ -173,9 +176,7 @@ describe('what intake builds, over generated documents', () => {
         const backwards = loadSpace(file, [...resources].reverse());
         expect(forwards.ok && backwards.ok).toBe(true);
         if (!forwards.ok || !backwards.ok) return;
-        expect(backwards.space.maps.map((map) => map.id)).toEqual(
-          forwards.space.maps.map((map) => map.id),
-        );
+        expect(backwards.space.maps.map((m) => m.id)).toEqual(forwards.space.maps.map((m) => m.id));
         expect(backwards.space.graphs.map((graph) => graph.id)).toEqual(
           forwards.space.graphs.map((graph) => graph.id),
         );
@@ -189,7 +190,7 @@ describe('what intake refuses, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, fc.nat(), (maps, raw) => {
         const { file, resources } = documentFrom(maps);
-        const edges = file.maps.flatMap((map) => map.graphs.flatMap((graph) => graph.edges));
+        const edges = file.maps.flatMap((m) => m.graphs.flatMap((graph) => graph.edges));
         edges[raw % edges.length]!.to = uuid('00000000-0000-4000-8000-ffffffffffff');
 
         const result = loadSpace(file, resources);
@@ -210,11 +211,11 @@ describe('what intake refuses, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, fc.nat(), (maps, raw) => {
         const { file, resources } = documentFrom(maps);
-        const map = file.maps[raw % file.maps.length]!;
-        const keys = Object.keys(map.positions);
+        const chosen = file.maps[raw % file.maps.length]!;
+        const keys = Object.keys(chosen.positions);
         const evicted = keys[raw % keys.length]!;
-        map.positions = Object.fromEntries(
-          Object.entries(map.positions).filter(([id]) => id !== evicted),
+        chosen.positions = Object.fromEntries(
+          Object.entries(chosen.positions).filter(([id]) => id !== evicted),
         );
 
         const result = loadSpace(file, resources);
@@ -241,7 +242,7 @@ describe('what intake refuses, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, fc.nat(), (maps, raw) => {
         const { file, resources } = documentFrom(maps);
-        const graphs = file.maps.flatMap((map) => map.graphs);
+        const graphs = file.maps.flatMap((m) => m.graphs);
         const graph = graphs[raw % graphs.length]!;
         graph.edges.push({ ...graph.edges[raw % graph.edges.length]! });
 
@@ -249,6 +250,112 @@ describe('what intake refuses, over generated documents', () => {
         expect(result.ok).toBe(false);
         if (result.ok) return;
         expect(result.errors.some((error) => error.kind === 'duplicate-graph-edge')).toBe(true);
+      }),
+    );
+  });
+});
+
+type ContentKind = Resource['kind'];
+
+/** A Resource of the chosen kind that owns its content. */
+function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'reference'>): Resource {
+  const title = `Resource ${index}`;
+  switch (kind) {
+    case 'markdown':
+      return { id, title, kind, body: index % 3 === 0 ? '' : `Body ${index}\n` };
+    case 'image':
+      return { id, title, kind, url: `https://example.com/${index}.png` };
+    case 'space': {
+      const view = { spaceId: OTHER_SPACE, map: mapId(index), graph: graphId(index) };
+      return index % 2 === 0
+        ? { id, title, kind, ...view, framing: { centreX: index, centreY: -index, zoom: 1 } }
+        : { id, title, kind, ...view };
+    }
+  }
+}
+
+/**
+ * The generated document with each Resource given a kind. A Reference Resource
+ * targets an earlier Resource that owns content, since intake refuses a
+ * Reference Resource to a Reference Resource; with none yet, it is Markdown.
+ */
+function withKinds(
+  maps: { ids: number[]; graphs: number }[],
+  kinds: readonly ContentKind[],
+  targets: readonly number[],
+) {
+  const { file } = documentFrom(maps);
+  const owners: UUID[] = [];
+  const resources = [...new Set(maps.flatMap((entry) => entry.ids))].map(
+    (value, index): Resource => {
+      const id = resourceId(value);
+      const chosen = kinds[index % kinds.length] ?? 'markdown';
+      const pick = targets[index % targets.length] ?? 0;
+      const target = owners.length === 0 ? undefined : owners[pick % owners.length];
+      if (chosen === 'reference') {
+        if (target !== undefined) {
+          return { id, title: `Resource ${index}`, kind: 'reference', target };
+        }
+        owners.push(id);
+        return contentOwner(id, index, 'markdown');
+      }
+      owners.push(id);
+      return contentOwner(id, index, chosen);
+    },
+  );
+  return {
+    file,
+    files: resources.map((resource) => ({
+      path: `resources/${resource.id}.md`,
+      text: serializeResourceFile(resource),
+    })),
+  };
+}
+
+const kindsArb = fc.array(fc.constantFrom<ContentKind>('markdown', 'image', 'space', 'reference'), {
+  minLength: 1,
+  maxLength: 8,
+});
+const targetsArb = fc.array(fc.nat(), { minLength: 1, maxLength: 8 });
+
+const acceptedWithKinds = (
+  maps: { ids: number[]; graphs: number }[],
+  kinds: readonly ContentKind[],
+  targets: readonly number[],
+): Space => {
+  const { file, files } = withKinds(maps, kinds, targets);
+  const result = loadSpace(file, files);
+  if (!result.ok) throw new Error(result.errors.map((error) => error.message).join('; '));
+  return result.space;
+};
+
+describe('resolved content, over generated Spaces of every kind', () => {
+  it('answers self exactly for Resources that own content, and never unresolved', () => {
+    fc.assert(
+      fc.property(mapsArb, kindsArb, targetsArb, (maps, kinds, targets) => {
+        const space = acceptedWithKinds(maps, kinds, targets);
+        for (const resource of space.resources) {
+          const content = resolveResourceContent(space, resource);
+          expect(content.kind).not.toBe('unresolved');
+          expect(content.via === 'self').toBe(resource.kind !== 'reference');
+        }
+      }),
+    );
+  });
+
+  it('answers a Reference Resource with its Target’s content, reached by reference', () => {
+    fc.assert(
+      fc.property(mapsArb, kindsArb, targetsArb, (maps, kinds, targets) => {
+        const space = acceptedWithKinds(maps, kinds, targets);
+        for (const resource of space.resources) {
+          if (resource.kind !== 'reference') continue;
+          const target = space.lookup.resource(resource.target);
+          if (target === undefined) throw new Error('intake accepted a missing Target');
+          expect(resolveResourceContent(space, resource)).toStrictEqual({
+            ...resolveResourceContent(space, target),
+            via: 'reference',
+          });
+        }
       }),
     );
   });

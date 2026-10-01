@@ -1,12 +1,8 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
-import type {
-  CanvasResourceBodyEditor,
-  ImageReplaceEditor,
-  CanvasSpaceResourceSelection,
-  EntityActionGroup,
-} from '@project/ui';
+import { CLOSED_DISPLAY } from '@project/ui';
+import type { CanvasSpaceResourceSelection, EntityActionGroup, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   type Resource,
@@ -14,7 +10,7 @@ import {
   type GraphHeadShape,
   type GraphId,
 } from '@project/core';
-import { resolveContentResource } from '@project/graph';
+import { resolveResourceContent } from '@project/graph';
 import type {
   GraphRenderEdge,
   LayoutStrategyResource,
@@ -43,26 +39,15 @@ export type ResourceTitleEditor = {
   onCancel: () => void;
 };
 
-/**
- * What kind of Resource a node draws, drawn as a persistent glyph on the Front.
- *
- * Carried rather than inferred from whether this node's content resolved
- * elsewhere: that answers the Resource's kind by proxy, which is exactly what
- * goes wrong for the next kind that resolves its content elsewhere too.
- *
- * An Image Resource carries its URL whether it is Closed, Open or presented, and
- * no other kind carries one. The URL is the Resource's own field rather than
- * content ADR 0006 keeps off every node, and the Open front's content stays
- * mounted while it fades out on Close, drawing the picture from this URL until
- * it unmounts.
- */
-export type ResourceNodeKind =
-  | { kind: Exclude<Resource['kind'], 'image'>; imageUrl?: never }
-  | { kind: 'image'; imageUrl: string };
-
 /** Data carried by each custom resource node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
-export type ResourceNodeData = ResourceNodeKind & {
+export type ResourceNodeData = {
+  /**
+   * The Resource's own kind, drawn as a persistent glyph on the Front. A
+   * Reference Resource is `reference` whatever its Target is; what it draws is
+   * its `display`.
+   */
+  kind: Resource['kind'];
   /** Reports rendered title geometry by placement, including embedded placements. */
   onBodyHeightChange?: (id: string, height: number | null) => void;
   resourceId: ResourceId;
@@ -116,35 +101,10 @@ export type ResourceNodeData = ResourceNodeKind & {
    */
   onBeginBodyEditing?: () => void;
   /**
-   * The live body edit, absent on a Resource whose rendered Markdown is at rest.
-   *
-   * Its presence *is* the caret, carrying the two operations that end the edit —
-   * the same pairing `titleEditor` above makes, for the same reason: a
-   * composition cannot ask for the caret without saying what commits it and what
-   * takes the caret back.
-   *
-   * The second of those is `onEnd`, **not** `titleEditor`'s `onCancel`. A body
-   * edit ends the same way whichever accepted exit it took, so `onEnd` fires
-   * after an accepted commit as well as after `Escape`; a retained commit keeps
-   * the editor mounted. A composition that gave `onEnd` the abandon meaning
-   * would undo every accepted save.
-   *
-   * Independent of `titleEditor` on purpose. Open is what the Map
-   * authored and the caret is a gesture the author just made, so a Resource can be
-   * Open while its *title* is being renamed (ADR 0064).
-   */
-  bodyEditor?: CanvasResourceBodyEditor;
-  /**
-   * The running replacement of an Image Resource's image, absent while its
-   * picture is at rest. Its presence is the running replacement, as
-   * `bodyEditor`'s is a running body edit.
-   */
-  imageReplacer?: ImageReplaceEditor;
-  /**
    * Resizing this Open Resource, absent on one that may not be resized.
    *
    * Presence is the capability and it carries its own floor, for the same reason
-   * the two editors above carry their own completions: the collapsed size is
+   * `titleEditor` above carries its own completions: the collapsed size is
    * `RESOURCE_SIZE`, which belongs to the composition and not to this package —
    * an adapter that hardcoded a minimum would be a second opinion about a
    * constant `app` already owns.
@@ -214,29 +174,18 @@ export type ResourceNodeData = ResourceNodeKind & {
    * leaves the alert region unmounted.
    */
   contextNotice?: string | null;
-  /** The resolved content kind, including a Space Resource reached through a Reference Resource. */
-  spaceContent?: Extract<Resource, { kind: 'space' }>;
+  /**
+   * What this Resource shows now: Closed with no content, or Open or presented
+   * with its resolved content, its own or its Target's.
+   *
+   * A Resource both presented and Open is `presented`, decided here and nowhere
+   * else. `open` stays beside it as the Map's authored geometry — z-order,
+   * resize and displacement read it — and never chooses what is drawn.
+   */
+  display: ResourceDisplay;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
-  /**
-   * Draw the resource's content rather than its title. ADR 0006 deferred a "show
-   * full content" view and left it a View's choice; presenting is that view (ADR
-   * 0027). Set on the active resource alone, never on the whole graph.
-   */
-  showContent: boolean;
-  /** The Markdown to draw when `showContent`, resolved through a reference resource to its
-   *  target's body. Absent otherwise — content is not embedded in every node
-   *  (ADR 0006), which is the constraint that made this per-resource.
-   *
-   *  **An Open Resource carries one too.** ADR 0064 narrows ADR 0006 rather
-   *  than lifting it — an Open Resource carries its source because the author
-   *  asked for that one, not because every Resource does. `openResourceIds` is what
-   *  tells this projection which Resources the Map Opened, and `body` is
-   *  resolved for them in the same pass: `ResourceNode` reads `data.body ?? ''`, so
-   *  a Resource resolved into one set and not the other would draw an empty
-   *  document over a working editor rather than fail. */
-  body?: string;
   /** The graph being emphasised, if any. Drives handle dimming. */
   activeGraphId: GraphId | null;
   /** The active Graph's colour, used by graph-independent authoring handles. */
@@ -325,9 +274,6 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
   ]);
 }
 
-const nodeKind = (resource: Resource): ResourceNodeKind =>
-  resource.kind === 'image' ? { kind: 'image', imageUrl: resource.url } : { kind: resource.kind };
-
 /**
  * Map resources → React Flow resource nodes, each declaring the four anchors an Edge
  * may attach to on every side. The resource id is the React Flow node id.
@@ -336,8 +282,9 @@ const nodeKind = (resource: Resource): ResourceNodeKind =>
  * is the Active Graph's, which the composition resolves and passes as
  * `activeGraphColor`.
  *
- * A node carries its resource's *title*, not its content (ADR 0006) — the content is
- * loaded when a resource is opened or presented, not embedded in every node.
+ * A node carries its resource's *title*, not its content (ADR 0064) — a Closed
+ * node's display carries none, and the content is resolved only for a Resource
+ * that is Open or presented.
  */
 export function projectResourceNodes(
   space: Space,
@@ -354,14 +301,16 @@ export function projectResourceNodes(
   return source.map((resource) => {
     const placedResource = laidOut.get(resource.id);
     const active = resource.id === activeResourceId;
-    const showContent = active && showActiveResourceContent;
+    // Only the active Resource is presented, never the whole graph (ADR 0027).
+    const presented = active && showActiveResourceContent;
     // Every Resource kind Opens, so the Map's Open set is the whole answer and
     // there is no kind guard beside it.
     const open = options.openResourceIds?.has(resource.id) === true;
-    // A reference resource shows its target's content under its own title (ADR 0009).
-    const content = resolveContentResource(space, resource.id);
-    const body =
-      showContent || open ? (content?.kind === 'markdown' ? content.body : '') : undefined;
+    const shown = presented ? 'presented' : open ? 'open' : 'closed';
+    const display: ResourceDisplay =
+      shown === 'closed'
+        ? CLOSED_DISPLAY
+        : { shown, content: resolveResourceContent(space, resource) };
     const node: ResourceFlowNode = {
       id: resource.id,
       type: 'resource',
@@ -370,10 +319,10 @@ export function projectResourceNodes(
         resourceId: resource.id,
         title: resource.title,
         readOnly: options.readOnly ?? false,
-        ...nodeKind(resource),
+        kind: resource.kind,
         active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
-        showContent,
+        display,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
       },
@@ -399,8 +348,6 @@ export function projectResourceNodes(
       node.height = placedResource.height;
       node.handles = declaredHandles(placedResource);
     }
-    if (content?.kind === 'space') node.data.spaceContent = content;
-    if (body !== undefined) node.data.body = body;
     if (open) {
       node.data.open = true;
       node.zIndex = 10;

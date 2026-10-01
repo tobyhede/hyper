@@ -50,7 +50,7 @@ interface SpaceResourceSelection {
 
 /**
  * What a Space Resource pointed at a fixture selects: the Map that Space opens
- * on, and that Map's Active Graph (ADR 0079, ADR 0026).
+ * on, and that Map's Active Graph (ADR 0079, ADR 0040).
  *
  * Derived from the target snapshot rather than written out beside each Space
  * Resource, because a transcribed pair is one that goes stale the moment a
@@ -61,12 +61,12 @@ interface SpaceResourceSelection {
  * fixture Space Resource indistinguishable from an authored one.
  */
 const opensOn = (target: SpaceSnapshot): SpaceResourceSelection => {
-  const map = (target.document.maps ?? []).find(({ id }) => id === target.document.defaultMap);
-  if (map === undefined)
+  const opening = (target.document.maps ?? []).find(({ id }) => id === target.document.defaultMap);
+  if (opening === undefined)
     throw new Error(`Story Space ${target.document.title} declares no opening Map`);
-  const graph = map.graphs.find(({ id }) => id === map.activeGraph) ?? map.graphs[0];
-  if (graph === undefined) throw new Error(`Story Map ${map.title} owns no Graph to select`);
-  return { map: map.id, graph: graph.id };
+  const graph = opening.graphs.find(({ id }) => id === opening.activeGraph) ?? opening.graphs[0];
+  if (graph === undefined) throw new Error(`Story Map ${opening.title} owns no Graph to select`);
+  return { map: opening.id, graph: graph.id };
 };
 
 /** A Space Resource titled for the Space it shows, selecting what that Space opens on. */
@@ -74,8 +74,8 @@ export const spaceResourceDocument = (
   title: string,
   target: SpaceSnapshot,
 ): SpaceSnapshot['resources'][number]['document'] => {
-  const { map, graph } = opensOn(target);
-  return { title, kind: 'space', spaceId: target.id, map, graph };
+  const { map: mapId, graph } = opensOn(target);
+  return { title, kind: 'space', spaceId: target.id, map: mapId, graph };
 };
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -108,7 +108,7 @@ const COLLECTION_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
  *
  * **No Graph carries a colour.** A Graph without one takes a palette slot by
  * order through `graphColorsByGraphId`, and the flatten across Maps in declared
- * order (ADR 0045) puts Long, Mid, Short and Echo in the first four slots.
+ * order puts Long, Mid, Short and Echo in the first four slots.
  * Deriving them is the point: a palette edit reaches the story, and the story
  * cannot claim a colour production would not give it.
  *
@@ -206,17 +206,17 @@ export const authoredSnapshotWithGraphHeads: SpaceSnapshot = {
   ...authoredSnapshot,
   document: {
     ...authoredSnapshot.document,
-    maps: (authoredSnapshot.document.maps ?? []).map((map) =>
-      map.id === COLLECTION_ONE
+    maps: (authoredSnapshot.document.maps ?? []).map((m) =>
+      m.id === COLLECTION_ONE
         ? {
-            ...map,
-            graphs: map.graphs.map((graph) => {
+            ...m,
+            graphs: m.graphs.map((graph) => {
               if (graph.title === 'Mid') return { ...graph, headShape: 'dot' as const };
               if (graph.title === 'Short') return { ...graph, headShape: 'diamond' as const };
               return graph;
             }),
           }
-        : map,
+        : m,
     ),
   },
 };
@@ -239,12 +239,12 @@ export const widelyPlacedSnapshot: SpaceSnapshot = {
   ...sparseAuthoredSnapshot,
   document: {
     ...sparseAuthoredSnapshot.document,
-    maps: (sparseAuthoredSnapshot.document.maps ?? []).map((map) =>
-      map.id === COLLECTION_ONE
+    maps: (sparseAuthoredSnapshot.document.maps ?? []).map((m) =>
+      m.id === COLLECTION_ONE
         ? {
-            ...map,
+            ...m,
             graphs: [
-              ...map.graphs,
+              ...m.graphs,
               ...Array.from({ length: 8 }, (_, index) => ({
                 id: uuidSchema.parse(`00000000-0000-4000-8000-0000000000b${String(index)}`),
                 title: `Supporting argument ${String(index + 1)}`,
@@ -252,7 +252,7 @@ export const widelyPlacedSnapshot: SpaceSnapshot = {
               })),
             ],
           }
-        : map,
+        : m,
     ),
   },
 };
@@ -312,7 +312,7 @@ export const editedSnapshot: SpaceSnapshot = {
  * Ladle spec names a Resource, a Map or a Graph of this Space by id, only the
  * `Map 1` and `Graph 1` titles `newSpace()` mints for them. The ambient
  * generator is named here rather than inside `newSpace`, which takes its
- * identity source like every other minting operation (ADR 0016); this fixture
+ * identity source like every other minting operation (ADR 0109); this fixture
  * is the composition root that supplies it.
  */
 const minted = newSpace(newUuid);
@@ -325,11 +325,11 @@ export const newSpaceFixture: Space = loaded(loadSpace(minted.file, minted.resou
  * a minted id is safe is the block of ids declared above it. A counter that
  * handed out ids `RESOURCE_A` and `RESOURCE_B` already carry would not be
  * refused — a conversion's freshness is checked against the Space's *Graphs*
- * (ADR 0045), and a Resource's id is not one — so a story that converted a View
+ * (ADR 0108), and a Resource's id is not one — so a story that converted a View
  * would mint a Graph wearing a Resource's identity, in silence.
  *
  * No story converts one today. The counter is the fixture's answer to ADR
- * 0016's composition seam. Co-locating it is what stops that being one
+ * 0109's composition seam. Co-locating it is what stops that being one
  * constraint to remember: an id declared above and the counter below it are
  * read together, and `story-spaces.test.ts` holds them apart.
  *
@@ -363,7 +363,7 @@ export const storyGraphIds = (): (() => GraphId) => {
  * several outgoing Edges, and there is no such Resource anywhere in the tracked
  * fixtures — the E2E fixture's Graphs are deliberately all lines too.
  *
- * Each **declares where it opens**, so `defaultMap` and ADR 0026's Active
+ * Each **declares where it opens**, so `defaultMap` and ADR 0040's Active
  * Graph rule answer for a story exactly as they do for the app: the Map named
  * here owns one Graph, and a Map that names no `activeGraph` opens on the
  * first it owns. A story therefore calls `present()` and nothing else to be
@@ -971,3 +971,81 @@ export const edgeToolbarSnapshot: SpaceSnapshot = {
 };
 
 export const edgeToolbarSpace: Space = loaded(loadSpaceSnapshot(edgeToolbarSnapshot));
+
+/** A reserved block, like {@link MINTED_GRAPH_ID_BASE} and for the same reason. */
+const IMAGE_REFERENCE_ID_BASE = 0x9b0;
+
+const imageReferenceId = (offset: number): UUID =>
+  uuidSchema.parse(
+    `00000000-0000-4000-8000-${(IMAGE_REFERENCE_ID_BASE + offset).toString(16).padStart(12, '0')}`,
+  );
+
+const IMAGE_REFERENCE_MAP = imageReferenceId(0);
+
+/** The ids of the Image Resources and the Reference Resources to them. */
+export const imageReferenceIds = {
+  harbour: imageReferenceId(2),
+  harbourReference: imageReferenceId(3),
+  missing: imageReferenceId(4),
+  missingReference: imageReferenceId(5),
+} as const;
+
+/** Harbour's picture, which the catalogue test serves as a 400×300 image. */
+export const IMAGE_REFERENCE_HARBOUR_URL = 'https://example.com/harbour.png';
+/** A picture under a name that never resolves, so its Reference Resource draws the failed state. */
+export const IMAGE_REFERENCE_MISSING_URL = 'https://missing.invalid/picture.png';
+
+/**
+ * Two Image Resources, each with a Reference Resource to it: one whose picture
+ * loads, and one whose picture never does. A Reference Resource drawn from
+ * this Space resolves its Target's picture through the same intake and
+ * resolution production uses (ADR 0070, ADR 0106).
+ */
+export const imageReferenceSnapshot: SpaceSnapshot = {
+  id: imageReferenceId(0xf),
+  document: {
+    version: 1,
+    title: 'Image references',
+    defaultMap: IMAGE_REFERENCE_MAP,
+    maps: [
+      {
+        id: IMAGE_REFERENCE_MAP,
+        title: 'Pictures',
+        kind: 'positioned',
+        positions: {
+          [imageReferenceIds.harbour]: { x: 0, y: 0, open: false },
+          [imageReferenceIds.harbourReference]: { x: 360, y: 0, open: false },
+          [imageReferenceIds.missing]: { x: 0, y: 200, open: false },
+          [imageReferenceIds.missingReference]: { x: 360, y: 200, open: false },
+        },
+        graphs: [{ id: imageReferenceId(1), title: 'Main', edges: [] }],
+        activeGraph: imageReferenceId(1),
+      },
+    ],
+  },
+  resources: [
+    {
+      id: imageReferenceIds.harbour,
+      document: {
+        title: 'Harbour',
+        kind: 'image',
+        url: IMAGE_REFERENCE_HARBOUR_URL,
+        naturalSize: { width: 400, height: 300 },
+      },
+    },
+    {
+      id: imageReferenceIds.harbourReference,
+      document: { title: 'Harbour, again', kind: 'reference', target: imageReferenceIds.harbour },
+    },
+    {
+      id: imageReferenceIds.missing,
+      document: { title: 'Missing', kind: 'image', url: IMAGE_REFERENCE_MISSING_URL },
+    },
+    {
+      id: imageReferenceIds.missingReference,
+      document: { title: 'Missing, again', kind: 'reference', target: imageReferenceIds.missing },
+    },
+  ],
+};
+
+export const imageReferenceSpace: Space = loaded(loadSpaceSnapshot(imageReferenceSnapshot));

@@ -2,14 +2,21 @@ import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import { OPEN_RESOURCE_CHROME, uuidSchema, type Map, type Resource } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
-import { CanvasResource, type CanvasResourceFront, type CanvasResourceState } from '@project/ui';
+import {
+  CanvasResource,
+  CLOSED_DISPLAY,
+  type CanvasResourceFront,
+  type CanvasResourceState,
+  type FrontDisplay,
+} from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { resourceSizeVars, snapResourceSizeToClose } from '#src/resource';
 import { CanvasResourceSpecimen } from '../support/CanvasResourceSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
-import { CanvasResourceNodeSpecimen } from '../support/ReactFlowCanvas';
+import { requireDefaultMap } from '#src/map-resolution';
+import { CanvasResourceNodeSpecimen, type DrawnMap } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
-import { authoredSpace } from '../support/spaces';
+import { authoredSpace, imageReferenceIds, imageReferenceSpace } from '../support/spaces';
 import harbour from '#fixture-images/harbour-400x300.png';
 import '../support/inventory.css';
 
@@ -304,19 +311,19 @@ function Instance({
     setOpen(next);
     return 'completed' as const;
   };
-  const front: CanvasResourceFront =
-    kind === 'reference'
-      ? // Every kind Opens and Closes through the one operation (ADR 0070), so the
-        // Reference Resource carries it too.
-        {
-          kind: 'reference',
-          target: { kind: 'markdown', source: 'Markdown content' },
-          open,
-          onOpenChange: changeOpen,
-        }
-      : open
-        ? { kind: 'markdown', source: 'Markdown content', open: true, onOpenChange: changeOpen }
-        : { kind: 'markdown', source: 'Markdown content', open: false, onOpenChange: changeOpen };
+  // Every kind Opens and Closes through the one operation (ADR 0070), so the
+  // Reference Resource carries it too.
+  const front: CanvasResourceFront = { kind, onOpenChange: changeOpen };
+  const display: FrontDisplay = open
+    ? {
+        shown: 'open',
+        content: {
+          kind: 'markdown',
+          source: 'Markdown content',
+          via: kind === 'reference' ? 'reference' : 'self',
+        },
+      }
+    : CLOSED_DISPLAY;
   const state: Exclude<CanvasResourceState, 'editing'> = dragging
     ? 'dragging'
     : selected
@@ -330,7 +337,13 @@ function Instance({
         tabIndex={-1}
         onClick={() => setSelected(true)}
       >
-        <CanvasResource front={front} state={state} title={title} graphColor="#ffc53d" />
+        <CanvasResource
+          front={front}
+          display={display}
+          state={state}
+          title={title}
+          graphColor="#ffc53d"
+        />
       </div>
       <label className="flex items-center gap-1 text-xs text-muted-foreground">
         <input
@@ -393,7 +406,7 @@ export const OpenAndClose: Story = () => {
         <CanvasResourceNodeSpecimen
           open={open}
           onOpenChange={changeOpen}
-          body={openMarkdown}
+          content={{ kind: 'markdown', source: openMarkdown, via: 'self' }}
           nodeSize={open ? openFrame : closedFrame}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -406,7 +419,11 @@ export const OpenAndClose: Story = () => {
           open={longOpen}
           onOpenChange={changeLongOpen}
           title="Long Markdown"
-          body={`${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`}
+          content={{
+            kind: 'markdown',
+            source: `${openMarkdown}\n\n### A deliberately long section\n\n${openMarkdown}\n\n${openMarkdown}`,
+            via: 'self',
+          }}
           nodeSize={longOpen ? openFrame : closedFrame}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -428,7 +445,11 @@ export const OpenReference: Story = () => {
         resourceId={resourceIds.openingReference}
         open={open}
         onOpenChange={changeOpen}
-        body={'## Strategies\n\nNo strategy is privileged.'}
+        content={{
+          kind: 'markdown',
+          source: '## Strategies\n\nNo strategy is privileged.',
+          via: 'reference',
+        }}
         nodeSize={open ? openFrame : closedFrame}
         stageClassName="inv-resource-node-stage--large"
       />
@@ -462,7 +483,7 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Harbour"
           kind="image"
-          imageUrl={harbour}
+          content={{ kind: 'image', url: harbour, via: 'self' }}
           open={open}
           onOpenChange={changeOpen}
           nodeSize={open ? firstOpen : closedFrame}
@@ -475,7 +496,7 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Harbour, larger"
           kind="image"
-          imageUrl={harbour}
+          content={{ kind: 'image', url: harbour, via: 'self' }}
           open
           nodeSize={{ width: 600, height: 440 }}
           zoom={1}
@@ -487,7 +508,7 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Missing"
           kind="image"
-          imageUrl="/images/missing-picture.png"
+          content={{ kind: 'image', url: '/images/missing-picture.png', via: 'self' }}
           open
           nodeSize={firstOpen}
           zoom={1}
@@ -499,6 +520,61 @@ export const OpenImage: Story = () => {
 };
 OpenImage.storyName = 'Open Image Resource';
 OpenImage.meta = { iframed: true };
+
+const imageReferenceMap: DrawnMap = {
+  space: imageReferenceSpace,
+  mapId: requireDefaultMap(imageReferenceSpace),
+};
+
+/**
+ * A Reference Resource whose Target is an Image Resource draws the Target's
+ * picture read-only through the same front (ADR 0070, ADR 0106): its own
+ * Title, Close, and no Replace, even where the picture does not load. Both
+ * Resources are in a Space that holds their Image Resource Targets, so what
+ * each draws is resolved from its Target rather than handed to it. Each is at
+ * the size its first Open writes: the Target's recorded 400×300 picture plus
+ * the front's chrome.
+ */
+export const OpenImageReference: Story = () => {
+  const [open, setOpen] = useState(true);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    return 'completed' as const;
+  };
+  const firstOpen = {
+    width: 400 + OPEN_RESOURCE_CHROME.width,
+    height: 300 + OPEN_RESOURCE_CHROME.height,
+  };
+  return (
+    <div className="flex flex-wrap items-start gap-8 p-8">
+      <section aria-label="Image Target" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">a Reference Resource to a 400×300 picture</p>
+        <CanvasResourceNodeSpecimen
+          drawn={imageReferenceMap}
+          resourceId={imageReferenceIds.harbourReference}
+          open={open}
+          onOpenChange={changeOpen}
+          nodeSize={open ? firstOpen : closedFrame}
+          zoom={1}
+          stageClassName="inv-resource-node-stage--large"
+        />
+      </section>
+      <section aria-label="Failed image Target" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">its Target's picture does not load</p>
+        <CanvasResourceNodeSpecimen
+          drawn={imageReferenceMap}
+          resourceId={imageReferenceIds.missingReference}
+          open
+          nodeSize={firstOpen}
+          zoom={1}
+          stageClassName="inv-resource-node-stage--large"
+        />
+      </section>
+    </div>
+  );
+};
+OpenImageReference.storyName = 'Open Image Reference Resource';
+OpenImageReference.meta = { iframed: true };
 
 /**
  * Enter is the Space Resource's kind command (ADR 0073, ADR 0068): it sits on the
@@ -513,11 +589,8 @@ export const EnterSpace: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        front={{
-          kind: 'space',
-          open: false,
-          onOpenChange: changeOpen,
-        }}
+        front={{ kind: 'space', onOpenChange: changeOpen }}
+        display={CLOSED_DISPLAY}
         state="selected"
         entityActions={[
           [
@@ -583,11 +656,8 @@ export const OpenIndependently: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        front={{
-          kind: 'space',
-          open: false,
-          onOpenChange: changeOpen,
-        }}
+        front={{ kind: 'space', onOpenChange: changeOpen }}
+        display={CLOSED_DISPLAY}
         state="selected"
         title="Architecture"
         graphColor="#35d6c3"
@@ -611,8 +681,8 @@ OpenIndependently.meta = { iframed: true };
  */
 export const RailActions: Story = () => {
   const [copied, setCopied] = useState<string | null>(null);
-  const map = authoredSpace.maps[0];
-  if (map === undefined) throw new Error('RailActions fixture requires an authored Map');
+  const firstMap = authoredSpace.maps[0];
+  if (firstMap === undefined) throw new Error('RailActions fixture requires an authored Map');
   const actions = spaceEntityActions({
     spaceId: authoredSpace.id,
     spaceTitle: authoredSpace.title,
@@ -629,11 +699,12 @@ export const RailActions: Story = () => {
         {authoredSpace.resources.slice(0, 2).map((resource, index) => (
           <CanvasResource
             key={resource.id}
-            front={{ kind: 'markdown', source: '', open: false, onOpenChange: () => 'retained' }}
+            front={{ kind: 'markdown', onOpenChange: () => 'retained' }}
+            display={CLOSED_DISPLAY}
             title={resource.title}
             state={index === 1 ? 'selected' : 'rest'}
             graphColor="#ffc53d"
-            entityActions={actions({ kind: 'resource', resource, map })}
+            entityActions={actions({ kind: 'resource', resource, map: firstMap })}
           />
         ))}
       </div>

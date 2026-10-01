@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { resourceToolbar, selectResource } from '../e2e/graph';
 import { expectPictureAtOwnSize, expectPictureLoaded, HARBOUR_SIZE } from '../e2e/image';
@@ -5,6 +6,7 @@ import { expectPictureAtOwnSize, expectPictureLoaded, HARBOUR_SIZE } from '../e2
 const openCloseStory = '/?story=components--resource--open-and-close&mode=preview';
 const markdownStory = '/?story=components--resource--editing--markdown&mode=preview';
 const resizeControlStory = '/?story=components--resource--resize-control&mode=preview';
+const HARBOUR = readFileSync(new URL('../fixture-images/harbour-400x300.png', import.meta.url));
 const openReferenceStory = '/?story=components--resource--open-reference-resource&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {
@@ -835,5 +837,56 @@ test(
     await expect(resource.getByText('/images/missing-picture.png')).toBeVisible();
     await expect(resource.getByRole('img', { name: 'Missing' })).toHaveCount(0);
     await expect(resource.getByRole('heading', { name: 'Missing' })).toBeVisible();
+  },
+);
+
+const openImageReferenceStory =
+  '/?story=components--resource--open-image-reference-resource&mode=preview';
+const IMAGE_REFERENCE_HARBOUR_URL = 'https://example.com/harbour.png';
+const IMAGE_REFERENCE_MISSING_URL = 'https://missing.invalid/picture.png';
+
+/**
+ * A Reference Resource to an Image Resource draws its Target's picture read-only
+ * through the same front (ADR 0070, ADR 0106): its own Title in the footer, the
+ * picture at its own size in a Resource at its first-Open size, Close and no
+ * Replace, and no Replace in the failed-image state either. The story's Space
+ * holds the Image Resource Targets, and this test serves Harbour's picture.
+ */
+test(
+  "an Open Reference Resource draws its Image Resource Target's picture read-only",
+  { tag: '@parity:open-reference-draws-target-image-read-only' },
+  async ({ page }) => {
+    await page.route(IMAGE_REFERENCE_HARBOUR_URL, (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: HARBOUR }),
+    );
+    await page.goto(openImageReferenceStory);
+    const loaded = page.getByRole('region', { name: 'Image Target', exact: true });
+    const resource = loaded.getByRole('article', { name: 'Harbour, again' });
+    await expect(resource).toHaveAttribute('data-kind', 'reference');
+    const picture = resource.getByRole('img', { name: 'Harbour, again' });
+    await expect(picture).toHaveAttribute('src', IMAGE_REFERENCE_HARBOUR_URL);
+    await expectPictureLoaded(picture, HARBOUR_SIZE.width);
+    await expect(resource.locator('.canvas-resource__content img')).toHaveCount(1);
+    await expect(resource.getByRole('heading', { name: 'Harbour, again' })).toBeVisible();
+    await expectPictureAtOwnSize(resource, picture, HARBOUR_SIZE);
+
+    const node = loaded.locator('.react-flow__node');
+    await selectResource(node);
+    const toolbar = await resourceToolbar(page, node);
+    await expect(
+      toolbar.getByRole('button', { name: 'Close Resource Harbour, again' }),
+    ).toBeVisible();
+    await expect(toolbar.getByRole('button', { name: /^Replace image of Resource/ })).toHaveCount(
+      0,
+    );
+    await expect(toolbar.getByRole('button', { name: /^Edit Resource/ })).toHaveCount(0);
+
+    const failed = page
+      .getByRole('region', { name: 'Failed image Target' })
+      .getByRole('article', { name: 'Missing, again' });
+    await expect(failed.getByText('Image did not load')).toBeVisible();
+    await expect(failed.getByText(IMAGE_REFERENCE_MISSING_URL)).toBeVisible();
+    await expect(failed.getByRole('heading', { name: 'Missing, again' })).toBeVisible();
+    await expect(failed.getByRole('button', { name: /Replace/ })).toHaveCount(0);
   },
 );

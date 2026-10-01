@@ -92,12 +92,12 @@ describe('mapResources', () => {
 
 describe('resourcesOutsideMap', () => {
   it("answers the Space's own Resources the Map does not place, and no others", () => {
-    const map = resolveMap(space).map;
-    const outside = resourcesOutsideMap(space, map);
+    const opening = resolveMap(space).map;
+    const outside = resourcesOutsideMap(space, opening);
 
     expect(outside.map(({ id }) => id)).toEqual([OMITTED]);
     expect(outside[0]).toBe(space.lookup.resource(OMITTED));
-    expect([...mapResources(space, map), ...outside].map(({ id }) => id).sort()).toEqual(
+    expect([...mapResources(space, opening), ...outside].map(({ id }) => id).sort()).toEqual(
       space.resources.map(({ id }) => id).sort(),
     );
   });

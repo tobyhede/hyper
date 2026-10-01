@@ -37,7 +37,12 @@ import {
   type UUID,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
-import { CANVAS_RESOURCE_DRAG_TILT_DEGREES, GraphIcon, type EntityActionGroup } from '@project/ui';
+import {
+  CANVAS_RESOURCE_DRAG_TILT_DEGREES,
+  GraphIcon,
+  spaceViewOf,
+  type EntityActionGroup,
+} from '@project/ui';
 import {
   nodeTypes,
   GraphConnectionLine,
@@ -72,6 +77,7 @@ import {
   embeddedAuthoringEnabled,
   editingPortalAncestor,
   embeddingIsPortalEditing,
+  reportsBodyHeight,
 } from '../embedded-open-space-resource';
 import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
@@ -774,13 +780,12 @@ export function SpaceCanvas({
   const canvasNodes = useMemo(
     () =>
       [...editableNodes, ...liveEmbeddings.flatMap((value) => value.nodes)].map((node) => {
-        const withHeight =
-          node.data.spaceContent === undefined
-            ? node
-            : {
-                ...node,
-                data: { ...node.data, onBodyHeightChange: reportBodyHeight },
-              };
+        const withHeight = reportsBodyHeight(node)
+          ? {
+              ...node,
+              data: { ...node.data, onBodyHeightChange: reportBodyHeight },
+            }
+          : node;
         if (!editingPortals.has(withHeight.data.resourceId) || withHeight.data.kind !== 'space') {
           return withHeight;
         }
@@ -801,12 +806,12 @@ export function SpaceCanvas({
     [editableNodes, liveEmbeddings, reportBodyHeight, editingPortals],
   );
   const portalNodesById = useMemo(() => {
-    const map = new Map<string, ResourceFlowNode>();
-    for (const node of nodes) map.set(node.id, node);
+    const byId = new Map<string, ResourceFlowNode>();
+    for (const node of nodes) byId.set(node.id, node);
     for (const value of liveEmbeddings) {
-      for (const child of value.nodes) map.set(child.id, child);
+      for (const child of value.nodes) byId.set(child.id, child);
     }
-    return map;
+    return byId;
   }, [nodes, liveEmbeddings]);
   const canvasEdges = useMemo(
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
@@ -902,7 +907,8 @@ export function SpaceCanvas({
       const drafted = session.portalDraft.get(resourceId);
       if (drafted !== undefined) return drafted;
       const parent = session.portalNodesById.get(parentId);
-      const stored = parent?.data.spaceContent?.framing;
+      const stored =
+        parent === undefined ? undefined : spaceViewOf(parent.data.display)?.view.framing;
       if (stored !== undefined) return stored;
       const published = session.embeddedPublications.get(parentId);
       const request = session.embeddedRequests.find(
@@ -1495,7 +1501,7 @@ export function SpaceCanvas({
             })}
             framing={
               portalDraft.get(request.parent.data.resourceId) ??
-              request.parent.data.spaceContent?.framing
+              spaceViewOf(request.parent.data.display)?.view.framing
             }
             bounds={request.bounds}
             absolute={request.absolute}

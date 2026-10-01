@@ -356,6 +356,13 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       'An Open Reference Resource keeps its own Title, renders its Target Markdown read-only, and offers Close without Target or source-edit controls.',
   },
+  {
+    id: 'open-reference-draws-target-image-read-only',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'OpenImageReference',
+    claim:
+      "An Open Reference Resource whose Target is an Image Resource keeps its own Title and draws the Target's picture read-only through the same front, at the size its Target's recorded picture gives its first Open, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106).",
+  },
   /*
    * **No claim covers a saving lifecycle.** The Command Dock mounts
    * `PersistenceControl` only for a conflict and a rejection — there is no

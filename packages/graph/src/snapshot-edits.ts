@@ -131,7 +131,7 @@ function createInMap(
   mode: PlacementMode,
 ): SnapshotEditOutcome {
   const maps = snapshot.document.maps ?? [];
-  const target = maps.find((map) => map.id === mapId);
+  const target = maps.find((m) => m.id === mapId);
   if (target === undefined) {
     return { kind: 'refused', refusal: { code: 'map-not-found' } };
   }
@@ -152,13 +152,13 @@ function createInMap(
       resources: [...snapshot.resources, { id: resourceId, document }],
       document: {
         ...snapshot.document,
-        maps: maps.map((map) =>
-          map.id === mapId
+        maps: maps.map((m) =>
+          m.id === mapId
             ? {
-                ...map,
-                positions: { ...map.positions, [resourceId]: { ...at, open: false } },
+                ...m,
+                positions: { ...m.positions, [resourceId]: { ...at, open: false } },
               }
-            : map,
+            : m,
         ),
       },
     },
@@ -232,10 +232,10 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
       resources: snapshot.resources.filter((resource) => resource.id !== resourceId),
       document: {
         ...snapshot.document,
-        maps: maps.map((map) => ({
-          ...map,
-          positions: Placement.toPositions(removedFrom(Placement.fromMap(map), resourceId)),
-          graphs: withoutIncidentEdges(map.graphs, resourceId),
+        maps: maps.map((m) => ({
+          ...m,
+          positions: Placement.toPositions(removedFrom(Placement.fromMap(m), resourceId)),
+          graphs: withoutIncidentEdges(m.graphs, resourceId),
         })),
       },
     },
@@ -253,9 +253,9 @@ const placedIn = (
   snapshot: SpaceSnapshot,
   mapId: UUID,
 ): { readonly map: Map; readonly placement: Placement } | SnapshotEditRefusal => {
-  const map = (snapshot.document.maps ?? []).find((candidate) => candidate.id === mapId);
-  if (map === undefined) return { code: 'map-not-found' };
-  return { map, placement: Placement.fromMap(map) };
+  const found = (snapshot.document.maps ?? []).find((candidate) => candidate.id === mapId);
+  if (found === undefined) return { code: 'map-not-found' };
+  return { map: found, placement: Placement.fromMap(found) };
 };
 
 /** The snapshot with one Map's positions replaced, and nothing else changed. */
@@ -269,8 +269,8 @@ const withPlacement = (
     ...snapshot,
     document: {
       ...snapshot.document,
-      maps: (snapshot.document.maps ?? []).map((map) =>
-        map.id === mapId ? { ...map, positions: Placement.toPositions(placement) } : map,
+      maps: (snapshot.document.maps ?? []).map((m) =>
+        m.id === mapId ? { ...m, positions: Placement.toPositions(placement) } : m,
       ),
     },
   },
@@ -368,6 +368,26 @@ const firstOpenSize = (document: ResourceDocument | undefined): Extent => {
 };
 
 /**
+ * The document whose kind chooses a Resource's first Open Size.
+ *
+ * A Reference Resource to an Image Resource draws its Target's image, so it
+ * reads its Target's recorded natural size by the same rule, in the same
+ * synchronous Edit (ADR 0070, ADR 0106). A Reference Resource to any other
+ * Target answers its own document, which opens at the default Open Size.
+ */
+const openSizeDocument = (
+  snapshot: SpaceSnapshot,
+  resourceId: UUID,
+): ResourceDocument | undefined => {
+  const documentOf = (id: UUID) =>
+    snapshot.resources.find((resource) => resource.id === id)?.document;
+  const document = documentOf(resourceId);
+  if (document?.kind !== 'reference') return document;
+  const target = documentOf(document.target);
+  return target?.kind === 'image' ? target : document;
+};
+
+/**
  * Open a Resource in one Map, moving the Resources clear of it by the room it
  * now takes (ADR 0084, ADR 0093).
  *
@@ -382,8 +402,7 @@ function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotE
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   if (at.open) return UNCHANGED;
-  const document = snapshot.resources.find((resource) => resource.id === resourceId)?.document;
-  const openSize = at.openSize ?? firstOpenSize(document);
+  const openSize = at.openSize ?? firstOpenSize(openSizeDocument(snapshot, resourceId));
   return withPlacement(
     snapshot,
     mapId,
@@ -508,14 +527,14 @@ function removeFromMap(
       ...snapshot,
       document: {
         ...snapshot.document,
-        maps: (snapshot.document.maps ?? []).map((map) =>
-          map.id === mapId
+        maps: (snapshot.document.maps ?? []).map((m) =>
+          m.id === mapId
             ? {
-                ...map,
+                ...m,
                 positions: Placement.toPositions(removedFrom(placed.placement, resourceId)),
-                graphs: withoutIncidentEdges(map.graphs, resourceId),
+                graphs: withoutIncidentEdges(m.graphs, resourceId),
               }
-            : map,
+            : m,
         ),
       },
     },

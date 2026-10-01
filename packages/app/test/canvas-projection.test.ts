@@ -107,7 +107,7 @@ describe('canvasProjection', () => {
       OTHER_GRAPH_OPACITY,
       1,
     ]);
-    // Emphasis, not filtering: both Graphs are still drawn (ADR 0026).
+    // Emphasis, not filtering: both Graphs are still drawn (ADR 0040).
     expect(emphasised.edges).toHaveLength(2);
   });
 
@@ -148,7 +148,7 @@ describe('canvasProjection', () => {
 
   /*
    * Two Space Resources on one target, selecting one Map at different Graphs
-   * (ADR 0026).
+   * (ADR 0040).
    *
    * Which Edges an embedding draws is the Map's business, and which one it
    * emphasises is the Resource's, so a pair that differs only by stored Graph has
@@ -193,8 +193,8 @@ describe('canvasProjection', () => {
     expect(byId[RESOURCE_A]?.active).toBe(true);
     expect(byId[RESOURCE_B]?.selectedForAuthoring).toBe(true);
     // Presenting draws the Active Resource's content, and only that Resource's (ADR 0027).
-    expect(byId[RESOURCE_A]?.showContent).toBe(true);
-    expect(byId[RESOURCE_B]?.showContent).toBe(false);
+    expect(byId[RESOURCE_A]?.display.shown).toBe('presented');
+    expect(byId[RESOURCE_B]?.display.shown).toBe('closed');
   });
 
   it('draws every Graph a selected Map owns', async () => {
@@ -233,14 +233,14 @@ describe('canvasProjection', () => {
   });
 
   it('carries each authored Open rect through strategy input and node projection', async () => {
-    const map = {
+    const authoredMap = {
       ...mapOwning(DRAWN),
       positions: {
         [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
         [RESOURCE_B]: { x: 700, y: 0, open: false },
       },
     };
-    const space = spaceWith({ maps: [map] });
+    const space = spaceWith({ maps: [authoredMap] });
     const resolved = resolveMap(space, MAP);
     const projection = canvasProjection(space, resolved);
     const strategyResource = projection.strategyGraph.resources.find(({ id }) => id === RESOURCE_A);

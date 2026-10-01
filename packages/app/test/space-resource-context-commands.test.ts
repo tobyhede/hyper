@@ -109,11 +109,11 @@ async function setup(available = true) {
       commandOutcomes: source.app.commandOutcomes,
     },
     document,
-    (map, graph) => {
+    (m, graph) => {
       const result = source.app.authoring.complete({
         kind: 'edited-resource',
         resourceId: RESOURCE,
-        document: { ...document, map: map.id, graph },
+        document: { ...document, map: m.id, graph },
       });
       return result.kind === 'refused' ? result.refusal.code : null;
     },
@@ -204,7 +204,7 @@ describe('persisting a Space Resource context command', () => {
     await spaces.waitForPersistence(META);
     await spaces.waitForPersistence(TARGET);
     const loaded = await backend.loadSpace(TARGET);
-    expect(loaded?.snapshot.document.maps?.map((map) => map.id)).toEqual([FIRST_MAP]);
+    expect(loaded?.snapshot.document.maps?.map((m) => m.id)).toEqual([FIRST_MAP]);
   });
 });
 

@@ -174,9 +174,10 @@ export function nextGraphColor(existing: readonly string[]): string {
 
 /** Resolve each graph's color: its space `color`, else a palette slot by order. */
 export function graphColorsByGraphId(space: Space): Record<string, string> {
-  const map: Record<string, string> = {};
+  const colorByGraphId: Record<string, string> = {};
   space.graphs.forEach((graph, index) => {
-    map[graph.id] = graph.color ?? GRAPH_PALETTE[index % GRAPH_PALETTE.length] ?? '#8a94a6';
+    colorByGraphId[graph.id] =
+      graph.color ?? GRAPH_PALETTE[index % GRAPH_PALETTE.length] ?? '#8a94a6';
   });
-  return map;
+  return colorByGraphId;
 }

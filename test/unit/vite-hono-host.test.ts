@@ -6,7 +6,13 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { connect } from 'node:net';
-import { encodeCompactUuid, newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import {
+  encodeCompactUuid,
+  newUuid,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { createSpaceHttpApp, MAX_COMMIT_BODY_BYTES, MAX_DRAINED_BODY_BYTES } from '@project/http';
 import {
   AggregateInvariantError,
@@ -25,6 +31,11 @@ import type { DatabaseTarget } from '../../src/database/database-target';
 import { createDatabaseHttpApp } from '../../src/http/database-http-runtime';
 import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
+
+/** A request that initializes no Space mints nothing, so any mint is a failure here. */
+const mintsNothing = (): UUID => {
+  throw new Error('This request initializes no Space, so it mints no identity.');
+};
 
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const MINTED_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
@@ -183,7 +194,9 @@ afterEach(async () => {
 
 describe('Vite Hono host', () => {
   it('loads one Fetch application and serves its API through a real Node socket', async () => {
-    const { host, createApp } = await startHost(createSpaceHttpApp(repository()));
+    const { host, createApp } = await startHost(
+      createSpaceHttpApp(repository(), { newId: mintsNothing }),
+    );
 
     await expect(
       fetch(`${host.url}/api/spaces`).then((response) => response.json()),
@@ -195,10 +208,13 @@ describe('Vite Hono host', () => {
   });
 
   it('leaves non-API requests to the next Vite middleware', async () => {
-    const { host } = await startHost(createSpaceHttpApp(repository()), (_request, response) => {
-      response.setHeader('Content-Type', 'text/html');
-      response.end('<main>Vite application</main>');
-    });
+    const { host } = await startHost(
+      createSpaceHttpApp(repository(), { newId: mintsNothing }),
+      (_request, response) => {
+        response.setHeader('Content-Type', 'text/html');
+        response.end('<main>Vite application</main>');
+      },
+    );
 
     const response = await fetch(`${host.url}/index.html`);
 
@@ -611,7 +627,7 @@ describe('Vite Hono host', () => {
 
   it('serves the API from the built runtime and leaves the rest to preview static assets', async () => {
     const { host, createApp } = await startHost(
-      createSpaceHttpApp(repository()),
+      createSpaceHttpApp(repository(), { newId: mintsNothing }),
       (_request, response) => {
         response.setHeader('Content-Type', 'text/html');
         response.end('<main>Built application</main>');
@@ -650,7 +666,9 @@ describe('Vite Hono host', () => {
         deletedSpaceIds: [],
       }),
     );
-    const { host } = await startHost(createSpaceHttpApp({ ...repository(), commit }));
+    const { host } = await startHost(
+      createSpaceHttpApp({ ...repository(), commit }, { newId: mintsNothing }),
+    );
 
     const response = await send(
       host.url,
@@ -669,7 +687,9 @@ describe('Vite Hono host', () => {
   });
 
   it('drains an oversized chunked body and reuses the connection', async () => {
-    const { host, connections } = await startHost(createSpaceHttpApp(repository()));
+    const { host, connections } = await startHost(
+      createSpaceHttpApp(repository(), { newId: mintsNothing }),
+    );
     const agent = new Agent({ keepAlive: true, maxSockets: 1 });
     try {
       const rejected = await send(
@@ -700,7 +720,9 @@ describe('Vite Hono host', () => {
   ])(
     'reuses the connection after rejecting a body far over the limit ($framing)',
     async ({ headers }) => {
-      const { host, connections } = await startHost(createSpaceHttpApp(repository()));
+      const { host, connections } = await startHost(
+        createSpaceHttpApp(repository(), { newId: mintsNothing }),
+      );
       const agent = new Agent({ keepAlive: true, maxSockets: 1 });
       try {
         const rejected = await send(
@@ -729,7 +751,9 @@ describe('Vite Hono host', () => {
   // be reused — a client that never stops sending loses its connection rather
   // than costing us the drain.
   it('drops the connection when a body outruns the drain allowance', async () => {
-    const { host, connections } = await startHost(createSpaceHttpApp(repository()));
+    const { host, connections } = await startHost(
+      createSpaceHttpApp(repository(), { newId: mintsNothing }),
+    );
     const agent = new Agent({ keepAlive: true, maxSockets: 1 });
     try {
       // The host answers 413 and stops reading, so the client's write may finish
@@ -770,7 +794,9 @@ describe('Vite Hono host', () => {
   });
 
   it('reuses the connection after every early request rejection', async () => {
-    const { host, connections } = await startHost(createSpaceHttpApp(repository()));
+    const { host, connections } = await startHost(
+      createSpaceHttpApp(repository(), { newId: mintsNothing }),
+    );
     const agent = new Agent({ keepAlive: true, maxSockets: 1 });
     const resource = '/api/spaces/00000000-0000-4000-8000-000000000001';
     const rejectedRequests = [
@@ -844,10 +870,13 @@ describe('Vite Hono host', () => {
   });
 
   it('leaves a request target the URL parser rejects to the next middleware', async () => {
-    const { host } = await startHost(createSpaceHttpApp(repository()), (_request, response) => {
-      response.setHeader('Content-Type', 'text/html');
-      response.end('<main>Vite application</main>');
-    });
+    const { host } = await startHost(
+      createSpaceHttpApp(repository(), { newId: mintsNothing }),
+      (_request, response) => {
+        response.setHeader('Content-Type', 'text/html');
+        response.end('<main>Vite application</main>');
+      },
+    );
 
     // Node accepts `//[` as a request target; `new URL('//[', base)` throws on
     // the empty IPv6 host. It is not an API path, so it belongs to Vite.
@@ -874,7 +903,7 @@ describe('Vite Hono host', () => {
             });
           },
         },
-        { logError: () => undefined },
+        { newId: mintsNothing, logError: () => undefined },
       ),
     );
 

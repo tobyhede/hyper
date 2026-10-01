@@ -220,7 +220,7 @@ describe('titles and sentences', () => {
     ['image-format-unsupported', 'notes.txt is not a PNG, JPEG, WebP or GIF image.'],
     [
       'image-svg-unsupported',
-      'figure.svg is an SVG image, which cannot be stored yet. Use PNG, JPEG, WebP or GIF.',
+      'figure.svg is an SVG image, which cannot be stored. Use PNG, JPEG, WebP or GIF.',
     ],
   ] as const)(
     'says a stored image refused as %s in the application’s words, naming the file',
@@ -229,12 +229,33 @@ describe('titles and sentences', () => {
       const name = message.split(' ')[0] ?? '';
 
       await outcomes.run('image-create', () =>
-        Promise.resolve({ kind: 'not-stored' as const, code, name }),
+        Promise.resolve({ kind: 'not-stored' as const, refusals: [{ code, name }] }),
       );
 
       expect(notice(outcomes, 'image-create')).toEqual({ title: 'Image not created', message });
     },
   );
+
+  it('says every file a drop had refused, not only the first', async () => {
+    const { outcomes } = open();
+
+    await outcomes.run('image-create', () =>
+      Promise.resolve({
+        kind: 'not-stored' as const,
+        refusals: [
+          { code: 'image-format-unsupported' as const, name: 'notes.txt' },
+          { code: 'image-too-large' as const, name: 'huge.png' },
+        ],
+      }),
+    );
+
+    expect(notice(outcomes, 'image-create')).toEqual({
+      title: 'Image not created',
+      message:
+        'notes.txt is not a PNG, JPEG, WebP or GIF image. ' +
+        'huge.png is larger than 10 MB, the largest image that can be stored.',
+    });
+  });
 
   it('continues a created Image Resource at the first Resource the Edit made', async () => {
     const { outcomes, continuation } = open();

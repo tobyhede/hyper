@@ -16,7 +16,7 @@ import { navigationAddress } from './navigation';
  * The whole of what this application asks a browser for.
  *
  * Five members and no more: two reads, two writes and the one event. Injected
- * at composition and **required with no default** — the same rule ADR 0016
+ * at composition and **required with no default** — the same rule ADR 0109
  * applies to `newId`, and for the same reason. A default would reinstate the
  * ambient `window` behind the owner's back, and the module would then be
  * reachable only by mounting a DOM.
