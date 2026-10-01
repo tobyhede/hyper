@@ -62,13 +62,13 @@ test(
     await page.keyboard.press('Enter');
 
     await expect(list).toHaveCount(0);
-    const edge = edgeNamed(page, 'Edge from T to B in Long');
+    const edge = edgeNamed(page, 'Edge from T… to B in Long');
     await expect(edge).toBeFocused();
     await expect(edge).toHaveClass(/selected/);
     await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('button', { name: 'Edit Edge T → B' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Edit Edge T… → B' })).toBeFocused();
   },
 );
 
@@ -132,10 +132,10 @@ test(
 
     await expect(list).toHaveCount(0);
     await expect(page.locator('.react-flow__node')).toHaveCount(resources + 1);
-    const edge = page.locator('.react-flow__edge[aria-label^="Edge from T to Resource "]');
+    const edge = page.locator('.react-flow__edge[aria-label^="Edge from T… to Resource "]');
     await expect(edge).toBeFocused();
     await expect(edge).toHaveClass(/selected/);
-    const title = /^Edge from T to (.+) in Long$/u.exec(
+    const title = /^Edge from T… to (.+) in Long$/u.exec(
       (await edge.getAttribute('aria-label')) ?? '',
     );
     const created = nodeNamed(page, title?.[1] ?? '');

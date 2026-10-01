@@ -3,13 +3,21 @@ import { describe, expect, it } from 'vitest';
 import {
   COLLAPSED_RESOURCE_SIZE,
   DEFAULT_OPEN_SIZE,
+  type Graph,
   type GraphEdge,
+  type Map as SpaceMap,
   type SpaceSnapshot,
   type ResourceDocument,
   type ResourcePlacement,
   type UUID,
 } from '@project/core';
-import { loadSpaceSnapshot, Placement, SnapshotEdit, type SnapshotEditOutcome } from '../src/index';
+import {
+  deletionReach,
+  loadSpaceSnapshot,
+  Placement,
+  SnapshotEdit,
+  type SnapshotEditOutcome,
+} from '../src/index';
 import { uuid } from './resource-files';
 
 /**
@@ -182,6 +190,122 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
           });
         },
       ),
+    );
+  });
+});
+
+describe('deletionReach properties', () => {
+  /**
+   * A Space of up to five Resources over up to three Maps, each placing its own
+   * subset — some Open, so a deletion reclaims room — and owning one or two
+   * Graphs whose Edges join Resources that Map places. Every Resource is
+   * Markdown, so nothing refuses the deletion.
+   */
+  const multiMapSnapshotArb = fc
+    .record({
+      pool: fc.uniqueArray(fc.uuid(), { minLength: 14, maxLength: 14 }),
+      resourceCount: fc.integer({ min: 1, max: 5 }),
+      maps: fc.array(
+        fc.record({
+          placed: fc.array(fc.boolean(), { minLength: 5, maxLength: 5 }),
+          open: fc.array(fc.boolean(), { minLength: 5, maxLength: 5 }),
+          coords: fc.array(coordArb, { minLength: 10, maxLength: 10 }),
+          graphs: fc.array(
+            fc.array(fc.tuple(fc.nat({ max: 4 }), fc.nat({ max: 4 })), { maxLength: 6 }),
+            { minLength: 1, maxLength: 2 },
+          ),
+        }),
+        { minLength: 1, maxLength: 3 },
+      ),
+      subjectSeed: fc.nat({ max: 4 }),
+    })
+    .map(({ pool, resourceCount, maps, subjectSeed }) => {
+      const ids = pool.map(uuid);
+      const resourceIds = ids.slice(0, resourceCount);
+      const mapIds = ids.slice(5, 8);
+      const graphIds = ids.slice(8, 14);
+      const documentMaps = maps.map((generated, m): SpaceMap => {
+        const placed = resourceIds.filter((_, r) => generated.placed[r] === true);
+        const positions: Record<UUID, ResourcePlacement> = {};
+        resourceIds.forEach((id, r) => {
+          if (generated.placed[r] !== true) return;
+          const at = { x: generated.coords[r * 2] ?? 0, y: generated.coords[r * 2 + 1] ?? 0 };
+          positions[id] =
+            generated.open[r] === true
+              ? { ...at, open: true, openSize: DEFAULT_OPEN_SIZE }
+              : { ...at, open: false };
+        });
+        const graphs = generated.graphs.map((pairs, g): Graph => {
+          const seen = new Set<string>();
+          const edges: GraphEdge[] = [];
+          for (const [a, b] of pairs) {
+            const from = placed[a % Math.max(placed.length, 1)];
+            const to = placed[b % Math.max(placed.length, 1)];
+            if (from === undefined || to === undefined || from === to) continue;
+            if (seen.has(`${from}:${to}`)) continue;
+            seen.add(`${from}:${to}`);
+            edges.push({ from, to });
+          }
+          return { id: graphIds[m * 2 + g] ?? GRAPH_ID, title: `Graph ${g + 1}`, edges };
+        });
+        return {
+          id: mapIds[m] ?? MAP_ID,
+          title: `Map ${m + 1}`,
+          kind: 'positioned',
+          positions,
+          graphs,
+        };
+      });
+      const snapshot: SpaceSnapshot = {
+        id: SPACE_ID,
+        document: {
+          version: 1,
+          title: 'Generated',
+          defaultMap: documentMaps[0]?.id ?? MAP_ID,
+          maps: documentMaps,
+        },
+        resources: resourceIds.map((id, index) => ({
+          id,
+          document: markdownDocument(`Resource ${index}`),
+        })),
+      };
+      const subject = resourceIds[subjectSeed % resourceIds.length] ?? resourceIds[0];
+      return { snapshot, subject };
+    });
+
+  it('names exactly the Maps and Graphs Delete from Space changes', () => {
+    fc.assert(
+      fc.property(multiMapSnapshotArb, ({ snapshot, subject }) => {
+        if (subject === undefined) return;
+        expect(loadSpaceSnapshot(snapshot).ok).toBe(true);
+        const before = snapshot.document.maps ?? [];
+
+        const reach = deletionReach(before, subject);
+        const outcome = SnapshotEdit.deleteFromSpace(snapshot, subject);
+
+        expect(outcome.kind).toBe('completed');
+        if (outcome.kind !== 'completed') return;
+        const after = outcome.snapshot.document.maps ?? [];
+        const namedMaps = new Set(reach.maps.map((m) => m.id));
+        const namedGraphs = new Set(reach.graphs.map(({ graph }) => graph.id));
+        before.forEach((original, m) => {
+          const deleted = after[m];
+          if (namedMaps.has(original.id)) {
+            expect(original.positions[subject]).toBeDefined();
+            expect(deleted?.positions[subject]).toBeUndefined();
+          } else {
+            expect(deleted).toEqual(original);
+          }
+          original.graphs.forEach((graph, g) => {
+            const edgesAfter = deleted?.graphs[g]?.edges ?? [];
+            if (namedGraphs.has(graph.id)) {
+              expect(edgesAfter.length).toBeLessThan(graph.edges.length);
+            } else {
+              expect(edgesAfter).toEqual(graph.edges);
+            }
+          });
+        });
+      }),
     );
   });
 });

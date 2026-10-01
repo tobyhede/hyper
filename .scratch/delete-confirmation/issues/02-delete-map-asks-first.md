@@ -4,10 +4,10 @@
 
 **Blocked by:** 01 — One delete confirmation for every kind of subject
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Delete Map asks before it runs, with the title and description above, naming the Map by its short name.
-- [ ] Delete runs the existing deletion and the canvas continues on the surviving Map as today; a refusal still reports.
-- [ ] Cancel and Escape leave the Map in place.
-- [ ] Delete Map is still withheld for a Space's last Map.
-- [ ] Existing Delete Map journeys pass through the confirmation.
+- [x] Delete Map asks before it runs, with the title and description above, naming the Map by its short name.
+- [x] Delete runs the existing deletion and the canvas continues on the surviving Map as today; a refusal still reports.
+- [x] Cancel and Escape leave the Map in place.
+- [x] Delete Map is still withheld for a Space's last Map.
+- [x] Existing Delete Map journeys pass through the confirmation.

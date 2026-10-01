@@ -1,9 +1,4 @@
 {
-  "packages/app/e2e/editing.spec.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "packages/app/e2e/graph.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 3

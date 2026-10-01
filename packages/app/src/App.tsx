@@ -25,7 +25,7 @@ import { SpaceCanvas } from './components/SpaceCanvas';
 import { CanvasCentre } from './components/CanvasCentre';
 import { CanvasContinuation } from './components/CanvasContinuation';
 import { ChromeContinuation } from './components/ChromeContinuation';
-import { ArmedResourceDeletion } from './components/DeleteResourceConfirmation';
+import { ArmedDeleteConfirmation } from './components/DeleteConfirmation';
 import { CommandDock } from './components/CommandDock';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
@@ -47,7 +47,7 @@ export const createApp = (
     continuation,
     edgeAuthoring,
     commandOutcomes,
-    resourceDeletion,
+    deleteConfirmation,
     reportObserverError,
   } = composition;
   /**
@@ -249,7 +249,7 @@ export const createApp = (
             ? 'Persisted'
             : sessionState.persistence.kind}
         </span>
-        <ArmedResourceDeletion resourceDeletion={resourceDeletion} />
+        <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} />
         {/* One child, not a row: the Resources list portals over this rather than
             sitting beside it, so a toggle that says nothing about the Map no
             longer re-flows the canvas and re-measures every Resource on it. */}
@@ -289,6 +289,7 @@ export const createApp = (
               />
               <SpaceCanvas
                 commandOutcomes={commandOutcomes}
+                deleteConfirmation={deleteConfirmation}
                 // Keyed on the replacement epoch, so accepting the stored Space
                 // takes the canvas's local editing state with it. The render
                 // adapter already drops the projection and drag bookkeeping, but

@@ -1,4 +1,4 @@
-import type { MapId } from '@project/core';
+import { shortTitle, type Map as SpaceMap, type MapId } from '@project/core';
 import {
   completeWhile,
   type Capability,
@@ -16,6 +16,7 @@ import {
   type AuthoringContext,
   type EmbeddedAuthoring,
 } from './authoring-contexts';
+import type { DeleteQuestionWords } from './delete-confirmation';
 
 /**
  * Map Edits, as one interface for every context that authors a Map.
@@ -99,6 +100,18 @@ export const MAP_REPORT_TITLES: ReportTitles = {
   unchanged: 'Map unchanged',
   notDeleted: 'Map not deleted',
 };
+
+/**
+ * What Delete Map asks before it runs. A Map is deleted from its Space with
+ * everything it owns; the Resources it places are the Space's and stay, which
+ * the question says on a line of its own.
+ */
+export const mapDeletionWords = (deletedMap: Pick<SpaceMap, 'title'>): DeleteQuestionWords => ({
+  subject: { kind: 'map', name: shortTitle(deletedMap.title) },
+  from: 'Space',
+  description:
+    'Permanently deletes the Map, and all Graphs from the Space.\nResources are not deleted.',
+});
 
 /**
  * The Map a completed `created-map` made, read where the Edit left it.

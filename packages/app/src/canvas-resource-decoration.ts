@@ -15,6 +15,7 @@ import {
 import { buildSpaceResourceRail } from './build-space-resource-rail';
 import type { SpaceResourceRailContext } from './space-resource-context-commands';
 import type { CommandOutcomes } from './command-outcomes';
+import type { DeleteConfirmation } from './delete-confirmation';
 import type { OpenSpaces } from './open-spaces';
 import type { ResourceResize } from './render-adapter';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
@@ -73,6 +74,7 @@ export interface CanvasResourceDecorationContext {
   readonly spaceResourceTargets: SpaceResourceTargets;
   readonly spaces: OpenSpaces | null;
   readonly commandOutcomes: CommandOutcomes | undefined;
+  readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'> | undefined;
   readonly completeSpaceResourceSelection: (
     resourceId: ResourceId,
     targetMap: Pick<SpaceResourceTargetMap, 'id'>,
@@ -142,6 +144,7 @@ type SpaceResourceDecorationContext = Pick<
   | 'spaceResourceTargets'
   | 'spaces'
   | 'commandOutcomes'
+  | 'deleteConfirmation'
   | 'completeSpaceResourceSelection'
   | 'portalEditing'
   | 'onPortalEditingChange'
@@ -317,6 +320,7 @@ export function decorateSpaceResourceNode(
     if (
       context.spaces !== null &&
       context.commandOutcomes !== undefined &&
+      context.deleteConfirmation !== undefined &&
       spaceDocument !== undefined
     ) {
       const entry = context.spaces.entry(spaceDocument.spaceId);
@@ -326,6 +330,7 @@ export function decorateSpaceResourceNode(
           spaces: context.spaces,
           containingSpaceId: context.containingSpaceId,
           commandOutcomes: context.commandOutcomes,
+          deleteConfirmation: context.deleteConfirmation,
         };
       }
     }

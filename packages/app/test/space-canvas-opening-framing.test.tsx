@@ -64,6 +64,7 @@ function inertEdgeAuthoring(): EdgeAuthoring {
     beginTitleEdit: () => undefined,
     completeTitle: () => null,
     setTitleHidden: () => false,
+    askToDelete: () => undefined,
     deleteEdge: () => false,
     cancelDraft: () => undefined,
     dispose: () => undefined,
@@ -205,6 +206,7 @@ describe('opening framing on a mounted canvas', () => {
           <ReactFlowProvider>
             <SpaceCanvas
               commandOutcomes={app.commandOutcomes}
+              deleteConfirmation={app.deleteConfirmation}
               nodes={[resourceNode()]}
               edges={[]}
               projectedNodes={null}
@@ -342,6 +344,7 @@ describe('opening framing on a mounted canvas', () => {
         <ReactFlowProvider>
           <SpaceCanvas
             commandOutcomes={app.commandOutcomes}
+            deleteConfirmation={app.deleteConfirmation}
             nodes={[resourceNode()]}
             edges={[]}
             projectedNodes={null}

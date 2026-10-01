@@ -127,6 +127,20 @@ describe('arming and cancellation', () => {
     resourceDeletion.arm(lookupResource(opened, RESOURCE_B));
     expect(resourceDeletion.getState().focusFallback).toBeNull();
   });
+
+  it('asks with what the deletion reaches in the Space it is armed over', () => {
+    const opened = open();
+    const { resourceDeletion, deleteConfirmation } = opened;
+
+    resourceDeletion.arm(lookupResource(opened));
+
+    expect(
+      deleteConfirmation.getState().pending?.reach?.map(({ title, graphs }) => ({
+        title,
+        graphs: graphs.map((graph) => graph.title),
+      })),
+    ).toEqual([{ title: 'Map 1', graphs: ['Main'] }]);
+  });
 });
 
 describe('confirmation', () => {

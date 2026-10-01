@@ -1,32 +1,80 @@
-import type { Resource, UUID } from '@project/core';
+import { shortTitle, type Resource } from '@project/core';
 import {
-  createObservableState,
-  type ObserverErrorReporter,
-  type ObservableState,
-} from '@project/persistence';
+  deletionReach,
+  graphColorsByGraphId,
+  type DeletionReach,
+  type Space,
+} from '@project/graph';
+import { graphAppearance } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
+import type {
+  DeleteConfirmation,
+  DeleteQuestion,
+  DeleteQuestionWords,
+  FocusFallback,
+} from './delete-confirmation';
 import type { SpaceAuthoring } from './space-authoring';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 
 /**
- * Delete Resource: the whole confirmation interaction, in one module.
+ * Delete from Space: a Resource as the subject of the delete confirmation.
  *
- * The menu arms a question and the dialog answers it, but neither surface owns
- * the interaction's lifetime. This module does: arming, cancellation, busy
- * state and kind-specific execution stay together, and the Edit owners stay
- * where they are.
+ * The rail and the Resources list arm it with a Resource; this module supplies
+ * what the confirmation says about that Resource and the kind-specific deletion
+ * it runs, and the confirmation owns the rest of the interaction.
  *
  * **What a deletion leaves behind is not this module's.** It runs each deletion
  * through command outcomes' `resource-delete` channel, which owns the notice,
- * its words and its staleness; this module keeps only the interaction.
+ * its words and its staleness.
  */
 
+const DELETES_THE_RESOURCE =
+  'Permanently deletes the Resource from the Space and all Maps and Graphs.';
+
 /**
- * Where the caret goes when the confirmation closes and the control that armed
- * it is no longer in the document. Named by the arming surface; `null` from it,
- * or no fallback at all, leaves the choice to the dialog primitive.
+ * Exhaustive over the kinds rather than a default plus one exception, so a new
+ * kind has to decide what its deletion destroys before it compiles. A Space
+ * Resource owns its target's lifetime together with every other reference to
+ * it, so its deletion can reach Spaces that are not on screen (ADR 0074).
  */
-export type FocusFallback = () => HTMLElement | null;
+const DELETION_DESCRIPTIONS = {
+  markdown: DELETES_THE_RESOURCE,
+  reference: DELETES_THE_RESOURCE,
+  image: DELETES_THE_RESOURCE,
+  space: `${DELETES_THE_RESOURCE} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`,
+} satisfies Record<Resource['kind'], string>;
+
+/**
+ * What Delete from Space asks about a Resource. The short Title names it on one
+ * line and marks a Title written on several as shortened rather than presenting
+ * its first line as the whole of it.
+ *
+ * Under the description it names what the deletion reaches: each Map that
+ * places the Resource, with the Graphs it owns that hold an Edge connected to
+ * it beneath, each by its short name and each Graph in its colour and head
+ * shape. Every reached Graph sits under a listed Map, because an Edge connects
+ * two Resources its Graph's Map places (CONTEXT.md, Graph).
+ */
+export const resourceDeletionWords = (
+  resource: Resource,
+  reach: DeletionReach,
+  colorByGraphId: Readonly<Record<string, string>>,
+): DeleteQuestionWords => ({
+  subject: { kind: 'resource', name: shortTitle(resource.title) },
+  from: 'Space',
+  description: DELETION_DESCRIPTIONS[resource.kind],
+  reach: reach.maps.map((m) => ({
+    key: m.id,
+    title: shortTitle(m.title),
+    graphs: reach.graphs
+      .filter((reached) => reached.map.id === m.id)
+      .map(({ graph }) => ({
+        key: graph.id,
+        title: shortTitle(graph.title),
+        appearance: graphAppearance(graph, colorByGraphId),
+      })),
+  })),
+});
 
 export interface ResourceDeletionState {
   /** The Resource a confirmation is standing over, or `null` when none is. */
@@ -51,11 +99,13 @@ export interface ResourceDeletion {
 
 export interface ResourceDeletionDependencies {
   readonly authoring: SpaceAuthoring;
-  readonly currentSpace: () => { readonly id: UUID };
+  /** The Space the deletion runs in, read at arming for what it reaches. */
+  readonly currentSpace: () => Space;
+  /** The one confirmation every delete command asks through. */
+  readonly deleteConfirmation: DeleteConfirmation;
   /** Where each deletion runs, and where its outcome is told. */
   readonly commandOutcomes: CommandOutcomes;
   readonly spaceResources?: SpaceResourceAuthoring | undefined;
-  readonly reportObserverError?: ObserverErrorReporter | undefined;
 }
 
 const NONE: ResourceDeletionState = { pending: null, focusFallback: null, deleting: false };
@@ -63,36 +113,12 @@ const NONE: ResourceDeletionState = { pending: null, focusFallback: null, deleti
 export function createResourceDeletion({
   authoring,
   currentSpace,
+  deleteConfirmation,
   commandOutcomes,
   spaceResources,
-  reportObserverError = (error) => console.error('Resource deletion observer failed', error),
 }: ResourceDeletionDependencies): ResourceDeletion {
-  const observable: ObservableState<ResourceDeletionState> = createObservableState(
-    NONE,
-    reportObserverError,
-  );
-  let disposed = false;
-  /** Bumped when the interaction is discarded or superseded. */
-  let interactionEpoch = 0;
-
-  const publish = (state: ResourceDeletionState): void => {
-    if (!disposed) observable.publish(state);
-  };
-
-  const discard = (): void => {
-    interactionEpoch += 1;
-    const { pending, deleting } = observable.getState();
-    if (pending !== null || deleting) publish(NONE);
-  };
-
-  let replacementEpoch = authoring.getState().replacementEpoch;
-  const unsubscribeAuthoring = authoring.subscribe(() => {
-    const state = authoring.getState();
-    if (state.replacementEpoch !== replacementEpoch) {
-      replacementEpoch = state.replacementEpoch;
-      discard();
-    }
-  });
+  /** The Resource behind each question this module armed. */
+  const armed = new WeakMap<DeleteQuestion, Resource>();
 
   const execute = async (resource: Resource): Promise<void> => {
     if (resource.kind === 'space') {
@@ -112,37 +138,50 @@ export function createResourceDeletion({
     );
   };
 
+  // The confirmation's state, read as the Resource it stands over. Derived once
+  // per published state, so a reader comparing snapshots sees one value for it.
+  let seen: ReturnType<DeleteConfirmation['getState']> | null = null;
+  let view: ResourceDeletionState = NONE;
+  let disposed = false;
+  const getState = (): ResourceDeletionState => {
+    if (disposed) return view;
+    const state = deleteConfirmation.getState();
+    if (state === seen) return view;
+    seen = state;
+    const resource = state.pending === null ? undefined : armed.get(state.pending);
+    view =
+      state.pending === null || resource === undefined
+        ? NONE
+        : {
+            pending: resource,
+            focusFallback: state.pending.focusFallback,
+            deleting: state.deleting,
+          };
+    return view;
+  };
+
   return {
-    getState: observable.getState,
-    subscribe: observable.subscribe,
+    getState,
+    subscribe: deleteConfirmation.subscribe,
     arm: (resource, focusFallback) => {
-      interactionEpoch += 1;
-      publish({ pending: resource, focusFallback: focusFallback ?? null, deleting: false });
+      const space = currentSpace();
+      const question = {
+        ...resourceDeletionWords(
+          resource,
+          deletionReach(space.maps, resource.id),
+          graphColorsByGraphId(space),
+        ),
+        run: () => execute(resource),
+        focusFallback: focusFallback ?? null,
+      };
+      armed.set(question, resource);
+      deleteConfirmation.arm(question);
     },
-    cancel: () => {
-      if (observable.getState().deleting) return;
-      interactionEpoch += 1;
-      publish(NONE);
-    },
-    confirm: () => {
-      const armed = observable.getState();
-      const { pending, deleting } = armed;
-      if (pending === null || deleting) return;
-      const resource = pending;
-      const atConfirm = interactionEpoch;
-      publish({ ...armed, deleting: true });
-      // Command outcomes answers rather than rejects: a throw has already
-      // reached its reporter and its channel by the time this settles.
-      void execute(resource).then(() => {
-        if (disposed || atConfirm !== interactionEpoch) return;
-        publish(NONE);
-      });
-    },
+    cancel: deleteConfirmation.cancel,
+    confirm: deleteConfirmation.confirm,
     dispose: () => {
+      getState();
       disposed = true;
-      interactionEpoch += 1;
-      unsubscribeAuthoring();
-      observable.clearSubscribers();
     },
   };
 }

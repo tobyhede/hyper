@@ -83,6 +83,7 @@ import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resour
 import { useOpenSpaces } from '../open-spaces-context';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import type { CommandOutcomes } from '../command-outcomes';
+import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageSources } from '../image-creation';
 import type { ImageReplacementActivity } from '../image-replacement-activity';
 import type { ObserverErrorReporter } from '@project/persistence';
@@ -205,6 +206,8 @@ const fileDropAt = (
 interface SpaceCanvasOwnProps {
   /** Where a Space Resource rail's Map report is held. */
   readonly commandOutcomes: CommandOutcomes;
+  /** Where a Space Resource rail's Delete Map and Delete Graph ask first. */
+  readonly deleteConfirmation: DeleteConfirmation;
   nodes: ResourceFlowNode[];
   edges: Edge[];
   /** The next projection, merged in by a completed connection so its Edge draws. */
@@ -375,6 +378,7 @@ interface EmbeddedConnectionStart {
 
 export function SpaceCanvas({
   commandOutcomes,
+  deleteConfirmation,
   nodes,
   edges,
   projectedNodes,
@@ -550,6 +554,7 @@ export function SpaceCanvas({
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
     commandOutcomes,
+    deleteConfirmation,
     nodes,
     availability,
     nameOnCreation,
@@ -1469,6 +1474,7 @@ export function SpaceCanvas({
         request.entry === undefined ? null : (
           <EmbeddedMapAuthoring
             commandOutcomes={commandOutcomes}
+            deleteConfirmation={deleteConfirmation}
             key={`${request.parent.id}:${request.mapId}`}
             parent={request.parent}
             entry={request.entry}

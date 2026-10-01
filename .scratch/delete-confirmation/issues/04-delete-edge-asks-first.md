@@ -4,10 +4,10 @@
 
 **Blocked by:** 01 — One delete confirmation for every kind of subject
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The Edge toolbar's Delete asks before it runs, naming the Edge.
-- [ ] The Delete key on a selection of Edges asks once for the selection, naming one Edge or counting several.
-- [ ] Cancel and Escape leave every selected Edge in place and the selection intact.
-- [ ] The Delete key on a selected Resource still runs Remove from Map without a question — Remove from Map is not a deletion.
-- [ ] Existing Edge deletion journeys pass through the confirmation.
+- [x] The Edge toolbar's Delete asks before it runs, naming the Edge.
+- [x] The Delete key on a selection of Edges asks once for the selection, naming one Edge or counting several.
+- [x] Cancel and Escape leave every selected Edge in place and the selection intact.
+- [x] The Delete key on a selected Resource still runs Remove from Map without a question — Remove from Map is not a deletion.
+- [x] Existing Edge deletion journeys pass through the confirmation.

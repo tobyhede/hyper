@@ -10,6 +10,7 @@ import {
   newResourceDrop,
   type ConnectionGesture,
   type DropTarget,
+  type EdgeCaretTarget,
   type ElementDropTarget,
 } from '../src/edge-authoring';
 
@@ -98,13 +99,22 @@ function open(
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { navigation, authoring, adapter, continuation, edgeAuthoring } = composeApp({
-    spaceSession: session,
-    selection: mapId,
-    newId,
-  });
+  const { navigation, authoring, adapter, continuation, edgeAuthoring, deleteConfirmation } =
+    composeApp({
+      spaceSession: session,
+      selection: mapId,
+      newId,
+    });
   adapter.getState().syncProjection(PROJECTED, []);
-  return { session, navigation, authoring, adapter, continuation, edges: edgeAuthoring };
+  return {
+    session,
+    navigation,
+    authoring,
+    adapter,
+    continuation,
+    deleteConfirmation,
+    edges: edgeAuthoring,
+  };
 }
 
 const graphsOf = (snapshot: SpaceSnapshot) =>
@@ -249,6 +259,112 @@ describe('writing an Edge Title', () => {
       ...SUBJECT,
       refusal: { code: 'edge-title-required' },
     });
+  });
+});
+
+describe('asking before Edges are deleted', () => {
+  const ASIDE = { from: RESOURCE_B, to: RESOURCE_C } as const;
+  const ASIDE_SUBJECT = { graphId: GRAPH_ID, edge: ASIDE } as const;
+  /** The Main Graph holding two Edges, the second titled. */
+  const twoEdges: SpaceSnapshot = {
+    ...positionedSnapshot,
+    document: {
+      ...positionedSnapshot.document,
+      maps: (positionedSnapshot.document.maps ?? []).map((m) =>
+        m.id === MAP_ID
+          ? {
+              ...m,
+              graphs: m.graphs.map((graph) =>
+                graph.id === GRAPH_ID
+                  ? { ...graph, edges: [EDGE, { ...ASIDE, title: 'Leads to' }] }
+                  : graph,
+              ),
+            }
+          : m,
+      ),
+    },
+  };
+  /** Records where the confirmation would put the caret, resolving nothing. */
+  const recording = () => {
+    const asked: EdgeCaretTarget[] = [];
+    return {
+      asked,
+      elementOf: (target: EdgeCaretTarget) => {
+        asked.push(target);
+        return null;
+      },
+    };
+  };
+
+  it('asks about one Edge by its endpoints, deleting nothing and keeping the selection', () => {
+    const { edges, session, adapter, deleteConfirmation } = open(twoEdges);
+    adapter.getState().selectEdge(SUBJECT);
+    const before = session.getState().working;
+
+    edges.askToDelete([SUBJECT], recording().elementOf);
+
+    expect(deleteConfirmation.getState().pending).toMatchObject({
+      subject: { kind: 'edge', name: 'Edge A → B' },
+      from: null,
+      description: 'Permanently deletes the Edge from the Graph.',
+    });
+    expect(session.getState().working).toBe(before);
+    expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
+  });
+
+  it('names a titled Edge by its Title', () => {
+    const { edges, deleteConfirmation } = open(twoEdges);
+    edges.askToDelete([ASIDE_SUBJECT], recording().elementOf);
+    expect(deleteConfirmation.getState().pending?.subject).toEqual({
+      kind: 'edge',
+      name: 'Edge Leads to',
+    });
+  });
+
+  it('asks once for several Edges, counting them', () => {
+    const { edges, deleteConfirmation } = open(twoEdges);
+    edges.askToDelete([SUBJECT, ASIDE_SUBJECT], recording().elementOf);
+    expect(deleteConfirmation.getState().pending).toMatchObject({
+      subject: { kind: 'edge', name: '2 Edges' },
+      from: null,
+      description: 'Permanently deletes the Edges from the Graph.',
+    });
+  });
+
+  it('asks nothing for no Edges', () => {
+    const { edges, deleteConfirmation } = open(twoEdges);
+    edges.askToDelete([], recording().elementOf);
+    expect(deleteConfirmation.getState().pending).toBeNull();
+  });
+
+  it('deletes every Edge asked about on Delete, and leaves them all on Cancel', async () => {
+    const cancelled = open(twoEdges);
+    cancelled.edges.askToDelete([SUBJECT, ASIDE_SUBJECT], recording().elementOf);
+    cancelled.deleteConfirmation.cancel();
+    expect(graphsOf(cancelled.session.getState().working)[0]?.edges).toHaveLength(2);
+
+    const confirmed = open(twoEdges);
+    confirmed.edges.askToDelete([SUBJECT, ASIDE_SUBJECT], recording().elementOf);
+    confirmed.deleteConfirmation.confirm();
+    await Promise.resolve();
+    expect(graphsOf(confirmed.session.getState().working)[0]?.edges).toEqual([]);
+  });
+
+  it('returns the caret to the Edge while it stands, and to its source once deleted', async () => {
+    const { edges, deleteConfirmation } = open(twoEdges);
+    const caret = recording();
+    edges.askToDelete([SUBJECT], caret.elementOf);
+    const fallback = deleteConfirmation.getState().pending?.focusFallback;
+
+    fallback?.();
+    deleteConfirmation.confirm();
+    await Promise.resolve();
+    fallback?.();
+
+    expect(caret.asked).toEqual([
+      { kind: 'edge', ...SUBJECT },
+      { kind: 'resource', resourceId: RESOURCE_A },
+    ]);
   });
 });
 

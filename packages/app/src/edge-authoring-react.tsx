@@ -20,7 +20,7 @@ import {
   type OnConnectStart,
 } from '@xyflow/react';
 import type { Resource, ResourceId, Graph, GraphId } from '@project/core';
-import { titleName, uuidSchema } from '@project/core';
+import { shortTitle, uuidSchema } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   ConnectionEndEligibilityContext,
@@ -33,9 +33,11 @@ import {
   newResourceDrop,
   type ElementDropTarget,
   type EdgeAuthoring,
+  type EdgeCaretTarget,
 } from './edge-authoring';
 import {
   edgeSelectionOf,
+  sameEdgeSubject,
   sameSelection,
   type CanvasSelection,
   type EdgeSubject,
@@ -90,7 +92,7 @@ export interface EdgeAuthoringSurface {
    * a context exists.
    */
   readonly provide: (children: ReactNode) => ReactNode;
-  /** Remove the selected projected Edges through Edge Authoring. */
+  /** Ask to delete the selected projected Edges, through Edge Authoring. */
   readonly deleteEdges: (edges: readonly Edge[]) => void;
 }
 
@@ -175,7 +177,7 @@ export function useEdgeAuthoring({
   mayOfferAlso,
 }: EdgeAuthoringInput): EdgeAuthoringSurface {
   const state = useSyncExternalStore(authoring.subscribe, authoring.getState);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getEdges } = useReactFlow();
   const connecting = useRef(false);
   const [modifierHeld, setModifierHeld] = useState(false);
   // Where the pointer is, not the point it is at: React bails out of an
@@ -314,12 +316,41 @@ export function useEdgeAuthoring({
     if (over === 'empty-canvas') setModifierHeld(event.altKey);
   }, []);
 
-  const deleteEdges = useCallback((requested: readonly Edge[]) => {
-    for (const edge of requested) {
-      const subject = edgeSelectionOf(edge);
-      if (subject !== null) latest.current.authoring.deleteEdge(subject);
-    }
-  }, []);
+  /**
+   * Where a caret target is drawn, read when the delete confirmation closes:
+   * an Edge through the list React Flow drew, which carries its id, and a
+   * Resource by its node.
+   */
+  const elementOf = useCallback(
+    (target: EdgeCaretTarget): HTMLElement | SVGElement | null => {
+      if (target.kind === 'resource') {
+        return document.querySelector<HTMLElement>(
+          `.react-flow__node[data-id="${CSS.escape(target.resourceId)}"]`,
+        );
+      }
+      const drawn = getEdges().find((candidate) => {
+        const subject = edgeSelectionOf(candidate);
+        return subject !== null && sameEdgeSubject(subject, target);
+      });
+      return drawn === undefined
+        ? null
+        : document.querySelector<SVGElement>(
+            `.react-flow__edge[data-id="${CSS.escape(drawn.id)}"]`,
+          );
+    },
+    [getEdges],
+  );
+
+  const deleteEdges = useCallback(
+    (requested: readonly Edge[]) => {
+      const subjects = requested.flatMap((edge) => {
+        const subject = edgeSelectionOf(edge);
+        return subject === null ? [] : [{ graphId: subject.graphId, edge: subject.edge }];
+      });
+      latest.current.authoring.askToDelete(subjects, elementOf);
+    },
+    [elementOf],
+  );
 
   /**
    * Repair the focus React Flow's native Edge Escape leaves on `body`.
@@ -351,7 +382,7 @@ export function useEdgeAuthoring({
   // Names rather than Titles: these are read into an Edge's accessible name
   // below, and a name is one line (ADR 0083).
   const resourceTitles = useMemo(
-    () => new Map(placedResources.map((resource) => [resource.id, titleName(resource.title)])),
+    () => new Map(placedResources.map((resource) => [resource.id, shortTitle(resource.title)])),
     [placedResources],
   );
   const graphTitles = useMemo(
@@ -502,7 +533,7 @@ export function useEdgeAuthoring({
         authoring.setTitleHidden(subject, hidden);
       },
       deleteEdge: (subject) => {
-        authoring.deleteEdge(subject);
+        authoring.askToDelete([subject], elementOf);
       },
     }),
     [
@@ -516,6 +547,7 @@ export function useEdgeAuthoring({
       resourceName,
       authoring,
       completeTitle,
+      elementOf,
     ],
   );
 

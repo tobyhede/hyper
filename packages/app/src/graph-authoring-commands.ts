@@ -1,4 +1,11 @@
-import type { GraphHeadShape, GraphId, MapId } from '@project/core';
+import {
+  shortTitle,
+  type Graph,
+  type GraphHeadShape,
+  type GraphId,
+  type Map as SpaceMap,
+  type MapId,
+} from '@project/core';
 import {
   completeWhile,
   type Capability,
@@ -16,6 +23,7 @@ import {
   type AuthoringContext,
   type EmbeddedAuthoring,
 } from './authoring-contexts';
+import type { DeleteQuestionWords } from './delete-confirmation';
 
 /**
  * Graph Edits, as one interface for every context that authors a Graph.
@@ -114,6 +122,19 @@ export const GRAPH_REPORT_TITLES: ReportTitles = {
   unchanged: 'Graph unchanged',
   notDeleted: 'Graph not deleted',
 };
+
+/**
+ * What Delete Graph asks before it runs. A Graph's name is unique only within
+ * its Map, so the question names the Map it is deleted from.
+ */
+export const graphDeletionWords = (
+  graph: Pick<Graph, 'title'>,
+  owningMap: Pick<SpaceMap, 'title'>,
+): DeleteQuestionWords => ({
+  subject: { kind: 'graph', name: shortTitle(graph.title) },
+  from: shortTitle(owningMap.title),
+  description: 'Permanently deletes the Graph and all Edges from the Map.',
+});
 
 /**
  * Create an empty Graph in `mapId`, which the Map makes its Active Graph.

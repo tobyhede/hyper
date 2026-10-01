@@ -502,6 +502,10 @@ describe('the Map an Open Space Resource draws', () => {
       within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
     );
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete Collection 1' }));
+    const question = await screen.findByRole('alertdialog', {
+      name: 'Delete Collection 1 From Space?',
+    });
+    fireEvent.click(within(question).getByRole('button', { name: 'Delete' }));
 
     const dismiss = await screen.findByRole('button', { name: 'Dismiss: Map not deleted' });
     await waitFor(() =>

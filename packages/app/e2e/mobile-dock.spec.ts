@@ -1,6 +1,7 @@
 import { expect, test } from './fixtures';
 import type { Route } from '@playwright/test';
 import {
+  confirmDeletion,
   activateGraph,
   activeGraph,
   boxOf,
@@ -142,6 +143,7 @@ test('New Map selects an empty authored Map, and Delete returns to the one befor
 
   const menu = await mapMenu(page);
   await menu.getByRole('menuitem', { name: 'Delete Map 1' }).click();
+  await confirmDeletion(page, 'Delete Map 1 From Space?');
   await expect(selectedCanvas(page)).toContainText('Collection 1');
 });
 
@@ -165,6 +167,7 @@ test('New Graph activates an empty Graph, and Delete returns to the one before',
 
   const menu = await graphMenu(page);
   await menu.getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+  await confirmDeletion(page, 'Delete Graph 1 From Collection 1?');
   await expect(activeGraph(page)).toContainText('Long');
 });
 

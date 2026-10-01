@@ -7,9 +7,10 @@ import {
   RESOURCE_DRAG_TYPE,
   SPACE_DRAG_TYPE,
 } from '../src/components/ResourcesPopover';
-import { DeleteResourceConfirmation } from '../src/components/DeleteResourceConfirmation';
+import { DeleteConfirmation } from '../src/components/DeleteConfirmation';
 import type { SettlePlacement, SettleResource } from '../src/resources-drag';
-import type { FocusFallback } from '../src/resource-deletion';
+import type { FocusFallback } from '../src/delete-confirmation';
+import { resourceDeletionWords } from '../src/resource-deletion';
 
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
@@ -195,8 +196,8 @@ function DeletingFixture() {
         onDelete={(resource, focusFallback) => setPending({ resource, focusFallback })}
       />
       {pending === null ? null : (
-        <DeleteResourceConfirmation
-          resource={pending.resource}
+        <DeleteConfirmation
+          {...resourceDeletionWords(pending.resource, { maps: [], graphs: [] }, {})}
           deleting={false}
           focusFallback={pending.focusFallback}
           onConfirm={() => {

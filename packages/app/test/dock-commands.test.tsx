@@ -19,7 +19,7 @@ import { Default, Replacing, SaveFailedElsewhere } from '../stories/space/comman
 // The shared reading of "unavailable": ADR 0073 keeps a toolbar item focusable
 // while it is withdrawn, so `aria-disabled` is the attribute and `toBeDisabled`
 // would call every one of them available.
-import { unavailable } from './command-dock';
+import { confirmDeletion, unavailable } from './command-dock';
 
 /**
  * What the Command Dock owes an author, held over the application the catalogue mounts.
@@ -694,7 +694,9 @@ describe('the last Map and Graph', () => {
         const item = deleteItem(kind);
         if (unavailable(item)) break;
         const before = showing(kind);
+        const from = kind === 'Map' ? 'Space' : showing('Map');
         fireEvent.click(item);
+        confirmDeletion(`Delete ${before} From ${from}?`);
         await waitFor(() => expect(showing(kind)).not.toBe(before));
       }
       expect(unavailable(deleteItem(kind))).toBe(true);
@@ -708,7 +710,7 @@ describe('the last Map and Graph', () => {
     expect(graph).toBeInTheDocument();
     // The dismissed menu hands the caret back to the name it opened from.
     await waitFor(() => expect(graph).toHaveFocus());
-  });
+  }, 15_000);
 });
 
 /**

@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { useReactFlow, useStore } from '@xyflow/react';
 import type { ResourceId } from '@project/core';
+import { canvasElement } from '../canvas-element';
 import { staysOwed, type Continuation, type ContinuationTarget } from '../continuation';
 import { edgeSelectionOf, sameEdgeSubject, type EdgeSubject } from '../render-adapter';
 
@@ -85,7 +86,7 @@ export function CanvasContinuation({
    * render anyway and a stable identity would buy nothing.
    */
   const elementOf = (target: ContinuationTarget): HTMLElement | null => {
-    if (target.kind === 'canvas') return document.querySelector<HTMLElement>('.react-flow');
+    if (target.kind === 'canvas') return canvasElement();
     if (target.kind === 'resource') {
       return document.querySelector<HTMLElement>(
         `.react-flow__node[data-id="${CSS.escape(target.resourceId)}"]`,
@@ -160,7 +161,7 @@ export function CanvasContinuation({
     // Only when the completed projection has left focus nowhere. An author who
     // has already moved to another control keeps it.
     if (document.activeElement !== document.body) return;
-    (element ?? document.querySelector<HTMLElement>('.react-flow'))?.focus();
+    (element ?? canvasElement())?.focus();
   });
 
   return null;

@@ -419,7 +419,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Delete Graph removes the active Graph when the Map owns more than one, and is present but unavailable on the last Graph the Map keeps.',
+      'Delete Graph asks first, then removes the active Graph when the Map owns more than one, and is present but unavailable on the last Graph the Map keeps.',
   },
   {
     id: 'command-dock-copies-graph-destinations',
@@ -641,7 +641,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/edge-toolbar.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Selecting an Active Graph Edge reveals one toolbar named for the Edge — its Title, or From → To — holding Edit, the Title eye and Delete as one `Edge commands` group; Delete removes the Edge from its Graph.',
+      'Selecting an Active Graph Edge reveals one toolbar named for the Edge — its Title, or From → To — holding Edit, the Title eye and Delete as one `Edge commands` group; Delete asks first, then removes the Edge from its Graph.',
   },
   {
     id: 'edge-toolbar-reveals-on-hover',
@@ -714,6 +714,41 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'Canvas',
     claim:
       'The themed canvas control continuously zooms with its slider, zooms with its buttons and fits the real React Flow viewport.',
+  },
+  {
+    id: 'delete-confirmation-asks-before-deleting-a-map',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'Map',
+    claim:
+      'Delete Map asks `Delete {Map} From Space?`, saying the Map, its Graphs and their Edges are permanently deleted while its Resources stay, and Cancel closes the question with the caret back on the command that asked it.',
+  },
+  {
+    id: 'delete-confirmation-asks-before-deleting-a-graph',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'Graph',
+    claim:
+      'Delete Graph asks `Delete {Graph} From {Map}?`, saying the Graph and its Edges are permanently deleted, and Cancel closes the question with the caret back on the command that asked it.',
+  },
+  {
+    id: 'delete-confirmation-asks-before-deleting-an-edge',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'Edge',
+    claim:
+      'Delete Edge asks `Delete Edge {name}?`, naming an untitled Edge by its two ends, and Cancel closes the question with the caret back on the command that asked it.',
+  },
+  {
+    id: 'delete-confirmation-lists-what-a-resource-deletion-reaches',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'Resource',
+    claim:
+      'Delete from Space asks `Delete {Resource} From Space?` and names each Map that places the Resource with the Graphs it owns that hold an Edge connected to it beneath, and the question opens with the caret on Cancel.',
+  },
+  {
+    id: 'delete-confirmation-warns-a-space-resource-reaches-its-space',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'SpaceResource',
+    claim:
+      'Delete from Space on a Space Resource says that the last reference to a Space deletes that Space with it, along with every Space below it that nothing else references.',
   },
   {
     id: 'open-space-resource-draws-its-selected-map',

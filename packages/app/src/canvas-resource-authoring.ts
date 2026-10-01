@@ -28,6 +28,7 @@ import type { SpaceAuthoring } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 import type { CommandOutcomes } from './command-outcomes';
+import type { DeleteConfirmation } from './delete-confirmation';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
 import type { SpaceResourceFraming } from './space-resource-framing';
 import {
@@ -108,6 +109,8 @@ const completeEditedSpaceResource = (
 export interface CanvasResourceAuthoringInput {
   /** Where a Space Resource rail's Map report is held — the containing canvas's. */
   readonly commandOutcomes?: CommandOutcomes;
+  /** Where a Space Resource rail's Delete Map and Delete Graph ask first — the containing canvas's. */
+  readonly deleteConfirmation?: DeleteConfirmation;
   readonly nodes: readonly ResourceFlowNode[];
   /**
    * What may be authored right now, answered once for the whole application.
@@ -182,6 +185,7 @@ export interface CanvasResourceAuthoring {
  */
 export function useCanvasResourceAuthoring({
   commandOutcomes,
+  deleteConfirmation,
   nodes,
   availability,
   nameOnCreation,
@@ -576,6 +580,7 @@ export function useCanvasResourceAuthoring({
       spaceResourceTargets,
       spaces,
       commandOutcomes,
+      deleteConfirmation,
       completeSpaceResourceSelection,
       portalEditing,
       onPortalEditingChange,
@@ -591,6 +596,7 @@ export function useCanvasResourceAuthoring({
       spaceResourceTargets,
       spaces,
       commandOutcomes,
+      deleteConfirmation,
       completeSpaceResourceSelection,
       portalEditing,
       onPortalEditingChange,

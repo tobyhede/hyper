@@ -4,9 +4,9 @@
 
 **Blocked by:** 01 — One delete confirmation for every kind of subject
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Delete Graph asks before it runs, with the title and description above.
-- [ ] Delete runs the existing deletion and the Active Graph moves to the survivor as today; a refusal still reports.
-- [ ] Cancel and Escape leave the Graph and its Edges in place.
-- [ ] Existing Delete Graph journeys pass through the confirmation.
+- [x] Delete Graph asks before it runs, with the title and description above.
+- [x] Delete runs the existing deletion and the Active Graph moves to the survivor as today; a refusal still reports.
+- [x] Cancel and Escape leave the Graph and its Edges in place.
+- [x] Existing Delete Graph journeys pass through the confirmation.

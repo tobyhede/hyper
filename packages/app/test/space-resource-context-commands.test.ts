@@ -107,6 +107,7 @@ async function setup(available = true) {
       spaces,
       containingSpaceId: META,
       commandOutcomes: source.app.commandOutcomes,
+      deleteConfirmation: source.app.deleteConfirmation,
     },
     document,
     (m, graph) => {
@@ -119,7 +120,7 @@ async function setup(available = true) {
     },
     () => available,
   );
-  return { backend, spaces, commands, source, control };
+  return { backend, spaces, commands, source, control, entry };
 }
 
 /** A press the rail offers, which the test needs to be offered. */
@@ -197,10 +198,50 @@ describe('the rail’s Graph commands', () => {
   });
 });
 
+/**
+ * The rail's Delete Map and Delete Graph ask first, through the containing
+ * canvas's confirmation and in the Dock's words; Cancel runs nothing.
+ */
+describe('the rail’s deletions', () => {
+  it('asks before deleting the Map it shows, and Cancel leaves it', async () => {
+    const { commands, source, entry } = await setup();
+    offeredPress(commands.mapCommands.onDelete)(() => null);
+
+    expect(source.app.deleteConfirmation.getState().pending).toMatchObject({
+      subject: { kind: 'map', name: 'Second' },
+      from: 'Space',
+    });
+    source.app.deleteConfirmation.cancel();
+    expect(source.app.deleteConfirmation.getState().pending).toBeNull();
+    expect(entry.app.currentSpace().maps.map((m) => m.id)).toEqual([FIRST_MAP, SECOND_MAP]);
+  });
+
+  it('asks before deleting the Graph it shows, and Delete deletes it', async () => {
+    const { commands, source, entry } = await setup();
+    offeredPress(commands.graphCommands?.onDelete ?? null)(() => null);
+
+    expect(source.app.deleteConfirmation.getState().pending).toMatchObject({
+      subject: { kind: 'graph', name: 'Delete me' },
+      from: 'Second',
+    });
+    expect(entry.app.currentSpace().lookup.map(SECOND_MAP)?.map.graphs).toHaveLength(2);
+    source.app.deleteConfirmation.confirm();
+    await vi.waitFor(() => expect(source.app.deleteConfirmation.getState().pending).toBeNull());
+    expect(
+      entry.app
+        .currentSpace()
+        .lookup.map(SECOND_MAP)
+        ?.map.graphs.map((graph) => graph.id),
+    ).toEqual([SURVIVOR_GRAPH]);
+  });
+});
+
 describe('persisting a Space Resource context command', () => {
   it('persists Map deletion after moving the stored referring Resource', async () => {
-    const { backend, spaces, commands } = await setup();
-    await offeredPress(commands.mapCommands.onDelete)();
+    const { backend, spaces, commands, source } = await setup();
+    offeredPress(commands.mapCommands.onDelete)(() => null);
+    source.app.deleteConfirmation.confirm();
+    await vi.waitFor(() => expect(source.app.deleteConfirmation.getState().pending).toBeNull());
     await spaces.waitForPersistence(META);
     await spaces.waitForPersistence(TARGET);
     const loaded = await backend.loadSpace(TARGET);

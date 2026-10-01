@@ -832,6 +832,7 @@ export function createOpenSpaces({
     target.app.commandOutcomes.dispose();
     target.app.edgeAuthoring.dispose();
     target.app.resourceDeletion.dispose();
+    target.app.deleteConfirmation.dispose();
     target.app.continuation.dispose();
     target.app.authoring.dispose();
     retired.add(target);

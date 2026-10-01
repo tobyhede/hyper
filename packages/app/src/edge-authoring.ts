@@ -1,4 +1,10 @@
-import type { ResourceId, MapPosition, SpaceSnapshot, MapId } from '@project/core';
+import {
+  shortTitle,
+  type ResourceId,
+  type MapPosition,
+  type SpaceSnapshot,
+  type MapId,
+} from '@project/core';
 import {
   createNonThrowingReporter,
   createObservableState,
@@ -9,6 +15,7 @@ import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { RESOURCE_SIZE } from './resource';
 import type { ConnectionCompletion, ConnectionResult } from './connection-completion';
 import type { Continuation, ContinuationTarget } from './continuation';
+import type { DeleteConfirmation, DeleteQuestionWords } from './delete-confirmation';
 import type { CanvasSelection, EdgeSubject, RenderAdapter } from './render-adapter';
 import { sameEdgeSubject, sameSelection } from './render-adapter';
 import type {
@@ -304,6 +311,19 @@ export interface EdgeAuthoring {
   /** The refusal, which keeps the draft standing, or `null` once settled or with no draft. */
   readonly completeTitle: (title: string) => AuthoringRefusal | null;
   readonly setTitleHidden: (subject: EdgeSubject, hidden: boolean) => boolean;
+  /**
+   * Ask the delete confirmation to delete these Edges, one question for all of
+   * them; Delete deletes each through {@link EdgeAuthoring.deleteEdge}. Nothing
+   * changes until it is answered, the selection included.
+   *
+   * `elementOf` is the canvas's answer to where a target is drawn: the caret
+   * returns to the first Edge while it stands, and to its source Resource once
+   * it has gone, where the deletion's own focus continuation lands.
+   */
+  readonly askToDelete: (
+    subjects: readonly EdgeSubject[],
+    elementOf: (target: EdgeCaretTarget) => HTMLElement | SVGElement | null,
+  ) => void;
   readonly deleteEdge: (subject: EdgeSubject) => boolean;
   /** Cancel the topmost Edge surface, producing no Edit. */
   readonly cancelDraft: () => void;
@@ -316,10 +336,54 @@ export interface EdgeAuthoringDependencies {
   readonly connections: ConnectionCompletion;
   /** Where every focus move this lifecycle owes the author is published. */
   readonly continuation: Continuation;
+  /** The one question every delete command asks before it runs. */
+  readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'>;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
 }
 
 const IDLE: EdgeAuthoringState = { draft: null, refusal: null };
+
+/** Where the caret can return when an Edge deletion's question closes. */
+export type EdgeCaretTarget = Extract<ContinuationTarget, { readonly kind: 'edge' | 'resource' }>;
+
+/**
+ * An Edge as its toolbar names it — its Title, or its two ends' names — so the
+ * question names the Edge the toolbar's Delete does.
+ */
+const edgeName = (
+  snapshot: SpaceSnapshot,
+  mapId: MapId,
+  { graphId, edge }: EdgeSubject,
+): string => {
+  const title = (snapshot.document.maps ?? [])
+    .find((m) => m.id === mapId)
+    ?.graphs.find((graph) => graph.id === graphId)
+    ?.edges.find((held) => held.from === edge.from && held.to === edge.to)?.title;
+  if (title !== undefined) return title;
+  const resourceName = (resourceId: ResourceId): string => {
+    const resource = snapshot.resources.find(({ id }) => id === resourceId);
+    return resource === undefined ? resourceId : shortTitle(resource.document.title);
+  };
+  return `${resourceName(edge.from)} → ${resourceName(edge.to)}`;
+};
+
+/** What deleting Edges asks: the one Edge by name, or several by count. */
+export const edgeDeletionWords = (
+  snapshot: SpaceSnapshot,
+  mapId: MapId,
+  subjects: readonly [EdgeSubject, ...EdgeSubject[]],
+): DeleteQuestionWords =>
+  subjects.length === 1
+    ? {
+        subject: { kind: 'edge', name: `Edge ${edgeName(snapshot, mapId, subjects[0])}` },
+        from: null,
+        description: 'Permanently deletes the Edge from the Graph.',
+      }
+    : {
+        subject: { kind: 'edge', name: `${subjects.length} Edges` },
+        from: null,
+        description: 'Permanently deletes the Edges from the Graph.',
+      };
 
 /** The channel a finished pointer gesture leaves its refusal on. */
 const gestureRefusal = (refusal: AuthoringRefusal): EdgeRefusal => ({ kind: 'gesture', refusal });
@@ -354,6 +418,7 @@ export function createEdgeAuthoring({
   adapter,
   connections,
   continuation,
+  deleteConfirmation,
   reportObserverError = (error) => console.error('EdgeAuthoring observer failed', error),
 }: EdgeAuthoringDependencies): EdgeAuthoring {
   const observable: ObservableState<EdgeAuthoringState> = createObservableState(
@@ -560,6 +625,18 @@ export function createEdgeAuthoring({
     if (current.graphId !== active) adapter.getState().clearSelection();
   });
 
+  const deleteEdge = (subject: EdgeSubject): boolean => {
+    select(subject);
+    const { graphId, edge } = subject;
+    // A refused Delete leaves the Edge selected, so its toolbar owns the
+    // sentence rather than the canvas announcement.
+    const deleted = completeStructural({ kind: 'deleted-edge', graphId, edge }) === 'settled';
+    // The Edge that held focus is about to leave the projection, and React
+    // Flow moves focus only for elements it still draws.
+    if (deleted) requestFocus({ kind: 'resource', resourceId: edge.from });
+    return deleted;
+  };
+
   return {
     getState: observable.getState,
     subscribe: observable.subscribe,
@@ -650,17 +727,26 @@ export function createEdgeAuthoring({
       );
     },
 
-    deleteEdge: (subject) => {
-      select(subject);
-      const { graphId, edge } = subject;
-      // A refused Delete leaves the Edge selected, so its toolbar owns the
-      // sentence rather than the canvas announcement.
-      const deleted = completeStructural({ kind: 'deleted-edge', graphId, edge }) === 'settled';
-      // The Edge that held focus is about to leave the projection, and React
-      // Flow moves focus only for elements it still draws.
-      if (deleted) requestFocus({ kind: 'resource', resourceId: edge.from });
-      return deleted;
+    askToDelete: (subjects, elementOf) => {
+      const [first, ...rest] = subjects;
+      if (first === undefined) return;
+      const { session, navigation } = authoring.getState();
+      const mapId = navigation.selectedMapId;
+      deleteConfirmation.arm({
+        ...edgeDeletionWords(session.working, mapId, [first, ...rest]),
+        run: () => {
+          for (const subject of subjects) deleteEdge(subject);
+        },
+        focusFallback: () =>
+          elementOf(
+            holdsEdge(authoring.getState().session.working, mapId, first)
+              ? { kind: 'edge', ...first }
+              : { kind: 'resource', resourceId: first.edge.from },
+          ),
+      });
     },
+
+    deleteEdge,
 
     cancelDraft: () => {
       const { draft } = observable.getState();
