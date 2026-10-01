@@ -89,11 +89,8 @@ A repo-wide rename conflicts with everything, so it should run alone, and early.
 
 ## Verification bar
 
-Also stated in AGENTS.md; repeated here because it is the easiest step to skip.
+AGENTS.md "Before claiming done" is the bar: the full suite runs in CI on a draft PR opened as soon as the branch has a commit, and the laptop runs only targeted checks. Two rules sit beside it:
 
-- `pnpm verify` for every change.
-- `pnpm e2e` as well for any UI or graph change.
-- Report the real output. Never assert success without having run the command.
 - A behaviour-preserving refactor should leave e2e green **and unchanged**. That is the guard that proves it was behaviour-preserving.
 - Prove a bug fix against the defect, not only against a test written afterwards to pass. A test you wrote to match your fix will pass whether or not the fix addresses the real problem — reproduce the broken behaviour first, then show it gone.
 
