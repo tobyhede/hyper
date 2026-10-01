@@ -39,6 +39,7 @@ const ALL_AVAILABLE: AuthoringAvailability = {
   dragNodes: true,
   selectNodes: true,
   navigate: true,
+  replaceSession: true,
 };
 
 describe('authoring availability', () => {

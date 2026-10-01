@@ -85,6 +85,12 @@ export interface DockChrome {
    * this one answer, as ADR 0073 asks — announced, focusable and inert.
    */
   readonly navigate: boolean;
+  /**
+   * Whether the open session may be replaced by the stored Space —
+   * `AuthoringAvailability.replaceSession`, handed down unchanged. A conflict's
+   * Reload draws unavailable from it.
+   */
+  readonly replaceSession: boolean;
   readonly space: DockSpace;
   readonly canvas: DockCanvas;
   readonly graph: DockGraph;

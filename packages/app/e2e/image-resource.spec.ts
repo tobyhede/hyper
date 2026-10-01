@@ -1369,6 +1369,153 @@ test('a replacement in flight holds a Back and a Forward across a fragment link'
 });
 
 /**
+ * Stand a revision conflict up under a held replacement: another writer commits
+ * first, the browser's Open of the Image Resource on its target is parked until
+ * `file` has been chosen and its upload held, and the parked save then meets the
+ * newer stored revision.
+ */
+async function conflictDuringReplacement(
+  page: Page,
+  spaceId: UUID,
+  file: { readonly name: string; readonly mimeType: string; readonly buffer: Buffer },
+) {
+  const stored = await page.request.get(`/api/spaces/${spaceId}`);
+  expect(stored.ok()).toBe(true);
+  const loaded = decodeLoadedSpace(await stored.json());
+  const remoteCommit = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId,
+          snapshot: {
+            ...loaded.snapshot,
+            document: { ...loaded.snapshot.document, title: 'Renamed elsewhere' },
+          },
+          expectedRevision: loaded.revision.toString(),
+        },
+      ],
+    },
+  });
+  expect(remoteCommit.ok()).toBe(true);
+
+  let releaseSave: () => void = () => undefined;
+  const saveHeld = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  let parked = false;
+  await page.route('**/api/spaces', async (route) => {
+    if (!parked && route.request().method() === 'POST') {
+      parked = true;
+      await saveHeld;
+    }
+    await route.continue();
+  });
+  let releaseUpload: () => void = () => undefined;
+  const uploadHeld = new Promise<void>((resolve) => {
+    releaseUpload = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === '/images',
+    async (route) => {
+      await uploadHeld;
+      await route.continue();
+    },
+  );
+
+  const { target } = await beginReplacing(page);
+  const chooser = page.waitForEvent('filechooser');
+  await target.getByRole('button', { name: 'Upload' }).click();
+  await (await chooser).setFiles(file);
+  await expect(target).toHaveAttribute('aria-busy', 'true');
+  releaseSave();
+  const conflict = page.getByRole('alertdialog', { name: 'Changes conflict' });
+  await expect(conflict).toBeVisible();
+  return {
+    target,
+    // The modal dialog hides the canvas from the accessibility tree, so what
+    // stands behind it is read from the node itself.
+    behindDialog: page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`),
+    conflict,
+    revision: loaded.revision + 1n,
+    releaseUpload: () => releaseUpload(),
+  };
+}
+
+test('keeping local work during a held replacement re-commits it, and the replacement goes on', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  const spaceId = await openPictures(page);
+  const { target, conflict, revision, releaseUpload } = await conflictDuringReplacement(
+    page,
+    spaceId,
+    {
+      name: FIRST_PICTURE.name,
+      mimeType: 'image/png',
+      buffer: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+    },
+  );
+  const status = page.getByTestId('persistence-status');
+  const keepLocal = conflict.getByRole('button', { name: 'Keep local and retry' });
+  await expect(keepLocal).not.toHaveAttribute('aria-disabled', 'true');
+  await keepLocal.click();
+  await expect(conflict).toBeHidden();
+  await expect(status).toHaveText('Persisted');
+  await expect(status).toHaveAttribute('data-revision', (revision + 1n).toString());
+  // It re-committed the working Space and replaced nothing under the target.
+  await expect(target).toHaveAttribute('aria-busy', 'true');
+
+  releaseUpload();
+  await expect(target).toHaveCount(0);
+  await expect(status).toHaveAttribute('data-revision', (revision + 2n).toString());
+  const { figure } = await storedFigure(page, spaceId);
+  expect(figure?.kind === 'image' ? figure.url : undefined).not.toBe(FIGURE_URL);
+});
+
+test('Reload is withheld while a replacement is held and offered again once it answers', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  const spaceId = await openPictures(page);
+  const { behindDialog, conflict, revision, releaseUpload } = await conflictDuringReplacement(
+    page,
+    spaceId,
+    {
+      // Declared a PNG, so it is sent, and refused by the host from its bytes.
+      name: 'fake.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('not a picture'),
+    },
+  );
+  const reload = conflict.getByRole('button', { name: 'Reload' });
+  await expect(reload).toHaveAttribute('aria-disabled', 'true');
+  await expect(reload).not.toHaveAttribute('disabled');
+  await reload.focus();
+  await expect(reload).toBeFocused();
+  await reload.click({ force: true });
+  await reload.press('Enter');
+  await expect(conflict).toBeVisible();
+  await expect(behindDialog.locator('[aria-busy="true"]')).toHaveCount(1);
+
+  releaseUpload();
+  await expect(
+    behindDialog.getByText('fake.png is not a PNG, JPEG, WebP or GIF image.'),
+  ).toBeVisible();
+  await expect(behindDialog.locator('[aria-busy="true"]')).toHaveCount(0);
+  await expect(reload).not.toHaveAttribute('aria-disabled', 'true');
+  await reload.click();
+  await expect(conflict).toBeHidden();
+  await expect(page.getByTestId('space-title').filter({ visible: true })).toHaveText(
+    'Renamed elsewhere',
+  );
+  await expect(page.getByTestId('persistence-status')).toHaveAttribute(
+    'data-revision',
+    revision.toString(),
+  );
+});
+
+/**
  * The tracked fixture's Image Resource shows a stored image the host seeded from
  * a tracked file before serving (ADR 0106), so it draws with every request that
  * leaves the host refused.

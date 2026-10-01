@@ -634,11 +634,14 @@ function PersistenceReport({
   persistence,
   edge,
   navigate,
+  replaceSession,
 }: {
   readonly persistence: DockPersistence;
   readonly edge: DockEdge;
   /** Whether the way to a blocking Space may run — {@link DockChrome.navigate}. */
   readonly navigate: boolean;
+  /** Whether a conflict's Reload may run — {@link DockChrome.replaceSession}. */
+  readonly replaceSession: boolean;
 }) {
   const { state } = persistence;
   // An aggregate refusal draws the same dialog a permanent
@@ -653,13 +656,8 @@ function PersistenceReport({
     <>
       {decision ? (
         <PersistenceControl
-          // A conflict's Reload and Keep local are not navigation. They are
-          // withheld under this answer only because it is the one Availability
-          // gives that is false exactly while a replacement runs, and Reload
-          // replaces the session that replacement stands on. Ticket 03
-          // (`.scratch/image-replacement-dock/`) gives them their own answer.
-          disabled={!navigate}
           navigate={navigate}
+          replaceSession={replaceSession}
           active={persistence.active}
           persistence={state}
           onAcceptRemote={persistence.onAcceptRemote}
@@ -730,6 +728,7 @@ export function CommandDock({
               persistence={chrome.persistence}
               edge={dock.edge}
               navigate={chrome.navigate}
+              replaceSession={chrome.replaceSession}
             />
           }
         >

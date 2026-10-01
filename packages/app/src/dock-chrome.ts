@@ -265,6 +265,7 @@ export function useDockChrome(
     // replacement discards is a name control's own.
     replacementEpoch,
     navigate: availability.navigate,
+    replaceSession: availability.replaceSession,
     space: {
       title: space.title,
       currentSpaceId: space.id,

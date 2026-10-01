@@ -148,6 +148,15 @@ export interface AuthoringAvailability {
    * navigation`).
    */
   readonly navigate: boolean;
+  /**
+   * The open session may be replaced by the stored Space: a conflict's Reload.
+   *
+   * A running replacement stands on the session it began in, so replacing that
+   * session under it is withheld until it answers. A recovery that re-commits
+   * the working Space, such as Keep local and retry or Retry, replaces nothing
+   * and is not asked this.
+   */
+  readonly replaceSession: boolean;
 }
 
 export function authoringAvailability(inProgress: AuthoringInProgress): AuthoringAvailability {
@@ -170,6 +179,7 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     dragNodes: false,
     selectNodes: false,
     navigate: false,
+    replaceSession: false,
     editResourceBody: availability.editResourceBody,
   };
 }
@@ -413,10 +423,11 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const selectNodes = !presenting;
 
   /**
-   * Only a replacement withholds navigation, which `authoringAvailability`
-   * answers over this result.
+   * Only a replacement withholds navigating or replacing the session, which
+   * `authoringAvailability` answers over this result.
    */
   const navigate = true;
+  const replaceSession = true;
 
   return {
     resourcesView,
@@ -434,5 +445,6 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
     dragNodes,
     selectNodes,
     navigate,
+    replaceSession,
   };
 }
