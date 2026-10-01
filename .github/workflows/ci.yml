@@ -1,4 +1,4 @@
-# The bar `docs/agents/workflow.md` already sets, run by something other than a
+# The bar AGENTS.md "Before claiming done" sets, run by something other than a
 # human remembering. Until now every gate in this repo — typecheck, lint,
 # format, tests, e2e — was opt-in, which is why `playwright.config.ts` has
 # carried `forbidOnly` and `retries` for a CI that did not exist.

@@ -88,10 +88,10 @@ Hard rules — **all four are now enforced, not just documented**. Two layers, b
 
 **The full bar runs in CI, on a draft PR.** `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` overload the local machine, so the laptop runs targeted checks and CI runs the suite.
 
-1. **Check locally, aimed at the change**: `pnpm typecheck`, `pnpm exec eslint <files>`, `pnpm exec vitest run <files>`, and `pnpm exec playwright test <spec>` when iterating on one UI behaviour.
+1. **Check locally, aimed at the change**: `pnpm typecheck` and `pnpm typecheck:packages`, `pnpm exec eslint <files>`, `pnpm exec vitest run <files>`, and `pnpm exec playwright test <spec>` when iterating on one UI behaviour (`-c playwright.ladle.config.ts` for a story spec under `packages/app/ladle-e2e/`). `pnpm verify:local` is the whole-repo static bar plus coverage at two workers.
 2. **Open a draft PR at the first commit.** Branch off `main`, push, `gh pr create --draft`. CI runs on pull requests and pushes to `main` only, so a pushed branch with no PR is never checked. Asking for the work authorises pushing its branch and opening its draft PR; marking it ready, merging and pushing to `main` wait for the user.
-3. **Done is every check green.** Watch with `gh pr checks --watch`; read a failure with `gh run view <run-id> --log-failed`. `main` is gated, so the baseline is green and a red job is yours until `git stash` or `git log` on the file shows otherwise.
-4. **Report the evidence**: the local commands you ran, each CI job's result, and, for a change reaching no application or test code (`.github/**`, `.scratch/**`, `docs/**`, a README), that only `format:check` observed it.
+3. **Done is `CI passed` green** — the gate job over every required job. Watch with `gh pr checks --watch`; when the gate is red, find the red job in that list and read it with `gh run view <run-id> --log-failed`. `main` is gated, so the baseline is green and a red job is yours until `git stash` or `git log` on the file shows otherwise.
+4. **Report the evidence**: the local commands you ran and those you skipped, the `CI passed` result with each job behind it, and which CI job read what changed, or that none did. Claim success only for a result you watched arrive.
 
 ## Scope discipline
 

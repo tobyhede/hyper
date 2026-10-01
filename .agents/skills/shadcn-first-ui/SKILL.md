@@ -77,7 +77,8 @@ Use `$prototype` only while a visual or product question is unresolved. A chosen
 
 Test semantics through accessible roles and user behavior. Every meaningful stable-story claim requires both a Ladle behavior test and a corresponding application behavior test; this dual verification is mandatory even when the local behavior appears straightforward. Compilation, screenshots, class assertions and element counts do not establish parity.
 
-Run the relevant tests and `pnpm verify` before completion. Run the
-repository's catalogue browser gate for catalogue changes when it exists. Run
-`pnpm e2e` for UI, graph, canvas, or rendering changes. Record the actual
-command outcomes in the pull request description.
+Run the tests that cover the change locally, and the repository's catalogue
+browser gate for catalogue changes when it exists. Completion is the bar
+AGENTS.md "Before claiming done" sets, met in CI on the draft pull request.
+Record the actual command outcomes and CI results in the pull request
+description.
