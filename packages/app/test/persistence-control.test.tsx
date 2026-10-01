@@ -25,13 +25,13 @@ describe('PersistenceControl', () => {
       onAcceptRemote,
       onKeepLocal,
     };
-    const { rerender } = render(<PersistenceControl {...props} disabled />);
+    const { rerender } = render(<PersistenceControl navigate {...props} disabled />);
     const reload = screen.getByRole('button', { name: 'Reload' });
     expect(reload).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Keep local and retry' })).toBeDisabled();
     fireEvent.click(reload);
     expect(onAcceptRemote).not.toHaveBeenCalled();
-    rerender(<PersistenceControl {...props} disabled={false} />);
+    rerender(<PersistenceControl navigate {...props} disabled={false} />);
     fireEvent.click(reload);
     expect(onAcceptRemote).toHaveBeenCalledOnce();
   });
@@ -41,6 +41,7 @@ describe('PersistenceControl', () => {
   it('keeps rejection acknowledgement available during replacement', () => {
     render(
       <PersistenceControl
+        navigate
         disabled
         persistence={{
           kind: 'rejected',
@@ -85,6 +86,7 @@ describe('PersistenceControl', () => {
   it('explains an aggregate refusal instead of naming its error kinds', () => {
     render(
       <PersistenceControl
+        navigate
         persistence={{
           kind: 'refused',
           failure: {
@@ -118,6 +120,7 @@ describe('PersistenceControl', () => {
   it('repeats a shared explanation once however many errors carry it', () => {
     render(
       <PersistenceControl
+        navigate
         persistence={{
           kind: 'refused',
           failure: {
@@ -140,6 +143,7 @@ describe('PersistenceControl', () => {
     const onAcceptRemote = vi.fn(() => null);
     render(
       <PersistenceControl
+        navigate
         persistence={{ kind: 'conflicted', current: undefined, baseline: undefined }}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={vi.fn()}
@@ -158,6 +162,7 @@ describe('PersistenceControl', () => {
     const onAcceptRemote = vi.fn(() => null);
     render(
       <PersistenceControl
+        navigate
         persistence={{
           kind: 'conflicted',
           current: undefined,
@@ -190,6 +195,7 @@ describe('PersistenceControl', () => {
   it('explains a permanent rejection from its code', () => {
     render(
       <PersistenceControl
+        navigate
         persistence={{
           kind: 'rejected',
           failure: { kind: 'permanent-failure', code: 'forbidden' },
@@ -228,6 +234,7 @@ describe('PersistenceControl', () => {
   ] as const)('explains the %s recovery a conflict offers', (_recovery, conflict, sentence) => {
     render(
       <PersistenceControl
+        navigate
         persistence={{ kind: 'conflicted', ...conflict }}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -262,6 +269,7 @@ describe('PersistenceControl', () => {
       }) as const;
     const view = render(
       <PersistenceControl
+        navigate
         persistence={rejection()}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -273,6 +281,7 @@ describe('PersistenceControl', () => {
 
     view.rerender(
       <PersistenceControl
+        navigate
         persistence={rejection()}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -305,6 +314,7 @@ describe('PersistenceControl', () => {
     } as const;
     const view = render(
       <PersistenceControl
+        navigate
         persistence={rejection}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -316,6 +326,7 @@ describe('PersistenceControl', () => {
 
     view.rerender(
       <PersistenceControl
+        navigate
         persistence={refusal}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -343,6 +354,7 @@ describe('PersistenceControl', () => {
     } as const;
     const control = (active: boolean) => (
       <PersistenceControl
+        navigate
         active={active}
         persistence={persistence}
         onAcceptRemote={vi.fn(() => null)}
@@ -374,6 +386,7 @@ describe('PersistenceControl', () => {
       ({ kind: 'conflicted', current: undefined, baseline: SNAPSHOT }) as const;
     const view = render(
       <PersistenceControl
+        navigate
         persistence={conflict()}
         onAcceptRemote={vi.fn(() => ({ code: 'stored-space-deleted' }) as const)}
         onKeepLocal={vi.fn()}
@@ -385,6 +398,7 @@ describe('PersistenceControl', () => {
 
     view.rerender(
       <PersistenceControl
+        navigate
         persistence={conflict()}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -404,6 +418,7 @@ describe('PersistenceNotice', () => {
   it('explains a retryable failure from its code', () => {
     render(
       <PersistenceNotice
+        navigate
         persistence={{
           kind: 'failed',
           failure: { kind: 'retryable-failure', code: 'network' },
@@ -426,6 +441,7 @@ describe('PersistenceNotice', () => {
     const onOpenSpace = vi.fn();
     render(
       <PersistenceNotice
+        navigate
         persistence={{
           kind: 'rejected',
           failure: { kind: 'permanent-failure', code: 'forbidden' },
@@ -478,6 +494,7 @@ describe('PersistenceNotice', () => {
   it('says a failed replay read did not send the changes, with Retry and nothing to open', () => {
     render(
       <PersistenceNotice
+        navigate
         persistence={{
           kind: 'failed',
           failure: { kind: 'retryable-failure', code: 'network' },
@@ -504,11 +521,17 @@ describe('PersistenceNotice', () => {
     render(
       <>
         <PersistenceControl
+          navigate
           persistence={oversized}
           onAcceptRemote={vi.fn(() => null)}
           onKeepLocal={vi.fn()}
         />
-        <PersistenceNotice persistence={oversized} onRetry={onRetry} onOpenSpace={vi.fn()} />
+        <PersistenceNotice
+          navigate
+          persistence={oversized}
+          onRetry={onRetry}
+          onOpenSpace={vi.fn()}
+        />
       </>,
     );
 
@@ -526,6 +549,7 @@ describe('PersistenceNotice', () => {
   it('draws nothing for a rejection no recovery attempt has blocked', () => {
     render(
       <PersistenceNotice
+        navigate
         persistence={{
           kind: 'rejected',
           failure: { kind: 'permanent-failure', code: 'forbidden' },
@@ -540,6 +564,7 @@ describe('PersistenceNotice', () => {
   it('leaves a blocked rejection to the notice rather than a dialog', () => {
     render(
       <PersistenceControl
+        navigate
         persistence={{
           kind: 'rejected',
           failure: { kind: 'permanent-failure', code: 'forbidden' },
@@ -556,6 +581,7 @@ describe('PersistenceNotice', () => {
   it('explains inside the conflict why keeping local work did not save', () => {
     render(
       <PersistenceControl
+        navigate
         persistence={{
           kind: 'conflicted',
           current: STORED,
@@ -577,6 +603,7 @@ describe('PersistenceNotice', () => {
     const onOpenSpace = vi.fn();
     render(
       <PersistenceControl
+        navigate
         persistence={{
           kind: 'conflicted',
           current: STORED,

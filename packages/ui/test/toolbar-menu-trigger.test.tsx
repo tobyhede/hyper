@@ -78,6 +78,28 @@ function Bar({ unavailable, onChoose }: { unavailable: Unavailable; onChoose?: (
 const map = () => screen.getByRole('button', { name: 'Map: Map A' });
 const spaces = () => screen.getByRole('button', { name: 'Open Spaces' });
 
+/**
+ * Press a control by pointer, Enter and Space inside one act, which flushes
+ * the open state and mounts any menu before it returns, so no wait follows.
+ * `a menu button that is available` holds that a trigger pressed this way is
+ * found open straight after.
+ */
+async function pressEveryWay(control: HTMLElement): Promise<void> {
+  await act(() => {
+    control.focus();
+    fireEvent.pointerDown(control, { button: 0, pointerType: 'mouse' });
+    fireEvent.mouseDown(control, { button: 0 });
+    fireEvent.pointerUp(control, { button: 0, pointerType: 'mouse' });
+    fireEvent.mouseUp(control, { button: 0 });
+    fireEvent.click(control);
+    fireEvent.keyDown(control, { key: 'Enter' });
+    fireEvent.keyUp(control, { key: 'Enter' });
+    fireEvent.keyDown(control, { key: ' ' });
+    fireEvent.keyUp(control, { key: ' ' });
+    return Promise.resolve();
+  });
+}
+
 describe.each([
   { unavailable: 'choice', subjects: [map] },
   { unavailable: 'dropdown', subjects: [spaces] },
@@ -117,21 +139,7 @@ describe.each([
 
     for (const subject of subjects) {
       const control = subject();
-      // A menu that opened would mount on the next frame, so the presses run
-      // inside one act that waits a beat before asserting nothing did.
-      await act(async () => {
-        control.focus();
-        fireEvent.pointerDown(control, { button: 0, pointerType: 'mouse' });
-        fireEvent.mouseDown(control, { button: 0 });
-        fireEvent.pointerUp(control, { button: 0, pointerType: 'mouse' });
-        fireEvent.mouseUp(control, { button: 0 });
-        fireEvent.click(control);
-        fireEvent.keyDown(control, { key: 'Enter' });
-        fireEvent.keyUp(control, { key: 'Enter' });
-        fireEvent.keyDown(control, { key: ' ' });
-        fireEvent.keyUp(control, { key: ' ' });
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      });
+      await pressEveryWay(control);
       expect(screen.queryByRole('menu')).not.toBeInTheDocument();
       expect(control).toHaveAttribute('aria-expanded', 'false');
     }
@@ -146,5 +154,17 @@ describe('a menu button that is available', () => {
     expect(map()).not.toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(map());
     await waitFor(() => expect(screen.getByRole('menu')).toBeInTheDocument());
+  });
+
+  it.each([
+    { name: 'Map: Map A', control: map },
+    { name: 'Open Spaces', control: spaces },
+  ])('is found open straight after $name is pressed every way', async ({ control }) => {
+    render(<Bar unavailable="none" />);
+
+    await pressEveryWay(control());
+
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(control()).toHaveAttribute('aria-expanded', 'true');
   });
 });

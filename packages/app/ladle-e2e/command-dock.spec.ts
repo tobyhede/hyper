@@ -1187,12 +1187,6 @@ test(
 );
 
 /**
- * The Dock docks to its **container's** edges, and the container is the
- * viewport-sized canvas — so every story is framed, and Ladle's own toolbar
- * would otherwise land on top of the surface under test. Proven by driving real
- * catalogue navigation while the story owns its own viewport.
- */
-/**
  * The Dock's navigation drawn unavailable (ADR 0073).
  *
  * A replacement is held for as long as the story is mounted, so the opener's
@@ -1230,6 +1224,12 @@ test(
   },
 );
 
+/**
+ * The Dock docks to its **container's** edges, and the container is the
+ * viewport-sized canvas — so every story is framed, and Ladle's own toolbar
+ * would otherwise land on top of the surface under test. Proven by driving real
+ * catalogue navigation while the story owns its own viewport.
+ */
 test('Command Dock stories are isolated from the Ladle catalogue', async ({ page }) => {
   await page.goto('/?story=space--command-dock--save-conflict');
 

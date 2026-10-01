@@ -136,10 +136,16 @@ export interface AuthoringAvailability {
    * Spaces, the opener's crumb, Exit, and going to a Space that blocks a save.
    *
    * The Dock draws each of them unavailable from this answer and nothing else.
-   * The domain refuses the same moves on its own (`open-spaces.ts`'s
-   * `assertNavigationAvailable`, and `browser-location.ts` ignoring a Map or
-   * Graph move and holding Back and Forward), so the drawn state is what an
-   * author sees and never the enforcement.
+   * The domain refuses the same moves on its own, so the drawn state is what an
+   * author sees and never the enforcement. `open-spaces.ts`'s
+   * `assertNavigationAvailable` refuses selecting, opening, entering and exiting
+   * a Space and opening an address (`packages/app/test/open-spaces.test.tsx`,
+   * `holds Space navigation and an Exit already waiting on persistence during
+   * replacement` and `refuses opening an address and entering a Space during
+   * replacement`); `browser-location.ts` ignores a Map or Graph move and holds a
+   * browser traversal (`packages/app/test/browser-location.test.ts`, `holds
+   * Maps, Graphs and browser traversal during replacement, then permits
+   * navigation`).
    */
   readonly navigate: boolean;
 }
@@ -406,7 +412,10 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const dragNodes = editable && !presenting;
   const selectNodes = !presenting;
 
-  /** Only a replacement withholds navigation, which is the branch above. */
+  /**
+   * Only a replacement withholds navigation, which `authoringAvailability`
+   * answers over this result.
+   */
   const navigate = true;
 
   return {

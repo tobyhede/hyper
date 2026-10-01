@@ -34,13 +34,13 @@ import type { StoredSpaceRefusal } from '../space-authoring';
 
 export interface PersistenceControlProps {
   /**
-   * Draw a conflict's Reload and Keep local and retry unavailable, while an
-   * image replacement holds the application. Acknowledging a rejection stays
-   * available: it only dismisses the dialog.
+   * Draw a conflict's Reload and Keep local and retry unavailable.
+   * Acknowledging a rejection stays available: it only dismisses the dialog,
+   * and the way to a blocking Space follows `navigate` instead.
    */
   readonly disabled?: boolean;
   /** Whether going to the blocking Space may run (`AuthoringAvailability.navigate`). */
-  readonly navigate?: boolean;
+  readonly navigate: boolean;
   readonly active?: boolean;
   readonly persistence: SpaceSessionState['persistence'];
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
@@ -86,7 +86,7 @@ const rejectionDescription = ({ failure }: Rejection): string =>
  */
 export function PersistenceControl({
   disabled = false,
-  navigate = true,
+  navigate,
   active = true,
   persistence,
   onAcceptRemote,
@@ -152,7 +152,7 @@ export interface PersistenceNoticeProps {
    * Retry is not a navigation: it commits the working Space again and replaces
    * nothing, so it stays available whatever this answers.
    */
-  readonly navigate?: boolean;
+  readonly navigate: boolean;
 }
 
 /**
@@ -177,7 +177,7 @@ export function PersistenceNotice({
   persistence,
   onRetry,
   onOpenSpace = null,
-  navigate = true,
+  navigate,
 }: PersistenceNoticeProps) {
   if (!canRetry(persistence)) return null;
 

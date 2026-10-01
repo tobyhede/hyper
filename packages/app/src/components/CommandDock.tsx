@@ -653,8 +653,11 @@ function PersistenceReport({
     <>
       {decision ? (
         <PersistenceControl
-          // A conflict's Reload and Keep local are withheld under the same
-          // answer: Reload replaces the session a running replacement stands on.
+          // A conflict's Reload and Keep local are not navigation. They are
+          // withheld under this answer only because it is the one Availability
+          // gives that is false exactly while a replacement runs, and Reload
+          // replaces the session that replacement stands on. Ticket 03
+          // (`.scratch/image-replacement-dock/`) gives them their own answer.
           disabled={!navigate}
           navigate={navigate}
           active={persistence.active}
@@ -708,7 +711,6 @@ export function CommandDock({
     (chrome.resources.list.disclose ?? null) === null ? null : RESOURCES_DISCLOSURE_ID,
   );
   const renaming = useDockRenaming(chrome);
-  const navigationWithheld = !chrome.navigate;
   const vertical = orientationOf(dock.edge) === 'vertical';
   // A rule divides across the dock's own axis, so it runs the other way.
   const divider = vertical ? 'horizontal' : 'vertical';
@@ -750,17 +752,17 @@ export function CommandDock({
             space={chrome.space}
             side={side}
             vertical={vertical}
-            menuDisabled={navigationWithheld}
+            navigate={chrome.navigate}
           />
           <Divider orientation={divider} />
-          <MapControls canvas={chrome.canvas} side={side} menuDisabled={navigationWithheld} />
+          <MapControls canvas={chrome.canvas} side={side} navigate={chrome.navigate} />
           <Divider orientation={divider} />
           <GraphControls
             graph={chrome.graph}
             mapTitle={chrome.canvas.selected.title}
             side={side}
             vertical={vertical}
-            menuDisabled={navigationWithheld}
+            navigate={chrome.navigate}
           />
           <Divider orientation={divider} />
           <ResourcesControl resources={chrome.resources} side={side} />
