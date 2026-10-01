@@ -831,7 +831,6 @@ export function createOpenSpaces({
     // request a continuation from the disposed one below.
     target.app.commandOutcomes.dispose();
     target.app.edgeAuthoring.dispose();
-    target.app.resourceDeletion.dispose();
     target.app.deleteConfirmation.dispose();
     target.app.continuation.dispose();
     target.app.authoring.dispose();

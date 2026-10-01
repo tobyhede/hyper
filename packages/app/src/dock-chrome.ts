@@ -407,7 +407,7 @@ export function useDockChrome(
         onAdd: (resource) => placement.addExistingResource(resource.id, centreAnchor(), false),
         // The confirmation the Resource's own Actions menu arms: a Resource no
         // Map places has no toolbar, and this list is where it is still named.
-        onDelete: availability.deleteResource ? app.resourceDeletion.arm : undefined,
+        onDelete: availability.deleteResource ? app.resourceDeletion.askToDelete : undefined,
         onDragStart: placement.startResourceDrag,
         onSpaceDragStart: placement.startSpaceDrag,
         onDragEnd: placement.endDrag,
