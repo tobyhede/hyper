@@ -272,11 +272,12 @@ function ExitReport({ space }: { readonly space: DockSpace }) {
 function OpenerAndOpenSpaces({
   space,
   side = 'bottom',
-  menuDisabled = false,
+  navigate,
 }: {
   readonly space: DockSpace;
   readonly side?: MenuSide;
-  readonly menuDisabled?: boolean;
+  /** Whether a navigation command may run (`DockChrome.navigate`). */
+  readonly navigate: boolean;
 }) {
   const { id: triggerId, open, onOpenChange } = useDockDisclosure();
   const opener = space.opener;
@@ -343,6 +344,7 @@ function OpenerAndOpenSpaces({
                   className="command-dock__crumb nokey"
                   aria-label={`Go to ${opener.title}`}
                   title={`Go to ${opener.title}`}
+                  disabled={!navigate}
                   onClick={() => space.onSelect(opener.spaceId, opener.title)}
                 />
               }
@@ -376,7 +378,7 @@ function OpenerAndOpenSpaces({
               // accessible name are one token, so the pair cannot drift.
               aria-label={openSpacesName(openCount(space.listing), unwell)}
               title="Switch Space"
-              disabled={menuDisabled}
+              disabled={!navigate}
               // A `ToolbarButton` like every other control in the bar. It sits
               // in a breadcrumb rather than in a cluster, but the Dock's one
               // `Toolbar.Root` encloses it, so it takes no tab stop of its own.
@@ -533,18 +535,18 @@ export function SpacesControl({
   space,
   side = 'bottom',
   vertical = false,
-  menuDisabled = false,
+  navigate,
 }: {
   readonly space: DockSpace;
   readonly side?: MenuSide;
   readonly vertical?: boolean;
   /**
-   * Draw the Space name and Open Spaces unavailable: each reports `aria-disabled`,
-   * keeps its place in the Dock's arrow order and opens nothing (ADR 0073).
-   * `ToolbarButton` supplies that for a menu trigger given `disabled`, which
-   * `toolbar-menu-trigger.test.tsx` in `@project/ui` holds.
+   * Whether a navigation command may run (`DockChrome.navigate`). While it may
+   * not, the opener's crumb, Open Spaces and the Space name are each a
+   * `ToolbarButton` given `disabled`, so each is drawn unavailable as
+   * {@link IdentitySurface}'s `menuDisabled` describes.
    */
-  readonly menuDisabled?: boolean;
+  readonly navigate: boolean;
 }) {
   return (
     /* Two parts rather than one group, because they have two jobs: the way
@@ -553,7 +555,7 @@ export function SpacesControl({
        it costs no tab stop — the toolbar root is the Dock's, so both parts'
        controls are items in the one roving order. */
     <div className="command-dock__space">
-      <OpenerAndOpenSpaces space={space} side={side} menuDisabled={menuDisabled} />
+      <OpenerAndOpenSpaces space={space} side={side} navigate={navigate} />
       {/* Always, because the region above always draws the Open Spaces menu. */}
       <Divider orientation={vertical ? 'horizontal' : 'vertical'} />
       <ToolbarGroup aria-label="Space" className="command-dock__cluster">
@@ -564,7 +566,7 @@ export function SpacesControl({
           title={space.title}
           triggerTitle="Space commands"
           onRename={space.onRename}
-          menuDisabled={menuDisabled}
+          menuDisabled={!navigate}
         >
           {(disclosure) => <SpaceMenu space={space} side={side} disclosure={disclosure} />}
         </IdentitySurface>

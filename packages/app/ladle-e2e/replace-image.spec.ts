@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { nodeByTitle, resourceControls, selectedCanvas } from '../e2e/graph';
+import {
+  dockNavigation,
+  expectAvailable,
+  expectWithheld,
+  nodeByTitle,
+  resourceControls,
+  selectedCanvas,
+} from '../e2e/graph';
 
 /**
  * Replacing an image over the production application: the story's Space holds
@@ -82,7 +89,7 @@ test(
     await next.target.getByRole('button', { name: 'Upload' }).click();
     await (await chooser).setFiles({ name: 'harbour.png', mimeType: 'image/png', buffer: HARBOUR });
     await expect(next.target).toHaveAttribute('aria-busy', 'true');
-    await expect(selectedCanvas(page)).toBeDisabled();
+    await expectWithheld(dockNavigation(page));
     await expect(next.target.getByRole('button', { name: 'Upload' })).toBeDisabled();
     // Close stays in its slot, unavailable, for the whole replacement: drawn,
     // announced unavailable, reachable from the rail, and pressing it does nothing.
@@ -94,10 +101,14 @@ test(
     await busyClose.dispatchEvent('click');
     await expect(next.resource).toHaveAttribute('data-open', 'true');
     await expect(next.target).toHaveAttribute('aria-busy', 'true');
+    // Unavailable is not unreachable: the withheld Map name still takes focus.
+    await selectedCanvas(page).focus();
+    await expect(selectedCanvas(page)).toBeFocused();
+    await next.target.getByRole('button', { name: 'Upload' }).focus();
     await page.clock.runFor(1000);
 
     await expect(next.target).toHaveCount(0);
-    await expect(selectedCanvas(page)).toBeEnabled();
+    await expectAvailable(dockNavigation(page));
     const picture = next.resource.getByRole('img', { name: 'Figure' });
     await expect(picture).toHaveAttribute('src', STORED_URL);
     await expect

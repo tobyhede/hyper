@@ -461,16 +461,6 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
 });
 
 /**
- * **A standing failure announces itself rather than waiting to be opened.**
- *
- * ADR 0082 binds the Dock to name which open Space is unwell, and adds the
- * clause that decides where: "a report you have to go and find is not a
- * report". The row inside the Open Spaces menu says *which* — that stays, and
- * it is the whole of the detail — but a mark only reachable by disclosing the
- * menu tells a reader who has no reason to open it nothing at all, so the
- * trigger carries the mark.
- */
-/**
  * The Dock's menu buttons can be drawn unavailable (ADR 0073), and a held
  * replacement is what draws them so: the Space, Map and Graph names and Open
  * Spaces each report `aria-disabled` and open nothing when pressed.
@@ -482,6 +472,18 @@ describe('a held replacement draws the Dock menu buttons unavailable', () => {
     within(dock()).getByRole('button', { name: /^Map: / }),
     within(dock()).getByRole('button', { name: /^Active Graph: / }),
   ];
+
+  /**
+   * Click a control inside one act, which flushes the open state before it
+   * returns, so the assertions after it need no wait. `finds each one open
+   * straight after the same press when nothing is held` holds that.
+   */
+  const press = async (control: HTMLElement): Promise<void> => {
+    await act(() => {
+      fireEvent.click(control);
+      return Promise.resolve();
+    });
+  };
 
   it('reports each one unavailable through aria-disabled', async () => {
     await renderDock(<Replacing />);
@@ -496,13 +498,20 @@ describe('a held replacement draws the Dock menu buttons unavailable', () => {
     await waitFor(() => expect(unavailable(menuButtons()[0] ?? dock())).toBe(true));
 
     for (const control of menuButtons()) {
-      await act(async () => {
-        fireEvent.pointerDown(control, { button: 0, isPrimary: true, pointerType: 'mouse' });
-        fireEvent.mouseDown(control, { button: 0 });
-        fireEvent.click(control);
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      });
+      await press(control);
       expect(screen.queryByRole('menu')).toBeNull();
+      expect(control).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+
+  it('finds each one open straight after the same press when nothing is held', async () => {
+    await renderDock(<Default />);
+
+    for (const control of menuButtons()) {
+      await press(control);
+      expect(control).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('menu')).toBeNull());
     }
   });
 
@@ -513,6 +522,16 @@ describe('a held replacement draws the Dock menu buttons unavailable', () => {
   });
 });
 
+/**
+ * **A standing failure announces itself rather than waiting to be opened.**
+ *
+ * ADR 0082 binds the Dock to name which open Space is unwell, and adds the
+ * clause that decides where: "a report you have to go and find is not a
+ * report". The row inside the Open Spaces menu says *which* — that stays, and
+ * it is the whole of the detail — but a mark only reachable by disclosing the
+ * menu tells a reader who has no reason to open it nothing at all, so the
+ * trigger carries the mark.
+ */
 describe('an unwell Space the reader is not in', () => {
   it('marks the Spaces trigger before anything is disclosed', async () => {
     await renderDock(<SaveFailedElsewhere />);

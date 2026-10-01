@@ -1,6 +1,6 @@
 import { useRef, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell, FieldSet } from '@project/ui';
+import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
@@ -265,14 +265,7 @@ export const createApp = (
               layout space from that paper: it is absolutely positioned, and
               `.graph-area` is already the positioned box it resolves against. */}
           {dockChrome === null ? null : (
-            <FieldSet disabled={replacingImage} className="contents">
-              <CommandDock
-                chrome={dockChrome}
-                container={graphArea}
-                initialEdge="top"
-                disabled={replacingImage}
-              />
-            </FieldSet>
+            <CommandDock chrome={dockChrome} container={graphArea} initialEdge="top" />
           )}
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />

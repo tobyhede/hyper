@@ -633,11 +633,12 @@ function Dock({
 function PersistenceReport({
   persistence,
   edge,
-  disabled,
+  navigate,
 }: {
   readonly persistence: DockPersistence;
   readonly edge: DockEdge;
-  readonly disabled: boolean;
+  /** Whether the way to a blocking Space may run — {@link DockChrome.navigate}. */
+  readonly navigate: boolean;
 }) {
   const { state } = persistence;
   // An aggregate refusal draws the same dialog a permanent
@@ -652,7 +653,13 @@ function PersistenceReport({
     <>
       {decision ? (
         <PersistenceControl
-          disabled={disabled}
+          // A conflict's Reload and Keep local are not navigation. They are
+          // withheld under this answer only because it is the one Availability
+          // gives that is false exactly while a replacement runs, and Reload
+          // replaces the session that replacement stands on. Ticket 03
+          // (`.scratch/image-replacement-dock/`) gives them their own answer.
+          disabled={!navigate}
+          navigate={navigate}
           active={persistence.active}
           persistence={state}
           onAcceptRemote={persistence.onAcceptRemote}
@@ -666,6 +673,7 @@ function PersistenceReport({
             persistence={state}
             onRetry={persistence.onRetry}
             onOpenSpace={persistence.onOpenSpace}
+            navigate={navigate}
           />
         </div>
       ) : null}
@@ -688,13 +696,11 @@ export function CommandDock({
   chrome,
   container,
   initialEdge,
-  disabled = false,
 }: {
   readonly chrome: DockChrome;
   /** The box the Dock docks to, stated by whoever mounts it. */
   readonly container: RefObject<HTMLElement | null>;
   readonly initialEdge: DockEdge;
-  readonly disabled?: boolean;
 }) {
   const [dock, setDock] = useState<DockPosition>({ edge: initialEdge, along: 'center' });
   const [openId, setOpenId] = useState<string | null>(
@@ -705,7 +711,6 @@ export function CommandDock({
     (chrome.resources.list.disclose ?? null) === null ? null : RESOURCES_DISCLOSURE_ID,
   );
   const renaming = useDockRenaming(chrome);
-  if (disabled && openId !== null) setOpenId(null);
   const vertical = orientationOf(dock.edge) === 'vertical';
   // A rule divides across the dock's own axis, so it runs the other way.
   const divider = vertical ? 'horizontal' : 'vertical';
@@ -724,7 +729,7 @@ export function CommandDock({
             <PersistenceReport
               persistence={chrome.persistence}
               edge={dock.edge}
-              disabled={disabled}
+              navigate={chrome.navigate}
             />
           }
         >
@@ -747,17 +752,17 @@ export function CommandDock({
             space={chrome.space}
             side={side}
             vertical={vertical}
-            menuDisabled={disabled}
+            navigate={chrome.navigate}
           />
           <Divider orientation={divider} />
-          <MapControls canvas={chrome.canvas} side={side} menuDisabled={disabled} />
+          <MapControls canvas={chrome.canvas} side={side} navigate={chrome.navigate} />
           <Divider orientation={divider} />
           <GraphControls
             graph={chrome.graph}
             mapTitle={chrome.canvas.selected.title}
             side={side}
             vertical={vertical}
-            menuDisabled={disabled}
+            navigate={chrome.navigate}
           />
           <Divider orientation={divider} />
           <ResourcesControl resources={chrome.resources} side={side} />

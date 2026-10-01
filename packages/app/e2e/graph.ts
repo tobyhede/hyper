@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { aggregateFileSchema } from '@project/core';
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type JSHandle, type Locator, type Page } from '@playwright/test';
 
 /**
  * Reading and driving the React Flow graph from e2e.
@@ -233,6 +233,73 @@ export async function beginRename(page: Page, identity: Locator): Promise<void> 
 /** What the Dock says is drawing. */
 export function selectedCanvas(page: Page): Locator {
   return page.getByTestId('selected-canvas');
+}
+
+/**
+ * The Dock's navigation menu buttons in their arrow order: Open Spaces, then
+ * the Space, Map and Graph names. The opener's crumb, drawn only in an entered
+ * Space, stands before them and is not among them.
+ */
+export function dockNavigation(page: Page): Locator[] {
+  const bar = dock(page).filter({ visible: true });
+  return [
+    bar.getByRole('button', { name: /^Spaces\./ }),
+    bar.getByTestId('space-title'),
+    bar.getByTestId('selected-canvas'),
+    bar.getByTestId('active-graph'),
+  ];
+}
+
+/**
+ * Each control is drawn unavailable and stays focusable: it reports
+ * `aria-disabled` and carries no native `disabled`, which would take it out of
+ * the arrow order (ADR 0073). `toBeDisabled` cannot tell the two apart.
+ */
+export async function expectWithheld(controls: readonly Locator[]): Promise<void> {
+  for (const control of controls) {
+    await expect(control).toHaveAttribute('aria-disabled', 'true');
+    await expect(control).not.toHaveAttribute('disabled');
+  }
+}
+
+/** Each control is available: neither `aria-disabled` nor natively disabled. */
+export async function expectAvailable(controls: readonly Locator[]): Promise<void> {
+  for (const control of controls) await expect(control).toBeEnabled();
+}
+
+/**
+ * Walk a toolbar's arrow order from the first control, reaching each of the
+ * rest in turn with ArrowRight.
+ *
+ * Other items may stand between two of them, so ArrowRight is pressed until the
+ * next control has focus, and the walk fails as soon as focus lands on an
+ * element it has already stood on: the order wrapped, stopped at its end, or
+ * left the toolbar without reaching it. Reaching a control proves it is
+ * focusable and in the roving order, which a natively disabled control is not
+ * (ADR 0073).
+ */
+export async function expectArrowOrder(
+  page: Page,
+  [first, ...rest]: readonly Locator[],
+): Promise<void> {
+  if (first === undefined) return;
+  await first.focus();
+  await expect(first).toBeFocused();
+  const focused = () => page.evaluateHandle(() => document.activeElement);
+  const visited: JSHandle<Element | null>[] = [await focused()];
+  for (const next of rest) {
+    for (;;) {
+      await page.keyboard.press('ArrowRight');
+      if (await next.evaluate((element) => element === document.activeElement)) break;
+      const revisited = await page.evaluate(
+        (seen) => seen.includes(document.activeElement),
+        visited,
+      );
+      expect(revisited, 'ArrowRight came round again before reaching the next control').toBe(false);
+      visited.push(await focused());
+    }
+    visited.push(await focused());
+  }
 }
 
 /**

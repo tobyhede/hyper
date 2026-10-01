@@ -14,6 +14,12 @@ import {
   activeResource,
   boxOf,
   createResource,
+  dock,
+  dockNavigation,
+  expectArrowOrder,
+  expectAvailable,
+  expectWithheld,
+  nodeByTitle,
   openResource,
   presentControl,
   resourceActions,
@@ -962,11 +968,11 @@ for (const failure of ['HTTP 500', 'network', 'timeout']) {
     };
     await upload();
     if (failure === 'timeout') {
-      await expect(selectedCanvas(page)).toBeDisabled();
+      await expectWithheld(dockNavigation(page));
       await page.clock.fastForward(120_000);
     }
     await expect(target.getByRole('alert')).toContainText('This image was not replaced:');
-    await expect(selectedCanvas(page)).toBeEnabled();
+    await expectAvailable(dockNavigation(page));
     expect((await storedFigure(page, spaceId)).revision).toBe(before.revision);
     expect(errors).toEqual([]);
     await page.unroute('**/images');
@@ -1009,7 +1015,12 @@ test('the same URL retries a failed picture without an Edit', async ({ page }) =
  * Send a file from the upload target and hold the host's answer until the
  * returned release is called, so the replacement stays in flight.
  */
-async function uploadHeld(page: Page, target: Locator): Promise<() => void> {
+async function uploadHeld(
+  page: Page,
+  target: Locator,
+  // Declared a PNG, so it is sent, and refused by the host from its bytes.
+  file = { name: 'fake.png', mimeType: 'image/png', buffer: Buffer.from('not a picture') },
+): Promise<() => void> {
   const held = Promise.withResolvers<undefined>();
   // The host's image collection, which a chosen file is sent to.
   await page.route(
@@ -1021,14 +1032,7 @@ async function uploadHeld(page: Page, target: Locator): Promise<() => void> {
   );
   const chooser = page.waitForEvent('filechooser');
   await target.getByRole('button', { name: 'Upload' }).click();
-  await (
-    await chooser
-  ).setFiles({
-    // Declared a PNG, so it is sent, and refused by the host from its bytes.
-    name: 'fake.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from('not a picture'),
-  });
+  await (await chooser).setFiles(file);
   await expect(target).toHaveAttribute('aria-busy', 'true');
   return () => held.resolve(undefined);
 }
@@ -1070,21 +1074,19 @@ test(
     await expect(target.getByRole('button', { name: 'Upload' })).toBeDisabled();
     await expect(target.getByRole('textbox', { name: 'Image URL' })).toBeDisabled();
     await expect(target).toHaveAttribute('aria-busy', 'true');
-    await expect(selectedCanvas(page)).toBeDisabled();
-    // The Dock's four menu buttons are drawn unavailable by `aria-disabled`,
-    // which Playwright's `toBeDisabled` would also accept from a fieldset.
-    const dockBar = page.getByRole('toolbar', { name: 'Command Dock' }).filter({ visible: true });
-    const menuButtons = [
-      dockBar.getByTestId('space-title'),
-      selectedCanvas(page),
-      dockBar.getByTestId('active-graph'),
-      dockBar.getByRole('button', { name: /^Spaces\./ }),
-    ];
+    // The Dock's navigation is drawn unavailable by `aria-disabled` and stays in
+    // its arrow order, so each withheld command is reached from the keyboard.
+    const menuButtons = dockNavigation(page);
+    await expectWithheld(menuButtons);
+    await expectArrowOrder(page, menuButtons);
     for (const control of menuButtons) {
-      await expect(control).toHaveAttribute('aria-disabled', 'true');
       await control.click({ force: true, delay: 120 });
       await expect(page.getByRole('menu')).toHaveCount(0);
+      await control.press('Enter');
+      await expect(page.getByRole('menu')).toHaveCount(0);
     }
+    // A withheld command is not a refused one, so nothing is reported.
+    await expect(page.getByRole('alert')).toHaveCount(0);
     await page.evaluate(
       () =>
         new Promise<void>((resolve) => {
@@ -1109,10 +1111,7 @@ test(
       'fake.png is not a PNG, JPEG, WebP or GIF image.',
     );
     await expect(cancel).toBeEnabled();
-    await expect(selectedCanvas(page)).toBeEnabled();
-    for (const control of menuButtons) {
-      await expect(control).not.toHaveAttribute('aria-disabled', 'true');
-    }
+    await expectAvailable(menuButtons);
     await page.goBack();
     await expect(page).toHaveURL(previousUrl);
     await expect(selectedCanvas(page)).toHaveText('Elsewhere');
@@ -1120,6 +1119,169 @@ test(
     await expect(selectedCanvas(page)).toHaveText('Pictures');
   },
 );
+
+test('a failed save is retried while a replacement is held, and the replacement goes on', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  await openPictures(page);
+  const status = page.getByTestId('persistence-status');
+  const before = BigInt((await status.getAttribute('data-revision')) ?? '');
+  let failing = true;
+  await page.route('**/api/spaces', async (route) => {
+    const request = route.request();
+    if (failing && request.method() === 'POST') return route.abort('failed');
+    return route.continue();
+  });
+  // Opening the Image Resource on its target is the Edit whose save fails.
+  const { target } = await beginReplacing(page);
+  const failure = page.getByTestId('persistence-failure');
+  await expect(failure).toBeVisible();
+
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === '/images',
+    async (route) => {
+      await held;
+      await route.continue();
+    },
+  );
+  const chooser = page.waitForEvent('filechooser');
+  await target.getByRole('button', { name: 'Upload' }).click();
+  await (
+    await chooser
+  ).setFiles({
+    name: FIRST_PICTURE.name,
+    mimeType: 'image/png',
+    buffer: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+  });
+  await expect(target).toHaveAttribute('aria-busy', 'true');
+
+  const retry = failure.getByRole('button', { name: 'Retry', exact: true });
+  await expect(retry).toBeEnabled();
+  failing = false;
+  await retry.click();
+  await expect(failure).toBeHidden();
+  await expect(status).toHaveText('Persisted');
+  await expect(status).toHaveAttribute('data-revision', (before + 1n).toString());
+  // Retry re-committed the working Space and replaced nothing under the target.
+  await expect(target).toHaveAttribute('aria-busy', 'true');
+  await expectWithheld(dockNavigation(page));
+
+  release();
+  await expect(target).toHaveCount(0);
+  await expectAvailable(dockNavigation(page));
+});
+
+const PRESENTATION_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
+const OVERVIEW_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000061');
+
+/**
+ * Add the Image Resource, Closed, to the fixture's Presentation Space on the
+ * Overview Map that Meta's Space Resource enters it on, through the same HTTP
+ * commit the browser makes.
+ */
+async function seedPresentationFigure(page: Page): Promise<void> {
+  const response = await page.request.get(`/api/spaces/${PRESENTATION_ID}`);
+  expect(response.ok()).toBe(true);
+  const { snapshot, revision } = decodeLoadedSpace(await response.json());
+  const maps = (snapshot.document.maps ?? []).map((authored) =>
+    authored.id === OVERVIEW_MAP_ID
+      ? {
+          ...authored,
+          positions: { ...authored.positions, [IMAGE_ID]: { x: 1272, y: 12, open: false } },
+        }
+      : authored,
+  );
+  const commit = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId: PRESENTATION_ID,
+          snapshot: {
+            ...snapshot,
+            resources: [
+              ...snapshot.resources,
+              {
+                id: IMAGE_ID,
+                document: {
+                  title: 'Figure',
+                  kind: 'image',
+                  url: FIGURE_URL,
+                  naturalSize: HARBOUR_SIZE,
+                },
+              },
+            ],
+            document: { ...snapshot.document, maps },
+          },
+          expectedRevision: revision.toString(),
+        },
+      ],
+    },
+  });
+  expect(commit.ok()).toBe(true);
+}
+
+/**
+ * In an entered Space the opener's crumb is navigation too: it is withheld with
+ * the rest and walked in the same arrow order, and when the replacement
+ * completes every navigation command is available again, Exit included.
+ */
+test("a replacement in an entered Space withholds the opener's crumb, and completion makes every navigation command available", async ({
+  page,
+}) => {
+  await serveFigure(page);
+  await seedPresentationFigure(page);
+  await page.goto('/');
+  await selectCanvas(page, 'Linked Spaces');
+  const presentation = nodeByTitle(page, 'Presentation');
+  await expect(presentation).toBeVisible();
+  await settled(page);
+  await (
+    await resourceControls(page, presentation)
+  )
+    .getByRole('button', { name: 'Actions for Resource Presentation' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
+  // Meta stays open behind the entered Space, so its Dock is in the page too.
+  const bar = dock(page).filter({ visible: true });
+  const shownSpace = bar.getByTestId('space-title');
+  await expect(shownSpace).toContainText('Presentation');
+  await expect(bar.getByTestId('selected-canvas')).toContainText('Overview');
+  await settled(page);
+
+  const { resource, target } = await beginReplacing(page);
+  const release = await uploadHeld(page, target, {
+    name: FIRST_PICTURE.name,
+    mimeType: 'image/png',
+    buffer: Buffer.from(FIRST_PICTURE.base64, 'base64'),
+  });
+
+  const goTo = page.getByRole('button', { name: 'Go to Map fixture' });
+  const navigation = [goTo, ...dockNavigation(page)];
+  await expectWithheld(navigation);
+  await expectArrowOrder(page, navigation);
+  await goTo.click({ force: true });
+  await expect(shownSpace).toContainText('Presentation');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+
+  release();
+  await expect(target).toHaveCount(0);
+  await expectPictureLoaded(
+    resource.getByRole('img', { name: 'Figure' }),
+    FIRST_PICTURE.size.width,
+  );
+  await expectAvailable(navigation);
+  await shownSpace.click({ delay: 120 });
+  const exit = page.getByRole('menu').getByRole('menuitem', { name: 'Exit Space' });
+  await expect(exit).toBeEnabled();
+  await exit.click();
+  await expect(shownSpace).toContainText('Map fixture');
+});
 
 /**
  * Follow a fragment of the current location, answering whether the browser

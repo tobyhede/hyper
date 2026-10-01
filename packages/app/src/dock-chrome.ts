@@ -264,6 +264,7 @@ export function useDockChrome(
     // ADR 0042's epoch, handed down rather than acted on here: the editor a
     // replacement discards is a name control's own.
     replacementEpoch,
+    navigate: availability.navigate,
     space: {
       title: space.title,
       currentSpaceId: space.id,
@@ -283,10 +284,15 @@ export function useDockChrome(
         });
       },
       onExit: exitSpace,
-      // `openSpaces.exit`'s own rule, asked of the aggregate that enforces it.
-      // With no session there is nothing to exit into, so the command is
-      // unavailable rather than absent.
-      exitDisabled: spaces === null || space.id === spaces.metaSpaceId || exiting !== null,
+      // `openSpaces.exit`'s own rules, asked of the aggregate that enforces
+      // them: Meta is permanent, and navigation may be withheld. With no
+      // session there is nothing to exit into, so the command is unavailable
+      // rather than absent.
+      exitDisabled:
+        spaces === null ||
+        space.id === spaces.metaSpaceId ||
+        exiting !== null ||
+        !availability.navigate,
       exitReport,
       onDismissExitReport: () => setExitReport(null),
     },

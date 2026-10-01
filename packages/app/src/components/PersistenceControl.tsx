@@ -34,11 +34,13 @@ import type { StoredSpaceRefusal } from '../space-authoring';
 
 export interface PersistenceControlProps {
   /**
-   * Draw a conflict's Reload, Keep local and retry and Open of the blocking
-   * Space unavailable, while an image replacement holds the application.
-   * Acknowledging a rejection stays available: it only dismisses the dialog.
+   * Draw a conflict's Reload and Keep local and retry unavailable.
+   * Acknowledging a rejection stays available: it only dismisses the dialog,
+   * and the way to a blocking Space follows `navigate` instead.
    */
   readonly disabled?: boolean;
+  /** Whether going to the blocking Space may run (`AuthoringAvailability.navigate`). */
+  readonly navigate: boolean;
   readonly active?: boolean;
   readonly persistence: SpaceSessionState['persistence'];
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
@@ -84,6 +86,7 @@ const rejectionDescription = ({ failure }: Rejection): string =>
  */
 export function PersistenceControl({
   disabled = false,
+  navigate,
   active = true,
   persistence,
   onAcceptRemote,
@@ -110,6 +113,7 @@ export function PersistenceControl({
     return (
       <ConflictControl
         disabled={disabled}
+        navigate={navigate}
         conflict={persistence}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={onKeepLocal}
@@ -143,6 +147,12 @@ export interface PersistenceNoticeProps {
   readonly onRetry: () => void;
   /** Go to the Space whose recovery blocks this save, when there is a way to. */
   readonly onOpenSpace?: OpenBlockingSpace | null;
+  /**
+   * Whether going to the blocking Space may run (`AuthoringAvailability.navigate`).
+   * Retry is not a navigation: it commits the working Space again and replaces
+   * nothing, so it stays available whatever this answers.
+   */
+  readonly navigate: boolean;
 }
 
 /**
@@ -167,6 +177,7 @@ export function PersistenceNotice({
   persistence,
   onRetry,
   onOpenSpace = null,
+  navigate,
 }: PersistenceNoticeProps) {
   if (!canRetry(persistence)) return null;
 
@@ -175,7 +186,11 @@ export function PersistenceNotice({
       <AlertIcon />
       <AlertTitle>Changes not saved</AlertTitle>
       <AlertDescription>{noticeReason(persistence)}</AlertDescription>
-      <OpenBlockingSpaceButton blocked={persistence.blocked} onOpenSpace={onOpenSpace} />
+      <OpenBlockingSpaceButton
+        blocked={persistence.blocked}
+        onOpenSpace={onOpenSpace}
+        disabled={!navigate}
+      />
       <AlertAction>
         <Button
           variant="secondary"
@@ -210,7 +225,10 @@ function OpenBlockingSpaceButton({
         variant="secondary"
         size="compact"
         data-testid="persistence-open-blocking-space"
+        // Unavailable rather than unreachable (ADR 0073): it announces itself
+        // and keeps its place in the tab order.
         disabled={disabled}
+        focusableWhenDisabled
         onClick={() => {
           onOpenSpace(blocked.spaceId, blocked.title);
         }}
@@ -252,12 +270,14 @@ interface RefusedRecovery {
  */
 function ConflictControl({
   disabled,
+  navigate,
   conflict,
   onAcceptRemote,
   onKeepLocal,
   onOpenSpace,
 }: {
   readonly disabled: boolean;
+  readonly navigate: boolean;
   readonly conflict: Conflict;
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
   readonly onKeepLocal: () => void;
@@ -294,7 +314,7 @@ function ConflictControl({
             <OpenBlockingSpaceButton
               blocked={conflict.blocked}
               onOpenSpace={onOpenSpace}
-              disabled={disabled}
+              disabled={!navigate}
             />
           </Alert>
         )}

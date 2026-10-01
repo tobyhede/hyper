@@ -241,6 +241,7 @@ export const PersistenceFailure: Story = () => (
   <ResourcesPopoverFixture
     notice={
       <PersistenceNotice
+        navigate
         persistence={{
           kind: 'failed',
           failure: { kind: 'retryable-failure', code: 'network' },
