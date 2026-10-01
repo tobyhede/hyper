@@ -103,7 +103,7 @@ function connections(
  * above answers what the adapter was *told*; this answers what a Space ends up
  * holding, so the two are not interchangeable.
  *
- * Opens on the selected Map's own map (ADR 0025) — Authoring derives it
+ * Opens on the selected Map's own map — Authoring derives it
  * fresh rather than holding a copy, so there is no separate starting geometry
  * to state.
  */

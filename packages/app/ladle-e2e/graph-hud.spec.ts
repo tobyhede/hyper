@@ -13,16 +13,16 @@ const story = (name: string): string => `/?story=${name}&mode=preview`;
  * declaration). What the Graph HUD assertions below hold the rendered key to.
  */
 const openingMapOf = (snapshot: SpaceSnapshot): Map => {
-  const map = snapshot.document.maps?.find(
+  const opening = snapshot.document.maps?.find(
     (candidate) => candidate.id === snapshot.document.defaultMap,
   );
-  if (map === undefined) throw new Error('Story Space declares no opening Map.');
-  return map;
+  if (opening === undefined) throw new Error('Story Space declares no opening Map.');
+  return opening;
 };
 
-/** The Graph a Map is active on, falling back to its first (ADR 0026). */
-const activeGraphOf = (map: Map): Graph => {
-  const active = map.graphs.find((graph) => graph.id === map.activeGraph) ?? map.graphs[0];
+/** The Graph a Map is active on, falling back to its first (ADR 0040). */
+const activeGraphOf = (m: Map): Graph => {
+  const active = m.graphs.find((graph) => graph.id === m.activeGraph) ?? m.graphs[0];
   if (active === undefined) throw new Error('Map owns no Graph.');
   return active;
 };
@@ -116,14 +116,14 @@ test(
   async ({ page }) => {
     await page.goto(story('surfaces--graph-hud--retained'));
 
-    const map = openingMapOf(authoredSnapshotWithGraphHeads);
-    const titles = map.graphs.map((graph) => graph.title);
-    const active = activeGraphOf(map);
+    const opening = openingMapOf(authoredSnapshotWithGraphHeads);
+    const titles = opening.graphs.map((graph) => graph.title);
+    const active = activeGraphOf(opening);
 
     await expect(page.getByTestId('hud-space')).toHaveText(
       authoredSnapshotWithGraphHeads.document.title,
     );
-    await expect(page.getByTestId('hud-map')).toHaveText(map.title);
+    await expect(page.getByTestId('hud-map')).toHaveText(opening.title);
     await expect(page.getByTestId('canvas-identity').getByRole('button')).toHaveCount(0);
 
     const key = page.getByTestId('graph-legend');
@@ -135,7 +135,7 @@ test(
     const minimap = page.locator('.react-flow__minimap');
     await expect(minimap).toBeVisible();
     await expect(page.locator('.react-flow__minimap-node')).toHaveCount(
-      Object.keys(map.positions).length,
+      Object.keys(opening.positions).length,
     );
 
     // The key and MiniMap are sibling Panels meeting at one edge. This catches
@@ -166,9 +166,9 @@ test(
     const heads = await items
       .locator('[data-slot="graph-legend-mark"] [data-slot="graph-head-shape"]')
       .evaluateAll((els) => els.map((el) => el.getAttribute('data-head-shape')));
-    expect(heads).toEqual(map.graphs.map((graph) => graph.headShape ?? 'arrow'));
+    expect(heads).toEqual(opening.graphs.map((graph) => graph.headShape ?? 'arrow'));
     expect(new Set(heads).size).toBe(titles.length);
-    expect(map.graphs.some((graph) => graph.headShape === undefined)).toBe(true);
+    expect(opening.graphs.some((graph) => graph.headShape === undefined)).toBe(true);
   },
 );
 
@@ -238,9 +238,9 @@ test(
   async ({ page }) => {
     await page.goto(story('surfaces--graph-hud--sparse-map'));
 
-    const map = openingMapOf(sparseAuthoredSnapshot);
-    const titles = map.graphs.map((graph) => graph.title);
-    const active = activeGraphOf(map);
+    const opening = openingMapOf(sparseAuthoredSnapshot);
+    const titles = opening.graphs.map((graph) => graph.title);
+    const active = activeGraphOf(opening);
 
     const items = page.getByTestId('graph-legend').locator('.legend__item');
     await expect(items).toHaveCount(titles.length);
@@ -248,7 +248,7 @@ test(
     await expect(items.first()).toHaveAttribute('data-active', 'true');
     await expect(items.first()).toHaveText(active.title);
     await expect(page.locator('.react-flow__minimap-node')).toHaveCount(
-      Object.keys(map.positions).length,
+      Object.keys(opening.positions).length,
     );
 
     // The scale proof holds at every catalogue Map. This

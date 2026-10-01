@@ -97,7 +97,7 @@ describe('Map delete draws the right geometry', () => {
 
     const written = session
       .getState()
-      .working.document.maps?.find((map) => map.id === SURVIVING_MAP_ID);
+      .working.document.maps?.find((m) => m.id === SURVIVING_MAP_ID);
     expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600, open: false });
   });
 });
@@ -195,7 +195,7 @@ describe('Entering draws the entered Map’s geometry', () => {
 
     const written = entered.session
       .getState()
-      .working.document.maps?.find((map) => map.id === ENTERED_MAP_ID);
+      .working.document.maps?.find((m) => m.id === ENTERED_MAP_ID);
     expect(written?.positions[SHARED_RESOURCE_ID]).toEqual({ x: 500, y: 600, open: false });
   });
 });
@@ -282,9 +282,9 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
     const loaded = loadSpaceSnapshot(written);
     expect(loaded.ok).toBe(true);
 
-    const top = written.document.maps?.find((map) => map.id === TOP_MAP_ID);
+    const top = written.document.maps?.find((m) => m.id === TOP_MAP_ID);
     expect(top?.positions[TOP_RESOURCE_ID]).toEqual({ x: 10, y: 20, open: false });
-    const other = written.document.maps?.find((map) => map.id === OTHER_MAP_ID);
+    const other = written.document.maps?.find((m) => m.id === OTHER_MAP_ID);
     expect(other?.graphs.map((graph) => graph.id)).toEqual([OTHER_GRAPH_ID]);
   });
 });

@@ -35,7 +35,7 @@ const id = (value: string): UUID => uuidSchema.parse(value);
 /**
  * A minter for a collaborator this test expects to mint nothing.
  *
- * ADR 0016 has a test name the ids it is about to assert on, and three collaborators
+ * ADR 0109 has a test name the ids it is about to assert on, and three collaborators
  * here take a minter while only one of them mints. Sharing the Target's would
  * let an unexpected mint duplicate its Graph id into another Space and pass;
  * this fails at the call instead.
@@ -245,7 +245,7 @@ describe('the selected Map after a coordinated recovery restores a participant',
     const space = target.currentSpace();
     const { selectedMapId } = target.navigation.getState();
 
-    expect(space.maps.map((map) => map.id)).toContain(selectedMapId);
+    expect(space.maps.map((m) => m.id)).toContain(selectedMapId);
     expect(selectedMapId).toBe(TARGET_MAP_ID);
   });
 

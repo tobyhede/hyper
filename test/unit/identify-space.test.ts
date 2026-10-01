@@ -8,7 +8,7 @@ const GRAPH_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 
 /**
- * A counter rather than a constant or a spy on the ambient generator (ADR 0016):
+ * A counter rather than a constant or a spy on the ambient generator (ADR 0109):
  * a constant collides the moment more than one id is minted, and `randomUUID` is
  * an unseedable CSPRNG, so controlling it means owning it.
  */
@@ -61,18 +61,18 @@ describe('identifySpace', () => {
 
     const snapshot = identifySpace(input, countingIds());
 
-    const [map, second] = snapshot.document.maps ?? [];
-    if (map === undefined || second === undefined) throw new Error('Structure was not kept');
+    const [first, second] = snapshot.document.maps ?? [];
+    if (first === undefined || second === undefined) throw new Error('Structure was not kept');
     const minted = snapshot.resources.find(
       ({ id }) => id !== RESOURCE_ID && id !== SECOND_RESOURCE_ID,
     )?.id;
-    const mintedGraph = map.graphs[0]?.id;
+    const mintedGraph = first.graphs[0]?.id;
     if (minted === undefined || mintedGraph === undefined) throw new Error('Nothing was minted');
 
     // The explicit ids survive exactly; the minted ones are distinct UUIDs.
     expect(second.graphs[0]?.id).toBe(GRAPH_ID);
-    expect(map.graphs[0]?.edges).toEqual([{ from: RESOURCE_ID, to: SECOND_RESOURCE_ID }]);
-    const identities = [snapshot.id, minted, mintedGraph, map.id, second.id];
+    expect(first.graphs[0]?.edges).toEqual([{ from: RESOURCE_ID, to: SECOND_RESOURCE_ID }]);
+    const identities = [snapshot.id, minted, mintedGraph, first.id, second.id];
     for (const id of identities) expect(uuidSchema.safeParse(id).success).toBe(true);
     expect(new Set(identities).size).toBe(identities.length);
   });

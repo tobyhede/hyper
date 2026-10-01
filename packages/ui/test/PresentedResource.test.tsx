@@ -17,8 +17,8 @@ describe('PresentedResource', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Hello' })).toBeInTheDocument();
-    // The counterpart to the opened Resource's source editor: here the markers are
-    // consumed and real elements come out (ADR 0011).
+    // The counterpart to the Resource's source editor: here the markers are
+    // consumed and real elements come out.
     expect(container.querySelector('strong')?.textContent).toBe('bold');
     expect(container.querySelectorAll('li')).toHaveLength(2);
   });

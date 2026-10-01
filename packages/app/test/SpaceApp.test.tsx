@@ -90,8 +90,8 @@ const withDanglingGraph = (base: SpaceSnapshot, title: string): SpaceSnapshot =>
   document: {
     ...base.document,
     title,
-    maps: (base.document.maps ?? []).map((map) => ({
-      ...map,
+    maps: (base.document.maps ?? []).map((m) => ({
+      ...m,
       graphs: [
         { id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_ID, to: MISSING_RESOURCE_ID }] },
       ],
@@ -180,8 +180,8 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
     ...base,
     document: {
       ...base.document,
-      maps: base.document.maps?.map((map) => ({
-        ...map,
+      maps: base.document.maps?.map((m) => ({
+        ...m,
         graphs: [
           { id: OWNED_GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_ID, to: RESOURCE_ID }] },
         ],
@@ -512,9 +512,9 @@ describe('Space app failure reporting', () => {
       ...snapshot('Space', 'Resource', 10, 20),
       document: {
         ...snapshot('Space', 'Resource', 10, 20).document,
-        maps: snapshot('Space', 'Resource', 10, 20).document.maps?.map((map) => ({
-          ...map,
-          graphs: [...map.graphs, { id: GRAPH_ID, title: 'Addressed', edges: [] }],
+        maps: snapshot('Space', 'Resource', 10, 20).document.maps?.map((m) => ({
+          ...m,
+          graphs: [...m.graphs, { id: GRAPH_ID, title: 'Addressed', edges: [] }],
         })),
       },
     };
@@ -815,7 +815,7 @@ describe('Space app Resources list', () => {
       resources: [],
       document: {
         ...seeded.document,
-        maps: seeded.document.maps?.map((map) => ({ ...map, positions: {} })),
+        maps: seeded.document.maps?.map((m) => ({ ...m, positions: {} })),
       },
     };
     const stored = { snapshot: empty, revision: 1n, exportedRevision: null };

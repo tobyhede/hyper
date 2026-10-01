@@ -38,7 +38,7 @@ export interface SpaceResourceRailContext {
 export function spaceResourceContextCommands(
   { entry, spaces, containingSpaceId, commandOutcomes }: SpaceResourceRailContext,
   document: Extract<ResourceDocument, { kind: 'space' }>,
-  select: (map: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
+  select: (targetMap: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   available: () => boolean,
 ): SpaceResourceContextCommands {
   // The rail's own answer, asked again when a command is pressed.
@@ -54,8 +54,8 @@ export function spaceResourceContextCommands(
   const location = spaces.browserLocation;
   const { map: mapId, graph: graphId } = document;
   const space = entry.app.currentSpace();
-  const map = space.maps.find((each) => each.id === mapId);
-  const graph = map?.graphs.find((each) => each.id === graphId);
+  const targetMap = space.maps.find((each) => each.id === mapId);
+  const graph = targetMap?.graphs.find((each) => each.id === graphId);
   const addressed = mapAuthoring.map(mapId);
   // Each press is built from the capability that answers its availability,
   // so the rail draws a command unavailable exactly when invoking it would be.
@@ -104,7 +104,7 @@ export function spaceResourceContextCommands(
     }),
     onCopyLink: () => copyLink(location.href({ kind: 'map', spaceId: entry.id, mapId })),
   };
-  if (map === undefined || graph === undefined) return { mapCommands };
+  if (targetMap === undefined || graph === undefined) return { mapCommands };
   const addressedGraph = graphAuthoring.map(mapId).graph(graphId);
   return {
     mapCommands,

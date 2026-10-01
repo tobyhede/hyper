@@ -72,7 +72,7 @@ export function EmbeddedMapAuthoring({
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
 }) {
   const parentId = parent.id;
-  // The target's own composition names where this reports (ADR 0016); nothing
+  // The target's own composition names where this reports (ADR 0109); nothing
   // here holds a second sink, and a default in the module would be one.
   const [composition] = useState(() =>
     createEmbeddedAuthoring(entry, mapId, entry.app.reportObserverError),

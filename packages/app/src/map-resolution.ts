@@ -57,8 +57,8 @@ export function resolveMap(space: Space, mapId?: MapId): ResolvedMap {
  * a filter and never a manufactured position. One named operation, so two call
  * sites cannot derive membership differently.
  */
-export function mapResources(space: Space, map: Map): readonly Resource[] {
-  const members = Placement.fromMap(map);
+export function mapResources(space: Space, m: Map): readonly Resource[] {
+  const members = Placement.fromMap(m);
   return space.resources.filter((resource) => members.has(resource.id));
 }
 
@@ -69,7 +69,7 @@ export function mapResources(space: Space, map: Map): readonly Resource[] {
  * The complement of `mapResources`, read off the same membership, so what one
  * places and the other omits partition the Space's Resources.
  */
-export function resourcesOutsideMap(space: Space, map: Map): readonly Resource[] {
-  const members = Placement.fromMap(map);
+export function resourcesOutsideMap(space: Space, m: Map): readonly Resource[] {
+  const members = Placement.fromMap(m);
   return space.resources.filter((resource) => !members.has(resource.id));
 }

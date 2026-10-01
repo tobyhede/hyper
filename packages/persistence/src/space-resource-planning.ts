@@ -194,7 +194,7 @@ const storedSnapshot = (aggregate: LoadedAggregate, id: UUID): LoadedSpace | und
 
 /**
  * What a Space Resource selects in a Space it is shown: the Map that Space
- * opens on, and that Map's Active Graph (ADR 0079, ADR 0026), both read off
+ * opens on, and that Map's Active Graph (ADR 0079, ADR 0040), both read off
  * `lookup.map` rather than re-derived.
  *
  * `undefined` is the type-level boundary between a snapshot that passed intake
@@ -665,15 +665,14 @@ export const planContextDeletion = (
     ...target.document,
     maps: maps
       .filter(({ id }) => !deletingMap || id !== input.mapId)
-      .map((map) =>
-        !deletingMap && map.id === input.mapId
+      .map((m) =>
+        !deletingMap && m.id === input.mapId
           ? {
-              ...map,
-              activeGraph:
-                map.activeGraph === input.graphId ? replacementGraph.id : map.activeGraph,
-              graphs: map.graphs.filter(({ id }) => id !== input.graphId),
+              ...m,
+              activeGraph: m.activeGraph === input.graphId ? replacementGraph.id : m.activeGraph,
+              graphs: m.graphs.filter(({ id }) => id !== input.graphId),
             }
-          : map,
+          : m,
       ),
   };
   if (deletingMap && target.document.defaultMap === input.mapId) {

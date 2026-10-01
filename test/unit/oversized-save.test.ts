@@ -12,6 +12,11 @@ import {
 import { createSpaceHttpApp, HttpSpaceBackend, MAX_COMMIT_BODY_BYTES } from '@project/http';
 import { MemorySpaceRepository } from '../support/memory-space-repository';
 
+/** A request that initializes no Space mints nothing, so any mint is a failure here. */
+const mintsNothing = (): UUID => {
+  throw new Error('This request initializes no Space, so it mints no identity.');
+};
+
 /**
  * A save over the size limit across the HTTP boundary: the browser transport, the
  * Hono application and a real repository behind it. A request over
@@ -73,7 +78,7 @@ const bodyForRequestOf = (bytes: number): string =>
 
 const overHttp = (stored: LoadedSpace) => {
   const repository = new MemorySpaceRepository([stored], META_ID);
-  const app = createSpaceHttpApp(repository);
+  const app = createSpaceHttpApp(repository, { newId: mintsNothing });
   const posted: number[] = [];
   const backend = new HttpSpaceBackend('http://hyper.test', {
     fetch: async (input, init) => {

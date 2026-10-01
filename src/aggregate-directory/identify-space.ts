@@ -67,7 +67,7 @@ export const describeSchemaFailure = (issues: readonly SchemaIssue[], label: str
  * identified snapshots (ADR 0078), so the minting has one home on the way in
  * and the repositories have none.
  *
- * `newId` is the caller's (ADR 0016) rather than an ambient generator, so the
+ * `newId` is the caller's (ADR 0109) rather than an ambient generator, so the
  * CLI's composition root is the one place identity comes from and a test can
  * name what it will assert on.
  *
@@ -103,10 +103,10 @@ export const identifySpace = (
     );
   }
 
-  const maps = input.document.maps?.map((map) => ({
-    ...map,
-    id: map.id ?? newId(),
-    graphs: map.graphs.map((graph) => ({ ...graph, id: graph.id ?? newId() })),
+  const maps = input.document.maps?.map((m) => ({
+    ...m,
+    id: m.id ?? newId(),
+    graphs: m.graphs.map((graph) => ({ ...graph, id: graph.id ?? newId() })),
   }));
 
   // The document is carried through rather than rebuilt field by field, so a

@@ -592,9 +592,9 @@ describe('the Map an Open Space Resource draws', () => {
       ...value,
       document: {
         ...value.document,
-        maps: value.document.maps?.map((map) => ({
-          ...map,
-          graphs: map.graphs.map((graph) => ({
+        maps: value.document.maps?.map((m) => ({
+          ...m,
+          graphs: m.graphs.map((graph) => ({
             ...graph,
             edges: [{ from: HOME_RESOURCE_ID, to: SPACE_RESOURCE_ID }],
           })),
@@ -674,10 +674,10 @@ describe('the Map an Open Space Resource draws', () => {
       ),
       document: {
         ...value.document,
-        maps: value.document.maps?.map((map) => ({
-          ...map,
+        maps: value.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
           },
         })),
@@ -769,9 +769,9 @@ describe('the Map an Open Space Resource draws', () => {
       ...value,
       document: {
         ...value.document,
-        maps: value.document.maps?.map((map) => ({
-          ...map,
-          graphs: map.graphs.map((graph) => ({
+        maps: value.document.maps?.map((m) => ({
+          ...m,
+          graphs: m.graphs.map((graph) => ({
             ...graph,
             edges: [{ from: HOME_RESOURCE_ID, to: SPACE_RESOURCE_ID }],
           })),
@@ -827,10 +827,10 @@ describe('the Map an Open Space Resource draws', () => {
       ),
       document: {
         ...value.document,
-        maps: value.document.maps?.map((map) => ({
-          ...map,
+        maps: value.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
           },
         })),
@@ -897,10 +897,10 @@ describe('the Map an Open Space Resource draws', () => {
       ),
       document: {
         ...value.document,
-        maps: value.document.maps?.map((map) => ({
-          ...map,
+        maps: value.document.maps?.map((m) => ({
+          ...m,
           positions: {
-            ...map.positions,
+            ...m.positions,
             [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
           },
         })),
@@ -1049,7 +1049,7 @@ describe('the Map an Open Space Resource draws', () => {
       spaces
         .entry(TARGET_ID)
         ?.session.getState()
-        .working.document.maps?.find((map) => map.id === SELECTED_MAP_ID)?.positions,
+        .working.document.maps?.find((m) => m.id === SELECTED_MAP_ID)?.positions,
     ).toHaveProperty(DRAWN_B);
     expect(
       initial.session
@@ -1101,13 +1101,13 @@ describe('the Map an Open Space Resource draws', () => {
       ),
       document: {
         ...target.document,
-        maps: target.document.maps?.map((map) =>
-          map.id !== SELECTED_MAP_ID
-            ? map
+        maps: target.document.maps?.map((m) =>
+          m.id !== SELECTED_MAP_ID
+            ? m
             : {
-                ...map,
+                ...m,
                 positions: {
-                  ...map.positions,
+                  ...m.positions,
                   [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
@@ -1226,13 +1226,13 @@ describe('the Map an Open Space Resource draws', () => {
       ),
       document: {
         ...target.document,
-        maps: target.document.maps?.map((map) =>
-          map.id !== SELECTED_MAP_ID
-            ? map
+        maps: target.document.maps?.map((m) =>
+          m.id !== SELECTED_MAP_ID
+            ? m
             : {
-                ...map,
+                ...m,
                 positions: {
-                  ...map.positions,
+                  ...m.positions,
                   [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
@@ -1320,13 +1320,13 @@ describe('the Map an Open Space Resource draws', () => {
       ),
       document: {
         ...target.document,
-        maps: target.document.maps?.map((map) =>
-          map.id !== SELECTED_MAP_ID
-            ? map
+        maps: target.document.maps?.map((m) =>
+          m.id !== SELECTED_MAP_ID
+            ? m
             : {
-                ...map,
+                ...m,
                 positions: {
-                  ...map.positions,
+                  ...m.positions,
                   [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
@@ -1406,8 +1406,7 @@ describe('the Map an Open Space Resource draws', () => {
         spaces
           .entry(TARGET_ID)
           ?.session.getState()
-          .working.document.maps?.find((map) => map.id === SELECTED_MAP_ID)?.positions[DRAWN_A]
-          ?.open,
+          .working.document.maps?.find((m) => m.id === SELECTED_MAP_ID)?.positions[DRAWN_A]?.open,
       ).toBe(true),
     );
     expect(

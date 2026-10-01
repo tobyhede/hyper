@@ -53,10 +53,10 @@ describe('the story Spaces', () => {
     const opens = requireDefaultMap(space.space);
 
     expect(opens).toBe(space.space.defaultMap);
-    const map = space.space.lookup.map(opens)?.map;
+    const openingMap = space.space.lookup.map(opens)?.map;
     expect(openedMapTitle(space.space, opens)).toBe('Collection 2');
     expect(
-      space.space.resources.filter((resource) => map?.positions[resource.id] === undefined),
+      space.space.resources.filter((resource) => openingMap?.positions[resource.id] === undefined),
     ).not.toHaveLength(0);
   });
 
@@ -88,7 +88,7 @@ describe('the story Spaces', () => {
 
     expect(openedMapTitle(edited.space, opens)).toBe('Collection 1');
     expect(edited.space.maps.slice(0, authoredSpace.maps.length)).toEqual(authoredSpace.maps);
-    expect(edited.space.maps.slice(authoredSpace.maps.length).map((map) => map.title)).toEqual([
+    expect(edited.space.maps.slice(authoredSpace.maps.length).map((m) => m.title)).toEqual([
       'Collection 3',
     ]);
   });
@@ -116,7 +116,7 @@ describe('the story Spaces', () => {
       ...[authoredSpace, edited.space, traversalSpace, deepDiveSpace, commandDockSpace].flatMap(
         (space) => [
           ...space.resources.map((resource) => resource.id),
-          ...space.maps.map((map) => map.id),
+          ...space.maps.map((m) => m.id),
           ...space.graphs.map((graph) => graph.id),
         ],
       ),
@@ -152,7 +152,7 @@ describe('the story Spaces', () => {
   /**
    * The traversal Spaces open where they say, on the one Graph their Map
    * owns — so a presenting story calls `present()` and nothing else, and the
-   * Graph it presents is the one `requireDefaultMap` and ADR 0026 answer rather
+   * Graph it presents is the one `requireDefaultMap` and ADR 0040 answer rather
    * than one the harness picked.
    */
   it('opens each traversal Space on the Map and Graph it declares', () => {
@@ -192,7 +192,7 @@ describe('the story Spaces', () => {
   /**
    * The Graph colours `authoredSpace` draws are derived, not transcribed. The
    * four Graphs carry no colour of their own, so each takes a palette slot by
-   * its position in the flatten across Maps (ADR 0045).
+   * its position in the flatten across Maps.
    */
   it('carries no Graph colour of its own, leaving the palette to answer', () => {
     expect(authoredSpace.graphs.map((graph) => graph.title)).toEqual([
@@ -218,7 +218,7 @@ describe('the story Spaces', () => {
    */
   it('gives the Command Dock two Maps, three Graphs over the first, and Resources outside it', () => {
     const opens = requireDefaultMap(commandDockSpace);
-    const map = commandDockSpace.lookup.map(opens)?.map;
+    const openingMap = commandDockSpace.lookup.map(opens)?.map;
 
     expect(opens).toBe(commandDockSpace.defaultMap);
     expect(openedMapTitle(commandDockSpace, opens)).toBe('Collection 1');
@@ -226,12 +226,12 @@ describe('the story Spaces', () => {
       'Collection 1',
       'Collection 2',
     ]);
-    expect(map?.graphs.map((graph) => graph.title)).toEqual(['Long', 'Mid', 'Short']);
+    expect(openingMap?.graphs.map((graph) => graph.title)).toEqual(['Long', 'Mid', 'Short']);
 
     const unplaced = commandDockSpace.resources.filter(
-      (resource) => map?.positions[resource.id] === undefined,
+      (resource) => openingMap?.positions[resource.id] === undefined,
     );
-    expect(unplaced.length).toBeGreaterThan(Object.keys(map?.positions ?? {}).length * 4);
+    expect(unplaced.length).toBeGreaterThan(Object.keys(openingMap?.positions ?? {}).length * 4);
   });
 
   /**
@@ -244,15 +244,15 @@ describe('the story Spaces', () => {
    */
   it('carries every Resource kind on the Command Dock canvas and in its Resources list', () => {
     const opens = requireDefaultMap(commandDockSpace);
-    const map = commandDockSpace.lookup.map(opens)?.map;
+    const openingMap = commandDockSpace.lookup.map(opens)?.map;
     const kinds = (resources: readonly { readonly kind: string }[]): readonly string[] =>
       [...new Set(resources.map((resource) => resource.kind))].sort();
 
     const placed = commandDockSpace.resources.filter(
-      (resource) => map?.positions[resource.id] !== undefined,
+      (resource) => openingMap?.positions[resource.id] !== undefined,
     );
     const unplaced = commandDockSpace.resources.filter(
-      (resource) => map?.positions[resource.id] === undefined,
+      (resource) => openingMap?.positions[resource.id] === undefined,
     );
 
     expect(kinds(placed)).toEqual(['markdown', 'reference', 'space']);

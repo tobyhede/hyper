@@ -6,6 +6,20 @@ import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository
 import { createSpaceStartup, type SpaceStartup } from '../../packages/app/src/space';
 import { recordingHistory } from '../../packages/app/test/browser-history';
 
+/** A request that initializes no Space mints nothing, so any mint is a failure here. */
+const mintsNothing = (): UUID => {
+  throw new Error('This request initializes no Space, so it mints no identity.');
+};
+
+/** Hands out the ids a first working load mints, in order, then refuses. */
+const mintingIds =
+  (...ids: UUID[]): (() => UUID) =>
+  () => {
+    const id = ids.shift();
+    if (id === undefined) throw new Error('initializer minted too many identities');
+    return id;
+  };
+
 /**
  * Startup over the recording browser rather than the ambient one.
  *
@@ -86,12 +100,12 @@ const otherSnapshot = (): SpaceSnapshot => {
   };
 };
 
-const startupFor = (metaSpaceId: UUID, ...snapshots: SpaceSnapshot[]) => {
+const startupFor = (newId: () => UUID, metaSpaceId: UUID, ...snapshots: SpaceSnapshot[]) => {
   const repository = new E2eMemorySpaceRepository(
     snapshots.map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
     metaSpaceId,
   );
-  const app = createSpaceHttpApp(repository);
+  const app = createSpaceHttpApp(repository, { newId });
   return startupOver(
     new HttpSpaceBackend('http://hyper.test', {
       fetch: (input, init) => Promise.resolve(app.fetch(new Request(input, init))),
@@ -106,12 +120,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     });
-    const ids = [MAP_ID, GRAPH_ID];
-    const startup = startupOver(backend, () => {
-      const id = ids.shift();
-      if (id === undefined) throw new Error('initializer minted too many identities');
-      return id;
-    });
+    const startup = startupOver(backend, mintingIds(MAP_ID, GRAPH_ID));
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
@@ -123,7 +132,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('opens the Space named by the compact product-route id through HTTP', async () => {
-    const startup = startupFor(SPACE_ID, snapshot());
+    const startup = startupFor(mintingIds(MAP_ID, GRAPH_ID), SPACE_ID, snapshot());
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
@@ -136,6 +145,7 @@ describe('HTTP space startup composition', () => {
 
   it('fails when the product-route id no longer resolves', async () => {
     const startup = startupFor(
+      mintsNothing,
       OTHER_SPACE_ID,
       snapshot(OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space'),
     );
@@ -146,7 +156,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('opens the exact named Space when several are stored', async () => {
-    const startup = startupFor(SPACE_ID, metaReferencingOther(), otherSnapshot());
+    const startup = startupFor(mintsNothing, SPACE_ID, metaReferencingOther(), otherSnapshot());
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),
@@ -156,7 +166,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('names the Meta Space from the aggregate it loaded while Meta is not open', async () => {
-    const startup = startupFor(SPACE_ID, metaReferencingOther(), otherSnapshot());
+    const startup = startupFor(mintsNothing, SPACE_ID, metaReferencingOther(), otherSnapshot());
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),
@@ -199,7 +209,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('rejects a malformed compact product-route id', async () => {
-    const startup = startupFor(SPACE_ID, snapshot());
+    const startup = startupFor(mintsNothing, SPACE_ID, snapshot());
 
     await expect(startup.resolve('/spaces/not-a-compact-uuid')).rejects.toThrow(
       'The product URL is malformed.',

@@ -101,10 +101,10 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
       const created = catalog[0];
       if (created === undefined) throw new Error('Expected the new Space in the catalog');
       const stored = await opened.repository.loadSpace(created.id);
-      const map = stored?.snapshot.document.maps?.[0];
-      const graph = map?.graphs[0];
+      const firstMap = stored?.snapshot.document.maps?.[0];
+      const graph = firstMap?.graphs[0];
       const resourceId = stored?.snapshot.resources[0]?.id;
-      if (map === undefined || graph === undefined || resourceId === undefined) {
+      if (firstMap === undefined || graph === undefined || resourceId === undefined) {
         throw new Error('Expected a complete new Space');
       }
       expect(stored).toEqual({
@@ -115,7 +115,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
             title: 'New space',
             maps: [
               {
-                id: map.id,
+                id: firstMap.id,
                 title: 'Map 1',
                 kind: 'positioned',
                 positions: { [resourceId]: { x: 0, y: 0, open: false } },
@@ -131,7 +131,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
                 activeGraph: graph.id,
               },
             ],
-            defaultMap: map.id,
+            defaultMap: firstMap.id,
           },
           resources: [
             {
@@ -143,7 +143,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
         revision: 0n,
         exportedRevision: null,
       });
-      for (const id of [resourceId, map.id, graph.id]) {
+      for (const id of [resourceId, firstMap.id, graph.id]) {
         expect(uuidSchema.safeParse(id).success).toBe(true);
       }
 

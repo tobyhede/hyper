@@ -14,7 +14,7 @@ import type { Space } from './space';
  * Contextual entity resolution over a validated Space.
  *
  * A Map owns its Graphs (ADR 0040) and `space.graphs` is a flatten across
- * every Map (ADR 0045), so an id taken off that collection has lost the one
+ * every Map, so an id taken off that collection has lost the one
  * resource ownership adds — which Map's Resources its Edges are closed over, and
  * which Map an Edit to it belongs in. Every answer here therefore arrives
  * with its context already resolved, rather than as a bare value a caller has to
@@ -31,7 +31,7 @@ import type { Space } from './space';
  * A Map, and the Graph it opens active on.
  *
  * The Active Graph is resolved once, here, rather than at each reader: it is the
- * Graph the Map names, or its first (ADR 0026). Resolving it does **not**
+ * Graph the Map names, or its first (ADR 0040). Resolving it does **not**
  * fill the authored optional — `map` is the exact authored value, so a
  * snapshot or an export written from it preserves the absence.
  */
@@ -132,10 +132,10 @@ export function buildSpaceLookup(input: {
   readonly maps: readonly Map[];
 }): SpaceLookupResult {
   const resolvedMaps = new Map<UUID, ResolvedMap>();
-  for (const map of input.maps) {
-    const activeGraph = map.graphs.find((graph) => graph.id === map.activeGraph) ?? map.graphs[0];
-    if (activeGraph === undefined) return { ok: false, mapWithoutGraph: map.id };
-    resolvedMaps.set(map.id, { map, activeGraph });
+  for (const m of input.maps) {
+    const activeGraph = m.graphs.find((graph) => graph.id === m.activeGraph) ?? m.graphs[0];
+    if (activeGraph === undefined) return { ok: false, mapWithoutGraph: m.id };
+    resolvedMaps.set(m.id, { map: m, activeGraph });
   }
 
   const ownedGraphs = new Map<GraphId, OwnedGraph>();

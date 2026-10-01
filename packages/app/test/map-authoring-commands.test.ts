@@ -333,7 +333,7 @@ describe('what each context addresses', () => {
 });
 
 const mapsOf = (space: OpenSpace): readonly MapId[] =>
-  space.app.currentSpace().maps.map((map) => map.id);
+  space.app.currentSpace().maps.map((m) => m.id);
 
 describe.each(contexts)('Map creation through $name', ({ setup }) => {
   it('creates one empty Map and answers its Map and Active Graph', async () => {

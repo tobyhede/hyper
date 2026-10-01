@@ -45,9 +45,10 @@ export async function openEdgeToolbarStory(scenario: EdgeToolbarScenario) {
   const opened = await spaces.open(edgeToolbarSnapshot.id);
   if (scenario === 'refused') {
     const stored = edgeToolbarSnapshot.document;
-    const map = stored.maps?.find((candidate) => candidate.id === stored.defaultMap);
+    const opening = stored.maps?.find((candidate) => candidate.id === stored.defaultMap);
     const graph =
-      map?.graphs.find((candidate) => candidate.id === map.activeGraph) ?? map?.graphs[0];
+      opening?.graphs.find((candidate) => candidate.id === opening.activeGraph) ??
+      opening?.graphs[0];
     const untitled = graph?.edges.find((edge) => edge.title === undefined);
     if (graph === undefined || untitled === undefined) {
       throw new Error('The Edge fixture holds no untitled Active Graph Edge.');

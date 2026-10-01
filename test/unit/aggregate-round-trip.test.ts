@@ -273,9 +273,9 @@ describe('exporting and importing one complete aggregate', () => {
       ...meta,
       document: {
         ...meta.document,
-        maps: meta.document.maps?.map((map) => ({
-          ...map,
-          graphs: map.graphs.map((graph) => ({ ...graph, edges: [edge] })),
+        maps: meta.document.maps?.map((m) => ({
+          ...m,
+          graphs: m.graphs.map((graph) => ({ ...graph, edges: [edge] })),
         })),
       },
     };
@@ -295,9 +295,9 @@ describe('exporting and importing one complete aggregate', () => {
       ...meta,
       document: {
         ...meta.document,
-        maps: meta.document.maps?.map((map) => ({
-          ...map,
-          graphs: map.graphs.map((graph) => ({ ...graph, headShape: 'diamond' as const })),
+        maps: meta.document.maps?.map((m) => ({
+          ...m,
+          graphs: m.graphs.map((graph) => ({ ...graph, headShape: 'diamond' as const })),
         })),
       },
     };
@@ -313,7 +313,7 @@ describe('exporting and importing one complete aggregate', () => {
       stored.find(({ id }) => id === META_SPACE_ID)?.document.maps?.[0]?.graphs[0]?.headShape,
     ).toBe('diamond');
     for (const target of stored.filter(({ id }) => id !== META_SPACE_ID)) {
-      for (const graph of target.document.maps?.flatMap((map) => map.graphs) ?? []) {
+      for (const graph of target.document.maps?.flatMap((m) => m.graphs) ?? []) {
         expect(graph).not.toHaveProperty('headShape');
       }
     }
@@ -428,16 +428,16 @@ describe('a mapless Space', () => {
     const repository = repositoryHolding([mapless]);
 
     const initialized = await createWorkingSpaceLoader(repository, newUuid)(META_SPACE_ID);
-    const map = initialized?.snapshot.document.maps?.[0];
-    if (map === undefined) throw new Error('The working load initialized no Map');
+    const initializedMap = initialized?.snapshot.document.maps?.[0];
+    if (initializedMap === undefined) throw new Error('The working load initialized no Map');
     await exportTo(repository, destination);
 
     const exported = spaceFileSchema.parse(
       JSON.parse(await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8')),
     );
-    expect(exported.defaultMap).toBe(map.id);
-    expect(exported.maps?.[0]?.id).toBe(map.id);
-    expect(exported.maps?.[0]?.graphs[0]?.id).toBe(map.graphs[0]?.id);
+    expect(exported.defaultMap).toBe(initializedMap.id);
+    expect(exported.maps?.[0]?.id).toBe(initializedMap.id);
+    expect(exported.maps?.[0]?.graphs[0]?.id).toBe(initializedMap.graphs[0]?.id);
     // The Map initialization authors is *empty* (ADR 0079) — it does not
     // adopt the Resources the Space already held — and export writes that as it is
     // rather than placing them for it.
@@ -466,10 +466,10 @@ describe('re-exporting over an earlier export', () => {
               ...snapshot,
               document: {
                 ...snapshot.document,
-                maps: snapshot.document.maps?.map((map) => ({
-                  ...map,
+                maps: snapshot.document.maps?.map((m) => ({
+                  ...m,
                   positions: Object.fromEntries(
-                    Object.entries(map.positions).filter(([id]) => id !== SECOND_LINK_ID),
+                    Object.entries(m.positions).filter(([id]) => id !== SECOND_LINK_ID),
                   ),
                 })),
               },
@@ -529,12 +529,12 @@ describe('re-exporting over an earlier export', () => {
             ...snapshot,
             document: {
               ...snapshot.document,
-              maps: snapshot.document.maps?.map((map) => ({
-                ...map,
+              maps: snapshot.document.maps?.map((m) => ({
+                ...m,
                 positions: Object.fromEntries(
-                  Object.entries(map.positions).filter(([id]) => id !== MARKDOWN_RESOURCE_ID),
+                  Object.entries(m.positions).filter(([id]) => id !== MARKDOWN_RESOURCE_ID),
                 ),
-                graphs: map.graphs.map((graph) => ({ ...graph, edges: [] })),
+                graphs: m.graphs.map((graph) => ({ ...graph, edges: [] })),
               })),
             },
             resources: snapshot.resources.filter(({ id }) => id !== MARKDOWN_RESOURCE_ID),

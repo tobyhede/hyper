@@ -64,17 +64,17 @@ describe('loadSpaceSnapshot', () => {
   });
 
   it('refuses an infinite remembered Open Size', () => {
-    const map = snapshot.document.maps?.[0];
-    if (map === undefined) throw new Error('fixture has a Map');
+    const firstMap = snapshot.document.maps?.[0];
+    if (firstMap === undefined) throw new Error('fixture has a Map');
     const result = loadSpaceSnapshot({
       ...snapshot,
       document: {
         ...snapshot.document,
         maps: [
           {
-            ...map,
+            ...firstMap,
             positions: {
-              ...map.positions,
+              ...firstMap.positions,
               [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: Infinity, height: 146 } },
             },
           },

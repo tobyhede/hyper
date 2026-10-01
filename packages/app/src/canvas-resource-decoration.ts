@@ -75,7 +75,7 @@ export interface CanvasResourceDecorationContext {
   readonly commandOutcomes: CommandOutcomes | undefined;
   readonly completeSpaceResourceSelection: (
     resourceId: ResourceId,
-    map: Pick<SpaceResourceTargetMap, 'id'>,
+    targetMap: Pick<SpaceResourceTargetMap, 'id'>,
     graphId: GraphId,
   ) => string | null;
   readonly portalEditing: ReadonlySet<ResourceId> | undefined;
@@ -333,7 +333,8 @@ export function decorateSpaceResourceNode(
       target,
       document: spaceDocument,
       disabled: !(resourceBelongsToWorkingSpace && context.authorOnCanvas),
-      complete: (map, graphId) => context.completeSpaceResourceSelection(resourceId, map, graphId),
+      complete: (targetMap, graphId) =>
+        context.completeSpaceResourceSelection(resourceId, targetMap, graphId),
       onEditingChange: (editing) => context.onContextEditingChange(resourceId, editing),
       onReport: (message) => context.onContextReport(resourceId, message),
       context: railContext,

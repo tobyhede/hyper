@@ -84,7 +84,7 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        expect(space.graphs).toEqual(space.maps.flatMap((map) => map.graphs));
+        expect(space.graphs).toEqual(space.maps.flatMap((m) => m.graphs));
       }),
     );
   });
@@ -93,7 +93,7 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        const nested = space.maps.flatMap((map) => map.graphs);
+        const nested = space.maps.flatMap((m) => m.graphs);
         space.graphs.forEach((graph, index) => {
           expect(graph).toBe(nested[index]);
         });
@@ -105,9 +105,9 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        for (const map of space.maps) {
-          const owner = space.lookup.map(map.id);
-          for (const graph of map.graphs) {
+        for (const m of space.maps) {
+          const owner = space.lookup.map(m.id);
+          for (const graph of m.graphs) {
             const owned = space.lookup.graph(graph.id);
             expect(owned?.graph).toBe(graph);
             expect(owned?.owner).toBe(owner);
@@ -121,10 +121,10 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        for (const map of space.maps) {
-          const resolved = space.lookup.map(map.id);
+        for (const m of space.maps) {
+          const resolved = space.lookup.map(m.id);
           expect(resolved).toBeDefined();
-          expect(map.graphs).toContain(resolved?.activeGraph);
+          expect(m.graphs).toContain(resolved?.activeGraph);
         }
       }),
     );
@@ -134,9 +134,9 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, (maps) => {
         const space = accepted(maps);
-        for (const map of space.maps) {
-          const members = new Set(Object.keys(map.positions));
-          for (const graph of map.graphs) {
+        for (const m of space.maps) {
+          const members = new Set(Object.keys(m.positions));
+          for (const graph of m.graphs) {
             for (const edge of graph.edges) {
               expect(members.has(edge.from)).toBe(true);
               expect(members.has(edge.to)).toBe(true);
@@ -151,7 +151,7 @@ describe('what intake builds, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, fc.nat(), fc.nat(), (maps, rawTarget, rawHost) => {
         const { file, resources } = documentFrom(maps);
-        const all = file.maps.flatMap((map) => map.graphs.map((graph) => ({ map, graph })));
+        const all = file.maps.flatMap((m) => m.graphs.map((graph) => ({ map: m, graph })));
         const target = all[rawTarget % all.length]!;
         // The host map is an independent draw, so the repeat lands in its own
         // owner and in another map across the run. Deriving both from one
@@ -176,9 +176,7 @@ describe('what intake builds, over generated documents', () => {
         const backwards = loadSpace(file, [...resources].reverse());
         expect(forwards.ok && backwards.ok).toBe(true);
         if (!forwards.ok || !backwards.ok) return;
-        expect(backwards.space.maps.map((map) => map.id)).toEqual(
-          forwards.space.maps.map((map) => map.id),
-        );
+        expect(backwards.space.maps.map((m) => m.id)).toEqual(forwards.space.maps.map((m) => m.id));
         expect(backwards.space.graphs.map((graph) => graph.id)).toEqual(
           forwards.space.graphs.map((graph) => graph.id),
         );
@@ -192,7 +190,7 @@ describe('what intake refuses, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, fc.nat(), (maps, raw) => {
         const { file, resources } = documentFrom(maps);
-        const edges = file.maps.flatMap((map) => map.graphs.flatMap((graph) => graph.edges));
+        const edges = file.maps.flatMap((m) => m.graphs.flatMap((graph) => graph.edges));
         edges[raw % edges.length]!.to = uuid('00000000-0000-4000-8000-ffffffffffff');
 
         const result = loadSpace(file, resources);
@@ -213,11 +211,11 @@ describe('what intake refuses, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, fc.nat(), (maps, raw) => {
         const { file, resources } = documentFrom(maps);
-        const map = file.maps[raw % file.maps.length]!;
-        const keys = Object.keys(map.positions);
+        const chosen = file.maps[raw % file.maps.length]!;
+        const keys = Object.keys(chosen.positions);
         const evicted = keys[raw % keys.length]!;
-        map.positions = Object.fromEntries(
-          Object.entries(map.positions).filter(([id]) => id !== evicted),
+        chosen.positions = Object.fromEntries(
+          Object.entries(chosen.positions).filter(([id]) => id !== evicted),
         );
 
         const result = loadSpace(file, resources);
@@ -244,7 +242,7 @@ describe('what intake refuses, over generated documents', () => {
     fc.assert(
       fc.property(mapsArb, fc.nat(), (maps, raw) => {
         const { file, resources } = documentFrom(maps);
-        const graphs = file.maps.flatMap((map) => map.graphs);
+        const graphs = file.maps.flatMap((m) => m.graphs);
         const graph = graphs[raw % graphs.length]!;
         graph.edges.push({ ...graph.edges[raw % graph.edges.length]! });
 

@@ -23,7 +23,7 @@ const TARGET = id(2);
 const MAP = id(3);
 const OTHER_MAP = id(6);
 
-const spaceResource = (resourceId: typeof HOST, map: typeof MAP): ResourceFlowNode => ({
+const spaceResource = (resourceId: typeof HOST, mapId: typeof MAP): ResourceFlowNode => ({
   id: resourceId,
   type: 'resource',
   position: { x: 100, y: 200 },
@@ -37,7 +37,7 @@ const spaceResource = (resourceId: typeof HOST, map: typeof MAP): ResourceFlowNo
     open: true,
     active: false,
     selectedForAuthoring: false,
-    display: fixtureDisplay(true, 'space', '', { spaceId: TARGET, map }),
+    display: fixtureDisplay(true, 'space', '', { spaceId: TARGET, map: mapId }),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
   },

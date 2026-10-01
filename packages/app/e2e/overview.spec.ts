@@ -163,7 +163,7 @@ test(
 
 /**
  * A Map draws the Graphs it owns. Selecting is navigation and writes
- * nothing (ADR 0031), so the revision is unmoved throughout.
+ * nothing (ADR 0079), so the revision is unmoved throughout.
  *
  * This is also the application half of the Graph HUD's `SparseMap` story
  * (`packages/app/stories/surfaces/graph-hud.stories.tsx`):

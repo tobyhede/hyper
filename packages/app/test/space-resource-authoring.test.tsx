@@ -68,7 +68,7 @@ const OTHER_TO_HOME_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022'
  * The asymmetry is the fixture's job: a selection seeded from the head of the
  * list and one seeded from the Map's own Active Graph agree everywhere a
  * Map owns one Graph, so only a Map like this can say which rule ran
- * (ADR 0026).
+ * (ADR 0040).
  */
 const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000023');
 const OTHER_DRAFT_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000024');
@@ -294,7 +294,7 @@ function mount(
   reportObserverError?: ObserverErrorReporter,
   /**
    * The two injections only some tests name: the minter a coordinated Edit
-   * draws its identities from (ADR 0016), and the control that decides what a
+   * draws its identities from (ADR 0109), and the control that decides what a
    * commit answers.
    */
   { newId = newUuid, control }: MountInjections = {},
@@ -686,7 +686,7 @@ describe('Create Space Resource', () => {
    * Reported through the sink the composition was given, not a second one.
    *
    * A surface that answers the reporting requirement with its own
-   * `console.error` puts back exactly the invisible reporter ADR 0016 exists to
+   * `console.error` puts back exactly the invisible reporter ADR 0109 exists to
    * prevent: a host that installed a sink of its own would never see this.
    */
   it('reports a rejected create through the sink the composition was given', async () => {
@@ -745,7 +745,7 @@ describe('referencing an existing Space', () => {
    * An already-initialized target is read, not re-made.
    *
    * What the Resource records is the Map that Space itself opens on and that
-   * Map's own Active Graph (ADR 0079, ADR 0026) — `Current` and not `Draft`,
+   * Map's own Active Graph (ADR 0079, ADR 0040) — `Current` and not `Draft`,
    * which is the only distinction `Collection 1`'s two Graphs are here to expose.
    * The target's stored document is asserted whole, because initialization is a
    * commit and a commit that ran against a Space needing nothing would show up

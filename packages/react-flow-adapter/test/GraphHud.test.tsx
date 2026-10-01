@@ -181,11 +181,11 @@ describe('GraphHud', () => {
     );
 
     const space = container.querySelector('[data-icon="space"]');
-    const map = container.querySelector('.lucide-layout-grid');
+    const mapIcon = container.querySelector('.lucide-layout-grid');
     expect(space).toHaveAttribute('width', '13');
     expect(space).toHaveAttribute('height', '13');
-    expect(map).toHaveAttribute('width', '13');
-    expect(map).toHaveAttribute('height', '13');
+    expect(mapIcon).toHaveAttribute('width', '13');
+    expect(mapIcon).toHaveAttribute('height', '13');
   });
 
   /**

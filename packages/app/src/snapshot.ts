@@ -42,9 +42,9 @@ export const createWorkingSpaceReader = (): ((snapshot: SpaceSnapshot) => Space)
  * Convert the validated runtime aggregate into the complete persistence seam.
  *
  * `space.graphs` is deliberately not written: it is a *derived* flatten across
- * the maps that own them (ADR 0040, ADR 0045), and the document has no
- * space-level collection for it to go back into. Every graph reaches the wire
- * inside the map that owns it, which `space.maps` already carries.
+ * the Maps that own them (ADR 0040), and the document has no
+ * space-level collection for it to go back into. Every Graph reaches the wire
+ * inside the Map that owns it, which `space.maps` already carries.
  */
 export const snapshotFromSpace = (space: Space): SpaceSnapshot => {
   const document: SpaceSnapshot['document'] = {
@@ -93,7 +93,7 @@ export const updatePositionedMap = (
   { mapId, title, activeGraphId }: PositionedMapEdit,
 ): SpaceSnapshot => {
   const maps = base.document.maps ?? [];
-  if (!maps.some((map) => map.id === mapId)) {
+  if (!maps.some((m) => m.id === mapId)) {
     throw new Error(`Cannot write Map ${mapId}: the snapshot holds no such Map.`);
   }
   return {

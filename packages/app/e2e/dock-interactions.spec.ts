@@ -97,8 +97,8 @@ test('renaming a Space, Map or Graph from the Dock does not Open a selected Reso
   }
 
   for (const key of ['Enter', ' '] as const) {
-    const map = selectedCanvas(page);
-    await map.focus();
+    const mapControl = selectedCanvas(page);
+    await mapControl.focus();
     await page.keyboard.press(key);
     await expect(page.getByRole('menu')).toBeVisible();
     await expect(page.locator('.canvas-resource[data-open="true"]')).toHaveCount(0);

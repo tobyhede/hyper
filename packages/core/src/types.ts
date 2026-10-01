@@ -61,7 +61,7 @@ export type PositionedMap = z.infer<typeof positionedMapSchema>;
  * It is data, not behaviour — what arranges Resources is a
  * `LayoutStrategy` in `@project/graph`, and `positionedStrategy` is the one that
  * reads this. Only authored maps exist as values; an automatic strategy has
- * no Map behind it (ADR 0025).
+ * no Map behind it (ADR 0079).
  */
 export type Map = z.infer<typeof mapSchema>;
 

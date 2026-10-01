@@ -113,7 +113,7 @@ export interface MetaSpaceRetryOptions {
  * the repair too.
  *
  * `wait` and `report` are the caller's rather than a timer and a stream this
- * module names (ADR 0016, ADR 0081), and they arrive together in one object
+ * module names (ADR 0109, ADR 0081), and they arrive together in one object
  * because they are one collaborator set and `createApp` already gave them a
  * born type. The composition root passes a timer that cannot hold the process
  * open, and a test passes one that records instead of sleeping.

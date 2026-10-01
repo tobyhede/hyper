@@ -97,16 +97,16 @@ const positionedSnapshot: SpaceSnapshot = {
 };
 
 const graphsOf = (snapshot: SpaceSnapshot): readonly Graph[] =>
-  (snapshot.document.maps ?? []).flatMap((map) => map.graphs);
+  (snapshot.document.maps ?? []).flatMap((m) => m.graphs);
 
 const mapOf = (snapshot: SpaceSnapshot, mapId: string) =>
-  (snapshot.document.maps ?? []).find((map) => map.id === mapId);
+  (snapshot.document.maps ?? []).find((m) => m.id === mapId);
 
 function open(
   snapshot: SpaceSnapshot = positionedSnapshot,
   mapId: MapId = MAP_ID,
   // The ids this Edit will mint, named by the test that asserts on them rather
-  // than taken from the ambient generator (ADR 0016, and `./minting`).
+  // than taken from the ambient generator (ADR 0109, and `./minting`).
   newId: () => UUID = mintingIds(MINTED),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
@@ -1590,8 +1590,8 @@ describe('Delete Resource from Space', () => {
   });
 
   /*
-   * A Space Resource owns the Space it names (ADR 0058), so deleting it deletes
-   * that Space and the closure below it — one coordinated multi-Space Edit,
+   * The Space Resources naming a Space own it together (ADR 0074), so deleting
+   * the last one deletes that Space and the closure below it — one coordinated multi-Space Edit,
    * which is the session registry's and not a single-Space update this seam can
    * make. Completing it here stores a Space whose target is unreachable, and
    * aggregate intake refuses that commit permanently with the Resource already gone

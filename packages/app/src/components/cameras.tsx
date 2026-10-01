@@ -10,7 +10,8 @@ import { viewportFromFraming, type SpaceResourceFraming } from '../space-resourc
 
 /**
  * The camera seam (ADR 0027): the components that move React Flow's viewport
- * and the whole of what this app asks of it.
+ * when presenting starts, advances or ends, and when a Space Resource is
+ * entered.
  *
  * Overview and presenting are one `fitView` call (ADR 0044). Enter from a Space
  * Resource is not: the stored framing is a Map-coordinate camera, and

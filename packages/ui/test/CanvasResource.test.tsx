@@ -1811,9 +1811,9 @@ describe('CanvasResource Space front', () => {
       />,
     );
 
-    const map = screen.getByTestId('space-resource-map');
-    expect(map).toBeEnabled();
-    expect(map).toHaveTextContent('No Map');
+    const mapSelector = screen.getByTestId('space-resource-map');
+    expect(mapSelector).toBeEnabled();
+    expect(mapSelector).toHaveTextContent('No Map');
     const graph = screen.getByTestId('space-resource-graph');
     expect(graph).toHaveAttribute('aria-disabled', 'true');
     expect(graph).toHaveTextContent('No Graph');

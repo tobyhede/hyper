@@ -66,7 +66,7 @@ export interface PendingCanvasProjection {
 
 export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCanvasProjection {
   const colors = graphColorsByGraphId(space);
-  // Which Graphs the Map draws: the ones it owns, exactly (ADR 0045). They
+  // Which Graphs the Map draws: the ones it owns, exactly (ADR 0040). They
   // are the Space's own values, so the projection below draws the same Graphs
   // the Map carries rather than a set derived a second way here.
   const visibleGraphs = resolved.map.graphs;

@@ -43,16 +43,16 @@ const NO_MEMBERSHIPS: readonly MapMembership[] = [];
 export function otherMapMemberships(space: Space, selectedMapId: MapId): MapMemberships {
   const colors = graphColorsByGraphId(space);
   const memberships = new Map<ResourceId, MapMembership[]>();
-  for (const map of space.maps) {
-    if (map.id === selectedMapId) continue;
+  for (const otherMap of space.maps) {
+    if (otherMap.id === selectedMapId) continue;
     for (const resource of space.resources) {
-      if (map.positions[resource.id] === undefined) continue;
-      const graphs = map.graphs
+      if (otherMap.positions[resource.id] === undefined) continue;
+      const graphs = otherMap.graphs
         .filter((graph) =>
           graph.edges.some((edge) => edge.from === resource.id || edge.to === resource.id),
         )
         .map((graph) => ({ id: graph.id, title: graph.title, color: graphColor(graph, colors) }));
-      const membership = { mapId: map.id, mapTitle: map.title, graphs };
+      const membership = { mapId: otherMap.id, mapTitle: otherMap.title, graphs };
       const existing = memberships.get(resource.id);
       if (existing === undefined) memberships.set(resource.id, [membership]);
       else existing.push(membership);

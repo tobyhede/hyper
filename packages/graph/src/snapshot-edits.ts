@@ -131,7 +131,7 @@ function createInMap(
   mode: PlacementMode,
 ): SnapshotEditOutcome {
   const maps = snapshot.document.maps ?? [];
-  const target = maps.find((map) => map.id === mapId);
+  const target = maps.find((m) => m.id === mapId);
   if (target === undefined) {
     return { kind: 'refused', refusal: { code: 'map-not-found' } };
   }
@@ -152,13 +152,13 @@ function createInMap(
       resources: [...snapshot.resources, { id: resourceId, document }],
       document: {
         ...snapshot.document,
-        maps: maps.map((map) =>
-          map.id === mapId
+        maps: maps.map((m) =>
+          m.id === mapId
             ? {
-                ...map,
-                positions: { ...map.positions, [resourceId]: { ...at, open: false } },
+                ...m,
+                positions: { ...m.positions, [resourceId]: { ...at, open: false } },
               }
-            : map,
+            : m,
         ),
       },
     },
@@ -232,10 +232,10 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
       resources: snapshot.resources.filter((resource) => resource.id !== resourceId),
       document: {
         ...snapshot.document,
-        maps: maps.map((map) => ({
-          ...map,
-          positions: Placement.toPositions(removedFrom(Placement.fromMap(map), resourceId)),
-          graphs: withoutIncidentEdges(map.graphs, resourceId),
+        maps: maps.map((m) => ({
+          ...m,
+          positions: Placement.toPositions(removedFrom(Placement.fromMap(m), resourceId)),
+          graphs: withoutIncidentEdges(m.graphs, resourceId),
         })),
       },
     },
@@ -253,9 +253,9 @@ const placedIn = (
   snapshot: SpaceSnapshot,
   mapId: UUID,
 ): { readonly map: Map; readonly placement: Placement } | SnapshotEditRefusal => {
-  const map = (snapshot.document.maps ?? []).find((candidate) => candidate.id === mapId);
-  if (map === undefined) return { code: 'map-not-found' };
-  return { map, placement: Placement.fromMap(map) };
+  const found = (snapshot.document.maps ?? []).find((candidate) => candidate.id === mapId);
+  if (found === undefined) return { code: 'map-not-found' };
+  return { map: found, placement: Placement.fromMap(found) };
 };
 
 /** The snapshot with one Map's positions replaced, and nothing else changed. */
@@ -269,8 +269,8 @@ const withPlacement = (
     ...snapshot,
     document: {
       ...snapshot.document,
-      maps: (snapshot.document.maps ?? []).map((map) =>
-        map.id === mapId ? { ...map, positions: Placement.toPositions(placement) } : map,
+      maps: (snapshot.document.maps ?? []).map((m) =>
+        m.id === mapId ? { ...m, positions: Placement.toPositions(placement) } : m,
       ),
     },
   },
@@ -527,14 +527,14 @@ function removeFromMap(
       ...snapshot,
       document: {
         ...snapshot.document,
-        maps: (snapshot.document.maps ?? []).map((map) =>
-          map.id === mapId
+        maps: (snapshot.document.maps ?? []).map((m) =>
+          m.id === mapId
             ? {
-                ...map,
+                ...m,
                 positions: Placement.toPositions(removedFrom(placed.placement, resourceId)),
-                graphs: withoutIncidentEdges(map.graphs, resourceId),
+                graphs: withoutIncidentEdges(m.graphs, resourceId),
               }
-            : map,
+            : m,
         ),
       },
     },

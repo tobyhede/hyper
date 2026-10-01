@@ -2,7 +2,7 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This is a **single-context** repo: one `CONTEXT.md` + `docs/adr/` at the root. It is a pnpm monorepo, but the five `@project/*` packages are architectural layers of one domain (everything derives from `core`'s schema), not separate bounded contexts, so a single root context fits.
+This is a **single-context** repo: one `CONTEXT.md` + `docs/adr/` at the root. It is a pnpm monorepo, but the seven `@project/*` packages are architectural layers of one domain (everything derives from `core`'s schema), not separate bounded contexts, so a single root context fits.
 
 ## Before exploring, read these
 
@@ -20,10 +20,10 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 │   ├── README.md                       the accepted set, one line each
 │   ├── 0001-recursive-spaces.md
 │   ├── 0002-layout-view-separation.md
-│   ├── ADR 0003
+│   ├── 0003-routes-may-conflict.md
 │   ├── 0004-cards-are-the-graph.md
 │   ├── 0005-layout-is-a-strategy.md
-│   ├── ADR 0007
+│   ├── 0007-routes-are-the-only-structure.md
 │   └── superseded/                     retired decisions, kept as history
 │       ├── 0006-cards-show-titles-in-the-graph.md
 │       └── 0008-presentation-is-a-reveal-deck.md
@@ -35,6 +35,8 @@ For *how* these get written — the grilling loop, when a decision earns an ADR,
 ## Use the glossary's vocabulary
 
 When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
+
+**Map shares its spelling with a builtin and an Array method, so code follows ADR 0101's conventions.** No domain value is bound to a local named `map` — a callback's domain initial is `(m)`, and a longer-lived local takes a descriptive name. A `…Map` suffix on one of our identifiers means the entity, never a lookup table (say `…ById`, `…ByKind`). `.map(`, `.flatMap(`, `ReadonlyMap`, `WeakMap`, `MiniMap`, Prisma's `@@map` and a dependency's own names (Zod's `optionsMap`) are foreign and stay as they are.
 
 If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap to record during domain review.
 

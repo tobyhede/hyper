@@ -52,13 +52,13 @@ const target: SpaceResourceTarget = {
 };
 
 const documentOf = (
-  map: typeof FIRST_MAP_ID,
+  mapId: typeof FIRST_MAP_ID,
   graph: typeof FIRST_GRAPH_ID,
 ): Extract<ResourceDocument, { kind: 'space' }> => ({
   title: 'Elsewhere',
   kind: 'space',
   spaceId: TARGET_ID,
-  map,
+  map: mapId,
   graph,
 });
 

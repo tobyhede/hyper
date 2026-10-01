@@ -683,7 +683,7 @@ test(
     expect(inner.y).toBeGreaterThanOrEqual(outer.y);
     expect(inner.x + inner.width).toBeLessThanOrEqual(outer.x + outer.width);
     expect(inner.y + inner.height).toBeLessThanOrEqual(outer.y + outer.height);
-    const map = await boxOf(
+    const mapSelector = await boxOf(
       (await resourceControls(page, resource)).getByTestId('space-resource-map'),
       'Map selector',
     );
@@ -692,9 +692,9 @@ test(
       'Graph selector',
     );
     // Both named choices share the toolbar floating above the Resource (ADR 0102).
-    expect(map.y + map.height).toBeLessThanOrEqual(outer.y);
-    expect(graph.y).toBeCloseTo(map.y, 1);
-    expect(graph.x).toBeGreaterThanOrEqual(map.x + map.width);
+    expect(mapSelector.y + mapSelector.height).toBeLessThanOrEqual(outer.y);
+    expect(graph.y).toBeCloseTo(mapSelector.y, 1);
+    expect(graph.x).toBeGreaterThanOrEqual(mapSelector.x + mapSelector.width);
     expect(graph.x + graph.width).toBeLessThan(outer.x + outer.width);
   },
 );

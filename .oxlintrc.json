@@ -168,7 +168,7 @@
       // real disk-full/permission-denied conditions aren't practically
       // triggerable in a test. Unlike the Base UI/React Flow boundary above,
       // a real fix exists in principle: give `exportAggregate` an injected
-      // filesystem seam (ADR 0016's composition-time pattern) so this test
+      // filesystem seam (ADR 0109's composition-time pattern) so this test
       // could supply a faithful in-memory implementation that fails on
       // command. That is a production-code change this bounded, zero-prod-risk
       // phase deliberately does not make — left for whoever next touches
@@ -407,7 +407,7 @@
       // signature, and `space-authoring.test.ts`'s
       // `AuthoringOptions`/`AuthoringExtras` mirror
       // `packages/app/src/space-authoring.ts`'s real
-      // `SpaceAuthoringDependencies.reportObserverError` (ADR 0016's
+      // `SpaceAuthoringDependencies.reportObserverError` (ADR 0109's
       // composition-time injection seam).
       "files": [
         "packages/app/src/authoring-refusal.ts",

@@ -139,7 +139,7 @@ type TopologyPreservingDecision =
  */
 const selectableStructure = (document: SpaceSnapshot['document']): readonly string[] =>
   (document.maps ?? [])
-    .flatMap((map) => [map.id, ...map.graphs.map((graph) => `${map.id}/${graph.id}`)])
+    .flatMap((m) => [m.id, ...m.graphs.map((graph) => `${m.id}/${graph.id}`)])
     .sort();
 
 const sameStrings = (left: readonly string[], right: readonly string[]): boolean =>

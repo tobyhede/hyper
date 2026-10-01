@@ -93,9 +93,9 @@ const point = (at: PlacementPoint): ResourcePlacement => {
 };
 
 /** The placement a Map holds. */
-function fromMap(map: Map): Placement {
+function fromMap(m: Map): Placement {
   const positions = new Map<ResourceId, ResourcePlacement>();
-  for (const [resourceId, at] of Object.entries(map.positions)) {
+  for (const [resourceId, at] of Object.entries(m.positions)) {
     if (at !== undefined) {
       // SAFETY: `Object.entries` widens this key to `string`, but it was
       // already branded — `mapSchema` declares `positions` as
@@ -158,8 +158,8 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * completed gesture actually placed.
  *
  * With nothing authored yet the whole rendered map is adopted: an automatic
- * strategy authors nothing, and conversion copies every resource already on screen
- * so that nothing moves at the moment it happens (ADR 0025).
+ * strategy authors nothing, and adopting it copies every resource already on screen
+ * so that nothing moves at the moment it happens.
  *
  * With an authored placement, the rendered geometry is a **report, not an
  * authorship claim**, and `placed` is the whole of what may be read out of it —

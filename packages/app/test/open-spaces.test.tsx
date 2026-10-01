@@ -284,10 +284,10 @@ describe('Open Spaces', () => {
     ).toBe('completed');
     const after = target.session.getState().working;
     expect(
-      after.document.maps?.find((map) => map.id === MAP_ID)?.positions[OTHER_RESOURCE_ID]?.open,
+      after.document.maps?.find((m) => m.id === MAP_ID)?.positions[OTHER_RESOURCE_ID]?.open,
     ).toBe(true);
-    expect(after.document.maps?.find((map) => map.id === SECOND_MAP_ID)).toEqual(
-      before.document.maps?.find((map) => map.id === SECOND_MAP_ID),
+    expect(after.document.maps?.find((m) => m.id === SECOND_MAP_ID)).toEqual(
+      before.document.maps?.find((m) => m.id === SECOND_MAP_ID),
     );
     expect(target.app.navigation.getState().selectedMapId).toBe(SECOND_MAP_ID);
     expect(after.document.defaultMap).toBe(before.document.defaultMap);

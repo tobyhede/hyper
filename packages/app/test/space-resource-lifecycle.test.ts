@@ -184,7 +184,7 @@ describe('what a Space Resource may reference', () => {
             },
           ],
           // Carried where the Map authored one, because it is what a Resource
-          // pointed at this Map seeds its Graph from (ADR 0026). `Map 2`
+          // pointed at this Map seeds its Graph from (ADR 0040). `Map 2`
           // below authored none and so carries none.
           activeGraph: TARGET_GRAPH_ID,
         },

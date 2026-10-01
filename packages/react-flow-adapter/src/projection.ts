@@ -282,7 +282,7 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
  * is the Active Graph's, which the composition resolves and passes as
  * `activeGraphColor`.
  *
- * A node carries its resource's *title*, not its content (ADR 0006) — a Closed
+ * A node carries its resource's *title*, not its content (ADR 0064) — a Closed
  * node's display carries none, and the content is resolved only for a Resource
  * that is Open or presented.
  */

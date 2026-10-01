@@ -59,7 +59,7 @@ export const nextResourceTitle = (snapshot: SpaceSnapshot): string =>
  * be minted inside the lifecycle and would disagree with the Resource's from the
  * outset. One string is handed to both the Space and the Space Resource, so they
  * agree at creation. Collisions
- * across Spaces are accepted: a title is not an identifier (ADR 0016).
+ * across Spaces are accepted: a title is not an identifier (ADR 0089).
  */
 export const nextSpaceTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
@@ -71,7 +71,7 @@ export const nextSpaceTitle = (snapshot: SpaceSnapshot): string =>
 export const nextMapTitle = (snapshot: SpaceSnapshot): string =>
   nextNumberedTitle(
     'Map',
-    (snapshot.document.maps ?? []).map((map) => map.title),
+    (snapshot.document.maps ?? []).map((m) => m.title),
   );
 
 /** What an Edit calls the next Graph in the supplied collection. */

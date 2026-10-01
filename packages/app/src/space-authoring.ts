@@ -564,7 +564,7 @@ interface SpaceAuthoringDependencies {
    *
    * Taken here, once, rather than at each `newUuid()` call inside the derivation,
    * so a test supplies the ids it is about to assert on. Do not mock
-   * `crypto.randomUUID` instead: ADR 0016 records why a global mock is refused.
+   * `crypto.randomUUID` instead: ADR 0109 records why a global mock is refused.
    *
    * It is also what keeps {@link deriveCompletedEdit} a pure core: nothing in it
    * mints from the ambient CSPRNG, so a second call reproduces the first.
@@ -879,7 +879,7 @@ export function createSpaceAuthoring({
    * walk over one Map's Graphs. Comparing the owner's id is what keeps this
    * ownership rather than existence: a Graph a second Map owns resolves here
    * and is still not one this Edit may write. Graph ids are unique across the
-   * Space (ADR 0045), so there is no second Graph the id could have meant.
+   * Space (ADR 0108), so there is no second Graph the id could have meant.
    */
   const ownedGraph = (graphId: GraphId): Graph | undefined => {
     const selectedMap = selectedResolvedMap();
@@ -1028,14 +1028,12 @@ export function createSpaceAuthoring({
     if (completion.kind === 'deleted-map') {
       const snapshot = session.getState().working;
       const maps = snapshot.document.maps ?? [];
-      const target = maps.find((map) => map.id === completion.mapId);
+      const target = maps.find((m) => m.id === completion.mapId);
       if (target === undefined) return refuse({ code: 'map-not-found' });
       if (maps.length === 1) return refuse({ code: 'space-must-keep-map' });
-      const survivors = maps.filter((map) => map.id !== completion.mapId);
-      const selectedSurvives = survivors.some((map) => map.id === selection);
-      const nextMap = selectedSurvives
-        ? survivors.find((map) => map.id === selection)
-        : survivors[0];
+      const survivors = maps.filter((m) => m.id !== completion.mapId);
+      const selectedSurvives = survivors.some((m) => m.id === selection);
+      const nextMap = selectedSurvives ? survivors.find((m) => m.id === selection) : survivors[0];
       if (nextMap === undefined) {
         throw new Error('Deleting a Map left no survivor after the last Map was refused.');
       }
@@ -1080,8 +1078,10 @@ export function createSpaceAuthoring({
       // `map-required` arm: the refusal is the one the chosen shape
       // already raises, and inventing a second would make an Edit that holds
       // no Map say it needed one.
-      const map = (snapshot.document.maps ?? []).find((candidate) => candidate.id === selection);
-      if (map === undefined) return refuse({ code: 'map-not-found' });
+      const selectedMap = (snapshot.document.maps ?? []).find(
+        (candidate) => candidate.id === selection,
+      );
+      if (selectedMap === undefined) return refuse({ code: 'map-not-found' });
       const next = { ...snapshot, document: { ...snapshot.document, title } };
       assertValidAuthoredSnapshot(next);
       return {
@@ -1115,8 +1115,8 @@ export function createSpaceAuthoring({
           nextActiveGraphId:
             embeddedMapId === undefined
               ? navigation.getState().activeGraphId
-              : (map.activeGraph ?? map.graphs[0]?.id ?? null),
-          nextMapId: map.id,
+              : (selectedMap.activeGraph ?? selectedMap.graphs[0]?.id ?? null),
+          nextMapId: selectedMap.id,
         },
       };
     }
@@ -1127,9 +1127,9 @@ export function createSpaceAuthoring({
     // A selected Map the Space no longer holds is not an Edit. Checked before
     // resolving, because the resolver answers that case by throwing.
     //
-    // Not the case ADR 0045 forbids, which is turning a *thrown*
-    // `MapNotFoundError` into a refusal — there is no catch here and a
-    // resolver that refuses still takes the Edit down with it. This asks a
+    // This does not turn a *thrown* `MapNotFoundError` into a refusal —
+    // there is no catch here, and a resolver that refuses still takes the
+    // Edit down with it. This asks a
     // question of the Space instead, and the answer is an author's state rather
     // than a defect: the Map this gesture was aimed at is gone, so there is
     // nothing to write it into.
@@ -1151,20 +1151,20 @@ export function createSpaceAuthoring({
     // what keeps a settled drag from landing against a Map that has since
     // moved on.
     const placement = Placement.fromMap(resolved.map);
-    const writeMap = (write: (map: Map) => Map): void => {
+    const writeMap = (write: (m: Map) => Map): void => {
       snapshot = {
         ...snapshot,
         document: {
           ...snapshot.document,
-          maps: (snapshot.document.maps ?? []).map((map) => (map.id === mapId ? write(map) : map)),
+          maps: (snapshot.document.maps ?? []).map((m) => (m.id === mapId ? write(m) : m)),
         },
       };
     };
     const writePlacement = (next: Placement): void => {
-      writeMap((map) => ({ ...map, positions: Placement.toPositions(next) }));
+      writeMap((m) => ({ ...m, positions: Placement.toPositions(next) }));
     };
     const writeGraphs = (graphs: readonly Graph[]): void => {
-      writeMap((map) => ({ ...map, graphs: [...graphs] }));
+      writeMap((m) => ({ ...m, graphs: [...graphs] }));
     };
     // The one way a Resource is added: mint it, and let `SnapshotEdit` add and
     // place it. Add Resource and Create Reference differ in the document
@@ -1293,7 +1293,7 @@ export function createSpaceAuthoring({
       //
       // The caller names the Reference Resource after its Target, and it is
       // renamed in place afterwards; two Resources sharing a name is not a
-      // collision because a title is not an identifier (ADR 0016). What stays
+      // collision because a title is not an identifier (ADR 0089). What stays
       // this module's is the default and the normalization, not the choice.
       // Normalized the way a rename is, and for the same reason: creation and
       // renaming write one field, so the same typed bytes have to reach the
@@ -1326,12 +1326,16 @@ export function createSpaceAuthoring({
       if (deleted === undefined) {
         return refuse({ code: 'resource-not-found' });
       }
-      // A Space Resource owns the Space it names (ADR 0058), so deleting it deletes
-      // that Space and everything below it — one coordinated multi-Space Edit,
-      // which is Space Resource lifecycle through the session registry and not
-      // a single-Space update this seam can make. Completing it here would store
-      // a Space whose target is unreachable, and aggregate intake refuses that
-      // commit permanently with the Resource already gone from the working state.
+      // The Space Resources naming a Space own it together (ADR 0074): deleting
+      // one leaves the target to the others, and deleting the last deletes that
+      // Space and everything below it. Which case holds is a count across every
+      // Space, and the last-reference case is one coordinated multi-Space Edit —
+      // Space Resource lifecycle through the session registry. This seam reads
+      // and commits one Space, so it can neither count the references nor
+      // cascade, and it refuses every Space Resource deletion rather than guess.
+      // Completing a last-reference deletion here would store a Space nothing
+      // references, and aggregate intake refuses that commit permanently with
+      // the Resource already gone from the working state.
       // Decided before the module, so a Space Resource a Reference Resource
       // targets still answers this rather than `resource-has-references`.
       if (deleted.kind === 'space') {
@@ -1396,16 +1400,16 @@ export function createSpaceAuthoring({
     let mapTitle: string;
     let activeGraphId: GraphId | null;
     let createdGraphId: GraphId | undefined;
-    const { map } = resolved;
-    mapTitle = map.title;
+    const { map: editedMap } = resolved;
+    mapTitle = editedMap.title;
     // The Graphs as the Map held them before this Edit. The arms above that
     // change Graphs through the snapshot (Remove from Map, Delete from Space)
     // never reach the Graph-writing arms below, so the two cannot disagree.
-    const ownedGraphs = map.graphs;
+    const ownedGraphs = editedMap.graphs;
     activeGraphId =
       embeddedMapId === undefined
         ? navigationState.activeGraphId
-        : (map.activeGraph ?? map.graphs[0]?.id ?? null);
+        : (editedMap.activeGraph ?? editedMap.graphs[0]?.id ?? null);
     if (completion.kind === 'renamed-map') {
       // Addressed by id, exactly as Rename Graph is (ADR 0040) — and the id is
       // checked because this Edit resolves its Map from state read *later*

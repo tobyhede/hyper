@@ -93,7 +93,7 @@ const readAggregate = async (repository: SpaceRepository): Promise<AggregateLoad
  * Compose API resources and the product paths the HTTP host owns before SPA
  * fallback.
  *
- * `newId` is the composition-owned identity source (ADR 0016), and it is the
+ * `newId` is the composition-owned identity source (ADR 0109), and it is the
  * host's only one. One collaborator the host composes mints: the API tree's
  * working-space loader durably initializes a stored mapless Space on first
  * load (ADR 0079). So it is forwarded to `createSpaceHttpApp` rather than left
