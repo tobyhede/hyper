@@ -1,4 +1,4 @@
-import { useId, useState, useSyncExternalStore } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,10 +8,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  cn,
+  MapGraphList,
 } from '@project/ui';
 import type {
   DeleteConfirmation as DeleteConfirmationInteraction,
-  DeleteQuestionList,
   DeleteQuestionWords,
   FocusFallback,
 } from '../delete-confirmation';
@@ -27,8 +28,16 @@ import type {
  * be unmounting itself as it reported.
  *
  * The words are the arming command's: the subject's name, what it is deleted
- * from, the one line of what goes and any lists of what else it reaches. The
+ * from, what goes, a line at a time, and the Maps and Graphs it reaches. The
  * dialog adds only the question's shape and its two answers.
+ *
+ * **The question never outgrows the screen.** It stops at 32rem, or at the
+ * viewport less its own padding where that is less; the title and the two
+ * answers keep their height and the reach scrolls in what is left. The reach is
+ * focusable so a keyboard reader can scroll it, which would make it where the
+ * dialog opens — so the caret opens on Cancel. `DeleteResourceConfirmation.test.tsx`
+ * holds the opening caret, and `ladle-e2e/delete-confirmation.spec.ts` the
+ * scrolling.
  *
  * **Closing returns the caret to the control that armed it while that control
  * is still in the document**, whichever answer closed it. A completed deletion
@@ -41,7 +50,7 @@ export function DeleteConfirmation({
   subject,
   from,
   description,
-  lists = [],
+  reach = [],
   deleting,
   focusFallback = null,
   onConfirm,
@@ -62,6 +71,8 @@ export function DeleteConfirmation({
       ? active
       : null;
   });
+  const reachRegion = useRef<HTMLElement>(null);
+  const reaches = reach.length > 0;
   return (
     <AlertDialog
       open
@@ -73,6 +84,15 @@ export function DeleteConfirmation({
       }}
     >
       <AlertDialogContent
+        className={cn(
+          'max-h-[min(32rem,calc(100dvh-2*var(--alert-dialog-spacing)))]',
+          reaches && 'grid-rows-[auto_minmax(0,1fr)_auto]',
+        )}
+        initialFocus={() =>
+          reachRegion.current
+            ?.closest('[data-slot=alert-dialog-content]')
+            ?.querySelector<HTMLElement>('[data-slot=alert-dialog-cancel]') ?? true
+        }
         finalFocus={() => returnFocusTo(opener?.isConnected ? opener : (focusFallback?.() ?? null))}
       >
         <AlertDialogHeader>
@@ -80,11 +100,20 @@ export function DeleteConfirmation({
             Delete {subject.name}
             {from === null ? null : ` From ${from}`}?
           </AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
+          <AlertDialogDescription className="whitespace-pre-line">
+            {description}
+          </AlertDialogDescription>
         </AlertDialogHeader>
-        {lists.map((list) =>
-          list.names.length === 0 ? null : <ReachedList key={list.heading} list={list} />,
-        )}
+        {reaches ? (
+          <section
+            ref={reachRegion}
+            aria-label="What the deletion reaches"
+            tabIndex={0}
+            className="min-h-0 overflow-y-auto rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <MapGraphList label="Maps and Graphs" maps={reach} />
+          </section>
+        ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
           <AlertDialogAction
@@ -104,24 +133,6 @@ export function DeleteConfirmation({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
-}
-
-/** One list of what the deletion reaches, named by its heading. */
-function ReachedList({ list }: { readonly list: DeleteQuestionList }) {
-  const headingId = useId();
-  return (
-    <div className="grid gap-1 text-sm">
-      <p id={headingId} className="font-medium">
-        {list.heading}
-      </p>
-      <ul aria-labelledby={headingId} className="list-disc pl-5 text-muted-foreground">
-        {list.names.map((name, index) => (
-          // A name is unique only within its owner, so the position keys it.
-          <li key={index}>{name}</li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
@@ -160,7 +171,7 @@ export function ArmedDeleteConfirmation({
       subject={pending.subject}
       from={pending.from}
       description={pending.description}
-      lists={pending.lists ?? []}
+      reach={pending.reach ?? []}
       deleting={deleting}
       focusFallback={pending.focusFallback}
       onConfirm={deleteConfirmation.confirm}

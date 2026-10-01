@@ -3,6 +3,7 @@ import {
   type ObserverErrorReporter,
   type ObservableState,
 } from '@project/persistence';
+import type { MapGraphListMap } from '@project/ui';
 
 /**
  * The delete confirmation: one question, asked before any deletion runs.
@@ -27,23 +28,18 @@ export interface DeleteSubject {
   readonly name: string;
 }
 
-/** A named list of what else the deletion reaches, drawn under the description. */
-export interface DeleteQuestionList {
-  /** What the list is, which also names it to assistive technology. */
-  readonly heading: string;
-  /** Each entry by its short name, in the order the question gives them. */
-  readonly names: readonly string[];
-}
-
-/** Everything the confirmation says: `Delete {name} From {from}?` and one line under it. */
+/** Everything the confirmation says: `Delete {name} From {from}?` and what goes under it. */
 export interface DeleteQuestionWords {
   readonly subject: DeleteSubject;
   /** What the subject is deleted from, or `null` to ask `Delete {name}?`. */
   readonly from: string | null;
-  /** What is permanently deleted, in one line. */
+  /** What is permanently deleted; each `\n` starts a line of its own. */
   readonly description: string;
-  /** What else the deletion reaches, list by list; an empty list is not drawn. */
-  readonly lists?: readonly DeleteQuestionList[];
+  /**
+   * The Maps the deletion reaches, each with the Graphs it owns beneath it;
+   * drawn under the description, and not at all when empty.
+   */
+  readonly reach?: readonly MapGraphListMap[];
 }
 
 export interface DeleteQuestion extends DeleteQuestionWords {

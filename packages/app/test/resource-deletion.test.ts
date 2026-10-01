@@ -134,10 +134,12 @@ describe('arming and cancellation', () => {
 
     resourceDeletion.arm(lookupResource(opened));
 
-    expect(deleteConfirmation.getState().pending?.lists).toEqual([
-      { heading: 'Removed from Maps', names: ['Map 1'] },
-      { heading: 'Edges deleted from Graphs', names: ['Main'] },
-    ]);
+    expect(
+      deleteConfirmation.getState().pending?.reach?.map(({ title, graphs }) => ({
+        title,
+        graphs: graphs.map((graph) => graph.title),
+      })),
+    ).toEqual([{ title: 'Map 1', graphs: ['Main'] }]);
   });
 });
 

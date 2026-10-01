@@ -197,7 +197,7 @@ function DeletingFixture() {
       />
       {pending === null ? null : (
         <DeleteConfirmation
-          {...resourceDeletionWords(pending.resource, { maps: [], graphs: [] })}
+          {...resourceDeletionWords(pending.resource, { maps: [], graphs: [] }, {})}
           deleting={false}
           focusFallback={pending.focusFallback}
           onConfirm={() => {

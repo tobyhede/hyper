@@ -306,7 +306,7 @@ describe('asking before Edges are deleted', () => {
     expect(deleteConfirmation.getState().pending).toMatchObject({
       subject: { kind: 'edge', name: 'Edge A → B' },
       from: null,
-      description: 'Permanently deletes the Edge from its Graph.',
+      description: 'Permanently deletes the Edge from the Graph.',
     });
     expect(session.getState().working).toBe(before);
     expect(adapter.getState().selection).toEqual({ kind: 'edge', ...SUBJECT });
@@ -327,7 +327,7 @@ describe('asking before Edges are deleted', () => {
     expect(deleteConfirmation.getState().pending).toMatchObject({
       subject: { kind: 'edge', name: '2 Edges' },
       from: null,
-      description: 'Permanently deletes the Edges from their Graph.',
+      description: 'Permanently deletes the Edges from the Graph.',
     });
   });
 

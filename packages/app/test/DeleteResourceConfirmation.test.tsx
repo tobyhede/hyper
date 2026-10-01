@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Graph, type Map as SpaceMap, type Resource } from '@project/core';
 import { deletionReach, type DeletionReach } from '@project/graph';
@@ -9,10 +9,14 @@ const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffi
 
 const NOTHING: DeletionReach = { maps: [], graphs: [] };
 
-const ask = (resource: Resource, reach: DeletionReach = NOTHING) =>
+const ask = (
+  resource: Resource,
+  reach: DeletionReach = NOTHING,
+  colorByGraphId: Readonly<Record<string, string>> = {},
+) =>
   render(
     <DeleteConfirmation
-      {...resourceDeletionWords(resource, reach)}
+      {...resourceDeletionWords(resource, reach, colorByGraphId)}
       deleting={false}
       onConfirm={() => undefined}
       onDismiss={() => undefined}
@@ -24,7 +28,9 @@ describe('the question Delete from Space asks', () => {
     ask({ id: id('000000000001'), title: 'Auth', kind: 'markdown', body: '' });
 
     const question = screen.getByRole('alertdialog', { name: 'Delete Auth From Space?' });
-    expect(question).toHaveTextContent('Permanently deletes the Resource from the Space.');
+    expect(question).toHaveTextContent(
+      'Permanently deletes the Resource from the Space and all Maps and Graphs.',
+    );
     expect(within(question).getByRole('button', { name: 'Delete' })).toBeVisible();
     expect(within(question).getByRole('button', { name: 'Cancel' })).toBeVisible();
   });
@@ -56,7 +62,22 @@ describe('the question Delete from Space asks', () => {
       return { id: id(suffix), title, kind: 'positioned', positions, graphs };
     };
 
-    it('lists every Map that places it and the Graph holding its Edge, named with its Map', () => {
+    /** The reach as drawn: each Map's title, and the titles of the Graphs listed under it. */
+    const drawnReach = (question: HTMLElement) => {
+      const tree = within(question).getByRole('list', { name: 'Maps and Graphs' });
+      return Array.from(tree.querySelectorAll(':scope > li'), (item) => {
+        const graphs = item.querySelector('ul');
+        return {
+          map: item.firstElementChild?.textContent,
+          graphs:
+            graphs === null
+              ? []
+              : Array.from(graphs.querySelectorAll('li'), (graph) => graph.textContent),
+        };
+      });
+    };
+
+    it('names each Map that places it, with the Graphs holding its Edges beneath', () => {
       ask(
         subject,
         deletionReach(
@@ -70,38 +91,31 @@ describe('the question Delete from Space asks', () => {
       );
 
       const question = screen.getByRole('alertdialog', { name: 'Delete Auth From Space?' });
-      const maps = within(question).getByRole('list', { name: 'Removed from Maps' });
-      expect(
-        within(maps)
-          .getAllByRole('listitem')
-          .map((item) => item.textContent),
-      ).toEqual(['Overview', 'Detail…']);
-      const graphs = within(question).getByRole('list', { name: 'Edges deleted from Graphs' });
-      expect(
-        within(graphs)
-          .getAllByRole('listitem')
-          .map((item) => item.textContent),
-      ).toEqual(['Main in Overview']);
+      expect(drawnReach(question)).toEqual([
+        { map: 'Overview', graphs: ['Main'] },
+        { map: 'Detail…', graphs: [] },
+      ]);
+      const owned = within(question).getByRole('list', { name: 'Overview' });
+      expect(within(owned).getByRole('listitem')).toHaveTextContent('Main');
     });
 
-    it('names a Graph alone when only one Map is listed', () => {
-      ask(
-        subject,
-        deletionReach(
-          [spaceMap('000000000020', 'Overview', [graph('000000000030', 'Main', true)])],
-          subject.id,
-        ),
+    it('marks each Graph in its colour and head shape', () => {
+      const main: Graph = { ...graph('000000000030', 'Main', true), headShape: 'diamond' };
+      ask(subject, deletionReach([spaceMap('000000000020', 'Overview', [main])], subject.id), {
+        [main.id]: '#123456',
+      });
+
+      const mark = within(screen.getByRole('list', { name: 'Overview' }))
+        .getByRole('listitem')
+        .querySelector('[data-slot="graph-legend-mark"]');
+      expect(mark).toHaveAttribute('data-head-shape', 'diamond');
+      expect(mark?.querySelector('[data-slot="graph-legend-mark-line"]')).toHaveAttribute(
+        'stroke',
+        '#123456',
       );
-
-      const graphs = screen.getByRole('list', { name: 'Edges deleted from Graphs' });
-      expect(
-        within(graphs)
-          .getAllByRole('listitem')
-          .map((item) => item.textContent),
-      ).toEqual(['Main']);
     });
 
-    it('lists nothing for a Resource no Map places and no Edge touches', () => {
+    it('draws no reach for a Resource no Map places and no Edge touches', () => {
       ask(
         subject,
         deletionReach(
@@ -111,10 +125,29 @@ describe('the question Delete from Space asks', () => {
       );
 
       expect(screen.getByRole('alertdialog')).toBeVisible();
+      expect(screen.queryByRole('region', { name: 'What the deletion reaches' })).toBeNull();
       expect(screen.queryByRole('list')).toBeNull();
     });
 
-    it('keeps a Space Resource’s cascade sentence beside the lists', () => {
+    it('opens on Cancel, with the reach a focusable region of its own', async () => {
+      ask(
+        subject,
+        deletionReach(
+          [spaceMap('000000000020', 'Overview', [graph('000000000030', 'Main', true)])],
+          subject.id,
+        ),
+      );
+
+      const question = screen.getByRole('alertdialog');
+      await waitFor(() =>
+        expect(within(question).getByRole('button', { name: 'Cancel' })).toHaveFocus(),
+      );
+      expect(
+        within(question).getByRole('region', { name: 'What the deletion reaches' }),
+      ).toHaveAttribute('tabindex', '0');
+    });
+
+    it('keeps a Space Resource’s cascade sentence beside the reach', () => {
       const spaceResource: Resource = {
         id: subject.id,
         title: 'Nested',
@@ -133,7 +166,7 @@ describe('the question Delete from Space asks', () => {
 
       const question = screen.getByRole('alertdialog');
       expect(question).toHaveTextContent('that Space is deleted with it');
-      expect(within(question).getByRole('list', { name: 'Removed from Maps' })).toBeVisible();
+      expect(within(question).getByRole('list', { name: 'Maps and Graphs' })).toBeVisible();
     });
   });
 });

@@ -103,13 +103,14 @@ export const MAP_REPORT_TITLES: ReportTitles = {
 
 /**
  * What Delete Map asks before it runs. A Map is deleted from its Space with
- * everything it owns; the Resources it places are the Space's and stay.
+ * everything it owns; the Resources it places are the Space's and stay, which
+ * the question says on a line of its own.
  */
 export const mapDeletionWords = (deletedMap: Pick<SpaceMap, 'title'>): DeleteQuestionWords => ({
   subject: { kind: 'map', name: shortTitle(deletedMap.title) },
   from: 'Space',
   description:
-    'Permanently deletes the Map, its Graphs and their Edges. Its Resources stay in the Space.',
+    'Permanently deletes the Map, and all Graphs from the Space.\nResources are not deleted.',
 });
 
 /**

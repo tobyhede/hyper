@@ -20,7 +20,7 @@ import {
   type OnConnectStart,
 } from '@xyflow/react';
 import type { Resource, ResourceId, Graph, GraphId } from '@project/core';
-import { titleName, uuidSchema } from '@project/core';
+import { shortTitle, uuidSchema } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   ConnectionEndEligibilityContext,
@@ -382,7 +382,7 @@ export function useEdgeAuthoring({
   // Names rather than Titles: these are read into an Edge's accessible name
   // below, and a name is one line (ADR 0083).
   const resourceTitles = useMemo(
-    () => new Map(placedResources.map((resource) => [resource.id, titleName(resource.title)])),
+    () => new Map(placedResources.map((resource) => [resource.id, shortTitle(resource.title)])),
     [placedResources],
   );
   const graphTitles = useMemo(

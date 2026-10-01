@@ -1743,62 +1743,68 @@ test(
   },
 );
 
-test('Delete Map asks first, and Cancel or Escape keep the Map and return the caret', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  const question = page.getByRole('alertdialog', { name: 'Delete Collection 1 From Space?' });
+test(
+  'Delete Map asks first, and Cancel or Escape keep the Map and return the caret',
+  { tag: '@parity:delete-confirmation-asks-before-deleting-a-map' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    const question = page.getByRole('alertdialog', { name: 'Delete Collection 1 From Space?' });
 
-  await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
-  await expect(question).toBeVisible();
-  await expect(question).toContainText(
-    'Permanently deletes the Map, its Graphs and their Edges. Its Resources stay in the Space.',
-  );
-  await question.getByRole('button', { name: 'Cancel' }).click();
-  await expect(question).toHaveCount(0);
-  await expect(selectedCanvas(page)).toBeFocused();
+    await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
+    await expect(question).toBeVisible();
+    await expect(question).toContainText(
+      'Permanently deletes the Map, and all Graphs from the Space.\nResources are not deleted.',
+    );
+    await question.getByRole('button', { name: 'Cancel' }).click();
+    await expect(question).toHaveCount(0);
+    await expect(selectedCanvas(page)).toBeFocused();
 
-  await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
-  await expect(question).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(question).toHaveCount(0);
-  await expect(selectedCanvas(page)).toBeFocused();
-  await expect(selectedCanvas(page)).toContainText('Collection 1');
+    await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
+    await expect(question).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(question).toHaveCount(0);
+    await expect(selectedCanvas(page)).toBeFocused();
+    await expect(selectedCanvas(page)).toContainText('Collection 1');
 
-  await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
-  await confirmDeletion(page, 'Delete Collection 1 From Space?');
-  await expect(selectedCanvas(page)).not.toContainText('Collection 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-  await expect(await mapChoices(page)).not.toContainText(['Collection 1']);
-});
+    await (await mapMenu(page)).getByRole('menuitem', { name: 'Delete Collection 1' }).click();
+    await confirmDeletion(page, 'Delete Collection 1 From Space?');
+    await expect(selectedCanvas(page)).not.toContainText('Collection 1');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+    await expect(await mapChoices(page)).not.toContainText(['Collection 1']);
+  },
+);
 
-test('Delete Graph asks first, and Cancel or Escape keep the Graph and return the caret', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
-  await newGraph(page);
-  await expect(activeGraph(page)).toContainText('Graph 1');
-  const question = page.getByRole('alertdialog', { name: 'Delete Graph 1 From Collection 1?' });
+test(
+  'Delete Graph asks first, and Cancel or Escape keep the Graph and return the caret',
+  { tag: '@parity:delete-confirmation-asks-before-deleting-a-graph' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
+    await newGraph(page);
+    await expect(activeGraph(page)).toContainText('Graph 1');
+    const question = page.getByRole('alertdialog', { name: 'Delete Graph 1 From Collection 1?' });
 
-  await (await graphMenu(page)).getByRole('menuitem', { name: 'Delete Graph 1' }).click();
-  await expect(question).toBeVisible();
-  await expect(question).toContainText('Permanently deletes the Graph and its Edges.');
-  await question.getByRole('button', { name: 'Cancel' }).click();
-  await expect(question).toHaveCount(0);
-  await expect(activeGraph(page)).toBeFocused();
+    await (await graphMenu(page)).getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+    await expect(question).toBeVisible();
+    await expect(question).toContainText(
+      'Permanently deletes the Graph and all Edges from the Map.',
+    );
+    await question.getByRole('button', { name: 'Cancel' }).click();
+    await expect(question).toHaveCount(0);
+    await expect(activeGraph(page)).toBeFocused();
 
-  await (await graphMenu(page)).getByRole('menuitem', { name: 'Delete Graph 1' }).click();
-  await expect(question).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(question).toHaveCount(0);
-  await expect(activeGraph(page)).toBeFocused();
-  await expect(activeGraph(page)).toContainText('Graph 1');
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
-});
+    await (await graphMenu(page)).getByRole('menuitem', { name: 'Delete Graph 1' }).click();
+    await expect(question).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(question).toHaveCount(0);
+    await expect(activeGraph(page)).toBeFocused();
+    await expect(activeGraph(page)).toContainText('Graph 1');
+    await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  },
+);
 
 test(
   'Delete Graph removes the active Graph and withholds the last one',
@@ -2129,31 +2135,33 @@ test('Delete Resource confirms before removing the Resource from the whole Space
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
-test('the rail’s Delete from Space names the Maps and Graphs the deletion reaches', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await settled(page);
+test(
+  'the rail’s Delete from Space names the Maps and Graphs the deletion reaches',
+  { tag: '@parity:delete-confirmation-lists-what-a-resource-deletion-reaches' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await settled(page);
 
-  await nodeByTitle(page, 'B').click();
-  await (
-    await resourceActions(page, 'B')
-  )
-    .getByRole('menuitem', { name: 'Delete from Space' })
-    .click();
+    await nodeByTitle(page, 'B').click();
+    await (
+      await resourceActions(page, 'B')
+    )
+      .getByRole('menuitem', { name: 'Delete from Space' })
+      .click();
 
-  const confirmation = page.getByRole('alertdialog', { name: 'Delete B From Space?' });
-  await expect(
-    confirmation.getByRole('list', { name: 'Removed from Maps' }).getByRole('listitem'),
-  ).toHaveText(['Collection 1']);
-  await expect(
-    confirmation.getByRole('list', { name: 'Edges deleted from Graphs' }).getByRole('listitem'),
-  ).toHaveText(['Long', 'Mid', 'Short']);
+    const confirmation = page.getByRole('alertdialog', { name: 'Delete B From Space?' });
+    const reach = confirmation.getByRole('list', { name: 'Maps and Graphs' });
+    await expect(reach.locator(':scope > li')).toHaveCount(1);
+    await expect(
+      reach.getByRole('list', { name: 'Collection 1' }).getByRole('listitem'),
+    ).toHaveText(['Long', 'Mid', 'Short']);
+    await expect(confirmation.getByRole('button', { name: 'Cancel' })).toBeFocused();
 
-  await confirmation.getByRole('button', { name: 'Cancel' }).click();
-  await expect(nodeByTitle(page, 'B')).toBeVisible();
-});
+    await confirmation.getByRole('button', { name: 'Cancel' }).click();
+    await expect(nodeByTitle(page, 'B')).toBeVisible();
+  },
+);
 
 /**
  * The menu row that armed the question closes with its menu, so the caret
@@ -2986,7 +2994,7 @@ for (const key of ['Backspace', 'Delete'] as const) {
 
     // Escape leaves the Edge, its selection and the caret where they were.
     const question = page.getByRole('alertdialog', { name: /^Delete Edge .+\?$/ });
-    await expect(question).toContainText('Permanently deletes the Edge from its Graph.');
+    await expect(question).toContainText('Permanently deletes the Edge from the Graph.');
     // Once the question holds the caret: an Escape that reaches the still
     // focused Edge is React Flow's, which deselects it.
     await expect
@@ -3174,7 +3182,12 @@ async function titleEdge(page: Page, label: string, name: string, title: string)
 
 test(
   'a selected Edge reveals its toolbar over its midpoint, and Delete removes the Edge',
-  { tag: '@parity:edge-toolbar-offers-edit-title-and-delete' },
+  {
+    tag: [
+      '@parity:edge-toolbar-offers-edit-title-and-delete',
+      '@parity:delete-confirmation-asks-before-deleting-an-edge',
+    ],
+  },
   async ({ page }) => {
     await openLong(page);
     const drawn = await page.locator('.react-flow__edge').count();

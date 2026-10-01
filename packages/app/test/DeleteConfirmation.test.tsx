@@ -45,7 +45,7 @@ describe('the delete confirmation', () => {
     ask({
       subject: { kind: 'edge', name: '3 Edges' },
       from: null,
-      description: 'Permanently deletes the Edges from their Graph.',
+      description: 'Permanently deletes the Edges from the Graph.',
     });
 
     expect(screen.getByRole('alertdialog', { name: 'Delete 3 Edges?' })).toBeVisible();

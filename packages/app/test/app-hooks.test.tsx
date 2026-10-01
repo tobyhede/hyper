@@ -736,7 +736,7 @@ describe('useDockChrome', () => {
       subject: { kind: 'map', name: 'Map 1' },
       from: 'Space',
       description:
-        'Permanently deletes the Map, its Graphs and their Edges. Its Resources stay in the Space.',
+        'Permanently deletes the Map, and all Graphs from the Space.\nResources are not deleted.',
       focusFallback: noFallback,
     });
     expect(mapIds(opened)).toEqual([MAP_ID, OTHER_MAP_ID]);
@@ -776,7 +776,7 @@ describe('useDockChrome', () => {
     expect(opened.app.deleteConfirmation.getState().pending).toMatchObject({
       subject: { kind: 'graph', name: chrome?.graph.active.title },
       from: 'Map 1',
-      description: 'Permanently deletes the Graph and its Edges.',
+      description: 'Permanently deletes the Graph and all Edges from the Map.',
       focusFallback: noFallback,
     });
     expect(graphIds(opened)).toEqual([GRAPH_ID, CREATED]);

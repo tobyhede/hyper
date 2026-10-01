@@ -716,6 +716,41 @@ export const parityClaims: readonly ParityClaim[] = [
       'The themed canvas control continuously zooms with its slider, zooms with its buttons and fits the real React Flow viewport.',
   },
   {
+    id: 'delete-confirmation-asks-before-deleting-a-map',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'Map',
+    claim:
+      'Delete Map asks `Delete {Map} From Space?`, saying the Map, its Graphs and their Edges are permanently deleted while its Resources stay, and Cancel closes the question with the caret back on the command that asked it.',
+  },
+  {
+    id: 'delete-confirmation-asks-before-deleting-a-graph',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'Graph',
+    claim:
+      'Delete Graph asks `Delete {Graph} From {Map}?`, saying the Graph and its Edges are permanently deleted, and Cancel closes the question with the caret back on the command that asked it.',
+  },
+  {
+    id: 'delete-confirmation-asks-before-deleting-an-edge',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'Edge',
+    claim:
+      'Delete Edge asks `Delete Edge {name}?`, naming an untitled Edge by its two ends, and Cancel closes the question with the caret back on the command that asked it.',
+  },
+  {
+    id: 'delete-confirmation-lists-what-a-resource-deletion-reaches',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'Resource',
+    claim:
+      'Delete from Space asks `Delete {Resource} From Space?` and names each Map that places the Resource with the Graphs it owns that hold an Edge connected to it beneath, and the question opens with the caret on Cancel.',
+  },
+  {
+    id: 'delete-confirmation-warns-a-space-resource-reaches-its-space',
+    storyFile: 'components/delete-confirmation.stories.tsx',
+    storyExport: 'SpaceResource',
+    claim:
+      'Delete from Space on a Space Resource says that the last reference to a Space deletes that Space with it, along with every Space below it that nothing else references.',
+  },
+  {
     id: 'open-space-resource-draws-its-selected-map',
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',

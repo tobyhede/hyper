@@ -499,50 +499,57 @@ test(
  * (ADR 0074). Deleting the only reference takes its Space with it, which is
  * what leaves the Space count where it started.
  */
-test('deleting the last Space Resource deletes the Space it referenced', async ({ page }) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
-  await settled(page);
-  const nodes = await page.locator('.react-flow__node').count();
+test(
+  'deleting the last Space Resource deletes the Space it referenced',
+  { tag: '@parity:delete-confirmation-warns-a-space-resource-reaches-its-space' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+    const nodes = await page.locator('.react-flow__node').count();
 
-  await createSpaceResourceNamed(page, 'Architecture');
-  await settled(page);
+    await createSpaceResourceNamed(page, 'Architecture');
+    await settled(page);
 
-  // Deleting a Resource is the Resource's own rail (ADR 0073), reached by hovering it —
-  // the Space's command surface draws no Resource commands at all (ADR 0082).
-  const created = nodeByTitle(page, 'Architecture');
-  await created.hover();
-  await (
-    await resourceControls(page, created)
-  )
-    .getByRole('button', { name: 'Actions for Resource Architecture', exact: true })
-    .click({ delay: 120 });
-  await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
-  await expect(
-    page.getByText(
-      'If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.',
-    ),
-  ).toBeVisible();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
+    // Deleting a Resource is the Resource's own rail (ADR 0073), reached by hovering it —
+    // the Space's command surface draws no Resource commands at all (ADR 0082).
+    const created = nodeByTitle(page, 'Architecture');
+    await created.hover();
+    await (
+      await resourceControls(page, created)
+    )
+      .getByRole('button', { name: 'Actions for Resource Architecture', exact: true })
+      .click({ delay: 120 });
+    await page.getByRole('menuitem', { name: 'Delete from Space' }).click();
+    await expect(
+      page.getByText(
+        'If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.',
+      ),
+    ).toBeVisible();
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click();
 
-  await settled(page);
-  await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
-  await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
+    await settled(page);
+    await expect(nodeByTitle(page, 'Architecture')).toHaveCount(0);
+    await expect(page.locator('.react-flow__node')).toHaveCount(nodes);
 
-  // The Space went with it, so the Resources list no longer offers Space 1 —
-  // which is the only way this surface can see the cascade. The fixture's
-  // ordinary Spaces remain; the count lands back where this Space started.
-  await page.getByRole('button', { name: 'Resources' }).click();
-  const list = page.getByRole('dialog', { name: 'Resources' });
-  await expect(list).toBeVisible();
-  await expect(list.getByRole('button', { name: 'Add Space 1 to Map' })).toHaveCount(0);
-  await expect(
-    page.getByRole('button', {
-      name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
-    }),
-  ).toBeVisible();
-});
+    // The Space went with it, so the Resources list no longer offers Space 1 —
+    // which is the only way this surface can see the cascade. The fixture's
+    // ordinary Spaces remain; the count lands back where this Space started.
+    await page.getByRole('button', { name: 'Resources' }).click();
+    const list = page.getByRole('dialog', { name: 'Resources' });
+    await expect(list).toBeVisible();
+    await expect(list.getByRole('button', { name: 'Add Space 1 to Map' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', {
+        name: `Spaces in this Meta Space, ${String(FIXTURE_ORDINARY_SPACE_COUNT)}`,
+      }),
+    ).toBeVisible();
+  },
+);
 
 /**
  * Remove from Map takes only the placement — the opposite of Delete from

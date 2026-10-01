@@ -1,5 +1,5 @@
 import {
-  titleName,
+  shortTitle,
   type ResourceId,
   type MapPosition,
   type SpaceSnapshot,
@@ -362,13 +362,13 @@ const edgeName = (
   if (title !== undefined) return title;
   const resourceName = (resourceId: ResourceId): string => {
     const resource = snapshot.resources.find(({ id }) => id === resourceId);
-    return resource === undefined ? resourceId : titleName(resource.document.title);
+    return resource === undefined ? resourceId : shortTitle(resource.document.title);
   };
   return `${resourceName(edge.from)} → ${resourceName(edge.to)}`;
 };
 
 /** What deleting Edges asks: the one Edge by name, or several by count. */
-const edgeDeletionWords = (
+export const edgeDeletionWords = (
   snapshot: SpaceSnapshot,
   mapId: MapId,
   subjects: readonly [EdgeSubject, ...EdgeSubject[]],
@@ -377,12 +377,12 @@ const edgeDeletionWords = (
     ? {
         subject: { kind: 'edge', name: `Edge ${edgeName(snapshot, mapId, subjects[0])}` },
         from: null,
-        description: 'Permanently deletes the Edge from its Graph.',
+        description: 'Permanently deletes the Edge from the Graph.',
       }
     : {
         subject: { kind: 'edge', name: `${subjects.length} Edges` },
         from: null,
-        description: 'Permanently deletes the Edges from their Graph.',
+        description: 'Permanently deletes the Edges from the Graph.',
       };
 
 /** The channel a finished pointer gesture leaves its refusal on. */

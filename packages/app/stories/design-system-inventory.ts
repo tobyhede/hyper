@@ -57,7 +57,7 @@ export const uncataloguedComponents = [
   {
     module: 'packages/ui/src/Dialog.tsx',
     reason:
-      'Without a consumer since ADR 0089 retired the two Resource creation panes: `ResourcePane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the Resource deletion confirmation — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
+      'Without a consumer since ADR 0089 retired the two Resource creation panes: `ResourcePane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the delete confirmation every deletion asks through — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
   },
   {
     module: 'packages/ui/src/ResourceSearchCombobox.tsx',

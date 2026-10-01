@@ -487,7 +487,7 @@ describe('the Edge toolbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Edge A → B' }));
 
     const question = screen.getByRole('alertdialog', { name: 'Delete Edge A → B?' });
-    expect(question).toHaveTextContent('Permanently deletes the Edge from its Graph.');
+    expect(question).toHaveTextContent('Permanently deletes the Edge from the Graph.');
     expect(graphsOf(session.getState().working)[0]?.edges).toEqual([EDGE]);
     fireEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
 

@@ -133,7 +133,7 @@ export const graphDeletionWords = (
 ): DeleteQuestionWords => ({
   subject: { kind: 'graph', name: shortTitle(graph.title) },
   from: shortTitle(owningMap.title),
-  description: 'Permanently deletes the Graph and its Edges.',
+  description: 'Permanently deletes the Graph and all Edges from the Map.',
 });
 
 /**

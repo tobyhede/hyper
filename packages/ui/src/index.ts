@@ -111,6 +111,8 @@ export {
 } from './graph-color';
 export { GraphLegendMark } from './GraphLegendMark';
 export type { GraphLegendMarkProps } from './GraphLegendMark';
+export { MapGraphList } from './MapGraphList';
+export type { MapGraphListGraph, MapGraphListMap, MapGraphListProps } from './MapGraphList';
 export {
   GRAPH_HEAD_SHAPE_FRAME,
   GRAPH_HEAD_SHAPE_LABELS,

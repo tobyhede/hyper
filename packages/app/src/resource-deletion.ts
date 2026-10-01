@@ -1,5 +1,11 @@
 import { shortTitle, type Resource } from '@project/core';
-import { deletionReach, type DeletionReach, type Space } from '@project/graph';
+import {
+  deletionReach,
+  graphColorsByGraphId,
+  type DeletionReach,
+  type Space,
+} from '@project/graph';
+import { graphAppearance } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
 import type {
   DeleteConfirmation,
@@ -22,7 +28,8 @@ import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
  * its words and its staleness.
  */
 
-const DELETES_THE_RESOURCE = 'Permanently deletes the Resource from the Space.';
+const DELETES_THE_RESOURCE =
+  'Permanently deletes the Resource from the Space and all Maps and Graphs.';
 
 /**
  * Exhaustive over the kinds rather than a default plus one exception, so a new
@@ -42,33 +49,32 @@ const DELETION_DESCRIPTIONS = {
  * line and marks a Title written on several as shortened rather than presenting
  * its first line as the whole of it.
  *
- * Under the description it lists what the deletion reaches — the Maps that
- * place the Resource and the Graphs holding an Edge connected to it — each by
- * its short name. A Graph's name is unique only within its Map, so a Graph is
- * named with its Map once more than one Map is listed.
+ * Under the description it names what the deletion reaches: each Map that
+ * places the Resource, with the Graphs it owns that hold an Edge connected to
+ * it beneath, each by its short name and each Graph in its colour and head
+ * shape. Every reached Graph sits under a listed Map, because an Edge connects
+ * two Resources its Graph's Map places (CONTEXT.md, Graph).
  */
 export const resourceDeletionWords = (
   resource: Resource,
   reach: DeletionReach,
-): DeleteQuestionWords => {
-  const withMap = reach.maps.length > 1;
-  return {
-    subject: { kind: 'resource', name: shortTitle(resource.title) },
-    from: 'Space',
-    description: DELETION_DESCRIPTIONS[resource.kind],
-    lists: [
-      { heading: 'Removed from Maps', names: reach.maps.map((m) => shortTitle(m.title)) },
-      {
-        heading: 'Edges deleted from Graphs',
-        names: reach.graphs.map(({ map: m, graph }) =>
-          withMap
-            ? `${shortTitle(graph.title)} in ${shortTitle(m.title)}`
-            : shortTitle(graph.title),
-        ),
-      },
-    ],
-  };
-};
+  colorByGraphId: Readonly<Record<string, string>>,
+): DeleteQuestionWords => ({
+  subject: { kind: 'resource', name: shortTitle(resource.title) },
+  from: 'Space',
+  description: DELETION_DESCRIPTIONS[resource.kind],
+  reach: reach.maps.map((m) => ({
+    key: m.id,
+    title: shortTitle(m.title),
+    graphs: reach.graphs
+      .filter((reached) => reached.map.id === m.id)
+      .map(({ graph }) => ({
+        key: graph.id,
+        title: shortTitle(graph.title),
+        appearance: graphAppearance(graph, colorByGraphId),
+      })),
+  })),
+});
 
 export interface ResourceDeletionState {
   /** The Resource a confirmation is standing over, or `null` when none is. */
@@ -94,7 +100,7 @@ export interface ResourceDeletion {
 export interface ResourceDeletionDependencies {
   readonly authoring: SpaceAuthoring;
   /** The Space the deletion runs in, read at arming for what it reaches. */
-  readonly currentSpace: () => Pick<Space, 'id' | 'maps'>;
+  readonly currentSpace: () => Space;
   /** The one confirmation every delete command asks through. */
   readonly deleteConfirmation: DeleteConfirmation;
   /** Where each deletion runs, and where its outcome is told. */
@@ -158,8 +164,13 @@ export function createResourceDeletion({
     getState,
     subscribe: deleteConfirmation.subscribe,
     arm: (resource, focusFallback) => {
+      const space = currentSpace();
       const question = {
-        ...resourceDeletionWords(resource, deletionReach(currentSpace().maps, resource.id)),
+        ...resourceDeletionWords(
+          resource,
+          deletionReach(space.maps, resource.id),
+          graphColorsByGraphId(space),
+        ),
         run: () => execute(resource),
         focusFallback: focusFallback ?? null,
       };

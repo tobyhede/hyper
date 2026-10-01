@@ -26,7 +26,7 @@ const question = (
 ): DeleteQuestion => ({
   subject: { kind: 'graph', name: 'Main' },
   from: 'Overview',
-  description: 'Permanently deletes the Graph and its Edges.',
+  description: 'Permanently deletes the Graph and all Edges from the Map.',
   run,
   focusFallback: null,
   ...overrides,

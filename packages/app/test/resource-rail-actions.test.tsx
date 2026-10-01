@@ -917,7 +917,9 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     // The press asked rather than deleted, and the question says what goes.
     const question = await screen.findByRole('alertdialog', { name: 'Delete A From Space?' });
-    expect(question).toHaveTextContent('Permanently deletes the Resource from the Space.');
+    expect(question).toHaveTextContent(
+      'Permanently deletes the Resource from the Space and all Maps and Graphs.',
+    );
     expect(resourceIds(session)).toEqual([RESOURCE_ID, OTHER_RESOURCE_ID]);
 
     fireEvent.click(within(question).getByRole('button', { name: 'Delete' }));
