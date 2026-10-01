@@ -67,6 +67,7 @@ describe('PersistenceControl', () => {
     const onOpenSpace = vi.fn();
     render(
       <PersistenceControl
+        replaceSession
         navigate={false}
         persistence={{
           kind: 'conflicted',
@@ -93,6 +94,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{
           kind: 'refused',
           failure: {
@@ -127,6 +129,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{
           kind: 'refused',
           failure: {
@@ -150,6 +153,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{ kind: 'conflicted', current: undefined, baseline: undefined }}
         onAcceptRemote={onAcceptRemote}
         onKeepLocal={vi.fn()}
@@ -169,6 +173,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{
           kind: 'conflicted',
           current: undefined,
@@ -202,6 +207,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{
           kind: 'rejected',
           failure: { kind: 'permanent-failure', code: 'forbidden' },
@@ -241,6 +247,7 @@ describe('PersistenceControl', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{ kind: 'conflicted', ...conflict }}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -276,6 +283,7 @@ describe('PersistenceControl', () => {
     const view = render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={rejection()}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -288,6 +296,7 @@ describe('PersistenceControl', () => {
     view.rerender(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={rejection()}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -321,6 +330,7 @@ describe('PersistenceControl', () => {
     const view = render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={rejection}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -333,6 +343,7 @@ describe('PersistenceControl', () => {
     view.rerender(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={refusal}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -361,6 +372,7 @@ describe('PersistenceControl', () => {
     const control = (active: boolean) => (
       <PersistenceControl
         navigate
+        replaceSession
         active={active}
         persistence={persistence}
         onAcceptRemote={vi.fn(() => null)}
@@ -393,6 +405,7 @@ describe('PersistenceControl', () => {
     const view = render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={conflict()}
         onAcceptRemote={vi.fn(() => ({ code: 'stored-space-deleted' }) as const)}
         onKeepLocal={vi.fn()}
@@ -405,6 +418,7 @@ describe('PersistenceControl', () => {
     view.rerender(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={conflict()}
         onAcceptRemote={vi.fn(() => null)}
         onKeepLocal={vi.fn()}
@@ -528,6 +542,7 @@ describe('PersistenceNotice', () => {
       <>
         <PersistenceControl
           navigate
+          replaceSession
           persistence={oversized}
           onAcceptRemote={vi.fn(() => null)}
           onKeepLocal={vi.fn()}
@@ -571,6 +586,7 @@ describe('PersistenceNotice', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{
           kind: 'rejected',
           failure: { kind: 'permanent-failure', code: 'forbidden' },
@@ -588,6 +604,7 @@ describe('PersistenceNotice', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{
           kind: 'conflicted',
           current: STORED,
@@ -610,6 +627,7 @@ describe('PersistenceNotice', () => {
     render(
       <PersistenceControl
         navigate
+        replaceSession
         persistence={{
           kind: 'conflicted',
           current: STORED,

@@ -423,11 +423,10 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const selectNodes = !presenting;
 
   /**
-   * Only a replacement withholds navigation, which `authoringAvailability`
-   * answers over this result.
+   * Only a replacement withholds navigating or replacing the session, which
+   * `authoringAvailability` answers over this result.
    */
   const navigate = true;
-  /** Only a replacement withholds replacing the session, which is the branch above. */
   const replaceSession = true;
 
   return {

@@ -41,7 +41,7 @@ export interface PersistenceControlProps {
    * re-commits the working Space and replaces nothing, and acknowledging a
    * rejection only dismisses the dialog, so neither is asked this.
    */
-  readonly replaceSession?: boolean;
+  readonly replaceSession: boolean;
   readonly active?: boolean;
   readonly persistence: SpaceSessionState['persistence'];
   readonly onAcceptRemote: () => StoredSpaceRefusal | null;
@@ -87,7 +87,7 @@ const rejectionDescription = ({ failure }: Rejection): string =>
  */
 export function PersistenceControl({
   navigate,
-  replaceSession = true,
+  replaceSession,
   active = true,
   persistence,
   onAcceptRemote,
@@ -323,8 +323,7 @@ function ConflictControl({
           <Button
             variant="secondary"
             data-testid="persistence-accept-remote"
-            // Unavailable rather than unreachable (ADR 0073), as the way to a
-            // blocking Space is.
+            // Unavailable rather than unreachable (ADR 0073).
             disabled={!replaceSession}
             focusableWhenDisabled
             onClick={() => {

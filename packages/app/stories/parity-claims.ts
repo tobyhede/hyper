@@ -498,7 +498,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Replacing',
     claim:
-      'While an Image Resource’s replacement is held, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed, and are available again once it ends.',
+      'While an Image Resource’s replacement is held, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed.',
   },
   {
     id: 'command-dock-fits-a-narrow-container',
