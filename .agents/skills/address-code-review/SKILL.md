@@ -25,7 +25,7 @@ The findings already in this session's context (a code review run earlier in the
 
    Each agent returns, per entry: the verdict, its evidence, and for a fixed entry the regression test's file:line and the red output that proved the finding real. A batch that returns deferred entries re-partitions just those by step 2's rule and dispatches again; a batch that defers every entry it was given is a cycle, so those entries pool into one group worked by a single agent, which is not bound by its group's file set — the constraint keeps concurrent agents off one file, and there is no second writer left. Completion: every ledger entry has a verdict and none is left deferred.
 
-4. **Verify the tree.** Run the repository's verification bar (AGENTS.md "Before claiming done") and report the real output. A failure returns the responsible entry — or entries, where the failure is not attributable to one — to step 3, and the bar runs again. Completion: a green run, with its output reported.
+4. **Verify the tree.** Meet the bar AGENTS.md "Before claiming done" defines: push the fixes to the pull request and read its CI. A failure returns the responsible entry — or entries, where the failure is not attributable to one — to step 3, and the bar runs again. Completion: the `CI passed` check green on the pushed commit, with each job's result reported.
 
 5. **Report.** Map each ledger entry to exactly one outcome:
    - `fixed` — the change, plus the regression test's file:line, or `no test — no behaviour to regress`.
