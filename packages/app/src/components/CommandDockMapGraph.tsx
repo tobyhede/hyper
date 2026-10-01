@@ -46,9 +46,17 @@ import { IdentitySurface } from './CommandDockParts';
 export function MapControls({
   canvas,
   side = 'bottom',
+  menuDisabled = false,
 }: {
   readonly canvas: DockCanvas;
   readonly side?: MenuSide;
+  /**
+   * Draw this cluster's menu button unavailable: it reports `aria-disabled`,
+   * keeps its place in the Dock's arrow order and opens nothing (ADR 0073).
+   * `ToolbarButton` supplies that for a menu trigger given `disabled`, which
+   * `toolbar-menu-trigger.test.tsx` in `@project/ui` holds.
+   */
+  readonly menuDisabled?: boolean;
 }) {
   return (
     <ToolbarGroup aria-label="Map" className="command-dock__cluster">
@@ -59,6 +67,7 @@ export function MapControls({
         title={canvas.selected.title}
         triggerTitle="Switch Map"
         onRename={canvas.onRename}
+        menuDisabled={menuDisabled}
       >
         {(disclosure) => <MapIdentityMenu canvas={canvas} side={side} disclosure={disclosure} />}
       </IdentitySurface>
@@ -123,12 +132,20 @@ export function GraphControls({
   mapTitle,
   side = 'bottom',
   vertical = false,
+  menuDisabled = false,
 }: {
   readonly graph: DockGraph;
   /** Only to caption the list: the Graphs a menu offers are the ones this Map owns. */
   readonly mapTitle: string;
   readonly side?: MenuSide;
   readonly vertical?: boolean;
+  /**
+   * Draw this cluster's menu button unavailable: it reports `aria-disabled`,
+   * keeps its place in the Dock's arrow order and opens nothing (ADR 0073).
+   * `ToolbarButton` supplies that for a menu trigger given `disabled`, which
+   * `toolbar-menu-trigger.test.tsx` in `@project/ui` holds.
+   */
+  readonly menuDisabled?: boolean;
 }) {
   /**
    * **Present leads along a row and trails down a column**, and this is the one
@@ -183,6 +200,7 @@ export function GraphControls({
         title={graph.active.title}
         triggerTitle="Switch Graph"
         onRename={graph.onRename}
+        menuDisabled={menuDisabled}
       >
         {(disclosure) => (
           <GraphIdentityMenu

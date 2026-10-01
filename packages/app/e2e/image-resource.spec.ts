@@ -1035,7 +1035,12 @@ async function uploadHeld(page: Page, target: Locator): Promise<() => void> {
 
 test(
   'a replacement in flight holds the target up and shows its answer there',
-  { tag: '@parity:image-resource-replace-holds-navigation' },
+  {
+    tag: [
+      '@parity:image-resource-replace-holds-navigation',
+      '@parity:command-dock-draws-its-menu-buttons-unavailable',
+    ],
+  },
   async ({ page }) => {
     await serveFigure(page);
     await openPictures(page);
@@ -1066,6 +1071,20 @@ test(
     await expect(target.getByRole('textbox', { name: 'Image URL' })).toBeDisabled();
     await expect(target).toHaveAttribute('aria-busy', 'true');
     await expect(selectedCanvas(page)).toBeDisabled();
+    // The Dock's four menu buttons are drawn unavailable by `aria-disabled`,
+    // which Playwright's `toBeDisabled` would also accept from a fieldset.
+    const dockBar = page.getByRole('toolbar', { name: 'Command Dock' }).filter({ visible: true });
+    const menuButtons = [
+      dockBar.getByTestId('space-title'),
+      selectedCanvas(page),
+      dockBar.getByTestId('active-graph'),
+      dockBar.getByRole('button', { name: /^Spaces\./ }),
+    ];
+    for (const control of menuButtons) {
+      await expect(control).toHaveAttribute('aria-disabled', 'true');
+      await control.click({ force: true, delay: 120 });
+      await expect(page.getByRole('menu')).toHaveCount(0);
+    }
     await page.evaluate(
       () =>
         new Promise<void>((resolve) => {
@@ -1091,6 +1110,9 @@ test(
     );
     await expect(cancel).toBeEnabled();
     await expect(selectedCanvas(page)).toBeEnabled();
+    for (const control of menuButtons) {
+      await expect(control).not.toHaveAttribute('aria-disabled', 'true');
+    }
     await page.goBack();
     await expect(page).toHaveURL(previousUrl);
     await expect(selectedCanvas(page)).toHaveText('Elsewhere');

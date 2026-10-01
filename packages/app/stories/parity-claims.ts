@@ -494,6 +494,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'Presenting hides the command toolbar and leaves the presenting chrome; a failed save remains reported with Retry reachable.',
   },
   {
+    id: 'command-dock-draws-its-menu-buttons-unavailable',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Replacing',
+    claim:
+      'While an Image Resource’s replacement is held, the Space, Map and Graph names and Open Spaces each report aria-disabled and open nothing when pressed, and are available again once it ends.',
+  },
+  {
     id: 'command-dock-fits-a-narrow-container',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Narrow',

@@ -14,7 +14,7 @@ import {
   authoredSnapshot,
   deepDiveSnapshot,
 } from '../stories/support/spaces';
-import { Default, SaveFailedElsewhere } from '../stories/space/command-dock.stories';
+import { Default, Replacing, SaveFailedElsewhere } from '../stories/space/command-dock.stories';
 
 // The shared reading of "unavailable": ADR 0073 keeps a toolbar item focusable
 // while it is withdrawn, so `aria-disabled` is the attribute and `toBeDisabled`
@@ -470,6 +470,49 @@ describe('the grip discloses the twelve slots (ADR 0082)', () => {
  * menu tells a reader who has no reason to open it nothing at all, so the
  * trigger carries the mark.
  */
+/**
+ * The Dock's menu buttons can be drawn unavailable (ADR 0073), and a held
+ * replacement is what draws them so: the Space, Map and Graph names and Open
+ * Spaces each report `aria-disabled` and open nothing when pressed.
+ */
+describe('a held replacement draws the Dock menu buttons unavailable', () => {
+  const menuButtons = (): HTMLElement[] => [
+    within(dock()).getByRole('button', { name: /^Spaces\./ }),
+    within(dock()).getByRole('button', { name: /^Space: / }),
+    within(dock()).getByRole('button', { name: /^Map: / }),
+    within(dock()).getByRole('button', { name: /^Active Graph: / }),
+  ];
+
+  it('reports each one unavailable through aria-disabled', async () => {
+    await renderDock(<Replacing />);
+
+    await waitFor(() => {
+      for (const control of menuButtons()) expect(unavailable(control)).toBe(true);
+    });
+  });
+
+  it('opens no menu when one is pressed', async () => {
+    await renderDock(<Replacing />);
+    await waitFor(() => expect(unavailable(menuButtons()[0] ?? dock())).toBe(true));
+
+    for (const control of menuButtons()) {
+      await act(async () => {
+        fireEvent.pointerDown(control, { button: 0, isPrimary: true, pointerType: 'mouse' });
+        fireEvent.mouseDown(control, { button: 0 });
+        fireEvent.click(control);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      });
+      expect(screen.queryByRole('menu')).toBeNull();
+    }
+  });
+
+  it('draws the same buttons available when nothing is held', async () => {
+    await renderDock(<Default />);
+
+    for (const control of menuButtons()) expect(unavailable(control)).toBe(false);
+  });
+});
+
 describe('an unwell Space the reader is not in', () => {
   it('marks the Spaces trigger before anything is disclosed', async () => {
     await renderDock(<SaveFailedElsewhere />);

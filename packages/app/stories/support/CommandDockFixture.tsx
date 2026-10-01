@@ -21,6 +21,7 @@ export type DockScenario =
   | 'default'
   | 'new-space'
   | 'presenting'
+  | 'replacing'
   | 'save-failed'
   | 'save-rejected'
   | 'save-refused'
@@ -205,6 +206,10 @@ export async function openDockStory(scenario: DockScenario) {
   await spaces.switchTo(rendering.id);
 
   if (scenario === 'presenting') rendering.app.navigation.present();
+  // The real exclusive activity an Image Resource's replacement runs under,
+  // held open for as long as the story is mounted.
+  if (scenario === 'replacing')
+    void rendering.app.imageReplacement.run(() => new Promise<never>(() => undefined));
   if (scenario === 'save-blocked') {
     await quiesced(spaces);
     await blockSave(spaces, control, rendering);
