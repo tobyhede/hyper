@@ -219,7 +219,8 @@ export function useResourceRailActions(
                 }
               : null,
           deleteFromSpace: deleteResource
-            ? () => resourceDeletion.arm(resource, railFocusFallback(currentSpace, resourceId))
+            ? () =>
+                resourceDeletion.askToDelete(resource, railFocusFallback(currentSpace, resourceId))
             : null,
           enter:
             spaces === null || resource.kind !== 'space'

@@ -422,8 +422,11 @@ export interface DockResourcesList {
   readonly memberships?: MapMemberships | undefined;
   /** Returns a refusal that stays on the list, or null after a completed Add. */
   readonly onAdd: (resource: Resource, activation: 'keyboard' | 'pointer') => string | null;
-  /** Arm Delete from Space for a listed Resource; absent while deleting is unavailable. */
-  readonly onDelete?: ((resource: Resource) => void) | undefined;
+  /**
+   * Ask Delete from Space about a listed Resource, with where the caret returns
+   * if its row is gone; absent while deleting is unavailable.
+   */
+  readonly onDelete?: ((resource: Resource, focusFallback: FocusFallback) => void) | undefined;
   /** A Resource row left the list on a drag; `settle` takes the drop's answer back to that list. */
   readonly onDragStart: (resourceId: ResourceId, settle: SettleResource) => void;
   /** A Space row left the list on a drag; `settle` takes the drop's answer back to that list. */

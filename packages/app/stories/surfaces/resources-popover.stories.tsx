@@ -163,7 +163,7 @@ function RefusedAdd() {
           });
           return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
         }}
-        onDelete={composed.resourceDeletion.arm}
+        onDelete={composed.resourceDeletion.askToDelete}
         onDragStart={() => undefined}
       />
     </div>

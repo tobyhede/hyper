@@ -7,21 +7,16 @@ import {
 } from '@project/graph';
 import { graphAppearance } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
-import type {
-  DeleteConfirmation,
-  DeleteQuestion,
-  DeleteQuestionWords,
-  FocusFallback,
-} from './delete-confirmation';
+import type { DeleteConfirmation, DeleteQuestionWords, FocusFallback } from './delete-confirmation';
 import type { SpaceAuthoring } from './space-authoring';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 
 /**
  * Delete from Space: a Resource as the subject of the delete confirmation.
  *
- * The rail and the Resources list arm it with a Resource; this module supplies
+ * The rail and the Resources list ask it about a Resource; this module supplies
  * what the confirmation says about that Resource and the kind-specific deletion
- * it runs, and the confirmation owns the rest of the interaction.
+ * it runs, and the confirmation owns the interaction's lifetime.
  *
  * **What a deletion leaves behind is not this module's.** It runs each deletion
  * through command outcomes' `resource-delete` channel, which owns the notice,
@@ -76,39 +71,24 @@ export const resourceDeletionWords = (
   })),
 });
 
-export interface ResourceDeletionState {
-  /** The Resource a confirmation is standing over, or `null` when none is. */
-  readonly pending: Resource | null;
-  /** The armed question's focus fallback, or `null` when it names none. */
-  readonly focusFallback: FocusFallback | null;
-  /** Whether the armed confirmation is running its deletion. */
-  readonly deleting: boolean;
-}
-
 export interface ResourceDeletion {
-  readonly getState: () => ResourceDeletionState;
-  readonly subscribe: (listener: () => void) => () => void;
-  /** Arm the confirmation without deleting anything. Replaces any prior question. */
-  readonly arm: (resource: Resource, focusFallback?: FocusFallback) => void;
-  /** Dismiss the question without producing an Edit. */
-  readonly cancel: () => void;
-  /** Start deletion once for the armed Resource. */
-  readonly confirm: () => void;
-  readonly dispose: () => void;
+  /**
+   * Ask the delete confirmation about `resource`, with what its deletion reaches
+   * in the current Space, without deleting anything. Replaces any prior question.
+   */
+  readonly askToDelete: (resource: Resource, focusFallback: FocusFallback) => void;
 }
 
 export interface ResourceDeletionDependencies {
   readonly authoring: SpaceAuthoring;
-  /** The Space the deletion runs in, read at arming for what it reaches. */
+  /** The Space the deletion runs in, read at asking for what it reaches. */
   readonly currentSpace: () => Space;
   /** The one confirmation every delete command asks through. */
-  readonly deleteConfirmation: DeleteConfirmation;
+  readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'>;
   /** Where each deletion runs, and where its outcome is told. */
   readonly commandOutcomes: CommandOutcomes;
   readonly spaceResources?: SpaceResourceAuthoring | undefined;
 }
-
-const NONE: ResourceDeletionState = { pending: null, focusFallback: null, deleting: false };
 
 export function createResourceDeletion({
   authoring,
@@ -117,9 +97,6 @@ export function createResourceDeletion({
   commandOutcomes,
   spaceResources,
 }: ResourceDeletionDependencies): ResourceDeletion {
-  /** The Resource behind each question this module armed. */
-  const armed = new WeakMap<DeleteQuestion, Resource>();
-
   const execute = async (resource: Resource): Promise<void> => {
     if (resource.kind === 'space') {
       await commandOutcomes.run('space-resource-delete', async () => {
@@ -138,50 +115,18 @@ export function createResourceDeletion({
     );
   };
 
-  // The confirmation's state, read as the Resource it stands over. Derived once
-  // per published state, so a reader comparing snapshots sees one value for it.
-  let seen: ReturnType<DeleteConfirmation['getState']> | null = null;
-  let view: ResourceDeletionState = NONE;
-  let disposed = false;
-  const getState = (): ResourceDeletionState => {
-    if (disposed) return view;
-    const state = deleteConfirmation.getState();
-    if (state === seen) return view;
-    seen = state;
-    const resource = state.pending === null ? undefined : armed.get(state.pending);
-    view =
-      state.pending === null || resource === undefined
-        ? NONE
-        : {
-            pending: resource,
-            focusFallback: state.pending.focusFallback,
-            deleting: state.deleting,
-          };
-    return view;
-  };
-
   return {
-    getState,
-    subscribe: deleteConfirmation.subscribe,
-    arm: (resource, focusFallback) => {
+    askToDelete: (resource, focusFallback) => {
       const space = currentSpace();
-      const question = {
+      deleteConfirmation.arm({
         ...resourceDeletionWords(
           resource,
           deletionReach(space.maps, resource.id),
           graphColorsByGraphId(space),
         ),
         run: () => execute(resource),
-        focusFallback: focusFallback ?? null,
-      };
-      armed.set(question, resource);
-      deleteConfirmation.arm(question);
-    },
-    cancel: deleteConfirmation.cancel,
-    confirm: deleteConfirmation.confirm,
-    dispose: () => {
-      getState();
-      disposed = true;
+        focusFallback,
+      });
     },
   };
 }

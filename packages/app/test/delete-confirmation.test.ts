@@ -13,6 +13,9 @@ function authoringStandIn() {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    notifyWithoutReplacing: () => {
+      for (const listener of listeners) listener();
+    },
     replaceStoredSpace: () => {
       replacementEpoch += 1;
       for (const listener of listeners) listener();
@@ -98,6 +101,30 @@ describe('deleting', () => {
     await vi.waitFor(() => expect(confirmation.getState()).toEqual(NONE));
   });
 
+  it('runs a newer question asked while an older one is still deleting', async () => {
+    const { confirmation } = open();
+    let settleOlder: (() => void) | undefined;
+    confirmation.arm(
+      question(
+        () =>
+          new Promise<void>((resolve) => {
+            settleOlder = resolve;
+          }),
+      ),
+    );
+    confirmation.confirm();
+    const run = vi.fn();
+    const newer = question(run);
+
+    confirmation.arm(newer);
+    expect(confirmation.getState()).toEqual({ pending: newer, deleting: false });
+    confirmation.confirm();
+
+    expect(run).toHaveBeenCalledTimes(1);
+    settleOlder!();
+    await vi.waitFor(() => expect(confirmation.getState()).toEqual(NONE));
+  });
+
   it('reports a deletion that throws and stands down', async () => {
     const { confirmation, reported } = open();
     const failure = new Error('broke');
@@ -124,6 +151,35 @@ describe('replacement', () => {
     expect(confirmation.getState()).toEqual(NONE);
   });
 
+  it('discards a running question when the stored Space replaces the working one', () => {
+    const { confirmation, authoring } = open();
+    let settle: (() => void) | undefined;
+    confirmation.arm(
+      question(
+        () =>
+          new Promise<void>((resolve) => {
+            settle = resolve;
+          }),
+      ),
+    );
+    confirmation.confirm();
+    expect(settle).toBeDefined();
+
+    authoring.replaceStoredSpace();
+
+    expect(confirmation.getState()).toEqual(NONE);
+  });
+
+  it('keeps the question across a change that replaces nothing', () => {
+    const { confirmation, authoring } = open();
+    const asked = question(vi.fn());
+    confirmation.arm(asked);
+
+    authoring.notifyWithoutReplacing();
+
+    expect(confirmation.getState()).toEqual({ pending: asked, deleting: false });
+  });
+
   it('keeps a late answer from closing a newer question', async () => {
     const { confirmation, authoring } = open();
     let settle: (() => void) | undefined;
@@ -145,5 +201,31 @@ describe('replacement', () => {
     await Promise.resolve();
 
     expect(confirmation.getState()).toEqual({ pending: newer, deleting: false });
+  });
+});
+
+describe('disposal', () => {
+  it('publishes nothing once disposed, though a deletion settles later', async () => {
+    const { confirmation } = open();
+    let settle: (() => void) | undefined;
+    confirmation.arm(
+      question(
+        () =>
+          new Promise<void>((resolve) => {
+            settle = resolve;
+          }),
+      ),
+    );
+    confirmation.confirm();
+    const listener = vi.fn();
+    confirmation.subscribe(listener);
+
+    confirmation.dispose();
+    settle!();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(confirmation.getState().deleting).toBe(true);
   });
 });
