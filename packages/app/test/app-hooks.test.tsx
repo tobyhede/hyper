@@ -336,6 +336,22 @@ describe('useResourcePlacement', () => {
     });
   });
 
+  it('creates an Ur Resource at the visible centre and continues in its Title', () => {
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    const { result } = place(opened);
+    act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
+
+    act(() => result.current.createUrResource());
+
+    expect(opened.app.currentSpace().lookup.resource(CREATED)?.kind).toBe('ur');
+    expect(placedIds(opened)).toContain(CREATED);
+    expect(opened.app.continuation.getState().pending).toEqual({
+      target: { kind: 'resource', resourceId: CREATED },
+      select: true,
+      then: 'rename',
+    });
+  });
+
   it('settles a drop from the Resources list by placing the dragged Resource', () => {
     const opened = openDerivationSpace();
     const { result } = place(opened);

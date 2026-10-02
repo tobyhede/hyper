@@ -182,6 +182,8 @@ export type AuthoringCompletion =
     }
   /** Add Resource: a detached Markdown Resource at the visible centre, neutrally titled. */
   | { readonly kind: 'created-resource'; readonly anchor: MapPosition }
+  /** Create Ur Resource: a detached Ur Resource at the visible centre, neutrally titled (ADR 0113). */
+  | { readonly kind: 'created-ur-resource'; readonly anchor: MapPosition }
   /**
    * Create Reference: created with its Target, because a Reference Resource without
    * one is not a valid Resource. The caller supplies the Target's Title; an empty
@@ -1261,6 +1263,14 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'created-resource') {
       const created = createResource(
         { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
+        completion.anchor,
+        'avoidingOverlap',
+      );
+      if ('kind' in created) return created;
+      createdResourceId = created.id;
+    } else if (completion.kind === 'created-ur-resource') {
+      const created = createResource(
+        { title: nextResourceTitle(snapshot), kind: 'ur' },
         completion.anchor,
         'avoidingOverlap',
       );

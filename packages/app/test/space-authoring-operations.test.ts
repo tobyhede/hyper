@@ -240,6 +240,53 @@ describe('Add Resource', () => {
   });
 });
 
+describe('Create Ur Resource', () => {
+  it('creates one neutrally titled Ur Resource at the anchor, in one Edit', () => {
+    const { authoring, session } = openPositioned();
+    const edits: number[] = [];
+    session.subscribe(() => edits.push(session.getState().working.resources.length));
+
+    expect(authoring.complete({ kind: 'created-ur-resource', anchor: CENTRE })).toEqual({
+      kind: 'completed',
+      createdResourceId: MINTED,
+    });
+
+    // A Title and nothing else: the kind carries no content (ADR 0113).
+    expect(session.getState().working.resources[2]).toEqual({
+      id: MINTED,
+      document: { title: 'Resource 1', kind: 'ur' },
+    });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual(CENTRE);
+    expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
+    expect(new Set(edits)).toEqual(new Set([3]));
+  });
+
+  it('survives a commit and a reload through intake', async () => {
+    const loaded = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
+    const backend = MemorySpaceBackend.asMeta(loaded);
+    const session = openSpaceSession(backend, loaded);
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+    });
+
+    authoring.complete({ kind: 'created-ur-resource', anchor: CENTRE });
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
+
+    const stored = await backend.loadSpace(SPACE_ID);
+    const reopened = composeApp({
+      spaceSession: openSpaceSession(backend, stored!),
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+    });
+    expect(reopened.currentSpace().lookup.resource(MINTED)).toMatchObject({
+      kind: 'ur',
+      title: 'Resource 1',
+    });
+  });
+});
+
 describe('Create Image Resources', () => {
   const STORED = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
   const THIRD_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000033');

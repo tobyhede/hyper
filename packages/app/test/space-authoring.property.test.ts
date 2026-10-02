@@ -119,6 +119,7 @@ const anchor = fc.record({
  */
 const operation = fc.oneof(
   fc.record({ op: fc.constant('created-resource' as const), anchor }),
+  fc.record({ op: fc.constant('created-ur-resource' as const), anchor }),
   fc.record({ op: fc.constant('created-reference' as const), resource: index, anchor }),
   /**
    * Resource editing includes attempts to change a Reference Resource's immutable Target. The
@@ -317,6 +318,8 @@ function resolve(
     }
     case 'created-resource':
       return { kind: 'created-resource', anchor: generated.anchor };
+    case 'created-ur-resource':
+      return { kind: 'created-ur-resource', anchor: generated.anchor };
     case 'created-reference':
       return { kind: 'created-reference', target: resourceId, anchor: generated.anchor };
     case 'added-resource-to-map':

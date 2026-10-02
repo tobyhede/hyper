@@ -710,6 +710,22 @@ describe('ResourcesPopover', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('counts and filters Ur Resources under their own glyph', async () => {
+    const ur: Resource = { id: id('000000000005'), title: 'Gateway', kind: 'ur' };
+    const resources = [...RESOURCES, ur];
+    render(<Fixture resources={resources} allResources={resources} />);
+    await openList();
+
+    const toggle = screen.getByRole('button', { name: 'Ur Resources, 1' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Add Gateway to Map' })).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(screen.queryByRole('button', { name: 'Add Gateway to Map' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Zulu to Map' })).toBeInTheDocument();
+  });
+
   /**
    * The pair the filter exists to keep apart: a Space Resource is one framed view
    * placed in a Map, and a Space is the volume such a view is a view of
