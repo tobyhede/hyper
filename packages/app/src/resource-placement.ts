@@ -16,7 +16,7 @@ import {
   describeSpaceResourceBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
-import { createImageResources, type ImageOrigin } from './image-creation';
+import type { ImageOrigin } from './image-creation';
 import { resolveMap } from './map-resolution';
 import type { OpenSpace } from './open-spaces';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from './resource';
@@ -129,11 +129,19 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
  * or the Space under it changes.
  */
 export function useResourcePlacement(
-  { app, session: spaceSession, spaceResources, images }: OpenSpace,
+  { app, session: spaceSession, spaceResources }: OpenSpace,
   { map: selectedMap, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
 ): ResourcePlacementCommands {
   const { reportVisibleCentre, centreAnchor } = useVisibleCentre();
-  const { authoring, adapter, continuation, commandOutcomes, navigation, currentSpace } = app;
+  const {
+    authoring,
+    adapter,
+    continuation,
+    commandOutcomes,
+    navigation,
+    currentSpace,
+    createImageResources,
+  } = app;
   const mapId: MapId = selectedMap.id;
 
   /**
@@ -352,22 +360,18 @@ export function useResourcePlacement(
         anchor,
         placement: placementMode,
       };
-      void commandOutcomes.run(
-        'image-create',
-        () => createImageResources({ images, authoring }, origin, target),
-        {
-          continueAt: ({ createdResourceId }) =>
-            createdResourceId === undefined || navigation.getState().selectedMapId !== target.mapId
-              ? null
-              : {
-                  target: { kind: 'resource', resourceId: createdResourceId },
-                  select: true,
-                  then: 'rename',
-                },
-        },
-      );
+      void commandOutcomes.run('image-create', () => createImageResources(origin, target), {
+        continueAt: ({ createdResourceId }) =>
+          createdResourceId === undefined || navigation.getState().selectedMapId !== target.mapId
+            ? null
+            : {
+                target: { kind: 'resource', resourceId: createdResourceId },
+                select: true,
+                then: 'rename',
+              },
+      });
     },
-    [commandOutcomes, images, authoring, navigation],
+    [commandOutcomes, createImageResources, navigation],
   );
 
   /**

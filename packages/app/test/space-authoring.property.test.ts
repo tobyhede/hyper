@@ -15,6 +15,7 @@ import { GRAPH_PALETTE, loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import type { AuthoringCompletion, AuthoringResult } from '../src/space-authoring';
+import { unusedImageSources } from './image-sources';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -198,7 +199,11 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
         };
         const loaded = { snapshot, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-        const { authoring } = composeApp({ spaceSession: session, selection: OTHER_MAP_ID });
+        const { authoring } = composeApp({
+          images: unusedImageSources,
+          spaceSession: session,
+          selection: OTHER_MAP_ID,
+        });
 
         expect(
           authoring.complete({
@@ -240,6 +245,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
+          images: unusedImageSources,
           spaceSession: session,
           selection: mapId,
         });

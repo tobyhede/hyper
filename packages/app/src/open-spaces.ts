@@ -42,11 +42,6 @@ export interface OpenSpace {
    * able to author a Space Resource.
    */
   readonly spaceResources: SpaceResourceAuthoring;
-  /**
-   * Where an Image Resource's picture is stored and measured (ADR 0106). The
-   * same one on every entry, supplied to Open Spaces when it is composed.
-   */
-  readonly images: ImageSources;
 }
 
 export interface OpenSpacesState {
@@ -547,12 +542,12 @@ export function createOpenSpaces({
       app: composeApp({
         spaceSession: session,
         selection,
+        images,
         newId,
         reportObserverError: report,
         spaceResources,
       }),
       spaceResources,
-      images,
     };
     session.subscribe(() => {
       const state = observable.getState();

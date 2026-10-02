@@ -18,6 +18,8 @@ import {
   type SpaceResourceTargets,
 } from '../src/space-resource-targets';
 import { fixtureDisplay } from './render-adapter-fixtures';
+import type { ImageSources } from '../src/image-creation';
+import { heldImageSources, unusedImageSources } from './image-sources';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -128,7 +130,7 @@ const mountAuthoring = (
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter } = composeApp({ spaceSession });
+  const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
   const initialProps: HookProps = {
     open: false,
     enabled: true,
@@ -537,7 +539,7 @@ describe('canvas Resource authoring Space rail', () => {
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter } = composeApp({ spaceSession });
+    const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
     return renderHook(() =>
       useCanvasResourceAuthoring({
         nodes: [spaceNode(open, readOnly)],
@@ -640,7 +642,7 @@ describe('canvas Resource authoring decoration identity', () => {
   const mountIdentity = () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter } = composeApp({ spaceSession });
+    const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
     const onSelectResource = () => undefined;
     const onPortalEditingChange = () => undefined;
     const resourceResize = adapter.getState().resourceResize;
@@ -783,10 +785,19 @@ describe('canvas Resource authoring, replacing an image', () => {
   /** The replacer an Image Resource's `replacing` display carries, absent at rest. */
   const replacerOf = (drawn: ResourceFlowNode) =>
     drawn.data.display.shown === 'replacing' ? drawn.data.display.replacer : undefined;
-  const mountImage = (reportObserverError = vi.fn(), measurementFails = false) => {
+  /**
+   * The hook over a composed Space whose image replacements store and measure
+   * through `images`. What a replacement does is the replacement module's
+   * (`image-replacement.test.ts`); these prove only what the canvas draws and says.
+   */
+  const mountImage = (images: ImageSources = unusedImageSources) => {
     const loaded = { snapshot: withImage, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement } = composeApp({ spaceSession });
+    const { authoring, adapter, imageReplacement } = composeApp({
+      images,
+      spaceSession,
+      reportObserverError: vi.fn(),
+    });
     const hook = renderHook(() =>
       useCanvasResourceAuthoring({
         nodes: [imageNode],
@@ -806,20 +817,10 @@ describe('canvas Resource authoring, replacing an image', () => {
         spaceSession,
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
-        imageReplacing: {
-          images: {
-            store: () => Promise.reject(new Error('Nothing is stored in this test')),
-            measure: () =>
-              measurementFails
-                ? Promise.reject(new Error('Measurement failed'))
-                : Promise.resolve(undefined),
-          },
-          activity: imageReplacement,
-        },
-        reportObserverError,
+        imageReplacement,
       }),
     );
-    return { ...hook, spaceSession, imageReplacement };
+    return { ...hook, spaceSession };
   };
 
   it('installs the upload target when Replace begins on an Open Image Resource', () => {
@@ -832,66 +833,42 @@ describe('canvas Resource authoring, replacing an image', () => {
     expect(result.current.bodyEditing).toBe(true);
   });
 
-  it('answers a failed upload in the target without rejecting or changing the image', async () => {
-    const report = vi.fn(() => {
-      throw new Error('Broken diagnostic sink');
-    });
-    const { result, spaceSession } = mountImage(report);
+  it('says a broken upload in the target and keeps the target open', async () => {
+    const { result, spaceSession } = mountImage();
     act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
-    const replacer = replacerOf(onlyNode(result.current.nodes));
     const before = spaceSession.getState().working;
+
     await act(async () => {
       await expect(
-        replacer?.onReplace({
+        replacerOf(onlyNode(result.current.nodes))?.onReplace({
           kind: 'files',
           files: [new File(['bytes'], 'figure.png', { type: 'image/png' })],
         }),
-      ).resolves.toBe('This image was not replaced: Nothing is stored in this test');
+      ).resolves.toBe('This image was not replaced: No image store is reachable.');
     });
-    expect(spaceSession.getState().working).toBe(before);
-    expect(report).toHaveBeenCalledWith(new Error('Nothing is stored in this test'));
-    expect(result.current.bodyEditing).toBe(true);
-  });
-
-  it('reports an unexpected measuring rejection in the target without changing the image', async () => {
-    const report = vi.fn();
-    const { result, spaceSession } = mountImage(report, true);
-    act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
-    const before = spaceSession.getState().working;
-    await act(async () => {
-      await expect(
-        replacerOf(onlyNode(result.current.nodes))?.onReplace({
-          kind: 'url',
-          url: 'https://example.com/new.png',
-        }),
-      ).resolves.toBe('This image was not replaced: Measurement failed');
-    });
-    expect(report).toHaveBeenCalledWith(new Error('Measurement failed'));
     expect(spaceSession.getState().working).toBe(before);
     expect(result.current.bodyEditing).toBe(true);
   });
 
-  it('answers a replacement begun while another holds the activity in the target, changing nothing', async () => {
-    const { result, spaceSession, imageReplacement } = mountImage();
+  it('says another replacement is still running in the target, keeping it open', async () => {
+    const held = heldImageSources();
+    const { result } = mountImage(held.images);
     act(() => onlyNode(result.current.nodes).data.onBeginBodyEditing?.());
-    const held = Promise.withResolvers<undefined>();
-    const holding = imageReplacement.run(() => held.promise);
-    const before = spaceSession.getState().working;
+    const replacer = replacerOf(onlyNode(result.current.nodes));
 
+    let first: Promise<string | null> | undefined;
     await act(async () => {
+      first = replacer?.onReplace({ kind: 'url', url: 'https://example.com/first.png' });
       await expect(
-        replacerOf(onlyNode(result.current.nodes))?.onReplace({
-          kind: 'url',
-          url: 'https://example.com/new.png',
-        }),
+        replacer?.onReplace({ kind: 'url', url: 'https://example.com/second.png' }),
       ).resolves.toBe('Another image is still being replaced.');
     });
-    expect(spaceSession.getState().working).toBe(before);
-    expect(imageReplacement.getState()).toBe(true);
+    expect(result.current.bodyEditing).toBe(true);
 
-    held.resolve(undefined);
-    await holding;
-    expect(imageReplacement.getState()).toBe(false);
+    held.release();
+    await act(async () => {
+      await expect(first).resolves.toBeNull();
+    });
   });
 
   it('replaces the image from the target in one Edit, and says a refusal in the application’s words', async () => {
