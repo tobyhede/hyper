@@ -1,7 +1,7 @@
 # A commit outcome is named once on both sides of the seam
 
 Status: accepted
-Related: 0034, 0057, 0093
+Related: 0034, 0057, 0095
 
 What a store decides about a commit — `committed`, `conflict`, `aggregate-refused` — is one type, `CommitOutcome`, declared once in `@project/persistence` and shared by both seams. The stored seam's `RepositoryCommitResult` is that outcome plus `rejected`, the store's refusal of a request it will not judge; the browser's `CommitResult` is that same outcome plus the transport failures only a client can suffer. Neither restates an arm of the other. The status code each outcome crosses HTTP as is written once too, beside the codecs that encode and decode it, and the Fetch application and the browser transport both read that one table.
 
