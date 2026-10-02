@@ -25,20 +25,23 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 2. Edit on an Open Space Resource gates authoring inside it, as the policy value `inert` → `authoring`.
 3. Read-only has exactly two sources — shown through a Reference Resource, or a stale or retained Space — computed once and inherited by nested surfaces.
 4. Only the root surface presents (ADR 0111).
-5. Surfaces nest by construction; only an `authoring` surface can make a child `authoring`.
-6. One canvas selection names its surface; keyboard, rail and Undo/Redo dispatch to it, otherwise to the root.
-7. Navigation is held while any open Space is replacing an image.
-8. Per Space, from its composition: authoring, `commandOutcomes`, continuation, `deleteConfirmation`, Edge Authoring, image replacement. Per surface: the render adapter and its share of the selection.
+5. Surfaces nest by construction. A surface's policy is the lower of an inherited ceiling and its local state: read-only passes down, and every surface below the first embedded level is `inert` at most. Edit is offered only on a Space Resource in the root Map.
+6. One canvas selection names its surface's occurrence; keyboard, rail and Undo/Redo dispatch to it, otherwise to the root.
+7. Navigation is held while any composed Space — listed or only drawn — is replacing an image.
+8. Per Space, from its composition: authoring, `commandOutcomes`, `deleteConfirmation`, image replacement, and Edge Authoring's completion and eligibility. Per surface: the render adapter. Per canvas, keyed by occurrence: the selection, continuation and in-progress gesture state.
 9. One notice area shows the outcomes of every Space drawn on the canvas.
 10. Pointer gestures land in the surface under the point; keyboard creation in the selection's surface; the Dock in the root Space. A drop on an inert or read-only surface is refused with wording.
 11. The full entity menu is offered in every surface, acting on that surface's Space.
 12. A connection across two surfaces is refused with wording; Connect to Resource offers only Resources of the same surface.
-13. Opening a Space Resource admits its target to Open Spaces, with the containing Space as Opener; closing leaves it open.
-14. A Reference Resource whose Target is a Space Resource admits that target too and draws it `read-only`.
+13. A Space is composed while anything holds it: its Open Spaces listing, or any drawing of its Maps. Opening a Space Resource takes a hold on the target's composition without listing it; closing releases the hold. Exit releases only the listing's hold, so a Space still drawn stays composed, unlisted and without an Opener.
+14. A Reference Resource whose Target is a Space Resource holds that target too and draws it `read-only`.
 15. A stale or unavailable target draws its last working state `read-only`, with its own status.
 16. The nesting walk is seeded with the root's own Space and Map, so a surface never contains its own Map.
 17. *Surface* is a code name and stays out of `CONTEXT.md`.
 18. Undo and Redo follow the selection's surface, otherwise the root.
+19. Each drawing has an occurrence: the path of Space Resource nodes from the root Map to it. Two drawings of the same Map are two occurrences.
+20. A continuation is spent only in the occurrence that requested it. If that occurrence stops being drawn before the Edit completes, the Edit stands and the continuation is dropped, with no fallback to another drawing.
+21. An authoring embedded Map opens, closes and moves its own Space Resources; what they draw is `inert`.
 
 ## User Stories
 
@@ -64,12 +67,12 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 | 03 | An embedded Map is a surface over its own Space | ready-for-agent |
 | 04 | One canvas selection names its surface | ready-for-agent |
 | 05 | One notice area for every drawn Space | ready-for-agent |
-| 06 | Any open Space's replacement holds navigation | ready-for-agent |
+| 06 | Any composed Space's replacement holds navigation | ready-for-agent |
 | 07 | Cross-surface connections are refused and a surface never contains its own Map | ready-for-agent |
 
 ## Out of scope
 
-- Nested framing (Edit beyond one level).
+- Nested framing (Edit on a Space Resource below the root Map).
 - Cross-Space Edges and cross-Space presentation (ADR 0111).
 - A second React Flow instance or camera for an embedded Map.
 

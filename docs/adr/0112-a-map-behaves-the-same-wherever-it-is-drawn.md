@@ -14,20 +14,21 @@ ADR 0068 settled that editing inside an embedded Space authors that Space, and t
 
 A drawn Map is one Space's own composition, one Map and Graph named explicitly, and one policy: authoring, inert or read-only.
 
-- **Per Space, from that Space's one composition:** authoring, command outcomes, continuation, delete confirmation, Edge Authoring and image replacement. An embedded Map never borrows them from the Space that contains it.
-- **Per drawn Map:** the render adapter that projects it and its share of the canvas selection. The same Space may be drawn twice, showing different Maps.
-- **The policy is computed once where the Map is drawn and inherited by every Map drawn inside it.** Read-only comes from exactly two sources: the Map is shown through a Reference Resource, or its Space is stale or retained after a failure, in which case it draws its last working state with that Space's own status. Inert is Read on an Open Space Resource. Only an authoring Map can make a Map inside it authoring, through Edit on that Space Resource, so Edit reaches one level.
-- **Every Space whose Map is drawn is an open Space.** Opening a Space Resource, or a Reference Resource whose Target is one, admits its target to Open Spaces with the containing Space as its Opener; closing it leaves the target open, as Enter does. There is one kind of composed Space.
+- **Per Space, from that Space's one composition:** authoring, command outcomes, delete confirmation, image replacement, and Edge Authoring's completion and eligibility. An embedded Map never borrows them from the Space that contains it.
+- **Per drawn Map:** the render adapter that projects it. The same Space may be drawn twice, even showing the same Map, so each drawing has an **occurrence**: the path of Space Resource nodes from the canvas's own Map to it, unique while it is drawn.
+- **Per canvas, keyed by occurrence:** the selection, continuation and in-progress gesture state. A request to continue after an Edit carries the occurrence it was made in and is spent only there. If that occurrence stops being drawn before the Edit completes, the Edit stands and the continuation is dropped — nothing is selected, no caret is placed, and no other drawing of the same Map takes it.
+- **The policy is computed once where the Map is drawn, as the lower of an inherited ceiling and a local state.** The ceiling only restricts: read-only passes to every Map drawn inside, and every Map below the first embedded level is inert at most. Read-only comes from exactly two sources: the Map is shown through a Reference Resource, or its Space is stale or retained after a failure, in which case it draws its last working state with that Space's own status. The local state is Read or Edit on the Open Space Resource that draws the Map, and Edit is offered only on a Space Resource drawn in the canvas's own Map. An authoring embedded Map still opens, closes and moves the Space Resources in it, those being Edits to its own Map; what they draw is inert.
+- **A Space is composed while anything holds it.** Its listing in Open Spaces holds it, and so does each drawing of one of its Maps. Opening a Space Resource, or a Reference Resource whose Target is one, takes a hold on the target's composition without listing it; closing it releases the hold. Exit removes a Space from the listing and releases only the listing's hold, so a Space another Map still draws stays composed, unlisted and without an Opener, and is disposed when its last hold goes. There is one kind of composed Space with two kinds of holder.
 - **One canvas selection names the drawn Map it belongs to.** Keyboard commands, the rail and Undo and Redo act on that Map's Space, or on the canvas's own Space when nothing is selected. A pointer gesture — a drop, an empty Option/Alt drop, a paste at the pointer — lands in the Map under the point. The Command Dock always acts on the canvas's own Space, being that Space's command surface.
 - **One notice area** shows the outcomes of every Space whose Map is on the canvas.
-- **Navigation is held while any open Space is replacing an image**, wherever the replacement began.
+- **Navigation is held while any composed Space is replacing an image**, listed or only drawn, wherever the replacement began.
 - **A drawn Map never contains its own Map.** The walk that draws nested Maps starts with the canvas's own Space and Map on its path.
 
 ## Recorded differences
 
 - **Only the canvas's own Space presents.** Presenting is that Space's Navigation, and presentation stays within one Space (ADR 0111).
 - **One camera.** An embedded Map projects into the containing React Flow instance; its framing is authored on the Space Resource rather than being a second viewport (ADR 0068's compound canvas).
-- **No nested framing.** Edit on an Open Space Resource reaches one level, as above.
+- **No nested framing.** Edit is offered only on a Space Resource in the canvas's own Map; one level down it is withheld, as above.
 - **An Edge joins Resources in one Space.** A connection between Resources of two different drawn Maps is refused with wording, like any other connection refusal, and Connect to Resource offers only Resources of the same drawn Map.
 - **A drop on an inert or read-only Map is refused** with wording rather than falling through to the Map beneath it.
 
@@ -39,7 +40,13 @@ A drawn Map is one Space's own composition, one Map and Graph named explicitly, 
 
 **Borrowing the containing Space's command outcomes so notices stay visible.** It ties an Edit's notice to another Space's Map and replacement epoch. The notice area reads every drawn Space instead.
 
-**A composition for an embedded target outside Open Spaces.** It would be a second kind of composed Space, and every rule stated over the open set — the navigation hold first — would need a second statement for it.
+**Listing every drawn Space in Open Spaces.** Exit would then dispose a composition another Map still draws. Refusing Exit while a Space is drawn traps the author behind an Edit to another Space; letting the embedding stop drawing makes an authored Open state draw nothing; readmitting the Space undoes the Exit. Holds separate being listed from being composed, so none of the three is needed.
+
+**A second kind of composition for drawn Spaces.** Every rule over composed Spaces — the navigation hold first — would need a second statement. A drawn Space is the same composition, held differently.
+
+**Continuation per Space.** Two drawings of one Map share Space, Map and Resource ids, so a per-Space continuation cannot tell which drawing an Edit was made in. The occurrence can.
+
+**Letting an authoring embedded Map enable Edit below it.** Edit would then nest without limit, which is the nested framing this ADR leaves out.
 
 ## Vocabulary
 
