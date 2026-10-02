@@ -301,7 +301,8 @@
    the Title's layout in the middle of that motion. Every kind that draws content
    claims it, so an Open Reference Resource (ADR 0070) and an Open Image Resource
    read exactly as an Open Markdown Resource does — the `space` kind has no
-   content front to sit above a Title. */
+   content front to sit above a Title, and neither has the `ur` kind (ADR 0113),
+   so its body keeps the base `.canvas-resource__body` rule. */
 .canvas-resource:is([data-kind='markdown'], [data-kind='reference'], [data-kind='image'])
   .canvas-resource__body {
   order: 2;

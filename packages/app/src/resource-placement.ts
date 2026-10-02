@@ -84,6 +84,8 @@ export interface ResourcePlacementInput {
 export interface ResourcePlacementCommands extends VisibleCentreReporting {
   /** Add Resource: one completed Edit, then the naming continuation. */
   readonly addResource: () => void;
+  /** Create Ur Resource: one completed Edit, then the naming continuation. */
+  readonly createUrResource: () => void;
   /** Place a Resource this Map leaves out, answering a refusal's sentence or `null`. */
   readonly addExistingResource: (
     resourceId: ResourceId,
@@ -304,36 +306,48 @@ export function useResourcePlacement(
   );
 
   /**
-   * **The one creation whose refusal no surface shows, and that is a decision.**
+   * Add Resource and Create Ur Resource: one Edit at the visible centre,
+   * continuing in the new Resource's Title.
+   *
+   * **The creations whose refusal no surface shows, and that is a decision.**
    * A refusal carries a sentence for the author, worth showing where
-   * the author can act on it. Add Resource takes no input at all, cannot refuse
+   * the author can act on it. Neither takes any input at all, cannot refuse
    * against a choice the author made, and leaves nothing standing that a
-   * sentence could correct. If it ever grows an input it grows a surface with
+   * sentence could correct. If either grows an input it grows a surface with
    * it, and the refusal goes there.
    *
    * The toolbar stays available for an empty authored Map: it is the
    * zero-Resource Space's way to create the first Resource.
    */
-  const addResource = useCallback(() => {
-    const created = authoring.complete({ kind: 'created-resource', anchor: centreAnchor() });
-    // Each outcome named rather than caught. `queued` is an Edit that will still
-    // be performed, whose projection draws the Resource without help from here.
-    // `unchanged` this operation cannot answer — it mints unconditionally — but
-    // the shared completion union carries it, so it is narrowed rather than
-    // asserted away.
-    if (created.kind === 'refused') return;
-    if (created.kind === 'queued') return;
-    if (created.kind === 'unchanged') return;
-    if (created.createdResourceId === undefined) return;
-    // Selected as well as named, so continued authoring — a connection, a second
-    // Resource — carries on from it. Both are the one continuation, spent when
-    // the projection that draws the Resource arrives.
-    continuation.request({
-      target: { kind: 'resource', resourceId: created.createdResourceId },
-      select: true,
-      then: 'rename',
-    });
-  }, [authoring, centreAnchor, continuation]);
+  const createAtCentre = useCallback(
+    (resourceKind: 'markdown' | 'ur') => {
+      const created = authoring.complete({
+        kind: 'created-resource',
+        resourceKind,
+        anchor: centreAnchor(),
+      });
+      // Each outcome named rather than caught. `queued` is an Edit that will still
+      // be performed, whose projection draws the Resource without help from here.
+      // `unchanged` this operation cannot answer — it mints unconditionally — but
+      // the shared completion union carries it, so it is narrowed rather than
+      // asserted away.
+      if (created.kind === 'refused') return;
+      if (created.kind === 'queued') return;
+      if (created.kind === 'unchanged') return;
+      if (created.createdResourceId === undefined) return;
+      // Selected as well as named, so continued authoring — a connection, a second
+      // Resource — carries on from it. Both are the one continuation, spent when
+      // the projection that draws the Resource arrives.
+      continuation.request({
+        target: { kind: 'resource', resourceId: created.createdResourceId },
+        select: true,
+        then: 'rename',
+      });
+    },
+    [authoring, centreAnchor, continuation],
+  );
+  const addResource = useCallback(() => createAtCentre('markdown'), [createAtCentre]);
+  const createUrResource = useCallback(() => createAtCentre('ur'), [createAtCentre]);
 
   /**
    * Every Image Resource gesture: store and measure what it brought, then one
@@ -448,6 +462,7 @@ export function useResourcePlacement(
     reportVisibleCentre,
     centreAnchor,
     addResource,
+    createUrResource,
     addExistingResource,
     addSpaceResourceFor,
     createSpaceResource,

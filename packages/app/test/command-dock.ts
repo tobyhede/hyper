@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import type { ResourceKindName } from '../e2e/graph';
 
 /**
  * How a test reaches the application's command surface.
@@ -108,8 +109,8 @@ export const dock = (): HTMLElement => screen.getByRole('toolbar', { name: 'Comm
 /**
  * Create a Resource of one kind.
  *
- * The two kinds are peer controls in the Resources cluster — the kind is chosen at
- * creation, so neither is a default, and no disclosure stands in front of them.
+ * The kinds are peer controls in the Resources cluster — the kind is chosen at
+ * creation, so none is a default, and no disclosure stands in front of them.
  * One press per creation, whichever kind, and the Edit completes on that press
  * (ADR 0089). A Reference Resource is not among them: it is created from the Resource it points
  * at, through that Resource's own command menu.
@@ -118,8 +119,12 @@ export const createResource = (kind: ResourceKindName): void => {
   fireEvent.click(createResourceControl(kind));
 };
 
-/** The kinds the Dock offers, named as their controls announce them. */
-export type ResourceKindName = 'Markdown Resource' | 'Space Resource';
+/**
+ * The kinds the Dock offers, declared once beside the end-to-end helpers. A
+ * type-only import is erased, so the unit suite takes no runtime dependency on
+ * Playwright.
+ */
+export type { ResourceKindName } from '../e2e/graph';
 
 /**
  * One kind's Create control.

@@ -48,6 +48,7 @@ const FRONTS = [
   { label: 'reference', kind: 'reference', glyph: 'Reference Resource', border: 'dotted' },
   { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid' },
   { label: 'image', kind: 'image', glyph: 'Image Resource', border: 'solid' },
+  { label: 'ur', kind: 'ur', glyph: 'Ur Resource', border: 'solid' },
   // The creation ghost is not a Resource and takes the Markdown treatment, which is
   // why it is checked against the Markdown kind and glyph rather than its own.
   { label: 'creation ghost', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },

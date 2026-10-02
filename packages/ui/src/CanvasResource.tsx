@@ -75,6 +75,11 @@ export type CanvasResourceFront =
       readonly onBeginEdit?: () => void;
     }
   | {
+      readonly kind: 'ur';
+      /** An Ur Resource Opens through the shared Resource operation, and has nothing to edit. */
+      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+    }
+  | {
       readonly kind: 'space';
       /** A Space Resource Opens through the shared Resource operation. */
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
@@ -106,9 +111,10 @@ export type CanvasResourceFront =
 
 /**
  * What the content area below the Title draws. A Space Resource's content is
- * its embedded Map, which the canvas draws as sibling nodes, so it has no arm.
+ * its embedded Map, which the canvas draws as sibling nodes, and an Ur
+ * Resource has no content, so neither has an arm.
  */
-type AreaContent = Exclude<ResourceContent, { readonly kind: 'space' }>;
+type AreaContent = Exclude<ResourceContent, { readonly kind: 'space' | 'ur' }>;
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
@@ -285,6 +291,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
       case 'unresolved':
         return { kind, via: 'reference' };
       case 'space':
+      case 'ur':
       case undefined:
         return null;
     }

@@ -99,6 +99,26 @@ describe('PresentedResource', () => {
     expect(screen.queryByTestId('unresolved-content')).toBeNull();
   });
 
+  /**
+   * An Ur Resource has no content (ADR 0113), so presenting it draws its name
+   * alone, as a title slide; a Reference Resource to one draws the same.
+   */
+  it('presents an Ur Resource as a title slide, itself or through a Reference Resource', () => {
+    for (const via of ['self', 'reference'] as const) {
+      const { container, unmount } = render(
+        <PresentedResource title={'Gateway\nthe one way in'} content={{ kind: 'ur', via }} />,
+      );
+
+      const slide = screen.getByTestId('resource-content');
+      expect(slide).toHaveAttribute('data-content-kind', 'ur');
+      expect(screen.getByRole('heading', { name: 'Gateway' })).toBeInTheDocument();
+      expect(slide.textContent).toBe('Gateway');
+      expect(container.querySelector('.resource__body')).toBeNull();
+      expect(screen.queryByTestId('unresolved-content')).toBeNull();
+      unmount();
+    }
+  });
+
   it('presents an unresolved Target as a notice, not an empty document', () => {
     const { container } = render(
       <PresentedResource title="Dangling" content={{ kind: 'unresolved', via: 'reference' }} />,

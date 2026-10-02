@@ -19,6 +19,7 @@ const KIND_NAMES = {
   reference: 'Reference Resource',
   space: 'Space Resource',
   image: 'Image Resource',
+  ur: 'Ur Resource',
 } satisfies Record<Resource['kind'], string>;
 
 /**
@@ -30,6 +31,7 @@ const REFERENCE_NAMES = {
   markdown: 'Reference to a Markdown Resource',
   space: 'Reference to a Space Resource',
   image: 'Reference to an Image Resource',
+  ur: 'Reference to an Ur Resource',
 } satisfies Record<ResourceBaseKind, string>;
 
 /**

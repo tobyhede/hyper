@@ -180,8 +180,17 @@ export type AuthoringCompletion =
       /** An Option/Alt drop point, kept exactly, or `beside-source` for the Connect list's New Resource row. */
       readonly position: MapPosition | 'beside-source';
     }
-  /** Add Resource: a detached Markdown Resource at the visible centre, neutrally titled. */
-  | { readonly kind: 'created-resource'; readonly anchor: MapPosition }
+  /**
+   * Add Resource and Create Ur Resource: a detached Resource of a kind that takes
+   * no input at the visible centre, neutrally titled. Add Resource makes a
+   * `markdown` one with an empty body; Create Ur Resource makes a `ur` one, which
+   * carries a Title and nothing else (ADR 0113).
+   */
+  | {
+      readonly kind: 'created-resource';
+      readonly resourceKind: 'markdown' | 'ur';
+      readonly anchor: MapPosition;
+    }
   /**
    * Create Reference: created with its Target, because a Reference Resource without
    * one is not a valid Resource. The caller supplies the Target's Title; an empty
@@ -1259,8 +1268,11 @@ export function createSpaceAuthoring({
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'created-resource') {
+      const title = nextResourceTitle(snapshot);
       const created = createResource(
-        { title: nextResourceTitle(snapshot), kind: 'markdown', body: '' },
+        completion.resourceKind === 'ur'
+          ? { title, kind: 'ur' }
+          : { title, kind: 'markdown', body: '' },
         completion.anchor,
         'avoidingOverlap',
       );

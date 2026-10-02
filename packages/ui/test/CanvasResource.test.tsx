@@ -1057,6 +1057,9 @@ describe('CanvasResource Title ladder', () => {
       [{ kind: 'reference' }, opened({ kind: 'markdown', source: '', via: 'reference' })],
       [{ kind: 'space' }, CLOSED_DISPLAY],
       [{ kind: 'space' }, opened(SPACE_CONTENT)],
+      [{ kind: 'ur' }, CLOSED_DISPLAY],
+      [{ kind: 'ur' }, opened({ kind: 'ur', via: 'self' })],
+      [{ kind: 'reference' }, opened({ kind: 'ur', via: 'reference' })],
     ];
 
     for (const [front, display] of fronts) {
@@ -2081,5 +2084,105 @@ describe('CanvasResource Close fade', () => {
     );
 
     expect(leavingContent().querySelector('img')).toHaveAttribute('src', FIGURE_URL);
+  });
+});
+
+/**
+ * An Ur Resource has no content (ADR 0113): Closed it draws like any Resource,
+ * Open it shows only its Title, and nothing anywhere offers to edit it.
+ */
+describe('CanvasResource Ur front', () => {
+  const UR_OPEN: FrontDisplay = opened({ kind: 'ur', via: 'self' });
+
+  it('presents a Closed Ur Resource by its Title and kind alone', () => {
+    render(
+      <CanvasResource
+        front={{ kind: 'ur' }}
+        display={CLOSED_DISPLAY}
+        state="rest"
+        title="Gateway"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    const resource = screen.getByRole('article', { name: 'Gateway' });
+    expect(resource).toHaveAttribute('data-kind', 'ur');
+    expect(resource).toHaveAttribute('data-open', 'false');
+    expect(screen.getByRole('heading', { name: 'Gateway' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Ur Resource' })).toBeVisible();
+    expect(resource.querySelector('.canvas-resource__content')).toBeNull();
+  });
+
+  it('opens and closes through the shared rail control, and offers no Edit', () => {
+    const onOpenChange = vi.fn(() => 'completed' as const);
+    const { rerender } = render(
+      <CanvasResource
+        front={{ kind: 'ur', onOpenChange }}
+        display={CLOSED_DISPLAY}
+        state="selected"
+        title="Gateway"
+        graphColor="#ffc53d"
+        onBeginTitleEdit={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Open Resource Gateway' }));
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+
+    rerender(
+      <CanvasResource
+        front={{ kind: 'ur', onOpenChange }}
+        display={UR_OPEN}
+        state="selected"
+        title="Gateway"
+        graphColor="#ffc53d"
+        onBeginTitleEdit={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Edit Title Gateway' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Close Resource Gateway' }));
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('draws only its Title while Open, with no content area and no placeholder', () => {
+    render(
+      <CanvasResource
+        front={{ kind: 'ur' }}
+        display={UR_OPEN}
+        state="rest"
+        title={'Gateway\nthe one way in'}
+        graphColor="#ffc53d"
+      />,
+    );
+
+    const resource = screen.getByRole('article', { name: 'Gateway' });
+    expect(resource).toHaveAttribute('data-open', 'true');
+    expect(resource).toHaveAttribute('data-content-kind', 'ur');
+    expect(resource.querySelector('.canvas-resource__content')).toBeNull();
+    expect(screen.queryByTestId('unresolved-content')).toBeNull();
+    expect(resource).toHaveTextContent(/^Gatewaythe one way in$/u);
+  });
+
+  it('draws an Open Reference Resource to an Ur Resource the same, read-only', () => {
+    render(
+      <CanvasResource
+        front={{ kind: 'reference', onOpenChange: () => 'completed' }}
+        display={opened({ kind: 'ur', via: 'reference' })}
+        state="selected"
+        title="Gateway, again"
+        graphColor="#ffc53d"
+      />,
+    );
+
+    const resource = screen.getByRole('article', { name: 'Gateway, again' });
+    expect(resource).toHaveAttribute('data-kind', 'reference');
+    expect(resource).toHaveAttribute('data-content-kind', 'ur');
+    expect(resource.querySelector('.canvas-resource__content')).toBeNull();
+    expect(resource).toHaveTextContent(/^Gateway, again$/u);
+    expect(screen.getByRole('button', { name: 'Close Resource Gateway, again' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Edit Resource Gateway, again' })).toBeNull();
   });
 });

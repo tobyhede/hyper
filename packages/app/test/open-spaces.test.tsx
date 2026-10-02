@@ -608,7 +608,11 @@ describe('Open Spaces', () => {
     const other = await openSpaces.open(OTHER_ID);
 
     expect(
-      other.app.authoring.complete({ kind: 'created-resource', anchor: { x: 100, y: 100 } }),
+      other.app.authoring.complete({
+        kind: 'created-resource',
+        resourceKind: 'markdown',
+        anchor: { x: 100, y: 100 },
+      }),
     ).toEqual({ kind: 'completed', createdResourceId: MINTED_RESOURCE_ID });
 
     expect(other.session.getState().working.resources.map(({ id }) => id)).toContain(

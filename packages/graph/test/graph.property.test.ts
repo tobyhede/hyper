@@ -271,6 +271,8 @@ function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'refer
         ? { id, title, kind, ...view, framing: { centreX: index, centreY: -index, zoom: 1 } }
         : { id, title, kind, ...view };
     }
+    case 'ur':
+      return { id, title, kind };
   }
 }
 
@@ -312,10 +314,10 @@ function withKinds(
   };
 }
 
-const kindsArb = fc.array(fc.constantFrom<ContentKind>('markdown', 'image', 'space', 'reference'), {
-  minLength: 1,
-  maxLength: 8,
-});
+const kindsArb = fc.array(
+  fc.constantFrom<ContentKind>('markdown', 'image', 'space', 'ur', 'reference'),
+  { minLength: 1, maxLength: 8 },
+);
 const targetsArb = fc.array(fc.nat(), { minLength: 1, maxLength: 8 });
 
 const acceptedWithKinds = (

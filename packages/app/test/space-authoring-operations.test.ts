@@ -173,7 +173,9 @@ describe('Add Resource', () => {
   it('creates one neutrally titled detached Resource at the anchor it was given', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'created-resource', anchor: CENTRE })).toEqual({
+    expect(
+      authoring.complete({ kind: 'created-resource', resourceKind: 'markdown', anchor: CENTRE }),
+    ).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -197,8 +199,8 @@ describe('Add Resource', () => {
     // real one.
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
-    authoring.complete({ kind: 'created-resource', anchor: CENTRE });
-    authoring.complete({ kind: 'created-resource', anchor: CENTRE });
+    authoring.complete({ kind: 'created-resource', resourceKind: 'markdown', anchor: CENTRE });
+    authoring.complete({ kind: 'created-resource', resourceKind: 'markdown', anchor: CENTRE });
 
     const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     const stacked = Object.values(positions).filter(
@@ -227,7 +229,11 @@ describe('Add Resource', () => {
     };
     const { authoring, session } = open(openedSnapshot);
 
-    authoring.complete({ kind: 'created-resource', anchor: { x: 500, y: 400 } });
+    authoring.complete({
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: { x: 500, y: 400 },
+    });
 
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
@@ -236,6 +242,55 @@ describe('Add Resource', () => {
       x: 500,
       y: 400,
       open: false,
+    });
+  });
+});
+
+describe('Create Ur Resource', () => {
+  it('creates one neutrally titled Ur Resource at the anchor, in one Edit', () => {
+    const { authoring, session } = openPositioned();
+    const edits: number[] = [];
+    session.subscribe(() => edits.push(session.getState().working.resources.length));
+
+    expect(
+      authoring.complete({ kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE }),
+    ).toEqual({
+      kind: 'completed',
+      createdResourceId: MINTED,
+    });
+
+    // A Title and nothing else: the kind carries no content (ADR 0113).
+    expect(session.getState().working.resources[2]).toEqual({
+      id: MINTED,
+      document: { title: 'Resource 1', kind: 'ur' },
+    });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual(CENTRE);
+    expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
+    expect(new Set(edits)).toEqual(new Set([3]));
+  });
+
+  it('survives a commit and a reload through intake', async () => {
+    const loaded = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
+    const backend = MemorySpaceBackend.asMeta(loaded);
+    const session = openSpaceSession(backend, loaded);
+    const { authoring } = composeApp({
+      spaceSession: session,
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+    });
+
+    authoring.complete({ kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE });
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
+
+    const stored = await backend.loadSpace(SPACE_ID);
+    const reopened = composeApp({
+      spaceSession: openSpaceSession(backend, stored!),
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+    });
+    expect(reopened.currentSpace().lookup.resource(MINTED)).toMatchObject({
+      kind: 'ur',
+      title: 'Resource 1',
     });
   });
 });

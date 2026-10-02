@@ -84,6 +84,7 @@ const FRONTS = [
   { kind: 'reference', label: 'reference' },
   { kind: 'space', label: 'space' },
   { kind: 'image', label: 'image' },
+  { kind: 'ur', label: 'ur' },
   { kind: 'preview', label: 'creation ghost' },
 ] as const satisfies readonly { kind: CanvasResourceFront['kind']; label: string }[];
 

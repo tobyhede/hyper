@@ -49,6 +49,7 @@ type MarkdownFront = Mutable<Extract<CanvasResourceFront, { kind: 'markdown' }>>
 type ReferenceFront = Mutable<Extract<CanvasResourceFront, { kind: 'reference' }>>;
 type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
 type ImageFront = Mutable<Extract<CanvasResourceFront, { kind: 'image' }>>;
+type UrFront = Mutable<Extract<CanvasResourceFront, { kind: 'ur' }>>;
 
 /**
  * The operations each kind's front offers, by the Resource's own kind. What it
@@ -69,6 +70,12 @@ function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
       const front: ImageFront = { kind: 'image' };
       if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
       if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
+      return front;
+    }
+    case 'ur': {
+      // An Ur Resource has no content, so it offers Open and Close and no edit.
+      const front: UrFront = { kind: 'ur' };
+      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
       return front;
     }
     case 'reference': {
