@@ -1,6 +1,6 @@
 # Ur Resource
 
-Status: ready-for-agent
+Status: resolved
 
 The spec is ADR 0113 (`docs/adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md`) and the **Resource**, **Ur Resource** and **Reference Resource** entries in `CONTEXT.md`. This file only slices the work.
 
