@@ -147,6 +147,7 @@ const canonicalResource = (
     if (document.naturalSize !== undefined) image.naturalSize = document.naturalSize;
     return image;
   }
+  if (document.kind === 'ur') return { ...common, kind: 'ur' };
   return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
 

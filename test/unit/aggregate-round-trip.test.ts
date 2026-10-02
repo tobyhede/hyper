@@ -367,6 +367,43 @@ url: /images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU
 `);
   });
 
+  /*
+   * An Ur Resource is its Title and its kind (ADR 0113): its file is a
+   * frontmatter fence and no body, and a Reference Resource to it comes back
+   * still pointing at it.
+   */
+  it('round-trips an Ur Resource and a Reference Resource to it', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const UR_ID = uuidSchema.parse('14141414-1414-4414-8414-141414141414');
+    const TO_UR_ID = uuidSchema.parse('15151515-1515-4515-8515-151515151515');
+    const added = [
+      { id: UR_ID, document: { title: 'Node', kind: 'ur' as const } },
+      {
+        id: TO_UR_ID,
+        document: { title: 'Node, again', kind: 'reference' as const, target: UR_ID },
+      },
+    ];
+    const [meta, ...targets] = completeAggregate();
+    if (meta === undefined) throw new Error('The aggregate names no Meta Space');
+    const withUr: SpaceSnapshot = { ...meta, resources: [...meta.resources, ...added] };
+
+    await exportTo(repositoryHolding([withUr, ...targets]), destination);
+    const reimported = await importFrom(destination);
+
+    const stored = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
+    expect(stored?.resources.filter(({ id }) => id === UR_ID || id === TO_UR_ID)).toEqual(
+      expect.arrayContaining(added),
+    );
+    expect(await readFile(join(destination, META_SPACE_ID, 'resources', `${UR_ID}.md`), 'utf8'))
+      .toBe(`---
+id: ${UR_ID}
+title: Node
+kind: ur
+---
+
+`);
+  });
+
   it('re-exports over its own output without changing a byte', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const source = repositoryHolding(completeAggregate());

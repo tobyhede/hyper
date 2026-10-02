@@ -375,32 +375,35 @@ describe('SnapshotEdit.createInMap properties', () => {
         coordsArb,
         fc.nat({ max: 8 }),
         fc.uuid().map(uuid),
-        fc.boolean(),
-        (ids, coords, targetSeed, newResourceId, targetIsSpace) => {
+        fc.constantFrom<'markdown' | 'space' | 'ur'>('markdown', 'space', 'ur'),
+        (ids, coords, targetSeed, newResourceId, targetKind) => {
           fc.pre(!ids.includes(newResourceId));
           const target = ids[targetSeed % ids.length];
           if (target === undefined) return;
           const base = baseSnapshot(ids, Placement.toPositions(closedPlacement(ids, coords)));
           // A Space Resource owns content too: it draws its target's Map (ADR 0070).
-          const snapshot: SpaceSnapshot = targetIsSpace
-            ? {
-                ...base,
-                resources: base.resources.map((resource) =>
-                  resource.id === target
-                    ? {
-                        id: target,
-                        document: {
-                          title: 'Nested',
-                          kind: 'space',
-                          spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
-                          map: MAP_ID,
-                          graph: GRAPH_ID,
-                        },
-                      }
-                    : resource,
-                ),
-              }
-            : base;
+          // An Ur Resource's content is empty, and it is still a Target (ADR 0113).
+          const targetDocument: ResourceDocument | undefined =
+            targetKind === 'space'
+              ? {
+                  title: 'Nested',
+                  kind: 'space',
+                  spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
+                  map: MAP_ID,
+                  graph: GRAPH_ID,
+                }
+              : targetKind === 'ur'
+                ? { title: 'Node', kind: 'ur' }
+                : undefined;
+          const snapshot: SpaceSnapshot =
+            targetDocument === undefined
+              ? base
+              : {
+                  ...base,
+                  resources: base.resources.map((resource) =>
+                    resource.id === target ? { id: target, document: targetDocument } : resource,
+                  ),
+                };
 
           const outcome = SnapshotEdit.createInMap(
             snapshot,
@@ -420,6 +423,37 @@ describe('SnapshotEdit.createInMap properties', () => {
           });
         },
       ),
+    );
+  });
+
+  it('creates an Ur Resource, which intake accepts and which first Opens at the default Open Size', () => {
+    fc.assert(
+      fc.property(idsArb, coordsArb, fc.uuid().map(uuid), (ids, coords, newResourceId) => {
+        fc.pre(!ids.includes(newResourceId));
+        const base = baseSnapshot(ids, Placement.toPositions(closedPlacement(ids, coords)));
+        const document: ResourceDocument = { title: 'Node', kind: 'ur' };
+
+        const created = SnapshotEdit.createInMap(
+          base,
+          MAP_ID,
+          newResourceId,
+          document,
+          { x: 0, y: 0 },
+          'avoidingOverlap',
+        );
+        expect(created.kind).toBe('completed');
+        if (created.kind !== 'completed') return;
+        expect(loadSpaceSnapshot(created.snapshot).ok).toBe(true);
+        expect(created.snapshot.resources.at(-1)).toEqual({ id: newResourceId, document });
+
+        const opened = SnapshotEdit.open(created.snapshot, MAP_ID, newResourceId);
+        expect(opened.kind).toBe('completed');
+        if (opened.kind !== 'completed') return;
+        expect(opened.snapshot.document.maps?.[0]?.positions[newResourceId]).toMatchObject({
+          open: true,
+          openSize: DEFAULT_OPEN_SIZE,
+        });
+      }),
     );
   });
 

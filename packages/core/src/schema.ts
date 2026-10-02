@@ -186,6 +186,16 @@ export const imageResourceFrontmatterSchema = z.object({
   naturalSize: imageNaturalSizeSchema.optional(),
 });
 
+/**
+ * A Resource with no content: a Title and every capability every Resource has
+ * (ADR 0113). Its frontmatter is the whole of it, so its file has no body.
+ */
+export const urResourceFrontmatterSchema = z.object({
+  id: idSchema,
+  title: resourceTitleSchema,
+  kind: z.literal('ur'),
+});
+
 const defaultMarkdownKind = (value: unknown): unknown =>
   typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
     ? { ...value, kind: 'markdown' }
@@ -204,6 +214,7 @@ export const resourceFrontmatterSchema = z.preprocess(
     referenceResourceFrontmatterSchema,
     spaceResourceFrontmatterSchema,
     imageResourceFrontmatterSchema,
+    urResourceFrontmatterSchema,
   ]),
 );
 
@@ -219,6 +230,9 @@ export const importSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSche
 export const importImageResourceFrontmatterSchema = imageResourceFrontmatterSchema.extend({
   id: uuidSchema.optional(),
 });
+export const importUrResourceFrontmatterSchema = urResourceFrontmatterSchema.extend({
+  id: uuidSchema.optional(),
+});
 export const importResourceFrontmatterSchema = z.preprocess(
   defaultMarkdownKind,
   z.discriminatedUnion('kind', [
@@ -226,6 +240,7 @@ export const importResourceFrontmatterSchema = z.preprocess(
     importReferenceResourceFrontmatterSchema,
     importSpaceResourceFrontmatterSchema,
     importImageResourceFrontmatterSchema,
+    importUrResourceFrontmatterSchema,
   ]),
 );
 
@@ -243,6 +258,9 @@ export const spaceResourceSchema = spaceResourceFrontmatterSchema;
 /** A resource that shows a picture from its URL (ADR 0106). */
 export const imageResourceSchema = imageResourceFrontmatterSchema;
 
+/** A resource with no content (ADR 0113). */
+export const urResourceSchema = urResourceFrontmatterSchema;
+
 /**
  * A resource parsed from its file (ADR 0020). A markdown resource carries the file body
  * that stores its content; a reference resource carries only the pointer to its target's
@@ -254,6 +272,7 @@ export const resourceSchema = z.discriminatedUnion('kind', [
   referenceResourceSchema,
   spaceResourceSchema,
   imageResourceSchema,
+  urResourceSchema,
 ]);
 
 /** The refusal code for a multi-line Edge Title; the application owns the wording. */
@@ -490,11 +509,13 @@ export const markdownResourceDocumentSchema = markdownResourceSchema.omit({ id: 
 export const referenceResourceDocumentSchema = referenceResourceSchema.omit({ id: true });
 export const spaceResourceDocumentSchema = spaceResourceSchema.omit({ id: true });
 export const imageResourceDocumentSchema = imageResourceSchema.omit({ id: true });
+export const urResourceDocumentSchema = urResourceSchema.omit({ id: true });
 export const resourceDocumentSchema = z.discriminatedUnion('kind', [
   markdownResourceDocumentSchema,
   referenceResourceDocumentSchema,
   spaceResourceDocumentSchema,
   imageResourceDocumentSchema,
+  urResourceDocumentSchema,
 ]);
 
 /** A complete, fully identified snapshot of one Space, exchanged at persistence seams. */

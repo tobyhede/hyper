@@ -239,6 +239,8 @@ function ownContent(kind: ResourceNodeData['kind'], source: string, url: string)
         },
         via: 'self',
       };
+    case 'ur':
+      return { kind: 'ur', via: 'self' };
   }
 }
 

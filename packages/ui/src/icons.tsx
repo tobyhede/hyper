@@ -169,6 +169,9 @@ export const ImageIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <ImageGlyph size={size} />
 );
 
+/** The Resource kind with no content (ADR 0113): an empty frame. */
+export const UrIcon = ({ size = 14 }: { size?: number | undefined }) => <Square size={size} />;
+
 /** Content a Reference Resource cannot reach, because its Target does not resolve. */
 export const UnresolvedTargetIcon = ({ size = 14 }: { size?: number | undefined }) => (
   <Link2Off size={size} />
@@ -272,6 +275,7 @@ export const BASE_GLYPHS = {
   markdown: MarkdownIcon,
   space: SpaceResourceIcon,
   image: ImageIcon,
+  ur: UrIcon,
 } satisfies Record<ResourceBaseKind, ComponentType<BaseGlyphProps>>;
 
 /**

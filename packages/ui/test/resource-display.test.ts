@@ -25,6 +25,7 @@ const content: fc.Arbitrary<ResourceContent> = fc.oneof(
   fc.record({ kind: fc.constant('markdown' as const), source: fc.string(), via }),
   fc.record({ kind: fc.constant('image' as const), url: fc.webUrl(), via }),
   fc.record({ kind: fc.constant('space' as const), view: fc.constant(view), via }),
+  fc.record({ kind: fc.constant('ur' as const), via }),
   fc.constant({ kind: 'unresolved' as const, via: 'reference' as const }),
 );
 

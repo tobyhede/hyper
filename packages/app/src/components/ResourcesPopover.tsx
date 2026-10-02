@@ -46,6 +46,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
   Tooltip,
+  UrIcon,
   TooltipContent,
   TooltipTrigger,
 } from '@project/ui';
@@ -92,7 +93,7 @@ const everyFilter = <const T extends readonly ResourcesFilter[]>(
   filters: T & (ResourcesFilter extends T[number] ? unknown : never),
 ): T => filters;
 
-const FILTERS = everyFilter(['markdown', 'image', 'reference', 'space', 'spaces']);
+const FILTERS = everyFilter(['markdown', 'image', 'ur', 'reference', 'space', 'spaces']);
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
 const RESOURCE_FILTERS = FILTERS.filter(
@@ -110,6 +111,7 @@ const ALL_FILTERS: readonly ResourcesFilter[] = FILTERS;
 const FILTER_NAMES = {
   markdown: 'Markdown Resources',
   image: 'Image Resources',
+  ur: 'Ur Resources',
   reference: 'Reference Resources',
   space: 'Space Resources in this Space',
   spaces: 'Spaces in this Meta Space',
@@ -124,6 +126,7 @@ const FILTER_NAMES = {
 const FILTER_GLYPHS = {
   markdown: MarkdownIcon,
   image: ImageIcon,
+  ur: UrIcon,
   reference: ReferenceIcon,
   space: SpaceResourceIcon,
   spaces: ParentIcon,
@@ -666,6 +669,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
     return {
       markdown: ofKind('markdown'),
       image: ofKind('image'),
+      ur: ofKind('ur'),
       reference: ofKind('reference'),
       space: ofKind('space'),
       spaces: spaces.filter((space) => matched(space.title)).length,
