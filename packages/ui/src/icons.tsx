@@ -172,8 +172,7 @@ export const ImageIcon = ({ size = 14 }: { size?: number | undefined }) => (
 
 /**
  * The Resource kind with no content (ADR 0113): an empty circle, the set-theory
- * urelement its name comes from — a thing with no members. Kept distinct from
- * `StopPresentingIcon`'s square, so no glyph in the set means two things.
+ * urelement its name comes from — a thing with no members.
  */
 export const UrIcon = ({ size = 14 }: { size?: number | undefined }) => <Circle size={size} />;
 

@@ -46,9 +46,9 @@ import {
   ToggleGroup,
   ToggleGroupItem,
   Tooltip,
-  UrIcon,
   TooltipContent,
   TooltipTrigger,
+  UrIcon,
 } from '@project/ui';
 import './resources-popover.css';
 
