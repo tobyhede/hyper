@@ -126,7 +126,7 @@ export interface AppCore {
 export interface ComposedApp extends AppCore {
   /**
    * This Space's image replacements: the one way to replace an Image
-   * Resource's picture, and the busy state navigation and availability read.
+   * Resource's picture, and its busy state.
    */
   readonly imageReplacement: ImageReplacements;
   readonly authoring: SpaceAuthoring;

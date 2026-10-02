@@ -34,7 +34,8 @@ export type ImageReplacementResult =
  * replaces an Image Resource's picture, and whether an attempt is running.
  *
  * The busy state is what holds navigation and incompatible authoring while an
- * attempt runs, so it is read by those consumers rather than kept a second time.
+ * attempt runs, so it is read by those consumers rather than kept a second time
+ * (`browser-location.test.ts`, `open-spaces.test.tsx`).
  */
 export interface ImageReplacements {
   /** True from the moment an attempt starts until it settles. */
@@ -113,7 +114,9 @@ const attempt = async (
  *
  * Exclusive per Space: the busy state is set before any image work starts and
  * cleared by the attempt that set it, on every settled path, once its Edit is
- * applied — persistence acknowledgement is the session's and is not awaited.
+ * applied — persistence acknowledgement is the session's and is not awaited
+ * (`image-replacement.test.ts`, "is busy through applying the Edit and released
+ * without waiting for the save").
  */
 export function createImageReplacements({
   images,
