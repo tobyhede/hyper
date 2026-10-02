@@ -52,7 +52,7 @@ test(
     const list = await openConnect(page, 'Resource 3');
 
     // One toggle per Resource kind, and no Spaces source.
-    await expect(list.getByRole('button', { pressed: true })).toHaveCount(4);
+    await expect(list.getByRole('button', { pressed: true })).toHaveCount(5);
     await expect(list.getByRole('button', { name: /^Spaces in this Meta Space/ })).toHaveCount(0);
     await expect(list.getByRole('button', { name: 'Connect to Resource 3' })).toHaveCount(0);
     await expect(list.getByRole('textbox', { name: 'Search resources' })).toBeFocused();
