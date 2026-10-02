@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #331; `CI passed` green on f549d219 (run 36966992919).
 
 - [x] Application composition requires ImageSources and constructs one replacement module per Space using its Space Authoring and diagnostic reporter. Open Spaces forwards its existing sources; isolated tests and stories supply explicit dependencies without ambient defaults.
 - [x] Callers use one replacement operation plus observable busy state. The operation reads the current Resource itself; no caller supplies the current image URL or assembles the lock and execution sequence.

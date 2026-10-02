@@ -1,6 +1,6 @@
 # Image replacement owns its complete attempt
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #331; `CI passed` green on f549d219 (run 36966992919).
 
 ## Problem Statement
 
