@@ -1,7 +1,7 @@
 # Reference Thing is the first-public name for Alias
 
 Status: accepted
-Refines: 0009, 0039, 0051, 0070, 0085, 0089
+Renames: 0009, 0039, 0051, 0070, 0085, 0089
 Related: 0004, 0054, 0069
 
 The first-public domain calls the Thing that is a reference to another Thing a

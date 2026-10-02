@@ -60,6 +60,10 @@ test-results/
 # this script rather than rebuilding a parser from the ticket's prose. It goes
 # when ticket 04 is reopened and decided again.
 !.scratch/impact-gate/calibration.py
+# `pnpm spaces` mints these from docs/adr and the issue files; the Markdown it
+# copies in is tracked at its source, so a tracked second copy is state that can
+# disagree with the code generating it (ADR 0056).
+.scratch/spaces/**
 
 # Package-local spike harnesses: runnable code that proved something and was
 # never meant to ship. What they proved belongs in a finding or an ADR, in

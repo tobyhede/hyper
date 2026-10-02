@@ -2,7 +2,8 @@
 
 Status: accepted
 Related: 0068, 0070
-Refined by: 0071, 0074, 0077, 0078, 0079, 0085, 0111
+Refined by: 0071, 0074, 0077, 0078, 0079, 0111
+Renamed by: 0085
 
 Every Space, Card, Graph and Space View has a durable product URL built from its
 Id. A URL may identify the entity alone or establish an explicit Space View,

@@ -3,7 +3,8 @@
 Status: accepted
 Supersedes: 0019, 0029
 Refines: 0010, 0020
-Refined by: 0040, 0041, 0058
+Refined by: 0040, 0058
+Renamed by: 0041
 
 Hyper persists every edit transactionally to PostgreSQL and regenerates the
 existing `space.json` plus card Markdown structure through explicit CLI export.

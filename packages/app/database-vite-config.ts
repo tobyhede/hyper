@@ -36,7 +36,12 @@ export const databaseViteConfig = (target: ViteDatabaseTarget, { mode }: ConfigE
               catalog: 'directory' as const,
               directory: repositoryFile('../../.scratch/v1-release/roadmap-space'),
             }
-          : undefined;
+          : target === postgresViteTarget && mode === 'spaces'
+            ? {
+                catalog: 'aggregate' as const,
+                directory: repositoryFile('../../.scratch/spaces'),
+              }
+            : undefined;
   const spaceHttpOptions: SpaceHttpPluginOptions = {
     developmentModule:
       memoryCatalog === undefined

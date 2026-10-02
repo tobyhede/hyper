@@ -130,6 +130,21 @@ const readAdrFiles = (): readonly (readonly [string, string])[] =>
   );
 
 /**
+ * A narrowing link and its answer: `Refines`/`Refined by`, or `Renames`/`Renamed by`.
+ *
+ * `Renames` is kept apart from `Refines` because a rename ADR decides words
+ * only. Filed as a refinement, it reads as a change to every decision whose
+ * vocabulary it touched, and those are most of the log.
+ */
+interface LinkPair {
+  readonly forward: string;
+  readonly answer: string;
+}
+
+const REFINES: LinkPair = { forward: 'Refines', answer: 'Refined by' };
+const RENAMES: LinkPair = { forward: 'Renames', answer: 'Renamed by' };
+
+/**
  * A reference naming no ADR is reported rather than skipped. Resolving the
  * target first and *filtering* on it would make the guard silent about the one
  * fault it cannot repair by symmetry: `Refines: 0099` is a dead end for a
@@ -148,37 +163,49 @@ const readAdrFiles = (): readonly (readonly [string, string])[] =>
  * ADR 0016 is the tree's only rejected ADR: the part of it that survived is
  * carried by ADR 0019, which ADR 0010 already names.
  */
-const refinesFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
+const forwardFaults = (
+  adrs: ReadonlyMap<string, StatusBlock>,
+  { forward, answer }: LinkPair,
+): string[] =>
   [...adrs].flatMap(([number, adr]) =>
     adr.status === 'rejected'
       ? []
-      : refs(adr.fields.get('Refines')).flatMap((target) => {
-          const refined = adrs.get(target);
-          if (refined === undefined) return [`${number} Refines ${target}, which is not an ADR`];
-          if (refined.status === 'rejected') return [];
-          return refs(refined.fields.get('Refined by')).includes(number)
+      : refs(adr.fields.get(forward)).flatMap((target) => {
+          const linked = adrs.get(target);
+          if (linked === undefined) return [`${number} ${forward} ${target}, which is not an ADR`];
+          if (linked.status === 'rejected') return [];
+          return refs(linked.fields.get(answer)).includes(number)
             ? []
-            : [`${number} Refines ${target}, but ${target} does not answer`];
+            : [`${number} ${forward} ${target}, but ${target} does not answer`];
         }),
   );
 
-const refinedByFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
+const answerFaults = (
+  adrs: ReadonlyMap<string, StatusBlock>,
+  { forward, answer }: LinkPair,
+): string[] =>
   [...adrs].flatMap(([number, adr]) =>
     adr.status === 'rejected'
       ? []
-      : refs(adr.fields.get('Refined by')).flatMap((target) => {
-          const refiner = adrs.get(target);
-          if (refiner === undefined) {
-            return [`${number} is 'Refined by' ${target}, which is not an ADR`];
+      : refs(adr.fields.get(answer)).flatMap((target) => {
+          const linker = adrs.get(target);
+          if (linker === undefined) {
+            return [`${number} is '${answer}' ${target}, which is not an ADR`];
           }
-          if (refiner.status === 'rejected') {
-            return [`${number} is 'Refined by' ${target}, which is rejected`];
+          if (linker.status === 'rejected') {
+            return [`${number} is '${answer}' ${target}, which is rejected`];
           }
-          return refs(refiner.fields.get('Refines')).includes(number)
+          return refs(linker.fields.get(forward)).includes(number)
             ? []
-            : [`${number} is 'Refined by' ${target}, but ${target} does not answer`];
+            : [`${number} is '${answer}' ${target}, but ${target} does not answer`];
         }),
   );
+
+const refinesFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
+  forwardFaults(adrs, REFINES);
+
+const refinedByFaults = (adrs: ReadonlyMap<string, StatusBlock>): string[] =>
+  answerFaults(adrs, REFINES);
 
 /**
  * The supersession half, in the shape the refinement guards above establish and
@@ -332,6 +359,10 @@ describe('ADR status blocks point both ways', () => {
 
   it('answers every `Refined by` with a `Refines`, and never names a rejected ADR', () => {
     expect(refinedByFaults(adrs)).toEqual([]);
+  });
+
+  it('answers every `Renames` with a `Renamed by`, and the reverse', () => {
+    expect([...forwardFaults(adrs, RENAMES), ...answerFaults(adrs, RENAMES)]).toEqual([]);
   });
 
   it('answers every `Supersedes` with a `Superseded by`', () => {
@@ -506,6 +537,19 @@ describe('the status block that guard reads', () => {
 
     expect(refinesFaults(answered)).toEqual([]);
     expect(refinedByFaults(answered)).toEqual([]);
+  });
+
+  it('reports a one-way rename in both directions', () => {
+    const adrs = synthetic({
+      '0040': ['Status: accepted'],
+      '0085': ['Status: accepted', 'Renames: 0040'],
+      '0086': ['Status: accepted', 'Renamed by: 0085'],
+    });
+
+    expect(forwardFaults(adrs, RENAMES)).toEqual(['0085 Renames 0040, but 0040 does not answer']);
+    expect(answerFaults(adrs, RENAMES)).toEqual([
+      "0086 is 'Renamed by' 0085, but 0085 does not answer",
+    ]);
   });
 
   it('reports a one-way supersession', () => {

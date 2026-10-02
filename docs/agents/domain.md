@@ -40,7 +40,7 @@ When your output names a domain concept (in an issue title, a refactor proposal,
 
 If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap to record during domain review.
 
-A superseded ADR lives in `docs/adr/superseded/`, so the top-level listing is the live set; `docs/adr/README.md` states each accepted decision in one line. Check an ADR's `Status:` before relying on it — a superseded one is history, not a rule. Its `Refines`/`Refined by` links point at the decisions that narrowed it. Never edit an accepted ADR; see `docs/agents/workflow.md`.
+A superseded ADR lives in `docs/adr/superseded/`, so the top-level listing is the live set; `docs/adr/README.md` states each accepted decision in one line, filed under the feature stream it belongs to. Check an ADR's `Status:` before relying on it — a superseded one is history, not a rule. Its `Refines`/`Refined by` links point at the decisions that narrowed it; `Renamed by` points at an ADR that changed only its words, which `docs/adr/README.md` already states in current vocabulary. Never edit an accepted ADR; see `docs/agents/workflow.md`.
 
 ## Flag ADR conflicts
 

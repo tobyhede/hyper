@@ -1,7 +1,8 @@
 # Alias resolution is lazy, non-destructive, and single-hop
 
 Status: accepted
-Refined by: 0032, 0070, 0085, 0092
+Refined by: 0032, 0070
+Renamed by: 0085, 0092
 Refines: 0004
 Related: 0012, 0023
 
