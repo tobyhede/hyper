@@ -33,10 +33,30 @@ const adr = (title: string, status: string): string => `# ${title}\n\n${status}\
 const issue = (title: string, status: string, blockers = ''): string =>
   `# ${title}\n\nStatus: ${status}\n${blockers === '' ? '' : `Blocked by: ${blockers}\n`}\nThe work.\n`;
 
-/** A repository holding four ADRs and five issues, one of them settled. */
+const index = (sections: Readonly<Record<string, readonly string[]>>): string =>
+  [
+    '# Accepted decisions',
+    '',
+    ...Object.entries(sections).flatMap(([title, numbers]) => [
+      `## ${title}`,
+      '',
+      '| ADR | Binds |',
+      '| --- | --- |',
+      ...numbers.map((number) => `| [${number}](${number}-x.md) | What ${number} binds. |`),
+      '',
+    ]),
+  ].join('\n');
+
+/**
+ * A repository holding five ADRs indexed under two streams, and five issues,
+ * one of them settled. 0003 is superseded and 0005 proposed, so neither is
+ * indexed and both are filed by their lineage.
+ */
 const repository = (): string => {
   const root = scratch();
+  write(root, 'docs/adr/README.md', index({ Foundations: ['0001'], Later: ['0002', '0004'] }));
   write(root, 'docs/adr/0001-first.md', adr('First', 'Status: accepted'));
+  write(root, 'docs/adr/0005-proposal.md', adr('Proposal', 'Status: proposed\nRefines: 0001'));
   write(
     root,
     'docs/adr/0002-second.md',
@@ -98,12 +118,37 @@ const space = (spaces: readonly Written[], title: string): Written => {
   return found;
 };
 
+type WrittenMap = NonNullable<Written['document']['maps']>[number];
+
+/** The Map titled `mapTitle`, or the default Map when none is named. */
+const mapTitled = (written: Written, mapTitle?: string): WrittenMap => {
+  const maps = written.document.maps ?? [];
+  const found =
+    mapTitle === undefined
+      ? maps.find(({ id }) => id === written.document.defaultMap)
+      : maps.find(({ title }) => title === mapTitle);
+  if (found === undefined) throw new Error(`No Map titled ${mapTitle ?? '(default)'}`);
+  return found;
+};
+
+const nameOf = (written: Written, id: string): string =>
+  [...written.ids].find(([, candidate]) => candidate === id)?.[0].replace(/\.md$/u, '') ?? id;
+
 /** A Graph's Edges as Resource file names without `.md`, which is what the assertions are about. */
-const edges = (written: Written, graphTitle: string): readonly string[] => {
-  const nameById = new Map([...written.ids].map(([name, id]) => [id, name.replace(/\.md$/u, '')]));
-  const graph = written.document.maps?.[0]?.graphs.find(({ title }) => title === graphTitle);
+const edges = (written: Written, graphTitle: string, mapTitle?: string): readonly string[] => {
+  const graph = mapTitled(written, mapTitle).graphs.find(({ title }) => title === graphTitle);
   if (graph === undefined) throw new Error(`No Graph titled ${graphTitle}`);
-  return graph.edges.map(({ from, to }) => `${nameById.get(from)} -> ${nameById.get(to)}`).sort();
+  return graph.edges
+    .map(({ from, to }) => `${nameOf(written, from)} -> ${nameOf(written, to)}`)
+    .sort();
+};
+
+/** Where a Map places a Resource, by its file name without `.md`. */
+const placed = (written: Written, name: string, mapTitle?: string) => {
+  const positions = new Map(Object.entries(mapTitled(written, mapTitle).positions));
+  const placement = positions.get(written.ids.get(`${name}.md`) ?? '');
+  if (placement === undefined) throw new Error(`${name} is not placed`);
+  return { x: placement.x, y: placement.y };
 };
 
 describe('the knowledge aggregate', () => {
@@ -151,6 +196,9 @@ describe('the ADR Space', () => {
       '0002-second.md',
       '0003-retired.md',
       '0004-rename.md',
+      '0005-proposal.md',
+      'stream-foundations.md',
+      'stream-later.md',
     ]);
     const retired = readFileSync(join(decisions.directory, 'resources/0003-retired.md'), 'utf8');
     expect(retired).toContain('title: "ADR 0003 (superseded) — Retired"');
@@ -162,7 +210,10 @@ describe('the ADR Space', () => {
 
     // `Supersedes: 0003` and `Superseded by: 0002` are one relation stated from
     // both ends; 0099 has no Resource; `Related:` is not a dependency.
-    expect(edges(decisions, 'Refines')).toEqual(['0001-first -> 0002-second']);
+    expect(edges(decisions, 'Refines')).toEqual([
+      '0001-first -> 0002-second',
+      '0001-first -> 0005-proposal',
+    ]);
     expect(edges(decisions, 'Supersedes')).toEqual(['0003-retired -> 0002-second']);
   });
 
@@ -175,10 +226,86 @@ describe('the ADR Space', () => {
     ]);
     // The rename ADR has no dependency Edge, so it is packed with the
     // unconnected ADRs below the placed ones rather than drawn after 0002.
-    const positions = new Map(Object.entries(decisions.document.maps?.[0]?.positions ?? {}));
-    const rename = positions.get(decisions.ids.get('0004-rename.md') ?? '');
-    const second = positions.get(decisions.ids.get('0002-second.md') ?? '');
-    expect(rename?.y).toBeGreaterThan(second?.y ?? 0);
+    expect(placed(decisions, '0004-rename').y).toBeGreaterThan(placed(decisions, '0002-second').y);
+  });
+
+  it('opens on every stream at once and draws each stream as its own Map', () => {
+    const decisions = space(generate(repository()).spaces, 'Architecture decisions');
+
+    expect(decisions.document.maps?.map(({ title }) => title)).toEqual([
+      'All decisions',
+      'Foundations',
+      'Later',
+    ]);
+    expect(mapTitled(decisions).title).toBe('All decisions');
+  });
+
+  it('files superseded and unlisted ADRs by their lineage, and tells each stream in order', () => {
+    const decisions = space(generate(repository()).spaces, 'Architecture decisions');
+
+    // 0005 is proposed and refines 0001; 0003 is superseded by 0002.
+    expect(edges(decisions, 'Story', 'Foundations')).toEqual([
+      '0001-first -> 0005-proposal',
+      'stream-foundations -> 0001-first',
+    ]);
+    expect(edges(decisions, 'Story', 'Later')).toEqual([
+      '0002-second -> 0003-retired',
+      '0003-retired -> 0004-rename',
+      'stream-later -> 0002-second',
+    ]);
+    const header = readFileSync(join(decisions.directory, 'resources/stream-later.md'), 'utf8');
+    expect(header).toContain('- **ADR 0002 — Second** — What 0002 binds.');
+    expect(header).toContain('- **ADR 0003 (superseded) — Retired**\n');
+  });
+
+  it('draws the ADRs a stream builds on and is built on by beside it, linked into it', () => {
+    const decisions = space(generate(repository()).spaces, 'Architecture decisions');
+
+    expect(edges(decisions, 'Refines', 'Later')).toEqual(['0001-first -> 0002-second']);
+    expect(placed(decisions, '0001-first', 'Later').x).toBeLessThan(
+      placed(decisions, '0002-second', 'Later').x,
+    );
+    expect(edges(decisions, 'Refines', 'Foundations')).toEqual([
+      '0001-first -> 0002-second',
+      '0001-first -> 0005-proposal',
+    ]);
+    expect(placed(decisions, '0002-second', 'Foundations').x).toBeGreaterThan(
+      placed(decisions, '0005-proposal', 'Foundations').x,
+    );
+    // A stream Map carries only the Resources it is about.
+    expect(Object.keys(mapTitled(decisions, 'Foundations').positions)).not.toContain(
+      decisions.ids.get('0004-rename.md'),
+    );
+  });
+
+  it('gives each stream its own lane on the Map of every stream, headed by its title', () => {
+    const decisions = space(generate(repository()).spaces, 'Architecture decisions');
+    const lowest = (names: readonly string[]): number =>
+      Math.max(...names.map((name) => placed(decisions, name).y));
+    const highest = (names: readonly string[]): number =>
+      Math.min(...names.map((name) => placed(decisions, name).y));
+
+    const foundations = ['stream-foundations', '0001-first', '0005-proposal'];
+    const later = ['stream-later', '0002-second', '0003-retired', '0004-rename'];
+    expect(lowest(foundations)).toBeLessThan(highest(later));
+    for (const lane of [foundations, later]) {
+      const [header, ...members] = lane;
+      for (const member of members) {
+        expect(placed(decisions, header ?? '').x).toBeLessThan(placed(decisions, member).x);
+      }
+    }
+  });
+
+  it('draws only the Map of every ADR when there is no index to read streams from', () => {
+    const root = repository();
+    rmSync(join(root, 'docs/adr/README.md'));
+    const decisions = space(generate(root).spaces, 'Architecture decisions');
+
+    expect(decisions.document.maps?.map(({ title }) => title)).toEqual(['All decisions']);
+    expect(edges(decisions, 'Refines')).toEqual([
+      '0001-first -> 0002-second',
+      '0001-first -> 0005-proposal',
+    ]);
   });
 });
 

@@ -76,8 +76,8 @@ type Placement =
 type Positions = Readonly<Record<string, Placement>>;
 
 /**
- * The ids a generated Space is addressed by: its own, its one Map's, and the
- * Graph a Space Resource opens it on.
+ * The ids a generated Space is addressed by: its own, its default Map's, and
+ * the Graph a Space Resource opens it on.
  */
 interface SpaceIdentity {
   readonly spaceId: string;
@@ -85,14 +85,23 @@ interface SpaceIdentity {
   readonly graphId: string;
 }
 
+interface GeneratedMap {
+  readonly id: string;
+  readonly title: string;
+  /** The first Graph is the Map's Active Graph. */
+  readonly graphs: readonly [GeneratedGraph, ...GeneratedGraph[]];
+  readonly positions: Positions;
+}
+
 interface GeneratedSpace {
   readonly identity: SpaceIdentity;
   readonly title: string;
-  readonly mapTitle: string;
   readonly resources: readonly GeneratedResource[];
-  /** The first Graph is the Active Graph, and the one a Space Resource opens on. */
-  readonly graphs: readonly [GeneratedGraph, ...GeneratedGraph[]];
-  readonly positions: Positions;
+  /**
+   * The first Map is the default Map, and it and its Active Graph are what
+   * `identity` names, so a Space Resource opens the Space there.
+   */
+  readonly maps: readonly [GeneratedMap, ...GeneratedMap[]];
 }
 
 const stableUuid = (namespace: string, name: string): string => {
@@ -332,22 +341,20 @@ const writeSpace = (aggregate: string, space: GeneratedSpace): string => {
     id: spaceId,
     title: space.title,
     defaultMap: mapId,
-    maps: [
-      {
-        id: mapId,
-        title: space.mapTitle,
-        kind: 'positioned',
-        positions: space.positions,
-        graphs: space.graphs.map(({ id, title, color, edges }) => ({
-          id,
-          title,
-          color,
-          headShape: 'arrow',
-          edges: edges.map(({ from, to }) => ({ from, to })),
-        })),
-        activeGraph: space.graphs[0].id,
-      },
-    ],
+    maps: space.maps.map((generated) => ({
+      id: generated.id,
+      title: generated.title,
+      kind: 'positioned',
+      positions: generated.positions,
+      graphs: generated.graphs.map(({ id, title, color, edges }) => ({
+        id,
+        title,
+        color,
+        headShape: 'arrow',
+        edges: edges.map(({ from, to }) => ({ from, to })),
+      })),
+      activeGraph: generated.graphs[0].id,
+    })),
   };
 
   const destination = join(aggregate, spaceId);
@@ -438,21 +445,127 @@ const readAdrs = (adrRoot: string): readonly AdrDocument[] =>
     (left, right) => compareOrdinal(left.number, right.number),
   );
 
-const ADR_NAMESPACE = 'adr';
-const ADR_GRAPHS = { refines: 'refines', supersedes: 'supersedes', renames: 'renames' } as const;
+const ADR_STREAM_HEADING_PATTERN = /^##[ \t]+(.+?)[ \t]*$/u;
+const ADR_INDEX_ROW_PATTERN = /^\|[ \t]*\[(\d{4})\]\([^)]*\)[ \t]*\|[ \t]*(.*?)[ \t]*\|[ \t]*$/u;
+
+/** One section of the ADR index: a feature stream, and what each ADR it lists binds. */
+interface AdrStream {
+  readonly title: string;
+  readonly slug: string;
+  /** ADR number to its index line, in the order the index lists them. */
+  readonly binds: ReadonlyMap<string, string>;
+}
+
+const slugOf = (title: string): string =>
+  title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-|-$/gu, '');
 
 /**
- * The ADR record as a Space: one Resource per ADR, two Graphs of how the
- * decisions depend on each other, and a third of which ADRs only renamed the
- * words of others.
+ * The feature streams `docs/adr/README.md` files every accepted ADR under: each
+ * `##` section holding at least one ADR row is one stream. An index that is
+ * missing reads as no streams, and every ADR is then drawn unfiled.
+ */
+const readStreams = (adrRoot: string): readonly AdrStream[] => {
+  const index = join(adrRoot, 'README.md');
+  if (!existsSync(index)) return [];
+  const streams: { title: string; binds: Map<string, string> }[] = [];
+  for (const line of readFileSync(index, 'utf8').split('\n')) {
+    const heading = ADR_STREAM_HEADING_PATTERN.exec(line);
+    if (heading !== null) {
+      streams.push({ title: heading[1] ?? '', binds: new Map() });
+      continue;
+    }
+    const row = ADR_INDEX_ROW_PATTERN.exec(line);
+    if (row !== null) streams.at(-1)?.binds.set(row[1] ?? '', row[2] ?? '');
+  }
+  return streams
+    .filter(({ binds }) => binds.size > 0)
+    .map(({ title, binds }) => ({ title, slug: slugOf(title), binds }));
+};
+
+/**
+ * The stream every ADR belongs to. The index lists only accepted ADRs, so the
+ * rest are placed by their lineage: a superseded ADR joins the stream of the
+ * ADR that replaced it, and any other unlisted one (rejected, proposed) the
+ * stream of the first ADR it refines. An ADR neither rule reaches is unfiled.
+ */
+const streamsByNumber = (
+  adrs: readonly AdrDocument[],
+  streams: readonly AdrStream[],
+): ReadonlyMap<string, AdrStream> => {
+  const listed = new Map(
+    streams.flatMap((stream) =>
+      [...stream.binds.keys()].map((number) => [number, stream] as const),
+    ),
+  );
+  const byNumber = new Map(adrs.map((adr) => [adr.number, adr]));
+  const streamOf = (number: string, visiting: ReadonlySet<string>): AdrStream | undefined => {
+    const direct = listed.get(number);
+    if (direct !== undefined || visiting.has(number)) return direct;
+    const adr = byNumber.get(number);
+    if (adr === undefined) return undefined;
+    const next = new Set(visiting).add(number);
+    return [...adr.supersededBy, ...adr.refines]
+      .map((other) => streamOf(other, next))
+      .find((stream) => stream !== undefined);
+  };
+  return new Map(
+    adrs.flatMap((adr) => {
+      const stream = streamOf(adr.number, new Set());
+      return stream === undefined ? [] : [[adr.number, stream] as const];
+    }),
+  );
+};
+
+const ADR_NAMESPACE = 'adr';
+const ADR_GRAPHS = { refines: 'refines', supersedes: 'supersedes', renames: 'renames' } as const;
+const LANE_GAP = 240;
+const REFINES_COLOR = '#1f77b4';
+const STORY_COLOR = '#ff7f0e';
+const SUPERSEDES_COLOR = '#7f7f7f';
+
+const shifted = (positions: Positions, dx: number, dy: number): Positions =>
+  Object.fromEntries(
+    Object.entries(positions).map(([id, placement]) => [
+      id,
+      { ...placement, x: placement.x + dx, y: placement.y + dy },
+    ]),
+  );
+
+/** How far below its top a placement reaches, so the next band can start clear of it. */
+const depthBelow = (positions: Positions): number =>
+  Math.max(0, ...Object.values(positions).map(({ y }) => y + ROW));
+
+/** One column of Resources, top to bottom, at `x`. */
+const column = (ids: readonly string[], x: number): Positions =>
+  Object.fromEntries(
+    ids.map((id, at): [string, Placement] => [id, { x, y: at * ROW, open: false }]),
+  );
+
+/** Each id followed by the next: a path through `ids` in order. */
+const chain = (ids: readonly string[]): readonly GeneratedEdge[] =>
+  ids.flatMap((to, at) => {
+    const from = ids[at - 1];
+    return from === undefined ? [] : [{ from, to }];
+  });
+
+/**
+ * The ADR record as a Space: one Resource per ADR, plus one header Resource per
+ * feature stream, drawn on one Map per stream and an `All decisions` Map of
+ * every stream at once.
  *
  * An Edge runs from the decision that came first to the one that builds on it,
- * so following a Graph reads the record in the order it was decided. The Map
- * is laid out over the two dependency Graphs only: a rename touches most of
- * the log, so placing by it would pull every decision towards the rename ADRs.
+ * so following a Graph reads the record in the order it was decided. Every Map
+ * is laid out over the two dependency Graphs only: a rename touches most of the
+ * log, so placing by it would pull every decision towards the rename ADRs.
  */
 export const adrSpace = (repositoryRoot: string): GeneratedSpace => {
-  const adrs = readAdrs(join(repositoryRoot, 'docs', 'adr'));
+  const adrRoot = join(repositoryRoot, 'docs', 'adr');
+  const adrs = readAdrs(adrRoot);
+  const streams = readStreams(adrRoot);
+  const streamOf = streamsByNumber(adrs, streams);
   const idByNumber = new Map(
     adrs.map(({ number }) => [number, stableUuid(ADR_NAMESPACE, `adr:${number}`)]),
   );
@@ -481,35 +594,134 @@ export const adrSpace = (repositoryRoot: string): GeneratedSpace => {
     ({ renames }) => renames,
     ({ renamedBy }) => renamedBy,
   );
+  const dependencies = [...refines, ...supersedes];
   const identity = identityOf(ADR_NAMESPACE, ADR_GRAPHS.refines);
+
+  const lanes = streams.map((stream) => {
+    const members = adrs.filter(({ number }) => streamOf.get(number) === stream);
+    const header: GeneratedResource = {
+      kind: 'markdown',
+      id: stableUuid(ADR_NAMESPACE, `stream:${stream.slug}`),
+      slug: `stream-${stream.slug}`,
+      title: stream.title,
+      body: [
+        `# ${stream.title}`,
+        '',
+        `${members.length} decisions, in the order they were made.`,
+        '',
+        ...members.map((adr) => {
+          const binds = stream.binds.get(adr.number);
+          return binds === undefined ? `- **${adr.title}**` : `- **${adr.title}** — ${binds}`;
+        }),
+      ].join('\n'),
+    };
+    return { stream, header, members: members.map(({ number }) => idOf(number)) };
+  });
+  const unfiled = adrs
+    .filter(({ number }) => !streamOf.has(number))
+    .map(({ number }) => idOf(number));
+
+  const allDecisions = (): Positions => {
+    const placed: Positions[] = [];
+    let top = 0;
+    for (const { header, members } of [
+      ...lanes,
+      ...(unfiled.length === 0 ? [] : [{ header: undefined, members: unfiled }]),
+    ]) {
+      const ordered = shifted(layeredPositions(members, dependencies), COLUMN, 0);
+      const lane: Positions =
+        header === undefined ? ordered : { [header.id]: { x: 0, y: 0, open: false }, ...ordered };
+      placed.push(shifted(lane, 0, top));
+      top += depthBelow(lane) + LANE_GAP;
+    }
+    return Object.fromEntries(placed.flatMap((lane) => Object.entries(lane)));
+  };
+
+  const streamMap = ({ stream, header, members }: (typeof lanes)[number]): GeneratedMap => {
+    const inside = new Set(members);
+    const touching = dependencies.filter(({ from, to }) => inside.has(from) || inside.has(to));
+    const buildsOn = [
+      ...new Set(touching.filter(({ from }) => !inside.has(from)).map(({ from }) => from)),
+    ];
+    const builtOnBy = [
+      ...new Set(
+        touching.filter(({ to }) => !inside.has(to) && !buildsOn.includes(to)).map(({ to }) => to),
+      ),
+    ];
+    const shown = new Set([...members, ...buildsOn, ...builtOnBy]);
+    const drawn = (edges: readonly GeneratedEdge[]): readonly GeneratedEdge[] =>
+      edges.filter(
+        ({ from, to }) => shown.has(from) && shown.has(to) && (inside.has(from) || inside.has(to)),
+      );
+    const left = buildsOn.length === 0 ? COLUMN : 2 * COLUMN;
+    const placed = layeredPositions(members, dependencies);
+    const right = left + Math.max(0, ...Object.values(placed).map(({ x }) => x)) + COLUMN;
+    const graphId = (graph: string): string =>
+      stableUuid(ADR_NAMESPACE, `graph:stream:${stream.slug}:${graph}`);
+
+    return {
+      id: stableUuid(ADR_NAMESPACE, `map:stream:${stream.slug}`),
+      title: stream.title,
+      graphs: [
+        { id: graphId('refines'), title: 'Refines', color: REFINES_COLOR, edges: drawn(refines) },
+        {
+          id: graphId('story'),
+          title: 'Story',
+          color: STORY_COLOR,
+          edges: chain([header.id, ...members]),
+        },
+        {
+          id: graphId('supersedes'),
+          title: 'Supersedes',
+          color: SUPERSEDES_COLOR,
+          edges: drawn(supersedes),
+        },
+      ],
+      positions: {
+        [header.id]: { x: 0, y: 0, open: false },
+        ...column(buildsOn, COLUMN),
+        ...shifted(placed, left, 0),
+        ...column(builtOnBy, right),
+      },
+    };
+  };
 
   return {
     identity,
     title: 'Architecture decisions',
-    mapTitle: 'Decision record',
-    resources: adrs.map((adr) => ({
-      kind: 'markdown',
-      id: idOf(adr.number),
-      slug: adr.slug,
-      title: adr.title,
-      body: adr.body,
-    })),
-    graphs: [
-      { id: identity.graphId, title: 'Refines', color: '#1f77b4', edges: refines },
-      {
-        id: stableUuid(ADR_NAMESPACE, `graph:${ADR_GRAPHS.supersedes}`),
-        title: 'Supersedes',
-        color: '#7f7f7f',
-        edges: supersedes,
-      },
-      {
-        id: stableUuid(ADR_NAMESPACE, `graph:${ADR_GRAPHS.renames}`),
-        title: 'Renames',
-        color: '#c5b0d5',
-        edges: renames,
-      },
+    resources: [
+      ...lanes.map(({ header }) => header),
+      ...adrs.map((adr): GeneratedResource => ({
+        kind: 'markdown',
+        id: idOf(adr.number),
+        slug: adr.slug,
+        title: adr.title,
+        body: adr.body,
+      })),
     ],
-    positions: layeredPositions([...ids], [...refines, ...supersedes]),
+    maps: [
+      {
+        id: identity.mapId,
+        title: 'All decisions',
+        graphs: [
+          { id: identity.graphId, title: 'Refines', color: REFINES_COLOR, edges: refines },
+          {
+            id: stableUuid(ADR_NAMESPACE, `graph:${ADR_GRAPHS.supersedes}`),
+            title: 'Supersedes',
+            color: SUPERSEDES_COLOR,
+            edges: supersedes,
+          },
+          {
+            id: stableUuid(ADR_NAMESPACE, `graph:${ADR_GRAPHS.renames}`),
+            title: 'Renames',
+            color: '#c5b0d5',
+            edges: renames,
+          },
+        ],
+        positions: allDecisions(),
+      },
+      ...lanes.map(streamMap),
+    ],
   };
 };
 
@@ -567,7 +779,6 @@ export const issueSpace = (scratchRoot: string): GeneratedSpace => {
   return {
     identity,
     title: 'Open issues',
-    mapTitle: 'Remaining work',
     resources: open.map(({ issue, reference, slug }) => ({
       kind: 'markdown',
       id: stableUuid(ISSUE_NAMESPACE, `issue:${issue.path}`),
@@ -575,16 +786,22 @@ export const issueSpace = (scratchRoot: string): GeneratedSpace => {
       title: `${reference} — ${issue.title}`,
       body: readFileSync(join(scratchRoot, issue.path), 'utf8'),
     })),
-    graphs: [
-      { id: identity.graphId, title: 'Critical paths', color: '#d62728', edges: critical },
+    maps: [
       {
-        id: stableUuid(ISSUE_NAMESPACE, `graph:${ISSUE_GRAPHS.other}`),
-        title: 'Other blockers',
-        color: '#2ca02c',
-        edges: blockers.filter(({ from, to }) => !criticalKeys.has(`${from}\u0000${to}`)),
+        id: identity.mapId,
+        title: 'Remaining work',
+        graphs: [
+          { id: identity.graphId, title: 'Critical paths', color: '#d62728', edges: critical },
+          {
+            id: stableUuid(ISSUE_NAMESPACE, `graph:${ISSUE_GRAPHS.other}`),
+            title: 'Other blockers',
+            color: '#2ca02c',
+            edges: blockers.filter(({ from, to }) => !criticalKeys.has(`${from}\u0000${to}`)),
+          },
+        ],
+        positions: layeredPositions(ids, blockers),
       },
     ],
-    positions: layeredPositions(ids, blockers),
   };
 };
 
@@ -627,20 +844,25 @@ export const overviewSpace = (decisions: SpaceIdentity, issues: SpaceIdentity): 
   return {
     identity,
     title: 'Hyper',
-    mapTitle: 'Overview',
     resources: [decisionsResource, issuesResource],
-    graphs: [
+    maps: [
       {
-        id: identity.graphId,
-        title: 'Decisions, then the work they leave',
-        color: '#9467bd',
-        edges: [{ from: decisionsResource.id, to: issuesResource.id }],
+        id: identity.mapId,
+        title: 'Overview',
+        graphs: [
+          {
+            id: identity.graphId,
+            title: 'Decisions, then the work they leave',
+            color: '#9467bd',
+            edges: [{ from: decisionsResource.id, to: issuesResource.id }],
+          },
+        ],
+        positions: {
+          [decisionsResource.id]: open(0),
+          [issuesResource.id]: open(SPACE_RESOURCE_OPEN_SIZE.width + 120),
+        },
       },
     ],
-    positions: {
-      [decisionsResource.id]: open(0),
-      [issuesResource.id]: open(SPACE_RESOURCE_OPEN_SIZE.width + 120),
-    },
   };
 };
 
