@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import type { ResourceKindName } from '../e2e/graph';
 
 /**
  * How a test reaches the application's command surface.
@@ -118,8 +119,12 @@ export const createResource = (kind: ResourceKindName): void => {
   fireEvent.click(createResourceControl(kind));
 };
 
-/** The kinds the Dock offers, named as their controls announce them. */
-export type ResourceKindName = 'Markdown Resource' | 'Space Resource' | 'Ur Resource';
+/**
+ * The kinds the Dock offers, declared once beside the end-to-end helpers. A
+ * type-only import is erased, so the unit suite takes no runtime dependency on
+ * Playwright.
+ */
+export type { ResourceKindName } from '../e2e/graph';
 
 /**
  * One kind's Create control.

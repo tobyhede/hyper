@@ -368,6 +368,24 @@ describe('SnapshotEdit.createInMap properties', () => {
     );
   });
 
+  /** The document a Target of `kind` replaces the base Markdown Resource with, if any. */
+  const contentOwningTarget = (kind: 'markdown' | 'space' | 'ur'): ResourceDocument | undefined => {
+    switch (kind) {
+      case 'markdown':
+        return undefined;
+      case 'space':
+        return {
+          title: 'Nested',
+          kind: 'space',
+          spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
+          map: MAP_ID,
+          graph: GRAPH_ID,
+        };
+      case 'ur':
+        return { title: 'Node', kind: 'ur' };
+    }
+  };
+
   it('creates a Reference Resource to a Target that owns content, which intake accepts', () => {
     fc.assert(
       fc.property(
@@ -383,18 +401,7 @@ describe('SnapshotEdit.createInMap properties', () => {
           const base = baseSnapshot(ids, Placement.toPositions(closedPlacement(ids, coords)));
           // A Space Resource owns content too: it draws its target's Map (ADR 0070).
           // An Ur Resource's content is empty, and it is still a Target (ADR 0113).
-          const targetDocument: ResourceDocument | undefined =
-            targetKind === 'space'
-              ? {
-                  title: 'Nested',
-                  kind: 'space',
-                  spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
-                  map: MAP_ID,
-                  graph: GRAPH_ID,
-                }
-              : targetKind === 'ur'
-                ? { title: 'Node', kind: 'ur' }
-                : undefined;
+          const targetDocument = contentOwningTarget(targetKind);
           const snapshot: SpaceSnapshot =
             targetDocument === undefined
               ? base

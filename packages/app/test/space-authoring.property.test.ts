@@ -317,9 +317,9 @@ function resolve(
       };
     }
     case 'created-resource':
-      return { kind: 'created-resource', anchor: generated.anchor };
+      return { kind: 'created-resource', resourceKind: 'markdown', anchor: generated.anchor };
     case 'created-ur-resource':
-      return { kind: 'created-ur-resource', anchor: generated.anchor };
+      return { kind: 'created-resource', resourceKind: 'ur', anchor: generated.anchor };
     case 'created-reference':
       return { kind: 'created-reference', target: resourceId, anchor: generated.anchor };
     case 'added-resource-to-map':

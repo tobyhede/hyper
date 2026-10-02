@@ -74,8 +74,8 @@ export function PresentedResource({ title, content }: PresentedResourceProps) {
  * A presented image is never replaced, its own or a Target's, so no arm offers
  * Replace. A Space Resource draws its name alone: what presenting one should
  * draw is `resource-content/07`'s open question. An Ur Resource has no
- * content (ADR 0113), so it draws its name alone, which `data-content-kind`
- * lets the presented frame lay out as a title slide.
+ * content (ADR 0113), so it draws its name alone. The article carries the
+ * kind as `data-content-kind` so a stylesheet can address each kind's frame.
  */
 function PresentedContent({
   name,

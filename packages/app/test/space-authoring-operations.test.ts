@@ -173,7 +173,9 @@ describe('Add Resource', () => {
   it('creates one neutrally titled detached Resource at the anchor it was given', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'created-resource', anchor: CENTRE })).toEqual({
+    expect(
+      authoring.complete({ kind: 'created-resource', resourceKind: 'markdown', anchor: CENTRE }),
+    ).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -197,8 +199,8 @@ describe('Add Resource', () => {
     // real one.
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
-    authoring.complete({ kind: 'created-resource', anchor: CENTRE });
-    authoring.complete({ kind: 'created-resource', anchor: CENTRE });
+    authoring.complete({ kind: 'created-resource', resourceKind: 'markdown', anchor: CENTRE });
+    authoring.complete({ kind: 'created-resource', resourceKind: 'markdown', anchor: CENTRE });
 
     const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     const stacked = Object.values(positions).filter(
@@ -227,7 +229,11 @@ describe('Add Resource', () => {
     };
     const { authoring, session } = open(openedSnapshot);
 
-    authoring.complete({ kind: 'created-resource', anchor: { x: 500, y: 400 } });
+    authoring.complete({
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: { x: 500, y: 400 },
+    });
 
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
@@ -246,7 +252,9 @@ describe('Create Ur Resource', () => {
     const edits: number[] = [];
     session.subscribe(() => edits.push(session.getState().working.resources.length));
 
-    expect(authoring.complete({ kind: 'created-ur-resource', anchor: CENTRE })).toEqual({
+    expect(
+      authoring.complete({ kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE }),
+    ).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -271,7 +279,7 @@ describe('Create Ur Resource', () => {
       newId: mintingIds(MINTED),
     });
 
-    authoring.complete({ kind: 'created-ur-resource', anchor: CENTRE });
+    authoring.complete({ kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
 
     const stored = await backend.loadSpace(SPACE_ID);

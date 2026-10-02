@@ -320,8 +320,12 @@ export function useResourcePlacement(
    * zero-Resource Space's way to create the first Resource.
    */
   const createAtCentre = useCallback(
-    (kind: 'created-resource' | 'created-ur-resource') => {
-      const created = authoring.complete({ kind, anchor: centreAnchor() });
+    (resourceKind: 'markdown' | 'ur') => {
+      const created = authoring.complete({
+        kind: 'created-resource',
+        resourceKind,
+        anchor: centreAnchor(),
+      });
       // Each outcome named rather than caught. `queued` is an Edit that will still
       // be performed, whose projection draws the Resource without help from here.
       // `unchanged` this operation cannot answer — it mints unconditionally — but
@@ -342,11 +346,8 @@ export function useResourcePlacement(
     },
     [authoring, centreAnchor, continuation],
   );
-  const addResource = useCallback(() => createAtCentre('created-resource'), [createAtCentre]);
-  const createUrResource = useCallback(
-    () => createAtCentre('created-ur-resource'),
-    [createAtCentre],
-  );
+  const addResource = useCallback(() => createAtCentre('markdown'), [createAtCentre]);
+  const createUrResource = useCallback(() => createAtCentre('ur'), [createAtCentre]);
 
   /**
    * Every Image Resource gesture: store and measure what it brought, then one
