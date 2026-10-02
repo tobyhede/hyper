@@ -844,7 +844,7 @@ describe('canvas Resource authoring, replacing an image', () => {
           kind: 'files',
           files: [new File(['bytes'], 'figure.png', { type: 'image/png' })],
         }),
-      ).resolves.toBe('This image was not replaced: This test stores no image.');
+      ).resolves.toBe('This image was not replaced: No image store is reachable.');
     });
     expect(spaceSession.getState().working).toBe(before);
     expect(result.current.bodyEditing).toBe(true);

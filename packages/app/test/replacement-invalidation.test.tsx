@@ -148,7 +148,6 @@ async function mountedSpaceApp(local: SpaceSnapshot = LOCAL): Promise<SpaceSessi
   let view: RenderResult | undefined;
   mountSpace(
     {
-      images: unusedImageSources,
       id: runtime(local).id,
       session,
       app: composeApp({ images: unusedImageSources, spaceSession: session, spaceResources }),

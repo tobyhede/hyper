@@ -213,7 +213,7 @@ function mount(
   const app = composeApp({ images: unusedImageSources, spaceSession: session, spaceResources });
   prepare?.(app);
   mountSpace(
-    { images: unusedImageSources, id: runtime(mounted).id, session, app, spaceResources },
+    { id: runtime(mounted).id, session, app, spaceResources },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);

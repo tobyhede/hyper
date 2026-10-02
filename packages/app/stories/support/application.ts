@@ -3,23 +3,14 @@ import { MemorySpaceBackend, type MemorySpaceBackendTestControl } from '@project
 import { productDestinationPath } from '@project/http';
 import type { ImageSources } from '#src/image-creation';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '#src/open-spaces';
-
-/**
- * The catalogue has no host to store an image in, so a story that chooses a
- * file meets the application's own break notice; nothing a story shows is
- * measured.
- */
-export const catalogueImages: ImageSources = {
-  store: () => Promise.reject(new Error('The catalogue has no image store.')),
-  measure: () => Promise.resolve(undefined),
-};
+import { storelessImages } from './image-sources';
 
 /** Fixture data and an isolated history adapter; all session behavior is production's. */
 export function storySpaces(
   metaSpaceId: UUID,
   snapshots: readonly SpaceSnapshot[],
   control?: MemorySpaceBackendTestControl,
-  images: ImageSources = catalogueImages,
+  images: ImageSources = storelessImages,
 ): OpenSpaces {
   const backend = new MemorySpaceBackend(
     metaSpaceId,

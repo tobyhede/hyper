@@ -13,7 +13,13 @@ import { createRenderAdapter, type RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
 import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
-import type { ImageSources } from './image-creation';
+import {
+  createImageResources,
+  type ImageEditResult,
+  type ImageOrigin,
+  type ImageSources,
+  type ImageTarget,
+} from './image-creation';
 import { createImageReplacements, type ImageReplacements } from './image-replacement';
 
 /**
@@ -55,10 +61,13 @@ export interface ComposeCoreDependencies {
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
   /**
-   * Where this Space's replaced images are stored and measured (ADR 0106).
+   * Where this Space's created and replaced images are stored and measured
+   * (ADR 0106).
    *
    * Required with no default: both reach outside the process, so the caller
    * that composes the Space names them, and a test supplies answers of its own.
+   * The composition is the only holder, so creating and replacing an image in
+   * this Space always use the same sources.
    */
   readonly images: ImageSources;
   /**
@@ -124,6 +133,14 @@ export interface AppCore {
 }
 
 export interface ComposedApp extends AppCore {
+  /**
+   * Create Image Resources from one gesture's files or URL, over this Space's
+   * image sources and Authoring.
+   */
+  readonly createImageResources: (
+    origin: ImageOrigin,
+    target: ImageTarget,
+  ) => Promise<ImageEditResult>;
   /**
    * This Space's image replacements: the one way to replace an Image
    * Resource's picture, and its busy state.
@@ -240,6 +257,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   });
   return {
     ...core,
+    createImageResources: (origin, target) =>
+      createImageResources({ images, authoring }, origin, target),
     imageReplacement: createImageReplacements({
       images,
       authoring,

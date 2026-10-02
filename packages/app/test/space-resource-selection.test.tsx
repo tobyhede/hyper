@@ -235,7 +235,6 @@ function mount(value: SpaceSnapshot = created): SpaceSession {
   let view: RenderResult | undefined;
   mountSpace(
     {
-      images: unusedImageSources,
       id: runtime(value).id,
       session,
       app: composeApp({ images: unusedImageSources, spaceSession: session }),

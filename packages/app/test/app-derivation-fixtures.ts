@@ -2,6 +2,7 @@ import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/cor
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { MemorySpaceBackend } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
+import type { ImageSources } from '../src/image-creation';
 import type { OpenSpace } from '../src/open-spaces';
 import { openTestSpace } from './opened-space';
 import { unusedImageSources } from './image-sources';
@@ -59,7 +60,10 @@ export const derivationSpace = (snapshot: SpaceSnapshot = derivationSnapshot): S
 };
 
 /** The fixture Space opened and composed the way Open Spaces opens one. */
-export const openDerivationSpace = (newId: () => UUID = newUuid): OpenSpace => {
+export const openDerivationSpace = (
+  newId: () => UUID = newUuid,
+  images: ImageSources = unusedImageSources,
+): OpenSpace => {
   const stored = { snapshot: derivationSnapshot, revision: 0n, exportedRevision: null };
   const { spaceSession, spaceResources } = openTestSpace(
     new MemorySpaceBackend(SPACE_ID, [stored]),
@@ -67,10 +71,9 @@ export const openDerivationSpace = (newId: () => UUID = newUuid): OpenSpace => {
     newId,
   );
   return {
-    images: unusedImageSources,
     id: SPACE_ID,
     session: spaceSession,
-    app: composeApp({ images: unusedImageSources, spaceSession, spaceResources, newId }),
+    app: composeApp({ images, spaceSession, spaceResources, newId }),
     spaceResources,
   };
 };

@@ -62,7 +62,31 @@ export interface ImageReplacementDependencies {
 }
 
 /**
- * The complete replacement attempt, from the input to one completed Edit.
+ * The Image Resource an attempt replaces, as it stands in the working Space it
+ * begins in, and that Space's replacement epoch, both from one read.
+ */
+interface ReplacementTarget {
+  readonly resourceId: ResourceId;
+  readonly heldUrl: string;
+  readonly epoch: number;
+}
+
+/**
+ * The target the identified Resource names in the Space as it stands, or
+ * `undefined` when the Space holds no Image Resource by that identity.
+ */
+const resolveTarget = (
+  authoring: Pick<SpaceAuthoring, 'getState'>,
+  resourceId: ResourceId,
+): ReplacementTarget | undefined => {
+  const { replacementEpoch: epoch, session } = authoring.getState();
+  const stored = session.working.resources.find((resource) => resource.id === resourceId);
+  if (stored?.document.kind !== 'image') return undefined;
+  return { resourceId, heldUrl: stored.document.url, epoch };
+};
+
+/**
+ * The image work of one attempt on a resolved target, through to one completed Edit.
  *
  * A chosen file is stored the way a created one is, so a declared type the
  * host refuses is answered before anything is sent; a URL is read as typed,
@@ -75,21 +99,16 @@ export interface ImageReplacementDependencies {
  */
 const attempt = async (
   { images, authoring }: Pick<ImageReplacementDependencies, 'images' | 'authoring'>,
-  resourceId: ResourceId,
+  { resourceId, heldUrl, epoch }: ReplacementTarget,
   replacement: ImageReplacement,
 ): Promise<ImageReplacementResult> => {
-  const { replacementEpoch: epoch, session } = authoring.getState();
-  const stored = session.working.resources.find((resource) => resource.id === resourceId);
-  if (stored?.document.kind !== 'image') {
-    return { kind: 'refused', refusal: { code: 'resource-not-found' } };
-  }
   let url: string;
   if (replacement.kind === 'url') {
     url = replacement.url.trim();
     if (!isAcceptedImageUrl(url)) {
       return { kind: 'refused', refusal: { code: IMAGE_URL_UNSUPPORTED } };
     }
-    if (url === stored.document.url) return { kind: 'unchanged' };
+    if (url === heldUrl) return { kind: 'unchanged' };
   } else {
     const files = replacement.files;
     if (files.length !== 1) return { kind: 'file-count-refused' };
@@ -112,9 +131,13 @@ const attempt = async (
 /**
  * One Space's image replacements, composed once with that Space's Authoring.
  *
- * Exclusive per Space: the busy state is set before any image work starts and
- * cleared by the attempt that set it, on every settled path, once its Edit is
- * applied — persistence acknowledgement is the session's and is not awaited
+ * Exclusive per Space: the Resource and the replacement epoch are read before
+ * the busy state is published, so a lookup the Space refuses publishes nothing
+ * and a Space replaced during that publication discards the attempt
+ * (`image-replacement.test.ts`, "discards a replacement whose Space is replaced
+ * while its busy state is published"). The busy state is set before any image
+ * work starts and cleared by the attempt that set it, on every settled path,
+ * once its Edit is applied — persistence acknowledgement is the session's and is not awaited
  * (`image-replacement.test.ts`, "is busy through applying the Edit and released
  * without waiting for the save").
  */
@@ -130,9 +153,13 @@ export function createImageReplacements({
     subscribe: busy.subscribe,
     replace: async (resourceId, replacement) => {
       if (busy.getState()) return { kind: 'already-replacing' };
+      const target = resolveTarget(authoring, resourceId);
+      if (target === undefined) {
+        return { kind: 'refused', refusal: { code: 'resource-not-found' } };
+      }
       busy.publish(true);
       try {
-        return await attempt({ images, authoring }, resourceId, replacement);
+        return await attempt({ images, authoring }, target, replacement);
       } catch (failure) {
         report(failure);
         return { kind: 'broken', failure };

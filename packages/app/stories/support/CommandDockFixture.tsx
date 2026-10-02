@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react';
 import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackendTestControl, type SpaceSessionState } from '@project/persistence';
 import { Application } from '#components/Application';
-import type { ImageSources } from '#src/image-creation';
 import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';
+import { heldImageSources } from './image-sources';
 import type { OpenSpace, OpenSpaces } from '#src/open-spaces';
 import {
   authoredSnapshot,
@@ -181,15 +181,6 @@ const withHeldImage = (snapshot: SpaceSnapshot): SpaceSnapshot => ({
   ],
 });
 
-/**
- * Image sources whose measuring never answers, so a replacement that reaches
- * it holds the Space for as long as the story is mounted.
- */
-const holdingImages: ImageSources = {
-  store: () => Promise.reject(new Error('The catalogue has no image store.')),
-  measure: () => new Promise<never>(() => undefined),
-};
-
 /** Open the authored crossing chain through the real session owner. */
 export async function openDockStory(scenario: DockScenario) {
   const control = new MemorySpaceBackendTestControl();
@@ -223,7 +214,7 @@ export async function openDockStory(scenario: DockScenario) {
   }
   const spaces =
     scenario === 'replacing'
-      ? storySpaces(metaSnapshot.id, snapshots, control, holdingImages)
+      ? storySpaces(metaSnapshot.id, snapshots, control, heldImageSources().images)
       : storySpaces(metaSnapshot.id, snapshots, control);
   await spaces.open(metaSnapshot.id);
   await spaces.enter(platformSnapshot.id);

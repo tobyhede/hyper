@@ -290,7 +290,7 @@ export interface SpaceCanvasProps {
    * The Space's image replacements (ADR 0106), which own the whole attempt.
    * Absent offers no Replace on an Image Resource.
    */
-  imageReplacement?: ImageReplacements | undefined;
+  imageReplacement?: Pick<ImageReplacements, 'replace'> | undefined;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *

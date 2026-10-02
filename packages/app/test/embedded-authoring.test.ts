@@ -52,7 +52,6 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const opened = openTestSpace(MemorySpaceBackend.asMeta(loaded), loaded);
   return {
-    images: unusedImageSources,
     id: SPACE_ID,
     session: opened.spaceSession,
     app: composeApp({

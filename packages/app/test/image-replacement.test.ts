@@ -128,6 +128,49 @@ const held = () => {
   return { images, storing, measuring, sent, measured };
 };
 
+/**
+ * The busy state an attempt that started image work leaves behind: held once,
+ * released once, and released now.
+ */
+const expectHeldThenReleased = ({
+  imageReplacement,
+  busy,
+}: Pick<ReturnType<typeof open>, 'imageReplacement' | 'busy'>) => {
+  expect(busy).toEqual([true, false]);
+  expect(imageReplacement.getState()).toBe(false);
+};
+
+/** A Space whose stored copy diverged from the session's, with its picture at `NEW_URL`. */
+const remote: SpaceSnapshot = {
+  ...snapshot,
+  resources: snapshot.resources.map((resource) =>
+    resource.id === IMAGE
+      ? { ...resource, document: { title: 'Remote figure', kind: 'image' as const, url: NEW_URL } }
+      : resource,
+  ),
+};
+
+/**
+ * One composed Space whose next local Edit conflicts with `remote`, so
+ * accepting the stored Space advances the replacement epoch.
+ */
+const diverging = (images: ImageSources) => {
+  const session = openSpaceSession(
+    MemorySpaceBackend.asMeta({ snapshot: remote, revision: 1n, exportedRevision: null }),
+    { snapshot, revision: 0n, exportedRevision: null },
+  );
+  const { authoring, imageReplacement } = composeApp({
+    spaceSession: session,
+    images,
+    reportObserverError: vi.fn(),
+  });
+  const conflict = async () => {
+    authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Local graph' });
+    await expect.poll(() => session.getState().persistence.kind).toBe('conflicted');
+  };
+  return { session, authoring, imageReplacement, conflict };
+};
+
 const file = (name: string): File => new File(['bytes'], name, { type: 'image/png' });
 
 const imageOf = (state: SpaceSnapshot) =>
@@ -314,7 +357,8 @@ describe('replacing an Image Resource’s image', () => {
     expect(images.measured).toEqual([]);
     expect(session.getState().working).toBe(before);
     expect(imageReplacement.getState()).toBe(false);
-    expect(busy.at(-1)).toBe(false);
+    // No image work started, so no busy state was published either.
+    expect(busy).toEqual([]);
   });
 });
 
@@ -334,11 +378,11 @@ describe('what a replacement refuses', () => {
     expect(images.sent).toEqual([]);
     expect(images.measured).toEqual([]);
     expect(session.getState().working).toBe(before);
-    expect(busy).toEqual([true, false]);
+    expectHeldThenReleased({ imageReplacement, busy });
   });
 
   it('changes nothing when the host refuses the file, naming it', async () => {
-    const { session, imageReplacement } = open(
+    const { session, imageReplacement, busy } = open(
       sources({ 'notes.txt': { kind: 'refused', code: 'image-format-unsupported' } }, {}),
     );
     const before = session.getState().working;
@@ -350,12 +394,12 @@ describe('what a replacement refuses', () => {
       refusals: [{ code: 'image-format-unsupported', name: 'notes.txt' }],
     });
     expect(session.getState().working).toBe(before);
-    expect(imageReplacement.getState()).toBe(false);
+    expectHeldThenReleased({ imageReplacement, busy });
   });
 
   it('refuses a file whose declared type is not an image without sending it', async () => {
     const images = sources({}, {});
-    const { session, imageReplacement } = open(images);
+    const { session, imageReplacement, busy } = open(images);
     const before = session.getState().working;
     const notes = new File(['words'], 'notes.txt', { type: 'text/plain' });
 
@@ -367,11 +411,12 @@ describe('what a replacement refuses', () => {
     });
     expect(images.sent).toEqual([]);
     expect(session.getState().working).toBe(before);
+    expectHeldThenReleased({ imageReplacement, busy });
   });
 
   it('refuses a data: URL before loading it, and changes nothing', async () => {
     const images = sources({}, {});
-    const { session, imageReplacement } = open(images);
+    const { session, imageReplacement, busy } = open(images);
     const before = session.getState().working;
 
     await expect(
@@ -379,12 +424,12 @@ describe('what a replacement refuses', () => {
     ).resolves.toEqual({ kind: 'refused', refusal: { code: 'image-url-unsupported' } });
     expect(images.measured).toEqual([]);
     expect(session.getState().working).toBe(before);
-    expect(imageReplacement.getState()).toBe(false);
+    expectHeldThenReleased({ imageReplacement, busy });
   });
 
   it('answers unchanged for the URL the Resource already holds, trimmed, without loading it', async () => {
     const images = sources({}, { [OLD_URL]: { width: 10, height: 10 } });
-    const { session, control, imageReplacement } = open(images);
+    const { session, control, imageReplacement, busy } = open(images);
     const before = session.getState().working;
 
     await expect(
@@ -393,6 +438,7 @@ describe('what a replacement refuses', () => {
     expect(images.measured).toEqual([]);
     expect(session.getState().working).toBe(before);
     expect(control.attempts).toHaveLength(0);
+    expectHeldThenReleased({ imageReplacement, busy });
   });
 
   it('makes no Edit or commit when an upload stores the picture already held', async () => {
@@ -436,7 +482,7 @@ describe('a replacement that breaks', () => {
       expect(describeImageReplacement(result)).toBe(`This image was not replaced: ${stage} failed`);
       expect(report).toHaveBeenCalledWith(failure);
       expect(session.getState().working).toBe(before);
-      expect(busy).toEqual([true, false]);
+      expectHeldThenReleased({ imageReplacement, busy });
     },
   );
 
@@ -462,21 +508,6 @@ describe('a replacement whose Space was replaced', () => {
   it.each(['storing', 'measuring'] as const)(
     'discards a replacement still %s when the author accepts the stored Space',
     async (stage) => {
-      const remote = {
-        ...snapshot,
-        resources: snapshot.resources.map((resource) =>
-          resource.id === IMAGE
-            ? {
-                ...resource,
-                document: { title: 'Remote figure', kind: 'image' as const, url: NEW_URL },
-              }
-            : resource,
-        ),
-      };
-      const session = openSpaceSession(
-        MemorySpaceBackend.asMeta({ snapshot: remote, revision: 1n, exportedRevision: null }),
-        { snapshot, revision: 0n, exportedRevision: null },
-      );
       const waiting = Promise.withResolvers<undefined>();
       const images: ImageSources = {
         store: async () => {
@@ -488,17 +519,12 @@ describe('a replacement whose Space was replaced', () => {
           return { width: 20, height: 30 };
         },
       };
-      const { authoring, imageReplacement } = composeApp({
-        spaceSession: session,
-        images,
-        reportObserverError: vi.fn(),
-      });
+      const { session, authoring, imageReplacement, conflict } = diverging(images);
       const pending = imageReplacement.replace(IMAGE, {
         kind: 'files',
         files: [file('figure.png')],
       });
-      authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Local graph' });
-      await expect.poll(() => session.getState().persistence.kind).toBe('conflicted');
+      await conflict();
       expect(authoring.acceptStoredSpace()).toBeNull();
       const accepted = session.getState().working;
       waiting.resolve(undefined);
@@ -509,6 +535,28 @@ describe('a replacement whose Space was replaced', () => {
       expect(imageReplacement.getState()).toBe(false);
     },
   );
+
+  it('discards a replacement whose Space is replaced while its busy state is published', async () => {
+    const { session, authoring, imageReplacement, conflict } = diverging(
+      sources({}, { 'https://example.com/b.png': { width: 20, height: 30 } }),
+    );
+    await conflict();
+    const unsubscribe = imageReplacement.subscribe(() => {
+      if (imageReplacement.getState()) {
+        unsubscribe();
+        expect(authoring.acceptStoredSpace()).toBeNull();
+      }
+    });
+
+    await expect(
+      imageReplacement.replace(IMAGE, { kind: 'url', url: 'https://example.com/b.png' }),
+    ).resolves.toEqual({ kind: 'discarded' });
+    expect(imageOf(session.getState().working)).toMatchObject({
+      url: NEW_URL,
+      title: 'Remote figure',
+    });
+    expect(imageReplacement.getState()).toBe(false);
+  });
 });
 
 describe('the replacement module', () => {
@@ -517,6 +565,8 @@ describe('the replacement module', () => {
       'createImageReplacements',
       'describeImageReplacement',
     ]);
+    const { imageReplacement } = open(unusedImageSources);
+    expect(Object.keys(imageReplacement).sort()).toEqual(['getState', 'replace', 'subscribe']);
   });
 
   it('is composed once per Space, so one Space’s replacement holds no other', async () => {

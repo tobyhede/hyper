@@ -108,7 +108,7 @@ function stubEntry(
   app: OpenSpace['app'],
   spaceResources: OpenSpace['spaceResources'],
 ): OpenSpace {
-  return { images: unusedImageSources, id, session: spaceSession, app, spaceResources };
+  return { id, session: spaceSession, app, spaceResources };
 }
 
 beforeAll(() => {
