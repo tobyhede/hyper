@@ -9,6 +9,7 @@ import { composeApp } from '#src/compose-app';
 import { resolveMap, resourcesOutsideMap } from '#src/map-resolution';
 import { otherMapMemberships, type MapMemberships } from '#src/map-memberships';
 import type { SpaceDrag } from '#src/resources-drag';
+import { catalogueImages } from '../support/application';
 import { sparseAuthoredSnapshot, widelyPlacedSpace } from '../support/spaces';
 
 export default { title: 'Surfaces/Resources Popover' };
@@ -141,7 +142,10 @@ function RefusedAdd() {
     const stored = { snapshot: sparseAuthoredSnapshot, revision: 0n, exportedRevision: null };
     return openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
   }, []);
-  const composed = useMemo(() => composeApp({ spaceSession: session }), [session]);
+  const composed = useMemo(
+    () => composeApp({ spaceSession: session, images: catalogueImages }),
+    [session],
+  );
   useSyncExternalStore(session.subscribe, session.getState);
   const space = composed.currentSpace();
   const selectedMap = space.lookup.map(composed.navigation.getState().selectedMapId)?.map;

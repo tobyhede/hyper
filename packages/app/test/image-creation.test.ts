@@ -4,6 +4,7 @@ import { MemorySpaceBackend, openSpaceSession, type ImageStoring } from '@projec
 import { composeApp } from '../src/compose-app';
 import { createImageResources, type ImageSources } from '../src/image-creation';
 import { mintingIds } from './minting';
+import { unusedImageSources } from './image-sources';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -38,6 +39,7 @@ const open = (...ids: Parameters<typeof mintingIds>) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { authoring, navigation } = composeApp({
+    images: unusedImageSources,
     spaceSession: session,
     newId: mintingIds(...ids),
   });
@@ -284,6 +286,7 @@ describe('an Image Resource gesture the author moves away from', () => {
     const loaded = { snapshot: twoMaps, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, navigation } = composeApp({
+      images: unusedImageSources,
       spaceSession: session,
       newId: mintingIds(FIRST),
     });
@@ -317,6 +320,7 @@ describe('an Image Resource gesture the author moves away from', () => {
     const loaded = { snapshot: twoMaps, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, navigation } = composeApp({
+      images: unusedImageSources,
       spaceSession: session,
       newId: mintingIds(FIRST),
     });

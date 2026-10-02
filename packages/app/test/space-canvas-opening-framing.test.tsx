@@ -134,7 +134,7 @@ describe('opening framing on a mounted canvas', () => {
   it('ignores the host seed while hidden and reads this canvas when it first becomes active', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-    const app = composeApp({ spaceSession });
+    const app = composeApp({ images: unusedImageSources, spaceSession });
     const spaceResources: OpenSpace['spaceResources'] = {
       create: unused,
       link: unused,
@@ -289,7 +289,7 @@ describe('opening framing on a mounted canvas', () => {
   it('reads this canvas seed on the first paint when it is already the active Space', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-    const app = composeApp({ spaceSession });
+    const app = composeApp({ images: unusedImageSources, spaceSession });
     const spaceResources: OpenSpace['spaceResources'] = {
       create: unused,
       link: unused,

@@ -115,7 +115,7 @@ describe('graph viewport', () => {
         images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {

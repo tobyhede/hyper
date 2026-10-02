@@ -210,7 +210,7 @@ function mount(
     stored,
   );
   let view: RenderResult | undefined;
-  const app = composeApp({ spaceSession: session, spaceResources });
+  const app = composeApp({ images: unusedImageSources, spaceSession: session, spaceResources });
   prepare?.(app);
   mountSpace(
     { images: unusedImageSources, id: runtime(mounted).id, session, app, spaceResources },

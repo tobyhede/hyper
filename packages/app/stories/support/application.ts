@@ -9,7 +9,7 @@ import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '#src/open-spa
  * file meets the application's own break notice; nothing a story shows is
  * measured.
  */
-const catalogueImages: ImageSources = {
+export const catalogueImages: ImageSources = {
   store: () => Promise.reject(new Error('The catalogue has no image store.')),
   measure: () => Promise.resolve(undefined),
 };

@@ -547,6 +547,7 @@ export function createOpenSpaces({
       app: composeApp({
         spaceSession: session,
         selection,
+        images,
         newId,
         reportObserverError: report,
         spaceResources,

@@ -315,7 +315,11 @@ function mount(
     newId,
   );
   const spaceResources: SpaceResourceAuthoring = { ...authoring, ...broken };
-  const app = composeApp({ spaceSession: session, reportObserverError });
+  const app = composeApp({
+    images: unusedImageSources,
+    spaceSession: session,
+    reportObserverError,
+  });
   let view: RenderResult | undefined;
   mountSpace(
     { images: unusedImageSources, id: runtime(home).id, session, app, spaceResources },

@@ -84,9 +84,7 @@ import { useOpenSpaces } from '../open-spaces-context';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
-import type { ImageSources } from '../image-creation';
-import type { ImageReplacementActivity } from '../image-replacement-activity';
-import type { ObserverErrorReporter } from '@project/persistence';
+import type { ImageReplacements } from '../image-replacement';
 import {
   framingFromFit,
   panFraming,
@@ -203,7 +201,7 @@ const fileDropAt = (
     : 'refuse';
 };
 
-interface SpaceCanvasOwnProps {
+export interface SpaceCanvasProps {
   /** Where a Space Resource rail's Map report is held. */
   readonly commandOutcomes: CommandOutcomes;
   /** Where a Space Resource rail's Delete Map and Delete Graph ask first. */
@@ -288,7 +286,11 @@ interface SpaceCanvasOwnProps {
   ) => void;
   /** An image URL pasted on the canvas, with the authored top-left anchor at the pointer. */
   onPasteImageUrl: (url: string, anchor: { readonly x: number; readonly y: number }) => void;
-  reportObserverError?: ObserverErrorReporter;
+  /**
+   * The Space's image replacements (ADR 0106), which own the whole attempt.
+   * Absent offers no Replace on an Image Resource.
+   */
+  imageReplacement?: ImageReplacements | undefined;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *
@@ -359,17 +361,6 @@ interface SpaceCanvasOwnProps {
   ) => readonly EntityActionGroup[];
 }
 
-/**
- * Where Replace stores a chosen file and measures a picture (ADR 0106), given
- * with the activity that holds navigation and authoring while it runs: both or
- * neither. Neither offers no Replace on an Image Resource.
- */
-type SpaceCanvasImageProps =
-  | { images?: undefined; imageReplacement?: undefined }
-  | { images: ImageSources; imageReplacement: ImageReplacementActivity };
-
-export type SpaceCanvasProps = SpaceCanvasOwnProps & SpaceCanvasImageProps;
-
 /** Where an Edge drawn inside an embedded Map began: the embedding node's id, and the Resource dragged from. */
 interface EmbeddedConnectionStart {
   readonly parentId: string;
@@ -399,9 +390,7 @@ export function SpaceCanvas({
   onPlaceSpace,
   onDropImages,
   onPasteImageUrl,
-  images,
   imageReplacement,
-  reportObserverError,
   nameOnCreation,
   authoring,
   spaceSession,
@@ -548,10 +537,6 @@ export function SpaceCanvas({
             ),
     [resourceEntityActions, placedResources, onSelectResource, mapId],
   );
-  const imageReplacing = useMemo(
-    () => (images === undefined ? undefined : { images, activity: imageReplacement }),
-    [images, imageReplacement],
-  );
   const resourceAuthoring = useCanvasResourceAuthoring({
     commandOutcomes,
     deleteConfirmation,
@@ -562,8 +547,7 @@ export function SpaceCanvas({
     spaceSession,
     resourceResize,
     onSelectResource,
-    imageReplacing,
-    reportObserverError,
+    imageReplacement,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
     portalEditing: editingPortals,

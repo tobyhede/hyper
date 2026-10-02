@@ -174,7 +174,7 @@ function mount(value: SpaceSnapshot = snapshot, history?: HistoryApi): SpaceSess
       images: unusedImageSources,
       id: runtime(value).id,
       session,
-      app: composeApp({ spaceSession: session }),
+      app: composeApp({ images: unusedImageSources, spaceSession: session }),
       spaceResources,
     },
     (app) => {

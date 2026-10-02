@@ -17,6 +17,7 @@ import { ArmedDeleteConfirmation } from '../src/components/DeleteConfirmation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -201,7 +202,12 @@ function compose({
 } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const composed = composeApp({ spaceSession: session, selection, connections });
+  const composed = composeApp({
+    images: unusedImageSources,
+    spaceSession: session,
+    selection,
+    connections,
+  });
   composed.adapter.getState().syncProjection(NODES, EDGES);
   return { session, ...composed };
 }

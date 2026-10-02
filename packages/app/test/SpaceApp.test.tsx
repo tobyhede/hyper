@@ -252,7 +252,7 @@ describe('Space app conflict recovery', () => {
         images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -325,7 +325,7 @@ describe('Space app conflict recovery', () => {
         images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -405,7 +405,7 @@ describe('Space app conflict recovery', () => {
         images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -481,7 +481,7 @@ describe('Space app permanent save refusal', () => {
         images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -533,7 +533,7 @@ describe('Space app failure reporting', () => {
         images: unusedImageSources,
         id: runtime(addressed).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -606,7 +606,7 @@ describe('Space app failure reporting', () => {
             images: unusedImageSources,
             id: runtime(valid).id,
             session,
-            app: composeApp({ spaceSession: session }),
+            app: composeApp({ images: unusedImageSources, spaceSession: session }),
             spaceResources,
           },
           (app) => render(app),
@@ -689,7 +689,7 @@ describe('Space app failure reporting', () => {
           images: unusedImageSources,
           id: runtime(valid).id,
           session,
-          app: composeApp({ spaceSession: session }),
+          app: composeApp({ images: unusedImageSources, spaceSession: session }),
           spaceResources,
         },
         (app) => render(app),
@@ -731,7 +731,7 @@ describe('Space app failure reporting', () => {
         exportedRevision: null,
       },
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     // Written straight onto the session, past the validation every authoring
     // path performs first: reaching this state means an invariant has already
     // broken, which is what the guard is a backstop for.
@@ -781,7 +781,7 @@ describe('Space app failure reporting', () => {
         images: unusedImageSources,
         id: runtime(valid).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -830,7 +830,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(empty).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -870,7 +870,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -916,7 +916,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -970,7 +970,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1023,7 +1023,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1076,7 +1076,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1117,7 +1117,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1173,7 +1173,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1207,7 +1207,7 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     const complete = app.authoring.complete;
     vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
       completion.kind === 'renamed-map'
@@ -1249,7 +1249,7 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     const complete = app.authoring.complete;
     vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
       completion.kind === 'renamed-graph'
@@ -1290,7 +1290,7 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     const complete = app.authoring.complete;
     vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
       completion.kind === 'created-map'
@@ -1327,7 +1327,7 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     // A second Map, selected, so Delete is available on it.
     expect(app.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
     const selected = app.navigation.getState().selectedMapId;
@@ -1385,7 +1385,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1427,7 +1427,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1465,7 +1465,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1524,7 +1524,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1620,7 +1620,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1685,7 +1685,7 @@ describe('Space app Resources list', () => {
         images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1742,7 +1742,11 @@ describe('Space app Resources list drop', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session, selection: MAP_ID });
+    const app = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+    });
     mountSpace(
       { images: unusedImageSources, id: runtime(local).id, session, app, spaceResources },
       (view) => render(view),

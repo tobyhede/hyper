@@ -13,10 +13,8 @@ import { createRenderAdapter, type RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
 import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
-import {
-  createImageReplacementActivity,
-  type ImageReplacementActivity,
-} from './image-replacement-activity';
+import type { ImageSources } from './image-creation';
+import { createImageReplacements, type ImageReplacements } from './image-replacement';
 
 /**
  * What an opened Space is composed of.
@@ -56,6 +54,13 @@ export interface ComposeCoreDependencies {
 }
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
+  /**
+   * Where this Space's replaced images are stored and measured (ADR 0106).
+   *
+   * Required with no default: both reach outside the process, so the caller
+   * that composes the Space names them, and a test supplies answers of its own.
+   */
+  readonly images: ImageSources;
   /**
    * Mints the identity of every Resource, Map and Graph a completed Edit creates
    * (ADR 0109).
@@ -119,7 +124,11 @@ export interface AppCore {
 }
 
 export interface ComposedApp extends AppCore {
-  readonly imageReplacement: ImageReplacementActivity;
+  /**
+   * This Space's image replacements: the one way to replace an Image
+   * Resource's picture, and the busy state navigation and availability read.
+   */
+  readonly imageReplacement: ImageReplacements;
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;
   /**
@@ -182,6 +191,7 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
 export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   const {
     spaceSession,
+    images,
     newId = newUuid,
     reportObserverError,
     connections,
@@ -230,7 +240,11 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   });
   return {
     ...core,
-    imageReplacement: createImageReplacementActivity(compositionReporter),
+    imageReplacement: createImageReplacements({
+      images,
+      authoring,
+      reportObserverError: compositionReporter,
+    }),
     authoring,
     adapter,
     continuation,

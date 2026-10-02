@@ -70,7 +70,7 @@ export const openDerivationSpace = (newId: () => UUID = newUuid): OpenSpace => {
     images: unusedImageSources,
     id: SPACE_ID,
     session: spaceSession,
-    app: composeApp({ spaceSession, spaceResources, newId }),
+    app: composeApp({ images: unusedImageSources, spaceSession, spaceResources, newId }),
     spaceResources,
   };
 };

@@ -55,7 +55,11 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
     images: unusedImageSources,
     id: SPACE_ID,
     session: opened.spaceSession,
-    app: composeApp({ spaceSession: opened.spaceSession, reportObserverError }),
+    app: composeApp({
+      images: unusedImageSources,
+      spaceSession: opened.spaceSession,
+      reportObserverError,
+    }),
     spaceResources: opened.spaceResources,
   };
 };

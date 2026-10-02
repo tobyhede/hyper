@@ -1,54 +1,104 @@
 import { isAcceptedImageUrl, IMAGE_URL_UNSUPPORTED, type ResourceId } from '@project/core';
-import { describeAuthoringRefusal, describeImageRefusals } from './authoring-refusal';
+import {
+  createNonThrowingReporter,
+  createObservableState,
+  type ObserverErrorReporter,
+} from '@project/persistence';
+import type { ImageReplacement } from '@project/ui';
+import {
+  describeAuthoringRefusal,
+  describeImageRefusals,
+  describeImageReplacementBreak,
+  describeImageReplacementPending,
+} from './authoring-refusal';
 import { storeEach, type ImageEditResult, type ImageSources } from './image-creation';
 import type { SpaceAuthoring } from './space-authoring';
-import type { ImageReplacement } from '@project/ui';
-
-/** A replacement whose initiating Space was replaced is discarded, never an Edit. */
-export type ImageReplacementResult =
-  ImageEditResult | { readonly kind: 'discarded' } | { readonly kind: 'file-count-refused' };
 
 /**
- * Replace an Image Resource's image, from what the author brought to one
- * completed Edit (ADR 0106).
+ * What one replacement attempt answers.
+ *
+ * `already-replacing` is another attempt holding the Space, answered before
+ * any image work starts; `discarded` is an attempt whose initiating Space was
+ * replaced while it ran, never an Edit; `broken` is a failure nothing expected,
+ * already reported, kept apart from the refusals an author can correct.
+ */
+export type ImageReplacementResult =
+  | ImageEditResult
+  | { readonly kind: 'already-replacing' }
+  | { readonly kind: 'discarded' }
+  | { readonly kind: 'file-count-refused' }
+  | { readonly kind: 'broken'; readonly failure: unknown };
+
+/**
+ * One composed Space's image replacements (ADR 0106): the one operation that
+ * replaces an Image Resource's picture, and whether an attempt is running.
+ *
+ * The busy state is what holds navigation and incompatible authoring while an
+ * attempt runs, so it is read by those consumers rather than kept a second time.
+ */
+export interface ImageReplacements {
+  /** True from the moment an attempt starts until it settles. */
+  readonly getState: () => boolean;
+  readonly subscribe: (listener: () => void) => () => void;
+  /**
+   * Replace the identified Image Resource's picture with what the author brought.
+   *
+   * The Resource is read as it stands when this is called. While another
+   * attempt runs this answers `already-replacing` and starts nothing.
+   */
+  readonly replace: (
+    resourceId: ResourceId,
+    replacement: ImageReplacement,
+  ) => Promise<ImageReplacementResult>;
+}
+
+export interface ImageReplacementDependencies {
+  /** Where a chosen file is stored and a picture measured. */
+  readonly images: ImageSources;
+  readonly authoring: Pick<SpaceAuthoring, 'complete' | 'getState'>;
+  /** Where an unexpected failure is reported; a sink that throws is contained. */
+  readonly reportObserverError: ObserverErrorReporter;
+}
+
+/**
+ * The complete replacement attempt, from the input to one completed Edit.
  *
  * A chosen file is stored the way a created one is, so a declared type the
  * host refuses is answered before anything is sent; a URL is read as typed,
  * trimmed. Either is then measured, so the Edit records the size it was told
- * and nothing is written back afterwards. A URL the Resource may not hold, or the one it
- * already holds, is answered before anything is loaded; the Edit still decides
- * `unchanged` against the Space as it stands when it completes.
+ * and nothing is written back afterwards. A URL the Resource may not hold, or
+ * the one it already holds, is answered before anything is loaded; the Edit
+ * still decides `unchanged` against the Space as it stands when it completes.
+ * An attempt that outlives the working Space it began in — a replacement epoch
+ * advanced while it waited — is discarded rather than completed.
  */
-export async function replaceImage(
-  {
-    images,
-    authoring,
-  }: {
-    readonly images: ImageSources;
-    readonly authoring: Pick<SpaceAuthoring, 'complete' | 'getState'>;
-  },
-  image: { readonly resourceId: ResourceId; readonly url: string },
+const attempt = async (
+  { images, authoring }: Pick<ImageReplacementDependencies, 'images' | 'authoring'>,
+  resourceId: ResourceId,
   replacement: ImageReplacement,
-): Promise<ImageReplacementResult> {
-  const epoch = authoring.getState().replacementEpoch;
+): Promise<ImageReplacementResult> => {
+  const { replacementEpoch: epoch, session } = authoring.getState();
+  const stored = session.working.resources.find((resource) => resource.id === resourceId);
+  if (stored?.document.kind !== 'image') {
+    return { kind: 'refused', refusal: { code: 'resource-not-found' } };
+  }
   let url: string;
   if (replacement.kind === 'url') {
     url = replacement.url.trim();
     if (!isAcceptedImageUrl(url)) {
       return { kind: 'refused', refusal: { code: IMAGE_URL_UNSUPPORTED } };
     }
-    if (url === image.url) return { kind: 'unchanged' };
+    if (url === stored.document.url) return { kind: 'unchanged' };
   } else {
     const files = replacement.files;
     if (files.length !== 1) return { kind: 'file-count-refused' };
-    const stored = await storeEach(images, files);
+    const storing = await storeEach(images, files);
     if (authoring.getState().replacementEpoch !== epoch) return { kind: 'discarded' };
-    if (stored.kind === 'not-stored') return stored;
-    const [storedUrl] = stored.urls;
+    if (storing.kind === 'not-stored') return storing;
+    const [storedUrl] = storing.urls;
     if (storedUrl === undefined) return { kind: 'unchanged' };
     url = storedUrl;
   }
-  const { resourceId } = image;
   const measured = await images.measure(url);
   if (authoring.getState().replacementEpoch !== epoch) return { kind: 'discarded' };
   return authoring.complete(
@@ -56,18 +106,54 @@ export async function replaceImage(
       ? { kind: 'replaced-image', resourceId, url }
       : { kind: 'replaced-image', resourceId, url, naturalSize: measured },
   );
+};
+
+/**
+ * One Space's image replacements, composed once with that Space's Authoring.
+ *
+ * Exclusive per Space: the busy state is set before any image work starts and
+ * cleared by the attempt that set it, on every settled path, once its Edit is
+ * applied — persistence acknowledgement is the session's and is not awaited.
+ */
+export function createImageReplacements({
+  images,
+  authoring,
+  reportObserverError,
+}: ImageReplacementDependencies): ImageReplacements {
+  const busy = createObservableState(false, reportObserverError);
+  const report = createNonThrowingReporter(reportObserverError);
+  return {
+    getState: busy.getState,
+    subscribe: busy.subscribe,
+    replace: async (resourceId, replacement) => {
+      if (busy.getState()) return { kind: 'already-replacing' };
+      busy.publish(true);
+      try {
+        return await attempt({ images, authoring }, resourceId, replacement);
+      } catch (failure) {
+        report(failure);
+        return { kind: 'broken', failure };
+      } finally {
+        busy.publish(false);
+      }
+    },
+  };
 }
 
 /**
  * What Replace image says about its answer, in the application's words: the
- * sentence for a refusal, or `null` for an answer that leaves nothing to say —
- * a completed Edit, the URL already held, a discarded stale interaction, or
- * a completion queued during another completion's publication.
+ * sentence for a refusal or a break, or `null` for an answer that leaves
+ * nothing to say — a completed Edit, the URL already held, a discarded stale
+ * attempt, or a completion queued during another completion's publication.
  */
 export const describeImageReplacement = (result: ImageReplacementResult): string | null => {
   switch (result.kind) {
     case 'file-count-refused':
       return 'Use one image at a time.';
+    case 'already-replacing':
+      return describeImageReplacementPending();
+    case 'broken':
+      return describeImageReplacementBreak(result.failure);
     case 'refused':
       return describeAuthoringRefusal(result.refusal);
     case 'not-stored':
