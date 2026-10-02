@@ -50,7 +50,9 @@ export function fixtureDisplay(
           view: { ...space, graph: FIXTURE_TARGET_GRAPH, framing: undefined },
           via: 'self',
         }
-      : { kind: 'markdown', source, via: kind === 'reference' ? 'reference' : 'self' };
+      : kind === 'ur'
+        ? { kind: 'ur', via: 'self' }
+        : { kind: 'markdown', source, via: kind === 'reference' ? 'reference' : 'self' };
   return { shown: 'open', content };
 }
 

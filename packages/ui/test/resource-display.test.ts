@@ -81,6 +81,14 @@ describe('the display states only a Resource’s own content enters', () => {
     );
   });
 
+  it('neither edits nor replaces an Open Ur Resource, its own or a Target’s', () => {
+    for (const reached of ['self', 'reference'] as const) {
+      const open: ResourceDisplay = { shown: 'open', content: { kind: 'ur', via: reached } };
+      expect(beginEditing(open, editor, true)).toBe(open);
+      expect(beginReplacing(open, replacer)).toBe(open);
+    }
+  });
+
   it('leaves every display that is neither editing nor replacing as it is at rest', () => {
     fc.assert(
       fc.property(shown, (value) => {

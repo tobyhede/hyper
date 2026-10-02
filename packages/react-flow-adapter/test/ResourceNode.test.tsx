@@ -607,6 +607,108 @@ describe('ResourceNode draws what the display shows', () => {
   });
 });
 
+/**
+ * An Ur Resource has no content (ADR 0113): it Opens, Closes and resizes as any
+ * Resource does, offers no Edit even when an edit operation reaches it, and
+ * presents as its name.
+ */
+describe('ResourceNode Ur Resource', () => {
+  const resize = {
+    minWidth: 260,
+    minHeight: 146,
+    onResizeStart: () => undefined,
+    onResizeEnd: () => undefined,
+    onResize: () => undefined,
+    onResizeCancel: () => undefined,
+  };
+
+  it('opens through the shared front and offers no Edit, even when one is supplied', () => {
+    const onEditResource = vi.fn();
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'ur',
+          title: 'Gateway',
+          selected: true,
+          onEditResource,
+          onBeginBodyEditing: vi.fn(),
+        })}
+      />,
+    );
+
+    expect(screen.getByRole('article', { name: 'Gateway' })).toHaveAttribute('data-kind', 'ur');
+    expect(screen.getByRole('img', { name: 'Ur Resource' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
+    screen.getByRole('button', { name: 'Open Resource Gateway' }).click();
+    expect(onEditResource).toHaveBeenCalledWith(true);
+  });
+
+  it('draws only its Title while Open, and offers Close and the resize control', () => {
+    const onEditResource = vi.fn();
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'ur',
+          title: 'Gateway',
+          open: true,
+          selected: true,
+          onEditResource,
+          onBeginBodyEditing: vi.fn(),
+          resize,
+        })}
+      />,
+    );
+
+    const resource = screen.getByRole('article', { name: 'Gateway' });
+    expect(resource).toHaveAttribute('data-open', 'true');
+    expect(resource.querySelector('.canvas-resource__content')).toBeNull();
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
+    screen.getByRole('button', { name: 'Close Resource Gateway' }).click();
+    expect(onEditResource).toHaveBeenCalledWith(false);
+  });
+
+  it('draws an Open Reference Resource to an Ur Resource as its Title alone, read-only', () => {
+    render(
+      <ResourceNode
+        {...props({
+          kind: 'reference',
+          title: 'Gateway, again',
+          open: true,
+          selected: true,
+          content: { kind: 'ur', via: 'reference' },
+          onEditResource: vi.fn(),
+        })}
+      />,
+    );
+
+    const resource = screen.getByRole('article', { name: 'Gateway, again' });
+    expect(resource).toHaveAttribute('data-content-kind', 'ur');
+    expect(resource.querySelector('.canvas-resource__content')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit Resource Gateway, again' })).toBeNull();
+  });
+
+  it('presents as a title slide, itself or through a Reference Resource', () => {
+    for (const [kind, via] of [
+      ['ur', 'self'],
+      ['reference', 'reference'],
+    ] as const) {
+      const { unmount } = render(
+        <ResourceNode
+          {...props({ kind, title: 'Gateway', presented: true, content: { kind: 'ur', via } })}
+        />,
+      );
+
+      const slide = screen.getByTestId('resource-content');
+      expect(slide).toHaveAttribute('data-content-kind', 'ur');
+      expect(screen.getByRole('heading', { name: 'Gateway' })).toBeVisible();
+      expect(slide.querySelector('.resource__body')).toBeNull();
+      expect(screen.queryByTestId('resource')).toBeNull();
+      unmount();
+    }
+  });
+});
+
 describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar", () => {
   const toolbar = () => screen.queryByRole('toolbar', { name: 'Resource A' });
 
