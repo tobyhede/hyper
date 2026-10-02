@@ -20,7 +20,7 @@
 - [x] Tests exercise the whole attempt through its interface with real Space Authoring, a memory-backed session and controlled ImageSources, including concurrency, both held asynchronous stages, refusals, rejection, a throwing reporter, stale results and commit timing.
 - [x] Standalone generic-activity tests are retired after their guarantees move to the replacement interface. Canvas tests retain presentation and draft assertions rather than duplicating module coordination tests.
 - [x] Stories that held an arbitrary activity instead hold an actual replacement. Existing application and Ladle E2E behavior assertions remain unchanged.
-- [ ] Targeted local typechecking, lint and affected tests pass; a draft PR runs the full repository verification bar and its CI gate is observed green before this ticket is resolved.
+- [x] Targeted local typechecking, lint and affected tests pass; a draft PR runs the full repository verification bar and its CI gate is observed green before this ticket is resolved.
 
 ## Scope constraint
 
