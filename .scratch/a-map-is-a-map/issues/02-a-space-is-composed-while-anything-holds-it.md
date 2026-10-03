@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** implementation under verification
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
@@ -14,3 +14,9 @@
 - [ ] Entering a Space that is only drawn lists it with an Opener and reuses the composition already held.
 - [ ] An embedded Map whose target was never listed is authorable in Edit.
 - [ ] The Dock's Open Spaces menu shows only listed Spaces.
+
+## Answer
+
+OpenSpaces holds one composition for its listing and every drawing. Draw-only holds do not join the Dock listing; Enter reuses that composition and records its Opener, Exit releases only the listing, and the last release flushes and disposes. The public OpenSpaces tests cover each lifetime and returning to an only-drawn Opener.
+
+Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.

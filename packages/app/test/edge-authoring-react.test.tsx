@@ -314,6 +314,7 @@ function DeleteWhenCommitted({ armed }: { readonly armed: boolean }) {
 
 /** The composition `App` performs, narrowed to what an Edge test needs. */
 function CanvasHarness({
+  imageReplacement,
   adapter,
   edgeAuthoring,
   continuation,
@@ -326,6 +327,7 @@ function CanvasHarness({
   presenting,
 }: Pick<
   ReturnType<typeof compose>,
+  | 'imageReplacement'
   | 'adapter'
   | 'edgeAuthoring'
   | 'continuation'
@@ -355,6 +357,7 @@ function CanvasHarness({
       {/* Production's dialog, drawn at the root as `App` draws it. */}
       <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} />
       <SpaceCanvas
+        imageReplacement={imageReplacement}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}
         nodes={projection?.nodes ?? []}

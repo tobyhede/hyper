@@ -4,7 +4,7 @@
 
 **Blocked by:** 07.
 
-**Status:** ready-for-agent
+**Status:** implementation under verification
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
@@ -12,3 +12,9 @@
 - [ ] The continuation selects the new Resource and places the caret in the originating drawing, including when another drawing shows the same Map.
 - [ ] A drop or paste on an inert or read-only Map is refused with wording and never lands in the Map beneath it.
 - [ ] The Command Dock still creates in the canvas's own Space.
+
+## Answer
+
+Pointer drop, paste and empty Alt-drop resolve the drawing under the point and convert coordinates through that drawing. Keyboard creation follows the selected occurrence. Inert/read-only targets refuse rather than forwarding creation to the containing Map. Naming continuation stays with the originating surface; application/browser tests cover these paths.
+
+Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.

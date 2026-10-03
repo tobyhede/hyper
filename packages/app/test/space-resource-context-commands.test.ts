@@ -100,13 +100,13 @@ async function setup(available = true) {
     history: recordingHistory(),
   });
   const source = await spaces.open(META);
-  const entry = await spaces.embed(TARGET);
+  const { entry: entry } = await spaces.hold(TARGET);
   const commands = spaceResourceContextCommands(
     {
       entry,
+      continuation: source.app.continuation,
       spaces,
       containingSpaceId: META,
-      commandOutcomes: source.app.commandOutcomes,
       deleteConfirmation: source.app.deleteConfirmation,
     },
     document,
@@ -261,6 +261,11 @@ it('persists a new Map before the Resource refers to it', async () => {
   }
   // The rail's New Map continues in the new Map's name.
   expect(await creating).toBe(true);
+  expect(source.app.continuation.getState().pending).toMatchObject({
+    target: { kind: 'control', name: 'map-name', scope: { id: 'test-rail' } },
+    then: 'rename',
+  });
+  expect(spaces.entry(TARGET)?.app.continuation.getState().pending).toBeNull();
   expect(await spaces.waitForPersistence(META)).toBe(true);
   expect(await spaces.waitForPersistence(TARGET)).toBe(true);
   const stored = await backend.loadSpace(META);

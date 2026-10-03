@@ -7,7 +7,6 @@ import { embeddedMap } from '../src/embedded-map';
 import {
   discoverEmbeddedOpenSpaceResources,
   embedBounds,
-  embeddedAuthoringEnabled,
   editingPortalAncestor,
   embeddingIsPortalEditing,
   reportsBodyHeight,
@@ -122,6 +121,44 @@ describe('embed bounds', () => {
 });
 
 describe('embedded open Space Resource discovery', () => {
+  it('never draws the root Map inside itself', () => {
+    const requests = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: TARGET, mapId: MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
+      nodes: [openSpaceResource(HOST, { spaceId: TARGET, map: MAP })],
+      entries: [{ id: TARGET }],
+      publications: new Map(),
+      bodyHeights: new Map(),
+      draggingIds: new Set(),
+    });
+    expect(requests).toEqual([]);
+  });
+
+  it('allows Edit one level deep and inherits read-only below a stale target', () => {
+    const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
+    const nested = openSpaceResource(NESTED, { spaceId: TARGET, map: OTHER_MAP });
+    const input = {
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' as const },
+      editingResources: new Set([HOST, NESTED]),
+      nodes: [parent],
+      entries: [{ id: TARGET }],
+      publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
+      bodyHeights: new Map(),
+      draggingIds: new Set<string>(),
+    };
+    expect(
+      discoverEmbeddedOpenSpaceResources({ ...input, staleSpaces: new Set() }).map(
+        (request) => request.policy,
+      ),
+    ).toEqual(['authoring', 'inert']);
+    expect(
+      discoverEmbeddedOpenSpaceResources({ ...input, staleSpaces: new Set([TARGET]) }).map(
+        (request) => request.policy,
+      ),
+    ).toEqual(['read-only', 'read-only']);
+  });
+
   it('does not nest a Map already crossed on the path', () => {
     const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const nested = openSpaceResource(
@@ -134,6 +171,9 @@ describe('embedded open Space Resource discovery', () => {
       },
     );
     const requests = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
@@ -151,6 +191,9 @@ describe('embedded open Space Resource discovery', () => {
       { position: { x: 50, y: 60 }, width: 400, height: 300 },
     );
     const requests = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
@@ -175,6 +218,9 @@ describe('embedded open Space Resource discovery', () => {
       { position: { x: 50, y: 60 }, width: 400, height: 300 },
     );
     const requests = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
@@ -208,6 +254,9 @@ describe('embedded open Space Resource discovery', () => {
       },
     );
     const requests = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([
@@ -250,6 +299,9 @@ describe('embedded open Space Resource discovery', () => {
       },
     );
     const requests = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([
@@ -299,7 +351,7 @@ describe('embedded open Space Resource discovery', () => {
       parent: { id: NESTED, width: size.width, height: size.height },
       projection: { nodes: [inner], edges: [] },
       offset: { x: 0, y: 0 },
-      enabled: false,
+      policy: 'inert',
       tilt: {
         center: tiltCenter,
         parentAbsolute: nestedRequest.absolute,
@@ -328,6 +380,9 @@ describe('embedded open Space Resource discovery', () => {
   it('leans nothing while no Resource is being moved', () => {
     const parent = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const requests = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map(),
@@ -345,13 +400,16 @@ describe('embedded open Space Resource discovery', () => {
       { position: { x: 50, y: 60 }, width: 400, height: 300 },
     );
     const requests = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
       nodes: [parent],
       entries: [{ id: TARGET }],
       publications: new Map([[HOST, { mapId: MAP, nodes: [nested] }]]),
       bodyHeights: new Map(),
       draggingIds: new Set<string>(),
     });
-    expect(requests.map((request) => request.readOnly)).toEqual([true, true]);
+    expect(requests.map((request) => request.policy)).toEqual(['read-only', 'read-only']);
   });
 
   it('does not discover a closed Space Resource or one without space content', () => {
@@ -375,6 +433,9 @@ describe('embedded open Space Resource discovery', () => {
     };
     expect(
       discoverEmbeddedOpenSpaceResources({
+        root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+        editingResources: new Set(),
+        staleSpaces: new Set(),
         nodes: [closed, markdown],
         entries: [],
         publications: new Map(),
@@ -393,6 +454,9 @@ describe('the body height an embedding is clipped by', () => {
     const bodyHeights = new Map([[HOST, 40]]);
     const opened = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const [first] = discoverEmbeddedOpenSpaceResources({
+      root: { spaceId: HOST, mapId: OTHER_MAP, policy: 'authoring' },
+      editingResources: new Set(),
+      staleSpaces: new Set(),
       nodes: [opened],
       entries: [{ id: TARGET }],
       publications: new Map(),
@@ -443,52 +507,5 @@ describe('edit portal ancestry', () => {
     expect(editingPortalAncestor(nested, byId, new Set())).toBeUndefined();
     expect(embeddingIsPortalEditing(nested, byId, new Set([HOST]))).toBe(true);
     expect(embeddingIsPortalEditing(host, byId, new Set([NESTED]))).toBe(false);
-  });
-});
-
-describe('embedded Read/Edit enabled gate', () => {
-  const open = {
-    authorInEmbeddedMap: true,
-    authorOnCanvas: true,
-    thisEmbeddingEditing: false,
-    hostBodyEditing: false,
-    hostTitleEditing: false,
-  };
-
-  it('enables authoring only while a portal ancestor is in Edit and the host is free', () => {
-    expect(embeddedAuthoringEnabled({ readOnly: false, portalEditing: true, ...open })).toBe(true);
-    expect(embeddedAuthoringEnabled({ readOnly: false, portalEditing: false, ...open })).toBe(
-      false,
-    );
-    expect(embeddedAuthoringEnabled({ readOnly: true, portalEditing: true, ...open })).toBe(false);
-    expect(
-      embeddedAuthoringEnabled({
-        readOnly: false,
-        portalEditing: true,
-        ...open,
-        hostBodyEditing: true,
-      }),
-    ).toBe(false);
-  });
-
-  it('keeps the embedding that owns the edit enabled when the host canvas has withdrawn', () => {
-    expect(
-      embeddedAuthoringEnabled({
-        readOnly: false,
-        portalEditing: true,
-        ...open,
-        authorOnCanvas: false,
-        thisEmbeddingEditing: true,
-      }),
-    ).toBe(true);
-    expect(
-      embeddedAuthoringEnabled({
-        readOnly: false,
-        portalEditing: true,
-        ...open,
-        authorOnCanvas: false,
-        thisEmbeddingEditing: false,
-      }),
-    ).toBe(false);
   });
 });

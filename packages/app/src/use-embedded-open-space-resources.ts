@@ -13,9 +13,10 @@ import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   discoverEmbeddedOpenSpaceResources,
   type EmbeddedOpenSpaceResourceRequest,
+  type EmbeddedRoot,
 } from './embedded-open-space-resource';
 import type { EmbeddedPublication } from './embedded-publication';
-import type { OpenSpace } from './open-spaces';
+import type { OpenSpace, SpaceHold } from './open-spaces';
 import type { SpaceResourceFraming } from './space-resource-framing';
 
 const EMPTY_ENTRIES = [] as const;
@@ -23,13 +24,12 @@ const EMPTY_PORTALS: ReadonlySet<ResourceId> = new Set();
 const emptySubscription = () => () => undefined;
 
 /**
- * What an embedding asks of Open Spaces: the live entry list and the one
- * operation that composes a target without taking the canvas off its host.
+ * What a drawing asks of Open Spaces: live compositions and one hold per occurrence.
  */
 export interface EmbeddedTargetReader {
-  readonly getState: () => { readonly entries: readonly OpenSpace[] };
+  readonly getState: () => { readonly composed: readonly OpenSpace[] };
   readonly subscribe: (listener: () => void) => () => void;
-  readonly embed: (spaceId: ResourceId) => Promise<OpenSpace | undefined>;
+  readonly hold: (spaceId: ResourceId) => Promise<Pick<SpaceHold, 'release'>>;
 }
 
 export interface EmbeddedOpenSpaceResources {
@@ -53,8 +53,10 @@ export function useEmbeddedOpenSpaceResources(
   nodes: readonly ResourceFlowNode[],
   spaces: EmbeddedTargetReader | null,
   draggingIds: ReadonlySet<string>,
+  root: EmbeddedRoot,
+  projectionReady = true,
 ): EmbeddedOpenSpaceResources {
-  const getEntries = useCallback(() => spaces?.getState().entries ?? EMPTY_ENTRIES, [spaces]);
+  const getEntries = useCallback(() => spaces?.getState().composed ?? EMPTY_ENTRIES, [spaces]);
   const entries = useSyncExternalStore(spaces?.subscribe ?? emptySubscription, getEntries);
   const [embeddedPublications, setEmbeddedPublications] = useState<
     ReadonlyMap<string, EmbeddedPublication>
@@ -66,7 +68,7 @@ export function useEmbeddedOpenSpaceResources(
    * every other — any target that opened would clear a sentence raised by a
    * different Space Resource, and the one on screen would never say which
    * target it was about. Keyed by the Space the read was aimed at, because that is what
-   * `spaces.embed` is asked for — two Resources reaching the same missing Space
+   * `spaces.hold` is asked for — two Resources reaching the same missing Space
    * are reporting one failure, and each names itself where it is drawn.
    */
   const [embeddedFailures, setEmbeddedFailures] = useState<ReadonlyMap<ResourceId, string>>(
@@ -101,13 +103,25 @@ export function useEmbeddedOpenSpaceResources(
   const embeddedRequests = useMemo(
     () =>
       discoverEmbeddedOpenSpaceResources({
+        root,
+        editingResources: editingPortals,
+        staleSpaces: new Set(embeddedFailures.keys()),
         nodes,
         entries,
         publications: embeddedPublications,
         bodyHeights,
         draggingIds,
       }),
-    [nodes, entries, embeddedPublications, bodyHeights, draggingIds],
+    [
+      nodes,
+      entries,
+      embeddedPublications,
+      bodyHeights,
+      draggingIds,
+      root,
+      editingPortals,
+      embeddedFailures,
+    ],
   );
   /**
    * A read outlives its embedding only while the *target* is gone.
@@ -142,16 +156,36 @@ export function useEmbeddedOpenSpaceResources(
       setEmbeddedFailures(new Map([...embeddedFailures].filter(([id]) => asked.has(id))));
     }
   }
-  const resumeEmbedded = useCallback(
-    async (spaceId: ResourceId) => {
+  const requested = useRef(
+    new Map<
+      string,
+      {
+        readonly spaceId: ResourceId;
+        hold?: Pick<SpaceHold, 'release'>;
+      }
+    >(),
+  );
+  const acquire = useCallback(
+    async (id: string, spaceId: ResourceId) => {
+      if (spaces === null) return;
+      const request: { readonly spaceId: ResourceId; hold?: Pick<SpaceHold, 'release'> } = {
+        spaceId,
+      };
+      requested.current.set(id, request);
       try {
-        await spaces?.embed(spaceId);
+        const hold = await spaces.hold(spaceId);
+        if (requested.current.get(id) !== request) {
+          await hold.release();
+          return;
+        }
+        request.hold = hold;
         setEmbeddedFailures((previous) =>
           previous.has(spaceId)
-            ? new Map([...previous].filter(([id]) => id !== spaceId))
+            ? new Map([...previous].filter(([key]) => key !== spaceId))
             : previous,
         );
       } catch (error) {
+        if (requested.current.get(id) !== request) return;
         const message = error instanceof Error ? error.message : String(error);
         setEmbeddedFailures((previous) =>
           previous.get(spaceId) === message ? previous : new Map(previous).set(spaceId, message),
@@ -160,27 +194,45 @@ export function useEmbeddedOpenSpaceResources(
     },
     [spaces],
   );
-  const requested = useRef(new Set<string>());
+  const resumeEmbedded = useCallback(
+    async (spaceId: ResourceId) => {
+      await Promise.all(
+        [...requested.current]
+          .filter(([, request]) => request.spaceId === spaceId)
+          .map(async ([id, request]) => {
+            if (request.hold !== undefined) return;
+            await acquire(id, spaceId);
+          }),
+      );
+    },
+    [acquire],
+  );
   useEffect(() => {
+    const claims = requested.current;
+    return () => {
+      for (const request of claims.values()) {
+        void request.hold?.release();
+      }
+      claims.clear();
+    };
+  }, [spaces]);
+  useEffect(() => {
+    if (!projectionReady) return;
     const visible = new Map(
       embeddedRequests.map((request) => [
-        `${request.parent.id}:${request.mapId}:${request.graphId}`,
+        `${request.parent.id}:${request.spaceId}:${request.mapId}:${request.graphId}`,
         request,
       ]),
     );
-    for (const id of requested.current) if (!visible.has(id)) requested.current.delete(id);
-    for (const [id, request] of visible) {
-      if (spaces === null || requested.current.has(id)) continue;
-      // The claim outlives the answer, refusal included. This effect re-runs
-      // whenever `embeddedRequests` changes identity — which every session
-      // change in every open Space does — so releasing the id on failure asks a
-      // permanently unreadable target again on essentially every edit anywhere.
-      // One read per embedding: closing and reopening the Resource, or selecting
-      // another Map, is what asks again, and so is `resumeEmbedded`.
-      requested.current.add(id);
-      void resumeEmbedded(request.spaceId);
+    for (const [id, request] of requested.current) {
+      if (visible.has(id)) continue;
+      void request.hold?.release();
+      requested.current.delete(id);
     }
-  }, [spaces, embeddedRequests, resumeEmbedded]);
+    for (const [id, request] of visible) {
+      if (!requested.current.has(id)) void acquire(id, request.spaceId);
+    }
+  }, [embeddedRequests, acquire, projectionReady]);
   const publishEmbedded = useCallback((id: string, value: EmbeddedPublication | null) => {
     setEmbeddedPublications((previous) => {
       if (previous.get(id) === value || (value === null && !previous.has(id))) return previous;

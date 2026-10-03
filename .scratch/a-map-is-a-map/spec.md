@@ -1,6 +1,6 @@
 # A Map is a Map wherever it is drawn
 
-**Status:** ready-for-agent
+**Status:** implementation under verification
 
 Decision: ADR 0112. Blocked by PR #331 (image replacement owns its complete attempt), which composes one image replacement per Space.
 
@@ -62,16 +62,16 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 
 | # | | Blocked by | Status |
 | --- | --- | --- | --- |
-| 01 | The canvas's own Map is a surface | — | ready-for-agent |
-| 02 | A Space is composed while anything holds it | — | ready-for-agent |
-| 03 | Navigation is held while any composed Space replaces an image | 02 | ready-for-agent |
-| 04 | One notice area for every drawn Space | 02 | ready-for-agent |
-| 05 | One policy decides authoring, inert and read-only | 01 | ready-for-agent |
-| 06 | An embedded Map is a surface over its own Space | 01, 02, 04, 05 | ready-for-agent |
-| 07 | Each drawing has an occurrence that selection and continuation follow | 06 | ready-for-agent |
-| 08 | Create inside an embedded Map | 07 | ready-for-agent |
-| 09 | Entity menu and Replace inside an embedded Map | 03, 07 | ready-for-agent |
-| 10 | Edges inside an embedded Map | 07 | ready-for-agent |
+| 01 | The canvas's own Map is a surface | — | implementation under verification |
+| 02 | A Space is composed while anything holds it | — | implementation under verification |
+| 03 | Navigation is held while any composed Space replaces an image | 02 | implementation under verification |
+| 04 | One notice area for every drawn Space | 02 | implementation under verification |
+| 05 | One policy decides authoring, inert and read-only | 01 | implementation under verification |
+| 06 | An embedded Map is a surface over its own Space | 01, 02, 04, 05 | implementation under verification |
+| 07 | Each drawing has an occurrence that selection and continuation follow | 06 | implementation under verification |
+| 08 | Create inside an embedded Map | 07 | implementation under verification |
+| 09 | Entity menu and Replace inside an embedded Map | 03, 07 | implementation under verification |
+| 10 | Edges inside an embedded Map | 07 | implementation under verification |
 
 ## Out of scope
 
@@ -82,3 +82,7 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 ## Verification
 
 Each ticket: targeted local typecheck, lint and affected tests, then a draft PR whose `CI passed` gate is observed green. Ticket 05's tests enumerate what each policy offers; tickets 08–10 each assert their capabilities against an embedded Map in `authoring` and the withheld set in `inert` and `read-only`.
+
+## Implementation scope
+
+The user approved implementation on the branch stacked over PR #331, leaving merges to them. Undo/Redo remains deferred until history exists; ticket 07 records that clarification. All remaining Map parity requirements are in scope.

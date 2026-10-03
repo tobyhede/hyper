@@ -232,11 +232,11 @@ type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;
 /**
  * Where the author continues after a completed Map creation.
  *
- * Required, and never `null`: a created Map always has a name to continue in,
- * so a `completed` answer from `run` means the continuation was requested.
+ * The Dock continues through its Space; a drawn occurrence requests its own
+ * continuation after these Space-owned outcomes have settled.
  */
 export interface MapCreateContinuation {
-  readonly continueAt: (created: CompletedContextEdit) => PendingContinuation;
+  readonly continueAt?: (created: CompletedContextEdit) => PendingContinuation;
 }
 
 /**
@@ -382,7 +382,7 @@ const COMMANDS: CommandDefinitions = {
     settle: (result, { continueAt }) => {
       if (result.kind === 'refused') return notice(result.report);
       if (result.kind !== 'completed') return CLEAR;
-      return { kind: 'clear', continuation: continueAt(result) };
+      return { kind: 'clear', continuation: continueAt?.(result) ?? null };
     },
     movedMap: claimedMove,
   },

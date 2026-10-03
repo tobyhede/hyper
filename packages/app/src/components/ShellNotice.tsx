@@ -9,6 +9,7 @@ import {
   CloseIcon,
 } from '@project/ui';
 import { COMMAND_CHANNELS, type CommandOutcomes } from '../command-outcomes';
+import type { OpenSpace } from '../open-spaces';
 
 /**
  * One standing report over the canvas, and the way to put it away.
@@ -65,8 +66,10 @@ export function ShellNotice({
 /** The standing notice on each command channel that has one, in channel order. */
 export function CommandNotices({
   commandOutcomes,
+  spaceTitle,
 }: {
   readonly commandOutcomes: Pick<CommandOutcomes, 'getState' | 'subscribe' | 'dismiss'>;
+  readonly spaceTitle?: string;
 }) {
   const { notices } = useSyncExternalStore(commandOutcomes.subscribe, commandOutcomes.getState);
   return (
@@ -76,7 +79,7 @@ export function CommandNotices({
         return notice === undefined ? null : (
           <ShellNotice
             key={channel}
-            title={notice.title}
+            title={spaceTitle === undefined ? notice.title : `${spaceTitle}: ${notice.title}`}
             onDismiss={() => commandOutcomes.dismiss(channel)}
           >
             {notice.message}
@@ -84,5 +87,16 @@ export function CommandNotices({
         );
       })}
     </>
+  );
+}
+
+/** Reports from a drawn Space keep that Space's live name and their own lifetime. */
+export function DrawnSpaceNotices({ entry }: { readonly entry: OpenSpace }) {
+  const { working } = useSyncExternalStore(entry.session.subscribe, entry.session.getState);
+  return (
+    <CommandNotices
+      commandOutcomes={entry.app.commandOutcomes}
+      spaceTitle={working.document.title}
+    />
   );
 }

@@ -19,13 +19,7 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { mountSettled } from './settled-mount';
 import { newUuid } from '@project/core';
-import {
-  anyPresentControl,
-  openSpaceMenu,
-  openSpaceRow,
-  openSpacesMenu,
-  unavailable,
-} from './command-dock';
+import { anyPresentControl, openSpaceMenu, unavailable } from './command-dock';
 import { unusedImageSources } from './image-sources';
 
 /**
@@ -375,17 +369,17 @@ describe('the Map an Open Space Resource draws', () => {
       await waitFor(() =>
         expect(spaces.entry(TARGET_ID)?.session.getState().persistence.kind).toBe(kind),
       );
-      openSpacesMenu();
-      const targetEntry = openSpaceRow(/Architecture/);
-      expect(
-        within(targetEntry).getByText(kind === 'failed' ? 'Save failed' : 'Save conflict'),
-      ).toBeTruthy();
+      expect(spaces.getState().entries.some((entry) => entry.id === TARGET_ID)).toBe(false);
+      const leaving = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(leaving);
+      expect(leaving.defaultPrevented).toBe(true);
       expect(screen.queryByRole('alertdialog')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
       expect(initial.session.getState().working).toEqual(value);
       expect(spaces.getState().activeSpaceId).toBe(HOME_ID);
-
-      fireEvent.click(targetEntry);
+      await act(async () => {
+        await spaces.enter(TARGET_ID, SELECTED_MAP_ID, SELECTED_GRAPH_ID);
+      });
       await waitFor(() => expect(spaces.getState().activeSpaceId).toBe(TARGET_ID));
       if (kind === 'failed') {
         fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
@@ -398,6 +392,9 @@ describe('the Map an Open Space Resource draws', () => {
         expect(spaces.entry(TARGET_ID)?.session.getState().persistence.kind).toBe('settled'),
       );
       expect(screen.queryByRole('alertdialog')).toBeNull();
+      const settledLeave = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(settledLeave);
+      expect(settledLeave.defaultPrevented).toBe(false);
       expect(initial.session.getState().working).toEqual(value);
       if (kind === 'conflicted')
         expect(spaces.entry(TARGET_ID)?.session.getState().working).toEqual(remote);
@@ -432,28 +429,55 @@ describe('the Map an Open Space Resource draws', () => {
     expect(screen.getByRole('textbox', { name: 'Map name' })).toHaveAccessibleDescription(
       'A Map title is required.',
     );
-    const dismiss = await screen.findByRole('button', { name: 'Dismiss: Map unchanged' });
+    const dismiss = await screen.findByRole('button', {
+      name: 'Dismiss: Architecture: Map unchanged',
+    });
     fireEvent.click(dismiss);
-    await waitFor(() => expect(screen.queryByText('Map unchanged')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText('Architecture: Map unchanged')).not.toBeInTheDocument(),
+    );
     expect(screen.getByRole('textbox', { name: 'Map name' })).toBeInTheDocument();
     expect(session.getState().working.resources).toHaveLength(2);
   });
 
   /**
    * A refused rail Graph rename is answered as a Map rename is: the editor
-   * holds the draft open, and the containing canvas's command outcomes hold
+   * holds the draft open, and the target Space's command outcomes hold
    * the report as "Graph unchanged". The rail says no sentence of its own.
    */
-  it('holds a refused rail Graph rename open and reports it on the containing Space', async () => {
-    await mount(
-      home({
-        title: 'Elsewhere',
-        kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
-      }),
-    );
+  it('holds a refused rail Graph rename open and names its drawn Space in the notice', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const otherMapId = uuidSchema.parse('00000000-0000-4000-8000-0000000000f1');
+    const firstMap = value.document.maps?.[0];
+    if (firstMap === undefined) throw new Error('Home must have a Map');
+    const { spaces } = await mountOpenSpaces({
+      ...value,
+      document: {
+        ...value.document,
+        maps: [
+          ...(value.document.maps ?? []),
+          {
+            ...firstMap,
+            id: otherMapId,
+            title: 'Another drawing',
+            graphs: [
+              {
+                id: uuidSchema.parse('00000000-0000-4000-8000-0000000000f2'),
+                title: 'Other',
+                edges: [],
+              },
+            ],
+            activeGraph: undefined,
+          },
+        ],
+      },
+    });
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     fireEvent.click(
       within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-graph'),
@@ -466,22 +490,34 @@ describe('the Map an Open Space Resource draws', () => {
     expect(screen.getByRole('textbox', { name: 'Graph name' })).toHaveAccessibleDescription(
       'A Graph title is required.',
     );
-    const dismiss = await screen.findByRole('button', { name: 'Dismiss: Graph unchanged' });
+    await screen.findByRole('button', {
+      name: 'Dismiss: Architecture: Graph unchanged',
+    });
     expect(screen.getAllByText('A Graph title is required.')).toHaveLength(2);
-    fireEvent.click(dismiss);
-    await waitFor(() => expect(screen.queryByText('Graph unchanged')).not.toBeInTheDocument());
-    expect(screen.getByRole('textbox', { name: 'Graph name' })).toBeInTheDocument();
+    fireEvent.keyDown(editor, { key: 'Escape' });
+    expect(
+      screen.getByRole('button', { name: 'Dismiss: Architecture: Graph unchanged' }),
+    ).toBeInTheDocument();
+    const targetComposition = spaces.entry(TARGET_ID);
+    act(() => spaces.browserLocation.chooseMap(otherMapId));
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    expect(spaces.entry(TARGET_ID)).toBe(targetComposition);
+    await screen.findByRole('button', { name: 'Dismiss: Architecture: Graph unchanged' });
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Architecture: Graph unchanged' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Architecture: Graph unchanged')).not.toBeInTheDocument(),
+    );
   });
 
   /**
-   * A refused rail Map deletion is said once, by the containing canvas's
+   * A refused rail Map deletion is said once, by the target Space's
    * command outcomes: the rail reports no sentence of its own beside the
    * notice, whose dismissal would otherwise leave a second copy behind.
    *
    * Refused through a spy on the target's Space Resource lifecycle, because
    * its refusals are races or recovery states no mount can stage.
    */
-  it('says a refused rail Map deletion once, as the containing Space’s notice', async () => {
+  it('says a refused rail Map deletion once, naming the drawn Space', async () => {
     const { spaces } = await mountOpenSpaces(
       home({
         title: 'Elsewhere',
@@ -507,7 +543,9 @@ describe('the Map an Open Space Resource draws', () => {
     });
     fireEvent.click(within(question).getByRole('button', { name: 'Delete' }));
 
-    const dismiss = await screen.findByRole('button', { name: 'Dismiss: Map not deleted' });
+    const dismiss = await screen.findByRole('button', {
+      name: 'Dismiss: Architecture: Map not deleted',
+    });
     await waitFor(() =>
       expect(
         within(controlsOf(containingNode(SPACE_RESOURCE_ID))).getByTestId('space-resource-map'),
@@ -515,9 +553,35 @@ describe('the Map an Open Space Resource draws', () => {
     );
     expect(screen.getAllByText('This Map is no longer part of the Space.')).toHaveLength(1);
     fireEvent.click(dismiss);
-    await waitFor(() => expect(screen.queryByText('Map not deleted')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText('Architecture: Map not deleted')).not.toBeInTheDocument(),
+    );
     expect(screen.queryByText('This Map is no longer part of the Space.')).not.toBeInTheDocument();
     expect(entry.app.currentSpace().maps).toHaveLength(2);
+  });
+
+  it('creates by keyboard in the selected drawing and continues naming there', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const { spaces } = await mountOpenSpaces(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    await waitFor(() =>
+      expect(queryCommand(embeddedNode(DRAWN_A), /Open Resource/)).not.toBeNull(),
+    );
+    fireEvent.focus(embeddedNode(DRAWN_A));
+    fireEvent.keyDown(embeddedNode(DRAWN_A), { key: 'c' });
+    await waitFor(() =>
+      expect(spaces.entry(TARGET_ID)?.session.getState().working.resources).toHaveLength(4),
+    );
+    expect(spaces.entry(HOME_ID)?.session.getState().working.resources).toHaveLength(2);
+    const editor = await screen.findByRole('textbox', { name: 'Resource title' });
+    expect(editor.closest('.react-flow__node')?.getAttribute('data-id')).toMatch(/^embedded:/);
   });
 
   it('keeps the embedded Map inert until Edit, and Done returns it to Read', async () => {
@@ -967,7 +1031,7 @@ describe('the Map an Open Space Resource draws', () => {
     expect(within(otherEmbedded).getByRole('button', { name: 'Edit Title Intake' })).toBeTruthy();
   });
 
-  it('reclips the retained drawing when its containing Resource resizes after Exit', async () => {
+  it('reclips a drawing that keeps its unlisted composition after Exit', async () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
@@ -992,6 +1056,7 @@ describe('the Map an Open Space Resource draws', () => {
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_B)).not.toBeNull());
     const previous = embeddedNode(DRAWN_B).style.clipPath;
     await act(async () => {
+      await spaces.enter(TARGET_ID, SELECTED_MAP_ID, SELECTED_GRAPH_ID);
       await spaces.exit(TARGET_ID);
     });
     act(() => {
@@ -1002,23 +1067,13 @@ describe('the Map an Open Space Resource draws', () => {
       });
     });
     await waitFor(() => expect(embeddedNode(DRAWN_B).style.clipPath).not.toBe(previous));
-    expect(spaces.entry(TARGET_ID)).toBeUndefined();
+    expect(spaces.entry(TARGET_ID)).toBeDefined();
+    expect(spaces.getState().entries.some((entry) => entry.id === TARGET_ID)).toBe(false);
     expect(queryCommand(embeddedNode(DRAWN_B), /Edit Resource/)).toBeNull();
     await waitFor(() => expect(initial.session.getState().persistence.kind).toBe('settled'));
   });
 
-  /**
-   * Delete answers a retained read the way Enter and F2 do.
-   *
-   * The canvas tells assistive technology that backspace or delete removes the
-   * focused Resource from its Map, and the read-only drawing left behind by Exit
-   * is still focusable. The other two Resource commands aimed at that drawing —
-   * `onEditResource` and `onBeginTitleEditing` — reopen the target's session so the
-   * next press acts; the deletion command consumed the key and answered
-   * nothing, so the press did not remove the Resource, did not reopen the target and
-   * left no sentence behind either.
-   */
-  it('reopens the retained embedding when Delete is aimed at its read-only Resource', async () => {
+  it('deletes inside an authoring drawing after Exit without listing its Space', async () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
@@ -1042,19 +1097,23 @@ describe('the Map an Open Space Resource draws', () => {
     render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_B)).not.toBeNull());
     await act(async () => {
+      await spaces.enter(TARGET_ID, SELECTED_MAP_ID, SELECTED_GRAPH_ID);
       await spaces.exit(TARGET_ID);
     });
-    expect(spaces.entry(TARGET_ID)).toBeUndefined();
+    expect(spaces.entry(TARGET_ID)).toBeDefined();
+    expect(spaces.getState().entries.some((entry) => entry.id === TARGET_ID)).toBe(false);
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    await waitFor(() =>
+      expect(queryCommand(embeddedNode(DRAWN_B), /Open Resource/)).not.toBeNull(),
+    );
     fireEvent.keyDown(embeddedNode(DRAWN_B), { key: 'Delete', bubbles: true });
     await waitFor(() => expect(spaces.entry(TARGET_ID)).not.toBeUndefined());
-    // The press reopens the target and removes nothing — neither the read-only
-    // Resource from the target Map nor the containing Space Resource it is drawn in.
     expect(
       spaces
         .entry(TARGET_ID)
         ?.session.getState()
         .working.document.maps?.find((m) => m.id === SELECTED_MAP_ID)?.positions,
-    ).toHaveProperty(DRAWN_B);
+    ).not.toHaveProperty(DRAWN_B);
     expect(
       initial.session
         .getState()
@@ -1062,7 +1121,7 @@ describe('the Map an Open Space Resource draws', () => {
     ).toBe(true);
   });
 
-  it('protects every containing Space Resource while a nested target owns the editor', async () => {
+  it('keeps a second-level Map inert while its containing Map is being edited', async () => {
     const thirdId = uuidSchema.parse('00000000-0000-4000-8000-000000000030');
     const thirdMap = uuidSchema.parse('00000000-0000-4000-8000-000000000031');
     const thirdGraph = uuidSchema.parse('00000000-0000-4000-8000-000000000032');
@@ -1152,41 +1211,17 @@ describe('the Map an Open Space Resource draws', () => {
     };
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
-    await waitFor(() =>
-      expect(
-        within(controlsOf(nested())).getByRole('button', { name: /Edit Resource/ }),
-      ).toBeTruthy(),
+    await waitFor(() => expect(nested()).toBeTruthy());
+    expect(queryCommand(nested(), /Edit Resource/)).toBeNull();
+    expect(queryCommand(nested(), /Open Resource/)).toBeNull();
+    expect(nested().querySelector('.rf-resource-node__inner')).toHaveAttribute(
+      'data-connection-authoring',
+      'false',
     );
-    fireEvent.click(within(controlsOf(nested())).getByRole('button', { name: /Edit Resource/ }));
-    await waitFor(() =>
-      expect(within(controlsOf(nested())).getByRole('button', { name: /Save/ })).toBeTruthy(),
-    );
-    // The nested Space Resource is neither selected nor in portal Edit, and the
-    // live edit withdraws selection from the canvases around it, so pressing it
-    // draws no toolbar at all: neither its Close nor its Map choice can be reached.
-    expect(queryControlsOf(embeddedNode(DRAWN_B))).toBeNull();
-    const outer = document.querySelector(`.react-flow__node[data-id="${SPACE_RESOURCE_ID}"]`);
-    if (!(outer instanceof HTMLElement)) throw new Error('Outer Resource missing');
-    expect(within(controlsOf(outer)).queryByRole('button', { name: /Close Resource/ })).toBeNull();
-    fireEvent.click(within(controlsOf(nested())).getByRole('button', { name: /Cancel/ }));
-    await waitFor(() =>
-      expect(
-        within(controlsOf(embeddedNode(DRAWN_B))).getByRole('button', { name: /Close Resource/ }),
-      ).toBeTruthy(),
-    );
+    expect(queryCommand(embeddedNode(DRAWN_B), /Close Resource/)).not.toBeNull();
+    expect(queryCommand(embeddedNode(DRAWN_B), /Edit Resource/)).toBeNull();
   });
 
-  /**
-   * Closing a Space Resource ends its read, and reopening starts a new one.
-   *
-   * The drawing left behind by an *Exit* is deliberately retained — the target
-   * is gone and a read-only picture of it is better than a hole. A Close is the
-   * other case: the embedding unmounts with its target still open, so the next
-   * Open composes a fresh one, and anything the previous composition published
-   * describes a Map nobody is reading any more. Held here through the one
-   * consequence that outlives the frame: the retained drawing says a nested
-   * Space Resource is Open, so reopening embeds a Space the target has since closed.
-   */
   it('forgets what a Closed Space Resource read, so reopening embeds nothing it held', async () => {
     const thirdId = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
     const thirdMap = uuidSchema.parse('00000000-0000-4000-8000-000000000041');
@@ -1270,6 +1305,7 @@ describe('the Map an Open Space Resource draws', () => {
     render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
     await waitFor(() => expect(spaces.entry(thirdId)).not.toBeUndefined());
 
+    const targetHold = await spaces.hold(TARGET_ID);
     // Close the containing Space Resource while the nested one is still Open, so
     // the read it leaves behind describes a Map that is about to change.
     act(() => {
@@ -1284,10 +1320,7 @@ describe('the Map an Open Space Resource draws', () => {
         resourceId: DRAWN_B,
       });
     });
-    await act(async () => {
-      await spaces.exit(thirdId);
-    });
-    expect(spaces.entry(thirdId)).toBeUndefined();
+    await waitFor(() => expect(spaces.entry(thirdId)).toBeUndefined());
 
     act(() => {
       initial.app.authoring.complete({ kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
@@ -1299,6 +1332,9 @@ describe('the Map an Open Space Resource draws', () => {
       });
     }
     expect(spaces.entry(thirdId)).toBeUndefined();
+    await act(async () => {
+      await targetHold.release();
+    });
   }, 20000);
 
   it('stops embedding a Space Resource whose Map is already on the containing path', async () => {
@@ -1364,17 +1400,17 @@ describe('the Map an Open Space Resource draws', () => {
     render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
     const query = (id: string): Element | null =>
       document.querySelector(`.react-flow__node[data-id="${id}"]`);
-    // Home drawn inside the target, one hop back — that much is ordinary nesting.
+    // The canvas Map is already on the path, so the return to Home is closed.
     const returned = embeddedNodeId(embeddedNodeId(SPACE_RESOURCE_ID, DRAWN_B), SPACE_RESOURCE_ID);
-    // The second crossing of `TARGET:SELECTED_MAP` is the cycle. Without the
-    // guard each settle adds another level, so this loop never stops growing.
+    // No further crossing can be drawn beneath that closed window.
     const repeated = embeddedNodeId(returned, DRAWN_A);
     for (let settle = 0; settle < 12; settle += 1) {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
     }
-    expect(query(returned)).not.toBeNull();
+    expect(query(embeddedNodeId(SPACE_RESOURCE_ID, DRAWN_B))).not.toBeNull();
+    expect(query(returned)).toBeNull();
     expect(query(repeated)).toBeNull();
   }, 20000);
 
@@ -1494,10 +1530,12 @@ describe('the Map an Open Space Resource draws', () => {
 
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    await act(async () => {
+      await Promise.resolve();
+    });
     // React Flow renders a child as a sibling of its parent and offsets it by
     // the parent origin, so the parenting is read off the store rather than off
-    // the DOM tree. What the DOM does carry is the refusal: no rail, and so no
-    // control that could author another Space from this canvas (ADR 0040).
+    // the DOM tree. The embedded Resource offers its own Space’s authoring rail.
     const drawn = embeddedNode(DRAWN_A);
     expect(within(controlsOf(drawn)).getByRole('button', { name: /Open Resource/ })).toBeTruthy();
     // Portal Edit publishes the same connection authoring the host canvas does:
@@ -1690,9 +1728,9 @@ describe('the Map an Open Space Resource draws', () => {
     const attempts: UUID[] = [];
     const counted: OpenSpaces = {
       ...spaces,
-      embed: (spaceId) => {
+      hold: (spaceId) => {
         attempts.push(spaceId);
-        return spaces.embed(spaceId);
+        return spaces.hold(spaceId);
       },
     };
     const initial = await spaces.open(HOME_ID);
@@ -1713,4 +1751,128 @@ describe('the Map an Open Space Resource draws', () => {
     }
     expect(attempts).toEqual([GONE_A_ID, GONE_B_ID]);
   });
+});
+
+it('offers the full entity menu while editing a drawn Map and creates its Reference in that Space', async () => {
+  const { spaces } = await mountOpenSpaces(
+    home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    }),
+  );
+  await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+  expect(queryCommand(embeddedNode(DRAWN_A), 'Actions for Resource Intake')).toBeNull();
+  beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+  fireEvent.click(
+    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', {
+      name: 'Actions for Resource Intake',
+    }),
+  );
+  expect(screen.getByRole('menuitem', { name: 'Create Reference' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Remove from Map' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Create Reference' }));
+  await waitFor(() => {
+    const references = spaces
+      .entry(TARGET_ID)
+      ?.session.getState()
+      .working.resources.filter(({ document }) => document.kind === 'reference');
+    expect(references).toHaveLength(1);
+    expect(references?.[0]?.document).toMatchObject({ kind: 'reference', target: DRAWN_A });
+  });
+  expect(
+    spaces
+      .entry(HOME_ID)
+      ?.session.getState()
+      .working.resources.some(({ document }) => document.kind === 'reference'),
+  ).toBe(false);
+});
+
+it('selects and deletes an embedded Edge, then Connect offers only that drawn Map', async () => {
+  const { spaces } = await mountOpenSpaces(
+    home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    }),
+  );
+  await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+  expect(screen.queryByRole('button', { name: 'Delete Edge Intake → Storage' })).toBeNull();
+  beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+  const edge = await screen.findByLabelText('Edge from Intake to Storage in Overview');
+  fireEvent.click(edge);
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete Edge Intake → Storage' }));
+  const confirmation = await screen.findByRole('alertdialog', {
+    name: 'Delete Edge Intake → Storage?',
+  });
+  fireEvent.click(within(confirmation).getByRole('button', { name: 'Delete' }));
+  await waitFor(() =>
+    expect(screen.queryByLabelText('Edge from Intake to Storage in Overview')).toBeNull(),
+  );
+  fireEvent.click(
+    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', {
+      name: 'Actions for Resource Intake',
+    }),
+  );
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Connect to Resource' }));
+  const choices = await screen.findByRole('dialog', { name: 'Connect Resource Intake' });
+  expect(
+    within(choices)
+      .getAllByRole('button', { name: /^Connect to / })
+      .map((button) => button.getAttribute('aria-label')),
+  ).toEqual(['Connect to Storage', 'Connect to a new Resource']);
+  fireEvent.click(within(choices).getByRole('button', { name: 'Connect to Storage' }));
+  await screen.findByRole('button', { name: 'Delete Edge Intake → Storage' });
+  expect(
+    spaces
+      .entry(TARGET_ID)
+      ?.session.getState()
+      .working.document.maps?.find((candidate) => candidate.id === SELECTED_MAP_ID)?.graphs[0]
+      ?.edges,
+  ).toEqual([{ from: DRAWN_A, to: DRAWN_B }]);
+  expect(
+    spaces.entry(HOME_ID)?.session.getState().working.document.maps?.[0]?.graphs[0]?.edges,
+  ).toEqual([]);
+});
+
+it('reports and dismisses a drawn Space Resource menu clipboard refusal', async () => {
+  const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+  });
+  try {
+    await mountOpenSpaces(
+      home({
+        title: 'Elsewhere',
+        kind: 'space',
+        spaceId: TARGET_ID,
+        map: SELECTED_MAP_ID,
+        graph: SELECTED_GRAPH_ID,
+      }),
+    );
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    fireEvent.click(
+      within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', {
+        name: 'Actions for Resource Intake',
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole('menuitem', {
+        name: (name) => name.startsWith('Copy link to Resource') && !name.includes('Map'),
+      }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Architecture: Link not copied');
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Architecture: Link not copied' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  } finally {
+    if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
+    else Object.defineProperty(navigator, 'clipboard', previousClipboard);
+  }
 });

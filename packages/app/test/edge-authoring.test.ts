@@ -599,6 +599,21 @@ describe('draft invalidation', () => {
 });
 
 describe('completing a pointer connection', () => {
+  it('names only the new Resource after an Alt create-and-connect drag ends', () => {
+    const { edges, continuation, session } = open();
+    edges.beginPointerConnect(RESOURCE_A);
+    edges.createConnectedResource(RESOURCE_A, { x: 800, y: 500 }, PROJECTED);
+    expect(continuation.getState().pending).toBeNull();
+    edges.endPointerDrag();
+    const created = session.getState().working.resources.find((resource) => resource.id === MINTED);
+    expect(created).toBeDefined();
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'resource', resourceId: MINTED },
+      select: true,
+      then: 'rename',
+    });
+  });
+
   it('authors the Edge and continues at the Resource it reached', () => {
     const { edges, session, continuation } = open();
     edges.beginPointerConnect(RESOURCE_B);

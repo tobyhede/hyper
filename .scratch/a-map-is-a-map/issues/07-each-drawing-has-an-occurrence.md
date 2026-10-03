@@ -4,7 +4,7 @@
 
 **Blocked by:** 06.
 
-**Status:** ready-for-agent
+**Status:** implementation under verification
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
@@ -13,3 +13,13 @@
 - [ ] Enter, F2 and Delete act on the selection's occurrence and do the same thing in every drawing; the canvas has no separate embedded branch for them.
 - [ ] Undo and Redo act on the selection's Space, or the canvas's own Space when nothing is selected.
 - [ ] The Command Dock always acts on the canvas's own Space.
+
+## Scope clarification
+
+The user confirmed on 2026-10-03 that Undo/Redo remains deferred until the application has history. V1 has no Undo/Redo implementation. The remaining occurrence, selection, keyboard and continuation requirements stay in scope.
+
+## Answer
+
+Selection dispatch resolves one occurrence for root and embedded drawings. Enter, F2, Delete and keyboard creation use that occurrence; adapters and continuations are scoped to the drawing. Unmounting drops its pending continuation. The Dock retains the root composition. Undo/Redo is deferred as recorded in Scope clarification.
+
+Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.

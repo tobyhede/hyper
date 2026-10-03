@@ -130,6 +130,6 @@ describe('the connection completion Edge Authoring is given', () => {
 
     expect(seen).toHaveLength(1);
     expect(seen[0]?.adapter).toBe(composed.adapter);
-    expect(seen[0]?.authoring).toBe(composed.authoring);
+    expect(seen[0]?.authoring).toBe(composed.surface.authoring);
   });
 });

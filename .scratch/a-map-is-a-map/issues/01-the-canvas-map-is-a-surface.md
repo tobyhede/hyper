@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately). PR #331 must be merged.
 
-**Status:** ready-for-agent
+**Status:** implementation under verification
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
@@ -13,3 +13,9 @@
 - [ ] Every collaborator the surface uses comes from the one composition it is given.
 - [ ] Existing unit, application E2E and Ladle E2E assertions pass unmodified.
 - [ ] The surface is tested through its own interface over a real composition.
+
+## Answer
+
+The canvas now mounts `MapSurface` over its own composition with an explicit Map, Graph and policy. The surface owns projection, contextual authoring, the render adapter, Edge Authoring and occurrence continuation. `map-surface.test.ts` exercises the interface over a real composition. PR #331 remains the stack base by the user’s explicit approval; merging is left to the user.
+
+Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.

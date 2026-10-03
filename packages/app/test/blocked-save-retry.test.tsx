@@ -116,7 +116,7 @@ const blockedSequence = async () => {
   await waitFor(() => expect(meta.session.getState().persistence.kind).toBe('rejected'));
   const targetId = targetOf(meta, c0.resourceId);
 
-  const target = await act(() => openSpaces.embed(targetId));
+  const { entry: target } = await act(() => openSpaces.hold(targetId));
   const targetWorking = target.session.getState().working;
   const targetMap = targetWorking.document.defaultMap;
   if (targetMap === undefined) throw new Error('TARGET has no Map');
@@ -193,13 +193,13 @@ const blockedTarget = async () => {
 
   const targetId = await createIn(meta, 'Target');
   await waitFor(() => expect(meta.session.getState().persistence.kind).toBe('settled'));
-  const target = await act(() => openSpaces.embed(targetId));
+  const { entry: target } = await act(() => openSpaces.hold(targetId));
 
   control.queueResult({ kind: 'permanent-failure', code: 'forbidden' });
   const childId = await createIn(target, 'Child');
   await waitFor(() => expect(target.session.getState().persistence.kind).toBe('rejected'));
 
-  const child = await act(() => openSpaces.embed(childId));
+  const { entry: child } = await act(() => openSpaces.hold(childId));
   control.queueResult({
     kind: 'conflict',
     conflicts: [
@@ -331,6 +331,7 @@ describe('A save another Space blocks', () => {
 
   it('refuses to exit a Space whose blocked save Retry can still make', async () => {
     const { control, openSpaces, target, targetId } = await blockedTarget();
+    await act(() => openSpaces.enter(targetId));
     const requests = control.requests.length;
 
     await expect(openSpaces.exit(targetId)).resolves.toEqual({

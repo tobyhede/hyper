@@ -155,6 +155,8 @@ describe('opening framing on a mounted canvas', () => {
     let state: OpenSpacesState = {
       activeSpaceId: HOST_ID,
       entries,
+      composed: [],
+      replacingImage: false,
       openedFrom: new Map(),
     };
     const spaces: OpenSpaces = {
@@ -181,7 +183,7 @@ describe('opening framing on a mounted canvas', () => {
         return seed;
       },
       open: unused,
-      embed: unused,
+      hold: unused,
       waitForPersistence: unused,
       openPath: unused,
       enter: unused,
@@ -205,6 +207,7 @@ describe('opening framing on a mounted canvas', () => {
         <Subscribed spaces={spaces}>
           <ReactFlowProvider>
             <SpaceCanvas
+              imageReplacement={app.imageReplacement}
               commandOutcomes={app.commandOutcomes}
               deleteConfirmation={app.deleteConfirmation}
               nodes={[resourceNode()]}
@@ -305,6 +308,8 @@ describe('opening framing on a mounted canvas', () => {
     const state: OpenSpacesState = {
       activeSpaceId: TARGET_ID,
       entries: [],
+      composed: [],
+      replacingImage: false,
       openedFrom: new Map(),
     };
     const spaces: OpenSpaces = {
@@ -320,7 +325,7 @@ describe('opening framing on a mounted canvas', () => {
         return TARGET_FRAMING;
       },
       open: unused,
-      embed: unused,
+      hold: unused,
       waitForPersistence: unused,
       openPath: unused,
       enter: unused,
@@ -343,6 +348,7 @@ describe('opening framing on a mounted canvas', () => {
       <OpenSpacesContext.Provider value={spaces}>
         <ReactFlowProvider>
           <SpaceCanvas
+            imageReplacement={app.imageReplacement}
             commandOutcomes={app.commandOutcomes}
             deleteConfirmation={app.deleteConfirmation}
             nodes={[resourceNode()]}

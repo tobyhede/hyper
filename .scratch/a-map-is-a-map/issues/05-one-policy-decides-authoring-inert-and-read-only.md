@@ -4,7 +4,7 @@
 
 **Blocked by:** 01.
 
-**Status:** ready-for-agent
+**Status:** implementation under verification
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
@@ -14,3 +14,9 @@
 - [ ] Node interactivity, the Resource's read-only flag, the rail's offers and availability all derive from the policy, and no separate read-only check remains; a Reference embedding's Resources are read-only like any other.
 - [ ] The nesting walk starts with the canvas's own Space and Map on its path, so a Map that shows itself is drawn as a closed window.
 - [ ] A test enumerates, per policy, what a drawn Map offers.
+
+## Answer
+
+One surface policy combines the inherited ceiling, reference/stale state, depth and local Edit state. Shared availability further restricts transient gestures without changing that policy. The nesting path starts at the canvas Map; second-level Maps remain inert. Policy enumeration and application nesting tests cover these boundaries.
+
+Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.

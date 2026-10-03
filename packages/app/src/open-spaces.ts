@@ -44,7 +44,14 @@ export interface OpenSpace {
   readonly spaceResources: SpaceResourceAuthoring;
 }
 
+export interface SpaceHold {
+  readonly entry: OpenSpace;
+  readonly release: () => Promise<void>;
+}
+
 export interface OpenSpacesState {
+  readonly composed: readonly OpenSpace[];
+  readonly replacingImage: boolean;
   readonly activeSpaceId: UUID | null;
   readonly entries: readonly OpenSpace[];
   /**
@@ -160,7 +167,7 @@ export interface OpenSpaces {
   readonly opener: (spaceId: UUID) => NamedSpace | null;
   /**
    * Choose a row from the Open Spaces menu: switch to an open Space, open a
-   * closed Meta with no Opener, or refuse anything else.
+   * closed Meta or a still-drawn Opener with no new Opener, or refuse anything else.
    *
    * Load failures still throw rather than answering `refused` — a refusal is
    * only ever a non-Meta Space closing between the listing being drawn and the
@@ -172,8 +179,8 @@ export interface OpenSpaces {
   readonly subscribe: (listener: () => void) => () => void;
   readonly entry: (spaceId: UUID) => OpenSpace | undefined;
   readonly open: (spaceId: UUID, selection?: MapId) => Promise<OpenSpace>;
-  /** Keep the containing canvas active while opening a target for embedded editing. */
-  readonly embed: (spaceId: UUID) => Promise<OpenSpace>;
+  /** Hold one drawing without listing its Space or changing the active canvas. */
+  readonly hold: (spaceId: UUID) => Promise<SpaceHold>;
   /** Wait for queued and in-flight writes before another Space refers to their result. */
   readonly waitForPersistence: (spaceId: UUID) => Promise<boolean>;
   readonly openPath: (pathname: string) => Promise<{
@@ -185,6 +192,7 @@ export interface OpenSpaces {
     selection?: MapId,
     graph?: GraphId,
     framing?: SpaceResourceFraming,
+    openerSpaceId?: UUID,
   ) => Promise<OpenSpace>;
   /**
    * The camera Enter asked the first canvas showing to take, or `undefined`.
@@ -328,7 +336,9 @@ const buildListing = (
     state.entries.map((entry) => ({
       spaceId: entry.id,
       title: entry.session.getState().working.document.title,
-      from: state.openedFrom.get(entry.id) ?? null,
+      from: state.entries.some((candidate) => candidate.id === state.openedFrom.get(entry.id))
+        ? (state.openedFrom.get(entry.id) ?? null)
+        : null,
       persistence: entry.session.getState().persistence,
     })),
     metaSpaceId,
@@ -366,30 +376,40 @@ export function createOpenSpaces({
     reportObserverError: report,
   });
   const observable = createObservableState<OpenSpacesState>(
-    { activeSpaceId: null, entries: [], openedFrom: new Map() },
+    {
+      activeSpaceId: null,
+      entries: [],
+      composed: [],
+      replacingImage: false,
+      openedFrom: new Map(),
+    },
     report,
   );
   const compositions = new Map<UUID, Promise<OpenSpace>>();
+  const drawingHolds = new Map<UUID, number>();
   const assertNavigationAvailable = (): void => {
-    const { activeSpaceId, entries } = observable.getState();
-    if (entries.find((entry) => entry.id === activeSpaceId)?.app.imageReplacement.getState()) {
+    if (observable.getState().replacingImage) {
       throw new NavigationUnavailableError();
     }
   };
   /**
    * Entries that have been the canvas, not merely composed for an embed.
    *
-   * Embed adds an Open Spaces entry without activating it (`embed` holds
-   * `activeSpaceId` on the containing Space). Enter is the first canvas
-   * showing, so it still seeds from the Resource — held by
+   * A drawing holds a composition without listing or activating it. Enter is
+   * the first canvas showing, so it still seeds from the Resource — held by
    * `packages/app/test/enter-space-resource.test.tsx`. A later Enter keeps the
    * live selection, which that file's already-open case holds.
    */
   const shownOnCanvas = new WeakSet<OpenSpace>();
   const openingFramingByEntry = new WeakMap<OpenSpace, SpaceResourceFraming>();
-  const browserLocation = createBrowserLocation(history, report, async (pathname) => {
-    await openPath(pathname);
-  });
+  const browserLocation = createBrowserLocation(
+    history,
+    report,
+    async (pathname) => {
+      await openPath(pathname);
+    },
+    () => observable.getState().replacingImage,
+  );
 
   /**
    * Hand the browser's location whichever composition is now on the canvas.
@@ -518,8 +538,9 @@ export function createOpenSpaces({
     // opener, which its re-homing discarded before this runs, so a crossing
     // raced this way joins at the root rather than where it would have landed
     // unraced.
-    const opener = from === entry.id || !state.entries.some(({ id }) => id === from) ? null : from;
+    const opener = from === entry.id || !state.composed.some(({ id }) => id === from) ? null : from;
     observable.publish({
+      ...state,
       activeSpaceId,
       entries: [...state.entries, entry],
       openedFrom: new Map(state.openedFrom).set(entry.id, opener),
@@ -551,9 +572,16 @@ export function createOpenSpaces({
     };
     session.subscribe(() => {
       const state = observable.getState();
-      if (!state.entries.some((entry) => entry.session === session)) return;
-      observable.publish({ ...state, entries: [...state.entries] });
+      if (!state.composed.some((entry) => entry.session === session)) return;
+      observable.publish({ ...state, entries: [...state.entries], composed: [...state.composed] });
     });
+    opened.app.imageReplacement.subscribe(() => {
+      const state = observable.getState();
+      const replacingImage = state.composed.some((entry) => entry.app.imageReplacement.getState());
+      if (state.replacingImage !== replacingImage) observable.publish({ ...state, replacingImage });
+    });
+    const state = observable.getState();
+    observable.publish({ ...state, composed: [...state.composed, opened] });
     return opened;
   };
 
@@ -599,38 +627,43 @@ export function createOpenSpaces({
     from: UUID | null,
     firstDisplay?: FirstCanvasSeed,
   ): Promise<OpenSpace> => {
-    const active = observable.getState().activeSpaceId;
-    if (active !== null && active !== target.id) {
-      await registry.waitUntilRetirable(active);
-    }
-    assertNavigationAvailable();
-    if (retired.has(target)) {
-      // The exit is the newer choice and has already taken this Space off the
-      // canvas, so there is nothing to reinstate — and nothing to answer with
-      // either, since the composition it names can no longer commit.
-      throw new Error(`Space ${target.id} was exited while it was being activated`);
-    }
-    if (request !== activationRequest) {
-      include(target, observable.getState().activeSpaceId ?? target.id, from);
+    try {
+      const active = observable.getState().activeSpaceId;
+      if (active !== null && active !== target.id) {
+        await registry.waitUntilRetirable(active);
+      }
+      assertNavigationAvailable();
+      if (retired.has(target)) {
+        // The exit is the newer choice and has already taken this Space off the
+        // canvas, so there is nothing to reinstate — and nothing to answer with
+        // either, since the composition it names can no longer commit.
+        throw new Error(`Space ${target.id} was exited while it was being activated`);
+      }
+      if (request !== activationRequest) {
+        include(target, observable.getState().activeSpaceId ?? target.id, from);
+        return target;
+      }
+      // First canvas showing is a fact about this entry after the waits, not
+      // about whichever entry the Space Id named when the request was made —
+      // compose may have produced a new one while an exit settled.
+      const seedFrom =
+        firstDisplay !== undefined && !shownOnCanvas.has(target) ? firstDisplay : undefined;
+      // Seed before include publishes — `makes the Enter framing seed readable
+      // on the activation that first shows an embedded Space` holds the order.
+      if (seedFrom !== undefined) {
+        if (seedFrom.framing !== undefined) openingFramingByEntry.set(target, seedFrom.framing);
+        else openingFramingByEntry.delete(target);
+      }
+      include(target, target.id, from);
+      if (seedFrom !== undefined) {
+        if (seedFrom.selection !== undefined) target.app.navigation.selectMap(seedFrom.selection);
+        if (seedFrom.graph !== undefined) target.app.navigation.activateGraph(seedFrom.graph);
+      }
       return target;
+    } catch (error) {
+      await releaseUnheld(target);
+      throw error;
     }
-    // First canvas showing is a fact about this entry after the waits, not
-    // about whichever entry the Space Id named when the request was made —
-    // compose may have produced a new one while an exit settled.
-    const seedFrom =
-      firstDisplay !== undefined && !shownOnCanvas.has(target) ? firstDisplay : undefined;
-    // Seed before include publishes — `makes the Enter framing seed readable
-    // on the activation that first shows an embedded Space` holds the order.
-    if (seedFrom !== undefined) {
-      if (seedFrom.framing !== undefined) openingFramingByEntry.set(target, seedFrom.framing);
-      else openingFramingByEntry.delete(target);
-    }
-    include(target, target.id, from);
-    if (seedFrom !== undefined) {
-      if (seedFrom.selection !== undefined) target.app.navigation.selectMap(seedFrom.selection);
-      if (seedFrom.graph !== undefined) target.app.navigation.activateGraph(seedFrom.graph);
-    }
-    return target;
   };
 
   const activate = async (
@@ -674,24 +707,42 @@ export function createOpenSpaces({
     selection?: MapId,
     graph?: GraphId,
     framing?: SpaceResourceFraming,
+    openerSpaceId?: UUID,
   ): Promise<OpenSpace> => {
     const firstDisplay: FirstCanvasSeed = {};
     if (selection !== undefined) firstDisplay.selection = selection;
     if (graph !== undefined) firstDisplay.graph = graph;
     if (framing !== undefined) firstDisplay.framing = framing;
-    return activate(spaceId, undefined, observable.getState().activeSpaceId, firstDisplay);
+    return activate(
+      spaceId,
+      undefined,
+      openerSpaceId ?? observable.getState().activeSpaceId,
+      firstDisplay,
+    );
   };
 
-  /**
-   * Open a target for embedded editing without taking the canvas off the Space
-   * that embeds it, which is still a crossing: the target hangs off the Space
-   * whose Resource reached it.
-   */
-  const embed = async (spaceId: UUID): Promise<OpenSpace> => {
-    const target = await compose(spaceId);
-    const active = observable.getState().activeSpaceId;
-    include(target, active ?? target.id, active);
-    return target;
+  const hold = async (spaceId: UUID): Promise<SpaceHold> => {
+    drawingHolds.set(spaceId, (drawingHolds.get(spaceId) ?? 0) + 1);
+    try {
+      const entry = await compose(spaceId);
+      let released = false;
+      return {
+        entry,
+        release: async () => {
+          if (released) return;
+          released = true;
+          const remaining = (drawingHolds.get(spaceId) ?? 1) - 1;
+          if (remaining > 0) drawingHolds.set(spaceId, remaining);
+          else drawingHolds.delete(spaceId);
+          await releaseUnheld(entry);
+        },
+      };
+    } catch (error) {
+      const remaining = (drawingHolds.get(spaceId) ?? 1) - 1;
+      if (remaining > 0) drawingHolds.set(spaceId, remaining);
+      else drawingHolds.delete(spaceId);
+      throw error;
+    }
   };
 
   const openPath: OpenSpaces['openPath'] = async (pathname) => {
@@ -756,6 +807,38 @@ export function createOpenSpaces({
     }
   };
 
+  const disposeComposition = (target: OpenSpace): void => {
+    const spaceId = target.id;
+    target.app.commandOutcomes.dispose();
+    target.app.surface.dispose();
+    target.app.deleteConfirmation.dispose();
+    target.app.authoring.dispose();
+    retired.add(target);
+    compositions.delete(spaceId);
+
+    const state = observable.getState();
+    const composed = state.composed.filter((entry) => entry !== target);
+    observable.publish({
+      ...state,
+      composed,
+      replacingImage: composed.some((entry) => entry.app.imageReplacement.getState()),
+    });
+  };
+
+  const releaseUnheld = async (target: OpenSpace): Promise<void> => {
+    for (;;) {
+      const state = observable.getState();
+      if (drawingHolds.has(target.id) || state.entries.includes(target) || retired.has(target))
+        return;
+      await registry.waitUntilRetirable(target.id);
+      if (drawingHolds.has(target.id) || observable.getState().entries.includes(target)) return;
+      if (registry.release(target.id)) {
+        disposeComposition(target);
+        return;
+      }
+    }
+  };
+
   const retireOpenSpace = async (
     spaceId: UUID,
     target: OpenSpace,
@@ -797,7 +880,7 @@ export function createOpenSpaces({
       }
       // The registry stops owning this session here, so anything still driving
       // it would be a writer outside the one owner.
-      if (registry.release(spaceId)) break;
+      if (drawingHolds.has(spaceId) || registry.release(spaceId)) break;
     }
     const state = observable.getState();
     const entries = state.entries.filter(({ id }) => id !== spaceId);
@@ -817,21 +900,8 @@ export function createOpenSpaces({
     for (const [entryId, opener] of openedFrom) {
       if (opener === spaceId) openedFrom.set(entryId, inherited);
     }
-    // The composition goes with the session the registry has just stopped
-    // owning. Each collaborator is released by name rather than relying on
-    // `authoring.dispose` clearing the subscriber set the others registered in:
-    // that is true today and is an ordering nothing here states or tests.
-    // Command outcomes goes first because it publishes into the continuation:
-    // disposed, it drops every in-flight run, so none can settle later and
-    // request a continuation from the disposed one below.
-    target.app.commandOutcomes.dispose();
-    target.app.edgeAuthoring.dispose();
-    target.app.deleteConfirmation.dispose();
-    target.app.continuation.dispose();
-    target.app.authoring.dispose();
-    retired.add(target);
-    compositions.delete(spaceId);
-    observable.publish({ activeSpaceId, entries, openedFrom });
+    observable.publish({ ...state, activeSpaceId, entries, openedFrom });
+    if (!drawingHolds.has(spaceId)) disposeComposition(target);
     followActiveSpace();
     return { kind: 'exited' };
   };
@@ -880,7 +950,7 @@ export function createOpenSpaces({
     const state = observable.getState();
     const openerId = state.openedFrom.get(spaceId) ?? null;
     if (openerId === null) return null;
-    const entry = state.entries.find((candidate) => candidate.id === openerId);
+    const entry = state.composed.find((candidate) => candidate.id === openerId);
     return entry === undefined
       ? null
       : { spaceId: openerId, title: entry.session.getState().working.document.title };
@@ -891,10 +961,14 @@ export function createOpenSpaces({
       const switched = await switchTo(spaceId);
       return { kind: 'switched', title: switched.session.getState().working.document.title };
     }
-    if (spaceId !== metaSpaceId) return { kind: 'refused', code: 'space-not-open' };
-    // The Open Spaces menu lists Meta whether or not it is open. Choosing it
-    // from the menu is not a crossing, so a Meta that is not open yet is
-    // opened directly, with no Opener.
+    const state = observable.getState();
+    const isDrawnOpener =
+      state.composed.some((entry) => entry.id === spaceId) &&
+      [...state.openedFrom.values()].includes(spaceId);
+    if (spaceId !== metaSpaceId && !isDrawnOpener)
+      return { kind: 'refused', code: 'space-not-open' };
+    // Returning to a drawn Opener and choosing closed Meta are direct opens,
+    // preserving any held composition without recording another crossing.
     const opened = await open(spaceId);
     return { kind: 'opened', title: opened.session.getState().working.document.title };
   };
@@ -906,9 +980,9 @@ export function createOpenSpaces({
     select,
     getState: observable.getState,
     subscribe: observable.subscribe,
-    entry: (spaceId) => observable.getState().entries.find(({ id }) => id === spaceId),
+    entry: (spaceId) => observable.getState().composed.find(({ id }) => id === spaceId),
     open,
-    embed,
+    hold,
     waitForPersistence: async (spaceId) => {
       await registry.waitUntilRetirable(spaceId);
       return registry.session(spaceId)?.getState().persistence.kind === 'settled';
