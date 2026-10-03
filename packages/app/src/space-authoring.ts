@@ -394,6 +394,11 @@ export interface SpaceAuthoringState {
   readonly navigation: NavigationState;
 }
 
+export interface MapAuthoringContext {
+  readonly mapId: UUID;
+  readonly graphId: GraphId | null;
+}
+
 export interface SpaceAuthoring {
   readonly getState: () => SpaceAuthoringState;
   readonly subscribe: (listener: () => void) => () => void;
@@ -415,6 +420,14 @@ export interface SpaceAuthoring {
    */
   readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
+  readonly completeInContext: (
+    context: MapAuthoringContext,
+    completion: AuthoringCompletion,
+  ) => AuthoringResult;
+  readonly edgeEligibilityInContext: (
+    context: MapAuthoringContext,
+    proposal: EdgeProposal,
+  ) => EdgeEligibility;
   /**
    * Author the explicitly addressed Map without switching this Space's canvas.
    * Deleting its visible Active Graph advances that selection to a survivor.
@@ -501,6 +514,7 @@ const refuse = (refusal: AuthoringRefusal): DerivedCompletion => ({ kind: 'refus
 interface ReportedCompletion {
   readonly completion: AuthoringCompletion;
   readonly embeddedMapId?: UUID | undefined;
+  readonly graphId?: GraphId | null | undefined;
 }
 
 export type EmbeddedResourceCompletion = Extract<
@@ -970,6 +984,22 @@ export function createSpaceAuthoring({
     return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
   };
 
+  const edgeEligibilityInContext = (
+    context: MapAuthoringContext,
+    proposal: EdgeProposal,
+  ): EdgeEligibility => {
+    const map = currentSpace().lookup.map(context.mapId);
+    if (map === undefined) return { kind: 'refused', refusal: { code: 'map-not-found' } };
+    const graph = map.map.graphs.find((candidate) => candidate.id === context.graphId) ?? null;
+    const refusal = connectRefusal(
+      proposal.from,
+      proposal.kind === 'connect' ? proposal.to : null,
+      Placement.fromMap(map.map),
+      graph,
+    );
+    return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
+  };
+
   /**
    * Derive the complete next state of every collaborator, or refuse.
    *
@@ -988,6 +1018,7 @@ export function createSpaceAuthoring({
   const deriveCompletedEdit = ({
     completion,
     embeddedMapId,
+    graphId,
   }: ReportedCompletion): DerivedCompletion => {
     const selection = embeddedMapId ?? navigation.getState().selectedMapId;
     if (completion.kind === 'created-map') {
@@ -1137,6 +1168,14 @@ export function createSpaceAuthoring({
       return refuse({ code: 'map-not-found' });
     }
     const resolved = resolveMap(space, selection);
+    const selectedGraphId =
+      graphId !== undefined
+        ? graphId
+        : embeddedMapId === undefined
+          ? navigationState.activeGraphId
+          : (resolved.map.activeGraph ?? resolved.map.graphs[0]?.id ?? null);
+    const selectedGraph =
+      resolved.map.graphs.find((candidate) => candidate.id === selectedGraphId) ?? null;
     // Which Map this Edit writes. Every arm below that changes its positions
     // or its Graphs writes them into `snapshot` itself, and the tail folds only
     // the Map's identity over the result — so an arm answered by a
@@ -1348,7 +1387,7 @@ export function createSpaceAuthoring({
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'create-and-connect') {
-      const refusal = connectRefusal(completion.from, null, placement);
+      const refusal = connectRefusal(completion.from, null, placement, selectedGraph);
       if (refusal !== null) return refuse(refusal);
       // A drop point is kept exactly, where the preview sat; beside-source has
       // no aimed point, so it avoids overlap. `connectRefusal` already proved the
@@ -1375,14 +1414,7 @@ export function createSpaceAuthoring({
       if (completion.graphId !== undefined && named?.owner.map.id !== resolved.map.id) {
         return refuse({ code: 'graph-not-owned' });
       }
-      const fallbackId = resolved.map.activeGraph ?? resolved.map.graphs[0]?.id;
-      const graph =
-        named?.graph ??
-        (embeddedMapId === undefined
-          ? targetGraph()
-          : fallbackId === undefined
-            ? null
-            : (resolved.map.graphs.find((candidate) => candidate.id === fallbackId) ?? null));
+      const graph = named?.graph ?? selectedGraph;
       const refusal = connectRefusal(completion.from, completion.to, placement, graph);
       if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
@@ -1406,10 +1438,7 @@ export function createSpaceAuthoring({
     // change Graphs through the snapshot (Remove from Map, Delete from Space)
     // never reach the Graph-writing arms below, so the two cannot disagree.
     const ownedGraphs = editedMap.graphs;
-    activeGraphId =
-      embeddedMapId === undefined
-        ? navigationState.activeGraphId
-        : (editedMap.activeGraph ?? editedMap.graphs[0]?.id ?? null);
+    activeGraphId = selectedGraphId;
     if (completion.kind === 'renamed-map') {
       // Addressed by id, exactly as Rename Graph is (ADR 0040) — and the id is
       // checked because this Edit resolves its Map from state read *later*
@@ -1629,11 +1658,15 @@ export function createSpaceAuthoring({
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
-  const complete = (completion: AuthoringCompletion, embeddedMapId?: UUID): AuthoringResult => {
+  const complete = (
+    completion: AuthoringCompletion,
+    embeddedMapId?: UUID,
+    graphId?: GraphId | null,
+  ): AuthoringResult => {
     if (embeddedMapId !== undefined && currentSpace().lookup.map(embeddedMapId) === undefined) {
       return { kind: 'refused', refusal: { code: 'map-not-found' } };
     }
-    const reported: ReportedCompletion = { completion, embeddedMapId };
+    const reported: ReportedCompletion = { completion, embeddedMapId, graphId };
     if (completing) {
       queued.push({ ...reported, replacementEpoch });
       return { kind: 'queued' };
@@ -1744,7 +1777,10 @@ export function createSpaceAuthoring({
     subscribe: observable.subscribe,
     mapPlacement,
     edgeEligibility,
+    edgeEligibilityInContext,
     complete,
+    completeInContext: (context, completion) =>
+      complete(completion, context.mapId, context.graphId),
     completeInMap: (mapId, completion) => complete(completion, mapId),
     retryPersistence: session.retry,
     // Read at the moment the author asks, never captured earlier. `session`

@@ -1789,6 +1789,55 @@ describe('connecting Resources on an embedded Map', () => {
       { id: RESOURCE_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
     ],
   };
+  it('creates and connects in the explicitly drawn Map and Graph without changing Navigation', () => {
+    const { session, navigation, authoring } = open(withOther);
+    const initialNavigation = navigation.getState();
+    const context = { mapId: OTHER_MAP_ID, graphId: SHOWN_GRAPH_ID };
+
+    expect(
+      authoring.edgeEligibilityInContext(context, { kind: 'create-and-connect', from: RESOURCE_A }),
+    ).toEqual({ kind: 'eligible' });
+    expect(
+      authoring.completeInContext(context, {
+        kind: 'create-and-connect',
+        from: RESOURCE_A,
+        position: { x: 950, y: 650 },
+      }),
+    ).toEqual({ kind: 'completed', createdResourceId: MINTED });
+    expect(navigation.getState()).toEqual(initialNavigation);
+    expect(mapOf(session.getState().working, MAP_ID)).toEqual(mapOf(positionedSnapshot, MAP_ID));
+    expect(mapOf(session.getState().working, OTHER_MAP_ID)?.positions[MINTED]).toEqual({
+      x: 950,
+      y: 650,
+      open: false,
+    });
+    expect(mapOf(session.getState().working, OTHER_MAP_ID)?.graphs[1]?.edges).toEqual([
+      { from: RESOURCE_A, to: MINTED },
+    ]);
+  });
+  it('uses the drawn Graph for both duplicate eligibility and completed connections', () => {
+    const { authoring } = open(withOther);
+    const context = { mapId: OTHER_MAP_ID, graphId: SHOWN_GRAPH_ID };
+    const proposal = { kind: 'connect' as const, from: RESOURCE_A, to: RESOURCE_C };
+    expect(authoring.edgeEligibilityInContext(context, proposal)).toEqual({ kind: 'eligible' });
+    expect(
+      authoring.completeInContext(context, {
+        kind: 'connected-resources',
+        from: RESOURCE_A,
+        to: RESOURCE_C,
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(authoring.edgeEligibilityInContext(context, proposal)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'edge-already-exists' },
+    });
+    expect(
+      authoring.edgeEligibilityInContext(
+        { mapId: OTHER_MAP_ID, graphId: OTHER_GRAPH_ID },
+        proposal,
+      ),
+    ).toEqual({ kind: 'eligible' });
+  });
   it('writes the Edge into the Graph the Space Resource is showing, not the canvas Active Graph', () => {
     const { session, navigation, authoring } = open(withOther);
     const initialNavigation = navigation.getState();

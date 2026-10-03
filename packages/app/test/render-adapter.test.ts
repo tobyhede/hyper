@@ -56,6 +56,12 @@ interface AuthoringCapabilities {
 function authoringSpy({ refusing, mapPlacement = Placement.empty() }: AuthoringCapabilities = {}) {
   const completions: unknown[] = [];
   const authoring: SpaceAuthoring = {
+    completeInContext: () => {
+      throw new Error('Contextual authoring is outside this adapter test.');
+    },
+    edgeEligibilityInContext: () => {
+      throw new Error('Contextual eligibility is outside this adapter test.');
+    },
     completeInMap: () => {
       throw new Error('Embedded authoring is outside this adapter test.');
     },
