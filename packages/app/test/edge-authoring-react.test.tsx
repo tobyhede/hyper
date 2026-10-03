@@ -1,3 +1,4 @@
+import { fixtureFacts } from './render-adapter-fixtures';
 import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { useLayoutEffect, type ReactNode } from 'react';
 import { Position, ReactFlowProvider, type Edge } from '@xyflow/react';
@@ -125,6 +126,7 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       title,
       readOnly: false,
       kind: 'markdown',
+      ...fixtureFacts('markdown'),
       active: false,
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,

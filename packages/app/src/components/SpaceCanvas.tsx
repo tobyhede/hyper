@@ -966,7 +966,10 @@ export function SpaceCanvas({
               data: { ...node.data, onBodyHeightChange: reportBodyHeight },
             }
           : node;
-        if (!editingPortals.has(withHeight.data.resourceId) || withHeight.data.kind !== 'space') {
+        if (
+          !editingPortals.has(withHeight.data.resourceId) ||
+          withHeight.data.contentAction !== 'author-space-view'
+        ) {
           return withHeight;
         }
         // `nopan` only: an Open Resource does not take `nowheel` (ADR 0064).
@@ -1132,7 +1135,7 @@ export function SpaceCanvas({
       if (id === undefined) return undefined;
       const node = portalGestureSnapshot.current.portalNodesById.get(id);
       if (node === undefined || node.parentId !== undefined) return undefined;
-      if (node.data.kind !== 'space') return undefined;
+      if (node.data.contentAction !== 'author-space-view') return undefined;
       if (!portalGestureSnapshot.current.editingPortals.has(node.data.resourceId)) return undefined;
       return node;
     };

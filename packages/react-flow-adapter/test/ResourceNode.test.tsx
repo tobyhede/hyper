@@ -1,3 +1,4 @@
+import { contentAction, openSizeFloor, embedsMap } from '@project/core';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type * as ReactFlowReact from '@xyflow/react';
@@ -225,7 +226,7 @@ function ownContent(kind: ResourceNodeData['kind'], source: string, url: string)
     case 'markdown':
       return { kind: 'markdown', source, via: 'self' };
     case 'image':
-      return { kind: 'image', url, via: 'self' };
+      return { kind: 'image', url, naturalSize: undefined, via: 'self' };
     case 'reference':
       return { kind: 'markdown', source, via: 'reference' };
     case 'space':
@@ -276,10 +277,14 @@ function props({
   readOnly = false,
   connectionAuthoringEnabled,
 }: Overrides = {}): NodeProps<ResourceFlowNode> {
+  const resolved = content ?? ownContent(kind, source, url);
   const data: ResourceFlowNode['data'] = {
     resourceId,
     title,
     kind,
+    contentAction: contentAction(resolved),
+    openSizeFloor: openSizeFloor(resolved),
+    embedsMap: embedsMap(resolved),
     active: false,
     selectedForAuthoring,
     display: running(
@@ -511,7 +516,7 @@ describe('ResourceNode draws what the display shows', () => {
           title: 'Harbour, again',
           open: true,
           selected: true,
-          content: { kind: 'image', url: FIGURE, via: 'reference' },
+          content: { kind: 'image', url: FIGURE, naturalSize: undefined, via: 'reference' },
           onEditResource: vi.fn(),
         })}
       />,
@@ -575,7 +580,7 @@ describe('ResourceNode draws what the display shows', () => {
           kind: 'reference',
           title: 'Harbour, again',
           presented: true,
-          content: { kind: 'image', url: FIGURE, via: 'reference' },
+          content: { kind: 'image', url: FIGURE, naturalSize: undefined, via: 'reference' },
         })}
       />,
     );

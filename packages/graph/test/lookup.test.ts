@@ -94,7 +94,12 @@ describe('resolveResourceContent', () => {
     [
       'an Image Resource',
       IMAGE,
-      { kind: 'image', url: 'https://example.com/harbour.png', via: 'self' },
+      {
+        kind: 'image',
+        url: 'https://example.com/harbour.png',
+        naturalSize: undefined,
+        via: 'self',
+      },
     ],
     ['a framed Space Resource', FRAMED_SPACE, { kind: 'space', view: framedView, via: 'self' }],
     [
@@ -115,7 +120,12 @@ describe('resolveResourceContent', () => {
     [
       'a Reference Resource to an image',
       TO_IMAGE,
-      { kind: 'image', url: 'https://example.com/harbour.png', via: 'reference' },
+      {
+        kind: 'image',
+        url: 'https://example.com/harbour.png',
+        naturalSize: undefined,
+        via: 'reference',
+      },
     ],
     [
       'a Reference Resource to a Space',

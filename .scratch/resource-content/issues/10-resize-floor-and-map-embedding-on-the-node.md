@@ -12,3 +12,9 @@
 - [ ] A projection test proves a Reference Resource to a Space Resource publishes the Space floor and `embedsMap: true`, and a Reference to Markdown publishes neither. This replaces the decoration test's hand-built `kind: 'space'` floor case.
 - [ ] No source site reads `node.data.kind` for anything but the glyph.
 - [ ] CI passed on the draft PR.
+
+## Comments
+
+2026-10-03: Projection publishes openSizeFloor and embedsMap for Closed and Open nodes. Resize consumes the projected floor; body-height reporting consumes embedsMap. Projection tests cover Space and Markdown References, and the decoration floor case now uses a real Reference-to-Space projection. The Closed Reference non-Map body-height regression failed before migration and passes afterward. Rendering discriminants remain in frontOf as explicitly scoped; semantic node-kind policy checks are removed.
+
+Implementation complete; independent review and the draft PR CI gate are pending. Status remains ready-for-agent until those checks pass.

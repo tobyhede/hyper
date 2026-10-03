@@ -1,3 +1,4 @@
+import { fixtureFacts } from './render-adapter-fixtures';
 import { act } from '@testing-library/react';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
@@ -88,6 +89,7 @@ function resourceNode(): ResourceFlowNode {
       title: 'A',
       readOnly: false,
       kind: 'markdown',
+      ...fixtureFacts('markdown'),
       active: false,
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,

@@ -173,13 +173,11 @@ export function embedBounds(
 
 /**
  * Whether a Resource reports its body height, which clips the Map it embeds.
- * Keyed by kind rather than by what the Resource shows, because a Closed
- * Resource shows nothing: a Space Resource, or a Reference Resource that may
- * target one, reports while Closed so the height is known on the frame it
- * Opens.
+ * The projection publishes the answer while Closed, so the height is known
+ * on the frame the Resource Opens.
  */
 export function reportsBodyHeight(node: ResourceFlowNode): boolean {
-  return node.data.kind === 'space' || node.data.kind === 'reference';
+  return node.data.embedsMap;
 }
 
 /**
@@ -218,7 +216,7 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
     const { view } = shown;
     const policy = mapSurfacePolicy({
       inherited: item.policy,
-      throughReference: shown.via === 'reference',
+      throughReference: parent.data.contentAction !== 'author-space-view',
       stale:
         input.staleSpaces.has(view.spaceId) ||
         (input.publications.has(parent.id) &&
@@ -289,7 +287,10 @@ export function editingPortalAncestor(
 ): ResourceFlowNode | undefined {
   let current = start;
   while (current !== undefined) {
-    if (current.data.kind === 'space' && editingPortals.has(current.data.resourceId)) {
+    if (
+      current.data.contentAction === 'author-space-view' &&
+      editingPortals.has(current.data.resourceId)
+    ) {
       return current;
     }
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);

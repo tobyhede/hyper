@@ -1,4 +1,9 @@
-import type { ContentVia, ResourceContent, SpaceView } from '@project/core';
+import {
+  contentAction,
+  type ContentVia,
+  type ResourceContent,
+  type SpaceView,
+} from '@project/core';
 import type { ImageReplaceEditor } from './ImageReplaceTarget';
 import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
 
@@ -58,10 +63,10 @@ export function beginEditing<D extends ResourceDisplay>(
 ): D | Extract<ResourceDisplay, { readonly shown: 'editing' }> {
   if (display.shown !== 'open') return display;
   const content = display.content;
-  if (content.kind !== 'markdown' || content.via !== 'self') return display;
+  if (contentAction(content) !== 'edit-markdown' || content.kind !== 'markdown') return display;
   return {
     shown: 'editing',
-    content: { kind: content.kind, source: content.source, via: content.via },
+    content: { ...content, via: 'self' },
     editor,
     autoFocus,
   };
@@ -77,10 +82,10 @@ export function beginReplacing<D extends ResourceDisplay>(
 ): D | Extract<ResourceDisplay, { readonly shown: 'replacing' }> {
   if (display.shown !== 'open') return display;
   const content = display.content;
-  if (content.kind !== 'image' || content.via !== 'self') return display;
+  if (contentAction(content) !== 'replace-image' || content.kind !== 'image') return display;
   return {
     shown: 'replacing',
-    content: { kind: content.kind, url: content.url, via: content.via },
+    content: { ...content, via: 'self' },
     replacer,
   };
 }

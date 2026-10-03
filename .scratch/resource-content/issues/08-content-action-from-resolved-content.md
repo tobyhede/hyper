@@ -18,3 +18,9 @@ No behaviour changes. The rendering switches that draw each content shape (`fron
 - [ ] No source site outside `resource-content.ts` names `'markdown' | 'image'` or reads `via` to decide whether content may be authored.
 - [ ] Existing Edit, Replace and embedded-Map authoring tests pass unchanged.
 - [ ] CI passed on the draft PR.
+
+## Comments
+
+2026-10-03: Built the core contentAction function over one exhaustive private content-facts table and migrated UI, adapter and application authoring decisions. Closed projections publish the action without carrying content. Core properties cover all valid kind/via combinations; existing display, replacement and embedded authoring tests remain green.
+
+Implementation complete; independent review and the draft PR CI gate are pending. Status remains ready-for-agent until those checks pass.

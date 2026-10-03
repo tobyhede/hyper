@@ -5,6 +5,9 @@ import { CLOSED_DISPLAY } from '@project/ui';
 import type { CanvasSpaceResourceSelection, EntityActionGroup, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
+  contentAction,
+  openSizeFloor,
+  embedsMap,
   type Resource,
   type ResourceId,
   type GraphHeadShape,
@@ -48,6 +51,10 @@ export type ResourceNodeData = {
    * its `display`.
    */
   kind: Resource['kind'];
+  /** Resolved content facts remain available while the display is Closed. */
+  contentAction: ReturnType<typeof contentAction>;
+  openSizeFloor: ReturnType<typeof openSizeFloor>;
+  embedsMap: boolean;
   /** Reports rendered title geometry by placement, including embedded placements. */
   onBodyHeightChange?: (id: string, height: number | null) => void;
   resourceId: ResourceId;
@@ -283,8 +290,8 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
  * `activeGraphColor`.
  *
  * A node carries its resource's *title*, not its content (ADR 0064) — a Closed
- * node's display carries none, and the content is resolved only for a Resource
- * that is Open or presented.
+ * node's display carries none; resolved content supplies only the facts the
+ * canvas needs while Closed.
  */
 export function projectResourceNodes(
   space: Space,
@@ -307,10 +314,8 @@ export function projectResourceNodes(
     // there is no kind guard beside it.
     const open = options.openResourceIds?.has(resource.id) === true;
     const shown = presented ? 'presented' : open ? 'open' : 'closed';
-    const display: ResourceDisplay =
-      shown === 'closed'
-        ? CLOSED_DISPLAY
-        : { shown, content: resolveResourceContent(space, resource) };
+    const content = resolveResourceContent(space, resource);
+    const display: ResourceDisplay = shown === 'closed' ? CLOSED_DISPLAY : { shown, content };
     const node: ResourceFlowNode = {
       id: resource.id,
       type: 'resource',
@@ -320,6 +325,9 @@ export function projectResourceNodes(
         title: resource.title,
         readOnly: options.readOnly ?? false,
         kind: resource.kind,
+        contentAction: contentAction(content),
+        openSizeFloor: openSizeFloor(content),
+        embedsMap: embedsMap(content),
         active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         display,

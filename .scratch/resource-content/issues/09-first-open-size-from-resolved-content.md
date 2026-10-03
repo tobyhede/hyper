@@ -12,3 +12,9 @@
 - [ ] `openSizeDocument` is gone, and nothing in `graph` decides Open Size from a stored `kind`.
 - [ ] Any existing test that asserted the default size for a Reference to a Space is flipped, and the flip is named in this ticket's Comments.
 - [ ] CI passed on the draft PR.
+
+## Comments
+
+2026-10-03: Image content carries recorded naturalSize. SnapshotEdit.open and loaded-Space resolution share one single-hop resolver; graph no longer decides first Open Size by kind. The new property failed before the change for a Space Target (Reference 560×420, Target 960×720), then passed for every Target kind. No existing Reference-to-Space default-size assertion existed to flip; image sizing tests remain unchanged.
+
+Implementation complete; independent review and the draft PR CI gate are pending. Status remains ready-for-agent until those checks pass.

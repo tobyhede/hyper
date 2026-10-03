@@ -203,7 +203,8 @@ export function useCanvasResourceAuthoring({
       (node) =>
         node.id === caret.resourceId &&
         node.data.open === true &&
-        (node.data.kind === 'markdown' || node.data.kind === 'image'),
+        (node.data.contentAction === 'edit-markdown' ||
+          node.data.contentAction === 'replace-image'),
     );
 
   if (caret?.field === 'body') {
@@ -574,7 +575,7 @@ export function useCanvasResourceAuthoring({
   const markdownDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (node.data.kind === 'markdown') {
+      if (node.data.contentAction === 'edit-markdown') {
         next.set(
           node.id,
           applyResourceDataPatch(node, decorateMarkdownResourceNode(node, markdownContext)),
@@ -586,7 +587,7 @@ export function useCanvasResourceAuthoring({
   const imageDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (node.data.kind === 'image') {
+      if (node.data.contentAction === 'replace-image') {
         next.set(
           node.id,
           applyResourceDataPatch(node, decorateImageResourceNode(node, imageContext)),
@@ -598,7 +599,7 @@ export function useCanvasResourceAuthoring({
   const spaceDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (node.data.kind === 'space') {
+      if (node.data.contentAction === 'author-space-view') {
         next.set(
           node.id,
           applyResourceDataPatch(node, decorateSpaceResourceNode(node, spaceContext)),
