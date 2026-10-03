@@ -1,6 +1,6 @@
 # 04 — One canvas selection names its surface
 
-**What to build:** Give each drawing an occurrence — the path of Space Resource nodes from the root Map to it — and replace the host selection plus the embedding's own selection with one canvas selection that names its occurrence. Continuation and in-progress gesture state become per canvas, keyed by occurrence. Keyboard commands, the rail and Undo/Redo dispatch through the selection.
+**What to build:** Give each drawing an occurrence — the path of drawing Resources (Space Resources, or Reference Resources whose Target is one) from the root Map to it — and replace the host selection plus the embedding's own selection with one canvas selection that names its occurrence. Continuation and in-progress gesture state become per canvas, keyed by occurrence. Keyboard commands, the rail and Undo/Redo dispatch through the selection.
 
 **Blocked by:** 03.
 

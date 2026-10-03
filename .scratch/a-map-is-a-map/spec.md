@@ -39,7 +39,7 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 16. The nesting walk is seeded with the root's own Space and Map, so a surface never contains its own Map.
 17. *Surface* is a code name and stays out of `CONTEXT.md`.
 18. Undo and Redo follow the selection's surface, otherwise the root.
-19. Each drawing has an occurrence: the path of Space Resource nodes from the root Map to it. Two drawings of the same Map are two occurrences.
+19. Each drawing has an occurrence: the path of drawing Resources (Space Resources, or Reference Resources whose Target is one) from the root Map to it. Two drawings of the same Map are two occurrences.
 20. A continuation is spent only in the occurrence that requested it. If that occurrence stops being drawn before the Edit completes, the Edit stands and the continuation is dropped, with no fallback to another drawing.
 21. An authoring embedded Map opens, closes and moves its own Space Resources; what they draw is `inert`.
 
