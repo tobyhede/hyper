@@ -6,15 +6,23 @@
 
 **Blocked by:** 08
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A `snapshot-edits` property test proves a Reference Resource first Opens at exactly the size its Target would, for every Target kind. Its Space case fails before this change.
-- [ ] `openSizeDocument` is gone, and nothing in `graph` decides Open Size from a stored `kind`.
-- [ ] Any existing test that asserted the default size for a Reference to a Space is flipped, and the flip is named in this ticket's Comments.
-- [ ] CI passed on the draft PR.
+- [x] A `snapshot-edits` property test proves a Reference Resource first Opens at exactly the size its Target would, for every Target kind. Its Space case fails before this change.
+- [x] `openSizeDocument` is gone, and nothing in `graph` decides Open Size from a stored `kind`.
+- [x] Any existing test that asserted the default size for a Reference to a Space is flipped, and the flip is named in this ticket's Comments.
+- [x] CI passed on the draft PR.
 
 ## Comments
 
 2026-10-03: Image content carries recorded naturalSize. SnapshotEdit.open and loaded-Space resolution share one single-hop resolver; graph no longer decides first Open Size by kind. The new property failed before the change for a Space Target (Reference 560×420, Target 960×720), then passed for every Target kind. No existing Reference-to-Space default-size assertion existed to flip; image sizing tests remain unchanged.
 
 Implementation complete; independent review and the draft PR CI gate are pending. Status remains ready-for-agent until those checks pass.
+
+2026-10-03 verification: independent Standards and Spec reviews of `1e936ac0...ee8529aa` found no defects. Watched [CI run 37109080025](https://github.com/tobyhede/hyper/actions/runs/37109080025) finish with `CI passed` green for implementation commit `ee8529aa`: static-checks, coverage, all three e2e shards, ladle, postgres and sqlite passed. Coverage exercises the core/graph/projection/application seams; e2e and ladle exercise the Resource surfaces; database jobs include the restart proofs.
+
+Local checks passed: `pnpm typecheck:toolchain`, `pnpm typecheck`, `pnpm typecheck:packages`, changed-file ESLint and oxlint, `pnpm ui:catalog:check`, targeted Vitest files (49 core/graph, 92 adapter, 99 UI and 186 application tests), and both existing `open-reference-shows-target-markdown-read-only` Playwright parity proofs. The application proof used `HYPER_E2E_PORT_BASE=62000` because port 5300 was occupied. An earlier Ladle attempt timed out during machine contention; the isolated rerun passed. Full local verify/e2e/Ladle/database suites were intentionally left to CI under AGENTS.md.
+
+## Answer
+
+Implemented and verified on draft PR #334. All acceptance criteria are satisfied; ticket 07 remains out of scope.
