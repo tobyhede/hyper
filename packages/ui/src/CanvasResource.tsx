@@ -7,7 +7,14 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import { titleLines, titleName, type ContentVia, type ResourceContent } from '@project/core';
+import {
+  contentAction,
+  drawsContentArea,
+  titleLines,
+  titleName,
+  type ContentVia,
+  type ResourceContent,
+} from '@project/core';
 import { Button } from './Button';
 import {
   ResourceRailAction,
@@ -282,12 +289,19 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
   const text =
     content?.kind === 'markdown' ? content.source : content?.kind === 'image' ? content.url : '';
   const via: ContentVia = content?.via ?? 'self';
+  const width = content?.kind === 'image' ? content.naturalSize?.width : undefined;
+  const height = content?.kind === 'image' ? content.naturalSize?.height : undefined;
   return useMemo<AreaContent | null>(() => {
     switch (kind) {
       case 'markdown':
         return { kind, source: text, via };
       case 'image':
-        return { kind, url: text, via };
+        return {
+          kind,
+          url: text,
+          via,
+          naturalSize: width === undefined || height === undefined ? undefined : { width, height },
+        };
       case 'unresolved':
         return { kind, via: 'reference' };
       case 'space':
@@ -295,7 +309,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
       case undefined:
         return null;
     }
-  }, [kind, text, via]);
+  }, [kind, text, via, width, height]);
 }
 
 /**
@@ -333,9 +347,17 @@ export function CanvasResource(props: CanvasResourceProps) {
   const openableFront = front.kind === 'preview' ? undefined : front;
   const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
   const contentFront =
-    !readOnly && (front.kind === 'markdown' || front.kind === 'image') ? front : undefined;
+    !readOnly && 'onBeginEdit' in front && (content === null || contentAction(content) !== 'none')
+      ? front
+      : undefined;
   const onBeginContentEdit = contentFront?.onBeginEdit;
-  const spaceFront = !readOnly && front.kind === 'space' && open ? front : undefined;
+  const spaceFront =
+    !readOnly &&
+    content !== null &&
+    contentAction(content) === 'author-space-view' &&
+    front.kind === 'space'
+      ? front
+      : undefined;
   const areaContent = useAreaContent(content);
   const bodyControl = useRef<HTMLDivElement>(null);
   const contentControl = useRef<HTMLDivElement>(null);
@@ -355,7 +377,7 @@ export function CanvasResource(props: CanvasResourceProps) {
    * edited or replaced from the Reference Resource (ADR 0070).
    */
   const contentAuthoring =
-    contentPresence.mounted && !contentLeaving && contentPresence.value.via === 'self';
+    contentPresence.mounted && !contentLeaving && contentAction(contentPresence.value) !== 'none';
   /**
    * The edit running inside the Markdown front this Resource owns.
    *
@@ -584,6 +606,9 @@ export function CanvasResource(props: CanvasResourceProps) {
       data-testid="resource"
       data-kind={visualKind}
       data-content-kind={content === null ? visualKind : content.kind}
+      data-content-area={
+        (contentPresence.mounted && drawsContentArea(contentPresence.value)) || undefined
+      }
       data-state={state}
       // Exposes authored state for the Resource's public treatment and evidence.
       // The React Flow wrapper owns the moving rect, while the Markdown Title's

@@ -12,7 +12,7 @@ import {
   embeddingIsPortalEditing,
   reportsBodyHeight,
 } from '../src/embedded-open-space-resource';
-import { fixtureDisplay } from './render-adapter-fixtures';
+import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 
 const id = (value: number) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${value.toString().padStart(12, '0')}`);
@@ -85,6 +85,9 @@ const openSpaceResource = (
     title: 'Elsewhere',
     readOnly: false,
     kind: geometry.kind ?? 'space',
+    contentAction: geometry.kind === 'reference' ? 'none' : 'author-space-view',
+    openSizeFloor: { width: 292, height: 266 },
+    embedsMap: geometry.kind !== 'markdown',
     open: geometry.open ?? true,
     active: false,
     selectedForAuthoring: false,
@@ -287,6 +290,7 @@ describe('embedded open Space Resource discovery', () => {
         title: 'Note',
         readOnly: false,
         kind: 'markdown',
+        ...fixtureFacts('markdown'),
         open: false,
         active: false,
         selectedForAuthoring: false,
@@ -365,6 +369,7 @@ describe('embedded open Space Resource discovery', () => {
         title: 'Note',
         readOnly: false,
         kind: 'markdown',
+        ...fixtureFacts('markdown'),
         open: true,
         active: false,
         selectedForAuthoring: false,
@@ -403,12 +408,21 @@ describe('the body height an embedding is clipped by', () => {
     expect(first?.bounds).toEqual({ left: 16, top: 16, right: 684, bottom: 456 });
   });
 
-  it('is reported by a Closed Reference Resource, whose Target may be a Space Resource', () => {
+  it('is reported by a Closed Reference Resource whose Target is a Space Resource', () => {
     expect(
       reportsBodyHeight(
         openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { kind: 'reference', open: false }),
       ),
     ).toBe(true);
+  });
+
+  it('does not report a Closed Reference whose resolved content embeds no Map', () => {
+    const node = openSpaceResource(
+      HOST,
+      { spaceId: TARGET, map: MAP },
+      { kind: 'reference', open: false },
+    );
+    expect(reportsBodyHeight({ ...node, data: { ...node.data, embedsMap: false } })).toBe(false);
   });
 
   it('is not reported by a Resource that can draw no Space', () => {
@@ -422,7 +436,7 @@ describe('the body height an embedding is clipped by', () => {
     expect(
       reportsBodyHeight({
         ...node,
-        data: { ...node.data, kind: 'image' },
+        data: { ...node.data, kind: 'image', embedsMap: false },
       }),
     ).toBe(false);
   });

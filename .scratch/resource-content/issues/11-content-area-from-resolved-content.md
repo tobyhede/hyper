@@ -14,3 +14,9 @@
 - [ ] No stylesheet selects on a `data-kind` list to decide content-area layout.
 - [ ] The Ladle story and application proof for the Resource front still hold (ADR 0052), and `pnpm ui:catalog:check` passes.
 - [ ] CI passed on the draft PR.
+
+## Comments
+
+2026-10-03: CanvasResource publishes data-content-area from resolved content and retains it through the Close fade; CSS keys on that answer. A Reference-to-Ur/Markdown/fade regression failed before the change and passes afterward. PresentedResource behavior and rendering switches remain unchanged; image fixtures only gain the required naturalSize key.
+
+Implementation complete; independent review and the draft PR CI gate are pending. Status remains ready-for-agent until those checks pass.

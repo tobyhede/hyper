@@ -1,10 +1,4 @@
-import {
-  SPACE_RESOURCE_MIN_OPEN_SIZE,
-  type GraphId,
-  type ResourceDocument,
-  type ResourceId,
-  type UUID,
-} from '@project/core';
+import { type GraphId, type ResourceDocument, type ResourceId, type UUID } from '@project/core';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
 import {
   beginEditing,
@@ -181,7 +175,7 @@ export function decorateSharedResourceNode(
   if (resourceBelongsToWorkingSpace && node.data.open === true && context.authorOnCanvas) {
     // Ordinary Open proposals preserve the Space footer. The gesture itself
     // still reaches Closed Size so ADR 0066's magnet can Close it.
-    const floor = node.data.kind === 'space' ? SPACE_RESOURCE_MIN_OPEN_SIZE : RESOURCE_SIZE;
+    const floor = node.data.openSizeFloor;
     patch.resize = {
       minWidth: RESOURCE_SIZE.width,
       minHeight: RESOURCE_SIZE.height,
@@ -246,13 +240,13 @@ export function decorateMarkdownResourceNode(
     resourceBelongsToWorkingSpace &&
     context.authorOnCanvas &&
     !context.bodyEditing &&
-    node.data.kind === 'markdown'
+    node.data.contentAction === 'edit-markdown'
   ) {
     patch.onBeginBodyEditing = () => context.beginBodyEditing(node);
   }
   if (
     resourceBelongsToWorkingSpace &&
-    node.data.kind === 'markdown' &&
+    node.data.contentAction === 'edit-markdown' &&
     context.bodyEditorResourceId === node.id
   ) {
     const editor = {
@@ -279,7 +273,7 @@ export function decorateImageResourceNode(
   context: ImageResourceDecorationContext,
 ): CanvasResourceDataPatch {
   const replace = context.replaceResourceImage;
-  if (node.data.kind !== 'image' || replace === undefined) return {};
+  if (node.data.contentAction !== 'replace-image' || replace === undefined) return {};
   const patch: Mutable<Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'display'>>> = {};
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
@@ -302,7 +296,7 @@ export function decorateSpaceResourceNode(
   node: ResourceFlowNode,
   context: SpaceResourceDecorationContext,
 ): CanvasResourceDataPatch {
-  if (node.data.kind !== 'space') return {};
+  if (node.data.contentAction !== 'author-space-view') return {};
   const patch: Mutable<Pick<ResourceNodeData, 'spaceRail' | 'contextNotice' | 'portal'>> = {};
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   const spaceDocument = context.spaceDocuments.get(node.data.resourceId);
