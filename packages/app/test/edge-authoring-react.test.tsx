@@ -184,7 +184,9 @@ const titled = (edges: readonly Edge[], title: string, hidden = false): Edge[] =
  * `core/test/persistence-schema.test.ts`), `ResolvedMap.activeGraph`
  * resolves named-or-first and is never null, Navigation writes only an Active
  * Graph the selected Map owns, and Graph deletion leaves the last one in
- * place (`planContextDeletion` answers `unchanged` without a successor).
+ * place (`planContextDeletion` answers `unchanged` without a successor,
+ * asserted by `persistence/test/space-resource-planning.test.ts`, "is
+ * unchanged when what the plan reads leaves no successor").
  *
  * So the stand-in is what exercises the channel at all, and the alternative —
  * arranging the fixture so the real completion refuses this way — is not
