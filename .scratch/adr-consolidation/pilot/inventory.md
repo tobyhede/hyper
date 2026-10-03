@@ -212,7 +212,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 - **Statement:** Add Map creates and selects an empty Map, with no Resource members, owning exactly one empty Graph that is its Active Graph. Existing Resources stay outside the new Map until an author adds them, for example from the Resources View.
 - **Sources:**
   - ADR 0079, paragraph 5
-  - ADR 0040, paragraph 4 ("Creating a Layout creates its initial empty active Route in the same Edit")
+  - ADR 0040, paragraph 3 ("Creating a Layout creates its initial empty active Route in the same Edit")
   - ADR 0041, paragraph 3 (invariants)
   - CONTEXT "Graph", paragraph 4
 - **Negatives:**
@@ -352,7 +352,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 **R26. Add Graph appends and activates in one Edit.**
 - **Statement:** Add Graph appends a new empty Graph to the Map and makes it active, in one Edit.
 - **Sources:**
-  - ADR 0040, paragraph 4
+  - ADR 0040, paragraph 3
   - CONTEXT "Interaction draft" (Add Graph completes before its title field opens)
 - **Status:** Built. The `'added-graph'` branch in `space-authoring.ts:1451–1465`.
 
@@ -518,7 +518,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 - **Sources:**
   - ADR 0084, "Closing reclaims from where things are now"
   - ADR 0093, paragraph 2
-  - CONTEXT "Placement", paragraph 4
+  - CONTEXT "Placement", paragraph 4 (the only source for the "reclaims from none" clause, which follows from the memoryless rule but appears in no ADR)
   - `AGENTS.md`, 0084 entry
 - **Reason:** See A14. Opening and closing are each a Map decision taken at a moment.
 - **Negatives:** Never record which Resources a particular Open pushed.
@@ -540,7 +540,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 **R44. Open Size survives Close.**
 - **Statement:**
   - Close changes only the state, and the next Open returns to the remembered Open Size.
-  - A first Open records the kind's default size.
+  - A first Open records a default Open Size (ADR 0066 says only "the concrete default Open Size"; that the kind chooses it, as an Image Resource fitting its image, is from CONTEXT "Opening").
   - The Closed Size is fixed domain policy and is never stored.
   - A resize that lands within the application's magnetic range of the Closed Size on both axes is completed as a Close, which keeps the remembered Open Size.
   - A one-axis match is an ordinary Resize.
