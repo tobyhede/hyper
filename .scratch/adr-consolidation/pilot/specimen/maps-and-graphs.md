@@ -4,7 +4,7 @@
 
 ## Orientation
 
-A **Map** is authored placement within a Space: which Resources it contains, where each sits, Open or Closed, each remembered Open Size, and the Graphs it owns. A **Graph** is directed Edges over one Map's Resources. The **Active Graph** is the one drawn emphasised, which new Edges join. A **layout strategy** is behaviour that arranges Resources. Definitions live in [CONTEXT.md][context].
+A **Map** is an authored subset of a Space's Resources: which Resources it contains, where each sits, Open or Closed, each remembered Open Size, and the Graphs it owns. A **Graph** is directed Edges over one Map's Resources. The **Active Graph** is the one drawn emphasised, which new Edges join. A **layout strategy** is behaviour that arranges Resources. Definitions live in [CONTEXT.md][context].
 
 Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Resource, Route as Graph, Cards View as Resources View, and Expanded as Open. Computed, Algorithmic and Space Views no longer exist.
 
@@ -15,8 +15,8 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R3. Automatic strategies are non-addressable capabilities, and none is privileged.** None draws the canvas. `gridStrategy` is the only one. It is pure, used only by tests, and kept so the contract has an implementation on each side, not because a grid is what returns. A change that works for only one strategy means the seam has leaked. ([0086], [0079], [0014])
 - **R4. The strategy contract carries positions only.** A `LayoutStrategyResource` has optional `x`/`y` and no ports, and a `LayoutStrategyEdge` has endpoints and no routed sections. A Map stores a Resource and its position and nothing else, so routed geometry has nowhere to land. ([0086])
 - **R5. There is no intermediate arranged-result type.** A strategy takes a `LayoutStrategyGraph` and returns the same shape with geometry filled in. "Arrangement" is prose, not a domain term (A1). ([0005], kept binding by [0014]; [0041])
-- **R6. Auto-arrange is a destructive Edit over an existing Map.** The author invokes it explicitly, by a named tool. It rewrites that Map's positions in one Edit, and the result is authored like any other position. It is not a canvas, a selectable context, a renderer decision or incremental placement, and it creates no Map: the render path, not the algorithm, was wrong. It is to live in `graph`, re-siting the render-time `elkjs` lint ban (`eslint.config.js`). **Not built.** Undo is open (D12, §6). ([0086], [0014], [0084])
-- **R7. An engine returns only attached to an Edit, and never to honour a drop point.** Three spikes that seeded or constrained an optimiser each reshuffled existing Resources and placed the new one arbitrarily; the failure is structural. Whole-Map Auto-arrange is clear of it, because global rearrangement is what the author asked for. ([0086]; first [0013], carried by [0025])
+- **R6. Auto-arrange is a destructive Edit over an existing Map.** The author invokes it explicitly, by a named tool. It rewrites that Map's positions in one Edit, and the result is authored like any other position. It is not a canvas, a selectable context, a renderer decision or incremental placement, and it creates no Map: the render path was wrong, not the strategy it ran. It is to live in `graph`, re-siting the render-time `elkjs` lint ban (`eslint.config.js`). **Not built.** Undo is open (D12, §6). ([0086], [0014], [0084])
+- **R7. An automatic strategy returns only attached to an Edit, and never to honour a drop point.** Three spikes that seeded or constrained an optimiser each reshuffled existing Resources and placed the new one arbitrarily; the failure is structural. Whole-Map Auto-arrange is clear of it, because global rearrangement is what the author asked for. ([0086]; first [0013], carried by [0025])
 
 ## 2. The canvas context and the Map lifecycle
 
@@ -106,7 +106,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 **Built:** every rule above except these (evidence: `../inventory.md`).
 
 **Accepted, not built:**
-- **Auto-arrange** (R6), with any returning engine (R7). **No delivery issue exists**; `.scratch/positioned-layout/issues/05`, `14` and `15` are resolved tickets from the superseded model. Whether it records which strategy produced the positions is undecided.
+- **Auto-arrange** (R6), with any returning automatic strategy (R7). **No delivery issue exists**; `.scratch/positioned-layout/issues/05`, `14` and `15` are resolved tickets from the superseded model. Whether it records which strategy produced the positions is undecided.
 - **Manual Graph reordering** (R25). No operation exists in code, and no delivery issue was found.
 
 **Treatment without an ADR** (owned by code, tests or CONTEXT.md): R30's presentation gate; R33's Closed, Edge-less arrival; deleting the default Map moves `defaultMap` to the selected survivor, else the first; and R35, pending G1.

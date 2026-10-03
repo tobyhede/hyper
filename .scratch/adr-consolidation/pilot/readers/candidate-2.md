@@ -1,6 +1,6 @@
 # Candidate reader 2
 
-Route: specimen `ROUTE.md` → `maps-and-graphs.md`, in a detached checkout of `8b0b42df` with the inventory, questions, prior readings, research audit, spec and tickets removed. Model: Sonnet. The reader was told AGENTS.md might be in its context and to cite only documents opened through the candidate route, listing separately anything known only from AGENTS.md. The reader's report is recorded verbatim below.
+Route: specimen `ROUTE.md` → `maps-and-graphs.md`, in a detached checkout of `8b0b42df` with the inventory, questions, prior readings, research audit, spec and tickets removed. Model: Sonnet. Tool uses: 3. Wall time: about 54 s (both from the harness task notification). The reader was told AGENTS.md might be in its context and to cite only documents opened through the candidate route, listing separately anything known only from AGENTS.md. The reader's report is recorded verbatim below.
 
 ## Reading log
 1. `.scratch/adr-consolidation/pilot/specimen/ROUTE.md` — 551 words (whole file)

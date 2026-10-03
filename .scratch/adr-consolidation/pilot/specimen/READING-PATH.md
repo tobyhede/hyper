@@ -1,4 +1,4 @@
-# Route: where to read before you work
+# Reading path: where to read before you work
 
 > **Non-normative pilot specimen** (`.scratch/adr-consolidation/issues/01-prove-map-graph-pilot.md`). This page stands in for the routing guidance a contributor would meet in `AGENTS.md`, for a reading-path evaluation only. It adopts no policy and changes no accepted decision. Only the Map and Graph topic has a current contract here; every other topic keeps its existing route.
 
@@ -17,7 +17,7 @@ Read **[maps-and-graphs.md](maps-and-graphs.md)** first, before the code, if you
 - adds a Resource to a Map, removes it from one, or deletes it from the Space, where Map membership or Edges are affected
 - changes Open, Close, Resize, Open Size, or how neighbours are displaced
 - changes how a new Space is created, or how a stored or imported Space without a Map is first opened
-- changes the layout strategy contract, or adds or proposes an automatic arrangement (Auto-arrange) or a layout engine
+- changes the layout strategy contract, or adds or proposes an automatic arrangement (Auto-arrange) or a new automatic strategy
 
 It also applies if you touch any of these paths:
 

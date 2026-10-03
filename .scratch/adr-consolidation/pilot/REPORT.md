@@ -5,7 +5,7 @@ Status: evaluation complete, non-normative. This report adopts no policy; adopti
 ## Snapshot
 
 - Baseline route: `main` at `d27124479`, read in a detached checkout with `.scratch/adr-consolidation/` removed so the prior audit could not act as a shortcut.
-- Candidate route: branch `adr-consolidation-pilot` at `8b0b42df`, read in a detached checkout holding only `specimen/ROUTE.md` and `specimen/maps-and-graphs.md` from this pilot (inventory, questions, readings, research audit, spec and tickets removed).
+- Candidate route: branch `adr-consolidation-pilot` at `8b0b42df`, read in a detached checkout holding only the two specimen files from this pilot (inventory, questions, readings, research audit, spec and tickets removed). At that snapshot the entry file was `specimen/ROUTE.md`; after review it was renamed `READING-PATH.md` and four avoided words were replaced (see "Changes after evaluation").
 - Inventory and questions: pinned to `e836ecab` (2026-10-03). Four locator corrections were applied afterwards (see "Inventory corrections"); none changes a rule or an expected answer.
 - Date: 2026-10-03.
 
@@ -13,22 +13,24 @@ Status: evaluation complete, non-normative. This report adopts no policy; adopti
 
 1. [inventory.md](inventory.md) records 44 live rules (R1–R44), 18 rejected alternatives (A1–A18), 35 omitted historical claims each classified with a reason (O1–O35), 20 source disagreements (D1–D20, 19 resolved by a status or refinement relationship) and 6 rules true and built but with no ADR source (G1–G6).
 2. [questions.md](questions.md) fixes ten task-framed questions with expected answers, must-state items, must-not-contradict items and a rubric, before any specimen was drafted. The drafter was barred from reading it.
-3. [specimen/maps-and-graphs.md](specimen/maps-and-graphs.md) and [specimen/ROUTE.md](specimen/ROUTE.md) were drafted from the inventory by a separate agent. Every R and A id appears in its provenance table, and every relative link was checked to resolve.
-4. Four independent fresh readers (Sonnet, no shared context) answered the questions: two from `AGENTS.md` through the existing guidance ([baseline-1](readers/baseline-1.md), [baseline-2](readers/baseline-2.md)), two from `ROUTE.md` ([candidate-1](readers/candidate-1.md), [candidate-2](readers/candidate-2.md)). Neither arm could read source code.
-5. A separate grader marked anonymised answer sets against the rubric ([grading.md](grading.md)).
+3. [specimen/maps-and-graphs.md](specimen/maps-and-graphs.md) and [specimen/READING-PATH.md](specimen/READING-PATH.md) were drafted from the inventory by a separate agent. Every R and A id appears in its provenance table, and every relative link was checked to resolve.
+4. Four independent fresh readers (Sonnet, no shared context) answered the questions: two from `AGENTS.md` through the existing guidance ([baseline-1](readers/baseline-1.md), [baseline-2](readers/baseline-2.md)), two from the specimen entry file ([candidate-1](readers/candidate-1.md), [candidate-2](readers/candidate-2.md)). Neither arm could read source code.
+5. A separate grader marked the answer sets against the rubric ([grading.md](grading.md)). Reader labels were replaced by W–Z and the reading logs removed, but specimen answers cite R/A ids, so the grader could infer the route; treat the grading as independent of authorship, not as blind.
 
 ## Results
 
-| Route | Reader | Correct (rubric) | Files opened | Words read | Tool uses |
-|---|---|---|---|---|---|
-| Existing | baseline-1 | 3/10 | 6 | ~16,300 (incl. AGENTS.md 9,730) | 10 |
-| Existing | baseline-2 | 2/10 | 11 | ~18,600 (incl. AGENTS.md 9,730) | 14 |
-| Specimen | candidate-1 | 10/10 | 2 | ~3,660 | 3 |
-| Specimen | candidate-2 | 10/10 | 2 | ~3,660 | 3 |
+| Route | Reader | Correct (rubric) | Files opened | Words read | Tool uses | Wall time |
+|---|---|---|---|---|---|---|
+| Existing | baseline-1 | 3/10 | 6 | ~16,300 (incl. AGENTS.md 9,730) | 10 | ~89 s |
+| Existing | baseline-2 | 2/10 | 11 | ~18,600 (incl. AGENTS.md 9,730) | 14 | ~92 s |
+| Specimen | candidate-1 | 10/10 | 2 | ~3,660 | 3 | ~55 s |
+| Specimen | candidate-2 | 10/10 | 2 | ~3,660 | 3 | ~54 s |
+
+Tool uses and wall times come from the harness task notifications, not the readers' self-reports. Words read are the readers' own estimates. Wall time includes answer writing.
 
 Failures on the existing route, by cause:
 
-- **A working undo stated as fact** (4 failures: baseline-1 Q6; baseline-2 Q1, Q6, Q7). ADR 0086 and the `AGENTS.md` 0084 entry state it; ADRs 0048 and 0074 and the code say V1 has no undo. This verdict holds under either resolution of D12, since both agree no undo exists in V1. Without these, the baseline scores are 4/10 and 5/10.
+- **A working undo stated as fact** (4 failures: baseline-1 Q6; baseline-2 Q1, Q6, Q7; baseline-1 also asserted it in Q8, which failed for another reason). ADR 0086 and the `AGENTS.md` 0084 entry state it; ADRs 0048 and 0074 and the code say V1 has no undo. This verdict holds under either resolution of D12, since both agree no undo exists in V1. Without these, the baseline scores are 4/10 and 5/10.
 - **The reason missing or replaced** — the commonest cause. Readers kept the behaviour but cited an authority ("AGENTS.md says don't") or gave a neighbouring reason or the accepted cost in its place: default-Map reason, why Graphs are never shared, why not record the push set, the dormant-complexity reason for removing Computed Views, why first load places nothing, why there is no result type.
 - **A rule taken from an ADR body a later ADR changed.** baseline-2 stated Graph ids are scoped to their Map from ADR 0040's body; ADR 0108 makes them unique across the Space, and 0040's body carries no mark at that paragraph.
 - **A fixture sentence applied as a general rule.** baseline-1 used `rendering.md`'s "don't compute them and write the result back" (about the test fixture) to forbid Auto-arrange's write-back, contradicting R6.
@@ -38,7 +40,7 @@ Neither specimen reader reported a contradiction, a dead-end pointer, or a point
 
 ## Verdict
 
-**Correctness: pass.** Every fixed question passed on the specimen route for both readers, preserving the applicable rules and important negatives. The specimen introduced no new contradiction; the two open points it carries (D12, G1) are disagreements in the sources, surfaced rather than created, and no specimen reader treated either as settled.
+**Correctness: provisional pass.** Every fixed question passed on the specimen route for both readers, preserving the applicable rules and important negatives, with no dead-end pointer. The pass rests on the spec's condition — "no new unresolved contradiction" — not the ticket's stricter "no unresolved contradiction": the specimen carries two source disagreements (D12, G1) that it surfaces rather than creates, and no specimen reader treated either as settled. The spec also asks that ambiguities be resolved before scoring; D12, G1 and D16 were not, because they are the user's to decide. The D12-dependent grades hold under either proposed resolution, since both agree V1 has no undo; G1 and D16 affected no grade (grading.md, pattern 8). The pass becomes final when those three are resolved and the affected expected answers confirmed.
 
 **Reading effort, assessed separately:** about 3,660 words in 2 files against 16,000–18,600 words in 6–11 files, a reduction of roughly 78–80%, with fewer tool calls. The saving does not drive the verdict; the existing route also failed on correctness, so the comparison is not a shorter answer passing over a longer one.
 
@@ -59,16 +61,25 @@ Found by the specimen drafter against the source ADRs; recorded in `inventory.md
 - R44's "the kind's default size": ADR 0066 says only "the concrete default Open Size"; the kind choosing it is CONTEXT "Opening".
 - R7 and A12 generalise ADR 0086's "do not seed or constrain elkjs to honour a drop point" to any engine; kept, noted as a generalisation.
 
+## Changes after evaluation
+
+Review against the repository's vocabulary rules found avoided words in the specimen. Fixed after the readings, without changing any rule:
+
+- `ROUTE.md` renamed `READING-PATH.md`, and its heading changed, because CONTEXT avoids "route" outside qualified HTTP and graph-layout prose.
+- "engine" and "algorithm" (CONTEXT avoids both for a layout strategy) replaced in R6, R7, the Built section and the reading path.
+- "A Map is authored placement" (CONTEXT avoids placement as a name for a Map) reworded.
+
 ## Decisions required before adoption (ticket 02)
 
 1. **D12 — undo.** Choose between: "undoable" means the Edit is one atomic unit a future undo would reverse whole, and V1 has no undo; or Auto-arrange owes an undo or a confirmation in V1. The specimen's `<!-- PENDING:D12 -->` note is replaced by the decision. Either way the `AGENTS.md` 0084 entry's "undoing it undoes all of them" misleads readers today (two baseline failures).
 2. **G1 — room given back on removal or deletion of an Open Resource.** Cite it as a live rule following from ADR 0084, or treat it as CONTEXT- and test-owned behaviour. The specimen's `<!-- PENDING:G1 -->` note is replaced accordingly.
+3. **D16 — recording the default Map.** ADR 0079 says a later Edit "may" record the selected Map as `defaultMap`; the code always does, including for Add Map. Confirm whether the contract states the code's behaviour as the rule.
 
 ## Recommendation
 
 Adopt, through ticket 02, with three adjustments:
 
-1. Resolve D12 and G1 first, and record each resolution where it binds.
+1. Resolve D12, G1 and D16 first, and record each resolution where it binds.
 2. When integrating, replace the Map/Graph entries in `AGENTS.md` (ADR 0079, 0084, 0064's displacement sentences, 0041's model sentences) and the overlapping Map/Graph accounts in `docs/agents/editing-and-persistence.md` and `rendering.md` with pointers, then rerun the fixed questions through the adopted route with fresh readers. That rerun removes this pilot's main confound.
 3. Keep the provenance table and the "Built vs accepted-but-unbuilt" section. They are what let a reader tell Auto-arrange and manual Graph reordering are unbuilt, and what let a reviewer check completeness.
 
