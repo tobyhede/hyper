@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent — implemented on branch `sole-context-deletion-01`; the draft PR's `CI passed` gate is still to be observed.
+**Status:** resolved — draft PR #336, `CI passed` green.
 
 - [x] Remove `deleted-map` and `deleted-graph` from Space Authoring's completion vocabulary, implementation and embedded completion admissions, including the navigation fix-up that exists exclusively for deleted Graph completions.
 - [x] Leave no compatibility, forwarding or alternative deletion path in Space Authoring. Existing production Map and Graph authoring commands continue to call the coordinated Space Resource lifecycle.
@@ -19,7 +19,7 @@
 - [x] Remove the deleted Graph operation from the synchronous Space Authoring property generator. Keep its remaining intake-validity, snapshot-identity and no-throw guarantees; do not convert the suite to asynchronous lifecycle orchestration to retain an operation no longer on its interface.
 - [x] Update live completion/refusal documentation and any affected current counts to match the reduced interface. Preserve accepted ADR bodies as historical records.
 - [x] Verify that authored implementation and executable tests no longer construct or admit the removed completions or exclusively associated refusals. Historical documents may retain those spellings.
-- [ ] Run targeted local checks, including both TypeScript checks, affected lint and tests. Preserve behavior-level browser expectations. Run the full repository verification bar on a draft PR and observe its CI gate green before resolving the ticket.
+- [x] Run targeted local checks, including both TypeScript checks, affected lint and tests. Preserve behavior-level browser expectations. Run the full repository verification bar on a draft PR and observe its CI gate green before resolving the ticket.
 
 ## Scope
 

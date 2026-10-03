@@ -1,6 +1,6 @@
 # Map and Graph deletion use the coordinated lifecycle alone
 
-**Status:** implemented by ticket 01 (`issues/01-remove-unused-map-and-graph-deletion-completions.md`), pending CI
+**Status:** resolved by ticket 01 (`issues/01-remove-unused-map-and-graph-deletion-completions.md`), draft PR #336
 
 The user has confirmed outright removal and the test migration strategy below. The design discussion is complete.
 
