@@ -78,6 +78,7 @@ export interface EdgeOwnedReactFlowProps {
 }
 
 export interface EdgeAuthoringSurface {
+  readonly commands: EdgeAuthoringCommands;
   readonly edges: Edge[];
   readonly edgeTypes: EdgeTypes;
   readonly reactFlowProps: EdgeOwnedReactFlowProps;
@@ -97,6 +98,8 @@ export interface EdgeAuthoringSurface {
 }
 
 export interface EdgeAuthoringInput {
+  readonly commandsByEdge?: ReadonlyMap<string, EdgeAuthoringCommands>;
+  readonly resourceNodeId?: (resourceId: ResourceId) => string;
   readonly authoring: EdgeAuthoring;
   /** The projection the canvas is drawing, so a decoration cannot outrun it. */
   readonly edges: readonly Edge[];
@@ -175,6 +178,8 @@ export function useEdgeAuthoring({
   enabled,
   onSelectEdge,
   mayOfferAlso,
+  commandsByEdge,
+  resourceNodeId,
 }: EdgeAuthoringInput): EdgeAuthoringSurface {
   const state = useSyncExternalStore(authoring.subscribe, authoring.getState);
   const { screenToFlowPosition, getEdges } = useReactFlow();
@@ -194,9 +199,9 @@ export function useEdgeAuthoring({
   // every reader is a browser event: a pointer release or a key press arrives
   // from the event loop, always after the render that produced the value it
   // needs.
-  const latest = useRef({ projectedNodes, authoring, mayOfferAlso });
+  const latest = useRef({ projectedNodes, authoring, mayOfferAlso, edges, resourceNodeId });
   useEffect(() => {
-    latest.current = { projectedNodes, authoring, mayOfferAlso };
+    latest.current = { projectedNodes, authoring, mayOfferAlso, edges, resourceNodeId };
   });
 
   useEffect(() => {
@@ -325,10 +330,11 @@ export function useEdgeAuthoring({
     (target: EdgeCaretTarget): HTMLElement | SVGElement | null => {
       if (target.kind === 'resource') {
         return document.querySelector<HTMLElement>(
-          `.react-flow__node[data-id="${CSS.escape(target.resourceId)}"]`,
+          `.react-flow__node[data-id="${CSS.escape(latest.current.resourceNodeId?.(target.resourceId) ?? target.resourceId)}"]`,
         );
       }
       const drawn = getEdges().find((candidate) => {
+        if (!latest.current.edges.some((edge) => edge.id === candidate.id)) return false;
         const subject = edgeSelectionOf(candidate);
         return subject !== null && sameEdgeSubject(subject, target);
       });
@@ -517,8 +523,9 @@ export function useEdgeAuthoring({
   // `editingTitle` is derived *inside* the memo: outside it, a fresh object each
   // render would defeat the memo and re-render every Edge. `hovered` is gated on
   // `enabled` for the reason the draft is.
-  const commands = useMemo<EdgeAuthoringCommands>(
+  const commands: EdgeAuthoringCommands = useMemo<EdgeAuthoringCommands>(
     () => ({
+      forEdge: (edgeId): EdgeAuthoringCommands => commandsByEdge?.get(edgeId) ?? commands,
       activeGraphId,
       editingTitle: draft?.kind === 'title' ? { graphId: draft.graphId, edge: draft.edge } : null,
       refusal: state.refusal,
@@ -537,6 +544,7 @@ export function useEdgeAuthoring({
       },
     }),
     [
+      commandsByEdge,
       activeGraphId,
       draft,
       state.refusal,
@@ -551,15 +559,16 @@ export function useEdgeAuthoring({
     ],
   );
 
-  const layer = (
-    <>
-      <NewResourcePreview
-        title={newResourceTitle}
-        modifierHeld={modifierHeld}
-        pointerOver={pointerOver}
-        accepts={acceptsEmptyDrop}
-      />
-      {/*
+  const layer = useMemo(
+    () => (
+      <>
+        <NewResourcePreview
+          title={newResourceTitle}
+          modifierHeld={modifierHeld}
+          pointerOver={pointerOver}
+          accepts={acceptsEmptyDrop}
+        />
+        {/*
         The canvas announcement channel: the one refusal with no surface left.
 
         Every other channel is owned by a surface that is still on screen — the
@@ -569,12 +578,14 @@ export function useEdgeAuthoring({
         told. Which channel a refusal is on is Edge Authoring's answer, so this
         no longer has to infer it from an absent draft.
       */}
-      {state.refusal?.kind === 'gesture' && (
-        <span role="alert" className="canvas-refusal" data-testid="edge-gesture-refusal">
-          {describeAuthoringRefusal(state.refusal.refusal)}
-        </span>
-      )}
-    </>
+        {state.refusal?.kind === 'gesture' && (
+          <span role="alert" className="canvas-refusal" data-testid="edge-gesture-refusal">
+            {describeAuthoringRefusal(state.refusal.refusal)}
+          </span>
+        )}
+      </>
+    ),
+    [newResourceTitle, modifierHeld, pointerOver, acceptsEmptyDrop, state.refusal],
   );
 
   const reactFlowProps = useMemo<EdgeOwnedReactFlowProps>(
@@ -620,12 +631,16 @@ export function useEdgeAuthoring({
     [commands, connectionEndEligibility],
   );
 
-  return {
-    edges: decorated,
-    edgeTypes: EDGE_TYPES,
-    reactFlowProps,
-    layer,
-    provide,
-    deleteEdges,
-  };
+  return useMemo(
+    () => ({
+      commands,
+      edges: decorated,
+      edgeTypes: EDGE_TYPES,
+      reactFlowProps,
+      layer,
+      provide,
+      deleteEdges,
+    }),
+    [commands, decorated, reactFlowProps, layer, provide, deleteEdges],
+  );
 }

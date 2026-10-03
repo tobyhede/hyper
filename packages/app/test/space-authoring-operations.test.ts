@@ -1744,6 +1744,17 @@ describe('connecting Resources on an embedded Map', () => {
       { id: RESOURCE_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
     ],
   };
+  it('refuses a drawing whose Graph no longer belongs to its Map without changing the Space', () => {
+    const { session, authoring } = open(withOther);
+    const before = session.getState().working;
+    expect(
+      authoring.completeInContext(
+        { mapId: OTHER_MAP_ID, graphId: UNKNOWN_GRAPH },
+        { kind: 'opened-resource', resourceId: RESOURCE_A },
+      ),
+    ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
+    expect(session.getState().working).toBe(before);
+  });
   it('creates and connects in the explicitly drawn Map and Graph without changing Navigation', () => {
     const { session, navigation, authoring } = open(withOther);
     const initialNavigation = navigation.getState();

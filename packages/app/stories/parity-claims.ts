@@ -789,7 +789,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',
     claim:
-      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Shape, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
+      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Shape, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space. A refused Graph rename keeps the draft and reports in the notice area under the target Space's name; dismissing its notice keeps the editor open.",
   },
   {
     id: 'open-space-resource-chooses-its-context-on-the-shared-controls',

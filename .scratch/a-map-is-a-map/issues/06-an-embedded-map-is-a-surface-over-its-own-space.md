@@ -4,7 +4,7 @@
 
 **Blocked by:** 01, 02, 04, 05.
 
-**Status:** ready-for-agent
+**Status:** implementation under verification
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
@@ -13,3 +13,9 @@
 - [ ] The embedding's separate assembly is deleted, and no Edit is refused for being made through an embedding.
 - [ ] Its notices appear in the one notice area.
 - [ ] Every existing embedded-Map behaviour test passes.
+
+## Answer
+
+EmbeddedMapAuthoring mounts the same MapSurface over the held target composition. The separate completion allowlist is deleted. Target outcomes, deletion confirmation, image replacement and explicit Map/Graph authoring now travel together; root Navigation is unchanged by embedded Edits.
+
+Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.

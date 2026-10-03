@@ -1,3 +1,4 @@
+import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   RESOURCE_TITLE_REQUIRED,
@@ -88,9 +89,10 @@ const completeEditedSpaceResource = (
 };
 
 export interface CanvasResourceAuthoringInput {
-  /** Where a Space Resource rail's Map report is held — the containing canvas's. */
+  readonly continuation?: Continuation | undefined;
+  /** This canvas Space's outcomes; target rails resolve their target's composition. */
   readonly commandOutcomes?: CommandOutcomes;
-  /** Where a Space Resource rail's Delete Map and Delete Graph ask first — the containing canvas's. */
+  /** This canvas Space's confirmation; target rails use the target's confirmation. */
   readonly deleteConfirmation?: DeleteConfirmation;
   readonly nodes: readonly ResourceFlowNode[];
   /**
@@ -110,10 +112,9 @@ export interface CanvasResourceAuthoringInput {
   readonly onTitleEditingChange?: ((editing: boolean) => void) | undefined;
   /**
    * The Space's image replacements (ADR 0106), which own the whole attempt;
-   * this hook keeps only the caret on the target and says the answer. Absent
-   * offers no Replace on an Image Resource.
+   * this hook keeps only the caret on the target and says the answer.
    */
-  readonly imageReplacement?: Pick<ImageReplacements, 'replace'> | undefined;
+  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
   /**
    * What each referenced Space offers a Space Resource to select, keyed by target.
    *
@@ -164,6 +165,7 @@ export interface CanvasResourceAuthoring {
  * Resource. Space Authoring remains authoritative for every completed Edit.
  */
 export function useCanvasResourceAuthoring({
+  continuation,
   commandOutcomes,
   deleteConfirmation,
   nodes,
@@ -201,8 +203,7 @@ export function useCanvasResourceAuthoring({
       (node) =>
         node.id === caret.resourceId &&
         node.data.open === true &&
-        (node.data.kind === 'markdown' ||
-          (node.data.kind === 'image' && imageReplacement !== undefined)),
+        (node.data.kind === 'markdown' || node.data.kind === 'image'),
     );
 
   if (caret?.field === 'body') {
@@ -315,7 +316,6 @@ export function useCanvasResourceAuthoring({
   );
 
   const replaceResourceImage = useMemo(() => {
-    if (imageReplacement === undefined) return undefined;
     return async (resourceId: ResourceId, replacement: ImageReplacement): Promise<string | null> =>
       describeImageReplacement(await imageReplacement.replace(resourceId, replacement));
   }, [imageReplacement]);
@@ -535,6 +535,7 @@ export function useCanvasResourceAuthoring({
       spaceDocuments,
       spaceResourceTargets,
       spaces,
+      continuation,
       commandOutcomes,
       deleteConfirmation,
       completeSpaceResourceSelection,
@@ -551,6 +552,7 @@ export function useCanvasResourceAuthoring({
       spaceDocuments,
       spaceResourceTargets,
       spaces,
+      continuation,
       commandOutcomes,
       deleteConfirmation,
       completeSpaceResourceSelection,

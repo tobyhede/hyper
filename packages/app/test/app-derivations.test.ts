@@ -40,7 +40,13 @@ describe('showsSpace', () => {
   });
 
   it('answers whether the open set shows this Space', () => {
-    const state = { activeSpaceId: SPACE_ID, entries: [], openedFrom: new Map() };
+    const state = {
+      activeSpaceId: SPACE_ID,
+      entries: [],
+      composed: [],
+      replacingImage: false,
+      openedFrom: new Map(),
+    };
     expect(showsSpace(state, SPACE_ID)).toBe(true);
     expect(showsSpace({ ...state, activeSpaceId: MAP_ID }, SPACE_ID)).toBe(false);
     expect(showsSpace({ ...state, activeSpaceId: null }, SPACE_ID)).toBe(false);

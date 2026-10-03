@@ -11,6 +11,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 export async function exerciseSpaceResourceContextMenus(
   page: Page,
   resource: Locator,
+  targetTitle: string,
 ): Promise<void> {
   const canvas = page.locator('[data-testid="selected-canvas"]:visible');
   const containingMap = await canvas.textContent();
@@ -73,8 +74,16 @@ export async function exerciseSpaceResourceContextMenus(
     [/^Delete /],
   ]);
   await page.getByRole('menuitem', { name: 'Rename', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Graph name', exact: true }).fill('Target path');
-  await page.getByRole('textbox', { name: 'Graph name', exact: true }).press('Enter');
+  const graphName = page.getByRole('textbox', { name: 'Graph name', exact: true });
+  await graphName.fill('');
+  await graphName.press('Enter');
+  const notice = page.getByRole('alert').filter({ hasText: `${targetTitle}: Graph unchanged` });
+  await expect(notice).toContainText('A Graph title is required.');
+  await notice.getByRole('button', { name: `Dismiss: ${targetTitle}: Graph unchanged` }).click();
+  await expect(notice).toHaveCount(0);
+  await expect(graphName).toBeVisible();
+  await graphName.fill('Target path');
+  await graphName.press('Enter');
   await expect(
     (await resourceControls(page, resource)).getByTestId('space-resource-graph'),
   ).toHaveText('Target path');
@@ -146,7 +155,7 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(graphTrigger).toBeFocused();
   await openMenu('graph');
   await page.getByRole('menuitem', { name: 'Delete Graph 1', exact: true }).click();
-  await expect(graphQuestion).toBeVisible();
+  await expect(graphQuestion.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(graphQuestion).toHaveCount(0);
   await expect(graphTrigger).toBeFocused();
@@ -174,6 +183,7 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(mapQuestion).toContainText(
     'Permanently deletes the Map, and all Graphs from the Space.',
   );
+  await expect(mapQuestion.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(mapQuestion).toHaveCount(0);
   await expect(mapTrigger).toBeFocused();

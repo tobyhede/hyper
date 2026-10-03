@@ -170,6 +170,33 @@ it('holds Maps, Graphs and browser traversal during replacement, then permits na
   location.dispose();
 });
 
+it('holds Back, Forward and deliberate navigation when another composed Space replaces an image', async () => {
+  const app = compose();
+  const other = composeReplacing();
+  const history = recordingHistory(mapPath(MAP_ID));
+  const location = createBrowserLocation(history, undefined, undefined, () =>
+    other.app.imageReplacement.getState(),
+  );
+  location.follow(app);
+  const pending = other.replace();
+  location.activateGraph(SECOND_GRAPH_ID);
+  location.chooseMap(OTHER_MAP_ID);
+  history.popTo(mapPath(OTHER_MAP_ID));
+  expect(history.pathname()).toBe(mapPath(MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
+  expect(app.navigation.getState().activeGraphId).toBe(GRAPH_ID);
+  other.release();
+  await pending;
+  history.popTo(mapPath(OTHER_MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
+  const second = other.replace();
+  history.popTo(mapPath(MAP_ID));
+  expect(history.pathname()).toBe(mapPath(OTHER_MAP_ID));
+  other.release();
+  await second;
+  location.dispose();
+});
+
 it('holds a Back refused by a replacement while a later held Back is still returning', async () => {
   const { app, replace, release } = composeReplacing();
   const stand = standInBrowser({ path: mapPath(MAP_ID) });

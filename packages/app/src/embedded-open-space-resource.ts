@@ -7,6 +7,7 @@ import {
 } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { spaceViewOf } from '@project/ui';
+import { mapSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from './drag-tilt';
 import type { EmbeddedBounds } from './embedded-map';
@@ -32,9 +33,18 @@ export interface EmbeddedPublicationSnapshot {
   readonly nodes: readonly ResourceFlowNode[];
 }
 
+export interface EmbeddedRoot {
+  readonly spaceId: ResourceId;
+  readonly mapId: MapId;
+  readonly policy: MapSurfacePolicy;
+}
+
 export interface DiscoverEmbeddedOpenSpaceResourcesInput<
   Entry extends { readonly id: ResourceId },
 > {
+  readonly root: EmbeddedRoot;
+  readonly editingResources: ReadonlySet<ResourceId>;
+  readonly staleSpaces: ReadonlySet<ResourceId>;
   readonly nodes: readonly ResourceFlowNode[];
   readonly entries: readonly Entry[];
   readonly publications: ReadonlyMap<string, EmbeddedPublicationSnapshot>;
@@ -71,7 +81,8 @@ export interface EmbeddedOpenSpaceResourceRequest<Entry extends { readonly id: R
    */
   readonly drawnAbsolute: MapPosition;
   readonly bounds: EmbeddedBounds;
-  readonly readOnly: boolean;
+  readonly policy: MapSurfacePolicy;
+  readonly depth: number;
   /**
    * The point this embedding leans about while a Resource framing it is moved, in
    * canvas coordinates, or `undefined` when none is.
@@ -186,15 +197,17 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
     containingDrawn: MapPosition;
     clip: EmbeddedBounds | null;
     path: ReadonlySet<string>;
-    readOnly: boolean;
+    policy: MapSurfacePolicy;
+    depth: number;
     tiltCenter: MapPosition | undefined;
   }[] = input.nodes.map((parent) => ({
     parent,
     origin: { x: 0, y: 0 },
     containingDrawn: { x: 0, y: 0 },
     clip: null,
-    path: new Set<string>(),
-    readOnly: false,
+    path: new Set([`${input.root.spaceId}:${input.root.mapId}`]),
+    policy: input.root.policy,
+    depth: 1,
     tiltCenter: undefined,
   }));
   for (const item of queue) {
@@ -203,7 +216,16 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
     const shown = spaceViewOf(parent.data.display);
     if (shown === undefined) continue;
     const { view } = shown;
-    const readOnly = item.readOnly || shown.via === 'reference';
+    const policy = mapSurfacePolicy({
+      inherited: item.policy,
+      throughReference: shown.via === 'reference',
+      stale:
+        input.staleSpaces.has(view.spaceId) ||
+        (input.publications.has(parent.id) &&
+          !input.entries.some((entry) => entry.id === view.spaceId)),
+      depth: item.depth,
+      editing: input.editingResources.has(parent.data.resourceId),
+    });
     const crossing = `${view.spaceId}:${view.map}`;
     if (path.has(crossing)) continue;
     const crossed = new Set(path).add(crossing);
@@ -231,7 +253,8 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
         : undefined);
     requests.push({
       parent: { ...parent, position: authoredPosition },
-      readOnly,
+      policy,
+      depth: item.depth,
       spaceId: view.spaceId,
       mapId: view.map,
       graphId: view.graph,
@@ -250,7 +273,8 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
           containingDrawn: drawnAbsolute,
           clip: window.intersection,
           path: crossed,
-          readOnly,
+          policy,
+          depth: item.depth + 1,
           tiltCenter,
         });
     }
@@ -279,26 +303,4 @@ export function embeddingIsPortalEditing(
   editingPortals: ReadonlySet<ResourceId>,
 ): boolean {
   return editingPortalAncestor(parent, nodesById, editingPortals) !== undefined;
-}
-
-export interface EmbeddedAuthoringGate {
-  readonly readOnly: boolean;
-  readonly portalEditing: boolean;
-  readonly authorInEmbeddedMap: boolean;
-  readonly authorOnCanvas: boolean;
-  readonly thisEmbeddingEditing: boolean;
-  readonly hostBodyEditing: boolean;
-  readonly hostTitleEditing: boolean;
-}
-
-/** Read/Edit for an embedding: portal Edit, host availability, and the one live nested edit. */
-export function embeddedAuthoringEnabled(gate: EmbeddedAuthoringGate): boolean {
-  return (
-    !gate.readOnly &&
-    gate.portalEditing &&
-    gate.authorInEmbeddedMap &&
-    (gate.authorOnCanvas || gate.thisEmbeddingEditing) &&
-    !gate.hostBodyEditing &&
-    !gate.hostTitleEditing
-  );
 }

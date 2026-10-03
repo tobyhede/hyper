@@ -240,6 +240,18 @@ it('holds a Back to another Space when a replacement starts while that Space ope
   expect(openSpaces.browserLocation.getState().destinationNotFound).toBe(false);
 });
 
+it('releases a newly composed target when image replacement prevents its activation', async () => {
+  const held = heldImageSources();
+  const { openSpaces } = setup(undefined, undefined, undefined, held.images);
+  const other = await openSpaces.open(OTHER_ID);
+  const opening = openSpaces.open(META_ID);
+  const replacement = other.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  await expect(opening).rejects.toBeInstanceOf(NavigationUnavailableError);
+  held.release();
+  await replacement;
+  expect(openSpaces.entry(META_ID)).toBeUndefined();
+});
+
 /** Distinct ids for a Space Resource coordination, which mints several per call. */
 const countingIds = (): (() => UUID) => {
   let next = 0x20;
@@ -314,16 +326,68 @@ describe('Open Spaces', () => {
     expect(after.document.defaultMap).toBe(before.document.defaultMap);
   });
 
-  it('opens an embedded target in the shared entry without leaving the containing Space', async () => {
+  it('holds a drawn target without listing it, and Enter reuses its composition', async () => {
     const { openSpaces } = setup();
     const containing = await openSpaces.open(META_ID);
-    const target = await openSpaces.embed(OTHER_ID);
+    const first = await openSpaces.hold(OTHER_ID);
+    const second = await openSpaces.hold(OTHER_ID);
 
     expect(openSpaces.getState().activeSpaceId).toBe(containing.id);
-    expect(openSpaces.entry(OTHER_ID)).toBe(target);
-    expect(await openSpaces.embed(OTHER_ID)).toBe(target);
-    expect(await openSpaces.enter(OTHER_ID)).toBe(target);
+    expect(openSpaces.entry(OTHER_ID)).toBe(first.entry);
+    expect(second.entry).toBe(first.entry);
+    expect(openSpaces.getState().entries).toEqual([containing]);
+    expect(openSpaces.listing().map((row) => row.spaceId)).toEqual([META_ID]);
+    expect(openSpaces.opener(OTHER_ID)).toBeNull();
+    expect(await openSpaces.enter(OTHER_ID)).toBe(first.entry);
+    expect(openSpaces.opener(OTHER_ID)?.spaceId).toBe(META_ID);
+    await first.release();
+    await second.release();
+    expect(openSpaces.entry(OTHER_ID)).toBe(first.entry);
+  });
+
+  it('records a drawn-only Space as Opener without hiding or listing it', async () => {
+    const { openSpaces } = setup();
+    const source = await openSpaces.hold(META_ID);
+    const entered = await openSpaces.enter(OTHER_ID, undefined, undefined, undefined, META_ID);
+    expect(openSpaces.getState().entries).toEqual([entered]);
+    expect(openSpaces.opener(OTHER_ID)?.spaceId).toBe(META_ID);
+    expect(
+      openSpaces.listing().map((row) => ({ id: row.spaceId, open: row.open, depth: row.depth })),
+    ).toEqual([
+      { id: META_ID, open: false, depth: 0 },
+      { id: OTHER_ID, open: true, depth: 0 },
+    ]);
+    await source.release();
+  });
+
+  it('returns to an only-drawn ordinary Opener using its held composition', async () => {
+    const { openSpaces } = setup();
+    const source = await openSpaces.hold(OTHER_ID);
+    await openSpaces.enter(META_ID, undefined, undefined, undefined, OTHER_ID);
+    expect(openSpaces.opener(META_ID)?.spaceId).toBe(OTHER_ID);
+    await expect(openSpaces.select(OTHER_ID)).resolves.toEqual({ kind: 'opened', title: 'Other' });
     expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
+    expect(openSpaces.entry(OTHER_ID)).toBe(source.entry);
+    expect(openSpaces.getState().entries).toContain(source.entry);
+    await source.release();
+  });
+
+  it('Exit releases only its listing hold and the last drawing disposes the composition', async () => {
+    const { openSpaces } = setup();
+    await openSpaces.open(META_ID);
+    const target = await openSpaces.enter(OTHER_ID);
+    const first = await openSpaces.hold(OTHER_ID);
+    const second = await openSpaces.hold(OTHER_ID);
+    expect(await openSpaces.exit(OTHER_ID)).toEqual({ kind: 'exited' });
+    expect(openSpaces.entry(OTHER_ID)).toBe(target);
+    expect(openSpaces.opener(OTHER_ID)).toBeNull();
+    expect(openSpaces.listing().map((row) => row.spaceId)).toEqual([META_ID]);
+    await first.release();
+    await first.release();
+    expect(openSpaces.entry(OTHER_ID)).toBe(target);
+    await second.release();
+    expect(openSpaces.entry(OTHER_ID)).toBeUndefined();
+    expect((await openSpaces.hold(OTHER_ID)).entry).not.toBe(target);
   });
 
   it('opens and composes one live entry per Space id even when openings race', async () => {
@@ -384,7 +448,7 @@ describe('Open Spaces', () => {
   it('makes the Enter framing seed readable on the activation that first shows an embedded Space', async () => {
     const { openSpaces } = setup();
     await openSpaces.open(META_ID);
-    const embedded = await openSpaces.embed(OTHER_ID);
+    const { entry: embedded } = await openSpaces.hold(OTHER_ID);
     expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
     expect(openSpaces.openingFraming(embedded)).toBeUndefined();
 
@@ -1372,4 +1436,49 @@ describe('Open Spaces', () => {
     });
     expect(openSpaces.entry(META_ID)).toBe(meta);
   });
+});
+
+it('holds Back and Forward while an only-drawn Space replaces an image', async () => {
+  const held = heldImageSources();
+  const { openSpaces, history } = setup(undefined, undefined, undefined, held.images);
+  const meta = await openSpaces.open(META_ID);
+  const drawing = await openSpaces.hold(OTHER_ID);
+  const firstPath = productDestinationPath({
+    kind: 'map-graph',
+    spaceId: META_ID,
+    mapId: META_MAP_ID,
+    graphId: META_GRAPH_ONE,
+  });
+  history.replace(firstPath);
+  openSpaces.browserLocation.activateGraph(META_GRAPH_TWO);
+  const secondPath = history.pathname();
+  expect(secondPath).not.toBe(firstPath);
+  expect(openSpaces.getState().entries.map(({ id }) => id)).toEqual([META_ID]);
+  const observations: boolean[] = [];
+  const unsubscribe = openSpaces.subscribe(() => {
+    observations.push(openSpaces.getState().replacingImage);
+  });
+  const replacement = drawing.entry.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  expect(openSpaces.getState().replacingImage).toBe(true);
+  expect(observations).toContain(true);
+  history.popTo(firstPath);
+  await vi.waitFor(() => expect(history.pathname()).toBe(secondPath));
+  expect(meta.app.navigation.getState().activeGraphId).toBe(META_GRAPH_TWO);
+  await expect(openSpaces.enter(OTHER_ID)).rejects.toThrow(NavigationUnavailableError);
+  held.release();
+  await replacement;
+  expect(openSpaces.getState().replacingImage).toBe(false);
+  expect(observations.at(-1)).toBe(false);
+  history.popTo(firstPath);
+  await vi.waitFor(() => expect(meta.app.navigation.getState().activeGraphId).toBe(META_GRAPH_ONE));
+  const again = drawing.entry.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
+  history.popTo(secondPath);
+  await vi.waitFor(() => expect(history.pathname()).toBe(firstPath));
+  expect(meta.app.navigation.getState().activeGraphId).toBe(META_GRAPH_ONE);
+  held.release();
+  await again;
+  history.popTo(secondPath);
+  await vi.waitFor(() => expect(meta.app.navigation.getState().activeGraphId).toBe(META_GRAPH_TWO));
+  unsubscribe();
+  await drawing.release();
 });

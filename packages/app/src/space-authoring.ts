@@ -992,13 +992,13 @@ export function createSpaceAuthoring({
     context: MapAuthoringContext,
     proposal: EdgeProposal,
   ): EdgeEligibility => {
-    const map = currentSpace().lookup.map(context.mapId);
-    if (map === undefined) return { kind: 'refused', refusal: { code: 'map-not-found' } };
-    const graph = map.map.graphs.find((candidate) => candidate.id === context.graphId) ?? null;
+    const resolved = currentSpace().lookup.map(context.mapId);
+    if (resolved === undefined) return { kind: 'refused', refusal: { code: 'map-not-found' } };
+    const graph = resolved.map.graphs.find((candidate) => candidate.id === context.graphId) ?? null;
     const refusal = connectRefusal(
       proposal.from,
       proposal.kind === 'connect' ? proposal.to : null,
-      Placement.fromMap(map.map),
+      Placement.fromMap(resolved.map),
       graph,
     );
     return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
@@ -1146,6 +1146,9 @@ export function createSpaceAuthoring({
           : (resolved.map.activeGraph ?? resolved.map.graphs[0]?.id ?? null);
     const selectedGraph =
       resolved.map.graphs.find((candidate) => candidate.id === selectedGraphId) ?? null;
+    if (graphId != null && selectedGraph === null) {
+      return refuse({ code: 'graph-not-owned' });
+    }
     // Which Map this Edit writes. Every arm below that changes its positions
     // or its Graphs writes them into `snapshot` itself, and the tail folds only
     // the Map's identity over the result — so an arm answered by a

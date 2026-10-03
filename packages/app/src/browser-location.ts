@@ -45,7 +45,7 @@ export interface HistoryApi {
  */
 export type PopStateAnswer = undefined | false | Promise<undefined | false>;
 
-/** Navigation refused because the Space on the canvas is mid-way through an exclusive operation. */
+/** Navigation refused because a composed Space is mid-way through an exclusive operation. */
 export class NavigationUnavailableError extends Error {
   constructor() {
     super('Navigation is unavailable while an image replacement is pending.');
@@ -100,6 +100,7 @@ export function createBrowserLocation(
   reportObserverError: ObserverErrorReporter = (error) =>
     console.error('Browser location observer failed', error),
   openPath?: (pathname: string) => Promise<void>,
+  isNavigationHeld?: () => boolean,
 ): BrowserLocation {
   let followed: ComposedApp | null = null;
   let unfollow: (() => void) | null = null;
@@ -259,7 +260,7 @@ export function createBrowserLocation(
    * the published projection.
    */
   const deliberateMove = (move: () => void): void => {
-    if (followed?.imageReplacement.getState() === true) return;
+    if (navigationHeld()) return;
     addressedResourceId = null;
     destinationNotFound = false;
     move();
@@ -319,7 +320,8 @@ export function createBrowserLocation(
     settle();
   };
 
-  const navigationHeld = (): boolean => followed?.imageReplacement.getState() === true;
+  const navigationHeld = (): boolean =>
+    isNavigationHeld?.() ?? followed?.imageReplacement.getState() === true;
 
   let restorationRequest = 0;
   const restore = (): PopStateAnswer => {

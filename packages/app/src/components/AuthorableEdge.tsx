@@ -41,7 +41,8 @@ const edgeElementOf = (from: Element | null, edgeId: string): SVGElement | null 
  * chrome cannot disagree with the drawn line. Only Active Graph Edges draw chrome.
  */
 export function AuthorableEdge(props: EdgeProps<RoutedFlowEdge>) {
-  const commands = useContext(EdgeAuthoringContext);
+  const sharedCommands = useContext(EdgeAuthoringContext);
+  const commands = sharedCommands?.forEdge?.(props.id) ?? sharedCommands;
   const { path, labelX, labelY, span } = useRoutedEdgeGeometry(props);
   const line = <RoutedEdgePath {...routedEdgePathProps(props, path)} />;
   // The same translation the selection mirror and the callbacks use, so this
