@@ -258,7 +258,12 @@ describe.each(contexts)('Map rename through $name', ({ setup }) => {
   it('answers a rename of a Map that has gone as unavailable', async () => {
     const { authored, mapId, commands } = await setup();
     const rename = commands.map(mapId).rename;
-    expect(authored.app.authoring.complete({ kind: 'deleted-map', mapId }).kind).toBe('completed');
+    const gone = await authored.spaceResources.deleteMap({
+      targetSpaceId: TARGET,
+      mapId,
+      preferredMapId: null,
+    });
+    expect(gone.kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);

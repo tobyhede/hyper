@@ -297,7 +297,12 @@ describe.each(contexts)('Graph rename through $name', ({ setup }) => {
   it('answers a rename of a Map that has gone as unavailable', async () => {
     const { authored, mapId, graphId, commands } = await setup();
     const rename = commands.map(mapId).graph(graphId).rename;
-    expect(authored.app.authoring.complete({ kind: 'deleted-map', mapId }).kind).toBe('completed');
+    const gone = await authored.spaceResources.deleteMap({
+      targetSpaceId: TARGET,
+      mapId,
+      preferredMapId: null,
+    });
+    expect(gone.kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -373,7 +378,12 @@ describe.each(contexts)('Graph recolour through $name', ({ setup }) => {
   it('answers a recolour of a Map that has gone as unavailable', async () => {
     const { authored, mapId, graphId, commands } = await setup();
     const recolor = commands.map(mapId).graph(graphId).recolor;
-    expect(authored.app.authoring.complete({ kind: 'deleted-map', mapId }).kind).toBe('completed');
+    const gone = await authored.spaceResources.deleteMap({
+      targetSpaceId: TARGET,
+      mapId,
+      preferredMapId: null,
+    });
+    expect(gone.kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(recolor.invoke(OTHER_COLOR)).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -459,7 +469,12 @@ describe.each(contexts)('Graph creation through $name', ({ setup }) => {
   it('answers a creation in a Map that has gone as unavailable', async () => {
     const { authored, mapId, commands } = await setup();
     const create = commands.map(mapId).create;
-    expect(authored.app.authoring.complete({ kind: 'deleted-map', mapId }).kind).toBe('completed');
+    const gone = await authored.spaceResources.deleteMap({
+      targetSpaceId: TARGET,
+      mapId,
+      preferredMapId: null,
+    });
+    expect(gone.kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(await create.invoke()).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -1004,6 +1019,21 @@ describe('what each context deletes', () => {
       selectedMapId: SECOND_MAP,
       activeGraphId: THIRD_GRAPH,
     });
+  });
+
+  it('moves an embedded target canvas showing the deleted Graph to the survivor, and the containing canvas nowhere', async () => {
+    const { source, authored, commands } = await embedded();
+    authored.app.navigation.openGraph(SECOND_MAP, SECOND_GRAPH);
+    expect(await commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete.invoke()).toEqual({
+      kind: 'completed',
+      mapId: SECOND_MAP,
+      graphId: THIRD_GRAPH,
+    });
+    expect(authored.app.navigation.getState()).toMatchObject({
+      selectedMapId: SECOND_MAP,
+      activeGraphId: THIRD_GRAPH,
+    });
+    expect(source.app.navigation.getState().selectedMapId).toBe(META_MAP);
   });
 
   it('deletes a Graph an embedded target is not showing without moving either canvas', async () => {
