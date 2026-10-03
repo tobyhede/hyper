@@ -13,7 +13,7 @@ import { RESOURCE_SIZE } from '../src/resource';
 import type { ResourceResize } from '../src/render-adapter';
 import { mountSettled } from './settled-mount';
 import { CLOSED_DISPLAY } from '@project/ui';
-import { fixtureDisplay } from './render-adapter-fixtures';
+import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -71,6 +71,7 @@ const resourceNode = (
     title,
     readOnly: false,
     kind,
+    ...fixtureFacts(kind),
     active: false,
     selectedForAuthoring: false,
     display: CLOSED_DISPLAY,

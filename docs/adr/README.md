@@ -47,6 +47,7 @@ under `superseded/`.
 | [0099](0099-the-barrier-waits-only-for-commits-in-flight.md) | The coordination barrier pauses, then awaits only in-flight commits; one recovery rule covers both deletion cascades, reading stored and working state. |
 | [0106](0106-an-image-resource-owns-a-url-not-bytes.md) | An Image Resource owns a URL, not bytes. The host stores images at `/images/<sha256>`, named for what they are and outside the aggregate. The repo-state rule is deliberately waived for the picture. |
 | [0113](0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md) | Every capability is a Resource's, and a kind only adds actions; Reference is the terminal exception. An Ur Resource has no content and no Edit. A self-targeting Reference Resource was rejected. |
+| [0114](0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md) | First Open Size, resize floor, Map embedding and content area are decided from resolved content, so a Reference Resource takes its Target's; its kind withholds only content actions. |
 
 ## Layout, View and Graph
 

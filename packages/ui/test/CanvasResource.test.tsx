@@ -28,14 +28,41 @@ const SPACE_CONTENT: ResourceContent = {
 /** An Open display drawing `content`. */
 const opened = (content: ResourceContent): FrontDisplay => ({ shown: 'open', content });
 
+it('takes a Reference Resource’s content-area layout from its Target, including its Close fade', () => {
+  const props = {
+    front: { kind: 'reference' as const },
+    state: 'rest' as const,
+    title: 'A',
+    graphColor: '#ffc53d',
+  };
+  const { rerender } = render(
+    <CanvasResource {...props} display={opened({ kind: 'ur', via: 'reference' })} />,
+  );
+  const resource = screen.getByRole('article', { name: 'A' });
+  expect(resource).not.toHaveAttribute('data-content-area');
+  rerender(
+    <CanvasResource
+      {...props}
+      display={opened({ kind: 'markdown', source: 'Target body', via: 'reference' })}
+    />,
+  );
+  expect(resource).toHaveAttribute('data-content-area', 'true');
+  rerender(<CanvasResource {...props} display={CLOSED_DISPLAY} />);
+  expect(resource).toHaveAttribute('data-content-area', 'true');
+  expect(resource).toHaveTextContent('Target body');
+});
+
 it('keeps a pending replacement mounted when its entity actions become unavailable', async () => {
   const waiting = Promise.withResolvers<string | null>();
   const front: CanvasResourceFront = { kind: 'image' };
-  const display = beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-    accept: 'image/png',
-    onReplace: () => waiting.promise,
-    onEnd: () => undefined,
-  });
+  const display = beginReplacing(
+    opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
+    {
+      accept: 'image/png',
+      onReplace: () => waiting.promise,
+      onEnd: () => undefined,
+    },
+  );
   const { rerender } = render(
     <CanvasResource
       state="selected"
@@ -219,7 +246,10 @@ describe('CanvasResource kind and interaction state', () => {
     render(
       <CanvasResource
         front={{ kind: 'image' }}
-        display={{ shown: 'open', content: { kind: 'image', url: FIGURE_URL, via: 'self' } }}
+        display={{
+          shown: 'open',
+          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+        }}
         state="rest"
         title={'Figure\nFrom the north mole'}
         graphColor="#ffc53d"
@@ -241,7 +271,10 @@ describe('CanvasResource kind and interaction state', () => {
     render(
       <CanvasResource
         front={{ kind: 'image' }}
-        display={{ shown: 'open', content: { kind: 'image', url: FIGURE_URL, via: 'self' } }}
+        display={{
+          shown: 'open',
+          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+        }}
         state="rest"
         title="Figure"
         graphColor="#ffc53d"
@@ -261,7 +294,10 @@ describe('CanvasResource kind and interaction state', () => {
     render(
       <CanvasResource
         front={{ kind: 'image', onOpenChange }}
-        display={{ shown: 'open', content: { kind: 'image', url: FIGURE_URL, via: 'self' } }}
+        display={{
+          shown: 'open',
+          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+        }}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -308,11 +344,14 @@ describe('CanvasResource kind and interaction state', () => {
           onOpenChange: () => 'completed',
           onBeginEdit: () => undefined,
         }}
-        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-          accept: 'image/png',
-          onReplace: () => Promise.resolve(null),
-          onEnd,
-        })}
+        display={beginReplacing(
+          opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
+          {
+            accept: 'image/png',
+            onReplace: () => Promise.resolve(null),
+            onEnd,
+          },
+        )}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -340,11 +379,14 @@ describe('CanvasResource kind and interaction state', () => {
           kind: 'image',
           onOpenChange: () => 'completed',
         }}
-        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-          accept: 'image/png',
-          onReplace: () => new Promise(() => undefined),
-          onEnd,
-        })}
+        display={beginReplacing(
+          opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
+          {
+            accept: 'image/png',
+            onReplace: () => new Promise(() => undefined),
+            onEnd,
+          },
+        )}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -365,7 +407,10 @@ describe('CanvasResource kind and interaction state', () => {
     render(
       <CanvasResource
         front={{ kind: 'image', onBeginEdit }}
-        display={{ shown: 'open', content: { kind: 'image', url: FIGURE_URL, via: 'self' } }}
+        display={{
+          shown: 'open',
+          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+        }}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -382,7 +427,10 @@ describe('CanvasResource kind and interaction state', () => {
     render(
       <CanvasResource
         front={{ kind: 'image', onBeginEdit: () => undefined }}
-        display={{ shown: 'open', content: { kind: 'image', url: FIGURE_URL, via: 'self' } }}
+        display={{
+          shown: 'open',
+          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+        }}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -417,7 +465,12 @@ describe('CanvasResource kind and interaction state', () => {
     render(
       <CanvasResource
         front={{ kind: 'reference', onOpenChange: () => 'completed' }}
-        display={opened({ kind: 'image', url: FIGURE_URL, via: 'reference' })}
+        display={opened({
+          kind: 'image',
+          naturalSize: undefined,
+          url: FIGURE_URL,
+          via: 'reference',
+        })}
         state="selected"
         title="Figure, again"
         graphColor="#ffc53d"
@@ -445,7 +498,12 @@ describe('CanvasResource kind and interaction state', () => {
     render(
       <CanvasResource
         front={{ kind: 'image', onBeginEdit: () => undefined }}
-        display={opened({ kind: 'image', url: FIGURE_URL, via: 'reference' })}
+        display={opened({
+          kind: 'image',
+          naturalSize: undefined,
+          url: FIGURE_URL,
+          via: 'reference',
+        })}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -2044,7 +2102,10 @@ describe('CanvasResource Close fade', () => {
     const { rerender } = render(
       <CanvasResource
         front={{ kind: 'image' }}
-        display={{ shown: 'open', content: { kind: 'image', url: FIGURE_URL, via: 'self' } }}
+        display={{
+          shown: 'open',
+          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+        }}
         state="rest"
         title="A"
         graphColor="#ffc53d"
@@ -2067,7 +2128,12 @@ describe('CanvasResource Close fade', () => {
     const { rerender } = render(
       <CanvasResource
         front={{ kind: 'reference' }}
-        display={opened({ kind: 'image', url: FIGURE_URL, via: 'reference' })}
+        display={opened({
+          kind: 'image',
+          naturalSize: undefined,
+          url: FIGURE_URL,
+          via: 'reference',
+        })}
         state="rest"
         title="A"
         graphColor="#ffc53d"

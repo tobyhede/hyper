@@ -95,6 +95,49 @@ const colors = {
   '00000000-0000-4000-8000-000000000030': '#222222',
 };
 describe('projectResourceNodes', () => {
+  it.each(['space', 'markdown'] as const)(
+    'publishes resolved %s geometry and actions for Closed and Open References',
+    (kind) => {
+      const targetId = uuid('00000000-0000-4000-8000-000000000002');
+      const referenceId = uuid('00000000-0000-4000-8000-000000000007');
+      const target =
+        kind === 'markdown'
+          ? resourceFile(targetId, 'Target', 'Body')
+          : {
+              path: `resources/${targetId}.md`,
+              text: `---\nid: ${targetId}\ntitle: Target\nkind: space\nspaceId: 00000000-0000-4000-8000-000000000009\nmap: 00000000-0000-4000-8000-000000000050\ngraph: 00000000-0000-4000-8000-000000000004\n---\n`,
+            };
+      const loaded = load(
+        spaceFile([
+          {
+            id: '00000000-0000-4000-8000-000000000004',
+            title: 'Main',
+            edges: [{ from: targetId, to: referenceId }],
+          },
+        ]),
+        [target, referenceFile(referenceId, 'Reference', targetId)],
+      );
+      for (const open of [false, true]) {
+        const nodes = projectResourceNodes(loaded, {
+          openResourceIds: new Set(open ? [referenceId] : []),
+        });
+        expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
+          contentAction: 'none',
+          openSizeFloor:
+            kind === 'space' ? { width: 292, height: 266 } : { width: 260, height: 146 },
+          embedsMap: kind === 'space',
+        });
+        if (!open)
+          expect(nodes.find((node) => node.id === referenceId)?.data.display).toEqual({
+            shown: 'closed',
+          });
+        expect(nodes.find((node) => node.id === targetId)?.data).toMatchObject({
+          contentAction: kind === 'space' ? 'author-space-view' : 'edit-markdown',
+        });
+      }
+    },
+  );
+
   it('maps resources to resource nodes carrying the title, not the content', () => {
     const nodes = projectResourceNodes(space);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
@@ -289,7 +332,7 @@ describe('projectResourceNodes', () => {
     const imageNode = (options: Parameters<typeof projectResourceNodes>[1]) =>
       projectResourceNodes(withImage, options).find((node) => node.id === imageId)?.data;
 
-    const picture = { kind: 'image', url, via: 'self' };
+    const picture = { kind: 'image', url, naturalSize: undefined, via: 'self' };
     expect(imageNode({})).toMatchObject({ kind: 'image', display: { shown: 'closed' } });
     expect(imageNode({ openResourceIds: new Set([imageId]) })).toMatchObject({
       kind: 'image',
@@ -341,11 +384,11 @@ describe('projectResourceNodes display', () => {
     });
     expect(display(imageId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, via: 'self' },
+      content: { kind: 'image', url, naturalSize: undefined, via: 'self' },
     });
     expect(display(referenceId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, via: 'reference' },
+      content: { kind: 'image', url, naturalSize: undefined, via: 'reference' },
     });
   });
 
@@ -357,7 +400,10 @@ describe('projectResourceNodes display', () => {
     });
     expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
       open: true,
-      display: { shown: 'presented', content: { kind: 'image', url, via: 'reference' } },
+      display: {
+        shown: 'presented',
+        content: { kind: 'image', url, naturalSize: undefined, via: 'reference' },
+      },
     });
   });
 

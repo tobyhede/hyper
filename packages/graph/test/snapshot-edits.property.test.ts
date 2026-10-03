@@ -1196,3 +1196,49 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
     );
   });
 });
+
+describe('first Open content geometry', () => {
+  it('first Opens a Reference at exactly the size its Target would for every Target kind', () => {
+    fc.assert(
+      fc.property(
+        fc.record({
+          width: fc.integer({ min: 1, max: 6000 }),
+          height: fc.integer({ min: 1, max: 6000 }),
+        }),
+        fc.string(),
+        (naturalSize, body) => {
+          const target = uuid('00000000-0000-4000-8000-000000000004');
+          const reference = uuid('00000000-0000-4000-8000-000000000005');
+          const documents: ResourceDocument[] = [
+            { kind: 'markdown', title: 'Target', body },
+            { kind: 'image', title: 'Target', url: 'https://example.com/image.png', naturalSize },
+            { kind: 'image', title: 'Target', url: 'https://example.com/image.png' },
+            { kind: 'space', title: 'Target', spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID },
+            { kind: 'ur', title: 'Target' },
+          ];
+          for (const document of documents) {
+            const snapshot: SpaceSnapshot = {
+              ...baseSnapshot([target, reference], {
+                [target]: { x: 0, y: 0, open: false },
+                [reference]: { x: 1000, y: 0, open: false },
+              }),
+              resources: [
+                { id: target, document },
+                { id: reference, document: { kind: 'reference', title: 'Reference', target } },
+              ],
+            };
+            const openedTarget = SnapshotEdit.open(snapshot, MAP_ID, target);
+            const openedReference = SnapshotEdit.open(snapshot, MAP_ID, reference);
+            expect(openedTarget.kind).toBe('completed');
+            expect(openedReference.kind).toBe('completed');
+            if (openedTarget.kind !== 'completed' || openedReference.kind !== 'completed')
+              throw new Error('Expected Open');
+            expect(
+              openedReference.snapshot.document.maps?.[0]?.positions[reference]?.openSize,
+            ).toEqual(openedTarget.snapshot.document.maps?.[0]?.positions[target]?.openSize);
+          }
+        },
+      ),
+    );
+  });
+});

@@ -1,10 +1,7 @@
 import {
   COLLAPSED_RESOURCE_SIZE,
-  DEFAULT_OPEN_SIZE,
-  DEFAULT_SPACE_RESOURCE_OPEN_SIZE,
-  IMAGE_FIRST_OPEN_BOUND,
-  OPEN_RESOURCE_CHROME,
   titleName,
+  firstOpenSize,
   type Graph,
   type Map,
   type MapPosition,
@@ -14,6 +11,7 @@ import {
   type UUID,
 } from '@project/core';
 import { Placement } from './placement';
+import { resolveDocumentContent } from './content-resolution';
 
 /**
  * The Resource membership rules that turn a Space snapshot into the next one when
@@ -373,57 +371,10 @@ const roomBetween = (from: Extent, to: Extent): Extent => {
 };
 
 /**
- * The Open Size a Resource takes the first time it Opens, which is its kind's
- * choice (ADR 0066, ADR 0106).
- *
- * A Space Resource draws a whole Map and opens larger. An Image Resource with a
- * recorded natural size opens to hold it at one pixel per canvas unit, scaled
- * down proportionally to fit {@link IMAGE_FIRST_OPEN_BOUND}, plus
- * {@link OPEN_RESOURCE_CHROME}, and never smaller than the Closed size on either
- * axis. Read from the document alone, so Opening never waits on a load.
- */
-const firstOpenSize = (document: ResourceDocument | undefined): Extent => {
-  if (document?.kind === 'space') return DEFAULT_SPACE_RESOURCE_OPEN_SIZE;
-  if (document?.kind !== 'image' || document.naturalSize === undefined) return DEFAULT_OPEN_SIZE;
-  const natural = document.naturalSize;
-  const scale = Math.min(
-    1,
-    IMAGE_FIRST_OPEN_BOUND.width / natural.width,
-    IMAGE_FIRST_OPEN_BOUND.height / natural.height,
-  );
-  const fitted = (axis: keyof Extent): number =>
-    Math.max(
-      COLLAPSED_RESOURCE_SIZE[axis],
-      Math.round(natural[axis] * scale) + OPEN_RESOURCE_CHROME[axis],
-    );
-  return { width: fitted('width'), height: fitted('height') };
-};
-
-/**
- * The document whose kind chooses a Resource's first Open Size.
- *
- * A Reference Resource to an Image Resource draws its Target's image, so it
- * reads its Target's recorded natural size by the same rule, in the same
- * synchronous Edit (ADR 0070, ADR 0106). A Reference Resource to any other
- * Target answers its own document, which opens at the default Open Size.
- */
-const openSizeDocument = (
-  snapshot: SpaceSnapshot,
-  resourceId: UUID,
-): ResourceDocument | undefined => {
-  const documentOf = (id: UUID) =>
-    snapshot.resources.find((resource) => resource.id === id)?.document;
-  const document = documentOf(resourceId);
-  if (document?.kind !== 'reference') return document;
-  const target = documentOf(document.target);
-  return target?.kind === 'image' ? target : document;
-};
-
-/**
  * Open a Resource in one Map, moving the Resources clear of it by the room it
  * now takes (ADR 0084, ADR 0093).
  *
- * It Opens at the Open Size it remembers (ADR 0066), or at its kind's
+ * It Opens at the Open Size it remembers (ADR 0066), or at its content's
  * {@link firstOpenSize}. The room it
  * takes is that size's growth, so the Close that reverses this reads the same
  * number back off the entry. `unchanged` for a Resource already Open.
@@ -434,7 +385,10 @@ function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotE
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   if (at.open) return UNCHANGED;
-  const openSize = at.openSize ?? firstOpenSize(openSizeDocument(snapshot, resourceId));
+  const documentOf = (id: UUID) =>
+    snapshot.resources.find((resource) => resource.id === id)?.document;
+  const openSize =
+    at.openSize ?? firstOpenSize(resolveDocumentContent(documentOf(resourceId), documentOf));
   return withPlacement(
     snapshot,
     mapId,

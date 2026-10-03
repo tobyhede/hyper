@@ -1,5 +1,4 @@
 import type {
-  ContentVia,
   Resource,
   ResourceContent,
   ResourceId,
@@ -9,6 +8,7 @@ import type {
   UUID,
 } from '@project/core';
 import type { Space } from './space';
+import { resolveDocumentContent } from './content-resolution';
 
 /**
  * Contextual entity resolution over a validated Space.
@@ -62,31 +62,6 @@ export interface SpaceLookup {
   graph(id: GraphId): OwnedGraph | undefined;
 }
 
-/** A Resource that owns its content: every kind but a Reference Resource. */
-type ContentOwner = Exclude<Resource, { kind: 'reference' }>;
-
-function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent {
-  switch (resource.kind) {
-    case 'markdown':
-      return { kind: 'markdown', source: resource.body, via };
-    case 'image':
-      return { kind: 'image', url: resource.url, via };
-    case 'space':
-      return {
-        kind: 'space',
-        view: {
-          spaceId: resource.spaceId,
-          map: resource.map,
-          graph: resource.graph,
-          framing: resource.framing,
-        },
-        via,
-      };
-    case 'ur':
-      return { kind: 'ur', via };
-  }
-}
-
 /**
  * What `resource` draws as its content. Markdown, Image, Space and Ur Resources
  * answer their own with `via: 'self'`; a Reference Resource answers its
@@ -98,12 +73,7 @@ function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent 
  * Reference Resource.
  */
 export function resolveResourceContent(space: Space, resource: Resource): ResourceContent {
-  if (resource.kind !== 'reference') return ownedContent(resource, 'self');
-  const target = space.lookup.resource(resource.target);
-  if (target === undefined || target.kind === 'reference') {
-    return { kind: 'unresolved', via: 'reference' };
-  }
-  return ownedContent(target, 'reference');
+  return resolveDocumentContent(resource, (id) => space.lookup.resource(id));
 }
 
 /**

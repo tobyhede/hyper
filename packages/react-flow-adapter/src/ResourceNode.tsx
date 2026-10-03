@@ -60,7 +60,9 @@ function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
     case 'markdown': {
       const front: MarkdownFront = { kind: 'markdown' };
       if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
-      if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
+      if (data.contentAction === 'edit-markdown' && data.onBeginBodyEditing !== undefined) {
+        front.onBeginEdit = data.onBeginBodyEditing;
+      }
       return front;
     }
     case 'image': {
@@ -69,7 +71,9 @@ function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
       // takes on a Markdown Resource.
       const front: ImageFront = { kind: 'image' };
       if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
-      if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
+      if (data.contentAction === 'replace-image' && data.onBeginBodyEditing !== undefined) {
+        front.onBeginEdit = data.onBeginBodyEditing;
+      }
       return front;
     }
     case 'ur': {
