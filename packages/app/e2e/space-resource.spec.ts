@@ -1204,7 +1204,7 @@ test(
     )
       .getByRole('button', { name: 'Done Resource Architecture' })
       .click();
-    await exerciseSpaceResourceContextMenus(page, resource);
+    await exerciseSpaceResourceContextMenus(page, resource, 'Space 1');
     await page.reload();
     const reopened = nodeByTitle(page, 'Architecture');
     await expect(
@@ -1446,4 +1446,39 @@ test('deleting the selected Map clears framing; deleting a Graph keeps it', asyn
   await settled(page);
   const reset = await boxOf(embeddedNodes(page), 'embedding after Map fallback');
   expect(reset.x).not.toBeCloseTo(framed.x, 0);
+});
+
+test('Alt empty drop creates and connects inside the drawn Map', async ({ page }) => {
+  const parent = await openSpaceResourceOnItsMap(page);
+  await beginPortalEdit(page, parent);
+  const embedded = embeddedNodes(page);
+  await expect(embedded).toHaveCount(1);
+  const hostBefore = await hostGraphEdgeCount(page, parent);
+  const shownBefore = await embeddedGraphEdgeCount(page, parent);
+  await embedded.hover();
+  const source = await boxOf(authoringHandle(embedded, 'source', 'right'), 'embedded source');
+  const outer = await boxOf(parent, 'Space Resource');
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(source.x + source.width / 2 + 30, source.y + source.height / 2, {
+    steps: 4,
+  });
+  await page.keyboard.down('Alt');
+  await page.mouse.move(outer.x + outer.width * 0.7, outer.y + outer.height * 0.7, { steps: 12 });
+  await expect(page.getByTestId('new-resource-preview')).toBeVisible();
+  const preview = await boxOf(
+    page.getByTestId('new-resource-preview'),
+    'embedded Resource preview',
+  );
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await expect(embedded).toHaveCount(2);
+  await expect.poll(() => embeddedGraphEdgeCount(page, parent)).toBe(shownBefore + 1);
+  expect(await hostGraphEdgeCount(page, parent)).toBe(hostBefore);
+  const created = embedded.filter({ hasText: 'Resource 2' });
+  await expect(created.getByRole('textbox')).toBeFocused();
+  const placed = await boxOf(created, 'created embedded Resource');
+  expect(placed.x).toBeCloseTo(preview.x, 0);
+  expect(placed.y).toBeCloseTo(preview.y, 0);
+  expect(placed.width).toBeCloseTo(preview.width, 0);
 });

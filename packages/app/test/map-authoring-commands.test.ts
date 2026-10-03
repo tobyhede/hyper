@@ -194,7 +194,7 @@ const contexts: readonly {
       const control = new MemorySpaceBackendTestControl();
       const spaces = openSpaces(control);
       const source = await spaces.open(META);
-      const authored = await spaces.embed(TARGET);
+      const { entry: authored } = await spaces.hold(TARGET);
       let available = true;
       return {
         spaces,
@@ -301,7 +301,7 @@ describe('what each context addresses', () => {
   it('renames any Map of an embedded target without moving its canvas', async () => {
     const spaces = openSpaces();
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -314,10 +314,10 @@ describe('what each context addresses', () => {
     expect(authored.app.navigation.getState().selectedMapId).toBe(FIRST_MAP);
   });
 
-  it('does not rename through an embedded target that has been exited', async () => {
+  it('does not rename through an embedded target that is no longer drawn', async () => {
     const spaces = openSpaces();
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored, release } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -326,7 +326,7 @@ describe('what each context addresses', () => {
       available: () => true,
     });
     const rename = commands.map(SECOND_MAP).rename;
-    await spaces.exit(TARGET);
+    await release();
     expect(spaces.entry(TARGET)).toBeUndefined();
     expect(rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
   });
@@ -440,7 +440,7 @@ describe('what each context creates in', () => {
     const control = new MemorySpaceBackendTestControl();
     const spaces = openSpaces(control);
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -470,7 +470,7 @@ describe('what each context creates in', () => {
     const control = new MemorySpaceBackendTestControl();
     const spaces = openSpaces(control);
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -495,7 +495,7 @@ describe('what each context creates in', () => {
     const control = new MemorySpaceBackendTestControl();
     const spaces = openSpaces(control);
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -514,7 +514,7 @@ describe('what each context creates in', () => {
   it('reports a refused selection write as a Map created but not selected', async () => {
     const spaces = openSpaces();
     await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -533,7 +533,7 @@ describe('what each context creates in', () => {
   it('says a containing save that breaks after the Map is made as not selected, never not created', async () => {
     const spaces = openSpaces();
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     let asked = 0;
     const commands = embeddedMapAuthoringCommands({
       target: authored,
@@ -566,10 +566,10 @@ describe('what each context creates in', () => {
     });
   });
 
-  it('creates nothing in an embedded target exited while its Spaces were saving', async () => {
+  it('creates nothing in an embedded target released while its Spaces were saving', async () => {
     const spaces = openSpaces();
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored, release } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -579,7 +579,7 @@ describe('what each context creates in', () => {
     });
     const before = authored.session.getState().working;
     const creating = commands.create.invoke();
-    await spaces.exit(TARGET);
+    await release();
     expect(await creating).toEqual({ kind: 'unavailable' });
     expect(authored.session.getState().working).toBe(before);
   });
@@ -784,7 +784,7 @@ describe('what each context deletes', () => {
   it('deletes a Map an embedded target is not showing without moving its canvas', async () => {
     const spaces = openSpaces();
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -807,7 +807,7 @@ describe('what each context deletes', () => {
     const control = new MemorySpaceBackendTestControl();
     const spaces = openSpaces(control);
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -827,10 +827,10 @@ describe('what each context deletes', () => {
     expect(mapsOf(authored)).toEqual([FIRST_MAP, SECOND_MAP]);
   });
 
-  it('deletes nothing in an embedded target exited while its Spaces were saving', async () => {
+  it('deletes nothing in an embedded target released while its Spaces were saving', async () => {
     const spaces = openSpaces();
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored, release } = await spaces.hold(TARGET);
     const commands = embeddedMapAuthoringCommands({
       target: authored,
       spaces,
@@ -840,7 +840,7 @@ describe('what each context deletes', () => {
     });
     const deleteMap = vi.spyOn(authored.spaceResources, 'deleteMap');
     const deleting = commands.map(SECOND_MAP).delete.invoke();
-    await spaces.exit(TARGET);
+    await release();
     expect(await deleting).toEqual({ kind: 'unavailable' });
     expect(deleteMap).not.toHaveBeenCalled();
   });

@@ -1,3 +1,4 @@
+import type { Continuation } from './continuation';
 import {
   SPACE_RESOURCE_MIN_OPEN_SIZE,
   type GraphId,
@@ -61,14 +62,17 @@ export interface CanvasResourceDecorationContext {
   readonly completeResourceBody: (resourceId: ResourceId, body: string) => 'completed' | 'retained';
   /**
    * Replace an Image Resource's image, answering the sentence for a refusal or
-   * `null` once the replacement is over. Absent where no image can be stored.
+   * `null` once the replacement is over.
    */
-  readonly replaceResourceImage?:
-    ((resourceId: ResourceId, replacement: ImageReplacement) => Promise<string | null>) | undefined;
+  readonly replaceResourceImage: (
+    resourceId: ResourceId,
+    replacement: ImageReplacement,
+  ) => Promise<string | null>;
   /** What a replacement's file picker offers. */
   readonly imageAccept: string;
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
+  readonly continuation?: Continuation | undefined;
   readonly containingSpaceId: UUID;
   readonly spaceDocuments: ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: 'space' }>>;
   readonly spaceResourceTargets: SpaceResourceTargets;
@@ -139,6 +143,7 @@ type SpaceResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   | 'authorOnCanvas'
   | 'editableResourceIds'
+  | 'continuation'
   | 'containingSpaceId'
   | 'spaceDocuments'
   | 'spaceResourceTargets'
@@ -279,7 +284,7 @@ export function decorateImageResourceNode(
   context: ImageResourceDecorationContext,
 ): CanvasResourceDataPatch {
   const replace = context.replaceResourceImage;
-  if (node.data.kind !== 'image' || replace === undefined) return {};
+  if (node.data.kind !== 'image') return {};
   const patch: Mutable<Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'display'>>> = {};
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
@@ -318,6 +323,7 @@ export function decorateSpaceResourceNode(
     const resourceId = node.data.resourceId;
     let railContext: SpaceResourceRailContext | undefined;
     if (
+      context.continuation !== undefined &&
       context.spaces !== null &&
       context.commandOutcomes !== undefined &&
       context.deleteConfirmation !== undefined &&
@@ -327,10 +333,10 @@ export function decorateSpaceResourceNode(
       if (entry !== undefined) {
         railContext = {
           entry,
+          continuation: context.continuation,
           spaces: context.spaces,
           containingSpaceId: context.containingSpaceId,
-          commandOutcomes: context.commandOutcomes,
-          deleteConfirmation: context.deleteConfirmation,
+          deleteConfirmation: entry.app.deleteConfirmation,
         };
       }
     }

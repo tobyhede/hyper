@@ -1,3 +1,8 @@
+import type { DrawnClipboardFailure } from '../embedded-publication';
+import { NewResourcePreview } from './NewResourcePreview';
+import { nextResourceTitle } from '../titles';
+import { ChromeContinuation } from './ChromeContinuation';
+import { surfaceAvailability } from '../map-surface-policy';
 import {
   useCallback,
   useEffect,
@@ -15,6 +20,7 @@ import {
   Background,
   ReactFlow,
   type Edge,
+  type EdgeMouseHandler,
   type IsValidConnection,
   type OnConnect,
   type OnConnectEnd,
@@ -55,11 +61,18 @@ import {
 import { connectionAppearance } from '../colors';
 import { describeAuthoringRefusal } from '../authoring-refusal';
 import type { AuthoringAvailability } from '../authoring-availability';
+import { observeMapSurfaces, type MapSurface } from '../map-surface';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
 import { useEdgeAuthoring } from '../edge-authoring-react';
-import type { EdgeAuthoring } from '../edge-authoring';
-import type { CanvasSelection, ResourceResize, EdgeSubject } from '../render-adapter';
+import { newResourceDrop, dropTarget, type EdgeAuthoring } from '../edge-authoring';
+import {
+  edgeSelectionOf,
+  sameSelection,
+  type CanvasSelection,
+  type ResourceResize,
+  type EdgeSubject,
+} from '../render-adapter';
 import type { SpaceAuthoring } from '../space-authoring';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { RESOURCE_SIZE } from '../resource';
@@ -73,14 +86,10 @@ import {
   parseEmbeddedNodeId,
   withEmbeddedEdgeTypes,
 } from '../embedded-map';
-import {
-  embeddedAuthoringEnabled,
-  editingPortalAncestor,
-  embeddingIsPortalEditing,
-  reportsBodyHeight,
-} from '../embedded-open-space-resource';
+import { editingPortalAncestor, reportsBodyHeight } from '../embedded-open-space-resource';
 import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resources';
 import { useOpenSpaces } from '../open-spaces-context';
+import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
@@ -168,15 +177,6 @@ const NOT_A_CANVAS_COMMAND =
  * keeps a second canvas's node — a story, a catalogue page — from naming a Resource
  * this Map is not drawing.
  */
-const focusedResource = (
-  target: Element,
-  nodes: readonly ResourceFlowNode[],
-): ResourceId | null => {
-  const element = target.closest<HTMLElement>('.react-flow__node[data-id]');
-  if (element === null) return null;
-  const id = element.dataset['id'];
-  return nodes.find((node) => node.id === id)?.data.resourceId ?? null;
-};
 
 /**
  * What a drag carrying files is over. `'place'` is the canvas's empty pane,
@@ -202,6 +202,9 @@ const fileDropAt = (
 };
 
 export interface SpaceCanvasProps {
+  readonly surface?: MapSurface;
+  readonly onDrawnClipboardFailuresChange?: (failures: readonly DrawnClipboardFailure[]) => void;
+  readonly onDrawnSpacesChange?: (entries: readonly OpenSpace[]) => void;
   /** Where a Space Resource rail's Map report is held. */
   readonly commandOutcomes: CommandOutcomes;
   /** Where a Space Resource rail's Delete Map and Delete Graph ask first. */
@@ -290,7 +293,7 @@ export interface SpaceCanvasProps {
    * The Space's image replacements (ADR 0106), which own the whole attempt.
    * Absent offers no Replace on an Image Resource.
    */
-  imageReplacement?: Pick<ImageReplacements, 'replace'> | undefined;
+  imageReplacement: Pick<ImageReplacements, 'replace'>;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *
@@ -368,6 +371,9 @@ interface EmbeddedConnectionStart {
 }
 
 export function SpaceCanvas({
+  surface,
+  onDrawnClipboardFailuresChange,
+  onDrawnSpacesChange,
   commandOutcomes,
   deleteConfirmation,
   nodes,
@@ -451,10 +457,54 @@ export function SpaceCanvas({
     publishEmbedded,
     reportBodyHeight,
     editingPortals,
-    onPortalEditingChange,
+    onPortalEditingChange: setPortalEditing,
     portalDraft,
     setPortalDraft,
-  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds);
+  } = useEmbeddedOpenSpaceResources(
+    nodes,
+    spaces,
+    draggingIds,
+    {
+      spaceId: thisSpaceId,
+      mapId,
+      policy: availability.authorInEmbeddedMap ? 'authoring' : 'inert',
+    },
+    placementReady,
+  );
+
+  const onPortalEditingChange = useCallback(
+    (resourceId: ResourceId, editing: boolean) => {
+      setPortalEditing(resourceId, editing);
+      if (!editing) onSelectResource(resourceId);
+    },
+    [setPortalEditing, onSelectResource],
+  );
+
+  const drawnSpaces = useMemo(
+    () => [
+      ...new Map(
+        embeddedRequests.flatMap((request) =>
+          request.entry === undefined ? [] : [[request.entry.id, request.entry] as const],
+        ),
+      ).values(),
+    ],
+    [embeddedRequests],
+  );
+  useEffect(() => {
+    onDrawnSpacesChange?.(drawnSpaces);
+  }, [drawnSpaces, onDrawnSpacesChange]);
+
+  const clipboardFailures = useMemo(
+    () =>
+      embeddedRequests.flatMap((request) => {
+        const failure = embeddedPublications.get(request.parent.id)?.clipboardFailure;
+        return failure == null ? [] : [failure];
+      }),
+    [embeddedRequests, embeddedPublications],
+  );
+  useEffect(() => {
+    onDrawnClipboardFailuresChange?.(clipboardFailures);
+  }, [clipboardFailures, onDrawnClipboardFailuresChange]);
 
   const editingEmbeddingIds = new Set(
     embeddedRequests.flatMap((request) => {
@@ -538,6 +588,7 @@ export function SpaceCanvas({
     [resourceEntityActions, placedResources, onSelectResource, mapId],
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
+    continuation: surface?.continuation,
     commandOutcomes,
     deleteConfirmation,
     nodes,
@@ -586,7 +637,15 @@ export function SpaceCanvas({
         return [
           {
             ...value,
+            availability: surfaceAvailability(value.availability, request.policy, request.depth),
             changeNodes: () => undefined,
+            edges: value.edges.map((edge) => ({
+              ...edge,
+              selected: false,
+              selectable: false,
+              focusable: false,
+              deletable: false,
+            })),
             // The three Resource commands aimed at a retained read answer it the
             // same way: reopen the target's session so the next press acts.
             // The canvas still announces that delete removes the focused Resource
@@ -600,10 +659,13 @@ export function SpaceCanvas({
             },
             nodes: value.nodes.map((node): ResourceFlowNode => ({
               ...clipEmbeddedNode(node, request.bounds),
-              draggable: false,
+              draggable: request.policy === 'authoring',
+              connectable: request.policy === 'authoring',
+              selectable: request.policy === 'authoring',
+              focusable: request.policy === 'authoring',
               data: {
                 ...node.data,
-                readOnly: true,
+                readOnly: request.policy === 'read-only',
                 onEditResource: () => {
                   void resumeEmbedded(request.spaceId);
                   return 'retained';
@@ -619,6 +681,28 @@ export function SpaceCanvas({
     [embeddedRequests, embeddedPublications, resumeEmbedded],
   );
 
+  useEffect(() => {
+    const drawn = [
+      ...(surface === undefined ? [] : [surface]),
+      ...liveEmbeddings.map((entry) => entry.surface),
+    ];
+    return observeMapSurfaces(drawn);
+  }, [surface, liveEmbeddings]);
+
+  const embeddingAt = useCallback(
+    (point: { readonly x: number; readonly y: number }) =>
+      [...embeddedRequests]
+        .reverse()
+        .find(
+          ({ absolute, bounds }) =>
+            point.x >= absolute.x + bounds.left &&
+            point.x <= absolute.x + bounds.right &&
+            point.y >= absolute.y + bounds.top &&
+            point.y <= absolute.y + bounds.bottom,
+        ),
+    [embeddedRequests],
+  );
+
   const embedConnectFrom = useRef<EmbeddedConnectionStart | null>(null);
   // The embedding a connection in flight started in, as state so the preview
   // redraws in that embedding's Graph when one starts. The ref above stays the
@@ -626,6 +710,34 @@ export function SpaceCanvas({
   // own that is refreshed after commit, so a closure over this state would
   // answer from the render before the connection started.
   const [embeddedConnectionParent, setEmbeddedConnectionParent] = useState<string | null>(null);
+  const [embeddedAltHeld, setEmbeddedAltHeld] = useState(false);
+  const [embeddedDropEmpty, setEmbeddedDropEmpty] = useState(false);
+  useEffect(() => {
+    if (embeddedConnectionParent === null) return;
+    const changed = (event: KeyboardEvent) => {
+      if (event.key === 'Alt') setEmbeddedAltHeld(event.type === 'keydown');
+    };
+    const clear = () => setEmbeddedAltHeld(false);
+    window.addEventListener('keydown', changed);
+    window.addEventListener('keyup', changed);
+    window.addEventListener('blur', clear);
+    return () => {
+      window.removeEventListener('keydown', changed);
+      window.removeEventListener('keyup', changed);
+      window.removeEventListener('blur', clear);
+    };
+  }, [embeddedConnectionParent]);
+  const connectingEmbedding =
+    embeddedConnectionParent === null
+      ? undefined
+      : embeddedPublications.get(embeddedConnectionParent);
+  const embeddedPreviewScale =
+    connectingEmbedding === undefined
+      ? 1
+      : 1 /
+        (connectingEmbedding.toAuthored({ x: 1, y: 0 }).x -
+          connectingEmbedding.toAuthored({ x: 0, y: 0 }).x);
+
   const mayOfferEmbedded = useCallback(
     (resourceId: ResourceId) => {
       const session = embedConnectFrom.current;
@@ -638,7 +750,17 @@ export function SpaceCanvas({
     },
     [embeddedPublications],
   );
+  const commandsByEdge = useMemo(
+    () =>
+      new Map(
+        liveEmbeddings.flatMap((value) =>
+          value.edges.map((edge) => [edge.id, value.edgeSurface.commands] as const),
+        ),
+      ),
+    [liveEmbeddings],
+  );
   const edgeSurface = useEdgeAuthoring({
+    commandsByEdge,
     authoring: edgeAuthoring,
     edges,
     projectedNodes,
@@ -669,60 +791,139 @@ export function SpaceCanvas({
   // (ADR 0065), whose events stop before this canvas handler. Opening is the
   // affordance and the Resource-level keyboard command.
 
-  const handleKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
-      if (event.key === 'Enter' || event.key === ' ') {
-        if (bodyEditing) return;
-        // The same exclusion the `C` branch below makes, and load-bearing
-        // rather than defensive: an Open Resource draws its editor *inside* the
-        // node, so a Space typed into it would otherwise be cancelled here
-        // before the document ever received the character.
-        if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
-        const resource = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
-        if (resource === null || !event.currentTarget.contains(resource)) return;
-        const resourceId = resource.dataset['id'];
-        if (resourceId === undefined) return;
-        event.preventDefault();
-        const embedded = liveEmbeddings
-          .flatMap((value) => value.nodes)
-          .find((node) => node.id === resourceId);
-        if (embedded === undefined) onOpenResource(resourceId);
-        else embedded.data.onEditResource?.(true);
-        return;
-      }
-      // `C` adds a Resource, and it is the only unmodified authoring shortcut there
-      // is. Answered here rather than on the window, so "graph focused" is a
-      // fact about where the event came from rather than a guess: this handler
-      // sits on React Flow's own wrapper, so a key pressed in the toolbar, in a
-      // pane over the graph or in the Resources View never reaches it.
-      //
-      // Three exclusions, and each names a different way the key is not a
-      // command. A modifier makes it a browser or OS shortcut. A repeat is one
-      // press held down, and a command runs once per press. And a text control
-      // is somewhere the author is *typing* a c — the inline title editor stops
-      // its own key events before they get here, so this covers whatever text
-      // entry the canvas gains next rather than a case that exists today.
-      if (event.key.toUpperCase() !== ADD_RESOURCE_KEY) return;
-      // `shiftKey` belongs here for a reason the others do not share: matching
-      // case-insensitively is what lets Caps Lock work, and it lets Shift
-      // through in the same breath, since both arrive as `C`. Only the flag
-      // tells them apart — Caps Lock changes the character and never sets it.
-      // Without this the toolbar announces `aria-keyshortcuts="C"`, which ARIA
-      // defines as the unmodified key, while the canvas answers Shift+C too.
-      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-      if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
-      // The default is prevented only where the command can actually run
-      // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while authoring is
-      // withdrawn is left to whatever else would have had it. The guard at the
-      // top of this handler is the other half of that: it is `authorOnCanvas`
-      // rather than the mode alone, so every branch below is already behind it.
-      if (bodyEditing) return;
-      event.preventDefault();
-      onAddResource();
-    },
-    [onOpenResource, availability.authorOnCanvas, bodyEditing, onAddResource, liveEmbeddings],
+  const occurrences = useMemo(
+    () => [
+      {
+        id: 'root',
+        addResource: onAddResource,
+        nodes,
+        authoring,
+        availability,
+        bodyEditing: resourceAuthoring.bodyEditing,
+        openResource: onOpenResource,
+        beginTitleEditing,
+        selection,
+        removeResource: (id: string) => {
+          const resourceId = nodes.find((node) => node.id === id)?.data.resourceId;
+          if (resourceId === undefined) return null;
+          const result = authoring.complete({ kind: 'removed-resource-from-map', resourceId });
+          return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
+        },
+        edgeAuthoring,
+        deleteSelectedEdge: () =>
+          edgeSurface.deleteEdges(edgeSurface.edges.filter((edge) => edge.selected)),
+      },
+      ...liveEmbeddings.map((value) => ({
+        id: value.surface.context().occurrence ?? '',
+        addResource: value.placement.addResource,
+        nodes: value.nodes,
+        authoring: value.surface.authoring,
+        availability: value.availability,
+        bodyEditing: value.bodyEditing,
+        selection: value.surface.adapter.getState().selection,
+        openResource: (id: string) => {
+          const resourceId = value.nodes.find((node) => node.id === id)?.data.resourceId;
+          if (resourceId !== undefined) value.openResource(resourceId);
+        },
+        beginTitleEditing: (id: string) => {
+          const resourceId = value.nodes.find((node) => node.id === id)?.data.resourceId;
+          if (resourceId !== undefined) value.beginTitleEditing(resourceId);
+        },
+        removeResource: value.removeResource,
+        edgeAuthoring: value.surface.edgeAuthoring,
+        deleteSelectedEdge: () => {
+          const selected = value.surface.adapter.getState().selection;
+          if (selected.kind !== 'edge') return;
+          value.surface.edgeAuthoring.askToDelete([selected], (target) => {
+            if (target.kind !== 'resource') return canvasRef.current;
+            const node = value.nodes.find(
+              (candidate) => candidate.data.resourceId === target.resourceId,
+            );
+            return node === undefined
+              ? canvasRef.current
+              : document.querySelector<HTMLElement>(
+                  `.react-flow__node[data-id="${CSS.escape(node.id)}"]`,
+                );
+          });
+        },
+      })),
+    ],
+    [
+      nodes,
+      authoring,
+      availability,
+      resourceAuthoring.bodyEditing,
+      onOpenResource,
+      beginTitleEditing,
+      selection,
+      edgeAuthoring,
+      edgeSurface,
+      liveEmbeddings,
+      onAddResource,
+    ],
   );
+
+  const latestOccurrences = useRef(occurrences);
+  useLayoutEffect(() => {
+    latestOccurrences.current = occurrences;
+  }, [occurrences]);
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof Element)) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      if (bodyEditing) return;
+      // The same exclusion the `C` branch below makes, and load-bearing
+      // rather than defensive: an Open Resource draws its editor *inside* the
+      // node, so a Space typed into it would otherwise be cancelled here
+      // before the document ever received the character.
+      if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
+      const resource = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
+      if (resource === null || !event.currentTarget.contains(resource)) return;
+      const resourceId = resource.dataset['id'];
+      if (resourceId === undefined) return;
+      event.preventDefault();
+      const occurrence = occurrences.find((value) =>
+        value.nodes.some((node) => node.id === resourceId),
+      );
+      if (occurrence?.availability.authorOnCanvas !== true || occurrence.bodyEditing) return;
+      occurrence.openResource(resourceId);
+      return;
+    }
+    // `C` adds a Resource, and it is the only unmodified authoring shortcut there
+    // is. Answered here rather than on the window, so "graph focused" is a
+    // fact about where the event came from rather than a guess: this handler
+    // sits on React Flow's own wrapper, so a key pressed in the toolbar, in a
+    // pane over the graph or in the Resources View never reaches it.
+    //
+    // Three exclusions, and each names a different way the key is not a
+    // command. A modifier makes it a browser or OS shortcut. A repeat is one
+    // press held down, and a command runs once per press. And a text control
+    // is somewhere the author is *typing* a c — the inline title editor stops
+    // its own key events before they get here, so this covers whatever text
+    // entry the canvas gains next rather than a case that exists today.
+    if (event.key.toUpperCase() !== ADD_RESOURCE_KEY) return;
+    // `shiftKey` belongs here for a reason the others do not share: matching
+    // case-insensitively is what lets Caps Lock work, and it lets Shift
+    // through in the same breath, since both arrive as `C`. Only the flag
+    // tells them apart — Caps Lock changes the character and never sets it.
+    // Without this the toolbar announces `aria-keyshortcuts="C"`, which ARIA
+    // defines as the unmodified key, while the canvas answers Shift+C too.
+    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
+    // The default is prevented only where the command can actually run
+    // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while authoring is
+    // withdrawn is left to whatever else would have had it. The guard at the
+    // top of this handler is the other half of that: it is `authorOnCanvas`
+    // rather than the mode alone, so every branch below is already behind it.
+    const current =
+      occurrences.find(
+        (value) => value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
+      ) ?? occurrences[0];
+    if (current === undefined || !current.availability.authorOnCanvas || current.bodyEditing)
+      return;
+    event.preventDefault();
+    current.addResource();
+  };
 
   // `F2` renames the selected Resource, and this is the *only* handler that answers
   // it. Don't add a second, such as a React Flow `onKeyDown` branch: two handlers
@@ -730,31 +931,32 @@ export function SpaceCanvas({
   // nothing about the target renames whichever Resource happens to be selected
   // when the key is typed into a control.
   useLayoutEffect(() => {
-    if (!availability.authorOnCanvas || bodyEditing) return;
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (event.key !== 'F2') return;
       if (event.target instanceof Element && event.target.closest(NOT_A_CANVAS_COMMAND) !== null) {
         return;
       }
-      const embedded = liveEmbeddings.flatMap((value) => value.nodes).find((node) => node.selected);
-      if (embedded !== undefined) {
-        event.preventDefault();
-        embedded.data.onBeginTitleEditing?.();
+      const occurrence = latestOccurrences.current.find((value) =>
+        value.nodes.some((node) => node.selected),
+      );
+      if (
+        occurrence === undefined ||
+        !occurrence.availability.authorOnCanvas ||
+        occurrence.bodyEditing
+      )
         return;
-      }
-      const selected = nodes.find((node) => node.selected);
+      const selected = occurrence.nodes.find((node) => node.selected);
       if (selected === undefined) return;
       event.preventDefault();
-      beginTitleEditing(selected.id);
+      occurrence.beginTitleEditing(selected.id);
     };
     window.addEventListener('keydown', beginSelectedTitleEdit);
     return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, [availability.authorOnCanvas, bodyEditing, nodes, beginTitleEditing, liveEmbeddings]);
+  }, []);
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
   // that depended on the object would be rebuilt every time.
-  const deleteEdges = edgeSurface.deleteEdges;
   const editableNodes = resourceAuthoring.nodes;
   /**
    * The canvas React Flow draws: this Space's Resources, then the Maps its
@@ -805,6 +1007,27 @@ export function SpaceCanvas({
   const canvasEdges = useMemo(
     () => [...edgeSurface.edges, ...liveEmbeddings.flatMap((value) => value.edges)],
     [edgeSurface.edges, liveEmbeddings],
+  );
+  const changeCanvasEdges = useCallback<OnEdgesChange>(
+    (changes) => {
+      const rootChanges = changes.filter((change) => {
+        if (change.type === 'add') return true;
+        const owner = liveEmbeddings.find((value) =>
+          value.edges.some((edge) => edge.id === change.id),
+        );
+        if (owner === undefined) return true;
+        if (change.type !== 'select' || !owner.availability.authorOnCanvas) return false;
+        const edge = owner.edges.find((candidate) => candidate.id === change.id);
+        const subject = edge === undefined ? null : edgeSelectionOf(edge);
+        if (subject === null) return false;
+        const adapter = owner.surface.adapter.getState();
+        if (change.selected) adapter.selectEdge(subject);
+        else if (sameSelection(adapter.selection, subject)) adapter.clearSelection();
+        return false;
+      });
+      onEdgesChange(rootChanges);
+    },
+    [liveEmbeddings, onEdgesChange],
   );
   // A stable identity, or React Flow warns of a fresh `edgeTypes` object (#002).
   const canvasEdgeTypes = useMemo(
@@ -1053,41 +1276,6 @@ export function SpaceCanvas({
     setCommandRefusal(null);
   }
 
-  const latestDeletion = useRef({
-    embedded: liveEmbeddings,
-    authoring,
-    bodyEditing,
-    authorOnCanvas: availability.authorOnCanvas,
-    deleteEdges,
-    edges: edgeSurface.edges,
-    nodes,
-    selection,
-  });
-  // A native event can arrive after commit but before passive effects. Refresh
-  // the snapshot in the synchronous commit phase so the stable listener cannot
-  // act on the previous selection or refusal state.
-  useLayoutEffect(() => {
-    latestDeletion.current = {
-      embedded: liveEmbeddings,
-      authoring,
-      bodyEditing,
-      authorOnCanvas: availability.authorOnCanvas,
-      deleteEdges,
-      edges: edgeSurface.edges,
-      nodes,
-      selection,
-    };
-  }, [
-    authoring,
-    bodyEditing,
-    availability.authorOnCanvas,
-    deleteEdges,
-    edgeSurface.edges,
-    nodes,
-    selection,
-    liveEmbeddings,
-  ]);
-
   useEffect(() => {
     const deleteSelection = (event: KeyboardEvent): void => {
       if (event.key !== 'Backspace' && event.key !== 'Delete') return;
@@ -1103,48 +1291,22 @@ export function SpaceCanvas({
       if (!(event.target instanceof Element)) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       if (canvasRef.current?.contains(event.target) !== true) return;
-      const current = latestDeletion.current;
-      if (!current.authorOnCanvas || current.bodyEditing) return;
       const focusedNodeId = event.target.closest<HTMLElement>('.react-flow__node[data-id]')
         ?.dataset['id'];
-      const embedded = current.embedded.find((value) =>
-        value.nodes.some(
-          (node) => node.id === focusedNodeId || (focusedNodeId === undefined && node.selected),
-        ),
+      const current = latestOccurrences.current.find((value) =>
+        focusedNodeId === undefined
+          ? value.selection.kind !== 'none' || value.nodes.some((node) => node.selected)
+          : value.nodes.some((node) => node.id === focusedNodeId),
       );
-      const embeddedId = focusedNodeId ?? embedded?.nodes.find((node) => node.selected)?.id;
-      if (embedded !== undefined && embeddedId !== undefined) {
-        event.preventDefault();
-        setCommandRefusal(embedded.removeResource(embeddedId));
+      if (current === undefined || !current.availability.authorOnCanvas || current.bodyEditing)
         return;
-      }
-      // The Resource the key was *aimed at* wins over the one selected before it.
-      // React Flow never selects a node on focus — its `onFocus` only auto-pans
-      // — and only the Edge half of this canvas bridges the two, so a Tab to
-      // another Resource leaves the selection behind while that Resource's assistive
-      // description promises Delete removes *it*. The open branch above already
-      // resolves its Resource this way; the selection is the fallback for a press
-      // that came from the pane rather than from a node.
-      const focusedResourceId = focusedResource(event.target, current.nodes);
-      const { selection } = current;
-      const resourceId =
-        focusedResourceId ?? (selection.kind === 'resource' ? selection.resourceId : null);
-      if (resourceId !== null) {
+      const nodeId = focusedNodeId ?? current.nodes.find((node) => node.selected)?.id;
+      if (nodeId !== undefined) {
         event.preventDefault();
-        const result = current.authoring.complete({
-          kind: 'removed-resource-from-map',
-          resourceId,
-        });
-        setCommandRefusal(
-          result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null,
-        );
-        return;
-      }
-      if (selection.kind === 'edge') {
-        const selectedEdges = current.edges.filter((edge) => edge.selected);
-        if (selectedEdges.length === 0) return;
+        setCommandRefusal(current.removeResource(nodeId));
+      } else if (current.selection.kind === 'edge') {
         event.preventDefault();
-        current.deleteEdges(selectedEdges);
+        current.deleteSelectedEdge();
       }
     };
     window.addEventListener('keydown', deleteSelection);
@@ -1183,19 +1345,38 @@ export function SpaceCanvas({
     selectionOnDrag,
   } = edgeSurface.reactFlowProps;
 
+  const onCanvasEdgeMouseEnter = useCallback<EdgeMouseHandler>(
+    (event, edge) => {
+      const owner = liveEmbeddings.find((value) => value.edges.some((each) => each.id === edge.id));
+      (owner?.edgeSurface.reactFlowProps.onEdgeMouseEnter ?? onEdgeMouseEnter)(event, edge);
+    },
+    [liveEmbeddings, onEdgeMouseEnter],
+  );
+  const onCanvasEdgeMouseLeave = useCallback<EdgeMouseHandler>(
+    (event, edge) => {
+      const owner = liveEmbeddings.find((value) => value.edges.some((each) => each.id === edge.id));
+      (owner?.edgeSurface.reactFlowProps.onEdgeMouseLeave ?? onEdgeMouseLeave)(event, edge);
+    },
+    [liveEmbeddings, onEdgeMouseLeave],
+  );
   const onEmbeddedConnectStart = useCallback<OnConnectStart>(
     (event, params) => {
       const parsed = parseEmbeddedNodeId(params.nodeId ?? '');
       if (parsed !== undefined) {
         embedConnectFrom.current = { parentId: parsed.parentId, from: parsed.resourceId };
         setEmbeddedConnectionParent(parsed.parentId);
+        setEmbeddedAltHeld('altKey' in event && event.altKey);
+        setEmbeddedDropEmpty(false);
+        embeddedPublications
+          .get(parsed.parentId)
+          ?.surface.edgeAuthoring.beginPointerConnect(parsed.resourceId);
         return;
       }
       embedConnectFrom.current = null;
       setEmbeddedConnectionParent(null);
       onConnectStart(event, params);
     },
-    [onConnectStart],
+    [onConnectStart, embeddedPublications],
   );
   const onEmbeddedConnect = useCallback<OnConnect>(
     (connection) => {
@@ -1205,17 +1386,75 @@ export function SpaceCanvas({
         return;
       }
       if (routed.kind === 'host') onConnect(connection);
+      else setCommandRefusal('An Edge can connect Resources only within the same drawn Map.');
     },
     [embeddedPublications, onConnect],
   );
   const onEmbeddedConnectEnd = useCallback<OnConnectEnd>(
     (event, connection) => {
+      const source = connection.fromNode?.id;
+      const target =
+        connection.toNode?.id ??
+        ('clientX' in event
+          ? document
+              .elementFromPoint(event.clientX, event.clientY)
+              ?.closest<HTMLElement>('.react-flow__node[data-id]')?.dataset['id']
+          : undefined);
+      if (
+        source !== undefined &&
+        target !== undefined &&
+        target !== embedConnectFrom.current?.parentId &&
+        canvasNodeConnection(source, target).kind === 'invalid'
+      ) {
+        setCommandRefusal('An Edge can connect Resources only within the same drawn Map.');
+      }
+      const embedded = embedConnectFrom.current;
       embedConnectFrom.current = null;
       setEmbeddedConnectionParent(null);
-      onConnectEnd(event, connection);
+      if (embedded === null) {
+        onConnectEnd(event, connection);
+        return;
+      }
+      const publication = embeddedPublications.get(embedded.parentId);
+      if (publication === undefined) return;
+      if ('clientX' in event && 'altKey' in event) {
+        const point = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        const owner = embeddingAt(point);
+        const drop = newResourceDrop(
+          {
+            kind: 'dragging',
+            sourceId: embedded.from,
+            point: publication.toAuthored(point),
+            over: dropTarget({
+              connectionTarget: connection.toNode !== null,
+              element:
+                owner?.parent.id !== embedded.parentId
+                  ? 'off-canvas'
+                  : target === embedded.parentId || target === undefined
+                    ? 'empty-canvas'
+                    : 'resource',
+            }),
+            modifierHeld: event.altKey,
+          },
+          () =>
+            publication.availability.authorOnCanvas &&
+            publication.surface.edgeAuthoring.accepts({
+              kind: 'create-and-connect',
+              from: embedded.from,
+            }),
+        );
+        if (drop !== null)
+          publication.surface.edgeAuthoring.createConnectedResource(
+            embedded.from,
+            drop.position,
+            publication.surface.adapter.getState().projection?.nodes ?? null,
+          );
+      }
+      publication.surface.edgeAuthoring.endPointerDrag();
     },
-    [onConnectEnd],
+    [onConnectEnd, embeddedPublications, screenToFlowPosition, embeddingAt],
   );
+
   const isEmbeddedConnectionValid = useCallback<IsValidConnection>(
     (connection) => {
       const routed = canvasNodeConnection(connection.source, connection.target);
@@ -1252,9 +1491,22 @@ export function SpaceCanvas({
   const trackPointer = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       pointer.current = { x: event.clientX, y: event.clientY };
+      if (embedConnectFrom.current !== null) {
+        const point = screenToFlowPosition(pointer.current);
+        const owner = embeddingAt(point);
+        const target =
+          event.target instanceof Element
+            ? event.target.closest<HTMLElement>('.react-flow__node[data-id]')?.dataset['id']
+            : undefined;
+        setEmbeddedDropEmpty(
+          owner?.parent.id === embedConnectFrom.current.parentId &&
+            (target === owner.parent.id || target === undefined),
+        );
+        setEmbeddedAltHeld(event.altKey);
+      }
       onMouseMove(event);
     },
-    [onMouseMove],
+    [onMouseMove, screenToFlowPosition, embeddingAt],
   );
   const forgetPointer = useCallback(() => {
     pointer.current = null;
@@ -1277,13 +1529,47 @@ export function SpaceCanvas({
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2,
       };
+      const point = screenToFlowPosition(at);
+      const request = embeddingAt(point);
+      if (request !== undefined) {
+        const drawing = embeddedPublications.get(request.parent.id);
+        if (request.policy !== 'authoring' || drawing?.availability.addResource !== true) {
+          setCommandRefusal('Edit this Map before adding Resources.');
+          return;
+        }
+        const local = drawing.toAuthored(point);
+        drawing.placement.pasteImageUrl(url, {
+          x: local.x - RESOURCE_SIZE.width / 2,
+          y: local.y - RESOURCE_SIZE.height / 2,
+        });
+        setCommandRefusal(null);
+        return;
+      }
       onPasteImageUrl(url, anchorAt(at.x, at.y));
     },
-    [availability.authorOnCanvas, onPasteImageUrl, anchorAt],
+    [
+      availability.authorOnCanvas,
+      onPasteImageUrl,
+      anchorAt,
+      screenToFlowPosition,
+      embeddingAt,
+      embeddedPublications,
+    ],
   );
 
   const onExternalDragOver = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
+      const request = embeddingAt(screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+      if (
+        request !== undefined &&
+        (event.dataTransfer.types.includes('Files') ||
+          event.dataTransfer.types.includes(RESOURCE_DRAG_TYPE) ||
+          event.dataTransfer.types.includes(SPACE_DRAG_TYPE))
+      ) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = request.policy === 'authoring' ? 'copy' : 'none';
+        return;
+      }
       const files = fileDropAt(event, availability.authorOnCanvas);
       if (files !== null) {
         event.preventDefault();
@@ -1301,11 +1587,50 @@ export function SpaceCanvas({
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
     },
-    [availability.authorOnCanvas],
+    [availability.authorOnCanvas, embeddingAt, screenToFlowPosition],
   );
 
   const onExternalDrop = useCallback(
     (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!(event.target instanceof Element) || event.target.closest(NOT_A_CANVAS_COMMAND) !== null)
+        return;
+      const point = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      const request = embeddingAt(point);
+      if (request !== undefined) {
+        event.preventDefault();
+        const drawing = embeddedPublications.get(request.parent.id);
+        if (request.policy !== 'authoring' || drawing?.availability.addResource !== true) {
+          setCommandRefusal('Edit this Map before adding Resources.');
+          return;
+        }
+        const local = drawing.toAuthored(point);
+        const anchor = {
+          x: local.x - RESOURCE_SIZE.width / 2,
+          y: local.y - RESOURCE_SIZE.height / 2,
+        };
+        if (event.dataTransfer.types.includes('Files')) {
+          drawing.placement.dropImages([...event.dataTransfer.files], anchor);
+          setCommandRefusal(null);
+        } else {
+          const resourceId = uuidSchema.safeParse(event.dataTransfer.getData(RESOURCE_DRAG_TYPE));
+          const spaceId = uuidSchema.safeParse(event.dataTransfer.getData(SPACE_DRAG_TYPE));
+          if (resourceId.success)
+            setCommandRefusal(drawing.placement.addExistingResource(resourceId.data, anchor, true));
+          else if (spaceId.success) {
+            void drawing.entry.spaceResources
+              .target(spaceId.data)
+              .then(async (target) => {
+                setCommandRefusal(
+                  target === undefined
+                    ? 'This Space could not be opened.'
+                    : await drawing.placement.addSpaceResourceFor(target, anchor),
+                );
+              })
+              .catch(drawing.entry.app.reportObserverError);
+          }
+        }
+        return;
+      }
       // Files first: a drop from the desktop carries no Resources list type,
       // and the browser would otherwise open the file in place of the Space.
       const files = fileDropAt(event, availability.authorOnCanvas);
@@ -1331,7 +1656,16 @@ export function SpaceCanvas({
       if (resourceId.success) onAddExistingResource(resourceId.data, anchor);
       else if (spaceId.success) onPlaceSpace(spaceId.data, anchor);
     },
-    [availability.authorOnCanvas, onAddExistingResource, onPlaceSpace, onDropImages, anchorAt],
+    [
+      availability.authorOnCanvas,
+      onAddExistingResource,
+      onPlaceSpace,
+      onDropImages,
+      anchorAt,
+      screenToFlowPosition,
+      embeddingAt,
+      embeddedPublications,
+    ],
   );
 
   const embeddedEvents = useMemo(() => {
@@ -1355,7 +1689,7 @@ export function SpaceCanvas({
       edgeTypes={canvasEdgeTypes}
       onNodesChange={changeCanvasNodes}
       {...embeddedEvents}
-      onEdgesChange={onEdgesChange}
+      onEdgesChange={changeCanvasEdges}
       // Edge Authoring's own properties, named one by one rather than spread, so
       // no property order below can silently replace one of its handlers.
       onConnect={onEmbeddedConnect}
@@ -1365,8 +1699,8 @@ export function SpaceCanvas({
       onMouseMove={trackPointer}
       onMouseLeave={forgetPointer}
       onPaste={onPaste}
-      onEdgeMouseEnter={onEdgeMouseEnter}
-      onEdgeMouseLeave={onEdgeMouseLeave}
+      onEdgeMouseEnter={onCanvasEdgeMouseEnter}
+      onEdgeMouseLeave={onCanvasEdgeMouseLeave}
       onDragOver={onExternalDragOver}
       onDrop={onExternalDrop}
       edgesReconnectable={edgesReconnectable}
@@ -1428,6 +1762,13 @@ export function SpaceCanvas({
       // outside its own extent and the first wheel tick yanks it back.
       maxZoom={MAX_ZOOM}
     >
+      {surface !== undefined && (
+        <ChromeContinuation
+          continuation={surface.continuation}
+          within={canvasRef}
+          chromeRenameReady={availability.authorOnCanvas}
+        />
+      )}
       <Background gap={24} />
       <GraphHeadMarkers />
       <svg aria-hidden="true" width={0} height={0}>
@@ -1455,40 +1796,16 @@ export function SpaceCanvas({
         </defs>
       </svg>
       {embeddedRequests.map((request) =>
-        request.entry === undefined ? null : (
+        request.entry?.app.currentSpace().lookup.map(request.mapId) === undefined ? null : (
           <EmbeddedMapAuthoring
-            commandOutcomes={commandOutcomes}
-            deleteConfirmation={deleteConfirmation}
             key={`${request.parent.id}:${request.mapId}`}
             parent={request.parent}
             entry={request.entry}
             mapId={request.mapId}
             graphId={request.graphId}
-            // Two answers and one membership test, and each is here for its own
-            // reason. `authorInEmbeddedMap` is every way this canvas is not
-            // being authored *except* an embedded edit; `authorOnCanvas` adds
-            // that one, so it is false the moment any embedding is editing —
-            // and the membership test is that same fact read the other way
-            // round, reinstating the one embedding that owns the edit. Which
-            // embedding it is never leaves this component, so it could not be
-            // an answer.
-            //
-            // The two live edits are this canvas's own and read at same-render
-            // freshness; the answers `App` holds are a frame behind them, since
-            // each is reported up through an effect.
-            enabled={embeddedAuthoringEnabled({
-              readOnly: request.readOnly,
-              portalEditing: embeddingIsPortalEditing(
-                request.parent,
-                portalNodesById,
-                editingPortals,
-              ),
-              authorInEmbeddedMap: availability.authorInEmbeddedMap,
-              authorOnCanvas: availability.authorOnCanvas,
-              thisEmbeddingEditing: editingEmbeddingIds.has(request.parent.id),
-              hostBodyEditing: bodyEditing,
-              hostTitleEditing: resourceAuthoring.titleEditing,
-            })}
+            policy={request.policy}
+            depth={request.depth}
+            spaceOnCanvas={!embeddedEditing || editingEmbeddingIds.has(request.parent.id)}
             framing={
               portalDraft.get(request.parent.data.resourceId) ??
               spaceViewOf(request.parent.data.display)?.view.framing
@@ -1542,6 +1859,26 @@ export function SpaceCanvas({
       <PresentingCamera activeResourceId={activeResourceId} />
       <OpeningFramingCamera framing={openingFraming} />
       {edgeSurface.layer}
+      {connectingEmbedding !== undefined && (
+        <NewResourcePreview
+          title={nextResourceTitle(connectingEmbedding.entry.session.getState().working)}
+          scale={embeddedPreviewScale}
+          modifierHeld={embeddedAltHeld}
+          pointerOver={embeddedDropEmpty ? 'empty-canvas' : 'off-canvas'}
+          accepts={(source) => {
+            const parsed = parseEmbeddedNodeId(source);
+            if (parsed === undefined) return false;
+            return (
+              parsed.parentId === embeddedConnectionParent &&
+              connectingEmbedding.availability.authorOnCanvas &&
+              connectingEmbedding.surface.edgeAuthoring.accepts({
+                kind: 'create-and-connect',
+                from: parsed.resourceId,
+              })
+            );
+          }}
+        />
+      )}
       <ResourceConnect
         connecting={openConnect}
         placed={placedResources}

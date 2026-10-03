@@ -30,10 +30,12 @@ export function CanvasContinuation({
   continuation,
   onSelectResource,
   onSelectEdge,
+  resourceNodeId = (resourceId) => resourceId,
 }: {
   readonly continuation: Continuation;
   readonly onSelectResource: (resourceId: ResourceId) => void;
   readonly onSelectEdge: (subject: EdgeSubject) => void;
+  readonly resourceNodeId?: (resourceId: ResourceId) => string;
 }) {
   const flow = useReactFlow();
   const { pending } = useSyncExternalStore(continuation.subscribe, continuation.getState);
@@ -89,13 +91,17 @@ export function CanvasContinuation({
     if (target.kind === 'canvas') return canvasElement();
     if (target.kind === 'resource') {
       return document.querySelector<HTMLElement>(
-        `.react-flow__node[data-id="${CSS.escape(target.resourceId)}"]`,
+        `.react-flow__node[data-id="${CSS.escape(resourceNodeId(target.resourceId))}"]`,
       );
     }
     if (target.kind !== 'edge') return null;
     const edge = drawnEdges.find((candidate) => {
       const subject = edgeSelectionOf(candidate);
-      return subject !== null && sameEdgeSubject(subject, target);
+      return (
+        candidate.source === resourceNodeId(target.edge.from) &&
+        subject !== null &&
+        sameEdgeSubject(subject, target)
+      );
     });
     return edge === undefined
       ? null
@@ -129,7 +135,7 @@ export function CanvasContinuation({
       element !== null &&
       (pending.then !== 'reveal' ||
         target.kind !== 'resource' ||
-        flow.getNode(target.resourceId) !== undefined);
+        flow.getNode(resourceNodeId(target.resourceId)) !== undefined);
     if (!drawn && staysOwed(pending)) return;
     if (pending.select) {
       if (target.kind === 'resource') onSelectResource(target.resourceId);
@@ -154,7 +160,11 @@ export function CanvasContinuation({
       // centre the node at the current zoom first; the queued `fitView` applies
       // after it and computes its viewport from the node's bounds alone, so the
       // camera ends where `fitView` puts it.
-      void flow.fitView({ nodes: [{ id: target.resourceId }], padding: 0.5, duration: 0 });
+      void flow.fitView({
+        nodes: [{ id: resourceNodeId(target.resourceId) }],
+        padding: 0.5,
+        duration: 0,
+      });
       element.focus({ preventScroll: true });
       return;
     }

@@ -130,7 +130,10 @@ const mountAuthoring = (
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
+  const { authoring, adapter, imageReplacement } = composeApp({
+    images: unusedImageSources,
+    spaceSession,
+  });
   const initialProps: HookProps = {
     open: false,
     enabled: true,
@@ -141,6 +144,7 @@ const mountAuthoring = (
   const hook = renderHook(
     ({ open, enabled, presenting, nameOnCreation, resourceId }: HookProps) =>
       useCanvasResourceAuthoring({
+        imageReplacement,
         nodes: [node(open, resourceId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
         // into answers by the one module that owns them. A live chrome rename is
@@ -539,9 +543,13 @@ describe('canvas Resource authoring Space rail', () => {
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
+    const { authoring, adapter, imageReplacement } = composeApp({
+      images: unusedImageSources,
+      spaceSession,
+    });
     return renderHook(() =>
       useCanvasResourceAuthoring({
+        imageReplacement,
         nodes: [spaceNode(open, readOnly)],
         availability: authoringAvailability({
           editable: true,
@@ -642,13 +650,17 @@ describe('canvas Resource authoring decoration identity', () => {
   const mountIdentity = () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
+    const { authoring, adapter, imageReplacement } = composeApp({
+      images: unusedImageSources,
+      spaceSession,
+    });
     const onSelectResource = () => undefined;
     const onPortalEditingChange = () => undefined;
     const resourceResize = adapter.getState().resourceResize;
     const hook = renderHook(
       ({ spaceResourceTargets, portalEditing }: IdentityProps) =>
         useCanvasResourceAuthoring({
+          imageReplacement,
           nodes: projection,
           availability: authoringAvailability({
             editable: true,

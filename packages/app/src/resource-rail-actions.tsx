@@ -234,6 +234,7 @@ export function useResourceRailActions(
                         resource.map,
                         resource.graph,
                         resource.framing,
+                        space.id,
                       ),
                     { subject: titleName(resource.title) },
                   );

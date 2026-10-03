@@ -4,6 +4,7 @@ import type { DestinationOpening } from '../destination-opening';
 import type { OpenSpace, OpenSpaces } from '../open-spaces';
 import { OpenSpacesContext } from '../open-spaces-context';
 import { SpaceAppFailure } from './SpaceAppFailure';
+import { useUnsettledLeaveGuard } from '../leave-guard';
 
 function SpaceApplication({
   entry,
@@ -54,6 +55,11 @@ export function OpenSpacesApplication({
 }) {
   const state = useSyncExternalStore(spaces.subscribe, spaces.getState);
   const showing = state.activeSpaceId ?? initial.id;
+  const unsettled =
+    state.composed
+      .map((entry) => entry.session.getState().persistence.kind)
+      .find((kind) => kind !== 'settled') ?? 'settled';
+  useUnsettledLeaveGuard(unsettled, state.replacingImage);
 
   return (
     <OpenSpacesContext.Provider value={spaces}>

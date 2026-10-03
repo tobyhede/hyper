@@ -119,7 +119,7 @@ const blockSave = async (
     .getState()
     .working.resources.find(({ id }) => id === created.resourceId);
   if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created.');
-  const target = await spaces.embed(resource.document.spaceId);
+  const { entry: target } = await spaces.hold(resource.document.spaceId);
   const stored = target.session.getState().working;
   const targetMap = stored.document.defaultMap;
   if (targetMap === undefined) throw new Error('The blocking Space has no Map.');

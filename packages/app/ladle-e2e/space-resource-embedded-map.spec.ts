@@ -381,7 +381,7 @@ test(
   { tag: '@parity:space-resource-context-menus-share-dock-actions' },
   async ({ page }) => {
     await open(page);
-    await exerciseSpaceResourceContextMenus(page, spaceResource(page));
+    await exerciseSpaceResourceContextMenus(page, spaceResource(page), 'Architecture');
   },
 );
 

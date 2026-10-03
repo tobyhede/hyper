@@ -75,4 +75,33 @@ describe('a reveal continuation', () => {
     expect(document.activeElement).toBe(node);
     expect(continuation.getState().pending).toBeNull();
   });
+  it('reaches the requesting drawing when the same Resource is drawn twice', () => {
+    const nodes = ['left', 'right'].map((occurrence) => {
+      const node = document.createElement('div');
+      node.className = 'react-flow__node';
+      node.dataset['id'] = `${occurrence}:${RESOURCE}`;
+      node.tabIndex = 0;
+      document.body.append(node);
+      return node;
+    });
+    const continuation = holding({
+      target: { kind: 'resource', resourceId: RESOURCE },
+      select: true,
+      then: 'focus',
+    });
+    const selected = vi.fn();
+    render(
+      <ReactFlowProvider>
+        <CanvasContinuation
+          continuation={continuation}
+          onSelectResource={selected}
+          onSelectEdge={vi.fn()}
+          resourceNodeId={(resourceId) => `right:${resourceId}`}
+        />
+      </ReactFlowProvider>,
+    );
+    expect(document.activeElement).toBe(nodes[1]);
+    expect(selected).toHaveBeenCalledWith(RESOURCE);
+    expect(continuation.getState().pending).toBeNull();
+  });
 });
