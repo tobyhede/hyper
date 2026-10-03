@@ -874,8 +874,8 @@ describe('Rename Space', () => {
    * Edit that re-resolves from the Map would therefore make a rename of the
    * Space activate a different Graph — moving the emphasis, the Dock's Graph
    * cluster and the product URL for a change that wrote only `document.title`.
-   * `created-map` and `deleted-map` re-resolve because each lands the
-   * reader in a different Map; this one lands nowhere.
+   * `created-map` re-resolves because it lands the reader in a different
+   * Map; this one lands nowhere.
    */
   it('leaves the Active Graph where Navigation put it', () => {
     const twoGraphs: SpaceSnapshot = {
@@ -998,111 +998,7 @@ describe('Rename Space', () => {
   });
 });
 
-describe('Delete Map', () => {
-  const otherGraph: Graph = { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] };
-  const twoMaps: SpaceSnapshot = {
-    ...positionedSnapshot,
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        positionedSnapshot.document.maps![0]!,
-        {
-          id: OTHER_MAP_ID,
-          title: 'Map 2',
-          kind: 'positioned',
-          positions: {
-            [RESOURCE_B]: {
-              x: 80,
-              y: 90,
-              open: true,
-              openSize: { width: 640, height: 360 },
-            },
-          },
-          graphs: [otherGraph],
-          activeGraph: OTHER_GRAPH_ID,
-        },
-      ],
-    },
-  };
-
-  it('deletes only the selected Map and continues in the first survivor', () => {
-    const { authoring, navigation, session } = open(twoMaps, OTHER_MAP_ID);
-
-    expect(authoring.complete({ kind: 'deleted-map', mapId: OTHER_MAP_ID })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(session.getState().working.resources).toEqual(twoMaps.resources);
-    expect(session.getState().working.document.maps).toEqual([
-      positionedSnapshot.document.maps![0]!,
-    ]);
-    expect(navigation.getState().selectedMapId).toBe(MAP_ID);
-    expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    expect(authoring.mapPlacement().get(RESOURCE_A)).toEqual({ x: 10, y: 20, open: false });
-  });
-
-  it('refuses to delete the last Map with a stable identity', () => {
-    const { authoring, session } = openPositioned();
-    const before = session.getState().working;
-
-    expect(authoring.complete({ kind: 'deleted-map', mapId: MAP_ID })).toEqual({
-      kind: 'refused',
-      refusal: { code: 'space-must-keep-map' },
-    });
-    expect(session.getState().working).toBe(before);
-  });
-});
-
-describe('Delete Graph', () => {
-  const twoGraphs: SpaceSnapshot = {
-    ...positionedSnapshot,
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        {
-          ...positionedSnapshot.document.maps![0]!,
-          graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
-          activeGraph: OTHER_GRAPH_ID,
-        },
-      ],
-    },
-  };
-
-  it('removes exactly one Graph and activates the first survivor', () => {
-    const { authoring, session, navigation } = open(twoGraphs);
-
-    expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
-    expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    // Resources and positions are untouched; only the Graph left.
-    expect(session.getState().working.resources).toEqual(positionedSnapshot.resources);
-    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual(
-      positionedSnapshot.document.maps![0]!.positions,
-    );
-  });
-
-  it('keeps the emphasis where it was when another Graph was deleted', () => {
-    const { authoring, navigation } = open(twoGraphs);
-
-    authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID });
-
-    expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
-  });
-
-  it("refuses to delete a Map's last Graph", () => {
-    const { authoring, session } = openPositioned();
-    const before = session.getState().working;
-
-    expect(authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID })).toEqual({
-      kind: 'refused',
-      refusal: { code: 'map-must-keep-graph' },
-    });
-    expect(session.getState().working).toBe(before);
-  });
-
+describe('Graph ownership', () => {
   it('refuses a Graph another Map owns, although the Space plainly holds it', () => {
     const twoMaps: SpaceSnapshot = {
       ...positionedSnapshot,
@@ -1122,7 +1018,9 @@ describe('Delete Graph', () => {
     };
     const { authoring } = open(twoMaps);
 
-    expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
+    expect(
+      authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'graph-not-owned' },
     });
@@ -1879,9 +1777,6 @@ describe('context commands on an embedded Map', () => {
       createdGraphId: MINTED,
     });
     expect(
-      authoring.completeInMap(OTHER_MAP_ID, { kind: 'deleted-graph', graphId: MINTED }).kind,
-    ).toBe('completed');
-    expect(
       authoring.completeInMap(OTHER_MAP_ID, {
         kind: 'renamed-graph',
         graphId: GRAPH_ID,
@@ -1892,37 +1787,10 @@ describe('context commands on an embedded Map', () => {
     expect(mapOf(working, OTHER_MAP_ID)).toMatchObject({
       title: 'Renamed context',
       positions: other.positions,
-      graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed Graph', color: '#f472b6' }],
+      graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed Graph', color: '#f472b6' }, { id: MINTED }],
     });
     expect(mapOf(working, MAP_ID)).toEqual(mapOf(positionedSnapshot, MAP_ID));
     expect(working.document.defaultMap).toBe(MAP_ID);
     expect(navigation.getState()).toEqual(initialNavigation);
   });
-});
-
-it('repairs the target canvas when a context command deletes its active Graph', () => {
-  const { session, navigation, authoring } = open({
-    ...positionedSnapshot,
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        {
-          id: MAP_ID,
-          title: 'Map 1',
-          kind: 'positioned',
-          positions: {
-            [RESOURCE_A]: { x: 10, y: 20, open: false },
-            [RESOURCE_B]: { x: 300, y: 40, open: false },
-          },
-          graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
-          activeGraph: GRAPH_ID,
-        },
-      ],
-    },
-  });
-  expect(authoring.completeInMap(MAP_ID, { kind: 'deleted-graph', graphId: GRAPH_ID }).kind).toBe(
-    'completed',
-  );
-  expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
-  expect(graphsOf(session.getState().working).map((graph) => graph.id)).toEqual([OTHER_GRAPH_ID]);
 });

@@ -453,10 +453,25 @@ describe('planContextDeletion', () => {
         },
       ],
     });
+    // The surviving Map and the target's Resources are carried as they were.
+    const target = stored[1]!;
+    expect(outcome.kind === 'changes' && outcome.changes[0]).toEqual({
+      kind: 'update',
+      spaceId: spaceOf(1),
+      snapshot: {
+        ...target,
+        document: {
+          ...target.document,
+          defaultMap: secondMapOf(1),
+          maps: target.document.maps?.slice(1),
+        },
+      },
+    });
   });
 
   it('prefers the named Graph and moves the Active Graph off the deleted one', () => {
-    const outcome = planContextDeletion(view([space(0, [1]), space(1, [])]), {
+    const stored = [space(0, [1]), space(1, [2]), space(2, [])];
+    const outcome = planContextDeletion(view(stored), {
       targetSpaceId: spaceOf(1),
       mapId: mapOf(1),
       graphId: graphOf(1),
@@ -477,6 +492,22 @@ describe('planContextDeletion', () => {
         },
         { spaceId: META, snapshot: { resources: [{ document: { graph: secondGraphOf(1) } }] } },
       ],
+    });
+    // Only the Graph goes: the Map keeps its positions, and the target its Resources.
+    const target = stored[1]!;
+    const targetMap = target.document.maps![0]!;
+    expect(outcome.kind === 'changes' && outcome.changes[0]).toEqual({
+      kind: 'update',
+      spaceId: spaceOf(1),
+      snapshot: {
+        ...target,
+        document: {
+          ...target.document,
+          maps: [
+            { ...targetMap, activeGraph: secondGraphOf(1), graphs: targetMap.graphs.slice(1) },
+          ],
+        },
+      },
     });
   });
 

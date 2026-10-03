@@ -3,6 +3,9 @@ import { uuidSchema, type ImageNaturalSize, type SpaceSnapshot } from '@project/
 import { MemorySpaceBackend, openSpaceSession, type ImageStoring } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createImageResources, type ImageSources } from '../src/image-creation';
+import { createOpenSpaces } from '../src/open-spaces';
+import { recordingHistory } from './browser-history';
+import { unusedImageSources } from './image-sources';
 import { mintingIds } from './minting';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -314,12 +317,18 @@ describe('an Image Resource gesture the author moves away from', () => {
   });
 
   it('creates nothing when the Map the gesture was made on is gone', async () => {
-    const loaded = { snapshot: twoMaps, revision: 0n, exportedRevision: null };
-    const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, navigation } = composeApp({
-      spaceSession: session,
+    const spaces = createOpenSpaces({
+      images: unusedImageSources,
+      backend: new MemorySpaceBackend(SPACE_ID, [
+        { snapshot: twoMaps, revision: 0n, exportedRevision: null },
+      ]),
+      metaSpaceId: SPACE_ID,
+      metaSpaceTitle: twoMaps.document.title,
       newId: mintingIds(FIRST),
+      history: recordingHistory(),
     });
+    const { app, session, spaceResources } = await spaces.open(SPACE_ID);
+    const { authoring, navigation } = app;
     const url = 'https://example.com/a.png';
     let measured: (size: ImageNaturalSize | undefined) => void = () => undefined;
     const images: ImageSources = {
@@ -337,7 +346,12 @@ describe('an Image Resource gesture the author moves away from', () => {
     );
     await Promise.resolve();
     navigation.selectMap(OTHER_MAP_ID);
-    expect(authoring.complete({ kind: 'deleted-map', mapId: MAP_ID }).kind).toBe('completed');
+    const deleted = await spaceResources.deleteMap({
+      targetSpaceId: SPACE_ID,
+      mapId: MAP_ID,
+      preferredMapId: OTHER_MAP_ID,
+    });
+    expect(deleted.kind).toBe('completed');
     const before = session.getState().working;
     measured(undefined);
 

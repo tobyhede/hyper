@@ -28,18 +28,22 @@ disagreeing with the function.
 
 ## Universal guard
 
-Every action but the three below asks this guard before its own checks:
+Every action but the two below asks this guard before its own checks:
 
 1. Does the selected Map still exist? → `map-not-found`
 
-Three actions are derived **above** it and so ask nothing universal:
-`created-map`, `deleted-map` and `renamed-space` write keys of
-`document` rather than anything inside a Map, read the working snapshot
-direct, and answer their own placement. The last two still resolve a Map —
-for the placement the completion carries, not for permission — so
-`map-not-found` appears in their rows as an ordinary check, and in
-`renamed-space` it is asked *after* the title checks: a blank name is a blank
+Two actions are derived **above** it and so ask nothing universal:
+`created-map` and `renamed-space` write keys of `document` rather than
+anything inside a Map, read the working snapshot direct, and answer their own
+placement. `renamed-space` still resolves a Map — for the placement the
+completion carries, not for permission — so `map-not-found` appears in its row
+as an ordinary check, asked *after* the title checks: a blank name is a blank
 name whether or not the canvas has moved on.
+
+Map and Graph deletion are not completions. They run through the coordinated
+Space Resource lifecycle (`spaceResources.deleteMap` / `deleteGraph`, ADR 0076,
+ADR 0091), which answers `unchanged` when no successor survives, so neither
+appears in the tables below.
 
 ## Per-action checks
 
@@ -89,22 +93,16 @@ the Title and `titleHidden` with it.
 | `added-graph` | none → completed |
 | `renamed-graph` | `graph-not-owned` → `graph-title-required` → (same title ⇒ `unchanged`) → completed |
 | `recolored-graph` | `graph-not-owned` → (same color ⇒ `unchanged`) → completed |
-| `deleted-graph` | `graph-not-owned` → `map-must-keep-graph` → completed |
 
 ### Map edits
 
 | Action | Its own checks, in order |
 | --- | --- |
 | `renamed-map` | `map-not-found` → `map-title-required` → (same title ⇒ `unchanged`) → completed |
-| `deleted-map` | `map-not-found` → `space-must-keep-map` → completed |
 
 `map-not-found` here is not the universal gate 2 check: it is the action
 naming a Map other than the one the Edit resolved, which is an author's stale
 gesture rather than a broken invariant.
-
-`deleted-map` refuses the last Map (ADR 0079) and otherwise completes on a
-survivor: the selected Map if it survived, else the first, which is also what
-`defaultMap` becomes when the deleted Map was it.
 
 ### Map creation
 
@@ -129,12 +127,13 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 26 codes
+## The 25 codes
 
-1 contextual (`map-not-found`) plus 25 action-specific —
-none is produced anywhere else. 24 of those 25 are tabulated above;
+1 contextual (`map-not-found`) plus 24 action-specific —
+none is produced anywhere else. 22 of those 24 are tabulated above;
 `map-required` is declared and presented but currently raised nowhere, so it
-appears in no row.
+appears in no row, and `image-url-unsupported`, raised by the Image Resource
+Edits, has no row yet.
 Count the codes, not the cells: several serve more than one action —
 `resource-not-found`, `resource-not-in-map`, `graph-not-owned`, `edge-not-found`,
 `edge-resource-outside-map` and the two `reference-target-*` each appear in more than
