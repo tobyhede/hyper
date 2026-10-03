@@ -1,17 +1,15 @@
-# 01 — The canvas's own Map is a surface
+# 01: The canvas's own Map is a surface
 
-**What to build:** Introduce the drawn-Map module (a *surface* in code) and make the canvas's own Map its root instance, with no change an author can see. A surface takes one Space's composed app, an explicit Map and Graph, and a policy, and owns the projection, the Resource authoring hook, Edge Authoring, availability and the commands a Map offers. `SpaceCanvas` draws the root surface instead of wiring those collaborators itself.
+**What to build:** A drawn-Map module (a *surface* in code) takes one composed Space, an explicit Map and Graph, and a policy, and owns what a Map offers on the canvas: the projection, Resource authoring, Edge Authoring, availability and commands. The canvas draws its own Map through it. Nothing an author sees changes; this makes the embedded Map's later move onto the same module a rewiring.
 
-**Blocked by:** PR #331.
+**Blocked by:** None (can start immediately). PR #331 must be merged.
 
 **Status:** ready-for-agent
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
-## Acceptance criteria
-
-- [ ] One module answers what a drawn Map offers from a composed Space, a Map and Graph, and a policy; `SpaceCanvas` mounts it for its own Map.
-- [ ] The projection is built over the explicit Map and Graph the surface is given, not read from Navigation inside the module; the root surface is given Navigation's selection.
+- [ ] One module answers what a drawn Map offers from a composed Space, a Map and Graph, and a policy; the canvas mounts it for its own Map.
+- [ ] The projection is built over the Map and Graph the surface is given; the canvas's own surface is given Navigation's selection, and the module reads no Navigation itself.
 - [ ] Every collaborator the surface uses comes from the one composition it is given.
-- [ ] Behaviour is unchanged: existing unit, application E2E and Ladle E2E assertions pass unmodified.
-- [ ] The surface is tested through its interface with a real composition, not through `SpaceCanvas`.
+- [ ] Existing unit, application E2E and Ladle E2E assertions pass unmodified.
+- [ ] The surface is tested through its own interface over a real composition.

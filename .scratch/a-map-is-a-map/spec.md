@@ -60,15 +60,18 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 
 ## Tickets
 
-| # | | Status |
-| --- | --- | --- |
-| 01 | The canvas's own Map is a surface | ready-for-agent |
-| 02 | One policy decides authoring, inert and read-only | ready-for-agent |
-| 03 | An embedded Map is a surface over its own Space | ready-for-agent |
-| 04 | One canvas selection names its surface | ready-for-agent |
-| 05 | One notice area for every drawn Space | ready-for-agent |
-| 06 | Any composed Space's replacement holds navigation | ready-for-agent |
-| 07 | Cross-surface connections are refused and a surface never contains its own Map | ready-for-agent |
+| # | | Blocked by | Status |
+| --- | --- | --- | --- |
+| 01 | The canvas's own Map is a surface | — | ready-for-agent |
+| 02 | A Space is composed while anything holds it | — | ready-for-agent |
+| 03 | Navigation is held while any composed Space replaces an image | 02 | ready-for-agent |
+| 04 | One notice area for every drawn Space | 02 | ready-for-agent |
+| 05 | One policy decides authoring, inert and read-only | 01 | ready-for-agent |
+| 06 | An embedded Map is a surface over its own Space | 01, 02, 04, 05 | ready-for-agent |
+| 07 | Each drawing has an occurrence that selection and continuation follow | 06 | ready-for-agent |
+| 08 | Create inside an embedded Map | 07 | ready-for-agent |
+| 09 | Entity menu and Replace inside an embedded Map | 03, 07 | ready-for-agent |
+| 10 | Edges inside an embedded Map | 07 | ready-for-agent |
 
 ## Out of scope
 
@@ -78,4 +81,4 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 
 ## Verification
 
-Each ticket: targeted local typecheck, lint and affected tests, then a draft PR whose `CI passed` gate is observed green. Ticket 03's tests assert the full Map capability list against an embedded Map in `authoring`, and the withheld set against `inert` and `read-only`.
+Each ticket: targeted local typecheck, lint and affected tests, then a draft PR whose `CI passed` gate is observed green. Ticket 05's tests enumerate what each policy offers; tickets 08–10 each assert their capabilities against an embedded Map in `authoring` and the withheld set in `inert` and `read-only`.
