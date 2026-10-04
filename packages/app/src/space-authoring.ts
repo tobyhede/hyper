@@ -100,6 +100,9 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
   }
 };
 
+/** The Resource kinds created from nothing but a press: no Target, no Space, no file. */
+export type InputFreeResourceKind = 'markdown' | 'ur';
+
 /** One picture an Image Resource is created for: its URL, and its size when it loaded. */
 export interface CreatedImage {
   readonly url: string;
@@ -181,14 +184,13 @@ export type AuthoringCompletion =
       readonly position: MapPosition | 'beside-source';
     }
   /**
-   * Add Resource and Create Ur Resource: a detached Resource of a kind that takes
-   * no input at the visible centre, neutrally titled. Add Resource makes a
-   * `markdown` one with an empty body; Create Ur Resource makes a `ur` one, which
-   * carries a Title and nothing else (ADR 0113).
+   * Create Resource: a detached Resource of a kind that takes no input at the
+   * visible centre, neutrally titled. A `markdown` one has an empty body; a `ur`
+   * one carries a Title and nothing else (ADR 0113).
    */
   | {
       readonly kind: 'created-resource';
-      readonly resourceKind: 'markdown' | 'ur';
+      readonly resourceKind: InputFreeResourceKind;
       readonly anchor: MapPosition;
     }
   /**

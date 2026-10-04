@@ -947,6 +947,59 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     );
   });
 
+  it('Opens, Resizes, Closes and reopens an Ur Resource as any other, displacing its neighbours', () => {
+    // An Ur Resource has no content, and nothing in Open, Close, Resize or
+    // displacement may treat it differently from a Markdown Resource.
+    const [subjectId, besideId, belowId, beforeId] = RESOURCE_IDS;
+    const markdown = snapshotOf([
+      { x: 0, y: 0, open: false, openSize: undefined },
+      { x: COLLAPSED_RESOURCE_SIZE.width, y: 40, open: false, openSize: undefined },
+      { x: 40, y: COLLAPSED_RESOURCE_SIZE.height, open: false, openSize: undefined },
+      { x: -300, y: -300, open: false, openSize: undefined },
+      { x: -600, y: 600, open: false, openSize: undefined },
+    ]);
+    const start: SpaceSnapshot = {
+      ...markdown,
+      resources: markdown.resources.map((resource) =>
+        resource.id === subjectId
+          ? { id: resource.id, document: { title: 'Node', kind: 'ur' } }
+          : resource,
+      ),
+    };
+    expect(loadSpaceSnapshot(start).ok).toBe(true);
+
+    const opened = completed(SnapshotEdit.open(start, MAP_ID, subjectId));
+    const growth = Placement.growth(DEFAULT_OPEN_SIZE);
+    expect(positionsOf(opened)).toMatchObject({
+      [subjectId]: { x: 0, y: 0, open: true, openSize: DEFAULT_OPEN_SIZE },
+      [besideId]: { x: COLLAPSED_RESOURCE_SIZE.width + growth.width, y: 40 },
+      [belowId]: { x: 40, y: COLLAPSED_RESOURCE_SIZE.height + growth.height },
+      [beforeId]: { x: -300, y: -300 },
+    });
+
+    const resizedTo = { width: 700, height: 500 };
+    const resized = completed(SnapshotEdit.resize(opened, MAP_ID, subjectId, resizedTo));
+    const resizedGrowth = Placement.growth(resizedTo);
+    expect(positionsOf(resized)).toMatchObject({
+      [subjectId]: { x: 0, y: 0, open: true, openSize: resizedTo },
+      [besideId]: { x: COLLAPSED_RESOURCE_SIZE.width + resizedGrowth.width, y: 40 },
+      [belowId]: { x: 40, y: COLLAPSED_RESOURCE_SIZE.height + resizedGrowth.height },
+      [beforeId]: { x: -300, y: -300 },
+    });
+
+    const closed = completed(SnapshotEdit.close(resized, MAP_ID, subjectId));
+    expect(originsOf(closed)).toEqual(originsOf(start));
+    expect(positionsOf(closed)[subjectId]).toEqual({
+      x: 0,
+      y: 0,
+      open: false,
+      openSize: resizedTo,
+    });
+
+    const reopened = completed(SnapshotEdit.open(closed, MAP_ID, subjectId));
+    expect(positionsOf(reopened)).toEqual(positionsOf(resized));
+  });
+
   it('refuses to Resize a Closed Resource, which has no Open Size to change', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, resizeArb, (generated, subjectIndex, size) => {

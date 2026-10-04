@@ -235,14 +235,14 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * The markdown, reference and space kinds, in one Space, on both sides of placement.
+   * The markdown, reference, space and ur kinds, in one Space, on both sides of placement.
    *
    * The Dock draws `ResourceKindIcon` on every list row while the canvas draws the
    * production `ResourceNode`, so a fixture whose placed Resources were all markdown
    * would let the list and the canvas disagree about a kind without either
    * being wrong.
    */
-  it('carries the markdown, reference and space kinds on the Command Dock canvas and in its Resources list', () => {
+  it('carries the markdown, reference, space and ur kinds on the Command Dock canvas and in its Resources list', () => {
     const opens = requireDefaultMap(commandDockSpace);
     const openingMap = commandDockSpace.lookup.map(opens)?.map;
     const kinds = (resources: readonly { readonly kind: string }[]): readonly string[] =>
@@ -255,8 +255,8 @@ describe('the story Spaces', () => {
       (resource) => openingMap?.positions[resource.id] === undefined,
     );
 
-    expect(kinds(placed)).toEqual(['markdown', 'reference', 'space']);
-    expect(kinds(unplaced)).toEqual(['markdown', 'reference', 'space']);
+    expect(kinds(placed)).toEqual(['markdown', 'reference', 'space', 'ur']);
+    expect(kinds(unplaced)).toEqual(['markdown', 'reference', 'space', 'ur']);
   });
 
   /**

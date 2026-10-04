@@ -326,7 +326,7 @@ describe('useResourcePlacement', () => {
     const { result } = place(opened);
     act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
 
-    act(() => result.current.addResource());
+    act(() => result.current.createResource('markdown'));
 
     expect(placedIds(opened)).toContain(CREATED);
     expect(opened.app.continuation.getState().pending).toEqual({
@@ -341,7 +341,7 @@ describe('useResourcePlacement', () => {
     const { result } = place(opened);
     act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
 
-    act(() => result.current.createUrResource());
+    act(() => result.current.createResource('ur'));
 
     expect(opened.app.currentSpace().lookup.resource(CREATED)?.kind).toBe('ur');
     expect(placedIds(opened)).toContain(CREATED);

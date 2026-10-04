@@ -420,7 +420,7 @@ export function useDockChrome(
       onCreate: (creation) => {
         switch (creation.kind) {
           case 'markdown':
-            placement.addResource();
+            placement.createResource('markdown');
             return;
           case 'space':
             placement.createSpaceResource();
@@ -429,7 +429,7 @@ export function useDockChrome(
             placement.createImagesFromFiles(creation.files);
             return;
           case 'ur':
-            placement.createUrResource();
+            placement.createResource('ur');
             return;
         }
       },

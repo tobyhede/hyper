@@ -302,9 +302,11 @@
    Resource's own kind, so an Open Reference Resource (ADR 0070) and an Open Image
    Resource read exactly as an Open Markdown Resource does. A `space` or `ur`
    Resource (ADR 0113) keeps the base `.canvas-resource__body` rule. A Reference
-   Resource whose Target is an Ur Resource takes this rule although it draws no
-   content; with no content sibling, both rules leave the body the card's only
-   in-flow child, anchored to its bottom. */
+   Resource whose Target is an Ur Resource takes this rule and resolves to no
+   content (`packages/graph/test/lookup.test.ts`). The rail is positioned
+   absolutely, so with no content sibling the body is the only in-flow child, and
+   this rule's `margin-top: auto` and the base rule's `justify-content: flex-end`
+   each put the Title at the bottom. */
 .canvas-resource:is([data-kind='markdown'], [data-kind='reference'], [data-kind='image'])
   .canvas-resource__body {
   order: 2;

@@ -28,6 +28,7 @@ import {
   type SettlePlacement,
   type SettleResource,
 } from './resources-drag';
+import type { InputFreeResourceKind } from './space-authoring';
 import { nextSpaceTitle } from './titles';
 import { useVisibleCentre, type VisibleCentreReporting } from './visible-centre';
 
@@ -82,10 +83,8 @@ export interface ResourcePlacementInput {
 }
 
 export interface ResourcePlacementCommands extends VisibleCentreReporting {
-  /** Add Resource: one completed Edit, then the naming continuation. */
-  readonly addResource: () => void;
-  /** Create Ur Resource: one completed Edit, then the naming continuation. */
-  readonly createUrResource: () => void;
+  /** Create a Resource of a kind that takes no input: one completed Edit, then the naming continuation. */
+  readonly createResource: (kind: InputFreeResourceKind) => void;
   /** Place a Resource this Map leaves out, answering a refusal's sentence or `null`. */
   readonly addExistingResource: (
     resourceId: ResourceId,
@@ -306,21 +305,21 @@ export function useResourcePlacement(
   );
 
   /**
-   * Add Resource and Create Ur Resource: one Edit at the visible centre,
-   * continuing in the new Resource's Title.
+   * Create Resource, for a kind that takes no input: one Edit at the visible
+   * centre, continuing in the new Resource's Title.
    *
    * **The creations whose refusal no surface shows, and that is a decision.**
    * A refusal carries a sentence for the author, worth showing where
-   * the author can act on it. Neither takes any input at all, cannot refuse
-   * against a choice the author made, and leaves nothing standing that a
-   * sentence could correct. If either grows an input it grows a surface with
-   * it, and the refusal goes there.
+   * the author can act on it. These creations take no input at all, cannot
+   * refuse against a choice the author made, and leave nothing standing that a
+   * sentence could correct. A kind that grows an input leaves
+   * `InputFreeResourceKind` and grows a surface, and the refusal goes there.
    *
    * The toolbar stays available for an empty authored Map: it is the
    * zero-Resource Space's way to create the first Resource.
    */
-  const createAtCentre = useCallback(
-    (resourceKind: 'markdown' | 'ur') => {
+  const createResource = useCallback(
+    (resourceKind: InputFreeResourceKind) => {
       const created = authoring.complete({
         kind: 'created-resource',
         resourceKind,
@@ -346,8 +345,6 @@ export function useResourcePlacement(
     },
     [authoring, centreAnchor, continuation],
   );
-  const addResource = useCallback(() => createAtCentre('markdown'), [createAtCentre]);
-  const createUrResource = useCallback(() => createAtCentre('ur'), [createAtCentre]);
 
   /**
    * Every Image Resource gesture: store and measure what it brought, then one
@@ -461,8 +458,7 @@ export function useResourcePlacement(
   return {
     reportVisibleCentre,
     centreAnchor,
-    addResource,
-    createUrResource,
+    createResource,
     addExistingResource,
     addSpaceResourceFor,
     createSpaceResource,

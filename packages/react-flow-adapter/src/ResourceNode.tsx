@@ -51,15 +51,23 @@ type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
 type ImageFront = Mutable<Extract<CanvasResourceFront, { kind: 'image' }>>;
 type UrFront = Mutable<Extract<CanvasResourceFront, { kind: 'ur' }>>;
 
+type MutableFront = MarkdownFront | ImageFront | UrFront | ReferenceFront | SpaceFront;
+
 /**
- * The operations each kind's front offers, by the Resource's own kind. What it
- * draws is the display's, not the front's.
+ * The operations each kind's front offers. What it draws is the display's, not
+ * the front's. Every kind opens and closes, so Open/Close is set once here; the
+ * rest is by the Resource's own kind.
  */
 function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
+  const front = kindFrontOf(data);
+  if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
+  return front;
+}
+
+function kindFrontOf(data: ResourceFlowNode['data']): MutableFront {
   switch (data.kind) {
     case 'markdown': {
       const front: MarkdownFront = { kind: 'markdown' };
-      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
       if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
       return front;
     }
@@ -68,27 +76,19 @@ function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
       // its picture is the content, and replacing it takes the place a body edit
       // takes on a Markdown Resource.
       const front: ImageFront = { kind: 'image' };
-      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
       if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
       return front;
     }
-    case 'ur': {
-      // An Ur Resource has no content, so it offers Open and Close and no edit.
-      const front: UrFront = { kind: 'ur' };
-      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
-      return front;
-    }
-    case 'reference': {
-      const front: ReferenceFront = { kind: 'reference' };
-      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
-      return front;
-    }
+    case 'ur':
+      // An Ur Resource has no content, so it offers no edit.
+      return { kind: 'ur' };
+    case 'reference':
+      return { kind: 'reference' };
     case 'space': {
       // A Space Resource's own front carries nothing it authors of the target: its
       // Title is the Resource's, its content is the target Space's, and the
       // composition hands down the rail fragment plus Enter.
       const front: SpaceFront = { kind: 'space' };
-      if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
       if (data.spaceSelection !== undefined) front.selection = data.spaceSelection;
       if (data.spaceRail !== undefined) front.spaceRail = data.spaceRail;
       if (data.portal !== undefined) front.portal = data.portal;
