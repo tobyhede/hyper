@@ -18,7 +18,7 @@ A Resource on a Map has a **Shape**: the outline its Closed front is drawn in. T
 
 **Only a Closed Resource draws its Shape.** An Open Resource and a presented Resource are always rectangles. They are read, not diagrammed, and an Open Markdown body or image inside a diamond would lose its corners and its resize control. The Shape stays recorded while the Resource is Open and returns when it Closes.
 
-**The author changes it through a Shape choice in the Resource's Actions menu**, drawn with `ChoiceMenu`. Each choice is one undoable Edit. The choice is offered while the Resource is Open too, so the menu doesn't change between states.
+**The author changes it through a Shape choice in the Resource's Actions menu**, drawn with `ChoiceMenu`. Each choice is one Edit. The choice is offered while the Resource is Open too, so the menu doesn't change between states.
 
 An embedded Map draws its Resources' Shapes, because one surface draws every Map (ADR 0112). An automatic arrangement (ADR 0086) moves positions and keeps every Shape. Whether a strategy may assign Shapes is a separate, later decision.
 
