@@ -68,7 +68,9 @@ function kindFrontOf(data: ResourceFlowNode['data']): MutableFront {
   switch (data.kind) {
     case 'markdown': {
       const front: MarkdownFront = { kind: 'markdown' };
-      if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
+      if (data.contentAction === 'edit-markdown' && data.onBeginBodyEditing !== undefined) {
+        front.onBeginEdit = data.onBeginBodyEditing;
+      }
       return front;
     }
     case 'image': {
@@ -76,7 +78,9 @@ function kindFrontOf(data: ResourceFlowNode['data']): MutableFront {
       // its picture is the content, and replacing it takes the place a body edit
       // takes on a Markdown Resource.
       const front: ImageFront = { kind: 'image' };
-      if (data.onBeginBodyEditing !== undefined) front.onBeginEdit = data.onBeginBodyEditing;
+      if (data.contentAction === 'replace-image' && data.onBeginBodyEditing !== undefined) {
+        front.onBeginEdit = data.onBeginBodyEditing;
+      }
       return front;
     }
     case 'ur':

@@ -296,19 +296,9 @@
   margin-top: auto;
 }
 
-/* A Title is the same bottom passenger before, during and after the React Flow
-   wrapper moves. Opening adds the content surface above it; it never switches
-   the Title's layout in the middle of that motion. The rule selects by the
-   Resource's own kind, so an Open Reference Resource (ADR 0070) and an Open Image
-   Resource read exactly as an Open Markdown Resource does. A `space` or `ur`
-   Resource (ADR 0113) keeps the base `.canvas-resource__body` rule. A Reference
-   Resource whose Target is an Ur Resource takes this rule and resolves to no
-   content (`packages/graph/test/lookup.test.ts`). The rail is positioned
-   absolutely, so with no content sibling the body is the only in-flow child, and
-   this rule's `margin-top: auto` and the base rule's `justify-content: flex-end`
-   each put the Title at the bottom. */
-.canvas-resource:is([data-kind='markdown'], [data-kind='reference'], [data-kind='image'])
-  .canvas-resource__body {
+/* A drawn content area sits above its Title. The attribute follows that area's
+   presence through Close, keeping the ordering until its exit fade completes. */
+.canvas-resource[data-content-area='true'] .canvas-resource__body {
   order: 2;
   flex: none;
   margin-top: auto;

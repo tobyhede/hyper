@@ -1,5 +1,13 @@
 import type { NodeChange } from '@xyflow/react';
-import { uuidSchema, type Resource, type ResourceContent, type UUID } from '@project/core';
+import {
+  contentAction,
+  openSizeFloor,
+  embedsMap,
+  uuidSchema,
+  type Resource,
+  type ResourceContent,
+  type UUID,
+} from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { CLOSED_DISPLAY, type ResourceDisplay } from '@project/ui';
 import type { RenderAdapter } from '../src/render-adapter';
@@ -15,6 +23,7 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
       title,
       readOnly: false,
       kind: 'markdown',
+      ...fixtureFacts('markdown'),
       active: false,
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,
@@ -47,7 +56,7 @@ export function fixtureDisplay(
 }
 
 function fixtureContent(
-  kind: Exclude<Resource['kind'], 'image'>,
+  kind: Resource['kind'],
   source: string,
   space: { readonly spaceId: UUID; readonly map: UUID },
 ): ResourceContent {
@@ -62,9 +71,31 @@ function fixtureContent(
         view: { ...space, graph: FIXTURE_TARGET_GRAPH, framing: undefined },
         via: 'self',
       };
+    case 'image':
+      return {
+        kind: 'image',
+        url: 'https://example.com/picture.png',
+        naturalSize: undefined,
+        via: 'self',
+      };
     case 'ur':
       return { kind: 'ur', via: 'self' };
   }
+}
+
+/** The projection's answers for the content used by node fixtures. */
+export function fixtureFacts(
+  kind: Resource['kind'],
+): Pick<ResourceFlowNode['data'], 'contentAction' | 'openSizeFloor' | 'embedsMap'> {
+  const content = fixtureContent(kind, '', {
+    spaceId: FIXTURE_TARGET_SPACE,
+    map: FIXTURE_TARGET_MAP,
+  });
+  return {
+    contentAction: contentAction(content),
+    openSizeFloor: openSizeFloor(content),
+    embedsMap: embedsMap(content),
+  };
 }
 
 export function moving(id: string, x: number, y: number): NodeChange<ResourceFlowNode>[] {

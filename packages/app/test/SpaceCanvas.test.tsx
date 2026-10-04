@@ -13,7 +13,7 @@ import { RESOURCE_SIZE } from '../src/resource';
 import type { ResourceResize } from '../src/render-adapter';
 import { mountSettled } from './settled-mount';
 import { CLOSED_DISPLAY } from '@project/ui';
-import { fixtureDisplay } from './render-adapter-fixtures';
+import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
 import type { SurfaceAuthoring } from '../src/space-authoring';
 
@@ -73,6 +73,7 @@ const resourceNode = (
     title,
     readOnly: false,
     kind,
+    ...fixtureFacts(kind),
     active: false,
     selectedForAuthoring: false,
     display: CLOSED_DISPLAY,

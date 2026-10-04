@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SPACE_RESOURCE_MIN_OPEN_SIZE, uuidSchema, type ResourceId } from '@project/core';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import {
+  SPACE_RESOURCE_MIN_OPEN_SIZE,
+  uuidSchema,
+  type ResourceId,
+  type SpaceSnapshot,
+} from '@project/core';
+import { projectResourceNodes, type ResourceFlowNode } from '@project/react-flow-adapter';
+import { loadSpaceSnapshot } from '@project/graph';
 import {
   decorateImageResourceNode,
   decorateMarkdownResourceNode,
@@ -11,7 +17,7 @@ import {
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
-import { fixtureDisplay } from './render-adapter-fixtures';
+import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -51,6 +57,7 @@ const projectionNode = (
     title: 'A',
     readOnly,
     kind,
+    ...fixtureFacts(kind),
     open,
     active: false,
     selectedForAuthoring: false,
@@ -200,10 +207,26 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.entityActions).toBeUndefined();
   });
 
-  it('floors an Open Space Resource resize above its footer while still reaching Close', () => {
+  it('uses a projected Reference’s Space resize floor while still reaching Close', () => {
+    const loaded = loadSpaceSnapshot({
+      id: SPACE_ID,
+      document: { version: 1, title: 'Host', maps: [] },
+      resources: [
+        { id: SPACE_RESOURCE_ID, document: spaceDocument },
+        {
+          id: REFERENCE_ID,
+          document: { title: 'Reference', kind: 'reference', target: SPACE_RESOURCE_ID },
+        },
+      ],
+    } satisfies SpaceSnapshot);
+    if (!loaded.ok) throw new Error('Expected a valid reference fixture');
+    const node = projectResourceNodes(loaded.space, {
+      openResourceIds: new Set([REFERENCE_ID]),
+    }).find((candidate) => candidate.id === REFERENCE_ID);
+    if (node === undefined) throw new Error('Expected the Reference projection');
     const previewResize = vi.fn();
     const patch = decorateSharedResourceNode(
-      projectionNode(SPACE_RESOURCE_ID, 'space', true),
+      node,
       context({
         resourceResize: {
           beginResize: () => undefined,
@@ -216,9 +239,9 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.resize?.minWidth).toBe(RESOURCE_SIZE.width);
     expect(patch.resize?.minHeight).toBe(RESOURCE_SIZE.height);
     patch.resize?.onResize({ width: 280, height: 220 });
-    expect(previewResize).toHaveBeenCalledWith(SPACE_RESOURCE_ID, SPACE_RESOURCE_MIN_OPEN_SIZE);
+    expect(previewResize).toHaveBeenCalledWith(REFERENCE_ID, SPACE_RESOURCE_MIN_OPEN_SIZE);
     patch.resize?.onResize(RESOURCE_SIZE);
-    expect(previewResize).toHaveBeenCalledWith(SPACE_RESOURCE_ID, RESOURCE_SIZE);
+    expect(previewResize).toHaveBeenCalledWith(REFERENCE_ID, RESOURCE_SIZE);
   });
 
   it('attaches the title editor only to the Resource holding the caret', () => {
@@ -316,8 +339,12 @@ describe('decorateImageResourceNode', () => {
       data: {
         ...node.data,
         kind: 'image',
+        ...fixtureFacts('image'),
         display: open
-          ? { shown: 'open', content: { kind: 'image', url: IMAGE_URL, via: 'self' } }
+          ? {
+              shown: 'open',
+              content: { kind: 'image', url: IMAGE_URL, naturalSize: undefined, via: 'self' },
+            }
           : node.data.display,
       },
     };
@@ -330,7 +357,7 @@ describe('decorateImageResourceNode', () => {
   it('enters the replacing display on an Open Image Resource whose caret is live', () => {
     expect(decorateImageResourceNode(imageNode(true), replacing).display).toMatchObject({
       shown: 'replacing',
-      content: { kind: 'image', url: IMAGE_URL, via: 'self' },
+      content: { kind: 'image', url: IMAGE_URL, naturalSize: undefined, via: 'self' },
       replacer: { accept: 'image/png' },
     });
   });

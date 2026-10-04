@@ -27,7 +27,12 @@ describe('PresentedResource', () => {
     render(
       <PresentedResource
         title={'Harbour\nAt dusk'}
-        content={{ kind: 'image', url: 'https://example.com/h.png', via: 'self' }}
+        content={{
+          kind: 'image',
+          naturalSize: undefined,
+          url: 'https://example.com/h.png',
+          via: 'self',
+        }}
       />,
     );
 
@@ -61,7 +66,12 @@ describe('PresentedResource', () => {
     render(
       <PresentedResource
         title="Harbour, again"
-        content={{ kind: 'image', url: 'https://example.com/h.png', via: 'reference' }}
+        content={{
+          kind: 'image',
+          naturalSize: undefined,
+          url: 'https://example.com/h.png',
+          via: 'reference',
+        }}
       />,
     );
 

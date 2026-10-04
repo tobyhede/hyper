@@ -484,7 +484,12 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Harbour"
           kind="image"
-          content={{ kind: 'image', url: harbour, via: 'self' }}
+          content={{
+            kind: 'image',
+            url: harbour,
+            naturalSize: { width: 400, height: 300 },
+            via: 'self',
+          }}
           open={open}
           onOpenChange={changeOpen}
           nodeSize={open ? firstOpen : closedFrame}
@@ -497,7 +502,12 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Harbour, larger"
           kind="image"
-          content={{ kind: 'image', url: harbour, via: 'self' }}
+          content={{
+            kind: 'image',
+            url: harbour,
+            naturalSize: { width: 400, height: 300 },
+            via: 'self',
+          }}
           open
           nodeSize={{ width: 600, height: 440 }}
           zoom={1}
@@ -509,7 +519,12 @@ export const OpenImage: Story = () => {
         <CanvasResourceNodeSpecimen
           title="Missing"
           kind="image"
-          content={{ kind: 'image', url: '/images/missing-picture.png', via: 'self' }}
+          content={{
+            kind: 'image',
+            url: '/images/missing-picture.png',
+            naturalSize: undefined,
+            via: 'self',
+          }}
           open
           nodeSize={firstOpen}
           zoom={1}

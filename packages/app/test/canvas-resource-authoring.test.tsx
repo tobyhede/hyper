@@ -17,7 +17,7 @@ import {
   NO_SPACE_RESOURCE_TARGETS,
   type SpaceResourceTargets,
 } from '../src/space-resource-targets';
-import { fixtureDisplay } from './render-adapter-fixtures';
+import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 import type { ImageSources } from '../src/image-creation';
 import { heldImageSources, unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
@@ -112,6 +112,7 @@ const node = (
     title: 'A',
     readOnly: false,
     kind,
+    ...fixtureFacts(kind),
     open,
     active: false,
     selectedForAuthoring: false,
@@ -825,10 +826,14 @@ describe('canvas Resource authoring, replacing an image', () => {
       title: 'Figure',
       readOnly: false,
       kind: 'image',
+      ...fixtureFacts('image'),
       open: true,
       active: false,
       selectedForAuthoring: false,
-      display: { shown: 'open', content: { kind: 'image', url: OLD_URL, via: 'self' } },
+      display: {
+        shown: 'open',
+        content: { kind: 'image', url: OLD_URL, naturalSize: undefined, via: 'self' },
+      },
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
     },
