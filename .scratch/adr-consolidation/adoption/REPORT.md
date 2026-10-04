@@ -23,9 +23,18 @@ Tool uses and wall times come from the harness. Neither reader reported a contra
 
 The pilot's specimen readers also scored 10/10, reading about 3,660 words. The adopted-route readers read more, about 6,500 and 9,100 words, because they started at `AGENTS.md` and read parts of `CONTEXT.md`, as a contributor would. The pilot's existing-route readers scored 3/10 and 2/10 on about 16,300 and 18,600 words.
 
-## Remaining confound
+## Fresh-session check
 
-The pilot's main confound is narrowed but not removed. The harness gave each reader the session's project instructions, which were the **pre-adoption** `AGENTS.md` with the long ADR 0079 and 0084 entries. adopted-2 noticed this and said it answered from the snapshot. Nothing in either answer set depends on text found only in the old entries. A rerun from a session that starts on the adopted `AGENTS.md` would remove the confound.
+The first pair had the pre-adoption `AGENTS.md` in context, and the guidance wording changed after they read. To remove both doubts, two more pairs were run as separate `claude -p` sessions (Sonnet, tools Read/Grep/Glob) started in a detached snapshot, so their project instructions were the adopted `AGENTS.md`. The glossary had by then been trimmed to definitions. Grading: [grading-fresh-session.md](grading-fresh-session.md).
+
+| Snapshot | Reader | Correct | Words read (reader's estimate, incl. AGENTS.md) | Wall time |
+|---|---|---|---|---|
+| `c00cae99` | adopted-3 (R) | 9/10 | ~15,500 | 49 s |
+| `c00cae99` | adopted-4 (S) | 10/10 | ~13,900 | 51 s |
+| `71019361` | adopted-5 (T) | 10/10 | see file | see file |
+| `71019361` | adopted-6 (U) | 10/10 | see file | see file |
+
+R failed Q10 by omitting that automatic strategies are not addressable. The contract stated it only in R3, while R8, the rule a reader reaches for on that question, did not point there. `71019361` added that cross-reference to R8, and both readers on that snapshot stated it. This is one fix after one failure, with no further iteration. A reader who misses an item the contract states is a sampling risk that a single fix cannot rule out.
 
 ## Findings that change no grade
 
@@ -34,4 +43,4 @@ The pilot's main confound is narrowed but not removed. The harness gave each rea
 
 ## Verdict
 
-Pass. Both readers answered every fixed question correctly through the adopted reading path, including the four resolutions made since the pilot.
+Pass on the final text (`71019361`): both fresh-session readers answered every fixed question correctly through the adopted reading path, including the four resolutions made since the pilot. Across all six adoption readers, 59 of 60 answers passed; the one failure led to the R8 cross-reference.

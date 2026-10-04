@@ -69,3 +69,34 @@ D12 sensitivity is moot: both readers say undo does not exist and the Edit is re
 
 - S states every Must-state item, including that automatic strategies are non-addressable and never draw the canvas (R3, R2, A3), and offers Auto-arrange as an unbuilt Edit plus authoring a new Map (R11).
 - Finding (S): S correctly notes the Resources View has no URL and is not a whole-Space view, and leaves a non-canvas listing as undocumented rather than resolving it.
+
+## Second pair (T, U), after the R8 cross-reference
+
+### Method
+
+T is `.scratch/adr-consolidation/adoption/readers/adopted-5.md` and U is `adopted-6.md`, both fresh `claude -p` sessions (Sonnet, Read/Grep/Glob only) in a detached checkout of snapshot `71019361`; only their Answers sections were graded. The rubric, standard and resolutions are those of the Method above (D12, G1, D16 with D21 under ADR 0116, PR #336), with the same strictness that failed R's Q10: every Must-state item was checked separately and none was taken as implied by a neighbouring statement. Disputed claims were checked against `docs/agents/maps-and-graphs.md` (R19, R42) and `.scratch/adr-consolidation/pilot/inventory.md`. The grader knew both sets came from the adopted route, so grading is independent of authorship but not blind to route.
+
+### Summary matrix
+
+| Reader | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | Q7 | Q8 | Q9 | Q10 | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| T | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | **10/10** |
+| U | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | PASS | **10/10** |
+
+No question failed. D12 sensitivity is moot: both say undo does not exist (T Q1, U Q1). The item that failed R's Q10, "automatic strategies are not addressable", is stated by both in Q10 itself (T: "an automatic strategy is non-addressable and never draws the canvas"; U: "An automatic strategy is also not addressable and never draws the canvas (R3)").
+
+### FAIL
+
+None.
+
+### Notable findings (no grade effect)
+
+- Q1 (U): U lists "a canvas or selectable context" without the word "addressable". The P and Q grading passed the same wording ("never a selectable context"), and U also states "not a render path", so the item is graded present. T states "selectable or addressable context" outright.
+- Q3: both state R19 correctly; U's "otherwise it retries" is R19's "otherwise the normal retry follows". Both state the no-authored-basis reason (A9) for leaving Resources unplaced, and U adds R17.
+- Q4: both give the D16/D21 resolution precisely (Add Map records `defaultMap` and writes its resolved `activeGraph`) and the post-#336 behaviour (not offered, `planContextDeletion` unchanged, no refusal code). T flags that the Add Map write comes from R10 rather than R11, which is accurate.
+- Q5: both place "activation is navigation, not durable until a later Edit" under a heading about switching the Active Graph, so the ambiguity recorded for R's Q5 does not arise.
+- Q6: both state the G1 resolution (Closed first in the same Edit with the memoryless reclaim, removal itself never displaces) and every Must-state item. U declines to say whether the remembered Open Size goes with the removed position and names it as a gap; T says nothing about it. Neither states R33's re-add behaviour; not Must-state.
+- Q7: both get A right, B down, C right only, D unmoved, positions written by the Open Edit (R38), "at or past" the collapsed edges and the zero floor, and give "one axis is enough" (U also the beside-the-subject reason).
+- Q8 (U): U's opening sentence, "R keeps its dropped position", describes the drop (R38) and the next bullet says Close reclaims R like any other Resource clear of S, so it is a wording finding rather than a contradiction of "R moves back". Both add the R42 drop-inside-the-Open-rect case consistently with ADR 0093, and both reject the push set with the stale-state and history-dependence reasons (A14).
+- Q9: both state the first-Graph fallback as a read that never writes (R28). Neither states intake rejection of a dangling or foreign `activeGraph`; not Must-state, not contradicted.
+- Q10 (U): U's alternative is "a future author-invoked Auto-arrange could tidy a Map, but it is not built", plus authoring a Map and adding Resources; it does not use the word "Edit" here (it does in Q1). Graded present, since an author-invoked operation over a Map is the Edit the item names, unlike R's Q10, which had no wording for its missing item. Sensitivity: read as strictly as possible, U would score 9/10. Both T and U leave the Resources View's fit for a read-only glance undecided rather than resolving it.
