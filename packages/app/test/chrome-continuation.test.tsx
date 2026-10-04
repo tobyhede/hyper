@@ -5,6 +5,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { ChromeContinuation } from '../src/components/ChromeContinuation';
 import { composeApp, type ComposedApp } from '../src/compose-app';
+import { unusedImageSources } from './image-sources';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -36,7 +37,8 @@ function open(): ComposedApp['continuation'] {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const backend = MemorySpaceBackend.asMeta(loaded);
   const session = openSpaceSession(backend, loaded);
-  return composeApp({ spaceSession: session, selection: MAP_ID }).continuation;
+  return composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID })
+    .continuation;
 }
 
 function Harness({

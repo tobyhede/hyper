@@ -171,10 +171,9 @@ function mount(value: SpaceSnapshot = snapshot, history?: HistoryApi): SpaceSess
   let view: RenderResult | undefined;
   mountSpace(
     {
-      images: unusedImageSources,
       id: runtime(value).id,
       session,
-      app: composeApp({ spaceSession: session }),
+      app: composeApp({ images: unusedImageSources, spaceSession: session }),
       spaceResources,
     },
     (app) => {

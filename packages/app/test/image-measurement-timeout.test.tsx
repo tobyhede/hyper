@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
+import { newUuid, uuidSchema, type ImageNaturalSize, type SpaceSnapshot } from '@project/core';
 import { productDestinationPath } from '@project/http';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createSpaceStartup } from '../src/space';
@@ -42,7 +42,24 @@ async function browserMeasurement() {
     productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
   );
   vi.useFakeTimers();
-  return { picture, measure: opened.images.measure };
+  /** Measured as the startup composed it: an Image Resource created from a URL, read back for its natural size. */
+  const measure = async (url: string): Promise<ImageNaturalSize | undefined> => {
+    const result = await opened.app.createImageResources(
+      { kind: 'url', url },
+      {
+        mapId: opened.app.navigation.getState().selectedMapId,
+        anchor: { x: 0, y: 0 },
+        placement: 'exact',
+      },
+    );
+    if (result.kind !== 'completed') throw new Error(`The image was not created: ${result.kind}.`);
+    const created = opened.session
+      .getState()
+      .working.resources.find(({ id }) => id === result.createdResourceId);
+    if (created?.document.kind !== 'image') throw new Error('No Image Resource was created.');
+    return created.document.naturalSize;
+  };
+  return { picture, measure };
 }
 
 afterEach(() => {

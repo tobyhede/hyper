@@ -67,7 +67,7 @@ describe('Map delete draws the right geometry', () => {
       revision: 0n,
       exportedRevision: null,
     });
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(DELETED_MAP_ID);
 
     // What the Dock's Delete does (`dock-chrome.ts`): Map authoring deletes the Map and
@@ -259,7 +259,7 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
   it('produces a snapshot intake accepts after a later top-level Edit', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(TOP_MAP_ID);
 
     // An embedded Edit against a Map other than the one selected at the
@@ -335,7 +335,11 @@ describe('A queued drag holds its drop point', () => {
   it('keeps a moved Resource drawn at its drop point while its completion waits behind an in-flight one', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
-    const { authoring, adapter } = composeApp({ spaceSession: session, selection: MAP_ID });
+    const { authoring, adapter } = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+    });
 
     adapter.getState().syncProjection([node(RESOURCE_A, 10, 20), node(RESOURCE_B, 300, 20)], []);
 
