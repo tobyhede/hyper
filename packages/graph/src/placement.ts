@@ -73,7 +73,7 @@ const brand = (positions: ReadonlyMap<ResourceId, Readonly<ResourcePlacement>>):
 
 /**
  * A whole entry, or a bare point for a Resource joining the placement, which
- * joins Closed and is given the rectangle (ADR 0115).
+ * joins Closed and is given the rectangle (ADR 0117).
  */
 type PlacementPoint = ResourcePlacement | (MapPosition & { readonly open?: never });
 
@@ -373,7 +373,7 @@ function roomAxis(at: MapPosition, subject: MapPosition): 'x' | 'y' | null {
  * was when it Opened.
  *
  * Open/Closed state, the remembered Open Size and the Shape ride through
- * untouched; only `x` and `y` move (ADR 0066, ADR 0115). Answers the placement
+ * untouched; only `x` and `y` move (ADR 0066, ADR 0117). Answers the placement
  * it was given whenever no Resource actually moves — a subject the map does not
  * hold, a growth that is zero on both axes, and the case neither of those
  * catches: a nonzero growth with nothing clear of the subject, which `reclaim`

@@ -286,7 +286,7 @@ describe('Placement.place', () => {
     });
   });
 
-  it('gives a Resource placed at a bare point the rectangle, Closed (ADR 0115)', () => {
+  it('gives a Resource placed at a bare point the rectangle, Closed (ADR 0117)', () => {
     expect(asObject(Placement.place(Placement.empty(), RESOURCE_B, { x: 640, y: 80 }))).toEqual({
       [RESOURCE_B]: { x: 640, y: 80, open: false, shape: 'rectangle' },
     });
@@ -482,7 +482,7 @@ describe('Placement.displace', () => {
 
   it('carries Open/Closed state, the remembered Open Size and the Shape through untouched', () => {
     // Only `x` and `y` move. Open Size and Shape are stored on the Resource's own
-    // entry and survive everything that happens to its neighbours (ADR 0066, ADR 0115).
+    // entry and survive everything that happens to its neighbours (ADR 0066, ADR 0117).
     const authored = Placement.fromEntries([
       [
         RESOURCE_A,

@@ -55,7 +55,7 @@ export type GraphHeadShape = z.infer<typeof graphHeadShapeSchema>;
 export type ImageNaturalSize = z.infer<typeof imageNaturalSizeSchema>;
 export type MapPosition = z.infer<typeof mapPositionSchema>;
 export type ResourcePlacement = z.infer<typeof resourcePlacementSchema>;
-/** One of the five outlines a Closed Resource is drawn in on a Map (ADR 0115). */
+/** One of the five outlines a Closed Resource is drawn in on a Map (ADR 0117). */
 export type ResourceShape = z.infer<typeof resourceShapeSchema>;
 export type PositionedMap = z.infer<typeof positionedMapSchema>;
 

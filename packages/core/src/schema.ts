@@ -370,7 +370,7 @@ const openSizeSchema = z.object({
 });
 
 /**
- * The outline a Closed Resource is drawn in on a Map (ADR 0115). Closed, because
+ * The outline a Closed Resource is drawn in on a Map (ADR 0117). Closed, because
  * every member touches the midpoint of each side of the Closed rect, where Edges
  * attach.
  */
@@ -388,7 +388,7 @@ export const ADDED_RESOURCE_SHAPE = 'rectangle' satisfies (typeof RESOURCE_SHAPE
 /**
  * What a Map stores for one Resource: its origin, Open/Closed state, remembered
  * Open Size and Shape. The Shape is required: nothing reads a missing one as a
- * rectangle (ADR 0115).
+ * rectangle (ADR 0117).
  */
 export const resourcePlacementSchema = z.discriminatedUnion('open', [
   mapPositionSchema.extend({

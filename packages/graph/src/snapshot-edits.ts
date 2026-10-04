@@ -467,7 +467,7 @@ function resize(
 }
 
 /**
- * Draw a Resource in another Shape in one Map (ADR 0115).
+ * Draw a Resource in another Shape in one Map (ADR 0117).
  *
  * The Shape is drawn inside the fixed Closed Size and changes no rect, so no
  * neighbour moves and the Resource's Open/Closed state and Open Size are kept.
@@ -496,7 +496,7 @@ function changeResourceShape(
  *
  * Membership, a position and the rectangle, and nothing else: a Resource added
  * back to a Map is detached, and neither the Edges nor the Shape it once had
- * there are inferred back (ADR 0115). The position is an authored one
+ * there are inferred back (ADR 0117). The position is an authored one
  * (ADR 0084); `avoidingOverlap` steps off a point another Resource already
  * occupies exactly, as a creation from a menu does ({@link freeAnchor}), and
  * `exact` keeps it.

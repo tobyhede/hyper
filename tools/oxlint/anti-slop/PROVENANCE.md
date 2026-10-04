@@ -36,7 +36,7 @@ test red rather than going unnoticed.
   `test/unit/anti-slop/no-shape-in-symbol-names.test.ts`.
 - `rules/no-shape-in-symbol-names.ts`: added an `allowedNames` option. A
   listed name is exempt only when the whole identifier equals it, so the Map
-  entry's `shape` field (ADR 0115) can be written while `shapes`, `shapeOf` or
+  entry's `shape` field (ADR 0117) can be written while `shapes`, `shapeOf` or
   `entryShape` is still reported. Read in the same `before` hook. Pinned by
   `test/unit/anti-slop/no-shape-in-symbol-names.test.ts`.
 

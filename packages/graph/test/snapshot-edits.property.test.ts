@@ -497,7 +497,7 @@ describe('SnapshotEdit.createInMap properties', () => {
           expect(outcome.kind).toBe('completed');
           if (outcome.kind !== 'completed') return;
           expect(loadSpaceSnapshot(outcome.snapshot).ok).toBe(true);
-          // Add Resource gives it the rectangle, written rather than implied (ADR 0115).
+          // Add Resource gives it the rectangle, written rather than implied (ADR 0117).
           expect(outcome.snapshot.document.maps?.[0]?.positions[newResourceId]).toEqual({
             x: anchor.x,
             y: anchor.y,
@@ -1034,7 +1034,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   it('keeps every Shape through Open, any number of Resizes, a magnetic Close and Close', () => {
     // A Shape is drawn inside the fixed Closed Size and changes no rect, so the
     // Edits that move and grow Resources carry every entry's Shape through
-    // untouched — the subject's and each displaced neighbour's (ADR 0115).
+    // untouched — the subject's and each displaced neighbour's (ADR 0117).
     fc.assert(
       fc.property(
         entriesArb,
@@ -1255,7 +1255,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
           const exact = completed(
             SnapshotEdit.addToMap(snapshot, MAP_ID, subject, anchor, 'exact'),
           );
-          // Add to Map gives it the rectangle (ADR 0115).
+          // Add to Map gives it the rectangle (ADR 0117).
           expect(mapIn(exact, MAP_ID)?.positions[subject]).toEqual({
             x: anchor.x,
             y: anchor.y,
