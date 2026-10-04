@@ -27,3 +27,5 @@ Ticket 02 is unblocked. The proposed ADR it revises is committed as 0115.
 2026-10-04, after merging `main` at `9cb40e16`: R10, R12 and R27 were corrected against code changed by PRs #332 and #336, without re-grading (`pilot/REPORT.md`, "Corrections against current code"). That opened D21, whether an Edit through a drawn Map should record `defaultMap`, which awaits the user.
 
 2026-10-04: D21 resolved as a rule and recorded as ADR 0116 in ticket 02.
+
+2026-10-04: the user accepted the resolve-after-scoring deviation; no pilot re-score. The adoption readers answered with all four resolutions in force (`../adoption/REPORT.md`).
