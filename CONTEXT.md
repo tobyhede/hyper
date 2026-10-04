@@ -135,7 +135,7 @@ _Avoid_: revision (that is what a stored Space is versioned by, and the two move
 ## Maps
 
 **Map**:
-A Resource-to-rect mapping the author wrote — which of a Space's Resources are in the Map, where they sit, their Open/Closed state, and the Open Size each remembers. It belongs to the Space and is part of what the Space is. A working Space always has at least one Map and may hold several. Membership, position, Open/Closed state and Open Size are properties of the Map, never of the Resource: the same Resource may be absent from one Map, sit at different coordinates in others, and be Open at different sizes in each. A Map may not name Resources the Space does not have.
+A Resource-to-rect mapping the author wrote — which of a Space's Resources are in the Map, where they sit, their Open/Closed state, the Open Size each remembers, and the Shape each is drawn in. It belongs to the Space and is part of what the Space is. A working Space always has at least one Map and may hold several. Membership, position, Open/Closed state, Open Size and Shape are properties of the Map, never of the Resource: the same Resource may be absent from one Map, sit at different coordinates in others, be Open at different sizes in each, and be a diamond in one and a rectangle in another. A Map may not name Resources the Space does not have.
 
 A Map owns a non-empty ordered collection of Graphs over its Resources. Several Graphs may share Resources within that Map. A Map may also name which of its Graphs opens active; otherwise its first Graph opens active.
 
@@ -143,11 +143,15 @@ The noun is always capitalised — a Map, the Map's Resources — because the wo
 _Avoid_: Diagram (ADR 0085's name for it, retired by ADR 0101), Layout (retired by ADR 0085 — it named both this entity and the behaviour that arranges Resources, which is why a **layout strategy** keeps the word and this does not), View, placement as a synonym (a Map *holds* a placement, and adds an identity, a title and its owned Graphs), manual and custom and free-form (a Map is authored, so the qualifiers say nothing).
 
 **Placement**:
-The Resource-to-rect mapping itself — which Resources are present, where they sit, whether each is **Open** or **Closed**, and its remembered **Open Size**, and nothing more. A **Map** is the authored entity a Space holds; the placement is the mapping inside it. Every Closed Resource has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Resource. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads.
+The Resource-to-rect mapping itself — which Resources are present, where they sit, whether each is **Open** or **Closed**, its remembered **Open Size**, and its **Shape**, and nothing more. A **Map** is the authored entity a Space holds; the placement is the mapping inside it. Every Closed Resource has the same **Closed Size** by domain rule, so that fixed size is not authored alongside each Resource. Placement is also what an automatic **layout strategy** computes and what the positioned strategy reads.
 
 A Map's placement is **sparse** relative to the Space, and omission is meaningful: a Resource the placement leaves out is not in that Map and is not rendered there. Adding an existing Resource to a Map writes its position. Removing it from the Map removes that entry and the incident Edges the Map owns without deleting the Resource from the Space. Omission is never the origin.
 
 **Add Resource** creates a new Resource and adds it to the current Map. **Add to Map** adds an existing Resource with its initial position. **Move Resource** changes the position of a Resource already in the Map. **Open** and **Close** change whether a Resource is Open, and **Resize** changes its Open Size. Closing preserves that size for the next Open; a Resource without one receives the default when first Opened. **Remove from Map** removes its membership, rect and incident Map-local Edges. “Place” is not a separate domain operation: every Resource in a Map necessarily has a position.
+
+**Shape**:
+The outline a Closed Resource is drawn in on a Map: a **rectangle**, a **pill**, an **ellipse**, a **diamond** or a **hexagon**. Like Open/Closed state and Open Size it is a property of the Map, not of the Resource or its kind, so the same Resource may take different Shapes in different Maps. It is diagram notation: an Open Resource and a presented Resource are read rather than diagrammed, and are drawn as rectangles whatever their Shape. How a Shape is given, kept and drawn is in [`docs/agents/maps-and-graphs.md`](docs/agents/maps-and-graphs.md).
+_Avoid_: head shape (a Graph's, drawn at its Edges' heads), node shape, symbol, figure, outline, border, frame (how a Shape is drawn, not what it is), and Shape as a name for a Resource kind (ADR 0113).
 
 Opening a Resource **displaces** the Resources clear of it: the Open, Close or Resize Edit moves them, and the move is authored like any other. Which Resources move, on which axis, and why Close remembers nothing are rules in [`docs/agents/maps-and-graphs.md`](docs/agents/maps-and-graphs.md).
 

@@ -12,6 +12,7 @@ Your task does any of these:
 - adds, deletes, orders or activates a Graph, or touches `activeGraph`
 - adds a Resource to a Map, removes it from one, or deletes it from the Space, where Map membership or Edges are affected
 - changes Open, Close, Resize, Open Size, or how neighbours are displaced
+- adds, changes or draws a Resource's Shape on a Map
 - changes how a new Space is created, or how a stored or imported Space without a Map is first opened
 - changes the layout strategy contract, or adds or proposes Auto-arrange or a new automatic strategy
 
@@ -101,6 +102,15 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 
 **Undo is not built.** It is a planned future feature. Every Edit, including Open, Close, Resize and Auto-arrange, is derived, submitted and stored as one atomic unit, so a future undo will reverse an Edit as a whole: undoing an Open moves back every Resource it displaced, and undoing an Auto-arrange restores every position it rewrote. Until undo exists, an Edit is reversed only by another Edit. Where [0086] and [0084] call these Edits undoable, they describe the unit a future undo reverses; where [0048] and [0074] say there is no undo, they describe V1. (Resolved 2026-10-04 as D12 in the [inventory].)
 
+## 7. Shape
+
+- **R45. A Resource's Shape is authored on the Map.** It is one of a closed set: rectangle, pill, ellipse, diamond, hexagon. It is stored in the Map's entry beside position, Open/Closed state and Open Size, never on the Resource, so the same Resource may take different Shapes in different Maps. A Shape is the diagram's notation, and notation belongs to the diagram (A19). ([0117])
+- **R46. Every kind may take any Shape.** Nothing about a Shape depends on content, so it is not a kind's (A20). ([0117], [0113])
+- **R47. The Shape is required, and a Resource added to a Map is given the rectangle.** Add Resource and Add to Map write it; no rule reads a missing Shape as the rectangle (A23). Every other Edit that rewrites an entry keeps it. Remove from Map forgets it with the rest of the entry. Choosing the Shape a Resource already has is `unchanged`. ([0117])
+- **R48. A Shape changes no rect.** It is drawn inside the fixed Closed Size, so displacement (R38–R41) and Edge attachment are unchanged. Every Shape in the set touches the midpoint of each side of its bounding rect, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title Lines and kind glyph lay out in the rectangle inscribed in the Shape; the selection ring and a Reference Resource's dotted border follow the outline. ([0117], [0110])
+- **R49. Only a Closed Resource draws its Shape.** An Open, editing or presented Resource is drawn as a rectangle whatever its Shape, and the Shape returns on Close. The Shape choice is offered while Open as well, so the menu does not change between states. ([0117], [0064])
+- **R50. An embedded Map draws its Resources' Shapes, and an automatic arrangement keeps every Shape.** Whether a strategy may assign Shapes is a separate, later decision. ([0117], [0112], [0086])
+
 ## Rejected alternatives
 
 | ID | Rejected | Why | Cost accepted |
@@ -123,6 +133,11 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 | A16 | Bands against the Open rect | The set changes between Edits, and the round trip fails ([0093]) | Far-left Resources still move down |
 | A17 | A stored Closed Size | Optional gives two shapes for one fact; required repeats a constant ([0066]) | Resizable Closed Resources would be a format change |
 | A18 | Activation as an Edit, or as dirtying | It changes nothing authored ([0028]) | Not durable until the next Edit |
+| A19 | A Shape on the Resource | Notation is the diagram's; a presentation field on the Resource is the shared slot the model rules out ([0117]) | A Resource re-added to a Map starts as a rectangle |
+| A20 | A Shape fixed by kind | A kind adds only what its content supports ([0117], [0113]) | — |
+| A21 | A Shape that changes the Closed Size | Displacement, attachment and the fixed Closed Size would each depend on it ([0117]) | A circle is drawn as an ellipse |
+| A22 | An open set (free radius, arbitrary path) | Edges could no longer be guaranteed to meet the outline ([0117]) | Five Shapes only |
+| A23 | A missing Shape read as the rectangle | The repo is the only source of state; the format rolls forward ([0117], [0054], [0056]) | Every fixture and seed carries `shape` |
 
 ## Accepted, not built
 
@@ -130,6 +145,7 @@ Every rule above is built except these:
 
 - **Auto-arrange** (R6), with any returning automatic strategy (R7). Delivery: [`.scratch/auto-arrange/issues/01-auto-arrange-a-map.md`](../../.scratch/auto-arrange/issues/01-auto-arrange-a-map.md), which also holds the two open questions: whether the Edit records which strategy produced the positions, and whether it asks for confirmation before rewriting a whole Map while undo does not exist.
 - **Manual Graph reordering** (R25). Delivery: [`.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md`](../../.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md).
+- **Drawing and choosing a Shape** (R48, R49, R50's embedded Map): R45–R47 and R50's arrangement half are built. Delivery: [`.scratch/resource-shape/`](../../.scratch/resource-shape/spec.md), tickets 02–04.
 
 Remove an entry here in the change that verifies its implementation.
 
@@ -174,7 +190,11 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R41 | §6 | [0084], [0093], CONTEXT.md "Placement" |
 | R42 | §6 | [0084], [0093] |
 | R44 | §6 | [0066], [0084] |
-| A1–A18 | Rejected alternatives | Cited in each row |
+| R45, R47, R49 | §7 | [0117] (R49 also [0064]) |
+| R46 | §7 | [0117], [0113] |
+| R48 | §7 | [0117], [0110] |
+| R50 | §7 | [0117], [0112], [0086] |
+| A1–A23 | Rejected alternatives | Cited in each row |
 | D12 | §6, Undo | [0086], [0084], [0048], [0074] |
 
 [context]: ../../CONTEXT.md
@@ -207,3 +227,8 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0022]: ../adr/superseded/0022-a-layout-names-the-routes-it-shows.md
 [0025]: ../adr/superseded/0025-a-layout-is-optional-and-editing-makes-it-positioned.md
 [0026]: ../adr/superseded/0026-a-route-is-active-and-the-layout-may-name-it.md
+[0054]: ../adr/0054-the-unreleased-prototype-rolls-forward.md
+[0056]: ../adr/0056-the-repository-is-the-only-source-of-state.md
+[0110]: ../adr/0110-an-edge-faces-across-the-larger-gap-between-two-resources.md
+[0113]: ../adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md
+[0117]: ../adr/0117-a-shape-is-a-maps-and-only-a-closed-resource-draws-it.md
