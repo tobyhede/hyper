@@ -15,14 +15,14 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R3. Automatic strategies are non-addressable capabilities, and none is privileged.** None draws the canvas. `gridStrategy` is the only one. It is pure, used only by tests, and kept so the contract has an implementation on each side, not because a grid is what returns. A change that works for only one strategy means the seam has leaked. ([0086], [0079], [0014])
 - **R4. The strategy contract carries positions only.** A `LayoutStrategyResource` has optional `x`/`y` and no ports, and a `LayoutStrategyEdge` has endpoints and no routed sections. A Map stores a Resource and its position and nothing else, so routed geometry has nowhere to land. ([0086])
 - **R5. There is no intermediate arranged-result type.** A strategy takes a `LayoutStrategyGraph` and returns the same shape with geometry filled in. "Arrangement" is prose, not a domain term (A1). ([0005], kept binding by [0014]; [0041])
-- **R6. Auto-arrange is a destructive Edit over an existing Map.** The author invokes it explicitly, by a named tool. It rewrites that Map's positions in one Edit, and the result is authored like any other position. It is not a canvas, a selectable context, a renderer decision or incremental placement, and it creates no Map: the render path was wrong, not the strategy it ran. It is to live in `graph`, re-siting the render-time `elkjs` lint ban (`eslint.config.js`). **Not built.** Undo is open (D12, §6). ([0086], [0014], [0084])
+- **R6. Auto-arrange is a destructive Edit over an existing Map.** The author invokes it explicitly, by a named tool. It rewrites that Map's positions in one Edit, and the result is authored like any other position. It is not a canvas, a selectable context, a renderer decision or incremental placement, and it creates no Map: the render path was wrong, not the strategy it ran. It is to live in `graph`, re-siting the render-time `elkjs` lint ban (`eslint.config.js`). **Not built.** It is one atomic Edit; undo is a future feature (§6). ([0086], [0014], [0084])
 - **R7. An automatic strategy returns only attached to an Edit, and never to honour a drop point.** Three spikes that seeded or constrained an optimiser each reshuffled existing Resources and placed the new one arbitrarily; the failure is structural. Whole-Map Auto-arrange is clear of it, because global rearrangement is what the author asked for. ([0086]; first [0013], carried by [0025])
 
 ## 2. The canvas context and the Map lifecycle
 
 - **R8. A Map is the only canvas context.** It alone is selectable and addressable (`/spaces/:spaceId/maps/:mapId`), and the canvas shows only its Graphs. No Computed or Space Views, no flatten across Maps, no dormant compatibility: obsolete identities are invalid input and their URLs are not found. ([0079], [0069])
 - **R9. A working Space always has a durable `defaultMap`,** its persisted opening selection. ([0079])
-- **R10. Choosing a Map is navigation, not an Edit.** It dirties nothing. A later successful Edit in that Map *may* record it as `defaultMap`; the current code does so on every Map-writing Edit, which is one permitted reading. A Map-writing Edit writes the resolved `activeGraph` explicitly. ([0079], [0028])
+- **R10. Choosing a Map is navigation, not an Edit.** It dirties nothing. A Space opens on the Map most recently edited in: every Edit in a Map records it as `defaultMap`, Add Map included, and writes the Map's resolved `activeGraph` explicitly. Viewing a Map without editing saves nothing, and reading never writes. Remembering the last Map viewed, or letting the author pin a default, would be a new decision. ([0079], [0028]; D16)
 - **R11. Add Map creates and selects an empty Map in one Edit.** It has no Resources and owns one empty Graph, its Active Graph. Existing Resources are not copied in; authors add them, for example from the Resources View. ([0079], [0040], [0041])
 - **R12. The last Map cannot be deleted** (`space-must-keep-map`), because a working Space must keep a durable default. ([0079])
 - **R13. Deleting a Map or Graph atomically relocates every Space Resource that selects it,** so no selection dangles. ([0091])
@@ -56,12 +56,8 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R32. Placement belongs to the Map, not the Resource.** The same Resource may be absent from one Map and placed or sized differently in others. ([0040], [0064], [0066])
 - **R33. Add to Map adds an existing Resource with an initial position.** It arrives Closed with no Edges (code treatment, not an ADR rule). ([0040])
 - **R34. Remove from Map is one Edit.** It removes membership, position, and every incident Edge in that Map's Graphs. Emptied Graphs remain. The Resource stays in the Space and in other Maps. ([0040])
-- **R35. Removing or deleting an Open Resource gives back its room,** by Close's negation. See G1 below.
+- **R35. Removing or deleting an Open Resource Closes it in the same Edit, then removes it.** Close's reclaim gives back the room it held, by the memoryless rule (R41), before its position and Edges go. Removing a Closed Resource moves nothing. Removal itself never displaces; only Open, Close and Resize do. Leaving the gap instead was considered and declined: nothing could reclaim it later, because Close is memoryless and the Resource is gone. ([0084]; [CONTEXT.md][context] "Placement"; `snapshot-edits.property.test.ts`)
 - **R36. Deleting a Resource from the Space runs Remove from Map's cascade in every Map.** ([0040])
-
-<!-- PENDING:G1 -->
-> **Open: awaiting decision (G1).** Removing or deleting an Open Resource gives back its room: [CONTEXT.md][context] ("Placement") says so and it is built (`Placement.reclaim`, `snapshot-edits.property.test.ts`), but **no ADR states it**; [0040] predates Open state and [0084] covers only Open, Close and Resize. One side: a live rule following from [0084]'s principle. The other: treatment owned by CONTEXT.md and the tests. Until decided, keep the behaviour and cite no ADR for it.
-<!-- /PENDING:G1 -->
 
 ## 6. Open, Close and displacement
 
@@ -74,9 +70,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R43. One Open, Close or Resize Edit may move many Resources, as one unit.** ([0084])
 - **R44. Open Size survives Close.** The next Open returns to it. A first Open records a concrete default, which a Resource kind may choose. The Closed Size is fixed policy and never stored (A17). A resize ending within the application's magnetic range of the Closed Size on **both** axes completes as a Close and keeps the Open Size. A one-axis match is an ordinary Resize. ([0066], [0084])
 
-<!-- PENDING:D12 -->
-> **Open: awaiting decision (D12, undo).** [0086] calls Auto-arrange's Edit "undoable like any other", and [0084] says undoing an Open "is undoing all of them". [0048] says "there is no undo anywhere in this app", and [0074] says "V1 has no undo". No undo exists in code, and no status link joins the pairs. One side: "undoable" means only one atomic unit that a future undo would reverse whole. The other: destructive Auto-arrange owes an undo or confirmation in V1. Until decided, claim no Edit can be undone.
-<!-- /PENDING:D12 -->
+**Undo.** Undo is not built; it is a planned future feature. Every Edit, including Open, Close, Resize and Auto-arrange, is derived, submitted and stored as one atomic unit, so a future undo will reverse an Edit as a whole: undoing an Open moves back every Resource it displaced, and undoing an Auto-arrange restores every position it rewrote. Until undo exists, an Edit is reversed only by another Edit. Where [0086] and [0084] call these Edits undoable, they describe the unit a future undo reverses; where [0048] and [0074] say there is no undo, they describe V1. (D12, resolved 2026-10-04.)
 
 ## Rejected alternatives
 
@@ -106,10 +100,10 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 **Built:** every rule above except these (evidence: `../inventory.md`).
 
 **Accepted, not built:**
-- **Auto-arrange** (R6), with any returning automatic strategy (R7). **No delivery issue exists**; `.scratch/positioned-layout/issues/05`, `14` and `15` are resolved tickets from the superseded model. Whether it records which strategy produced the positions is undecided.
+- **Auto-arrange** (R6), with any returning automatic strategy (R7). **No delivery issue exists**; `.scratch/positioned-layout/issues/05`, `14` and `15` are resolved tickets from the superseded model. Whether it records which strategy produced the positions is undecided, and so is whether it asks for confirmation before rewriting a whole Map while undo does not exist.
 - **Manual Graph reordering** (R25). No operation exists in code, and no delivery issue was found.
 
-**Treatment without an ADR** (owned by code, tests or CONTEXT.md): R30's presentation gate; R33's Closed, Edge-less arrival; deleting the default Map moves `defaultMap` to the selected survivor, else the first; and R35, pending G1.
+**Treatment without an ADR** (owned by code, tests or CONTEXT.md): R30's presentation gate; R33's Closed, Edge-less arrival; deleting the default Map moves `defaultMap` to the selected survivor, else the first.
 
 ## Provenance
 
@@ -141,7 +135,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 | R31 | §5 | [0040], [0004] |
 | R32 | §5 | [0040], [0064], [0066] |
 | R33, R34, R36 | §5 | [0040] |
-| R35 | §5, G1 note | CONTEXT.md "Placement"; no ADR |
+| R35 | §5 | [0084]; CONTEXT.md "Placement" |
 | R37 | §6 | [0064], [0066] |
 | R38, R39, R43 | §6 | [0084] |
 | R40 | §6 | [0093] |
@@ -150,7 +144,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 | R44 | §6 | [0066], [0084] |
 | A1–A18 | Rejected alternatives | Cited in each row |
 | D12 | §6 note | [0086], [0084], [0048], [0074] |
-| G1 | §5 note | CONTEXT.md, [0040], [0084] |
+| G1 | §5, R35 (resolved) | CONTEXT.md, [0040], [0084] |
 
 [context]: ../../../../CONTEXT.md
 [0004]: ../../../../docs/adr/0004-cards-are-the-graph.md

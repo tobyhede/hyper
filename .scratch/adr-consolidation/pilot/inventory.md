@@ -162,7 +162,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
   - No Auto-arrange exists in `packages/` or `src/`. The only hit is the doc comment at `packages/graph/src/layout.ts:52`.
   - Delivery issue: none found. `.scratch/positioned-layout/issues/05-auto-arrange.md`, 14 and 15 are resolved tickets from the superseded computed-view model.
   - It will live in `graph` (0086: the package "where Auto-arrange will live"). See D13.
-  - Whether it can be undone is UNRESOLVED (D12).
+  - It is one atomic Edit; undo is a future feature (D12, resolved).
 
 **R7. An engine may return, but only attached to an Edit.**
 - **Statement:** A graph-layout engine may return, attached to an Edit. Never seed or constrain an optimiser to honour a drop point.
@@ -199,14 +199,14 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 - **Status:** Built. `requireDefaultMap` throws when a working Space lacks one (`map-resolution.ts:28`).
 
 **R10. Choosing a Map is navigation.**
-- **Statement:** Choosing a Map is navigation, not an Edit. A later successful Edit in that Map records it as `defaultMap`, and writes the Map's resolved `activeGraph` explicitly.
+- **Statement:** Choosing a Map is navigation, not an Edit. A Space opens on the Map most recently edited in. Selecting a Map is navigation and saves nothing; every Edit in a Map records it as `defaultMap`, Add Map included, and writes the Map's resolved `activeGraph` explicitly.
 - **Sources:**
   - ADR 0079, paragraph 5 ("may record it")
   - ADR 0028, first two paragraphs (the write side for the active Graph; refined by 0040 and 0041)
   - CONTEXT "Active Graph", paragraph 2
   - `editing-and-persistence.md`, Map/Graph bullet 2
 - **Negatives:** Selecting a Map does not dirty or submit anything.
-- **Status:** Built. `updatePositionedMap` in `packages/app/src/snapshot.ts:91–113` writes `defaultMap: mapId` on every Map-writing Edit, and writes `activeGraph` when one is named. The code always records where 0079 says "may"; see D16.
+- **Status:** Built. `updatePositionedMap` in `packages/app/src/snapshot.ts:91–113` writes `defaultMap: mapId` on every Map-writing Edit, and writes `activeGraph` when one is named. The code always records where 0079 says "may"; the user confirmed "always" as the rule (D16).
 
 **R11. Add Map creates and selects an empty Map in one Edit.**
 - **Statement:** Add Map creates and selects an empty Map, with no Resource members, owning exactly one empty Graph that is its Active Graph. Existing Resources stay outside the new Map until an author adds them, for example from the Resources View.
@@ -439,10 +439,10 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 - **Status:** Built. `SnapshotEdit.removeFromMap` with `withoutIncidentEdges` (`snapshot-edits.ts:548–574`).
 
 **R35. Removing or deleting an Open Resource gives back its room.**
-- **Statement:** Removing an Open Resource from a Map, or deleting it from the Space, gives back the room it held, by the same negation Close applies.
+- **Statement:** Removing an Open Resource from a Map, or deleting it from the Space, Closes it in the same Edit and then removes it: Close's reclaim gives back the room it held, by the memoryless rule, before its position and Edges go. Removing a Closed Resource moves nothing. Removal itself never displaces; only Open, Close and Resize do.
 - **Sources:**
   - CONTEXT "Placement", paragraph 3 ("giving back the room it held if it was Open")
-  - Consistent with ADR 0084, but **no ADR states it**; see G1.
+  - ADR 0084 (Close's reclaim), applied by the Edit that removes; confirmed by the user as a live rule, see G1.
 - **Status:** Built. Evidence:
   - `Placement.reclaim` (`packages/graph/src/placement.ts:415–421`)
   - `removedFrom` (`snapshot-edits.ts:192`)
@@ -535,7 +535,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 **R43. One Edit can move many Resources, as a unit.**
 - **Statement:** A single Open, Close or Resize Edit may move many Resources, and it is one unit.
 - **Sources:** ADR 0084, "Authored positions may now be written by the application".
-- **Status:** Built (one completion, one snapshot). Whether that unit can be undone is UNRESOLVED; see D12.
+- **Status:** Built (one completion, one snapshot). Undo is not built; a future undo reverses the unit whole (D12, resolved).
 
 **R44. Open Size survives Close.**
 - **Statement:**
@@ -857,9 +857,7 @@ Classification: implementation-history, and out-of-pilot-scope (answered by 0087
 - ADR 0086 says Auto-arrange is "undoable like any other" Edit, and ADR 0084 says "undoing it is undoing all of them".
 - ADR 0048 says "there is no undo anywhere in this app", and ADR 0074 says "V1 has no undo".
 - Code: `packages/app/src/components/DeleteConfirmation.tsx`, "V1 has no undo", and no undo command exists.
-- Resolution: **UNRESOLVED.** There is no status relationship between 0086/0084 and 0048/0074. The user must decide either:
-  - "undoable" means only that the Edit is one atomic unit that a future undo would reverse whole, or
-  - Auto-arrange, which is destructive and unbuilt, owes an undo or a confirmation in V1.
+- Resolution: **Resolved by the user, 2026-10-04.** Undo is not built; it is a planned future feature. Every Edit, including Open, Close, Resize and Auto-arrange, is derived, submitted and stored as one atomic unit, so a future undo will reverse an Edit as a whole: undoing an Open moves back every Resource it displaced, and undoing an Auto-arrange restores every position it rewrote. Until undo exists, an Edit is reversed only by another Edit. So 0086's and 0084's "undoable" describe the unit a future undo reverses, and 0048's and 0074's "no undo" describe V1. Both hold. Atomicity rests on the Edit path (`docs/agents/editing-and-persistence.md`: complete snapshots derived before effects, submitted whole, never split across commits). Left open, for Auto-arrange's future delivery issue: whether it asks for confirmation before rewriting a whole Map while no undo exists.
 
 **D13. Does ADR 0086 site Auto-arrange in `graph`, given the `eslint.config.js` zone that bans elkjs from `graph`?**
 - Sources: ADR 0086 ("the package where Auto-arrange will live") and the `AGENTS.md` Hard rules note.
@@ -875,7 +873,7 @@ Classification: implementation-history, and out-of-pilot-scope (answered by 0087
 **D16. ADR 0079 versus the code: does a later Edit record the default Map?**
 - 0079 says a later successful Edit "**may** record" the Map as default.
 - The code records it on **every** Map-writing Edit (`snapshot.ts:111`), and Add Map records its new Map as default (`space-authoring.ts:1015`).
-- Resolution: No conflict, because the code is one permitted instance. The question set must not demand either "always" or "never" here.
+- Resolution: **Resolved by the user, 2026-10-04: the code's behaviour is the rule.** A Space opens on the Map most recently edited in. Selecting a Map is navigation and saves nothing; every Edit in a Map records it as `defaultMap`, Add Map included, and writes the Map's resolved `activeGraph` explicitly. This narrows 0079's "may" to "does" and confirms existing behaviour, so it needs no ADR and no code change. Remembering the last Map viewed, or a pinned default, would be a new decision.
 
 **D17. ADR 0086's open question on which side an Edge attaches, versus 0087 and 0110.**
 - Resolution: Resolved. 0087 `Refines: 0086`. Out of pilot scope.
@@ -896,7 +894,7 @@ Classification: implementation-history, and out-of-pilot-scope (answered by 0087
 **G1. Removing or deleting an Open Resource gives back its room (R35).**
 - Stated in: CONTEXT "Placement", and built in `placement.ts` `reclaim`.
 - Gap: No ADR says it. 0040's Remove from Map predates Open state, and 0084 speaks only of Open, Close and Resize.
-- **Needs user confirmation.** Either cite it as a live rule derived from 0084's principle ("displacement is applied by the Edit that causes it"), or treat it as treatment owned by CONTEXT and the tests.
+- **Resolved by the user, 2026-10-04: keep the current behaviour, as a live rule.** Removing an Open Resource from a Map, or deleting it from the Space, Closes it in the same Edit and then removes it: Close's reclaim gives back the room it held, by the memoryless rule, before its position and Edges go. Removing a Closed Resource moves nothing. Removal itself never displaces; only Open, Close and Resize do. Sources: ADR 0084 for the reclaim, CONTEXT "Placement", and `snapshot-edits.ts:193` with its property test. No new ADR: nothing changes. The user considered and declined the alternative, removal leaving a gap (keeping every other position intact).
 
 **G2. An empty Active Graph cannot be presented (R30).**
 - Stated in: CONTEXT and `dock-chrome.ts:390`.

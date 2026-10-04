@@ -40,7 +40,7 @@ Neither specimen reader reported a contradiction, a dead-end pointer, or a point
 
 ## Verdict
 
-**Correctness: provisional pass.** Every fixed question passed on the specimen route for both readers, preserving the applicable rules and important negatives, with no dead-end pointer. The pass rests on the spec's condition — "no new unresolved contradiction" — not the ticket's stricter "no unresolved contradiction": the specimen carries two source disagreements (D12, G1) that it surfaces rather than creates, and no specimen reader treated either as settled. The spec also asks that ambiguities be resolved before scoring; D12, G1 and D16 were not, because they are the user's to decide. The D12-dependent grades hold under either proposed resolution, since both agree V1 has no undo; G1 and D16 affected no grade (grading.md, pattern 8). The pass becomes final when those three are resolved and the affected expected answers confirmed.
+**Correctness: pass.** Every fixed question passed on the specimen route for both readers, preserving the applicable rules and important negatives, with no dead-end pointer. At grading, the specimen carried two source disagreements (D12, G1) that it surfaced rather than created; no specimen reader treated either as settled. Scoring ran before the user resolved D12, G1 and D16, contrary to the spec's order. All three were resolved afterwards (below). Every grade they touched stands, so the pass is final and the specimen now carries no unresolved contradiction.
 
 **Reading effort, assessed separately:** about 3,660 words in 2 files against 16,000–18,600 words in 6–11 files, a reduction of roughly 78–80%, with fewer tool calls. The saving does not drive the verdict; the existing route also failed on correctness, so the comparison is not a shorter answer passing over a longer one.
 
@@ -69,17 +69,17 @@ Review against the repository's vocabulary rules found avoided words in the spec
 - "engine" and "algorithm" (CONTEXT avoids both for a layout strategy) replaced in R6, R7, the Built section and the reading path.
 - "A Map is authored placement" (CONTEXT avoids placement as a name for a Map) reworded.
 
-## Decisions required before adoption (ticket 02)
+## Decisions resolved after evaluation
 
-1. **D12 — undo.** Choose between: "undoable" means the Edit is one atomic unit a future undo would reverse whole, and V1 has no undo; or Auto-arrange owes an undo or a confirmation in V1. The specimen's `<!-- PENDING:D12 -->` note is replaced by the decision. Either way the `AGENTS.md` 0084 entry's "undoing it undoes all of them" misleads readers today (two baseline failures).
-2. **G1 — room given back on removal or deletion of an Open Resource.** Cite it as a live rule following from ADR 0084, or treat it as CONTEXT- and test-owned behaviour. The specimen's `<!-- PENDING:G1 -->` note is replaced accordingly.
-3. **D16 — recording the default Map.** ADR 0079 says a later Edit "may" record the selected Map as `defaultMap`; the code always does, including for Add Map. Confirm whether the contract states the code's behaviour as the rule.
+1. **D12 — undo. Resolved 2026-10-04.** Undo is not built and is a planned future feature; every Edit is derived, submitted and stored as one atomic unit, so a future undo reverses an Edit whole. The specimen's pending note now states this, and the grades it affected stand unchanged. Whether Auto-arrange asks for confirmation while undo does not exist is left to its future delivery issue. Ticket 02 must correct the `AGENTS.md` 0084 entry, whose "undoing it undoes all of them" reads as if undo exists (two baseline failures).
+2. **G1 — room given back on removal. Resolved 2026-10-04: keep the current behaviour, as a live rule.** Removing or deleting an Open Resource Closes it in the same Edit, then removes it; removing a Closed Resource moves nothing; removal itself never displaces. Sourced to ADR 0084, CONTEXT and the property test, with no new ADR. Leaving the gap was considered and declined. All four readers stated this rule in Q6, so no grade changes.
+3. **D16 — recording the default Map. Resolved 2026-10-04: the code's behaviour is the rule.** A Space opens on the Map most recently edited in. Selecting a Map saves nothing, and every Edit in a Map records it as `defaultMap`, Add Map included. This narrows ADR 0079's "may" without changing code. No grade changes.
 
 ## Recommendation
 
 Adopt, through ticket 02, with three adjustments:
 
-1. Resolve D12, G1 and D16 first, and record each resolution where it binds.
+1. Carry the D12, G1 and D16 resolutions into the adopted contract, and correct the `AGENTS.md` 0084 entry's undo wording.
 2. When integrating, replace the Map/Graph entries in `AGENTS.md` (ADR 0079, 0084, 0064's displacement sentences, 0041's model sentences) and the overlapping Map/Graph accounts in `docs/agents/editing-and-persistence.md` and `rendering.md` with pointers, then rerun the fixed questions through the adopted route with fresh readers. That rerun removes this pilot's main confound.
 3. Keep the provenance table and the "Built vs accepted-but-unbuilt" section. They are what let a reader tell Auto-arrange and manual Graph reordering are unbuilt, and what let a reviewer check completeness.
 

@@ -378,7 +378,7 @@ Contrast: Deleting the Resource from the Space would run this same cascade in ev
 
 ## Ambiguities that affect expected answers
 
-1. **Undo (D12, UNRESOLVED).**
+1. **Undo (D12, resolved 2026-10-04: undo is not built and is a planned future feature; every Edit is one atomic unit a future undo reverses whole).**
    - The conflict: ADRs 0086 and 0084 call Auto-arrange and displacement Edits "undoable" as a unit. ADRs 0048 and 0074 and the code say V1 has no undo.
    - This affects: Q1, Q7 and Q8.
    - Acceptable answers:
@@ -386,16 +386,16 @@ Contrast: Deleting the Resource from the Space would run this same cascade in ev
      - "No undo exists in V1."
      - Naming the conflict.
    - Fails: an answer asserting that a working undo command reverses it.
-   - What would fix the expected answer: the user resolving D12.
-2. **Room reclaimed on removal (G1, sourcing).**
+   - The resolution confirms these grades: asserting a working undo today is wrong; "one atomic Edit" and "undo is a future feature" are right.
+2. **Room reclaimed on removal (G1, resolved 2026-10-04: a live rule; removal Closes an Open Resource in the same Edit, then removes it).**
    - The gap: R35 is stated by CONTEXT and built, but no ADR states it.
    - This affects: Q6.
    - Acceptable answers: Q6 lists reclaim under "Must not contradict" rather than "Must state", so an answer that omits it can still pass, but one that says the neighbours stay displaced fails.
-   - If the user confirms R35 as a live rule, move it to "Must state" before scoring.
-3. **Recording the default Map (D16).**
+   - The user confirmed R35 as a live rule. It now belongs under "Must state". All four graded readers stated it in Q6, so no grade changes.
+3. **Recording the default Map (D16, resolved 2026-10-04: every Edit in a Map records it as `defaultMap`, Add Map included).**
    - The difference: ADR 0079 says a later Edit "may" record the Map as default. The code always does, including for Add Map.
    - This affects: Q4 and Q9.
-   - Acceptable answers: any position consistent with "may".
+   - Acceptable answers: any position consistent with "may" (as graded). Under the resolution, "every Edit records it" is the precise answer. "May" stays acceptable, being less precise rather than wrong. No reader said "never" or "at selection", so no grade changes.
    - Fails: an answer saying selecting a Map is itself an Edit or is persisted at selection time.
 4. **Auto-arrange scope details (G6, and Open state).**
    - The gap: No source says whether Auto-arrange respects Open Sizes, which strategy it uses, or whether it records provenance.
