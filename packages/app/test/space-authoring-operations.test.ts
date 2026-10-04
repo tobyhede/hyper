@@ -276,6 +276,7 @@ describe('Create Ur Resource', () => {
     const backend = MemorySpaceBackend.asMeta(loaded);
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
+      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -286,6 +287,7 @@ describe('Create Ur Resource', () => {
 
     const stored = await backend.loadSpace(SPACE_ID);
     const reopened = composeApp({
+      images: unusedImageSources,
       spaceSession: openSpaceSession(backend, stored!),
       selection: MAP_ID,
       newId: mintingIds(MINTED),
