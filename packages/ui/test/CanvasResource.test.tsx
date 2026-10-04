@@ -2290,8 +2290,42 @@ describe('the Shape a Resource front is drawn in', () => {
     render(<CanvasResource {...props} shape={shape} display={CLOSED_DISPLAY} />);
     const resource = screen.getByRole('article', { name: 'Decide' });
     expect(resource).toHaveAttribute('data-resource-shape', shape);
-    expect(outline(resource)?.firstElementChild?.tagName).toBe(element);
+    expect(outline(resource)?.querySelector('.canvas-resource__outline-edge')?.tagName).toBe(
+      element,
+    );
   });
+
+  /*
+   * The selection ring and a Reference Resource's dotted edge follow the
+   * outline (ADR 0117): both are strokes of the outline's own geometry, so
+   * neither can be drawn as the bounding rect. Which of them shows, and how,
+   * is `canvas-resource.css`'s, keyed on the state and kind.
+   */
+  it.each(['pill', 'ellipse', 'diamond', 'hexagon'] as const)(
+    'draws a Closed %s ring and edge from one geometry',
+    (shape) => {
+      render(
+        <CanvasResource
+          {...props}
+          front={{ kind: 'reference' }}
+          state="selected"
+          shape={shape}
+          display={CLOSED_DISPLAY}
+        />,
+      );
+      const drawn = outline(screen.getByRole('article', { name: 'Decide' }));
+      const ring = drawn?.querySelector('.canvas-resource__outline-ring');
+      const edge = drawn?.querySelector('.canvas-resource__outline-edge');
+      expect(ring).not.toBeNull();
+      expect(edge).not.toBeNull();
+      // The ring is drawn beneath the edge, whose fill covers its inner half.
+      expect(drawn?.firstElementChild).toBe(ring);
+      expect(ring?.tagName).toBe(edge?.tagName);
+      for (const attribute of ['points', 'width', 'height', 'rx', 'ry']) {
+        expect(ring?.getAttribute(attribute)).toBe(edge?.getAttribute(attribute) ?? null);
+      }
+    },
+  );
 
   it('draws no outline for a Closed rectangle', () => {
     render(<CanvasResource {...props} shape="rectangle" display={CLOSED_DISPLAY} />);

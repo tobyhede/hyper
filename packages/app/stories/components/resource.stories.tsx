@@ -72,6 +72,13 @@ const ONE_LINE_TITLE = 'Strategies';
 const THREE_LINE_TITLE = 'Strategies\nno strategy is privileged\ngrid is one member of a set';
 
 /**
+ * More Title Lines than any front draws, each long enough to wrap: the Title a
+ * Shape truncates at whole lines.
+ */
+const OVERLONG_TITLE =
+  'Why authored placement beats a layout engine\nno strategy is privileged over any other\ngrid is one member of a growing set\nand a fourth line\nand a fifth';
+
+/**
  * One Title Line, long enough that the box breaks it. A break the box chose is
  * not a rung: every visual line of this is still the `title` role.
  */
@@ -171,6 +178,56 @@ export const ResourceShapes: Story = () => (
         {RESOURCE_SHAPES.map((shape) => (
           <Specimen key={shape} label={`${shape} · three lines`}>
             <CanvasResourceSpecimen shape={shape} title={THREE_LINE_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {RESOURCE_SHAPES.map((shape) => (
+          <Specimen key={shape} label={`${shape} · overlong`}>
+            <CanvasResourceSpecimen shape={shape} title={OVERLONG_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+    </CatalogueSection>
+  </div>
+);
+
+/** Every Shape but the rectangle, whose treatments are the front's own border and shadow. */
+const DRAWN_RESOURCE_SHAPES = RESOURCE_SHAPES.filter((shape) => shape !== 'rectangle');
+
+/**
+ * The selection ring and a Reference Resource's dotted edge on a Closed Shape
+ * (ADR 0117): both follow the outline rather than the bounding rect.
+ */
+export const ResourceShapeTreatments: Story = () => (
+  <div className="inv inv-sheet" style={resourceSizeVars}>
+    <CatalogueSection
+      title="Resource Shape treatments"
+      note="A selected Resource's ring and a Reference Resource's dotted edge are strokes of the Shape's own outline, so neither is drawn as the rect the Shape sits in. A Reference Resource's edge turns solid once it leaves rest, as the rectangle's border does."
+    >
+      <div className="inv-row">
+        {DRAWN_RESOURCE_SHAPES.map((shape) => (
+          <Specimen key={shape} label={`${shape} · selected`}>
+            <CanvasResourceSpecimen shape={shape} title={ONE_LINE_TITLE} state="selected" />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {DRAWN_RESOURCE_SHAPES.map((shape) => (
+          <Specimen key={shape} label={`${shape} · reference`}>
+            <CanvasResourceSpecimen shape={shape} title={ONE_LINE_TITLE} kind="reference" />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {DRAWN_RESOURCE_SHAPES.map((shape) => (
+          <Specimen key={shape} label={`${shape} · reference selected`}>
+            <CanvasResourceSpecimen
+              shape={shape}
+              title={ONE_LINE_TITLE}
+              kind="reference"
+              state="selected"
+            />
           </Specimen>
         ))}
       </div>

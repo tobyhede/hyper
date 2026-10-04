@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
+import { COLLAPSED_RESOURCE_SIZE, RESOURCE_SHAPES, type ResourceShape } from '@project/core';
+import { resourceShapeOutline } from '../src/resource-shape-outline';
 
 /**
  * The Title ladder's typography, read off the stylesheet that declares it.
@@ -129,7 +130,10 @@ describe('a single-line Title', () => {
    * chooses is not a rung.
    */
   it('still clamps to three visual lines at the title role', () => {
-    expect(declared(rung('title'), '-webkit-line-clamp')).toBe('3');
+    expect(declared(rung('title'), '-webkit-line-clamp')).toBe(
+      'var(--canvas-resource-title-clamp)',
+    );
+    expect(token('--canvas-resource-title-clamp')).toBe(3);
     expect(declared(block('.canvas-resource__title-line'), 'white-space')).toBe('normal');
   });
 });
@@ -180,9 +184,12 @@ describe('the rungs below the name', () => {
 
   /** Clamping counts visual lines, and it counts them per role. */
   it('clamp visual lines per role', () => {
-    const clamps = ['title', 'subtitle', 'caption'].map((role) =>
-      Number(declared(rung(role), '-webkit-line-clamp')),
-    );
+    const clamps = ['title', 'subtitle', 'caption'].map((role) => {
+      expect(declared(rung(role), '-webkit-line-clamp')).toBe(
+        `var(--canvas-resource-${role}-clamp)`,
+      );
+      return token(`--canvas-resource-${role}-clamp`);
+    });
     expect(clamps.every((count) => Number.isInteger(count) && count > 0)).toBe(true);
 
     const base = block('.canvas-resource__title-line');
@@ -225,21 +232,88 @@ describe('the ladder ceiling', () => {
     expect(ceiling).toBeLessThanOrEqual(room);
   });
 
-  /** And the heading clips at that ceiling rather than growing past it. */
-  it('is a clip on the heading, not a size the Resource grows to', () => {
+  /**
+   * The heading has no pixel ceiling of its own: one would cut a rung partway,
+   * because the rungs are drawn at three sizes and a ceiling counts one. The
+   * Title is truncated at whole lines instead — each rung clamps its own visual
+   * lines, and a rung past the third is not drawn.
+   */
+  it('truncates at whole lines rather than clipping the heading', () => {
     const heading = block('.canvas-resource__title');
-    const ceiling = declared(heading, 'max-height') ?? '';
-    expect(ceiling.startsWith('calc(')).toBe(true);
-    for (const name of [
-      '--canvas-resource-title-size',
-      '--canvas-resource-title-leading',
-      '--canvas-resource-title-ladder-lines',
-    ]) {
-      expect(ceiling).toContain(name);
-    }
-    expect(declared(heading, 'overflow')).toBe('hidden');
+    expect(declared(heading, 'max-height')).toBeUndefined();
     expect(declared(heading, 'height')).toBeUndefined();
     expect(declared(heading, 'min-height')).toBeUndefined();
+
+    const past = block('.canvas-resource__title-line:nth-child(n + 4)');
+    expect(declared(past, 'max-height')).toBe('0');
+    expect(declared(past, 'min-height')).toBe('0');
+  });
+});
+
+/** The declarations of the first rule whose selector, collapsed, is exactly `selector`. */
+const ruleOf = (selector: string): string | undefined => {
+  const uncommented = stylesheet.replaceAll(/\/\*[\s\S]*?\*\//gu, '');
+  for (const found of uncommented.matchAll(/^([^{}@/][^{}]*?)\s*\{([^}]*)\}/gmu)) {
+    if (found[1]?.replaceAll(/\s+/gu, ' ').trim() === selector) return found[2] ?? '';
+  }
+  return undefined;
+};
+
+/** A rung clamp as a Shape draws it: the Resource's own, narrowed by the Shape's rules. */
+const clampIn = (shape: ResourceShape, role: string): number => {
+  const name = `--canvas-resource-${role}-clamp`;
+  const layers = [
+    block('.canvas-resource'),
+    shape === 'rectangle'
+      ? undefined
+      : ruleOf(".canvas-resource:not([data-resource-shape='rectangle'])"),
+    ruleOf(`.canvas-resource[data-resource-shape='${shape}']`),
+  ];
+  const values = layers.flatMap((layer) => {
+    const value = layer === undefined ? undefined : declared(layer, name);
+    return value === undefined ? [] : [Number.parseFloat(value)];
+  });
+  const value = values.at(-1);
+  expect(value, `no ${name} for ${shape}`).toBeDefined();
+  return value ?? 0;
+};
+
+describe('every Shape draws its Title in whole lines', () => {
+  /**
+   * The tallest ladder a Shape's clamps allow — every rung at its full clamp —
+   * fits the room its Closed front gives the Title: the rectangle's body below
+   * the kind glyph's row, and every other Shape's inscribed rectangle below that
+   * row (ADR 0117). So no Title Line is ever cut partway.
+   */
+  it.each(RESOURCE_SHAPES)('fits the tallest %s ladder in the room the Shape gives it', (shape) => {
+    const border = themeToken('--canvas-resource-border-width', 'px');
+    const line =
+      token('--canvas-resource-title-size', 'px') * token('--canvas-resource-title-leading');
+    const ladder =
+      line *
+      (clampIn(shape, 'title') +
+        token('--canvas-resource-subtitle-ratio') * clampIn(shape, 'subtitle') +
+        token('--canvas-resource-caption-ratio') * clampIn(shape, 'caption'));
+
+    const closedBody = ruleOf(".canvas-resource[data-open='false'] > .canvas-resource__body");
+    const insetBody = ruleOf(
+      ".canvas-resource[data-open='false']:not([data-resource-shape='rectangle']) > .canvas-resource__body",
+    );
+    const bodyBottom = Number.parseFloat(
+      declared(block('.canvas-resource__body'), 'padding')?.split('px')[0] ?? '',
+    );
+    const room =
+      shape === 'rectangle'
+        ? COLLAPSED_RESOURCE_SIZE.height -
+          2 * border -
+          Number.parseFloat(declared(closedBody ?? '', 'padding-top') ?? '') -
+          bodyBottom
+        : COLLAPSED_RESOURCE_SIZE.height -
+          2 * resourceShapeOutline(shape).inscribed.block -
+          Number.parseFloat(declared(insetBody ?? '', 'padding') ?? '');
+
+    expect(room).toBeGreaterThan(0);
+    expect(ladder).toBeLessThanOrEqual(room);
   });
 });
 

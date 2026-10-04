@@ -53,7 +53,7 @@ import { ResourceImage } from './ResourceImage';
 import { ImageReplaceTarget } from './ImageReplaceTarget';
 import { UnresolvedContent } from './UnresolvedContent';
 import { atRest, drawnResourceShape, type FrontDisplay } from './resource-display';
-import { resourceShapeOutline } from './resource-shape-outline';
+import { resourceShapeOutline, type OutlinePoint } from './resource-shape-outline';
 
 /**
  * What a Resource front offers beyond its shared Title (ADR 0051): a kind-owned
@@ -746,6 +746,11 @@ export function CanvasResource(props: CanvasResourceProps) {
  * touches the midpoint of each of the rect's sides, where the adapter's handles
  * sit and Edges attach (ADR 0110, ADR 0117). The stroke keeps the border's
  * width at any rect because it does not scale with the drawing.
+ *
+ * The geometry is drawn twice: first the selection ring, a wider stroke that
+ * `canvas-resource.css` shows only while the Resource is selected or its Title
+ * is being written, then the edge, whose fill covers the ring's inner half. So
+ * the ring and a Reference Resource's dotted edge both follow the outline.
  */
 function ResourceShapeOutlineDrawing({ shape }: { readonly shape: ResourceShape }) {
   const outline = resourceShapeOutline(shape);
@@ -759,13 +764,35 @@ function ResourceShapeOutlineDrawing({ shape }: { readonly shape: ResourceShape 
       focusable="false"
     >
       {outline.kind === 'polygon' ? (
-        <polygon points={outline.points.map(({ x, y }) => `${x},${y}`).join(' ')} />
+        <>
+          <polygon className="canvas-resource__outline-ring" points={points(outline.points)} />
+          <polygon className="canvas-resource__outline-edge" points={points(outline.points)} />
+        </>
       ) : (
-        <rect width={width} height={height} rx={outline.rx} ry={outline.ry} />
+        <>
+          <rect
+            className="canvas-resource__outline-ring"
+            width={width}
+            height={height}
+            rx={outline.rx}
+            ry={outline.ry}
+          />
+          <rect
+            className="canvas-resource__outline-edge"
+            width={width}
+            height={height}
+            rx={outline.rx}
+            ry={outline.ry}
+          />
+        </>
       )}
     </svg>
   );
 }
+
+/** An outline polygon's vertices, as its `points` attribute spells them. */
+const points = (vertices: readonly OutlinePoint[]): string =>
+  vertices.map(({ x, y }) => `${x},${y}`).join(' ');
 
 interface TitleLadderProps {
   readonly title: string;

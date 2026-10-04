@@ -12,7 +12,7 @@ import {
   selectCanvas,
   settled,
 } from './graph';
-import { drawnOutline } from './resource-shape-outline';
+import { drawnOutline, outlineTreatment } from './resource-shape-outline';
 
 /**
  * A Resource's Shape (ADR 0117): chosen from the Resource's Actions menu, drawn
@@ -195,6 +195,7 @@ test(
         touchesSideMidpoints: true,
         fillsCorner: false,
         holdsTitleAndGlyph: true,
+        wholeTitleLines: true,
       });
     }
 
@@ -204,5 +205,73 @@ test(
       'data-resource-shape',
       'hexagon',
     );
+  },
+);
+
+test(
+  "a Closed Shape's selection ring and a Reference Resource's dotted edge follow its outline",
+  { tag: '@parity:closed-resource-treatments-follow-its-shape' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const a = nodeByTitle(page, 'A').first();
+    await expect(a).toBeVisible();
+
+    // Selected: the ring is the diamond's, not the rect's.
+    await (await resourceShapeChoice(page)).getByRole('menuitemradio', { name: 'Diamond' }).click();
+    await expect(face(a)).toHaveAttribute('data-resource-shape', 'diamond');
+    await expect(face(a)).toHaveAttribute('data-state', 'selected');
+    await expect
+      .poll(() => outlineTreatment(face(a)))
+      .toEqual({
+        ringShown: true,
+        ringFollowsOutline: true,
+        edge: 'solid',
+        rectBorder: false,
+      });
+
+    // A Reference Resource made from A, named apart from it and drawn as a hexagon.
+    const menu = await resourceActions(page, 'A');
+    await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
+    const title = page.getByRole('textbox', { name: 'Resource title' });
+    await expect(title).toBeFocused();
+    await title.fill('A, again');
+    await title.press('Enter');
+    await expect(title).toHaveCount(0);
+    await settled(page);
+    const reference = nodeByTitle(page, 'A, again');
+    await expect(face(reference)).toHaveAttribute('data-kind', 'reference');
+    await (
+      await resourceActions(page, 'A, again')
+    )
+      .getByRole('menuitem', { name: 'Shape' })
+      .click();
+    await page
+      .getByRole('group', { name: 'Shape' })
+      .getByRole('menuitemradio', { name: 'Hexagon' })
+      .click();
+    await expect(face(reference)).toHaveAttribute('data-resource-shape', 'hexagon');
+    await expect
+      .poll(() => outlineTreatment(face(reference)))
+      .toEqual({
+        ringShown: true,
+        ringFollowsOutline: true,
+        edge: 'solid',
+        rectBorder: false,
+      });
+
+    // At rest, with the pointer away, its edge is dotted along the hexagon.
+    await page.keyboard.press('Escape');
+    await page.mouse.move(2, 2);
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await expect(face(reference)).toHaveAttribute('data-state', 'rest');
+    await expect
+      .poll(() => outlineTreatment(face(reference)))
+      .toEqual({
+        ringShown: false,
+        ringFollowsOutline: false,
+        edge: 'dotted',
+        rectBorder: false,
+      });
   },
 );

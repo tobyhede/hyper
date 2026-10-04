@@ -174,7 +174,11 @@
   --canvas-resource-border-width: 4px;
   --canvas-resource-radius: 0;
   --canvas-resource-shadow-dragging: 7px 7px 0 var(--canvas-resource-ink-color);
-  --canvas-resource-shadow-selected: 0 0 0 3px var(--canvas-resource-ink-color);
+  /* The selection ring's width beyond the Resource's edge, read by the
+     rectangle's shadow below and by a Shape's ring stroke (`canvas-resource.css`). */
+  --canvas-resource-selected-ring-width: 3px;
+  --canvas-resource-shadow-selected: 0 0 0 var(--canvas-resource-selected-ring-width)
+    var(--canvas-resource-ink-color);
   /* Declared unlayered as well as in `@theme` above, and both are needed: an
      unlayered declaration beats the `@layer theme` one `@theme` emits, so a
      theme entry alone would leave `rounded-md` at Tailwind's default. */

@@ -1,6 +1,6 @@
 # Resource Shape
 
-Status: ready-for-agent
+Status: resolved
 
 The spec is ADR 0117 (`docs/adr/0117-a-shape-is-a-maps-and-only-a-closed-resource-draws-it.md`) and the **Shape**, **Map** and **Placement** entries in `CONTEXT.md`. This file only slices the work.
 

@@ -145,7 +145,6 @@ Every rule above is built except these:
 
 - **Auto-arrange** (R6), with any returning automatic strategy (R7). Delivery: [`.scratch/auto-arrange/issues/01-auto-arrange-a-map.md`](../../.scratch/auto-arrange/issues/01-auto-arrange-a-map.md), which also holds the two open questions: whether the Edit records which strategy produced the positions, and whether it asks for confirmation before rewriting a whole Map while undo does not exist.
 - **Manual Graph reordering** (R25). Delivery: [`.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md`](../../.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md).
-- **Drawing and choosing a Shape** (R48, R49, R50's embedded Map): R45–R47 and R50's arrangement half are built. Delivery: [`.scratch/resource-shape/`](../../.scratch/resource-shape/spec.md), tickets 02–04.
 
 Remove an entry here in the change that verifies its implementation.
 

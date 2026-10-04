@@ -1958,3 +1958,46 @@ it('reports and dismisses a drawn Space Resource menu clipboard refusal', async 
     else Object.defineProperty(navigator, 'clipboard', previousClipboard);
   }
 });
+
+it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing it there', async () => {
+  const { spaces } = await mountOpenSpaces(
+    home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    }),
+  );
+  await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+  beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+  fireEvent.click(
+    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', {
+      name: 'Actions for Resource Intake',
+    }),
+  );
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Shape' }));
+  fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Diamond' }));
+
+  await waitFor(() =>
+    expect(
+      spaces
+        .entry(TARGET_ID)
+        ?.session.getState()
+        .working.document.maps?.find((candidate) => candidate.id === SELECTED_MAP_ID)?.positions[
+        DRAWN_A
+      ]?.shape,
+    ).toBe('diamond'),
+  );
+  expect(
+    Object.values(
+      spaces.entry(HOME_ID)?.session.getState().working.document.maps?.[0]?.positions ?? {},
+    ).map((entry) => entry?.shape),
+  ).toEqual(['rectangle', 'rectangle']);
+  await waitFor(() =>
+    expect(embeddedNode(DRAWN_A).querySelector('.canvas-resource')).toHaveAttribute(
+      'data-resource-shape',
+      'diamond',
+    ),
+  );
+});

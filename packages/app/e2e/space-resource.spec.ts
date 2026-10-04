@@ -766,6 +766,91 @@ test(
 );
 
 /**
+ * A drawn Map draws its Resources' Shapes and, while it may be authored,
+ * offers the Shape choice (ADR 0117, ADR 0112). The choice writes the target
+ * Space's Map, so the target draws it when entered; a Reference Resource to
+ * the Space Resource draws the same Map read-only, with the Shape and no
+ * commands.
+ */
+test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn wherever it is', async ({
+  page,
+}) => {
+  const parent = await openSpaceResourceOnItsMap(page);
+  await beginPortalEdit(page, parent);
+  const embedded = embeddedNodes(page);
+  await expect(embedded).toHaveCount(1);
+  await (
+    await resourceControls(page, embedded)
+  )
+    .getByRole('button', { name: 'Actions for Resource Resource 1' })
+    .click({ delay: 120 });
+  await page.getByRole('menu').last().getByRole('menuitem', { name: 'Shape' }).click();
+  await page
+    .getByRole('group', { name: 'Shape' })
+    .getByRole('menuitemradio', { name: 'Diamond' })
+    .click();
+  await expect(embedded.locator('.canvas-resource')).toHaveAttribute(
+    'data-resource-shape',
+    'diamond',
+  );
+  await expect(
+    nodeByTitle(page, 'Architecture').locator('.canvas-resource').first(),
+  ).toHaveAttribute('data-resource-shape', 'rectangle');
+  await (
+    await resourceToolbar(page, parent)
+  )
+    .getByRole('button', { name: 'Done Resource Architecture' })
+    .click();
+  await settled(page);
+
+  // Through a Reference Resource the drawn Map is read-only: the Shape is
+  // drawn, and the Resource drawn there offers no commands.
+  await (
+    await resourceControls(page, parent)
+  )
+    .getByRole('button', { name: 'Actions for Resource Architecture' })
+    .click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Create Reference', exact: true }).click();
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill('Architecture, again');
+  await title.press('Enter');
+  await expect(title).toHaveCount(0);
+  await settled(page);
+  const reference = nodeByTitle(page, 'Architecture, again');
+  await reference.focus();
+  await reference.press('Enter');
+  const referenceId = await reference.getAttribute('data-id');
+  if (referenceId === null) throw new Error('The Reference Resource has no id.');
+  const throughReference = page.locator(`.react-flow__node[data-id^="embedded:${referenceId}:"]`);
+  await expect(throughReference).toHaveCount(1);
+  await expect(throughReference.locator('.canvas-resource')).toHaveAttribute(
+    'data-resource-shape',
+    'diamond',
+  );
+  await expect(throughReference).toHaveCSS('pointer-events', 'none');
+  await expect(
+    page.locator(`[data-resource-rail-for="${await throughReference.getAttribute('data-id')}"]`),
+  ).toHaveCount(0);
+
+  await enterThrough(page, nodeByTitle(page, 'Architecture'), 'Space 1');
+  // Entered, the target Space draws the Shape on its own Map, and keeps it on reload.
+  await expect(
+    page
+      .locator('.react-flow__node:visible')
+      .filter({ has: page.getByRole('heading', { name: 'Resource 1', exact: true }) })
+      .locator('.canvas-resource'),
+  ).toHaveAttribute('data-resource-shape', 'diamond');
+  await page.reload();
+  await expect(
+    page
+      .locator('.react-flow__node:visible')
+      .filter({ has: page.getByRole('heading', { name: 'Resource 1', exact: true }) })
+      .locator('.canvas-resource'),
+  ).toHaveAttribute('data-resource-shape', 'diamond');
+});
+
+/**
  * Handles author the Graph the Space Resource is showing
  * and do not complete a cross-Space Edge on the containing canvas (ADR 0040).
  */
