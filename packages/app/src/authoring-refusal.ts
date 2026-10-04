@@ -98,8 +98,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       if (
         refusal.operation === 'renamed-graph' ||
         refusal.operation === 'recolored-graph' ||
-        refusal.operation === 'changed-graph-head-shape' ||
-        refusal.operation === 'deleted-graph'
+        refusal.operation === 'changed-graph-head-shape'
       )
         return 'Select a Map to manage its Graphs.';
       return 'Select a Map to edit its Edges.';
@@ -121,8 +120,6 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'An image URL must start with https: or http:.';
     case 'space-title-required':
       return 'A Space title is required.';
-    case 'space-must-keep-map':
-      return 'A Space keeps at least one Map.';
     case 'reference-target-not-found':
       return 'That Target is no longer part of the Space.';
     case 'reference-target-must-own-content':
@@ -137,8 +134,6 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return `Delete the Reference Resources of this Resource first: ${refusal.referenceTitles.join(', ')}.`;
     case 'graph-title-required':
       return 'A Graph title is required.';
-    case 'map-must-keep-graph':
-      return 'A Map keeps at least one Graph.';
     case 'graph-not-owned':
       return 'That Graph is not one this Map owns.';
     case 'edge-not-found':

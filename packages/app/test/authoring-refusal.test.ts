@@ -35,8 +35,6 @@ const EVERY_REFUSAL = {
   'resource-not-open': { code: 'resource-not-open' },
   'resource-has-references': { code: 'resource-has-references', referenceTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },
-  'map-must-keep-graph': { code: 'map-must-keep-graph' },
-  'space-must-keep-map': { code: 'space-must-keep-map' },
   'graph-not-owned': { code: 'graph-not-owned' },
   'edge-not-found': { code: 'edge-not-found' },
   'edge-resource-outside-map': { code: 'edge-resource-outside-map' },

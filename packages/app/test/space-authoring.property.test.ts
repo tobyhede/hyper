@@ -152,7 +152,6 @@ const operation = fc.oneof(
     graph: index,
     headShape: fc.constantFrom(...GRAPH_HEAD_SHAPES),
   }),
-  fc.record({ op: fc.constant('deleted-graph' as const), graph: index }),
   fc.record({ op: fc.constant('deleted-edge' as const), graph: index, edge: index }),
   fc.record({
     op: fc.constant('titled-edge' as const),
@@ -342,8 +341,6 @@ function resolve(
       return { kind: 'recolored-graph', graphId, color: generated.color };
     case 'changed-graph-head-shape':
       return { kind: 'changed-graph-head-shape', graphId, headShape: generated.headShape };
-    case 'deleted-graph':
-      return { kind: 'deleted-graph', graphId };
     case 'deleted-edge':
       return {
         kind: 'deleted-edge',

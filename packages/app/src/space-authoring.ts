@@ -231,7 +231,6 @@ export type AuthoringCompletion =
   /** Delete Resource from Space: the same removal, cascaded through every Map. */
   | { readonly kind: 'deleted-resource'; readonly resourceId: ResourceId }
   | { readonly kind: 'renamed-map'; readonly mapId: UUID; readonly title: string }
-  | { readonly kind: 'deleted-map'; readonly mapId: UUID }
   /**
    * Rename Space: the one Edit on the Space document *above* any Map.
    *
@@ -241,11 +240,11 @@ export type AuthoringCompletion =
    * 0083 keeps the target's name off the Resource's front, so nothing in another
    * Space draws what this writes.
    *
-   * Derived beside `created-map` and `deleted-map`, ahead of the general
-   * per-Map path below: all three write keys of `document` directly, read
-   * `session.getState().working` themselves, and still owe `CompletedEdit` a
-   * Map and Active Graph to continue in even though this one changes
-   * neither. It resolves the selected Map only for that pair.
+   * Derived beside `created-map`, ahead of the general per-Map path below:
+   * both write keys of `document` directly, read `session.getState().working`
+   * themselves, and still owe `CompletedEdit` a Map and Active Graph to
+   * continue in even though this one changes neither. It resolves the
+   * selected Map only for that pair.
    *
    * Do not move it beside `renamed-map` on the general path: that demands a
    * `MapRequiredOperation` answer and a Map lookup for an Edit that touches no
@@ -260,7 +259,6 @@ export type AuthoringCompletion =
       readonly graphId: GraphId;
       readonly headShape: GraphHeadShape;
     }
-  | { readonly kind: 'deleted-graph'; readonly graphId: GraphId }
   | { readonly kind: 'deleted-edge'; readonly graphId: GraphId; readonly edge: GraphEdge }
   /**
    * Set or clear an Edge's Title. The Edge is found by its endpoints; any Title
@@ -313,7 +311,6 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
   | { readonly kind: 'changed-graph-head-shape' }
-  | { readonly kind: 'deleted-graph' }
   | { readonly kind: 'deleted-edge' }
   | { readonly kind: 'titled-edge' }
   | { readonly kind: 'hid-edge-title' }
@@ -357,7 +354,6 @@ export type AuthoringRefusal =
    * empty case wearing different bytes and only this Edit can refuse it.
    */
   | { readonly code: 'space-title-required' }
-  | { readonly code: 'space-must-keep-map' }
   | { readonly code: 'reference-target-not-found'; readonly targetId: ResourceId }
   | { readonly code: 'reference-target-must-own-content'; readonly targetId: ResourceId }
   | { readonly code: 'resource-already-in-map' }
@@ -369,7 +365,6 @@ export type AuthoringRefusal =
       readonly referenceTitles: readonly string[];
     }
   | { readonly code: 'graph-title-required' }
-  | { readonly code: 'map-must-keep-graph' }
   | { readonly code: 'graph-not-owned' }
   | { readonly code: 'edge-not-found' }
   | { readonly code: 'edge-resource-outside-map' }
@@ -428,7 +423,6 @@ export interface SpaceAuthoring {
   readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
   /**
    * Author the explicitly addressed Map without switching this Space's canvas.
-   * Deleting its visible Active Graph advances that selection to a survivor.
    */
   readonly completeInMap: (
     mapId: UUID,
@@ -544,8 +538,7 @@ export type EmbeddedContextCompletion = Extract<
       | 'added-graph'
       | 'renamed-graph'
       | 'recolored-graph'
-      | 'changed-graph-head-shape'
-      | 'deleted-graph';
+      | 'changed-graph-head-shape';
   }
 >;
 
@@ -1036,39 +1029,6 @@ export function createSpaceAuthoring({
         },
       };
     }
-    if (completion.kind === 'deleted-map') {
-      const snapshot = session.getState().working;
-      const maps = snapshot.document.maps ?? [];
-      const target = maps.find((m) => m.id === completion.mapId);
-      if (target === undefined) return refuse({ code: 'map-not-found' });
-      if (maps.length === 1) return refuse({ code: 'space-must-keep-map' });
-      const survivors = maps.filter((m) => m.id !== completion.mapId);
-      const selectedSurvives = survivors.some((m) => m.id === selection);
-      const nextMap = selectedSurvives ? survivors.find((m) => m.id === selection) : survivors[0];
-      if (nextMap === undefined) {
-        throw new Error('Deleting a Map left no survivor after the last Map was refused.');
-      }
-      const next = {
-        ...snapshot,
-        document: {
-          ...snapshot.document,
-          maps: survivors,
-          defaultMap:
-            snapshot.document.defaultMap === completion.mapId
-              ? nextMap.id
-              : snapshot.document.defaultMap,
-        },
-      };
-      assertValidAuthoredSnapshot(next);
-      return {
-        kind: 'completed',
-        edit: {
-          snapshot: next,
-          nextActiveGraphId: nextMap.activeGraph ?? nextMap.graphs[0]?.id ?? null,
-          nextMapId: nextMap.id,
-        },
-      };
-    }
     if (completion.kind === 'renamed-space') {
       const snapshot = session.getState().working;
       // Trimmed for the reason a Map's and a Graph's titles are: the schema
@@ -1103,15 +1063,14 @@ export function createSpaceAuthoring({
           //
           // Activating a Graph is not an Edit (ADR 0028), so the emphasised
           // Graph routinely differs from the `activeGraph` the Map stores
-          // until some other Edit writes it. `created-map` and
-          // `deleted-map` re-resolve legitimately, each landing the reader
-          // in a *different* Map; this Edit changes no Map and no
-          // selection, so re-resolving would answer a question nobody asked and
-          // snap the emphasis, the Dock's Graph cluster and the product URL back
-          // to the stored Graph — a rename of the Space silently activating a
-          // different Graph. So this carries the current one forward, exactly as
-          // the general path below does for the same reason (`navigation.ts`
-          // writes out the harm at length).
+          // until some other Edit writes it. `created-map` re-resolves
+          // legitimately, landing the reader in a *different* Map; this Edit
+          // changes no Map and no selection, so re-resolving would answer a
+          // question nobody asked and snap the emphasis, the Dock's Graph
+          // cluster and the product URL back to the stored Graph — a rename of
+          // the Space silently activating a different Graph. So this carries the
+          // current one forward, exactly as the general path below does for the
+          // same reason (`navigation.ts` writes out the harm at length).
           //
           // The embedded arm mirrors the one below, and it is written for that
           // reason alone. `selection` is then the embedded Map rather than
@@ -1481,7 +1440,6 @@ export function createSpaceAuthoring({
       completion.kind === 'renamed-graph' ||
       completion.kind === 'recolored-graph' ||
       completion.kind === 'changed-graph-head-shape' ||
-      completion.kind === 'deleted-graph' ||
       completion.kind === 'deleted-edge' ||
       completion.kind === 'titled-edge' ||
       completion.kind === 'hid-edge-title' ||
@@ -1513,17 +1471,6 @@ export function createSpaceAuthoring({
         // stores none is the arrow it already draws (ADR 0105).
         if (completion.headShape === graphHeadShape(graph)) return UNCHANGED;
         writeGraphs(replacing({ ...graph, headShape: completion.headShape }));
-      } else if (completion.kind === 'deleted-graph') {
-        // Every Map resolves an Active Graph, so the last one cannot go
-        // (ADR 0040). Removing its Edges is the author's way to empty it.
-        if (ownedGraphs.length === 1) {
-          return refuse({ code: 'map-must-keep-graph' });
-        }
-        const survivors = ownedGraphs.filter((_, index) => index !== graphIndex);
-        writeGraphs(survivors);
-        // Order among the survivors is untouched, and the first of them becomes
-        // active when the deleted Graph was the one being emphasised.
-        if (activeGraphId === graph.id) activeGraphId = survivors[0]?.id ?? null;
       } else if (completion.kind === 'deleted-edge') {
         const edgeIndex = indexOfEdge(graph.edges, completion.edge);
         if (edgeIndex === -1) {
@@ -1623,16 +1570,6 @@ export function createSpaceAuthoring({
       };
       installTogether(() => {
         session.submit(snapshot);
-        if (navigation.getState().selectedMapId === reported.embeddedMapId) {
-          // A context menu may delete the Graph the target's own canvas shows.
-          // Keep its Map, but never leave Navigation naming a removed Graph.
-          if (
-            reported.completion.kind === 'deleted-graph' &&
-            navigation.getState().activeGraphId === reported.completion.graphId
-          ) {
-            navigation.continueInMap(reported.embeddedMapId, derived.edit.nextActiveGraphId);
-          }
-        }
       });
     }
     const created: { createdResourceId?: ResourceId; createdGraphId?: GraphId } = {};
