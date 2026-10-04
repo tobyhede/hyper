@@ -85,6 +85,7 @@ describe('a completion an embedded Map does not support', () => {
 
     const result = composition.authoring.complete({
       kind: 'created-resource',
+      resourceKind: 'markdown',
       anchor: { x: 0, y: 0 },
     });
 

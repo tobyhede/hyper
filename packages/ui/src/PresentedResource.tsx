@@ -57,7 +57,11 @@ export function RenderedMarkdown({ markdown, className }: RenderedMarkdownProps)
 export function PresentedResource({ title, content }: PresentedResourceProps) {
   const name = titleName(title);
   return (
-    <article className="resource resource--full" data-testid="resource-content">
+    <article
+      className="resource resource--full"
+      data-testid="resource-content"
+      data-content-kind={content.kind}
+    >
       <h2 className="resource__title">{name}</h2>
       <PresentedContent name={name} content={content} />
     </article>
@@ -69,7 +73,9 @@ export function PresentedResource({ title, content }: PresentedResourceProps) {
  *
  * A presented image is never replaced, its own or a Target's, so no arm offers
  * Replace. A Space Resource draws its name alone: what presenting one should
- * draw is `resource-content/07`'s open question.
+ * draw is `resource-content/07`'s open question. An Ur Resource has no
+ * content (ADR 0113), so it draws its name alone. The article carries the
+ * kind as `data-content-kind` so a stylesheet can address each kind's frame.
  */
 function PresentedContent({
   name,
@@ -84,6 +90,7 @@ function PresentedContent({
     case 'image':
       return <ResourceImage key={content.url} url={content.url} name={name} />;
     case 'space':
+    case 'ur':
       return null;
     case 'unresolved':
       return <UnresolvedContent />;

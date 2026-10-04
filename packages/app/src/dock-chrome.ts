@@ -420,7 +420,7 @@ export function useDockChrome(
       onCreate: (creation) => {
         switch (creation.kind) {
           case 'markdown':
-            placement.addResource();
+            placement.createResource('markdown');
             return;
           case 'space':
             placement.createSpaceResource();
@@ -428,12 +428,16 @@ export function useDockChrome(
           case 'image':
             placement.createImagesFromFiles(creation.files);
             return;
+          case 'ur':
+            placement.createResource('ur');
+            return;
         }
       },
       createDisabled: {
         markdown: !availability.addResource,
         space: !availability.createSpaceResource,
         image: !availability.addResource,
+        ur: !availability.addResource,
       } satisfies Record<DockResourceKind, boolean>,
     },
     persistence: {

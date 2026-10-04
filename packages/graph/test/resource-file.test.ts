@@ -91,6 +91,30 @@ describe('parseResourceFile', () => {
     });
   });
 
+  it('reads an Ur Resource, which has no body (ADR 0113)', () => {
+    const text = `---\nid: ${RESOURCE_A}\ntitle: Node\nkind: ur\n---\n`;
+    expect(parseResourceFile({ path: 'resources/node.md', text })).toEqual({
+      ok: true,
+      resource: { id: RESOURCE_A, title: 'Node', kind: 'ur' },
+    });
+    expect(
+      parseImportResourceFile({
+        path: 'resources/node.md',
+        text: '---\ntitle: Node\nkind: ur\n---\n',
+      }),
+    ).toEqual({ ok: true, resource: { document: { title: 'Node', kind: 'ur' } } });
+  });
+
+  it('refuses an Ur Resource carrying a body rather than discarding it', () => {
+    const result = parseResourceFile({
+      path: 'resources/node.md',
+      text: `---\nid: ${RESOURCE_A}\ntitle: Node\nkind: ur\n---\n\nProse.\n`,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.map(({ kind }) => kind)).toEqual(['invalid-frontmatter']);
+  });
+
   it('reads a resource whose file ends at the closing fence, with no trailing newline', () => {
     const result = parseResourceFile({
       path: 'resources/a.md',

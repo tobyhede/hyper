@@ -975,6 +975,40 @@ export const spaceRepositoryContract = (
     });
   });
 
+  /**
+   * An Ur Resource is a Title and its kind and nothing else (ADR 0113), and a
+   * Reference Resource may target it; both reach the store and come back as
+   * they went in.
+   */
+  it(`${name} stores and reloads an Ur Resource and a Reference Resource to it unchanged`, async () => {
+    await withHarness(async (repository) => {
+      const first: SpaceSnapshot = {
+        ...space(SPACE_ID, 'Diagram', [RESOURCE_ID]),
+        resources: [
+          { id: RESOURCE_ID, document: { title: 'Node', kind: 'ur' } },
+          {
+            id: SECOND_RESOURCE_ID,
+            document: { title: 'Node, again', kind: 'reference', target: RESOURCE_ID },
+          },
+        ],
+      };
+      await seed(repository, first);
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(first, 0n, null));
+
+      const renamed: SpaceSnapshot = {
+        ...first,
+        resources: [
+          { id: RESOURCE_ID, document: { title: 'Renamed node', kind: 'ur' } },
+          ...first.resources.slice(1),
+        ],
+      };
+      await expect(commitUpdate(repository, renamed, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(renamed, 1n, null));
+    });
+  });
+
   it(`${name} refuses a topology-preserving update when stored Spaces have no Meta identity`, async (context) => {
     await withMissingMetaHarness(context, async (repository, removeMetaIdentity) => {
       const first = space(SPACE_ID, 'One', [RESOURCE_ID]);

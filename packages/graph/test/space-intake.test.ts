@@ -61,7 +61,7 @@ const viaFiles: Loader = ({ resources, ...structure }) =>
               path: `resources/${resource.id}.md`,
               text: `---\nid: ${resource.id}\ntitle: ${resource.title}\nkind: space\nspaceId: ${resource.spaceId}\nmap: ${resource.map}\ngraph: ${resource.graph}\n---\n`,
             }
-          : resource.kind === 'image'
+          : resource.kind === 'image' || resource.kind === 'ur'
             ? { path: `resources/${resource.id}.md`, text: serializeResourceFile(resource) }
             : resourceFile(resource.id, resource.title, resource.body),
     ),
@@ -287,6 +287,23 @@ describe.each([
         }),
       );
       expect(space.lookup.resource(A)).toEqual(image);
+    });
+
+    it('keeps an Ur Resource whole, placed and connected like any other (ADR 0113)', () => {
+      const ur: Resource = { id: A, title: 'Node', kind: 'ur' };
+      const space = loaded(
+        load({
+          resources: [ur, markdown(B, 'B')],
+          maps: [
+            positionedMap(
+              WORKING,
+              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              [graph(MAIN, 'Graph 1', [{ from: A, to: B }])],
+            ),
+          ],
+        }),
+      );
+      expect(space.lookup.resource(A)).toEqual(ur);
     });
 
     it('loads a map whose only graph holds no edges', () => {
@@ -673,6 +690,11 @@ describe.each([
       expect(errors).toContainEqual(
         expect.objectContaining({ kind: 'reference-targets-reference', ref: B }),
       );
+    });
+
+    it('accepts a reference resource whose target is an Ur Resource (ADR 0113)', () => {
+      const ur: Resource = { id: A, title: 'Node', kind: 'ur' };
+      expect(load({ resources: [ur, referenceTo(B, A)], maps: [] }).ok).toBe(true);
     });
 
     it('accepts a reference resource whose target is a Space Resource', () => {

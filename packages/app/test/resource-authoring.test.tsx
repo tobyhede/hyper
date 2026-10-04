@@ -709,6 +709,24 @@ describe('authoring an opened Resource', () => {
   });
 
   /**
+   * One press completes the Edit and continues at the new Resource's Title,
+   * exactly as Markdown creation does (ADR 0089, ADR 0113).
+   */
+  it('creates an Ur Resource in one press and continues in its Title', async () => {
+    const session = mount();
+    await settled(session);
+
+    createResource('Ur Resource');
+
+    const created = session.getState().working.resources.at(-1);
+    expect(created?.document).toEqual({ title: 'Resource 1', kind: 'ur' });
+    const title = await screen.findByRole('textbox', { name: 'Resource title' });
+    expect(title).toHaveValue('Resource 1');
+    expect(title).toHaveFocus();
+    await settled(session);
+  });
+
+  /**
    * A draft is seeded once from the Resource its editor was mounted on, so an
    * event reaching another Resource's node while A is being edited must not
    * leave A's text wearing B's identity — Save would then write A's title and

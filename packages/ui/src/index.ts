@@ -158,6 +158,7 @@ export {
   SpaceResourceIcon,
   SpaceIcon,
   SearchIcon,
+  UrIcon,
   PlusIcon,
   RemoveFromMapIcon,
   ZoomInIcon,

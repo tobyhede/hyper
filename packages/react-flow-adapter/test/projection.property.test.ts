@@ -235,7 +235,9 @@ function withKinds(
                 map: uuidSchema.parse(uuidFrom(901)),
                 graph: uuidSchema.parse(uuidFrom(902)),
               }
-            : { id, title, kind: 'markdown', body: `Body ${index}\n` };
+            : chosen === 'ur'
+              ? { id, title, kind: 'ur' }
+              : { id, title, kind: 'markdown', body: `Body ${index}\n` };
     if (resource.kind !== 'reference') owners.push(id);
     return { path: file.path, text: serializeResourceFile(resource) };
   });
@@ -243,7 +245,7 @@ function withKinds(
 }
 
 const kindsArb = fc.array(
-  fc.constantFrom<GeneratedKind>('markdown', 'image', 'space', 'reference'),
+  fc.constantFrom<GeneratedKind>('markdown', 'image', 'space', 'ur', 'reference'),
   { minLength: 1, maxLength: 8 },
 );
 

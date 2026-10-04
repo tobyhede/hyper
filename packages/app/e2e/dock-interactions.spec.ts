@@ -326,16 +326,16 @@ test('a reported failure is dismissed off the Dock it covers', async ({ page }) 
 });
 
 /**
- * Create Resource, as three peers, through the running application.
+ * Create Resource, as four peers, through the running application.
  *
  * The Ladle half of this claim asserts the controls are present, named and
  * ungated; this half asserts what a press of one actually *does*, which the
  * catalogue cannot: an application Edit, on the real Space, against the real
  * Authoring composition.
  *
- * **The press count is the obligation, and it is the same count for both.**
+ * **The press count is the obligation, and it is the same count for every kind.**
  * Each kind completes its Edit on activation and continues in the Resource's
- * own Title editor, so neither owes a second decision (ADR 0089).
+ * own Title editor, so none owes a second decision (ADR 0089).
  */
 test(
   'each Resource kind is created in one press from the Dock',
@@ -345,8 +345,8 @@ test(
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await settled(page);
 
-    // Nothing is disclosed on the way: both are on the surface, so no menu is
-    // opened by either press.
+    // Nothing is disclosed on the way: every kind is on the surface, so no
+    // menu is opened by any press.
     await expect(page.getByRole('menu')).toHaveCount(0);
 
     await createResource(page, 'Markdown Resource');
@@ -392,6 +392,19 @@ test(
     await expect(imageTitle).toBeFocused();
     await expect(imageTitle).toHaveValue(/^Resource \d+$/u);
     await imageTitle.press('Escape');
+    await settled(page);
+
+    // An Ur Resource is the Markdown press over again with no content: one
+    // press, and the caret in its Title (ADR 0113).
+    const urResources = page.locator('.react-flow__node .canvas-resource[data-kind="ur"]');
+    const urBefore = await urResources.count();
+    await createResource(page, 'Ur Resource');
+    const urTitle = page.getByRole('textbox', { name: 'Resource title' });
+    await expect(urTitle).toBeFocused();
+    await expect(urTitle).toHaveValue(/^Resource \d+$/u);
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await urTitle.press('Escape');
+    await expect(urResources).toHaveCount(urBefore + 1);
   },
 );
 
@@ -426,8 +439,8 @@ test(
     );
     const graph = await boxOf(surface.getByRole('group', { name: 'Graph' }), 'the Graph cluster');
 
-    // One row, so the cluster carrying four controls stands at the height of
-    // the one carrying three. Three siblings would auto-place onto three rows.
+    // One row, so the cluster carrying five controls stands at the height of
+    // the one carrying three. Loose siblings would auto-place onto a row each.
     expect(Math.abs(resources.height - graph.height)).toBeLessThanOrEqual(1);
 
     // And its trailing edge is still the surface's, so packing bought the room

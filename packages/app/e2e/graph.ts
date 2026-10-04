@@ -472,14 +472,15 @@ export function presentControl(page: Page): Locator {
 }
 
 /** The kinds the Dock offers, named as their controls announce them. */
-export type ResourceKindName = 'Markdown Resource' | 'Space Resource' | 'Image Resource';
+export type ResourceKindName =
+  'Markdown Resource' | 'Space Resource' | 'Image Resource' | 'Ur Resource';
 
 /**
  * One kind's Create control, which is also what reports whether creating is
- * available at all — both peers are withdrawn by the same fact.
+ * available at all — the peers are withdrawn by the same fact.
  *
  * **The default answers the availability question and nothing else.** Asking
- * "can a Resource be created" may use either peer, because `createDisabled`
+ * "can a Resource be created" may use any peer, because `createDisabled`
  * withdraws them together; an assertion about *which* control names its kind.
  */
 export function createResourceControl(
@@ -492,7 +493,7 @@ export function createResourceControl(
 /**
  * Create a Resource of one kind, from its own control in the Resources cluster.
  *
- * The two kinds are peers with no disclosure in front of them and each completes
+ * The kinds are peers with no disclosure in front of them and each completes
  * its Edit on the press (ADR 0089), so this is one press whichever kind is
  * asked for. A Reference Resource is not here: it is created from the Resource it points at,
  * through that Resource's own command menu.

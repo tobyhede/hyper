@@ -29,7 +29,7 @@ const GRAPH_ID = uuid('00000000-0000-4000-8000-000000000105');
 
 type ResourceKind = Resource['kind'];
 
-const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', 'image'];
+const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', 'image', 'ur'];
 
 /**
  * The same Title on each Resource kind. Every kind writes its Title through the one
@@ -47,6 +47,8 @@ function resourceOf(kind: ResourceKind, title: string): Resource {
       return { id: ID, title, kind, spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID };
     case 'image':
       return { id: ID, title, kind, url: 'https://example.com/figure.png' };
+    case 'ur':
+      return { id: ID, title, kind };
   }
 }
 

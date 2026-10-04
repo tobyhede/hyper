@@ -317,7 +317,7 @@ export const createApp = (
                 onSelectEdge={canvasRendering.selectEdge}
                 placedResources={view.placedResources}
                 newResourceTitle={view.newResourceTitle}
-                onAddResource={placement.addResource}
+                onAddResource={() => placement.createResource('markdown')}
                 onAddExistingResource={placement.dropExistingResource}
                 onPlaceSpace={placement.dropSpace}
                 onDropImages={placement.dropImages}

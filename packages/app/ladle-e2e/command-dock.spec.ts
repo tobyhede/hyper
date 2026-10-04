@@ -860,13 +860,13 @@ test(
  * application cannot mean.
  */
 test(
-  'Create offers the three kinds as peers, each named for what it makes',
+  'Create offers the four kinds as peers, each named for what it makes',
   { tag: '@parity:command-dock-creates-each-kind-in-one-press' },
   async ({ page }) => {
     await page.goto(story('default'));
 
     const strip = surface(page);
-    for (const kind of ['Markdown Resource', 'Space Resource', 'Image Resource']) {
+    for (const kind of ['Markdown Resource', 'Space Resource', 'Image Resource', 'Ur Resource']) {
       const control = strip.getByRole('button', { name: `Create ${kind}` });
       await expect(control).toBeVisible();
       // Available, and reached without opening anything first — which is the
@@ -895,15 +895,26 @@ test(
     await title.press('Enter');
     await expect(spaceResources).toHaveCount(before + 1);
 
+    // The Ur Resource's one press completes the same way, continuing in its
+    // Title.
+    const urResources = page.locator('.react-flow__node:visible .canvas-resource[data-kind="ur"]');
+    const urBefore = await urResources.count();
+    const createUr = strip.getByRole('button', { name: 'Create Ur Resource', exact: true });
+    await createUr.click();
+    await expect(title).toBeFocused();
+    await title.press('Enter');
+    await expect(urResources).toHaveCount(urBefore + 1);
+
     // The Image Resource's one press opens the file picker, and a picker
     // closed with nothing chosen creates nothing.
     const images = page.locator('.react-flow__node:visible .canvas-resource[data-kind="image"]');
+    const imagesBefore = await images.count();
     const chooser = page.waitForEvent('filechooser');
     await strip.getByRole('button', { name: 'Create Image Resource', exact: true }).click();
     await (await chooser).setFiles([]);
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
-    await expect(images).toHaveCount(0);
+    await expect(images).toHaveCount(imagesBefore);
   },
 );
 
@@ -918,9 +929,9 @@ test(
  * what the row is spent on instead.
  *
  * Asserted as the obligation and not as a CSS value: the cluster is **one row**
- * (so it stands at its neighbours' height rather than three times it), and its
- * three glyphs sit on **one pitch** (so the trigger's chevron reads as the first
- * of three rather than as punctuation after the word). A verb track apiece
+ * (so it stands at its neighbours' height rather than several times it), and its
+ * glyphs sit on **one pitch** (so the trigger's chevron reads as the first of
+ * them rather than as punctuation after the word). A verb track apiece
  * would stand empty on the other rows.
  */
 test(
@@ -934,7 +945,7 @@ test(
     const resources = strip.getByRole('group', { name: 'Resources' });
     const graph = strip.getByRole('group', { name: 'Graph' });
 
-    // One row: the cluster carrying the disclosure and the three Creates is no taller
+    // One row: the cluster carrying the disclosure and the four Creates is no taller
     // than the one carrying a name, a disclosure and Present. Left as loose
     // siblings the vertical column auto-places them onto a row each and this is
     // what fails.
@@ -945,8 +956,8 @@ test(
     if (resourcesBox !== null && graphBox !== null)
       expect(Math.abs(resourcesBox.height - graphBox.height)).toBeLessThanOrEqual(1);
 
-    // One pitch: the chevron and the three Creates are evenly spaced, so the
-    // disclosure reads as the first of four glyphs. Centres rather than edges,
+    // One pitch: the chevron and the four Creates are evenly spaced, so the
+    // disclosure reads as the first of five glyphs. Centres rather than edges,
     // because the chevron is a 14px glyph inside a padded trigger and the
     // Creates are 14px glyphs inside 28px buttons.
     const centres = await strip.evaluate((root) => {
@@ -965,7 +976,7 @@ test(
           return rect.left + rect.width / 2;
         });
     });
-    expect(centres).toHaveLength(4);
+    expect(centres).toHaveLength(5);
     const pitches = centres.slice(1).map((centre, index) => centre - (centres[index] ?? 0));
     for (const pitch of pitches) expect(Math.abs(pitch - (pitches[0] ?? 0))).toBeLessThanOrEqual(1);
   },

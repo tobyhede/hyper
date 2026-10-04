@@ -28,8 +28,8 @@ const MAP_ID = '00000000-0000-4000-8000-000000000004';
 const GRAPH_ID = '00000000-0000-4000-8000-000000000005';
 
 /**
- * Any schema that reads a Resource's Title, written so the three kinds and the
- * three unions can sit in one list. Only the Title is under test here, so what
+ * Any schema that reads a Resource's Title, written so the kind schemas and the
+ * unions can sit in one list. Only the Title is under test here, so what
  * each one answers with is `unknown` and the assertions read the Title off it.
  */
 type ResourceTitleSchema = ZodType<unknown, ZodTypeDef, unknown>;
@@ -110,7 +110,7 @@ const unionSchemas: readonly { readonly label: string; readonly schema: Resource
 /**
  * Every door a Resource's Title arrives through, carrying one Title.
  *
- * A rule that reaches only the three declared shapes is visibly not the rule at
+ * A rule that reaches only the per-kind schemas is visibly not the rule at
  * every door: the union, the stored document and the import variants have to
  * answer the same way, which is what makes a stored Title and an imported one
  * the same Title.
