@@ -550,7 +550,10 @@ describe('planContextDeletion', () => {
       ...twoGraphs,
       document: {
         ...twoGraphs.document,
-        maps: twoGraphs.document.maps?.map((map) => ({ ...map, graphs: map.graphs.slice(0, 1) })),
+        maps: twoGraphs.document.maps?.map((targetMap) => ({
+          ...targetMap,
+          graphs: targetMap.graphs.slice(0, 1),
+        })),
       },
     };
 
