@@ -11,7 +11,7 @@ import {
   type CanvasSpaceResourceCommands,
   type CanvasSpaceResourceGraphCommands,
 } from '@project/ui';
-import type { CommandOutcomes } from './command-outcomes';
+import type { Continuation } from './continuation';
 import { copyLink } from './clipboard';
 import { GRAPH_PALETTE_ENTRIES, graphColorsByGraphId } from '@project/graph';
 import { offered, renameDraftAnswer } from './authoring-commands';
@@ -29,27 +29,21 @@ interface SpaceResourceContextCommands {
 /** The target an Open Space Resource embeds, and what its rail's commands report into. */
 export interface SpaceResourceRailContext {
   readonly entry: OpenSpace;
+  readonly continuation: Continuation;
   readonly spaces: OpenSpaces;
   readonly containingSpaceId: UUID;
-  /** The containing canvas's, where a report from this rail is held. */
-  readonly commandOutcomes: CommandOutcomes;
-  /** The containing canvas's, where this rail's Delete Map and Delete Graph ask first. */
+  /** The target Space's confirmation, presented alongside its drawn Map. */
   readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'>;
 }
 
 /** The Dock commands, addressed to the target and the context this Resource stores. */
 export function spaceResourceContextCommands(
-  {
-    entry,
-    spaces,
-    containingSpaceId,
-    commandOutcomes,
-    deleteConfirmation,
-  }: SpaceResourceRailContext,
+  { entry, spaces, containingSpaceId, deleteConfirmation, continuation }: SpaceResourceRailContext,
   document: Extract<ResourceDocument, { kind: 'space' }>,
   select: (targetMap: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   available: () => boolean,
 ): SpaceResourceContextCommands {
+  const { commandOutcomes } = entry.app;
   // The rail's own answer, asked again when a command is pressed.
   const embedded = {
     target: entry,
@@ -69,32 +63,35 @@ export function spaceResourceContextCommands(
   // Each press is built from the capability that answers its availability,
   // so the rail draws a command unavailable exactly when invoking it would be.
   const mapCommands: CanvasSpaceResourceCommands = {
-    // The containing canvas's command outcomes hold a refusal's or a break's
-    // notice: it is drawn by the Space the author is looking at, not by the
-    // target. The editor holds a refused draft open on the refusal's sentence.
+    // The editor holds a refused draft open on the refusal's sentence.
     onRename: offered(
       addressed.rename,
       (rename) => (title: string) =>
         renameDraftAnswer(commandOutcomes.run('map-manage', () => rename(title))),
     ),
-    // Map authoring orders the creation and the selection write, and the
-    // containing canvas holds its report. Where the caret goes is this rail's:
-    // command outcomes requests it only for a current completion, so the rail
-    // answers whether it went there from the outcome alone. The creation
-    // authors in the target and never moves the containing canvas, so its
-    // completion is held to the Map it was pressed on like any other outcome.
+    // The target owns the Edit and its report; the source occurrence owns
+    // the caret. A completion after that occurrence goes away still authors
+    // the Map but cannot send focus into another occurrence.
     onCreate: offered(mapAuthoring.create, (create) => async (scope: string) => {
+      const source = spaces.entry(containingSpaceId);
+      const sourceMap = source?.app.authoring.getState().navigation.selectedMapId;
       const outcome = await commandOutcomes.run('map-create', create, {
-        completionMovesMap: false,
-        continueAt: ({ mapId: created }) => ({
-          target: { kind: 'control', name: 'map-name', scope: { id: scope, subject: created } },
-          select: false,
-          then: 'rename',
-        }),
+        completionMovesMap: true,
       });
       switch (outcome.kind) {
-        case 'completed':
-          return true;
+        case 'completed': {
+          if (source?.app.authoring.getState().navigation.selectedMapId !== sourceMap) return false;
+          continuation.request({
+            target: {
+              kind: 'control',
+              name: 'map-name',
+              scope: { id: scope, subject: outcome.mapId },
+            },
+            select: false,
+            then: 'rename',
+          });
+          return continuation.getState().pending !== null;
+        }
         case 'refused':
         case 'unchanged':
         case 'unavailable':
@@ -103,12 +100,11 @@ export function spaceResourceContextCommands(
           return false;
       }
     }),
-    // Asked first, through the containing canvas's delete confirmation, in
+    // Asked first, through the target Space's delete confirmation, in
     // the words the Dock's Delete Map asks. Map authoring waits for both
     // Spaces, repoints every Space Resource that selected the Map — this one
     // included — and leaves the target's canvas on the survivor; the
-    // containing canvas holds a refusal or a break. The canvas it leaves is
-    // the target's, not the containing one, so it claims no move.
+    // target holds a refusal or a break and claims the selection move.
     onDelete:
       targetMap === undefined
         ? null
@@ -116,7 +112,7 @@ export function spaceResourceContextCommands(
             deleteConfirmation.arm({
               ...mapDeletionWords(targetMap),
               run: async () => {
-                await commandOutcomes.run('map-delete', remove, { completionMovesMap: false });
+                await commandOutcomes.run('map-delete', remove, { completionMovesMap: true });
               },
               focusFallback,
             });
@@ -132,8 +128,8 @@ export function spaceResourceContextCommands(
       // Graph that stores none.
       color: graphColor(graph, graphColorsByGraphId(space)),
       colors: GRAPH_PALETTE_ENTRIES,
-      // Graph authoring completes both in the target; the containing canvas's
-      // command outcomes hold a refusal or a break, and the rail says no
+      // Graph authoring completes both in the target; that Space's
+      // outcomes hold a refusal or a break, and the rail says no
       // sentence of its own. A refused rename is also the editor's, which holds
       // the draft open.
       onRename: offered(
@@ -152,7 +148,7 @@ export function spaceResourceContextCommands(
         },
       ),
       // Graph authoring orders the creation and the selection write, and the
-      // containing canvas holds its report. The rail does not continue into
+      // target Space holds its report. The rail does not continue into
       // the new Graph's name, so the caret never goes there, and the creation
       // never moves the containing canvas's Map.
       onCreate: offered(graphAuthoring.map(mapId).create, (create) => async () => {
@@ -162,7 +158,7 @@ export function spaceResourceContextCommands(
       // Asked first, in the words the Dock's Delete Graph asks. Graph
       // authoring waits for both Spaces, repoints every Space Resource that
       // selected the Graph — this one included — and leaves the target's
-      // canvas on the survivor; the containing canvas holds a refusal or a
+      // canvas on the survivor; the target holds a refusal or a
       // break.
       onDelete: offered(addressedGraph.delete, (remove) => (focusFallback: FocusFallback) => {
         deleteConfirmation.arm({

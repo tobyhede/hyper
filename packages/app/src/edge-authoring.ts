@@ -22,7 +22,7 @@ import type {
   AuthoringRefusal,
   EdgeEligibility,
   EdgeProposal,
-  SpaceAuthoring,
+  SurfaceAuthoring,
 } from './space-authoring';
 
 /**
@@ -331,7 +331,7 @@ export interface EdgeAuthoring {
 }
 
 export interface EdgeAuthoringDependencies {
-  readonly authoring: SpaceAuthoring;
+  readonly authoring: SurfaceAuthoring;
   readonly adapter: RenderAdapter;
   readonly connections: ConnectionCompletion;
   /** Where every focus move this lifecycle owes the author is published. */
@@ -473,7 +473,7 @@ export function createEdgeAuthoring({
    * the instant its subject really goes.
    */
   const completeStructural = (
-    completion: Parameters<SpaceAuthoring['complete']>[0] & EdgeSubject,
+    completion: Parameters<SurfaceAuthoring['complete']>[0] & EdgeSubject,
   ): AuthoringRefusal | 'settled' | 'queued' => {
     const result = authoring.complete(completion);
     if (result.kind === 'refused') {
@@ -495,7 +495,8 @@ export function createEdgeAuthoring({
   };
 
   /** The Resource a finished pointer connection continues at, held across the drag's end. */
-  let continueAt: ResourceId | null = null;
+  let continueAt: { readonly resourceId: ResourceId; readonly then: 'rename' | 'nothing' } | null =
+    null;
 
   /**
    * Take what a connection attempt came to, and say what the author sees.
@@ -523,8 +524,11 @@ export function createEdgeAuthoring({
   /**
    * Hold the Resource a pointer connection continues at until its drag ends.
    */
-  const holdForDrag = (resourceId: ResourceId | null): void => {
-    if (resourceId !== null) continueAt = resourceId;
+  const holdForDrag = (
+    resourceId: ResourceId | null,
+    then: 'rename' | 'nothing' = 'nothing',
+  ): void => {
+    if (resourceId !== null) continueAt = { resourceId, then };
   };
 
   /**
@@ -656,6 +660,7 @@ export function createEdgeAuthoring({
     createConnectedResource: (from, position, projected) =>
       holdForDrag(
         settleConnection(connections.createAndConnect(from, position, projected), gestureRefusal),
+        'rename',
       ),
 
     connectTo: (from, target, projected) => {
@@ -683,14 +688,12 @@ export function createEdgeAuthoring({
       continueAt = null;
       const { draft } = observable.getState();
       if (draft?.kind === 'pointer-connect') publish({ draft: null });
-      // The storyboard's connected Resource is the selected one, so continued
-      // authoring carries on from it — and there is nothing to do *there*, which
-      // is the whole reason `select` is an axis of its own.
+      // Existing targets become selected; a newly created target also opens its Title editor.
       if (reached !== null) {
         continuation.request({
-          target: { kind: 'resource', resourceId: reached },
+          target: { kind: 'resource', resourceId: reached.resourceId },
           select: true,
-          then: 'nothing',
+          then: reached.then,
         });
       }
     },

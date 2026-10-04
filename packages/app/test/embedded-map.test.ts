@@ -4,7 +4,6 @@ import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph
 import {
   AUTHORING_HANDLE_DIAMETER,
   ROUTED_EDGE_TYPE,
-  RoutedEdge,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
 import { CANVAS_RESOURCE_DRAG_TILT_DEGREES } from '@project/ui';
@@ -13,7 +12,6 @@ import {
   canvasNodeConnection,
   clipEmbeddedNode,
   constrainEmbeddedPosition,
-  EMBEDDED_EDGE_TYPE,
   embeddedMap,
   embeddedNodeId,
   parseEmbeddedNodeId,
@@ -103,7 +101,7 @@ async function draw(open = false, width = 1000, height = 1000) {
       parent: parent(first, width, height),
       projection: projected,
       offset: { x: 16, y: 42 },
-      enabled: true,
+      policy: 'authoring' as const,
     }),
   };
 }
@@ -141,7 +139,7 @@ const drawFrom = (
     parent: projectionParent(source),
     projection: projected,
     offset: { x: 16, y: 42 },
-    enabled: true,
+    policy: 'authoring' as const,
     bounds,
   });
 
@@ -154,7 +152,7 @@ async function drawLeaning(tilt: EmbeddedTilt) {
     parent: projectionParent(parent(first)),
     projection: projected,
     offset: { x: 16, y: 42 },
-    enabled: true,
+    policy: 'authoring' as const,
     tilt,
   });
 }
@@ -352,7 +350,7 @@ describe('an embedded production projection', () => {
       parent: projectionParent(containing),
       projection: projected,
       offset: { x: 16, y: 42 },
-      enabled: true,
+      policy: 'authoring' as const,
       bounds: view(containing),
     };
     const upright = embedded(embeddedMap(request).nodes, B);
@@ -419,7 +417,7 @@ describe('an embedded production projection', () => {
     expect(drawn.edges[0]).toMatchObject({
       source: embeddedNodeId(PARENT, A),
       target: embeddedNodeId(PARENT, B),
-      selectable: false,
+      selectable: true,
     });
     expect(drawn.nodes[0]?.handles).toEqual(projected.nodes[0]?.handles);
     expect(drawn.edges[0]?.sourceHandle).toBe(projected.edges[0]?.sourceHandle);
@@ -477,7 +475,7 @@ describe('an embedded production projection', () => {
       projection: projected,
       offset: { x: 16, y: 42 },
       zoom: 0.5,
-      enabled: true,
+      policy: 'authoring' as const,
     });
     const drawn = embedded(zoomed.nodes, B);
     expect(drawn.width).toBe(source.width);
@@ -500,7 +498,7 @@ describe('an embedded production projection', () => {
       projection: projected,
       offset: { x: 16, y: 42 },
       zoom: 4,
-      enabled: true,
+      policy: 'authoring' as const,
     });
     const drawn = embedded(zoomed.nodes, B);
     // B is authored at 400,0. Framing multiplies the point, not the box, so the
@@ -521,14 +519,14 @@ describe('an embedded production projection', () => {
       parent: containing,
       projection: projected,
       offset: { x: 16, y: 42 },
-      enabled: false,
+      policy: 'inert' as const,
     });
     expect(inert.nodes[0]).toMatchObject({
       draggable: false,
       selectable: false,
       focusable: false,
       connectable: false,
-      className: 'nopan nowheel nodrag',
+      className: 'rf-resource-node nopan nowheel nodrag',
       data: { connectionAuthoringEnabled: false },
     });
     expect(inert.nodes[0]?.style?.pointerEvents).toBe('none');
@@ -537,25 +535,23 @@ describe('an embedded production projection', () => {
   // An embedded Edge is a copy of an Edge of another Space's Map — a Space never
   // embeds itself (ADR 0068) — so it must never read as an Edge of the Map on the
   // canvas, whose endpoints are Resource ids rather than placement ids.
-  it('mints its Edges as its own type, which never converts to an Edge selection', async () => {
+  it('keeps the domain Edge subject when a drawing rekeys its endpoints', async () => {
     const { drawn, projected } = await draw();
     expect(projected.edges.length).toBeGreaterThan(0);
     for (const edge of projected.edges) expect(edgeSelectionOf(edge)).not.toBeNull();
     expect(drawn.edges).toHaveLength(projected.edges.length);
-    for (const edge of drawn.edges) {
-      expect(edge.type).toBe(EMBEDDED_EDGE_TYPE);
-      expect(edgeSelectionOf(edge)).toBeNull();
-    }
+    expect(drawn.edges.map(edgeSelectionOf)).toEqual(projected.edges.map(edgeSelectionOf));
+    expect(drawn.edges[0]).toMatchObject({ selectable: true, focusable: true, deletable: true });
   });
 
   // An unregistered type falls back to React Flow's default curve (its error 011)
   // and loses the lane offset, end trim and anchor attachment the routed Edge draws.
-  it('registers every Edge type it mints in the canvas table, drawn as the routed Edge', async () => {
+  it('registers every Edge type it mints in the canvas table, drawn by the same Edge component', async () => {
     const { drawn } = await draw();
     const canvasEdge = () => null;
     const table = withEmbeddedEdgeTypes({ [ROUTED_EDGE_TYPE]: canvasEdge });
     expect(table[ROUTED_EDGE_TYPE]).toBe(canvasEdge);
-    for (const edge of drawn.edges) expect(table[edge.type ?? '']).toBe(RoutedEdge);
+    for (const edge of drawn.edges) expect(table[edge.type ?? '']).toBe(canvasEdge);
   });
 
   it('gives two embeddings of the same Space distinct node and Edge identities', async () => {
@@ -564,7 +560,7 @@ describe('an embedded production projection', () => {
       parent: { ...parent, id: id(8) },
       projection: projected,
       offset: { x: 16, y: 42 },
-      enabled: true,
+      policy: 'authoring' as const,
     });
     expect(new Set([...drawn.nodes, ...second.nodes].map((node) => node.id)).size).toBe(6);
     expect(new Set([...drawn.edges, ...second.edges].map((edge) => edge.id)).size).toBe(2);

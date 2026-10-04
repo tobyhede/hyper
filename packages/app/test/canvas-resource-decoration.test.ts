@@ -74,6 +74,7 @@ const context = (
   authorOnCanvas: true,
   bodyEditing: false,
   imageAccept: 'image/png',
+  replaceResourceImage: () => Promise.resolve(null),
   editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID, UR_ID]),
   openResource: () => 'completed',
   closeResource: () => 'completed',

@@ -78,11 +78,13 @@ export interface PositionedMapEdit {
   readonly title: string;
   /** The Graph the Map opens on. */
   readonly activeGraphId: GraphId | null;
+  /** Whether the Map becomes the Space's opening one. */
+  readonly opening: boolean;
 }
 
 /**
  * Fold a completed Edit's Map identity — title, kind and Active Graph — into
- * the snapshot, and make that Map the Space's opening one.
+ * the snapshot, and make that Map the Space's opening one when asked.
  *
  * Writes into a Map the snapshot already holds, and throws for one it does not:
  * creating a Map is the `created-map` Edit's own statement, not a side effect
@@ -90,7 +92,7 @@ export interface PositionedMapEdit {
  */
 export const updatePositionedMap = (
   base: SpaceSnapshot,
-  { mapId, title, activeGraphId }: PositionedMapEdit,
+  { mapId, title, activeGraphId, opening }: PositionedMapEdit,
 ): SpaceSnapshot => {
   const maps = base.document.maps ?? [];
   if (!maps.some((m) => m.id === mapId)) {
@@ -108,7 +110,7 @@ export const updatePositionedMap = (
         if (activeGraphId !== null) written.activeGraph = activeGraphId;
         return written;
       }),
-      defaultMap: mapId,
+      defaultMap: opening ? mapId : base.document.defaultMap,
     },
   };
 };

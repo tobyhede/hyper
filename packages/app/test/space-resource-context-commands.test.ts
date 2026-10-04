@@ -6,6 +6,7 @@ import { createOpenSpaces } from '../src/open-spaces';
 import { spaceResourceContextCommands } from '../src/space-resource-context-commands';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
@@ -100,18 +101,18 @@ async function setup(available = true) {
     history: recordingHistory(),
   });
   const source = await spaces.open(META);
-  const entry = await spaces.embed(TARGET);
+  const { entry } = await spaces.hold(TARGET);
   const commands = spaceResourceContextCommands(
     {
       entry,
+      continuation: source.app.continuation,
       spaces,
       containingSpaceId: META,
-      commandOutcomes: source.app.commandOutcomes,
       deleteConfirmation: source.app.deleteConfirmation,
     },
     document,
     (m, graph) => {
-      const result = source.app.authoring.complete({
+      const result = source.app.authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE,
         document: { ...document, map: m.id, graph },
@@ -261,6 +262,11 @@ it('persists a new Map before the Resource refers to it', async () => {
   }
   // The rail's New Map continues in the new Map's name.
   expect(await creating).toBe(true);
+  expect(source.app.continuation.getState().pending).toMatchObject({
+    target: { kind: 'control', name: 'map-name', scope: { id: 'test-rail' } },
+    then: 'rename',
+  });
+  expect(spaces.entry(TARGET)?.app.continuation.getState().pending).toBeNull();
   expect(await spaces.waitForPersistence(META)).toBe(true);
   expect(await spaces.waitForPersistence(TARGET)).toBe(true);
   const stored = await backend.loadSpace(META);

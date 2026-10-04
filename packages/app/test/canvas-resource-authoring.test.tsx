@@ -20,6 +20,8 @@ import {
 import { fixtureDisplay } from './render-adapter-fixtures';
 import type { ImageSources } from '../src/image-creation';
 import { heldImageSources, unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
+import { canvasAuthoring } from './canvas-authoring';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -133,7 +135,10 @@ const mountAuthoring = (
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
+  const { authoring, adapter, imageReplacement } = composeApp({
+    images: unusedImageSources,
+    spaceSession,
+  });
   const initialProps: HookProps = {
     open: false,
     enabled: true,
@@ -144,6 +149,7 @@ const mountAuthoring = (
   const hook = renderHook(
     ({ open, enabled, presenting, nameOnCreation, resourceId }: HookProps) =>
       useCanvasResourceAuthoring({
+        imageReplacement,
         nodes: [node(open, resourceId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
         // into answers by the one module that owns them. A live chrome rename is
@@ -162,7 +168,7 @@ const mountAuthoring = (
           creatingSpaceResource: false,
         }),
         nameOnCreation,
-        authoring,
+        authoring: canvasAuthoring(authoring),
         spaceSession,
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
@@ -414,7 +420,7 @@ describe('canvas Resource authoring', () => {
       'space',
     );
     act(() => {
-      authoring.complete({ kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
+      authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
     });
     rerender({
       open: true,
@@ -574,9 +580,13 @@ describe('canvas Resource authoring Space rail', () => {
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
+    const { authoring, adapter, imageReplacement } = composeApp({
+      images: unusedImageSources,
+      spaceSession,
+    });
     return renderHook(() =>
       useCanvasResourceAuthoring({
+        imageReplacement,
         nodes: [spaceNode(open, readOnly)],
         availability: authoringAvailability({
           editable: true,
@@ -590,7 +600,7 @@ describe('canvas Resource authoring Space rail', () => {
           creatingSpaceResource: false,
         }),
         nameOnCreation: null,
-        authoring,
+        authoring: canvasAuthoring(authoring),
         spaceSession,
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
@@ -678,13 +688,18 @@ describe('canvas Resource authoring decoration identity', () => {
   const mountIdentity = () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter } = composeApp({ images: unusedImageSources, spaceSession });
+    const { authoring, adapter, imageReplacement } = composeApp({
+      images: unusedImageSources,
+      spaceSession,
+    });
+    const surfaceAuthoring = canvasAuthoring(authoring);
     const onSelectResource = () => undefined;
     const onPortalEditingChange = () => undefined;
     const resourceResize = adapter.getState().resourceResize;
     const hook = renderHook(
       ({ spaceResourceTargets, portalEditing }: IdentityProps) =>
         useCanvasResourceAuthoring({
+          imageReplacement,
           nodes: projection,
           availability: authoringAvailability({
             editable: true,
@@ -698,7 +713,7 @@ describe('canvas Resource authoring decoration identity', () => {
             creatingSpaceResource: false,
           }),
           nameOnCreation: null,
-          authoring,
+          authoring: surfaceAuthoring,
           spaceSession,
           resourceResize,
           onSelectResource,
@@ -849,7 +864,7 @@ describe('canvas Resource authoring, replacing an image', () => {
           creatingSpaceResource: false,
         }),
         nameOnCreation: null,
-        authoring,
+        authoring: canvasAuthoring(authoring),
         spaceSession,
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,

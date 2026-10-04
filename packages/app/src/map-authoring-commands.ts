@@ -17,6 +17,7 @@ import {
   type EmbeddedAuthoring,
 } from './authoring-contexts';
 import type { DeleteQuestionWords } from './delete-confirmation';
+import { CANVAS } from './space-authoring';
 
 /**
  * Map Edits, as one interface for every context that authors a Map.
@@ -139,7 +140,7 @@ const createMap = (
     context,
     creates,
     MAP_REPORT_TITLES.creation,
-    () => app.authoring.complete({ kind: 'created-map' }),
+    () => app.authoring.complete(CANVAS, { kind: 'created-map' }),
     () => recoverCreatedMap(app),
   );
 };

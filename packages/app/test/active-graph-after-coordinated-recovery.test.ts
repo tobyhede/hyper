@@ -10,6 +10,7 @@ import { canvasProjection } from '../src/canvas-projection';
 import { resolveMap } from '../src/map-resolution';
 import { mintingIds } from './minting';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * A Space whose working snapshot was replaced under it still names a Graph.
@@ -158,7 +159,7 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
     spaceSession: targetSession,
     newId: mintingIds(ADDED_GRAPH_ID),
   });
-  expect(target.authoring.complete({ kind: 'added-graph' }).kind).toBe('completed');
+  expect(target.authoring.complete(CANVAS, { kind: 'added-graph' }).kind).toBe('completed');
   expect(target.navigation.getState().activeGraphId).toBe(ADDED_GRAPH_ID);
   await vi.waitFor(() => expect(targetSession.getState().persistence.kind).toBe('settled'));
 
@@ -220,7 +221,7 @@ const openRolledBackOverCreatedMap = async (): Promise<ReturnType<typeof compose
     spaceSession: targetSession,
     newId: mintingIds(CREATED_MAP_ID, CREATED_MAP_GRAPH_ID),
   });
-  expect(target.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+  expect(target.authoring.complete(CANVAS, { kind: 'created-map' }).kind).toBe('completed');
   expect(target.navigation.getState().selectedMapId).toBe(CREATED_MAP_ID);
   await vi.waitFor(() => expect(targetSession.getState().persistence.kind).toBe('settled'));
 
@@ -322,7 +323,7 @@ describe('the Active Graph after a coordinated recovery restores a participant',
     expect(target.navigation.getState().mode).toBe('presenting');
 
     expect(
-      target.authoring.complete({
+      target.authoring.complete(CANVAS, {
         kind: 'renamed-graph',
         graphId: TARGET_GRAPH_ID,
         title: 'Renamed',

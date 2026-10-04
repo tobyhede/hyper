@@ -232,24 +232,24 @@ type Completed<Result> = Extract<Result, { readonly kind: 'completed' }>;
 /**
  * Where the author continues after a completed Map creation.
  *
- * Required, and never `null`: a created Map always has a name to continue in,
- * so a `completed` answer from `run` means the continuation was requested.
+ * The Dock continues through its Space; a drawn occurrence requests its own
+ * continuation after these Space-owned outcomes have settled.
  */
 export interface MapCreateContinuation {
-  readonly continueAt: (created: CompletedContextEdit) => PendingContinuation;
+  readonly continueAt?: (created: CompletedContextEdit) => PendingContinuation;
 }
 
 /**
  * Whether this run's completion is what moves the Map these command outcomes
  * read.
  *
- * Required on every Map creation and deletion, because only the caller knows:
- * the Dock's creation selects the new Map on the canvas it stands on, and its
+ * Required on every Map creation and deletion, because only the caller knows.
+ * The Dock's creation selects the new Map on the canvas it stands on, and its
  * deletion leaves that canvas on the survivor, so both claim it. A Space
- * Resource's rail authors in the target Space and is held by the containing
- * canvas's command outcomes, whose Map it never moves, so it claims neither.
- * A claimed completion is not held to the Map the run was pressed on; every
- * other outcome, and every unclaimed completion, still is.
+ * Resource's rail reports through the target Space's command outcomes, and its
+ * creation and deletion move that Space's canvas in the same way, so it claims
+ * both too. A claimed completion is not held to the Map the run was pressed
+ * on; every other outcome, and every unclaimed completion, still is.
  */
 export interface MapCompletionClaim {
   readonly completionMovesMap: boolean;
@@ -382,7 +382,7 @@ const COMMANDS: CommandDefinitions = {
     settle: (result, { continueAt }) => {
       if (result.kind === 'refused') return notice(result.report);
       if (result.kind !== 'completed') return CLEAR;
-      return { kind: 'clear', continuation: continueAt(result) };
+      return { kind: 'clear', continuation: continueAt?.(result) ?? null };
     },
     movedMap: claimedMove,
   },

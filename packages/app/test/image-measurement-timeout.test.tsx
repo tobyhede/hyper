@@ -48,6 +48,7 @@ async function browserMeasurement() {
       { kind: 'url', url },
       {
         mapId: opened.app.navigation.getState().selectedMapId,
+        drawing: 'canvas',
         anchor: { x: 0, y: 0 },
         placement: 'exact',
       },

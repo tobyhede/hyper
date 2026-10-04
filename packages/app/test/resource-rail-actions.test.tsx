@@ -417,10 +417,10 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('shows a refused removal as "Resource not removed" and dismisses it', async () => {
     const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
       const complete = authoring.complete;
-      vi.spyOn(authoring, 'complete').mockImplementation((completion) =>
+      vi.spyOn(authoring, 'complete').mockImplementation((target, completion) =>
         completion.kind === 'removed-resource-from-map'
           ? { kind: 'refused', refusal: { code: 'resource-not-found' } }
-          : complete(completion),
+          : complete(target, completion),
       );
     });
 
@@ -447,14 +447,14 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('shows a refused Graph creation and Reference Resource creation, and dismisses each', async () => {
     const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
       const complete = authoring.complete;
-      vi.spyOn(authoring, 'complete').mockImplementation((completion) => {
+      vi.spyOn(authoring, 'complete').mockImplementation((target, completion) => {
         if (completion.kind === 'added-graph') {
           return { kind: 'refused', refusal: { code: 'map-not-found' } };
         }
         if (completion.kind === 'created-reference') {
           return { kind: 'refused', refusal: { code: 'resource-not-found' } };
         }
-        return complete(completion);
+        return complete(target, completion);
       });
     });
 

@@ -6,6 +6,7 @@ import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';
 import { heldImageSources } from './image-sources';
 import type { OpenSpace, OpenSpaces } from '#src/open-spaces';
+import { CANVAS } from '#src/space-authoring';
 import {
   authoredSnapshot,
   commandDockSnapshot,
@@ -119,7 +120,7 @@ const blockSave = async (
     .getState()
     .working.resources.find(({ id }) => id === created.resourceId);
   if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created.');
-  const target = await spaces.embed(resource.document.spaceId);
+  const { entry: target } = await spaces.hold(resource.document.spaceId);
   const stored = target.session.getState().working;
   const targetMap = stored.document.defaultMap;
   if (targetMap === undefined) throw new Error('The blocking Space has no Map.');
@@ -142,7 +143,7 @@ const blockSave = async (
 
   const notes = rendering.session.getState().working.resources[0];
   if (notes === undefined) throw new Error('The blocked scenario needs an editable Resource.');
-  const edited = rendering.app.authoring.complete({
+  const edited = rendering.app.authoring.complete(CANVAS, {
     kind: 'edited-resource',
     resourceId: notes.id,
     document: { ...notes.document, title: `${notes.document.title} edited` },
@@ -281,7 +282,7 @@ export async function openDockStory(scenario: DockScenario) {
     // on screen so recovery can be compared without changing the scenario.
     const resource = stored.working.resources[0];
     if (resource === undefined) throw new Error('The failure scenario needs an editable Resource.');
-    const result = target.app.authoring.complete({
+    const result = target.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: resource.id,
       document:

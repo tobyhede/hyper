@@ -400,6 +400,47 @@ export interface SpaceAuthoringState {
   readonly navigation: NavigationState;
 }
 
+/** Edits to the Map this Space's own canvas draws, which Navigation continues in. */
+export interface CanvasEditTarget {
+  readonly kind: 'canvas';
+}
+
+/**
+ * Edits to a Map drawn at an explicit Map and Graph, which leave this Space's
+ * opening Map, its stored Active Graph and its Navigation where they are.
+ * `graphId` is the Graph a connection joins; `null` joins the Map's own.
+ */
+export interface DrawnEditTarget {
+  readonly kind: 'drawn';
+  readonly mapId: MapId;
+  readonly graphId: GraphId | null;
+}
+
+/** Where an Edit lands: decided by the drawing that made the gesture (ADR 0112). */
+export type EditTarget = CanvasEditTarget | DrawnEditTarget;
+
+export const CANVAS: CanvasEditTarget = { kind: 'canvas' };
+
+/**
+ * Every Edit a drawn Map completes. Creating a Map chooses which Map the
+ * Space's own canvas continues in, so it is the canvas's alone.
+ */
+export type DrawnCompletion = Exclude<AuthoringCompletion, { readonly kind: 'created-map' }>;
+
+/**
+ * Space Authoring as one drawing of a Map sees it: every Edit lands on that
+ * drawing's target, and an Edge is eligible against its Map and Graph
+ * (`map-surface.ts`).
+ */
+export interface SurfaceAuthoring {
+  readonly getState: () => SpaceAuthoringState;
+  readonly subscribe: (listener: () => void) => () => void;
+  /** The drawn Map's own placement, derived fresh from the working snapshot. */
+  readonly mapPlacement: () => Placement;
+  readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
+  readonly complete: (completion: DrawnCompletion) => AuthoringResult;
+}
+
 export interface SpaceAuthoring {
   readonly getState: () => SpaceAuthoringState;
   readonly subscribe: (listener: () => void) => () => void;
@@ -419,15 +460,15 @@ export interface SpaceAuthoring {
    * by React Flow's `isValidConnection`. Completion validates again, because the
    * Space can change while a preview or a picker is open.
    */
-  readonly edgeEligibility: (proposal: EdgeProposal) => EdgeEligibility;
-  readonly complete: (completion: AuthoringCompletion) => AuthoringResult;
+  readonly edgeEligibility: (target: EditTarget, proposal: EdgeProposal) => EdgeEligibility;
   /**
-   * Author the explicitly addressed Map without switching this Space's canvas.
+   * The one door every Edit enters by, naming where it lands. A drawn target
+   * authors its Map without moving this Space's canvas.
    */
-  readonly completeInMap: (
-    mapId: UUID,
-    completion: EmbeddedResourceCompletion | EmbeddedContextCompletion | ImagesCompletion,
-  ) => AuthoringResult;
+  readonly complete: {
+    (target: DrawnEditTarget, completion: DrawnCompletion): AuthoringResult;
+    (target: CanvasEditTarget, completion: AuthoringCompletion): AuthoringResult;
+  };
   readonly retryPersistence: () => void;
   /**
    * Commit the newest local work against the revision the conflict named,
@@ -466,18 +507,24 @@ export interface SpaceAuthoring {
  */
 interface CompletedEdit {
   readonly snapshot: SpaceSnapshot;
-  /** The Map this Edit wrote, which Navigation continues in. */
-  readonly nextMapId: MapId;
-  /**
-   * The Active Graph of that Map, which Navigation adopts along with it.
-   *
-   * Under ADR 0040 a Map owns its Graphs, so which one is active is a fact
-   * about the Map this Edit wrote and not a separate consequence.
-   */
-  readonly nextActiveGraphId: GraphId | null;
+  readonly install: EditInstall;
   readonly createdResourceId?: ResourceId;
   readonly createdGraphId?: GraphId;
 }
+
+/**
+ * What installing an Edit does besides submitting its snapshot.
+ *
+ * `continue-in-map` moves Navigation to the Map the Edit wrote and the Active
+ * Graph that belongs to it — under ADR 0040 a Map owns its Graphs, so the pair
+ * is one answer. It is the only install that moves Navigation, and so the only
+ * one the address follows (ADR 0081). `write-only` submits and moves nothing.
+ */
+type EditInstall =
+  | { readonly kind: 'continue-in-map'; readonly mapId: MapId; readonly graphId: GraphId | null }
+  | { readonly kind: 'write-only' };
+
+const WRITE_ONLY: EditInstall = { kind: 'write-only' };
 
 /**
  * What the pure core answers: a complete Edit, or one of the two outcomes that
@@ -496,31 +543,17 @@ const UNCHANGED = { kind: 'unchanged' } as const;
 const refuse = (refusal: AuthoringRefusal): DerivedCompletion => ({ kind: 'refused', refusal });
 
 /**
- * Everything a completion is derived from: the report itself, and the editor
- * state read at the moment it was made.
+ * Everything a completion is derived from: the report itself, and where it
+ * lands.
  *
  * The two travel together from `complete` to the derivation, and a queued one
- * has to hold them until the drain reaches it, so they are one value rather than
- * two parameters repeated at each hand-off.
+ * has to hold them until the drain reaches it (ADR 0042), so they are one value
+ * rather than two parameters repeated at each hand-off.
  */
 interface ReportedCompletion {
+  readonly target: EditTarget;
   readonly completion: AuthoringCompletion;
-  readonly embeddedMapId?: UUID | undefined;
 }
-
-export type EmbeddedResourceCompletion = Extract<
-  AuthoringCompletion,
-  {
-    kind:
-      | 'opened-resource'
-      | 'closed-resource'
-      | 'resized-resource'
-      | 'edited-resource'
-      | 'settled-resource-movement'
-      | 'removed-resource-from-map'
-      | 'connected-resources';
-  }
->;
 
 /**
  * Create Image Resources, addressed to the Map the gesture was made on: storing
@@ -528,19 +561,6 @@ export type EmbeddedResourceCompletion = Extract<
  * by the time this Edit lands (`image-creation.ts`).
  */
 export type ImagesCompletion = Extract<AuthoringCompletion, { kind: 'created-images' }>;
-
-/** Commands addressed to the Map shown by a Space Resource. */
-export type EmbeddedContextCompletion = Extract<
-  AuthoringCompletion,
-  {
-    kind:
-      | 'renamed-map'
-      | 'added-graph'
-      | 'renamed-graph'
-      | 'recolored-graph'
-      | 'changed-graph-head-shape';
-  }
->;
 
 /** A `ReportedCompletion` waiting behind the Edit that was installing when it arrived. */
 interface QueuedCompletion extends ReportedCompletion {
@@ -715,6 +735,14 @@ function sameValue(left: unknown, right: unknown): boolean {
 }
 
 const sameSnapshot = (left: SpaceSnapshot, right: SpaceSnapshot): boolean => sameValue(left, right);
+
+/** The Graph a Map opens on: its stored Active Graph, or its first. */
+const openingGraphId = (opened: Map): GraphId | null =>
+  opened.activeGraph ?? opened.graphs[0]?.id ?? null;
+
+/** The Graph a drawn target's connection joins: the one it names, or the Map's own. */
+const drawnGraphId = (drawn: Map, target: DrawnEditTarget): GraphId | null =>
+  target.graphId ?? openingGraphId(drawn);
 
 export function createSpaceAuthoring({
   session,
@@ -965,12 +993,18 @@ export function createSpaceAuthoring({
    * Asks `connectRefusal`, the completion's own rule, so preview and Edit
    * cannot drift. Pure: it mints, installs and publishes nothing.
    */
-  const edgeEligibility = (proposal: EdgeProposal): EdgeEligibility => {
-    const refusal = connectRefusal(
-      proposal.from,
-      proposal.kind === 'connect' ? proposal.to : null,
-      mapPlacement(),
-    );
+  const edgeEligibility = (target: EditTarget, proposal: EdgeProposal): EdgeEligibility => {
+    const to = proposal.kind === 'connect' ? proposal.to : null;
+    let refusal: AuthoringRefusal | null;
+    if (target.kind === 'canvas') {
+      refusal = connectRefusal(proposal.from, to, mapPlacement());
+    } else {
+      const resolved = currentSpace().lookup.map(target.mapId);
+      if (resolved === undefined) return { kind: 'refused', refusal: { code: 'map-not-found' } };
+      const graphId = drawnGraphId(resolved.map, target);
+      const graph = resolved.map.graphs.find((candidate) => candidate.id === graphId) ?? null;
+      refusal = connectRefusal(proposal.from, to, Placement.fromMap(resolved.map), graph);
+    }
     return refusal === null ? ELIGIBLE : { kind: 'refused', refusal };
   };
 
@@ -989,11 +1023,8 @@ export function createSpaceAuthoring({
    * Producing an unloadable Space *is* a failure, and it throws — here, where
    * the collaborators are all still level.
    */
-  const deriveCompletedEdit = ({
-    completion,
-    embeddedMapId,
-  }: ReportedCompletion): DerivedCompletion => {
-    const selection = embeddedMapId ?? navigation.getState().selectedMapId;
+  const deriveCompletedEdit = ({ target, completion }: ReportedCompletion): DerivedCompletion => {
+    const selection = target.kind === 'canvas' ? navigation.getState().selectedMapId : target.mapId;
     if (completion.kind === 'created-map') {
       const snapshot = session.getState().working;
       const mapId = newId();
@@ -1022,11 +1053,7 @@ export function createSpaceAuthoring({
       assertValidAuthoredSnapshot(next);
       return {
         kind: 'completed',
-        edit: {
-          snapshot: next,
-          nextActiveGraphId: graphId,
-          nextMapId: mapId,
-        },
+        edit: { snapshot: next, install: { kind: 'continue-in-map', mapId, graphId } },
       };
     }
     if (completion.kind === 'renamed-space') {
@@ -1070,23 +1097,16 @@ export function createSpaceAuthoring({
           // cluster and the product URL back to the stored Graph — a rename of
           // the Space silently activating a different Graph. So this carries the
           // current one forward, exactly as the general path below does for the
-          // same reason (`navigation.ts` writes out the harm at length).
-          //
-          // The embedded arm mirrors the one below, and it is written for that
-          // reason alone. `selection` is then the embedded Map rather than
-          // Navigation's, so Navigation's Graph may be one this Map does not
-          // show — but nothing here reads the answer: `performCompletion`'s
-          // embedded path submits and installs and never calls
-          // `continueInMap`, so `nextActiveGraphId` is discarded whenever
-          // `embeddedMapId` is given. The arm is consistency with the
-          // general path, not a guard against anything, and no gesture reaches a
-          // Space rename from an embedded Map in any case — the Dock's Space
-          // name is not drawn inside one.
-          nextActiveGraphId:
-            embeddedMapId === undefined
-              ? navigation.getState().activeGraphId
-              : (selectedMap.activeGraph ?? selectedMap.graphs[0]?.id ?? null),
-          nextMapId: selectedMap.id,
+          // same reason (`navigation.ts` writes out the harm at length). A drawn
+          // target moves nothing.
+          install:
+            target.kind === 'canvas'
+              ? {
+                  kind: 'continue-in-map',
+                  mapId: selectedMap.id,
+                  graphId: navigation.getState().activeGraphId,
+                }
+              : WRITE_ONLY,
         },
       };
     }
@@ -1107,6 +1127,16 @@ export function createSpaceAuthoring({
       return refuse({ code: 'map-not-found' });
     }
     const resolved = resolveMap(space, selection);
+    // The Graph a connection joins: the canvas's Active Graph, or the Graph
+    // the drawing shows. A drawn Graph its Map does not own names nothing
+    // this Edit may write.
+    const connectGraphId =
+      target.kind === 'canvas' ? navigationState.activeGraphId : drawnGraphId(resolved.map, target);
+    const connectGraph =
+      resolved.map.graphs.find((candidate) => candidate.id === connectGraphId) ?? null;
+    if (target.kind === 'drawn' && target.graphId !== null && connectGraph === null) {
+      return refuse({ code: 'graph-not-owned' });
+    }
     // Which Map this Edit writes. Every arm below that changes its positions
     // or its Graphs writes them into `snapshot` itself, and the tail folds only
     // the Map's identity over the result — so an arm answered by a
@@ -1321,7 +1351,7 @@ export function createSpaceAuthoring({
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'create-and-connect') {
-      const refusal = connectRefusal(completion.from, null, placement);
+      const refusal = connectRefusal(completion.from, null, placement, connectGraph);
       if (refusal !== null) return refuse(refusal);
       // A drop point is kept exactly, where the preview sat; beside-source has
       // no aimed point, so it avoids overlap. `connectRefusal` already proved the
@@ -1348,14 +1378,7 @@ export function createSpaceAuthoring({
       if (completion.graphId !== undefined && named?.owner.map.id !== resolved.map.id) {
         return refuse({ code: 'graph-not-owned' });
       }
-      const fallbackId = resolved.map.activeGraph ?? resolved.map.graphs[0]?.id;
-      const graph =
-        named?.graph ??
-        (embeddedMapId === undefined
-          ? targetGraph()
-          : fallbackId === undefined
-            ? null
-            : (resolved.map.graphs.find((candidate) => candidate.id === fallbackId) ?? null));
+      const graph = named?.graph ?? connectGraph;
       const refusal = connectRefusal(completion.from, completion.to, placement, graph);
       if (refusal !== null) return refuse(refusal);
       connection = { from: completion.from, to: completion.to };
@@ -1371,18 +1394,19 @@ export function createSpaceAuthoring({
     }
     // What the tail writes as the Map's identity.
     let mapTitle: string;
-    let activeGraphId: GraphId | null;
     let createdGraphId: GraphId | undefined;
     const { map: editedMap } = resolved;
     mapTitle = editedMap.title;
+    // The Map's stored Active Graph after this Edit. The canvas stores the
+    // Graph it emphasises; a drawn Map keeps the one it stored, because the
+    // Graph a drawing shows is the drawing's choice and not the Map's.
+    // `null` leaves the stored value as it is.
+    let activeGraphId: GraphId | null =
+      target.kind === 'canvas' ? navigationState.activeGraphId : (editedMap.activeGraph ?? null);
     // The Graphs as the Map held them before this Edit. The arms above that
     // change Graphs through the snapshot (Remove from Map, Delete from Space)
     // never reach the Graph-writing arms below, so the two cannot disagree.
     const ownedGraphs = editedMap.graphs;
-    activeGraphId =
-      embeddedMapId === undefined
-        ? navigationState.activeGraphId
-        : (editedMap.activeGraph ?? editedMap.graphs[0]?.id ?? null);
     if (completion.kind === 'renamed-map') {
       // Addressed by id, exactly as Rename Graph is (ADR 0040) — and the id is
       // checked because this Edit resolves its Map from state read *later*
@@ -1392,9 +1416,9 @@ export function createSpaceAuthoring({
       // arrived while another was completing derives off the queue rather than
       // off the press; the Dock's rename closes over the
       // `canvas.selected.id` of its last committed render, so a selection that
-      // moved this tick has not reached it yet; and an embedded Map Edit
-      // resolves `embeddedMapId` rather than the selection at all, so a
-      // rename aimed at the drawing Map names the wrong one by construction.
+      // moved this tick has not reached it yet; and a drawn target resolves
+      // its own Map rather than the selection at all, so a rename aimed at
+      // the canvas's Map names the wrong one by construction.
       // The surface guard is real and is not this one — `CommandDock` ends a
       // draft whose subject changed or whose Space was replaced (ADR 0042) —
       // but it ends it on the
@@ -1412,7 +1436,7 @@ export function createSpaceAuthoring({
       const writeGraphId =
         completion.kind === 'connected-resources' && completion.graphId !== undefined
           ? completion.graphId
-          : activeGraphId;
+          : connectGraphId;
       const graphIndex = ownedGraphs.findIndex((graph) => graph.id === writeGraphId);
       const graph = ownedGraphs[graphIndex];
       if (graph === undefined) {
@@ -1499,7 +1523,14 @@ export function createSpaceAuthoring({
         );
       }
     }
-    const next = updatePositionedMap(snapshot, { mapId, title: mapTitle, activeGraphId });
+    // The canvas's Edit makes its Map the Space's opening one; a drawn Map
+    // is written where it stands.
+    const next = updatePositionedMap(snapshot, {
+      mapId,
+      title: mapTitle,
+      activeGraphId,
+      opening: target.kind === 'canvas',
+    });
     if (sameSnapshot(previousSnapshot, next)) return UNCHANGED;
     assertValidAuthoredSnapshot(next);
     const created: { createdResourceId?: ResourceId; createdGraphId?: GraphId } = {};
@@ -1509,8 +1540,12 @@ export function createSpaceAuthoring({
       kind: 'completed',
       edit: {
         snapshot: next,
-        nextActiveGraphId: activeGraphId,
-        nextMapId: mapId,
+        // The canvas continues in the Map it wrote, on the Active Graph it
+        // stored; a drawn Edit moves nothing.
+        install:
+          target.kind === 'canvas'
+            ? { kind: 'continue-in-map', mapId, graphId: activeGraphId }
+            : WRITE_ONLY,
         ...created,
       },
     };
@@ -1544,10 +1579,11 @@ export function createSpaceAuthoring({
    * invariant, held against every caller, and this window is simply a caller
    * that satisfies it.
    */
-  const installCompletedEdit = (edit: CompletedEdit): void => {
+  const installCompletedEdit = ({ snapshot, install }: CompletedEdit): void => {
     installTogether(() => {
-      session.submit(edit.snapshot);
-      navigation.continueInMap(edit.nextMapId, edit.nextActiveGraphId);
+      session.submit(snapshot);
+      if (install.kind === 'continue-in-map')
+        navigation.continueInMap(install.mapId, install.graphId);
     });
   };
 
@@ -1557,21 +1593,7 @@ export function createSpaceAuthoring({
     // interface share one vocabulary rather than translating between two.
     if (derived.kind !== 'completed') return derived;
     const { createdResourceId, createdGraphId } = derived.edit;
-    if (reported.embeddedMapId === undefined) {
-      installCompletedEdit(derived.edit);
-    } else {
-      const previous = session.getState().working;
-      const snapshot = {
-        ...derived.edit.snapshot,
-        document: {
-          ...derived.edit.snapshot.document,
-          defaultMap: previous.document.defaultMap,
-        },
-      };
-      installTogether(() => {
-        session.submit(snapshot);
-      });
-    }
+    installCompletedEdit(derived.edit);
     const created: { createdResourceId?: ResourceId; createdGraphId?: GraphId } = {};
     if (createdResourceId !== undefined) created.createdResourceId = createdResourceId;
     if (createdGraphId !== undefined) created.createdGraphId = createdGraphId;
@@ -1580,11 +1602,11 @@ export function createSpaceAuthoring({
 
   let completing = false;
   const queued: QueuedCompletion[] = [];
-  const complete = (completion: AuthoringCompletion, embeddedMapId?: UUID): AuthoringResult => {
-    if (embeddedMapId !== undefined && currentSpace().lookup.map(embeddedMapId) === undefined) {
+  const complete = (target: EditTarget, completion: AuthoringCompletion): AuthoringResult => {
+    if (target.kind === 'drawn' && currentSpace().lookup.map(target.mapId) === undefined) {
       return { kind: 'refused', refusal: { code: 'map-not-found' } };
     }
-    const reported: ReportedCompletion = { completion, embeddedMapId };
+    const reported: ReportedCompletion = { target, completion };
     if (completing) {
       queued.push({ ...reported, replacementEpoch });
       return { kind: 'queued' };
@@ -1696,7 +1718,6 @@ export function createSpaceAuthoring({
     mapPlacement,
     edgeEligibility,
     complete,
-    completeInMap: (mapId, completion) => complete(completion, mapId),
     retryPersistence: session.retry,
     // Read at the moment the author asks, never captured earlier. `session`
     // ignores the call outside a conflict, so there is nothing to check here.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Map as SpaceMap,
   MapId,
@@ -134,15 +134,8 @@ export function useResourcePlacement(
   { map: selectedMap, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
 ): ResourcePlacementCommands {
   const { reportVisibleCentre, centreAnchor } = useVisibleCentre();
-  const {
-    authoring,
-    adapter,
-    continuation,
-    commandOutcomes,
-    navigation,
-    currentSpace,
-    createImageResources,
-  } = app;
+  const { commandOutcomes, currentSpace, createImageResources, surface } = app;
+  const { authoring, adapter, continuation } = surface;
   const mapId: MapId = selectedMap.id;
 
   /**
@@ -160,7 +153,7 @@ export function useResourcePlacement(
       // likeliest break on this path — the list has been open across renders
       // and the Map it resolves is the one drawing now.
       try {
-        const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
+        const resolved = resolveMap(currentSpace(), mapId);
         const result = await spaceResources.link({
           containingSpaceId: currentSpace().id,
           mapId: resolved.map.id,
@@ -176,7 +169,7 @@ export function useResourcePlacement(
         return describeSpaceResourceBreak(failure);
       }
     },
-    [currentSpace, navigation, spaceResources, reportBreak],
+    [currentSpace, mapId, spaceResources, reportBreak],
   );
 
   const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
@@ -200,40 +193,35 @@ export function useResourcePlacement(
     // An `async` thunk so a throw from the title minting or `resolveMap`
     // arrives at `run` as a rejection, as the lifecycle's own does.
     void commandOutcomes
-      .run(
-        'space-resource-create',
-        async () => {
-          const title = nextSpaceTitle(spaceSession.getState().working);
-          // Resolved at the press rather than closed over, for a gesture whose
-          // Edit lands one await later. `create` still refuses `map-not-found`
-          // on its own account, against the Map the coordinated Edit sees.
-          const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
-          return spaceResources.create({
-            containingSpaceId: currentSpace().id,
-            mapId: resolved.map.id,
-            title,
-            position: centreAnchor(),
-          });
-        },
-        {
-          // The id the lifecycle minted, not the Resource that appeared: a
-          // Markdown creation can land between this press and the installed
-          // Edit, so "which Resource is new" answers a different question from
-          // "which Resource did this press make". A refusal or an `unchanged`
-          // made no Resource, so command outcomes requests nothing for either.
-          //
-          // Nothing bumps the Spaces epoch here: a created Space joins the Meta
-          // Space for *every* open Space, so the lifecycle that made it is what
-          // announces it (`space-resource-lifecycle.ts`).
-          continueAt: ({ resourceId }) => ({
-            target: { kind: 'resource', resourceId },
+      .run('space-resource-create', async () => {
+        const title = nextSpaceTitle(spaceSession.getState().working);
+        const resolved = resolveMap(currentSpace(), mapId);
+        return spaceResources.create({
+          containingSpaceId: currentSpace().id,
+          mapId: resolved.map.id,
+          title,
+          position: centreAnchor(),
+        });
+      })
+      .then((result) => {
+        if (result.kind === 'completed' && surface.context().mapId === mapId)
+          continuation.request({
+            target: { kind: 'resource', resourceId: result.resourceId },
             select: true,
             then: 'rename',
-          }),
-        },
-      )
+          });
+      })
       .finally(() => setCreatingSpaceResource(false));
-  }, [commandOutcomes, spaceSession, currentSpace, navigation, spaceResources, centreAnchor]);
+  }, [
+    commandOutcomes,
+    spaceSession,
+    currentSpace,
+    mapId,
+    spaceResources,
+    centreAnchor,
+    continuation,
+    surface,
+  ]);
 
   /**
    * **The gesture supplies the Target, so nothing is chosen first**, and the
@@ -249,26 +237,21 @@ export function useResourcePlacement(
       // canvas, so by the time an answer exists there is no row left to swap a
       // word on. The rows that *can* refuse are drawn unavailable, so what
       // reaches here is a Target that went between the draw and the press.
-      const created = commandOutcomes.run(
-        'reference-create',
-        () =>
-          authoring.complete({
-            kind: 'created-reference',
-            target: resource.id,
-            title: resource.title,
-            anchor,
-          }),
-        {
-          continueAt: ({ createdResourceId }) =>
-            createdResourceId === undefined
-              ? null
-              : {
-                  target: { kind: 'resource', resourceId: createdResourceId },
-                  select: true,
-                  then: 'rename',
-                },
-        },
+      const created = commandOutcomes.run('reference-create', () =>
+        authoring.complete({
+          kind: 'created-reference',
+          target: resource.id,
+          title: resource.title,
+          anchor,
+        }),
       );
+      if (created.kind === 'completed' && created.createdResourceId !== undefined) {
+        continuation.request({
+          target: { kind: 'resource', resourceId: created.createdResourceId },
+          select: true,
+          then: 'rename',
+        });
+      }
       switch (created.kind) {
         case 'refused':
         case 'broke':
@@ -281,7 +264,7 @@ export function useResourcePlacement(
           return 'done';
       }
     },
-    [selectedMap, centreAnchor, commandOutcomes, authoring],
+    [selectedMap, centreAnchor, commandOutcomes, authoring, continuation],
   );
 
   /**
@@ -366,23 +349,24 @@ export function useResourcePlacement(
    */
   const createImages = useCallback(
     (origin: ImageOrigin, anchor: MapPosition, placementMode: PlacementMode) => {
-      const target = {
-        mapId: navigation.getState().selectedMapId,
-        anchor,
-        placement: placementMode,
-      };
-      void commandOutcomes.run('image-create', () => createImageResources(origin, target), {
-        continueAt: ({ createdResourceId }) =>
-          createdResourceId === undefined || navigation.getState().selectedMapId !== target.mapId
-            ? null
-            : {
-                target: { kind: 'resource', resourceId: createdResourceId },
-                select: true,
-                then: 'rename',
-              },
-      });
+      const target = { mapId, drawing: surface.target().kind, anchor, placement: placementMode };
+      void commandOutcomes
+        .run('image-create', () => createImageResources(origin, target))
+        .then((result) => {
+          if (
+            result.kind === 'completed' &&
+            result.createdResourceId !== undefined &&
+            surface.context().mapId === mapId
+          ) {
+            continuation.request({
+              target: { kind: 'resource', resourceId: result.createdResourceId },
+              select: true,
+              then: 'rename',
+            });
+          }
+        });
     },
-    [commandOutcomes, createImageResources, navigation],
+    [commandOutcomes, createImageResources, mapId, continuation, surface],
   );
 
   /**
@@ -459,22 +443,42 @@ export function useResourcePlacement(
     [addSpaceResourceFor, mapId],
   );
 
-  return {
-    reportVisibleCentre,
-    centreAnchor,
-    createResource,
-    addExistingResource,
-    addSpaceResourceFor,
-    createSpaceResource,
-    creatingSpaceResource,
-    createReferenceFrom,
-    createImagesFromFiles,
-    dropImages,
-    pasteImageUrl,
-    startResourceDrag,
-    startSpaceDrag,
-    endDrag,
-    dropExistingResource,
-    dropSpace,
-  };
+  return useMemo(
+    () => ({
+      reportVisibleCentre,
+      centreAnchor,
+      createResource,
+      addExistingResource,
+      addSpaceResourceFor,
+      createSpaceResource,
+      creatingSpaceResource,
+      createReferenceFrom,
+      createImagesFromFiles,
+      dropImages,
+      pasteImageUrl,
+      startResourceDrag,
+      startSpaceDrag,
+      endDrag,
+      dropExistingResource,
+      dropSpace,
+    }),
+    [
+      reportVisibleCentre,
+      centreAnchor,
+      createResource,
+      addExistingResource,
+      addSpaceResourceFor,
+      createSpaceResource,
+      creatingSpaceResource,
+      createReferenceFrom,
+      createImagesFromFiles,
+      dropImages,
+      pasteImageUrl,
+      startResourceDrag,
+      startSpaceDrag,
+      endDrag,
+      dropExistingResource,
+      dropSpace,
+    ],
+  );
 }

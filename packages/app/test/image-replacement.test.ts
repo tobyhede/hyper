@@ -13,6 +13,7 @@ import * as imageReplacementModule from '../src/image-replacement';
 import { describeImageReplacement } from '../src/image-replacement';
 import { unusedImageSources } from './image-sources';
 import { mintingIds } from './minting';
+import { CANVAS } from '../src/space-authoring';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const MARKDOWN = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -165,7 +166,7 @@ const diverging = (images: ImageSources) => {
     reportObserverError: vi.fn(),
   });
   const conflict = async () => {
-    authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Local graph' });
+    authoring.complete(CANVAS, { kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Local graph' });
     await expect.poll(() => session.getState().persistence.kind).toBe('conflicted');
   };
   return { session, authoring, imageReplacement, conflict };
@@ -335,7 +336,7 @@ describe('replacing an Image Resource’s image', () => {
 
   it('reads the Resource as it stands when asked, not as it stood when the caller saw it', async () => {
     const { session, authoring, imageReplacement } = open(sources({}, {}));
-    authoring.complete({ kind: 'replaced-image', resourceId: IMAGE, url: NEW_URL });
+    authoring.complete(CANVAS, { kind: 'replaced-image', resourceId: IMAGE, url: NEW_URL });
     const before = session.getState().working;
 
     await expect(imageReplacement.replace(IMAGE, { kind: 'url', url: NEW_URL })).resolves.toEqual({
@@ -447,7 +448,7 @@ describe('what a replacement refuses', () => {
       { [STORED]: { width: 40, height: 30 } },
     );
     const { session, authoring, control, imageReplacement } = open(images);
-    authoring.complete({ kind: 'replaced-image', resourceId: IMAGE, url: STORED });
+    authoring.complete(CANVAS, { kind: 'replaced-image', resourceId: IMAGE, url: STORED });
     await expect.poll(() => session.getState().persistence.kind).toBe('settled');
     const before = session.getState().working;
     const commits = control.attempts.length;
@@ -588,7 +589,7 @@ describe('the replaced-image completion', () => {
     const { authoring } = open(unusedImageSources);
 
     expect(
-      authoring.complete({ kind: 'replaced-image', resourceId: MARKDOWN, url: NEW_URL }),
+      authoring.complete(CANVAS, { kind: 'replaced-image', resourceId: MARKDOWN, url: NEW_URL }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-kind-immutable' } });
   });
 
@@ -597,7 +598,7 @@ describe('the replaced-image completion', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'replaced-image',
         resourceId: IMAGE,
         url: 'data:image/png;base64,AAAA',
@@ -610,7 +611,7 @@ describe('the replaced-image completion', () => {
     const { authoring } = open(unusedImageSources);
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'replaced-image',
         resourceId: IMAGE,
         url: OLD_URL,

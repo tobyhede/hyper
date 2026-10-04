@@ -4,6 +4,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { chromeControlStaysOwed, staysOwed, type PendingContinuation } from '../src/continuation';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * Where an Edit continues, as transitions rather than as a tree.
@@ -135,7 +136,7 @@ describe('invalidation', () => {
     };
     const { authoring, session, continuation } = open(stored, 1n);
     // Force the conflict the accept resolves.
-    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
+    authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
     continuation.request(NAME_A);
 
@@ -157,7 +158,7 @@ describe('invalidation', () => {
     const { authoring, navigation, continuation } = open();
     continuation.request(NAME_A);
 
-    authoring.complete({ kind: 'renamed-map', mapId: MAP_ID, title: 'Renamed' });
+    authoring.complete(CANVAS, { kind: 'renamed-map', mapId: MAP_ID, title: 'Renamed' });
     navigation.selectMap(MAP_ID);
     navigation.activateGraph(GRAPH_ID);
 

@@ -196,6 +196,39 @@ export const describeAggregateRefusal = (errors: readonly SpaceAggregateError[])
   [...new Set(errors.map((error) => AGGREGATE_REFUSAL_REASONS[error.kind]))].join(' ');
 
 /**
+ * Why a pointer gesture on the canvas made nothing before any Edit was
+ * attempted: what it aimed at is not somewhere it can land (ADR 0112).
+ */
+export type CanvasGestureRefusal =
+  | { readonly code: 'edge-across-drawings' }
+  | { readonly code: 'drawn-map-not-in-edit' }
+  | { readonly code: 'drawn-map-nested' }
+  | { readonly code: 'drawn-map-read-only' }
+  | { readonly code: 'drawn-map-unavailable' }
+  | { readonly code: 'resource-outside-drawn-space' }
+  | { readonly code: 'drawn-space-unreadable' };
+
+/** Application-owned copy for a refused canvas gesture. */
+export const describeCanvasGestureRefusal = (refusal: CanvasGestureRefusal): string => {
+  switch (refusal.code) {
+    case 'edge-across-drawings':
+      return 'An Edge can connect Resources only within the same drawn Map.';
+    case 'drawn-map-not-in-edit':
+      return 'Edit this Map before adding Resources.';
+    case 'drawn-map-nested':
+      return 'Enter this Map’s Space to add Resources to it.';
+    case 'drawn-map-read-only':
+      return 'This Map is shown read-only, so nothing can be added to it.';
+    case 'drawn-map-unavailable':
+      return 'Resources cannot be added to this Map right now.';
+    case 'resource-outside-drawn-space':
+      return 'A Resource can be placed only on a Map of its own Space.';
+    case 'drawn-space-unreadable':
+      return 'This Space could not be opened.';
+  }
+};
+
+/**
  * What the Connect list says after a choice, or `null` once the Edge is drawn.
  * The list closes on `null`, so `unavailable` must answer a sentence.
  */
