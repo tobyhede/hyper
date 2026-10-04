@@ -12,11 +12,14 @@ import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
+import { CANVAS } from '../src/space-authoring';
+import { canvasAuthoring } from './canvas-authoring';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { ArmedDeleteConfirmation } from '../src/components/DeleteConfirmation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -183,8 +186,11 @@ const titled = (edges: readonly Edge[], title: string, hidden = false): Edge[] =
  * `graphs: z.array(graphSchema).min(1)` (`core/src/schema.ts`, asserted by
  * `core/test/persistence-schema.test.ts`), `ResolvedMap.activeGraph`
  * resolves named-or-first and is never null, Navigation writes only an Active
- * Graph the selected Map owns, and Graph deletion refuses the
- * last one (`map-must-keep-graph`).
+ * Graph the selected Map owns, and Graph deletion leaves the last one in
+ * place (`precheckContextDeletion` and `planContextDeletion` answer
+ * `unchanged` for a Map's last Graph, asserted by
+ * `persistence/test/space-resource-planning.test.ts`, "is unchanged when the
+ * Graph is the last one its Map owns").
  *
  * So the stand-in is what exercises the channel at all, and the alternative —
  * arranging the fixture so the real completion refuses this way — is not
@@ -201,7 +207,12 @@ function compose({
 } = {}) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const composed = composeApp({ spaceSession: session, selection, connections });
+  const composed = composeApp({
+    images: unusedImageSources,
+    spaceSession: session,
+    selection,
+    connections,
+  });
   composed.adapter.getState().syncProjection(NODES, EDGES);
   return { session, ...composed };
 }
@@ -308,6 +319,7 @@ function DeleteWhenCommitted({ armed }: { readonly armed: boolean }) {
 
 /** The composition `App` performs, narrowed to what an Edge test needs. */
 function CanvasHarness({
+  imageReplacement,
   adapter,
   edgeAuthoring,
   continuation,
@@ -320,6 +332,7 @@ function CanvasHarness({
   presenting,
 }: Pick<
   ReturnType<typeof compose>,
+  | 'imageReplacement'
   | 'adapter'
   | 'edgeAuthoring'
   | 'continuation'
@@ -349,6 +362,7 @@ function CanvasHarness({
       {/* Production's dialog, drawn at the root as `App` draws it. */}
       <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} />
       <SpaceCanvas
+        imageReplacement={imageReplacement}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}
         nodes={projection?.nodes ?? []}
@@ -382,7 +396,7 @@ function CanvasHarness({
         onDropImages={() => undefined}
         onPasteImageUrl={() => undefined}
         nameOnCreation={null}
-        authoring={authoring}
+        authoring={canvasAuthoring(authoring)}
         spaceSession={session}
         resourceResize={{
           beginResize: () => undefined,
@@ -568,7 +582,7 @@ describe('the Edge toolbar', () => {
   it('makes the eye unavailable while the Title is being written, keeping the caret', async () => {
     const { adapter, session, authoring } = await mountCanvas();
     act(() => {
-      authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+      authoring.complete(CANVAS, { kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
     });
     act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
     act(() => adapter.getState().selectEdge(SUBJECT));
@@ -629,7 +643,7 @@ describe('the Edge toolbar', () => {
   it('hides a Title at rest from the eye, and dims it while the Edge is revealed', async () => {
     const { adapter, session, authoring } = await mountCanvas();
     act(() => {
-      authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+      authoring.complete(CANVAS, { kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
     });
     act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
     act(() => adapter.getState().selectEdge(SUBJECT));
@@ -1090,7 +1104,7 @@ describe('spending a continuation on the canvas', () => {
     document.body.focus();
 
     act(() => {
-      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
+      authoring.complete(CANVAS, { kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
       continuation.request(focusDrawn);
     });
 
@@ -1122,7 +1136,7 @@ describe('spending a continuation on the canvas', () => {
     document.body.focus();
 
     act(() => {
-      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
+      authoring.complete(CANVAS, { kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
       adapter.getState().selectEdge(DRAWN);
       continuation.request(focusDrawn);
     });

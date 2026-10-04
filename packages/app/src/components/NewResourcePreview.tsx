@@ -6,6 +6,7 @@ import { dropTarget, newResourceDrop, type ElementDropTarget } from '../edge-aut
 export interface NewResourcePreviewProps {
   /** Exact neutral title the authored Resource will carry. */
   readonly title: string;
+  readonly scale?: number;
   /** Alt/Option, tracked on `window` so it survives leaving the canvas. */
   readonly modifierHeld: boolean;
   /** The container-local classification of what the pointer is over. */
@@ -29,6 +30,7 @@ export interface NewResourcePreviewProps {
  */
 export function NewResourcePreview({
   title,
+  scale = 1,
   modifierHeld,
   pointerOver,
   accepts,
@@ -66,7 +68,8 @@ export function NewResourcePreview({
         // so no Resource is announced before there is a Resource.
         aria-hidden="true"
         style={{
-          transform: `translate(${drop.position.x}px, ${drop.position.y}px)`,
+          transform: `translate(${drop.position.x + (RESOURCE_SIZE.width * (1 - scale)) / 2}px, ${drop.position.y + (RESOURCE_SIZE.height * (1 - scale)) / 2}px) scale(${scale})`,
+          transformOrigin: 'top left',
           width: RESOURCE_SIZE.width,
         }}
       >

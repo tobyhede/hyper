@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   Map as SpaceMap,
   MapId,
@@ -16,7 +16,7 @@ import {
   describeSpaceResourceBreak,
   describeSpaceResourceRefusal,
 } from './authoring-refusal';
-import { createImageResources, type ImageOrigin } from './image-creation';
+import type { ImageOrigin } from './image-creation';
 import { resolveMap } from './map-resolution';
 import type { OpenSpace } from './open-spaces';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from './resource';
@@ -28,6 +28,7 @@ import {
   type SettlePlacement,
   type SettleResource,
 } from './resources-drag';
+import type { InputFreeResourceKind } from './space-authoring';
 import { nextSpaceTitle } from './titles';
 import { useVisibleCentre, type VisibleCentreReporting } from './visible-centre';
 
@@ -82,8 +83,8 @@ export interface ResourcePlacementInput {
 }
 
 export interface ResourcePlacementCommands extends VisibleCentreReporting {
-  /** Add Resource: one completed Edit, then the naming continuation. */
-  readonly addResource: () => void;
+  /** Create a Resource of a kind that takes no input: one completed Edit, then the naming continuation. */
+  readonly createResource: (kind: InputFreeResourceKind) => void;
   /** Place a Resource this Map leaves out, answering a refusal's sentence or `null`. */
   readonly addExistingResource: (
     resourceId: ResourceId,
@@ -129,11 +130,12 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
  * or the Space under it changes.
  */
 export function useResourcePlacement(
-  { app, session: spaceSession, spaceResources, images }: OpenSpace,
+  { app, session: spaceSession, spaceResources }: OpenSpace,
   { map: selectedMap, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
 ): ResourcePlacementCommands {
   const { reportVisibleCentre, centreAnchor } = useVisibleCentre();
-  const { authoring, adapter, continuation, commandOutcomes, navigation, currentSpace } = app;
+  const { commandOutcomes, currentSpace, createImageResources, surface } = app;
+  const { authoring, adapter, continuation } = surface;
   const mapId: MapId = selectedMap.id;
 
   /**
@@ -151,7 +153,7 @@ export function useResourcePlacement(
       // likeliest break on this path — the list has been open across renders
       // and the Map it resolves is the one drawing now.
       try {
-        const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
+        const resolved = resolveMap(currentSpace(), mapId);
         const result = await spaceResources.link({
           containingSpaceId: currentSpace().id,
           mapId: resolved.map.id,
@@ -167,7 +169,7 @@ export function useResourcePlacement(
         return describeSpaceResourceBreak(failure);
       }
     },
-    [currentSpace, navigation, spaceResources, reportBreak],
+    [currentSpace, mapId, spaceResources, reportBreak],
   );
 
   const [creatingSpaceResource, setCreatingSpaceResource] = useState(false);
@@ -191,40 +193,35 @@ export function useResourcePlacement(
     // An `async` thunk so a throw from the title minting or `resolveMap`
     // arrives at `run` as a rejection, as the lifecycle's own does.
     void commandOutcomes
-      .run(
-        'space-resource-create',
-        async () => {
-          const title = nextSpaceTitle(spaceSession.getState().working);
-          // Resolved at the press rather than closed over, for a gesture whose
-          // Edit lands one await later. `create` still refuses `map-not-found`
-          // on its own account, against the Map the coordinated Edit sees.
-          const resolved = resolveMap(currentSpace(), navigation.getState().selectedMapId);
-          return spaceResources.create({
-            containingSpaceId: currentSpace().id,
-            mapId: resolved.map.id,
-            title,
-            position: centreAnchor(),
-          });
-        },
-        {
-          // The id the lifecycle minted, not the Resource that appeared: a
-          // Markdown creation can land between this press and the installed
-          // Edit, so "which Resource is new" answers a different question from
-          // "which Resource did this press make". A refusal or an `unchanged`
-          // made no Resource, so command outcomes requests nothing for either.
-          //
-          // Nothing bumps the Spaces epoch here: a created Space joins the Meta
-          // Space for *every* open Space, so the lifecycle that made it is what
-          // announces it (`space-resource-lifecycle.ts`).
-          continueAt: ({ resourceId }) => ({
-            target: { kind: 'resource', resourceId },
+      .run('space-resource-create', async () => {
+        const title = nextSpaceTitle(spaceSession.getState().working);
+        const resolved = resolveMap(currentSpace(), mapId);
+        return spaceResources.create({
+          containingSpaceId: currentSpace().id,
+          mapId: resolved.map.id,
+          title,
+          position: centreAnchor(),
+        });
+      })
+      .then((result) => {
+        if (result.kind === 'completed' && surface.context().mapId === mapId)
+          continuation.request({
+            target: { kind: 'resource', resourceId: result.resourceId },
             select: true,
             then: 'rename',
-          }),
-        },
-      )
+          });
+      })
       .finally(() => setCreatingSpaceResource(false));
-  }, [commandOutcomes, spaceSession, currentSpace, navigation, spaceResources, centreAnchor]);
+  }, [
+    commandOutcomes,
+    spaceSession,
+    currentSpace,
+    mapId,
+    spaceResources,
+    centreAnchor,
+    continuation,
+    surface,
+  ]);
 
   /**
    * **The gesture supplies the Target, so nothing is chosen first**, and the
@@ -240,26 +237,21 @@ export function useResourcePlacement(
       // canvas, so by the time an answer exists there is no row left to swap a
       // word on. The rows that *can* refuse are drawn unavailable, so what
       // reaches here is a Target that went between the draw and the press.
-      const created = commandOutcomes.run(
-        'reference-create',
-        () =>
-          authoring.complete({
-            kind: 'created-reference',
-            target: resource.id,
-            title: resource.title,
-            anchor,
-          }),
-        {
-          continueAt: ({ createdResourceId }) =>
-            createdResourceId === undefined
-              ? null
-              : {
-                  target: { kind: 'resource', resourceId: createdResourceId },
-                  select: true,
-                  then: 'rename',
-                },
-        },
+      const created = commandOutcomes.run('reference-create', () =>
+        authoring.complete({
+          kind: 'created-reference',
+          target: resource.id,
+          title: resource.title,
+          anchor,
+        }),
       );
+      if (created.kind === 'completed' && created.createdResourceId !== undefined) {
+        continuation.request({
+          target: { kind: 'resource', resourceId: created.createdResourceId },
+          select: true,
+          then: 'rename',
+        });
+      }
       switch (created.kind) {
         case 'refused':
         case 'broke':
@@ -272,7 +264,7 @@ export function useResourcePlacement(
           return 'done';
       }
     },
-    [selectedMap, centreAnchor, commandOutcomes, authoring],
+    [selectedMap, centreAnchor, commandOutcomes, authoring, continuation],
   );
 
   /**
@@ -304,36 +296,46 @@ export function useResourcePlacement(
   );
 
   /**
-   * **The one creation whose refusal no surface shows, and that is a decision.**
+   * Create Resource, for a kind that takes no input: one Edit at the visible
+   * centre, continuing in the new Resource's Title.
+   *
+   * **The creations whose refusal no surface shows, and that is a decision.**
    * A refusal carries a sentence for the author, worth showing where
-   * the author can act on it. Add Resource takes no input at all, cannot refuse
-   * against a choice the author made, and leaves nothing standing that a
-   * sentence could correct. If it ever grows an input it grows a surface with
-   * it, and the refusal goes there.
+   * the author can act on it. These creations take no input at all, cannot
+   * refuse against a choice the author made, and leave nothing standing that a
+   * sentence could correct. A kind that grows an input leaves
+   * `InputFreeResourceKind` and grows a surface, and the refusal goes there.
    *
    * The toolbar stays available for an empty authored Map: it is the
    * zero-Resource Space's way to create the first Resource.
    */
-  const addResource = useCallback(() => {
-    const created = authoring.complete({ kind: 'created-resource', anchor: centreAnchor() });
-    // Each outcome named rather than caught. `queued` is an Edit that will still
-    // be performed, whose projection draws the Resource without help from here.
-    // `unchanged` this operation cannot answer — it mints unconditionally — but
-    // the shared completion union carries it, so it is narrowed rather than
-    // asserted away.
-    if (created.kind === 'refused') return;
-    if (created.kind === 'queued') return;
-    if (created.kind === 'unchanged') return;
-    if (created.createdResourceId === undefined) return;
-    // Selected as well as named, so continued authoring — a connection, a second
-    // Resource — carries on from it. Both are the one continuation, spent when
-    // the projection that draws the Resource arrives.
-    continuation.request({
-      target: { kind: 'resource', resourceId: created.createdResourceId },
-      select: true,
-      then: 'rename',
-    });
-  }, [authoring, centreAnchor, continuation]);
+  const createResource = useCallback(
+    (resourceKind: InputFreeResourceKind) => {
+      const created = authoring.complete({
+        kind: 'created-resource',
+        resourceKind,
+        anchor: centreAnchor(),
+      });
+      // Each outcome named rather than caught. `queued` is an Edit that will still
+      // be performed, whose projection draws the Resource without help from here.
+      // `unchanged` this operation cannot answer — it mints unconditionally — but
+      // the shared completion union carries it, so it is narrowed rather than
+      // asserted away.
+      if (created.kind === 'refused') return;
+      if (created.kind === 'queued') return;
+      if (created.kind === 'unchanged') return;
+      if (created.createdResourceId === undefined) return;
+      // Selected as well as named, so continued authoring — a connection, a second
+      // Resource — carries on from it. Both are the one continuation, spent when
+      // the projection that draws the Resource arrives.
+      continuation.request({
+        target: { kind: 'resource', resourceId: created.createdResourceId },
+        select: true,
+        then: 'rename',
+      });
+    },
+    [authoring, centreAnchor, continuation],
+  );
 
   /**
    * Every Image Resource gesture: store and measure what it brought, then one
@@ -347,27 +349,24 @@ export function useResourcePlacement(
    */
   const createImages = useCallback(
     (origin: ImageOrigin, anchor: MapPosition, placementMode: PlacementMode) => {
-      const target = {
-        mapId: navigation.getState().selectedMapId,
-        anchor,
-        placement: placementMode,
-      };
-      void commandOutcomes.run(
-        'image-create',
-        () => createImageResources({ images, authoring }, origin, target),
-        {
-          continueAt: ({ createdResourceId }) =>
-            createdResourceId === undefined || navigation.getState().selectedMapId !== target.mapId
-              ? null
-              : {
-                  target: { kind: 'resource', resourceId: createdResourceId },
-                  select: true,
-                  then: 'rename',
-                },
-        },
-      );
+      const target = { mapId, drawing: surface.target().kind, anchor, placement: placementMode };
+      void commandOutcomes
+        .run('image-create', () => createImageResources(origin, target))
+        .then((result) => {
+          if (
+            result.kind === 'completed' &&
+            result.createdResourceId !== undefined &&
+            surface.context().mapId === mapId
+          ) {
+            continuation.request({
+              target: { kind: 'resource', resourceId: result.createdResourceId },
+              select: true,
+              then: 'rename',
+            });
+          }
+        });
     },
-    [commandOutcomes, images, authoring, navigation],
+    [commandOutcomes, createImageResources, mapId, continuation, surface],
   );
 
   /**
@@ -444,22 +443,42 @@ export function useResourcePlacement(
     [addSpaceResourceFor, mapId],
   );
 
-  return {
-    reportVisibleCentre,
-    centreAnchor,
-    addResource,
-    addExistingResource,
-    addSpaceResourceFor,
-    createSpaceResource,
-    creatingSpaceResource,
-    createReferenceFrom,
-    createImagesFromFiles,
-    dropImages,
-    pasteImageUrl,
-    startResourceDrag,
-    startSpaceDrag,
-    endDrag,
-    dropExistingResource,
-    dropSpace,
-  };
+  return useMemo(
+    () => ({
+      reportVisibleCentre,
+      centreAnchor,
+      createResource,
+      addExistingResource,
+      addSpaceResourceFor,
+      createSpaceResource,
+      creatingSpaceResource,
+      createReferenceFrom,
+      createImagesFromFiles,
+      dropImages,
+      pasteImageUrl,
+      startResourceDrag,
+      startSpaceDrag,
+      endDrag,
+      dropExistingResource,
+      dropSpace,
+    }),
+    [
+      reportVisibleCentre,
+      centreAnchor,
+      createResource,
+      addExistingResource,
+      addSpaceResourceFor,
+      createSpaceResource,
+      creatingSpaceResource,
+      createReferenceFrom,
+      createImagesFromFiles,
+      dropImages,
+      pasteImageUrl,
+      startResourceDrag,
+      startSpaceDrag,
+      endDrag,
+      dropExistingResource,
+      dropSpace,
+    ],
+  );
 }

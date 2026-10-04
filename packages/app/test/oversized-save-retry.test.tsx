@@ -12,6 +12,7 @@ import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * Through the application: a save over the request size limit is explained by the Dock's notice rather than a dialog, keeps every
@@ -101,7 +102,7 @@ const storedNotes = async (backend: MemorySpaceBackend): Promise<string | undefi
 /** Complete the Edit an author makes by writing `body` into Notes. */
 const writeNotes = (space: OpenSpace, body: string): void => {
   act(() => {
-    const result = space.app.authoring.complete({
+    const result = space.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: RESOURCE_ID,
       document: { title: 'Notes', kind: 'markdown', body },

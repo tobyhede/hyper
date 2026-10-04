@@ -326,8 +326,24 @@ describe('useResourcePlacement', () => {
     const { result } = place(opened);
     act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
 
-    act(() => result.current.addResource());
+    act(() => result.current.createResource('markdown'));
 
+    expect(placedIds(opened)).toContain(CREATED);
+    expect(opened.app.continuation.getState().pending).toEqual({
+      target: { kind: 'resource', resourceId: CREATED },
+      select: true,
+      then: 'rename',
+    });
+  });
+
+  it('creates an Ur Resource at the visible centre and continues in its Title', () => {
+    const opened = openDerivationSpace(mintingIds(CREATED));
+    const { result } = place(opened);
+    act(() => result.current.reportVisibleCentre(() => ({ x: 70, y: 80 })));
+
+    act(() => result.current.createResource('ur'));
+
+    expect(opened.app.currentSpace().lookup.resource(CREATED)?.kind).toBe('ur');
     expect(placedIds(opened)).toContain(CREATED);
     expect(opened.app.continuation.getState().pending).toEqual({
       target: { kind: 'resource', resourceId: CREATED },

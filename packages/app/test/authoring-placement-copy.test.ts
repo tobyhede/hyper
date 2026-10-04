@@ -9,6 +9,7 @@ import { recordingHistory } from './browser-history';
 import { openTestSpace } from './opened-space';
 import { node, settled } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * Authored placement has one home, the session's snapshot. Every assertion
@@ -67,7 +68,7 @@ describe('Map delete draws the right geometry', () => {
       revision: 0n,
       exportedRevision: null,
     });
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(DELETED_MAP_ID);
 
     // What the Dock's Delete does (`dock-chrome.ts`): Map authoring deletes the Map and
@@ -88,7 +89,7 @@ describe('Map delete draws the right geometry', () => {
     // Graph — still writes the whole placement into the Map
     // (`updatePositionedMap`). The correct source for that write is the
     // surviving Map's own authored position for the shared Resource.
-    const renamed = app.authoring.complete({
+    const renamed = app.authoring.complete(CANVAS, {
       kind: 'renamed-graph',
       graphId: SURVIVING_GRAPH_ID,
       title: 'Renamed Graph',
@@ -186,7 +187,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     expect(entered.app.navigation.getState().selectedMapId).toBe(ENTERED_MAP_ID);
 
     // Again, an Edit that touches no position.
-    const renamed = entered.app.authoring.complete({
+    const renamed = entered.app.authoring.complete(CANVAS, {
       kind: 'renamed-graph',
       graphId: ENTERED_GRAPH_ID,
       title: 'Renamed Graph',
@@ -206,7 +207,6 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
   const OTHER_MAP_ID = id('32');
   const TOP_GRAPH_ID = id('33');
   const OTHER_GRAPH_ID = id('34');
-  const OTHER_GRAPH_TO_DELETE_ID = id('35');
   const TOP_RESOURCE_ID = id('36');
   const OTHER_RESOURCE_ID = id('37');
 
@@ -229,10 +229,7 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
           title: 'Other',
           kind: 'positioned',
           positions: { [OTHER_RESOURCE_ID]: { x: 500, y: 600, open: false } },
-          graphs: [
-            { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
-            { id: OTHER_GRAPH_TO_DELETE_ID, title: 'Doomed Graph', edges: [] },
-          ],
+          graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
         },
       ],
     },
@@ -249,29 +246,30 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
    *
    * What is pinned: an embedded Edit on a Map other than the one selected has
    * to produce a snapshot intake accepts, and a later top-level Edit has to see
-   * it. It is exercised with `deleted-graph`, the closest reachable kind that
-   * changes an unselected Map's own content — `SpaceAuthoring.completeInMap`'s
-   * parameter type (`EmbeddedResourceCompletion | EmbeddedContextCompletion`)
-   * excludes `deleted-resource` — called directly through `completeInMap`
-   * exactly as `space-authoring-operations.test.ts` does to reach this same
-   * primitive outside its production callers.
+   * it. It is exercised with `renamed-graph`, which changes an unselected
+   * Map's own content, completed for a drawn target exactly as
+   * `space-authoring-operations.test.ts` does.
    */
   it('produces a snapshot intake accepts after a later top-level Edit', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     expect(app.navigation.getState().selectedMapId).toBe(TOP_MAP_ID);
 
     // An embedded Edit against a Map other than the one selected at the
     // top level.
-    const embedded = app.authoring.completeInMap(OTHER_MAP_ID, {
-      kind: 'deleted-graph',
-      graphId: OTHER_GRAPH_TO_DELETE_ID,
-    });
+    const embedded = app.authoring.complete(
+      { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+      {
+        kind: 'renamed-graph',
+        graphId: OTHER_GRAPH_ID,
+        title: 'Renamed Other Graph',
+      },
+    );
     expect(embedded.kind).toBe('completed');
 
     // The next top-level Edit, against the (still selected) other Map.
-    const renamed = app.authoring.complete({
+    const renamed = app.authoring.complete(CANVAS, {
       kind: 'renamed-map',
       mapId: TOP_MAP_ID,
       title: 'Renamed Top',
@@ -285,7 +283,9 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
     const top = written.document.maps?.find((m) => m.id === TOP_MAP_ID);
     expect(top?.positions[TOP_RESOURCE_ID]).toEqual({ x: 10, y: 20, open: false });
     const other = written.document.maps?.find((m) => m.id === OTHER_MAP_ID);
-    expect(other?.graphs.map((graph) => graph.id)).toEqual([OTHER_GRAPH_ID]);
+    expect(other?.graphs.map((graph) => ({ id: graph.id, title: graph.title }))).toEqual([
+      { id: OTHER_GRAPH_ID, title: 'Renamed Other Graph' },
+    ]);
   });
 });
 
@@ -335,7 +335,11 @@ describe('A queued drag holds its drop point', () => {
   it('keeps a moved Resource drawn at its drop point while its completion waits behind an in-flight one', () => {
     const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
     const session = openSpaceSession(backend, { snapshot, revision: 0n, exportedRevision: null });
-    const { authoring, adapter } = composeApp({ spaceSession: session, selection: MAP_ID });
+    const { authoring, adapter } = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+    });
 
     adapter.getState().syncProjection([node(RESOURCE_A, 10, 20), node(RESOURCE_B, 300, 20)], []);
 
@@ -353,7 +357,7 @@ describe('A queued drag holds its drop point', () => {
         .projection?.nodes.find((resource) => resource.id === RESOURCE_B)?.position;
     });
     try {
-      const result = authoring.complete({
+      const result = authoring.complete(CANVAS, {
         kind: 'renamed-map',
         mapId: MAP_ID,
         title: 'Renamed',

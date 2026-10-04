@@ -9,6 +9,8 @@ import { composeApp } from '../src/compose-app';
 import { canvasProjection } from '../src/canvas-projection';
 import { resolveMap } from '../src/map-resolution';
 import { mintingIds } from './minting';
+import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * A Space whose working snapshot was replaced under it still names a Graph.
@@ -152,8 +154,12 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
     exportedRevision: null,
   });
 
-  const target = composeApp({ spaceSession: targetSession, newId: mintingIds(ADDED_GRAPH_ID) });
-  expect(target.authoring.complete({ kind: 'added-graph' }).kind).toBe('completed');
+  const target = composeApp({
+    images: unusedImageSources,
+    spaceSession: targetSession,
+    newId: mintingIds(ADDED_GRAPH_ID),
+  });
+  expect(target.authoring.complete(CANVAS, { kind: 'added-graph' }).kind).toBe('completed');
   expect(target.navigation.getState().activeGraphId).toBe(ADDED_GRAPH_ID);
   await vi.waitFor(() => expect(targetSession.getState().persistence.kind).toBe('settled'));
 
@@ -176,6 +182,7 @@ const openRolledBackTarget = async (): Promise<ReturnType<typeof composeApp>> =>
   // The author answers on the containing Space, through the operation
   // `PersistenceControl`'s "use the stored Space" spends.
   const metaApp = composeApp({
+    images: unusedImageSources,
     spaceSession: meta,
     newId: mintsNothing('Accepting the stored Space minted an identity.'),
   });
@@ -210,10 +217,11 @@ const openRolledBackOverCreatedMap = async (): Promise<ReturnType<typeof compose
   });
 
   const target = composeApp({
+    images: unusedImageSources,
     spaceSession: targetSession,
     newId: mintingIds(CREATED_MAP_ID, CREATED_MAP_GRAPH_ID),
   });
-  expect(target.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+  expect(target.authoring.complete(CANVAS, { kind: 'created-map' }).kind).toBe('completed');
   expect(target.navigation.getState().selectedMapId).toBe(CREATED_MAP_ID);
   await vi.waitFor(() => expect(targetSession.getState().persistence.kind).toBe('settled'));
 
@@ -231,6 +239,7 @@ const openRolledBackOverCreatedMap = async (): Promise<ReturnType<typeof compose
     .delete({ containingSpaceId: META_ID, resourceId: SPACE_RESOURCE_ID });
   await vi.waitFor(() => expect(meta.getState().persistence.kind).toBe('conflicted'));
   const metaApp = composeApp({
+    images: unusedImageSources,
     spaceSession: meta,
     newId: mintsNothing('Accepting the stored Space minted an identity.'),
   });
@@ -314,7 +323,7 @@ describe('the Active Graph after a coordinated recovery restores a participant',
     expect(target.navigation.getState().mode).toBe('presenting');
 
     expect(
-      target.authoring.complete({
+      target.authoring.complete(CANVAS, {
         kind: 'renamed-graph',
         graphId: TARGET_GRAPH_ID,
         title: 'Renamed',

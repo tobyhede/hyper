@@ -112,10 +112,9 @@ describe('graph viewport', () => {
     let view: RenderResult | undefined;
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -123,7 +122,7 @@ describe('graph viewport', () => {
         else view.rerender(app);
       },
     );
-    await screen.findByText('Local space');
+    await within(screen.getByTestId('command-dock')).findByText('Local space');
     expect(viewportTransform()).not.toMatch(/NaN/);
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));

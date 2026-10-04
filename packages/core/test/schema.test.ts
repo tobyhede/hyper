@@ -6,6 +6,8 @@ import {
   IMAGE_URL_UNSUPPORTED,
   graphEdgeSchema,
   graphSchema,
+  importResourceFrontmatterSchema,
+  resourceDocumentSchema,
   resourceFrontmatterSchema,
   resourceSchema,
   spaceFileSchema,
@@ -784,5 +786,30 @@ describe('an Image Resource', () => {
   it('gives an Image Resource no body — it owns its URL, not its bytes', () => {
     const image = resourceSchema.parse({ ...IMAGE, url: 'https://example.com/a.png', body: 'x' });
     expect('body' in image).toBe(false);
+  });
+});
+
+describe('an Ur Resource', () => {
+  const UR = {
+    id: '00000000-0000-4000-8000-000000000012',
+    title: 'Node',
+    kind: 'ur',
+  };
+
+  it('is an id, a Title and its kind, at every door', () => {
+    expect(resourceFrontmatterSchema.parse(UR)).toEqual(UR);
+    expect(resourceSchema.parse(UR)).toEqual(UR);
+    const { id: _id, ...document } = UR;
+    expect(resourceDocumentSchema.parse(document)).toEqual(document);
+    expect(importResourceFrontmatterSchema.parse(document)).toEqual(document);
+  });
+
+  it('gives an Ur Resource no body — it has no content', () => {
+    const ur = resourceSchema.parse({ ...UR, body: 'x' });
+    expect('body' in ur).toBe(false);
+  });
+
+  it('refuses an Ur Resource with no Title', () => {
+    expect(resourceSchema.safeParse({ ...UR, title: '  ' }).success).toBe(false);
   });
 });

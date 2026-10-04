@@ -453,10 +453,26 @@ describe('planContextDeletion', () => {
         },
       ],
     });
+    // The surviving Map and the target's Resources are carried as they were.
+    const target = stored[1]!;
+    if (outcome.kind !== 'changes') throw new Error('expected changes');
+    expect(outcome.changes[0]).toEqual({
+      kind: 'update',
+      spaceId: spaceOf(1),
+      snapshot: {
+        ...target,
+        document: {
+          ...target.document,
+          defaultMap: secondMapOf(1),
+          maps: target.document.maps?.slice(1),
+        },
+      },
+    });
   });
 
   it('prefers the named Graph and moves the Active Graph off the deleted one', () => {
-    const outcome = planContextDeletion(view([space(0, [1]), space(1, [])]), {
+    const stored = [space(0, [1]), space(1, [2]), space(2, [])];
+    const outcome = planContextDeletion(view(stored), {
       targetSpaceId: spaceOf(1),
       mapId: mapOf(1),
       graphId: graphOf(1),
@@ -477,6 +493,23 @@ describe('planContextDeletion', () => {
         },
         { spaceId: META, snapshot: { resources: [{ document: { graph: secondGraphOf(1) } }] } },
       ],
+    });
+    // Only the Graph goes: the Map keeps its positions, and the target its Resources.
+    const target = stored[1]!;
+    const targetMap = target.document.maps![0]!;
+    if (outcome.kind !== 'changes') throw new Error('expected changes');
+    expect(outcome.changes[0]).toEqual({
+      kind: 'update',
+      spaceId: spaceOf(1),
+      snapshot: {
+        ...target,
+        document: {
+          ...target.document,
+          maps: [
+            { ...targetMap, activeGraph: secondGraphOf(1), graphs: targetMap.graphs.slice(1) },
+          ],
+        },
+      },
     });
   });
 
@@ -501,6 +534,36 @@ describe('planContextDeletion', () => {
 
   it('is unchanged when what the plan reads leaves no successor', () => {
     expect(planContextDeletion(view([space(0, [1]), space(1, [])]), deleteMap)).toEqual({
+      kind: 'unchanged',
+    });
+  });
+
+  it('is unchanged when the Graph is the last one its Map owns', () => {
+    const deleteGraph = {
+      targetSpaceId: spaceOf(1),
+      mapId: mapOf(1),
+      graphId: graphOf(1),
+      preferredGraphId: null,
+    };
+    const twoGraphs = space(1, []);
+    const oneGraph: SpaceSnapshot = {
+      ...twoGraphs,
+      document: {
+        ...twoGraphs.document,
+        maps: twoGraphs.document.maps?.map((targetMap) => ({
+          ...targetMap,
+          graphs: targetMap.graphs.slice(0, 1),
+        })),
+      },
+    };
+
+    expect(precheckContextDeletion(new Map(), () => oneGraph, deleteGraph)).toEqual({
+      kind: 'unchanged',
+    });
+    expect(precheckContextDeletion(new Map(), () => twoGraphs, deleteGraph)).toEqual({
+      kind: 'proceed',
+    });
+    expect(planContextDeletion(view([space(0, [1]), oneGraph]), deleteGraph)).toEqual({
       kind: 'unchanged',
     });
   });

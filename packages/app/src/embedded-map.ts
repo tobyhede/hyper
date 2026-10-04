@@ -1,3 +1,4 @@
+import { withSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 import type { Edge, EdgeTypes } from '@xyflow/react';
 import {
   SPACE_RESOURCE_EMBED_INSET,
@@ -8,6 +9,7 @@ import {
 import {
   AUTHORING_HANDLE_DIAMETER,
   RoutedEdge,
+  ROUTED_EDGE_TYPE,
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
 
@@ -19,28 +21,13 @@ export const embeddedNodeId = (parentId: string, resourceId: string): string =>
   `embedded:${parentId}:${resourceId}`;
 export const embeddedClipId = (parentId: string): string => `embedded-clip-${parentId}`;
 
-/**
- * The React Flow Edge type an embedded Map's Edges are minted with.
- *
- * An embedded Edge copies an Edge of another Space's Map — Space Resource
- * references never cycle, so a Space never embeds itself (ADR 0068) — and its
- * endpoints are placement ids rather than Resource ids. Minting it under its own
- * type is what keeps it from ever reading as an Edge of the Map on the canvas:
- * `edgeSelectionOf` answers only for the routed type the canvas projection writes
- * (`embedded-map.test.ts`, 'mints its Edges as its own type, which never converts
- * to an Edge selection').
- */
+/** Embedded Edges keep their domain subject while their endpoints name this drawing. */
 export const EMBEDDED_EDGE_TYPE = 'embedded';
 
-/**
- * The canvas's Edge type table with the embedded type added, drawn by the plain
- * routed Edge — the same curve, lane offset, trim and attachment, without the
- * authoring controls. The embedding owns this registration so Edge Authoring
- * learns nothing about embedded Maps.
- */
+/** Every drawing uses the canvas's same Edge component and command context. */
 export const withEmbeddedEdgeTypes = (edgeTypes: EdgeTypes): EdgeTypes => ({
   ...edgeTypes,
-  [EMBEDDED_EDGE_TYPE]: RoutedEdge,
+  [EMBEDDED_EDGE_TYPE]: edgeTypes[ROUTED_EDGE_TYPE] ?? RoutedEdge,
 });
 
 const EMBEDDED_PREFIX = 'embedded:';
@@ -135,7 +122,7 @@ export interface EmbeddedMapRequest {
   readonly projection: CanvasNodesAndEdges;
   readonly offset: MapPosition;
   readonly zoom?: number;
-  readonly enabled: boolean;
+  readonly policy: MapSurfacePolicy;
   readonly bounds?: EmbeddedBounds;
   readonly tilt?: EmbeddedTilt | undefined;
 }
@@ -294,26 +281,35 @@ export function embeddedMap({
   projection,
   offset,
   zoom = 1,
-  enabled,
+  policy,
   bounds,
   tilt,
 }: EmbeddedMapRequest): CanvasNodesAndEdges {
+  const enabled = policy === 'authoring';
   const nodes = projection.nodes.map((node): ResourceFlowNode => {
     const position = { x: node.position.x * zoom + offset.x, y: node.position.y * zoom + offset.y };
-    const next: ResourceFlowNode = {
-      ...node,
-      id: embeddedNodeId(parent.id, node.id),
-      parentId: parent.id,
-      position,
-      connectable: enabled,
-      data: { ...node.data, connectionAuthoringEnabled: enabled, dragTilted: tilt !== undefined },
-      draggable: enabled,
-      selectable: enabled,
-      focusable: enabled,
-      deletable: false,
-      zIndex: (parent.zIndex ?? 10) + (node.data.open === true ? 2 : 1),
-    };
-    if (!enabled) next.className = 'nopan nowheel nodrag';
+    const next = withSurfacePolicy(
+      {
+        ...node,
+        id: embeddedNodeId(parent.id, node.id),
+        parentId: parent.id,
+        position,
+        data: {
+          ...node.data,
+          dragTilted: tilt !== undefined,
+          connectionAuthoringEnabled: node.data.connectionAuthoringEnabled !== false,
+        },
+        // Explicit, because a child of the canvas would otherwise take the
+        // canvas's own gesture defaults rather than this drawing's.
+        draggable: node.draggable !== false,
+        selectable: node.selectable !== false,
+        focusable: node.focusable !== false,
+        connectable: node.connectable !== false,
+        deletable: false,
+        zIndex: (parent.zIndex ?? 10) + (node.data.open === true ? 2 : 1),
+      },
+      policy,
+    );
     const clipBounds = bounds ?? {
       top: SPACE_RESOURCE_EMBED_INSET.top,
       left: SPACE_RESOURCE_EMBED_INSET.left,
@@ -336,12 +332,7 @@ export function embeddedMap({
             },
           };
     const style = { ...placed.style, transition: 'none' };
-    return enabled
-      ? { ...placed, style }
-      : {
-          ...placed,
-          style: { ...style, pointerEvents: 'none' },
-        };
+    return { ...placed, style };
   });
   const ids = new Map(
     projection.nodes.map((node) => [node.id, embeddedNodeId(parent.id, node.id)]),
@@ -361,9 +352,10 @@ export function embeddedMap({
             type: EMBEDDED_EDGE_TYPE,
             source,
             target,
-            selectable: false,
-            focusable: false,
-            deletable: false,
+            data: { ...edge.data, resourceEdge: { from: edge.source, to: edge.target } },
+            selectable: enabled,
+            focusable: enabled,
+            deletable: enabled,
             zIndex: (parent.zIndex ?? 10) + 1,
             style: { ...edge.style, clipPath: `url("#${embeddedClipId(parent.id)}")` },
           },

@@ -1,3 +1,4 @@
+import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   RESOURCE_TITLE_REQUIRED,
@@ -7,24 +8,15 @@ import {
   type ResourceId,
   type GraphId,
 } from '@project/core';
-import {
-  createNonThrowingReporter,
-  type ObserverErrorReporter,
-  type SpaceSession,
-} from '@project/persistence';
+import type { SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { EntityActionGroup, ImageReplacement } from '@project/ui';
-import { PICKED_IMAGE_TYPES, type ImageSources } from './image-creation';
-import { describeImageReplacement, replaceImage } from './image-replacement';
-import { type ImageReplacementActivity } from './image-replacement-activity';
+import { PICKED_IMAGE_TYPES } from './image-creation';
+import { describeImageReplacement, type ImageReplacements } from './image-replacement';
 import type { AuthoringAvailability } from './authoring-availability';
-import {
-  describeAuthoringRefusal,
-  describeImageReplacementBreak,
-  describeImageReplacementPending,
-} from './authoring-refusal';
+import { describeAuthoringRefusal } from './authoring-refusal';
 import type { ResourceResize } from './render-adapter';
-import type { SpaceAuthoring } from './space-authoring';
+import type { SurfaceAuthoring } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 import type { CommandOutcomes } from './command-outcomes';
@@ -38,16 +30,6 @@ import {
   decorateSharedResourceNode,
   decorateSpaceResourceNode,
 } from './canvas-resource-decoration';
-
-/**
- * Where a replaced image is stored and measured (ADR 0106), and the activity
- * that keeps one replacement running at a time. One value, so Replace cannot be
- * offered without the activity that holds navigation and authoring meanwhile.
- */
-export interface ImageReplacing {
-  readonly images: ImageSources;
-  readonly activity: ImageReplacementActivity;
-}
 
 type Caret =
   | { readonly resourceId: string; readonly field: 'title' }
@@ -89,7 +71,7 @@ const spaceDocumentsKeyOf = (
  * fields they patch and the sentence a failed parse returns.
  */
 const completeEditedSpaceResource = (
-  authoring: Pick<SpaceAuthoring, 'complete'>,
+  authoring: Pick<SurfaceAuthoring, 'complete'>,
   spaceSession: SpaceSession,
   resourceId: ResourceId,
   nextDocument: (document: Extract<ResourceDocument, { kind: 'space' }>) => ResourceDocument,
@@ -107,9 +89,10 @@ const completeEditedSpaceResource = (
 };
 
 export interface CanvasResourceAuthoringInput {
-  /** Where a Space Resource rail's Map report is held — the containing canvas's. */
+  readonly continuation?: Continuation | undefined;
+  /** This canvas Space's outcomes; target rails resolve their target's composition. */
   readonly commandOutcomes?: CommandOutcomes;
-  /** Where a Space Resource rail's Delete Map and Delete Graph ask first — the containing canvas's. */
+  /** This canvas Space's confirmation; target rails use the target's confirmation. */
   readonly deleteConfirmation?: DeleteConfirmation;
   readonly nodes: readonly ResourceFlowNode[];
   /**
@@ -121,19 +104,17 @@ export interface CanvasResourceAuthoringInput {
    */
   readonly availability: AuthoringAvailability;
   readonly nameOnCreation: string | null;
-  readonly authoring: Pick<SpaceAuthoring, 'complete' | 'getState'>;
+  readonly authoring: Pick<SurfaceAuthoring, 'complete' | 'getState'>;
   readonly spaceSession: SpaceSession;
   readonly resourceResize: ResourceResize;
   readonly onSelectResource: (resourceId: ResourceId) => void;
   readonly onBodyEditingChange?: ((editing: boolean) => void) | undefined;
   readonly onTitleEditingChange?: ((editing: boolean) => void) | undefined;
   /**
-   * Where a replaced image is stored and measured (ADR 0106), with the activity
-   * that holds navigation and authoring while it runs. Absent offers no Replace
-   * on an Image Resource.
+   * The Space's image replacements (ADR 0106), which own the whole attempt;
+   * this hook keeps only the caret on the target and says the answer.
    */
-  readonly imageReplacing?: ImageReplacing | undefined;
-  readonly reportObserverError?: ObserverErrorReporter | undefined;
+  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
   /**
    * What each referenced Space offers a Space Resource to select, keyed by target.
    *
@@ -184,6 +165,7 @@ export interface CanvasResourceAuthoring {
  * Resource. Space Authoring remains authoritative for every completed Edit.
  */
 export function useCanvasResourceAuthoring({
+  continuation,
   commandOutcomes,
   deleteConfirmation,
   nodes,
@@ -195,8 +177,7 @@ export function useCanvasResourceAuthoring({
   onSelectResource,
   onBodyEditingChange,
   onTitleEditingChange,
-  imageReplacing,
-  reportObserverError = console.error,
+  imageReplacement,
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   portalEditing,
@@ -222,8 +203,7 @@ export function useCanvasResourceAuthoring({
       (node) =>
         node.id === caret.resourceId &&
         node.data.open === true &&
-        (node.data.kind === 'markdown' ||
-          (node.data.kind === 'image' && imageReplacing !== undefined)),
+        (node.data.kind === 'markdown' || node.data.kind === 'image'),
     );
 
   if (caret?.field === 'body') {
@@ -336,33 +316,9 @@ export function useCanvasResourceAuthoring({
   );
 
   const replaceResourceImage = useMemo(() => {
-    if (imageReplacing === undefined) return undefined;
-    const { images, activity } = imageReplacing;
-    return (resourceId: ResourceId, replacement: ImageReplacement): Promise<string | null> =>
-      // A target mounted while another replacement holds the activity is
-      // answered in its own words rather than by the activity's rejection.
-      activity.getState()
-        ? Promise.resolve(describeImageReplacementPending())
-        : activity.run(async () => {
-            const stored = spaceSession
-              .getState()
-              .working.resources.find((resource) => resource.id === resourceId);
-            if (stored?.document.kind !== 'image') {
-              return describeAuthoringRefusal({ code: 'resource-not-found' });
-            }
-            try {
-              const result = await replaceImage(
-                { images, authoring },
-                { resourceId, url: stored.document.url },
-                replacement,
-              );
-              return describeImageReplacement(result);
-            } catch (failure) {
-              createNonThrowingReporter(reportObserverError)(failure);
-              return describeImageReplacementBreak(failure);
-            }
-          });
-  }, [authoring, imageReplacing, spaceSession, reportObserverError]);
+    return async (resourceId: ResourceId, replacement: ImageReplacement): Promise<string | null> =>
+      describeImageReplacement(await imageReplacement.replace(resourceId, replacement));
+  }, [imageReplacement]);
 
   const completeResourceTitle = useCallback(
     (resourceIdInput: string, title: string): string | null => {
@@ -579,6 +535,7 @@ export function useCanvasResourceAuthoring({
       spaceDocuments,
       spaceResourceTargets,
       spaces,
+      continuation,
       commandOutcomes,
       deleteConfirmation,
       completeSpaceResourceSelection,
@@ -595,6 +552,7 @@ export function useCanvasResourceAuthoring({
       spaceDocuments,
       spaceResourceTargets,
       spaces,
+      continuation,
       commandOutcomes,
       deleteConfirmation,
       completeSpaceResourceSelection,

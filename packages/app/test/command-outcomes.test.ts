@@ -10,12 +10,13 @@ import {
 import type { PendingContinuation } from '../src/continuation';
 import { composeApp } from '../src/compose-app';
 import type { CompletedContextEdit, EditOutcome } from '../src/authoring-commands';
-import type { AuthoringResult } from '../src/space-authoring';
+import { CANVAS, type AuthoringResult } from '../src/space-authoring';
 import type {
   SpaceResourceCreationResult,
   SpaceResourceDeletionResult,
 } from '../src/space-resource-lifecycle';
 import { openTestSpace } from './opened-space';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Command outcomes through its interface, over a real composition: a real
@@ -77,6 +78,7 @@ function open(storedRevision = 0n) {
   const { spaceSession: session } = openTestSpace(backend, loaded);
   const reported: unknown[] = [];
   const composed = composeApp({
+    images: unusedImageSources,
     spaceSession: session,
     selection: MAP_A,
     reportObserverError: (error) => reported.push(error),
@@ -843,7 +845,7 @@ describe('staleness', () => {
 
   it('discards a run that settles after the Space was replaced', async () => {
     const { outcomes, authoring, session } = open(1n);
-    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
+    authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
     const pending = deferred<AuthoringResult>();
     const running = outcomes.run('resource-delete', () => pending.promise);
@@ -857,7 +859,7 @@ describe('staleness', () => {
 
   it('clears every standing notice when the Space is replaced', async () => {
     const { outcomes, authoring, session } = open(1n);
-    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
+    authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
     outcomes.run('resource-delete', () => refusedAuthoring);
     await outcomes.run('space-resource-create', () => Promise.resolve(refusedCreation));
@@ -971,7 +973,7 @@ describe('a Map command whose run claims its completion moves the Map', () => {
 
   it('requests no continuation for a creation that completes after the Space was replaced', async () => {
     const { outcomes, authoring, session, continuation } = open(1n);
-    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
+    authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_A, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
     const pending = deferred<typeof createdMap>();
     const continueAt = vi.fn(inTheName);

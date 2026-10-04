@@ -1,29 +1,38 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { ChromeContinuation } from './ChromeContinuation';
+import { GraphIcon } from '@project/ui';
+import { ResourceConnect, type Connecting } from './ResourceConnect';
+import { nextResourceTitle } from '../titles';
+import { useEdgeAuthoring, type EdgeDrawing } from '../edge-authoring-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { NodeChange } from '@xyflow/react';
 import { type ResourceId, type GraphId, type MapId, type MapPosition } from '@project/core';
-import { Placement } from '@project/graph';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import { authoringAvailability } from '../authoring-availability';
-import { canvasProjection } from '../canvas-projection';
 import { connectionAppearance } from '../colors';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
-import { createEmbeddedAuthoring } from '../embedded-authoring';
+import { createMapSurface, mapSurfaceComposition } from '../map-surface';
+import { useOpenSpaces } from '../open-spaces-context';
+import { useResourcePlacement } from '../resource-placement';
+import { useResourceRailActions } from '../resource-rail-actions';
+import { useSpaceAddresses } from '../space-addresses';
+import { useMapSurface } from '../use-map-surface';
+import type { MapSurfacePolicy } from '../map-surface-policy';
 import {
   constrainEmbeddedPosition,
+  embeddedNodeId,
   embeddedMap,
+  parseEmbeddedNodeId,
   type EmbeddedBounds,
   type EmbeddedParentProjection,
   type EmbeddedTilt,
 } from '../embedded-map';
 import type { OpenSpace } from '../open-spaces';
-import { usePlacementRendering } from '../placement-rendering';
 import { useSpaceResourceTargets } from '../space-resource-targets';
 import { describeAuthoringRefusal } from '../authoring-refusal';
-import type { CommandOutcomes } from '../command-outcomes';
-import type { DeleteConfirmation } from '../delete-confirmation';
 import type { EmbeddedPublication } from '../embedded-publication';
 import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-framing';
 import { spaceResourceEmbedCamera } from '../camera';
+import { CanvasContinuation } from './CanvasContinuation';
+import { useNameOnCreation } from '../name-on-creation';
 
 export type { EmbeddedPublication };
 
@@ -31,13 +40,12 @@ const EMPTY_NODES: readonly ResourceFlowNode[] = [];
 
 /** Reuse production projection and Resource controls over an explicitly addressed target Map. */
 export function EmbeddedMapAuthoring({
-  commandOutcomes,
-  deleteConfirmation,
   parent,
   entry,
   mapId,
   graphId,
-  enabled,
+  policy,
+  spaceOnCanvas,
   framing,
   bounds: { left, top, right, bottom },
   absolute: { x: absoluteX, y: absoluteY },
@@ -45,8 +53,6 @@ export function EmbeddedMapAuthoring({
   tiltCenter,
   publish,
 }: {
-  readonly commandOutcomes: CommandOutcomes;
-  readonly deleteConfirmation: DeleteConfirmation;
   readonly parent: ResourceFlowNode;
   readonly entry: OpenSpace;
   readonly mapId: MapId;
@@ -58,7 +64,8 @@ export function EmbeddedMapAuthoring({
    * one to emphasise even where the Space it draws has authored none.
    */
   readonly graphId: GraphId;
-  readonly enabled: boolean;
+  readonly policy: MapSurfacePolicy;
+  readonly spaceOnCanvas: boolean;
   readonly framing: SpaceResourceFraming | undefined;
   readonly bounds: EmbeddedBounds;
   /** This Resource's authored top-left in canvas coordinates. */
@@ -75,90 +82,109 @@ export function EmbeddedMapAuthoring({
   readonly publish: (id: string, value: EmbeddedPublication | null) => void;
 }) {
   const parentId = parent.id;
-  // The target's own composition names where this reports (ADR 0109); nothing
-  // here holds a second sink, and a default in the module would be one.
+  const chromeRoot = useRef<HTMLElement>(null);
   const [composition] = useState(() =>
-    createEmbeddedAuthoring(entry, mapId, entry.app.reportObserverError),
+    createMapSurface(entry.app, () => ({
+      kind: 'drawn',
+      mapId,
+      graphId,
+      policy,
+      occurrence: parentId,
+    })),
   );
   useEffect(() => composition.observe(), [composition]);
+  useLayoutEffect(() => {
+    composition.update({ kind: 'drawn', mapId, graphId, policy, occurrence: parentId });
+  }, [composition, mapId, graphId, policy, parentId]);
+  const {
+    view,
+    canvasRendering,
+    availability,
+    editingResourceBody,
+    setEditingResourceBody,
+    setEditingResourceTitle,
+  } = useMapSurface(entry.app, composition, {
+    activeResourceId: null,
+    presenting: false,
+    spaceOnCanvas: policy === 'authoring' && spaceOnCanvas,
+    creatingSpaceResource: false,
+  });
   const state = composition.adapter();
   const space = entry.app.currentSpace();
-  const resolved = space.lookup.map(mapId);
-  const pending = useMemo(
-    () => (resolved === undefined ? null : canvasProjection(space, resolved)),
-    [space, resolved],
+  const spaces = useOpenSpaces();
+  if (spaces === null) throw new Error('A drawn Map requires its Open Spaces composition.');
+  const contextual = useMemo(
+    () => mapSurfaceComposition(entry.app, composition),
+    [entry, composition],
   );
-  const authored = useMemo(
-    () => (resolved === undefined ? Placement.empty() : Placement.fromMap(resolved.map)),
-    [resolved],
+  const contextualEntry = useMemo(() => ({ ...entry, app: contextual }), [entry, contextual]);
+  const placement = useResourcePlacement(contextualEntry, {
+    map: view.selectedMap.map,
+    presenting: false,
+    replacementEpoch: composition.authoring.getState().replacementEpoch,
+    reportBreak: entry.app.reportObserverError,
+  });
+  const { entityActions, clipboardFailure, dismissClipboardFailure } = useSpaceAddresses(
+    spaces.browserLocation,
+    space,
   );
-  const emptyGraph = useMemo(() => ({ resources: [], edges: [] }), []);
-  const placement = usePlacementRendering(
-    pending?.strategyGraph ?? emptyGraph,
-    state.resizeDraft?.placement ?? authored,
+  const resourceRailActions = useResourceRailActions(contextual, {
+    space,
+    map: view.selectedMap.map,
+    entityActions,
+    availability,
+    editingResourceBody,
+    createReferenceFrom: placement.createReferenceFrom,
+    spaces,
+  });
+  const selectResource = state.selectResource;
+  const [connecting, setConnecting] = useState<Connecting | null>(null);
+  if (
+    connecting !== null &&
+    (!availability.connectOnCanvas ||
+      !view.placedResources.some((resource) => resource.id === connecting.from.id))
+  )
+    setConnecting(null);
+  const resourceEntityActions = useCallback(
+    (resourceId: ResourceId) =>
+      resourceRailActions(resourceId, [
+        {
+          id: 'connect',
+          label: 'Connect to Resource',
+          icon: <GraphIcon size={14} />,
+          onSelect: (anchor) => {
+            const from = view.placedResources.find((resource) => resource.id === resourceId);
+            if (from !== undefined) {
+              selectResource(resourceId);
+              setConnecting({ from, anchor });
+            }
+            return 'done';
+          },
+        },
+      ]),
+    [resourceRailActions, view.placedResources, selectResource],
   );
-  const laidOut = placement.kind === 'ready' ? placement.strategyGraph : null;
-  const projected = useMemo(
-    () =>
-      pending === null || laidOut === null
-        ? null
-        : pending.project(laidOut, {
-            activeGraphId: graphId,
-            activeResourceId: null,
-            selectedResourceId:
-              state.selection.kind === 'resource' ? state.selection.resourceId : null,
-            presenting: false,
-          }),
-    [pending, laidOut, graphId, state.selection],
-  );
-  useLayoutEffect(() => {
-    if (projected !== null)
-      composition.adapter.getState().syncProjection(projected.nodes, projected.edges);
-  }, [composition, projected]);
+  const authored = view.mapPlacement;
+  const pending = view.projection;
   const readTarget = useCallback((id: ResourceId) => entry.spaceResources.target(id), [entry]);
   const targets = useSpaceResourceTargets(space.resources, readTarget);
-  /**
-   * This embedding's own answers, from the one module that owns them.
-   *
-   * The facts are stated about *this* canvas rather than the containing one:
-   * its placement has resolved by the time anything is drawn, a traversal never
-   * runs inside an embedding, and no pane or chrome rename belongs to it.
-   * `enabled` is the containing canvas's `authorOnCanvas`, already narrowed to
-   * this embedding, and it arrives here as the same question one level down —
-   * so it is the `spaceOnCanvas` fact and nothing else, which is what keeps a
-   * live content editor in here through a withdrawal up there.
-   */
-  const availability = useMemo(
-    () =>
-      authoringAvailability({
-        editable: true,
-        replacingImage: false,
-        presenting: false,
-
-        editingResourceBody: false,
-        editingResourceTitle: false,
-        editingChromeTitle: false,
-        spaceOnCanvas: enabled,
-        creatingSpaceResource: false,
-        // Never this embedding's own fact. A Space Resource *inside* this Map is
-        // drawn by the containing `SpaceCanvas` too — its queue descends into
-        // the nodes this one publishes — so a nested edit is reported into that
-        // one Set, and reaches back here as `enabled` rather than from below.
-        editingEmbeddedMap: false,
-      }),
-    [enabled],
-  );
+  const nameOnCreation = useNameOnCreation(composition.continuation);
   const authoring = useCanvasResourceAuthoring({
-    commandOutcomes,
-    deleteConfirmation,
-    nodes: state.projection?.nodes ?? EMPTY_NODES,
+    continuation: composition.continuation,
+    commandOutcomes: entry.app.commandOutcomes,
+    deleteConfirmation: entry.app.deleteConfirmation,
+    imageReplacement: entry.app.imageReplacement,
+    nodes: canvasRendering.liveProjection?.nodes ?? EMPTY_NODES,
     availability,
-    nameOnCreation: null,
+    nameOnCreation,
     authoring: composition.authoring,
     spaceSession: entry.session,
     resourceResize: state.resourceResize,
     onSelectResource: state.selectResource,
+    onBodyEditingChange: setEditingResourceBody,
+    onTitleEditingChange: setEditingResourceTitle,
     spaceResourceTargets: targets,
+    resourceEntityActions,
   });
   const [origin] = useState(() => {
     const positions = [...authored.values()];
@@ -172,8 +198,17 @@ export function EmbeddedMapAuthoring({
     [origin, left, top, right, bottom, framing],
   );
   const drawingProjection = useMemo(
-    () => ({ nodes: authoring.nodes, edges: state.projection?.edges ?? [] }),
-    [authoring.nodes, state.projection?.edges],
+    () => ({
+      nodes: authoring.nodes.map((node) => ({
+        ...node,
+        draggable: availability.dragNodes,
+        selectable: availability.selectNodes,
+        focusable: availability.selectNodes,
+        connectable: availability.connectOnCanvas,
+      })),
+      edges: state.projection?.edges ?? [],
+    }),
+    [authoring.nodes, state.projection?.edges, availability],
   );
   const parentWidth = parent.width;
   const parentHeight = parent.height;
@@ -212,7 +247,7 @@ export function EmbeddedMapAuthoring({
         projection: drawingProjection,
         offset: { x: offsetX, y: offsetY },
         zoom: camera.zoom,
-        enabled,
+        policy,
         bounds: { left, top, right, bottom },
         tilt,
       }),
@@ -222,7 +257,7 @@ export function EmbeddedMapAuthoring({
       offsetX,
       offsetY,
       camera.zoom,
-      enabled,
+      policy,
       left,
       top,
       right,
@@ -230,13 +265,80 @@ export function EmbeddedMapAuthoring({
       tilt,
     ],
   );
+  const resourceNodeId = useCallback(
+    (resourceId: ResourceId) => embeddedNodeId(parentId, resourceId),
+    [parentId],
+  );
+  const cameraOffset = camera.offset;
+  const edgeDrawing = useMemo(
+    (): EdgeDrawing => ({
+      resourceOf: (nodeId) => {
+        const parsed = parseEmbeddedNodeId(nodeId);
+        return parsed?.parentId === parentId ? parsed.resourceId : undefined;
+      },
+      toMap: (point) =>
+        authoredFromDrawn(
+          { x: point.x - absoluteX, y: point.y - absoluteY },
+          cameraOffset,
+          camera.zoom,
+        ),
+      dropTargetOf: (element, point) => {
+        const within =
+          point.x >= absoluteX + left &&
+          point.x <= absoluteX + right &&
+          point.y >= absoluteY + top &&
+          point.y <= absoluteY + bottom;
+        if (!within) return 'off-canvas';
+        const under = element?.closest<HTMLElement>('.react-flow__node[data-id]')?.dataset['id'];
+        if (under === undefined || under === parentId) return 'empty-canvas';
+        return parseEmbeddedNodeId(under)?.parentId === parentId ? 'resource' : 'off-canvas';
+      },
+      previewScale: camera.zoom,
+    }),
+    [parentId, absoluteX, absoluteY, cameraOffset, camera.zoom, left, right, top, bottom],
+  );
+  const edgeSurface = useEdgeAuthoring({
+    authoring: composition.edgeAuthoring,
+    edges,
+    projectedNodes: canvasRendering.liveProjection?.nodes ?? null,
+    selection: state.selection,
+    activeGraphId: graphId,
+    graphs: view.projection.visibleGraphs,
+    placedResources: view.placedResources,
+    newResourceTitle: nextResourceTitle(entry.session.getState().working),
+    resourceNodeId,
+    enabled: availability.authorOnCanvas,
+    onSelectEdge: state.selectEdge,
+    drawing: edgeDrawing,
+  });
   const value = useMemo((): EmbeddedPublication => {
     const localIds = new Map(nodes.map((node) => [node.id, node.data.resourceId]));
     return {
+      clipboardFailure:
+        clipboardFailure === null
+          ? null
+          : {
+              occurrence: parentId,
+              title: space.title,
+              message: clipboardFailure,
+              dismiss: dismissClipboardFailure,
+            },
       entry,
+      placement,
+      toAuthored: (point) =>
+        authoredFromDrawn(
+          { x: point.x - absoluteX, y: point.y - absoluteY },
+          camera.offset,
+          camera.zoom,
+        ),
+      surface: composition,
+      edgeSurface,
+      availability,
+      openResource: authoring.openResource,
+      beginTitleEditing: authoring.beginTitleEditing,
       mapId,
       nodes,
-      edges,
+      edges: edgeSurface.edges,
       origin,
       bodyEditing: authoring.bodyEditing,
       titleEditing: authoring.titleEditing,
@@ -249,27 +351,10 @@ export function EmbeddedMapAuthoring({
         });
         return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
       },
-      mayConnectResources: (from, to) => {
-        const resolvedMap = entry.app.currentSpace().lookup.map(mapId);
-        const owned = entry.app.currentSpace().lookup.graph(graphId);
-        if (resolvedMap === undefined || owned?.owner.map.id !== mapId) return false;
-        const members = Placement.fromMap(resolvedMap.map);
-        if (!members.has(from) || !members.has(to)) return false;
-        return !owned.graph.edges.some((edge) => edge.from === from && edge.to === to);
-      },
-      connectResources: (from, to) => {
-        const resolvedMap = entry.app.currentSpace().lookup.map(mapId);
-        if (resolvedMap === undefined) return false;
-        const result = composition.authoring.complete({
-          kind: 'connected-resources',
-          from,
-          to,
-          graphId,
-        });
-        return result.kind === 'completed';
-      },
+      mayConnectResources: (from, to) =>
+        composition.authoring.edgeEligibility({ kind: 'connect', from, to }).kind === 'eligible',
       connectionAppearance: () =>
-        connectionAppearance(pending?.visibleGraphs ?? [], pending?.colors ?? {}, graphId),
+        connectionAppearance(pending.visibleGraphs, pending.colors, graphId),
       changeNodes: (changes) => {
         const local = changes.flatMap((change): NodeChange<ResourceFlowNode>[] => {
           if (change.type === 'add' || change.type === 'replace') return [];
@@ -299,10 +384,20 @@ export function EmbeddedMapAuthoring({
       },
     };
   }, [
+    clipboardFailure,
+    dismissClipboardFailure,
+    parentId,
+    space.title,
+    edgeSurface,
+    availability,
+    placement,
+    absoluteX,
+    absoluteY,
+    authoring.openResource,
+    authoring.beginTitleEditing,
     authoring.bodyEditing,
     authoring.titleEditing,
     nodes,
-    edges,
     camera,
     origin,
     composition,
@@ -319,5 +414,27 @@ export function EmbeddedMapAuthoring({
     if (import.meta.env.MODE === 'benchmark') performance.mark('hyper:embedded-map-publication');
     publish(parentId, value);
   }, [parentId, value, publish]);
-  return null;
+  return (
+    <>
+      {edgeSurface.layer}
+      <ResourceConnect
+        connecting={connecting}
+        placed={view.placedResources}
+        edgeAuthoring={composition.edgeAuthoring}
+        projectedNodes={canvasRendering.liveProjection?.nodes ?? null}
+        onClose={() => setConnecting(null)}
+      />
+      <ChromeContinuation
+        continuation={composition.continuation}
+        within={chromeRoot}
+        chromeRenameReady={availability.authorOnCanvas}
+      />
+      <CanvasContinuation
+        continuation={composition.continuation}
+        onSelectResource={state.selectResource}
+        onSelectEdge={state.selectEdge}
+        resourceNodeId={resourceNodeId}
+      />
+    </>
+  );
 }

@@ -457,30 +457,35 @@ test('dropping three images creates three Resources in one Edit, numbered in ord
 /**
  * Drag a picture over `target` and drop it there, answering whether the
  * `dragover` was taken and with which effect — a drag nothing takes is one the
- * browser answers by opening the file in place of the Space.
+ * browser answers by opening the file in place of the Space. `at` is where in
+ * the target's box, as fractions of its width and height; its centre by default.
  */
 async function dropPictureOn(
   target: Locator,
   picture: (typeof PICTURES)[number],
+  at: { readonly x: number; readonly y: number } = { x: 0.5, y: 0.5 },
 ): Promise<{ readonly taken: boolean; readonly dropEffect: string }> {
-  return target.evaluate((element, { name, base64 }) => {
-    const transfer = new DataTransfer();
-    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
-    transfer.items.add(new File([bytes], name, { type: 'image/png' }));
-    const box = element.getBoundingClientRect();
-    const init = {
-      dataTransfer: transfer,
-      clientX: box.left + box.width / 2,
-      clientY: box.top + box.height / 2,
-      bubbles: true,
-      cancelable: true,
-    };
-    const over = new DragEvent('dragover', init);
-    element.dispatchEvent(over);
-    const answer = { taken: over.defaultPrevented, dropEffect: transfer.dropEffect };
-    element.dispatchEvent(new DragEvent('drop', init));
-    return answer;
-  }, picture);
+  return target.evaluate(
+    (element, { name, base64, at: within }) => {
+      const transfer = new DataTransfer();
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      transfer.items.add(new File([bytes], name, { type: 'image/png' }));
+      const box = element.getBoundingClientRect();
+      const init = {
+        dataTransfer: transfer,
+        clientX: box.left + box.width * within.x,
+        clientY: box.top + box.height * within.y,
+        bubbles: true,
+        cancelable: true,
+      };
+      const over = new DragEvent('dragover', init);
+      element.dispatchEvent(over);
+      const answer = { taken: over.defaultPrevented, dropEffect: transfer.dropEffect };
+      element.dispatchEvent(new DragEvent('drop', init));
+      return answer;
+    },
+    { ...picture, at },
+  );
 }
 
 test('a picture dropped on a Resource, or on the Map an Open Space Resource draws, creates nothing', async ({
@@ -521,9 +526,11 @@ test('a picture dropped on a Resource, or on the Map an Open Space Resource draw
 
   // The empty canvas still takes a drop, which is what the refusals above are
   // measured against: once its Resource exists, any earlier drop that was
-  // taken would already have started storing its picture.
+  // taken would already have started storing its picture. Aimed at a corner,
+  // because the Open Space Resource's drawn Map covers the canvas's centre and
+  // a drop on it is refused rather than falling through to the canvas.
   const [, square] = PICTURES;
-  await dropPictureOn(pane(page), square);
+  await dropPictureOn(pane(page), square, { x: 0.04, y: 0.96 });
   const title = page.getByRole('textbox', { name: 'Resource title' });
   await expect(title).toBeFocused();
   await title.press('Escape');
@@ -1627,3 +1634,263 @@ test(
     expect((await storedFigure(page, spaceId)).figure).toMatchObject({ url: NEW_URL });
   },
 );
+
+test('replacing an image in an only-drawn Space holds Back and Forward and edits that Space', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  const response = await page.request.get(`/api/spaces/${DEEP_DIVE_ID}`);
+  expect(response.ok()).toBe(true);
+  const loaded = decodeLoadedSpace(await response.json());
+  const targetMap = loaded.snapshot.document.maps?.[0];
+  if (targetMap === undefined) throw new Error('Deep dive must have a Map');
+  const targetSnapshot = {
+    ...loaded.snapshot,
+    document: {
+      ...loaded.snapshot.document,
+      maps: [
+        {
+          ...targetMap,
+          positions: {
+            [HARBOUR_ID]: { x: 0, y: 0, open: true, openSize: { width: 408, height: 359 } },
+          },
+          graphs: targetMap.graphs.map((graph) => ({ ...graph, edges: [] })),
+        },
+      ],
+    },
+  };
+  const committed = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId: DEEP_DIVE_ID,
+          snapshot: targetSnapshot,
+          expectedRevision: loaded.revision.toString(),
+        },
+      ],
+    },
+  });
+  expect(committed.ok()).toBe(true);
+  const drawingId = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+  const root = await seedPositionedMap(page, 'Embedded pictures', () => ({
+    [drawingId]: { x: 0, y: 0, open: true, openSize: { width: 900, height: 700 } },
+  }));
+  await page.goto(`/spaces/${encodeCompactUuid(root.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toHaveText('Embedded pictures');
+  const drawing = page.locator(`.react-flow__node[data-id="${drawingId}"]`);
+  const picture = page.locator(`.react-flow__node[data-id="embedded:${drawingId}:${HARBOUR_ID}"]`);
+  await expect(picture).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Spaces. 1 open.' })).toBeVisible();
+  const edit = (await resourceControls(page, drawing)).getByRole('button', {
+    name: 'Edit Resource Deep dive',
+  });
+  await edit.focus();
+  await edit.press('Enter');
+  const heldUrl = page.url();
+  expect(await followFragment(page, 'embedded-image')).toBe(true);
+  const fragmentUrl = page.url();
+  const replace = (await resourceControls(page, picture)).getByRole('button', {
+    name: 'Replace image of Resource Harbour',
+  });
+  await replace.focus();
+  await replace.press('Enter');
+  const target = picture.getByRole('group', { name: 'Replace image of Harbour' });
+  const release = await uploadHeld(page, target);
+  const beforeDrag = await boxOf(picture, 'the busy embedded picture');
+  const parentBeforeDrag = await boxOf(drawing, 'the containing Space Resource');
+  await page.mouse.move(beforeDrag.x + 5, beforeDrag.y + 5);
+  await page.mouse.down();
+  await page.mouse.move(beforeDrag.x + 45, beforeDrag.y + 25, { steps: 5 });
+  await page.mouse.up();
+  const afterDrag = await boxOf(picture, 'the busy embedded picture');
+  const parentAfterDrag = await boxOf(drawing, 'the containing Space Resource');
+  expect(afterDrag.x - parentAfterDrag.x).toBeCloseTo(beforeDrag.x - parentBeforeDrag.x);
+  expect(afterDrag.y - parentAfterDrag.y).toBeCloseTo(beforeDrag.y - parentBeforeDrag.y);
+
+  const afterBack = await traverseCounting(page, -1);
+  await expect.poll(afterBack).toEqual({ pops: 2, url: fragmentUrl });
+  await expect(target).toHaveAttribute('aria-busy', 'true');
+  release();
+  await expect(target.getByRole('alert')).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(heldUrl);
+  const releaseAgain = await uploadHeld(page, target);
+  const afterForward = await traverseCounting(page, 1);
+  await expect.poll(afterForward).toEqual({ pops: 2, url: heldUrl });
+  releaseAgain();
+  await expect(target.getByRole('alert')).toBeVisible();
+  await target.getByRole('textbox', { name: 'Image URL' }).fill(FIGURE_URL);
+  await target.getByRole('textbox', { name: 'Image URL' }).press('Enter');
+  await expect(picture.getByRole('img', { name: 'Harbour' })).toHaveAttribute('src', FIGURE_URL);
+  await expect
+    .poll(async () => {
+      const result = await page.request.get(`/api/spaces/${DEEP_DIVE_ID}`);
+      return decodeLoadedSpace(await result.json()).snapshot.resources.find(
+        ({ id }) => id === HARBOUR_ID,
+      )?.document;
+    })
+    .toMatchObject({ kind: 'image', url: FIGURE_URL });
+  await expect(page.getByRole('button', { name: 'Spaces. 1 open.' })).toBeVisible();
+});
+
+test('drop and paste create in an edited embedded Map and an inert drop is refused', async ({
+  page,
+}) => {
+  await serveFigure(page);
+  const rootId = await openForCreation(page);
+  await createResource(page, 'Space Resource');
+  const naming = page.getByRole('textbox', { name: 'Resource title' });
+  const title = await naming.inputValue();
+  await naming.press('Enter');
+  await settled(page);
+  const rootRead = await page.request.get(`/api/spaces/${rootId}`);
+  const frame = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
+    ({ document }) => document.kind === 'space' && document.title === title,
+  );
+  if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
+  const targetId = frame.document.spaceId;
+  const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
+  await drawing.focus();
+  await drawing.press('Enter');
+  const child = page.locator(`.react-flow__node[data-id^="embedded:${frame.id}:"]`).first();
+  await expect(child).toBeVisible();
+  expect(await dropPictureOn(child, FIRST_PICTURE)).toEqual({ taken: true, dropEffect: 'none' });
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'Edit this Map before adding Resources.',
+  );
+  expect(await storedImages(page, targetId)).toHaveLength(0);
+  const edit = (await resourceControls(page, drawing)).getByRole('button', {
+    name: `Edit Resource ${title}`,
+  });
+  await edit.focus();
+  await edit.press('Enter');
+  await expect(child.locator('.rf-resource-node__inner')).toHaveAttribute(
+    'data-connection-authoring',
+    'true',
+  );
+  expect((await dropPictureOn(child, FIRST_PICTURE)).taken).toBe(true);
+  const createdTitle = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(createdTitle).toBeFocused();
+  await expect(
+    createdTitle.locator('xpath=ancestor::*[contains(@class,"react-flow__node")][1]'),
+  ).toHaveAttribute('data-id', /^embedded:/);
+  await createdTitle.press('Escape');
+  await expect.poll(async () => (await storedImages(page, targetId)).length).toBe(1);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate((url) => navigator.clipboard.writeText(url), FIGURE_URL);
+  await child.focus();
+  const box = await boxOf(child, 'the embedded Resource');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.keyboard.press('ControlOrMeta+V');
+  await expect(createdTitle).toBeFocused();
+  await createdTitle.press('Escape');
+  await expect.poll(async () => (await storedImages(page, targetId)).length).toBe(2);
+  expect(await storedImages(page, rootId)).toHaveLength(0);
+});
+
+/** Create a Space Resource on the opened Space's Map and Open it, answering it and its target. */
+async function openSpaceResource(
+  page: Page,
+  rootId: UUID,
+): Promise<{
+  readonly drawing: Locator;
+  readonly id: UUID;
+  readonly title: string;
+  readonly targetId: UUID;
+}> {
+  await createResource(page, 'Space Resource');
+  const naming = page.getByRole('textbox', { name: 'Resource title' });
+  const title = await naming.inputValue();
+  await naming.press('Enter');
+  await settled(page);
+  const rootRead = await page.request.get(`/api/spaces/${rootId}`);
+  const frame = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
+    ({ document }) => document.kind === 'space' && document.title === title,
+  );
+  if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
+  const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
+  await drawing.focus();
+  await drawing.press('Enter');
+  await expect(
+    page.locator(`.react-flow__node[data-id^="embedded:${frame.id}:"]`).first(),
+  ).toBeVisible();
+  return { drawing, id: frame.id, title, targetId: frame.document.spaceId };
+}
+
+test('a drop on the Map a Reference Resource draws is refused as read-only', async ({ page }) => {
+  const rootId = await openForCreation(page);
+  const { drawing, id, title, targetId } = await openSpaceResource(page, rootId);
+  await (
+    await resourceControls(page, drawing)
+  )
+    .getByRole('button', { name: `Actions for Resource ${title}` })
+    .click();
+  await page.getByRole('menuitem', { name: 'Create Reference' }).click();
+  const naming = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(naming).toBeFocused();
+  await naming.press('Enter');
+  await settled(page);
+  const rootRead = await page.request.get(`/api/spaces/${rootId}`);
+  const reference = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
+    ({ document }) => document.kind === 'reference' && document.target === id,
+  );
+  if (reference === undefined) throw new Error('Reference Resource was not created');
+  const referenceNode = page.locator(`.react-flow__node[data-id="${reference.id}"]`);
+  await referenceNode.focus();
+  await referenceNode.press('Enter');
+  const child = page.locator(`.react-flow__node[data-id^="embedded:${reference.id}:"]`).first();
+  await expect(child).toBeVisible();
+
+  expect(await dropPictureOn(child, FIRST_PICTURE)).toEqual({ taken: true, dropEffect: 'none' });
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'This Map is shown read-only, so nothing can be added to it.',
+  );
+  expect(await storedImages(page, targetId)).toHaveLength(0);
+});
+
+test('a Resource dragged from the Resources list onto an edited drawn Map is refused', async ({
+  page,
+}) => {
+  const rootId = await openForCreation(page);
+  const { drawing, title, targetId } = await openSpaceResource(page, rootId);
+  const edit = (await resourceControls(page, drawing)).getByRole('button', {
+    name: `Edit Resource ${title}`,
+  });
+  await edit.focus();
+  await edit.press('Enter');
+  const child = page.locator(`.react-flow__node[data-id^="embedded:"]`).first();
+  await expect(child.locator('.rf-resource-node__inner')).toHaveAttribute(
+    'data-connection-authoring',
+    'true',
+  );
+  const before = await storedRevision(page, targetId);
+  const rootRead = await page.request.get(`/api/spaces/${rootId}`);
+  const canvasResource = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
+    ({ document }) => document.kind === 'markdown',
+  );
+  if (canvasResource === undefined) throw new Error('The opened Space holds no Markdown Resource.');
+
+  // The Resources list carries one of the canvas's own Resources, which no Map
+  // of another Space can place.
+  await child.evaluate((element, resourceId) => {
+    const transfer = new DataTransfer();
+    transfer.setData('application/x-hyper-resource-id', resourceId);
+    const box = element.getBoundingClientRect();
+    const init = {
+      dataTransfer: transfer,
+      clientX: box.left + box.width / 2,
+      clientY: box.top + box.height / 2,
+      bubbles: true,
+      cancelable: true,
+    };
+    element.dispatchEvent(new DragEvent('dragover', init));
+    element.dispatchEvent(new DragEvent('drop', init));
+  }, canvasResource.id);
+
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'A Resource can be placed only on a Map of its own Space.',
+  );
+  await settled(page);
+  expect(await storedRevision(page, targetId)).toBe(before);
+});

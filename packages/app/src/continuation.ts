@@ -5,7 +5,7 @@ import {
   type ObserverErrorReporter,
 } from '@project/persistence';
 import type { EdgeSubject } from './render-adapter';
-import type { SpaceAuthoring } from './space-authoring';
+import type { SurfaceAuthoring } from './space-authoring';
 
 /**
  * Where an Edit continues, as one module.
@@ -96,11 +96,10 @@ export interface ContinuationDependencies {
    * The two facts that discard a continuation, read where Edge Authoring
    * already reads them.
    *
-   * The whole of Space Authoring rather than narrowed getters: Edge Authoring
-   * takes it for exactly these two, and manufacturing a port for a dependency
-   * with one in-process implementation is what ADR 0109 forbids.
+   * Read off the drawing's own authoring state, or the Space's, which publish
+   * the same two facts.
    */
-  readonly authoring: SpaceAuthoring;
+  readonly authoring: Pick<SurfaceAuthoring, 'getState' | 'subscribe'>;
   readonly reportObserverError?: ObserverErrorReporter | undefined;
 }
 

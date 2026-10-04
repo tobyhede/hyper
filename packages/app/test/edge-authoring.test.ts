@@ -17,6 +17,8 @@ import {
 import { RESOURCE_SIZE } from '../src/resource';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
+import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * Edge Authoring through its own interface: the one draft, what cancels it, what
@@ -100,11 +102,7 @@ function open(
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring, adapter, continuation, edgeAuthoring, deleteConfirmation } =
-    composeApp({
-      spaceSession: session,
-      selection: mapId,
-      newId,
-    });
+    composeApp({ images: unusedImageSources, spaceSession: session, selection: mapId, newId });
   adapter.getState().syncProjection(PROJECTED, []);
   return {
     session,
@@ -443,7 +441,7 @@ describe('draft invalidation', () => {
     const { edges, authoring } = open();
     edges.beginTitleEdit(SUBJECT);
 
-    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
+    authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
 
     expect(edges.getState().draft).toBeNull();
   });
@@ -461,12 +459,13 @@ describe('draft invalidation', () => {
     });
     const session = openSpaceSession(backend, loaded);
     const { authoring, edgeAuthoring: edges } = composeApp({
+      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });
     edges.beginTitleEdit(SUBJECT);
     // Force the conflict the accept resolves.
-    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
+    authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
 
     expect(authoring.acceptStoredSpace()).toBeNull();
@@ -522,7 +521,11 @@ describe('draft invalidation', () => {
     const { edges, authoring } = open();
     edges.beginTitleEdit(SUBJECT);
 
-    authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' });
+    authoring.complete(CANVAS, {
+      kind: 'renamed-graph',
+      graphId: OTHER_GRAPH_ID,
+      title: 'Renamed',
+    });
 
     expect(edges.getState().draft).toEqual({ kind: 'title', graphId: GRAPH_ID, edge: EDGE });
   });
@@ -566,7 +569,11 @@ describe('draft invalidation', () => {
     const { adapter, authoring } = open();
     adapter.getState().selectEdge(SUBJECT);
 
-    authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' });
+    authoring.complete(CANVAS, {
+      kind: 'renamed-graph',
+      graphId: OTHER_GRAPH_ID,
+      title: 'Renamed',
+    });
 
     expect(adapter.getState().selection).toEqual({
       kind: 'edge',
@@ -601,6 +608,21 @@ describe('draft invalidation', () => {
 });
 
 describe('completing a pointer connection', () => {
+  it('names only the new Resource after an Alt create-and-connect drag ends', () => {
+    const { edges, continuation, session } = open();
+    edges.beginPointerConnect(RESOURCE_A);
+    edges.createConnectedResource(RESOURCE_A, { x: 800, y: 500 }, PROJECTED);
+    expect(continuation.getState().pending).toBeNull();
+    edges.endPointerDrag();
+    const created = session.getState().working.resources.find((resource) => resource.id === MINTED);
+    expect(created).toBeDefined();
+    expect(continuation.getState().pending).toEqual({
+      target: { kind: 'resource', resourceId: MINTED },
+      select: true,
+      then: 'rename',
+    });
+  });
+
   it('authors the Edge and continues at the Resource it reached', () => {
     const { edges, session, continuation } = open();
     edges.beginPointerConnect(RESOURCE_B);

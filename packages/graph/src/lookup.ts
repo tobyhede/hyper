@@ -82,11 +82,13 @@ function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent 
         },
         via,
       };
+    case 'ur':
+      return { kind: 'ur', via };
   }
 }
 
 /**
- * What `resource` draws as its content. Markdown, Image and Space Resources
+ * What `resource` draws as its content. Markdown, Image, Space and Ur Resources
  * answer their own with `via: 'self'`; a Reference Resource answers its
  * Target's with `via: 'reference'`, following one hop (ADR 0009).
  *

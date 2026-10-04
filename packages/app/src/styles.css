@@ -463,6 +463,19 @@ body {
   line-height: 1.2;
 }
 
+/* A presented Ur Resource has no content (ADR 0113), so its frame is a title
+   slide: the name alone, centred in the frame. */
+.rf-resource-node__content .resource--full[data-content-kind='ur'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.rf-resource-node__content .resource--full[data-content-kind='ur'] .resource__title {
+  margin: 0;
+}
+
 .rf-resource-node__content .resource__body > * {
   margin: 0 0 2cqw;
 }

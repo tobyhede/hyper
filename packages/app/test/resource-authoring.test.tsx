@@ -171,10 +171,9 @@ function mount(value: SpaceSnapshot = snapshot, history?: HistoryApi): SpaceSess
   let view: RenderResult | undefined;
   mountSpace(
     {
-      images: unusedImageSources,
       id: runtime(value).id,
       session,
-      app: composeApp({ spaceSession: session }),
+      app: composeApp({ images: unusedImageSources, spaceSession: session }),
       spaceResources,
     },
     (app) => {
@@ -706,6 +705,24 @@ describe('authoring an opened Resource', () => {
     expect(await screen.findByRole('textbox', { name: 'Resource title' })).toHaveValue(
       'Resource 1',
     );
+    await settled(session);
+  });
+
+  /**
+   * One press completes the Edit and continues at the new Resource's Title,
+   * exactly as Markdown creation does (ADR 0089, ADR 0113).
+   */
+  it('creates an Ur Resource in one press and continues in its Title', async () => {
+    const session = mount();
+    await settled(session);
+
+    createResource('Ur Resource');
+
+    const created = session.getState().working.resources.at(-1);
+    expect(created?.document).toEqual({ title: 'Resource 1', kind: 'ur' });
+    const title = await screen.findByRole('textbox', { name: 'Resource title' });
+    expect(title).toHaveValue('Resource 1');
+    expect(title).toHaveFocus();
     await settled(session);
   });
 

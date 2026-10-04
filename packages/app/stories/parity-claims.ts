@@ -41,14 +41,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Default',
     claim:
-      'Create offers the Markdown, Space and Image Resource kinds as peer controls rather than behind a disclosure, each named for the kind it makes, so one activation reaches any kind available in the Dock — and every kind completes its Edit on that one activation, an Image Resource once the file picker it opens has chosen a file (ADR 0089, ADR 0106). Reference Resource is not a Dock Create peer.',
+      'Create offers the Markdown, Space, Image and Ur Resource kinds as peer controls rather than behind a disclosure, each named for the kind it makes, so one activation reaches any kind available in the Dock — and every kind completes its Edit on that one activation, an Image Resource once the file picker it opens has chosen a file (ADR 0089, ADR 0106). Reference Resource is not a Dock Create peer.',
   },
   {
     id: 'command-dock-packs-resources-onto-one-row',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'DockedLeft',
     claim:
-      'On a side edge the Resources cluster packs onto one row at its neighbours’ height, its trigger giving up the slack track the three authored names need, with the disclosure and the three Create controls on one glyph pitch.',
+      'On a side edge the Resources cluster packs onto one row at its neighbours’ height, its trigger giving up the slack track the three authored names need, with the disclosure and the four Create controls on one glyph pitch.',
   },
   {
     id: 'command-dock-identity-presentation',
@@ -789,7 +789,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',
     claim:
-      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Shape, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space.",
+      "Space Resource Map and Graph menus share the Dock's grouping grammar and commands and author the target — New, Colour, Shape, Rename, Copy link to Map or Copy link to Graph, and Delete, grouped and separated the same way — without navigating the containing Space. A refused Graph rename keeps the draft and reports in the notice area under the target Space's name; dismissing its notice keeps the editor open.",
   },
   {
     id: 'open-space-resource-chooses-its-context-on-the-shared-controls',

@@ -20,6 +20,7 @@ import { Default, Replacing, SaveFailedElsewhere } from '../stories/space/comman
 // while it is withdrawn, so `aria-disabled` is the attribute and `toBeDisabled`
 // would call every one of them available.
 import { confirmDeletion, unavailable } from './command-dock';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * What the Command Dock owes an author, held over the application the catalogue mounts.
@@ -229,9 +230,9 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
    * technology announces on the way past instead.
    *
    * **The fifth group is nested inside Resources, and is load-bearing rather than
-   * decorative.** The three Create commands are one `role="group"` so the
-   * vertical column has a single element to place: left as three siblings the
-   * cluster's grid auto-places them onto three rows and Resources stands at 102px
+   * decorative.** The Create commands are one `role="group"` so the
+   * vertical column has a single element to place: left as siblings the
+   * cluster's grid auto-places them onto a row each and Resources stands at 102px
    * beside a 44px Map. Base UI's group carries no positional logic and does
    * not divide the keyboard, so the roving tabindex stays on the one root —
    * which the arrow-order test below is what actually proves.
@@ -266,7 +267,12 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
 
     const create = within(dock()).getByRole('group', { name: 'Create a Resource' });
 
-    for (const name of ['Create Markdown Resource', 'Create Space Resource']) {
+    for (const name of [
+      'Create Markdown Resource',
+      'Create Space Resource',
+      'Create Image Resource',
+      'Create Ur Resource',
+    ]) {
       const control = within(create).getByRole('button', { name });
       expect(control).toHaveAttribute('title', name);
       expect(control.querySelectorAll('[title]')).toHaveLength(0);
@@ -640,7 +646,7 @@ function TwoSpacesWithAnUnwellOpener() {
         control.queueResult({ kind: 'retryable-failure', code: 'network' });
         const resource = opener.resources[0];
         if (resource === undefined) throw new Error('The Opener needs a Resource');
-        const edit = openedOpener.app.authoring.complete({
+        const edit = openedOpener.app.authoring.complete(CANVAS, {
           kind: 'edited-resource',
           resourceId: resource.id,
           document: { ...resource.document, title: 'An edited Resource' },

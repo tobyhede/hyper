@@ -14,7 +14,8 @@ import {
 import { GRAPH_PALETTE, loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import type { AuthoringCompletion, AuthoringResult } from '../src/space-authoring';
+import { CANVAS, type AuthoringCompletion, type AuthoringResult } from '../src/space-authoring';
+import { unusedImageSources } from './image-sources';
 
 /**
  * What every semantic operation owes, whatever order they arrive in.
@@ -119,6 +120,7 @@ const anchor = fc.record({
  */
 const operation = fc.oneof(
   fc.record({ op: fc.constant('created-resource' as const), anchor }),
+  fc.record({ op: fc.constant('created-ur-resource' as const), anchor }),
   fc.record({ op: fc.constant('created-reference' as const), resource: index, anchor }),
   /**
    * Resource editing includes attempts to change a Reference Resource's immutable Target. The
@@ -150,7 +152,6 @@ const operation = fc.oneof(
     graph: index,
     headShape: fc.constantFrom(...GRAPH_HEAD_SHAPES),
   }),
-  fc.record({ op: fc.constant('deleted-graph' as const), graph: index }),
   fc.record({ op: fc.constant('deleted-edge' as const), graph: index, edge: index }),
   fc.record({
     op: fc.constant('titled-edge' as const),
@@ -198,10 +199,14 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
         };
         const loaded = { snapshot, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-        const { authoring } = composeApp({ spaceSession: session, selection: OTHER_MAP_ID });
+        const { authoring } = composeApp({
+          images: unusedImageSources,
+          spaceSession: session,
+          selection: OTHER_MAP_ID,
+        });
 
         expect(
-          authoring.complete({
+          authoring.complete(CANVAS, {
             kind: 'edited-resource',
             resourceId: RESOURCE_C,
             document: { title: proposedTitle, kind: 'reference', target },
@@ -218,7 +223,7 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
 
         const beforeRetarget = session.getState().working;
         expect(
-          authoring.complete({
+          authoring.complete(CANVAS, {
             kind: 'edited-resource',
             resourceId: RESOURCE_C,
             document: { title: proposedTitle, kind: 'reference', target: alternativeTarget },
@@ -240,6 +245,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
         const loaded = { snapshot: start, revision: 0n, exportedRevision: null };
         const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
         const { currentSpace, navigation, authoring } = composeApp({
+          images: unusedImageSources,
           spaceSession: session,
           selection: mapId,
         });
@@ -255,7 +261,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
           const completion = resolve(generated, space.resources, graphs);
 
           const before = session.getState().working;
-          const result: AuthoringResult = authoring.complete(completion);
+          const result: AuthoringResult = authoring.complete(CANVAS, completion);
 
           expect(['completed', 'unchanged', 'refused']).toContain(result.kind);
           if (result.kind === 'refused') {
@@ -316,7 +322,9 @@ function resolve(
       };
     }
     case 'created-resource':
-      return { kind: 'created-resource', anchor: generated.anchor };
+      return { kind: 'created-resource', resourceKind: 'markdown', anchor: generated.anchor };
+    case 'created-ur-resource':
+      return { kind: 'created-resource', resourceKind: 'ur', anchor: generated.anchor };
     case 'created-reference':
       return { kind: 'created-reference', target: resourceId, anchor: generated.anchor };
     case 'added-resource-to-map':
@@ -333,8 +341,6 @@ function resolve(
       return { kind: 'recolored-graph', graphId, color: generated.color };
     case 'changed-graph-head-shape':
       return { kind: 'changed-graph-head-shape', graphId, headShape: generated.headShape };
-    case 'deleted-graph':
-      return { kind: 'deleted-graph', graphId };
     case 'deleted-edge':
       return {
         kind: 'deleted-edge',

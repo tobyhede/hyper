@@ -17,6 +17,8 @@ export const useOpenSpaces = (): OpenSpaces | null => useContext(OpenSpacesConte
 const NO_OPEN_SPACES: OpenSpacesState = {
   activeSpaceId: null,
   entries: [],
+  composed: [],
+  replacingImage: false,
   openedFrom: new Map(),
 };
 const noOpenSpaces = (): OpenSpacesState => NO_OPEN_SPACES;

@@ -2,7 +2,7 @@ import type { ResourceId, MapPosition } from '@project/core';
 import { createNonThrowingReporter, type ObserverErrorReporter } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { RenderAdapter } from './render-adapter';
-import type { AuthoringRefusal, SpaceAuthoring } from './space-authoring';
+import type { AuthoringRefusal, SurfaceAuthoring } from './space-authoring';
 
 /**
  * The three steps a completed connection takes, in the one order that works.
@@ -69,7 +69,7 @@ const UNAVAILABLE = { kind: 'unavailable' } as const;
 
 export interface ConnectionCompletionDependencies {
   readonly adapter: RenderAdapter;
-  readonly authoring: SpaceAuthoring;
+  readonly authoring: SurfaceAuthoring;
   /** Where an invariant violation at the React Flow seam is reported. */
   readonly reportInvariant?: ObserverErrorReporter;
 }
@@ -106,7 +106,7 @@ export function createConnectionCompletion({
    * the Edge anyway.
    */
   const complete = (
-    completion: Parameters<SpaceAuthoring['complete']>[0],
+    completion: Parameters<SurfaceAuthoring['complete']>[0],
     projected: readonly ResourceFlowNode[] | null,
     continueAt: (result: { readonly createdResourceId?: ResourceId }) => ResourceId | undefined,
   ): ConnectionResult => {
@@ -137,7 +137,7 @@ export function createConnectionCompletion({
    * are the same answer to the author.
    */
   const eligible = (
-    proposal: Parameters<SpaceAuthoring['edgeEligibility']>[0],
+    proposal: Parameters<SurfaceAuthoring['edgeEligibility']>[0],
   ): AuthoringRefusal | null => {
     const eligibility = authoring.edgeEligibility(proposal);
     return eligibility.kind === 'refused' ? eligibility.refusal : null;

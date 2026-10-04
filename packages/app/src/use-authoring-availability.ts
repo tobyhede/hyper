@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   authoringAvailability,
   type AuthoringAvailability,
@@ -49,12 +49,31 @@ export function useAuthoringAvailability(
   const [editingResourceBody, setEditingResourceBody] = useState(false);
   const [editingResourceTitle, setEditingResourceTitle] = useState(false);
   const [editingChromeTitle, setEditingChromeTitle] = useState(false);
-  const availability = authoringAvailability({
-    ...facts,
-    editingResourceBody,
-    editingResourceTitle,
-    editingChromeTitle,
-  });
+  const availability = useMemo(
+    () =>
+      authoringAvailability({
+        editable: facts.editable,
+        replacingImage: facts.replacingImage,
+        presenting: facts.presenting,
+        spaceOnCanvas: facts.spaceOnCanvas,
+        editingEmbeddedMap: facts.editingEmbeddedMap,
+        creatingSpaceResource: facts.creatingSpaceResource,
+        editingResourceBody,
+        editingResourceTitle,
+        editingChromeTitle,
+      }),
+    [
+      facts.editable,
+      facts.replacingImage,
+      facts.presenting,
+      facts.spaceOnCanvas,
+      facts.editingEmbeddedMap,
+      facts.creatingSpaceResource,
+      editingResourceBody,
+      editingResourceTitle,
+      editingChromeTitle,
+    ],
+  );
   const [renameEpoch, setRenameEpoch] = useState(replacementEpoch);
   if (renameEpoch !== replacementEpoch) {
     setRenameEpoch(replacementEpoch);

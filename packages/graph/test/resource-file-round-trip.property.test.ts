@@ -91,6 +91,11 @@ const resourceArb: fc.Arbitrary<Resource> = fc.oneof(
     },
     { requiredKeys: ['id', 'title', 'kind', 'url'] },
   ),
+  fc.record({
+    id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+    title: line,
+    kind: fc.constant('ur' as const),
+  }),
 );
 
 describe('resource file round-trip', () => {

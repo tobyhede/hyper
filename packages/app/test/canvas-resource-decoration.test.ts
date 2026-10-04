@@ -21,6 +21,7 @@ const TARGET_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008')
 const TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const MISSING_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const UR_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 
 const target: SpaceResourceTarget = {
   id: TARGET_SPACE_ID,
@@ -36,7 +37,7 @@ const target: SpaceResourceTarget = {
 
 const projectionNode = (
   resourceId: ResourceId,
-  kind: 'markdown' | 'reference' | 'space',
+  kind: 'markdown' | 'reference' | 'space' | 'ur',
   open = false,
   readOnly = false,
 ): ResourceFlowNode => ({
@@ -73,7 +74,8 @@ const context = (
   authorOnCanvas: true,
   bodyEditing: false,
   imageAccept: 'image/png',
-  editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID]),
+  replaceResourceImage: () => Promise.resolve(null),
+  editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID, UR_ID]),
   openResource: () => 'completed',
   closeResource: () => 'completed',
   beginTitleEditing: () => undefined,
@@ -231,6 +233,35 @@ describe('decorateSharedResourceNode', () => {
         context({ editingTitleResourceId: RESOURCE_ID }),
       ).titleEditor,
     ).toBeUndefined();
+  });
+});
+
+/**
+ * An Ur Resource has no content (ADR 0113): it takes every shared Resource
+ * operation and no content edit from any decorator.
+ */
+describe('an Ur Resource’s decoration', () => {
+  it('offers Open, title editing and entity actions, and no body editing', () => {
+    const patch = decorateSharedResourceNode(
+      projectionNode(UR_ID, 'ur', true),
+      context({ resourceEntityActions: () => [] }),
+    );
+    expect(patch.onEditResource).toBeTypeOf('function');
+    expect(patch.onBeginTitleEditing).toBeTypeOf('function');
+    expect(patch.entityActions).toEqual([]);
+    expect(patch.resize).toBeDefined();
+    expect(patch.onBeginBodyEditing).toBeUndefined();
+  });
+
+  it('is given no editor, replacer or rail, although its caret is live', () => {
+    const ur = projectionNode(UR_ID, 'ur', true);
+    const live = context({
+      bodyEditorResourceId: UR_ID,
+      replaceResourceImage: () => Promise.resolve(null),
+    });
+    expect(decorateMarkdownResourceNode(ur, live)).toEqual({});
+    expect(decorateImageResourceNode(ur, live)).toEqual({});
+    expect(decorateSpaceResourceNode(ur, live)).toEqual({});
   });
 });
 

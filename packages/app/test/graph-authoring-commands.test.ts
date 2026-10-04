@@ -21,7 +21,7 @@ import {
   type GraphAuthoringCommands,
 } from '../src/graph-authoring-commands';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
-import type { AuthoringResult } from '../src/space-authoring';
+import { CANVAS, type AuthoringResult } from '../src/space-authoring';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 
@@ -124,7 +124,7 @@ const openSpaces = (
 const selectOn =
   (source: OpenSpace) =>
   (mapId: MapId, graphId: GraphId): string | null => {
-    const result = source.app.authoring.complete({
+    const result = source.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: RESOURCE,
       document: { ...document, map: mapId, graph: graphId },
@@ -156,6 +156,9 @@ const publicationsOf = (space: OpenSpace) => {
   });
   return { count: () => count };
 };
+
+const deleteMapOf = (space: OpenSpace, mapId: MapId) =>
+  space.spaceResources.deleteMap({ targetSpaceId: TARGET, mapId, preferredMapId: null });
 
 /** One context, as far as the contract needs to drive it. */
 interface ContractContext {
@@ -226,7 +229,7 @@ const contexts: readonly {
       const control = new MemorySpaceBackendTestControl();
       const spaces = openSpaces(control, (error) => reported.push(error));
       const source = await spaces.open(META);
-      const authored = await spaces.embed(TARGET);
+      const { entry: authored } = await spaces.hold(TARGET);
       let available = true;
       return {
         spaces,
@@ -247,7 +250,7 @@ const contexts: readonly {
           available = false;
         },
         answerNext: (answer) => {
-          vi.spyOn(authored.app.authoring, 'completeInMap').mockImplementationOnce(answer);
+          vi.spyOn(authored.app.authoring, 'complete').mockImplementationOnce(answer);
         },
         reported,
       };
@@ -297,7 +300,7 @@ describe.each(contexts)('Graph rename through $name', ({ setup }) => {
   it('answers a rename of a Map that has gone as unavailable', async () => {
     const { authored, mapId, graphId, commands } = await setup();
     const rename = commands.map(mapId).graph(graphId).rename;
-    expect(authored.app.authoring.complete({ kind: 'deleted-map', mapId }).kind).toBe('completed');
+    expect((await deleteMapOf(authored, mapId)).kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -373,7 +376,7 @@ describe.each(contexts)('Graph recolour through $name', ({ setup }) => {
   it('answers a recolour of a Map that has gone as unavailable', async () => {
     const { authored, mapId, graphId, commands } = await setup();
     const recolor = commands.map(mapId).graph(graphId).recolor;
-    expect(authored.app.authoring.complete({ kind: 'deleted-map', mapId }).kind).toBe('completed');
+    expect((await deleteMapOf(authored, mapId)).kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(recolor.invoke(OTHER_COLOR)).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -459,7 +462,7 @@ describe.each(contexts)('Graph creation through $name', ({ setup }) => {
   it('answers a creation in a Map that has gone as unavailable', async () => {
     const { authored, mapId, commands } = await setup();
     const create = commands.map(mapId).create;
-    expect(authored.app.authoring.complete({ kind: 'deleted-map', mapId }).kind).toBe('completed');
+    expect((await deleteMapOf(authored, mapId)).kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(await create.invoke()).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -538,7 +541,7 @@ describe('what each context creates in', () => {
   ) => {
     const spaces = openSpaces(control);
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored, release } = await spaces.hold(TARGET);
     const commands = embeddedGraphAuthoringCommands({
       target: authored,
       spaces,
@@ -546,7 +549,7 @@ describe('what each context creates in', () => {
       select: select ?? selectOn(source),
       available: () => true,
     });
-    return { spaces, source, authored, commands, control };
+    return { spaces, source, authored, commands, control, release };
   };
 
   it('activates the created Graph on the top-level canvas', async () => {
@@ -622,8 +625,11 @@ describe('what each context creates in', () => {
     const { source, authored, commands, control } = await embedded();
     control.throwNext(new Error('offline'));
     expect(
-      source.app.authoring.complete({ kind: 'renamed-map', mapId: META_MAP, title: 'Renamed' })
-        .kind,
+      source.app.authoring.complete(CANVAS, {
+        kind: 'renamed-map',
+        mapId: META_MAP,
+        title: 'Renamed',
+      }).kind,
     ).toBe('completed');
     expect(await commands.map(SECOND_MAP).create.invoke()).toEqual({
       kind: 'refused',
@@ -651,11 +657,11 @@ describe('what each context creates in', () => {
     expect(graphsOf(authored, SECOND_MAP)).toHaveLength(3);
   });
 
-  it('creates nothing in an embedded target exited while its Spaces were saving', async () => {
-    const { spaces, authored, commands } = await embedded();
+  it('creates nothing in an embedded target released while its Spaces were saving', async () => {
+    const { release, authored, commands } = await embedded();
     const before = authored.session.getState().working;
     const creating = commands.map(SECOND_MAP).create.invoke();
-    await spaces.exit(TARGET);
+    await release();
     expect(await creating).toEqual({ kind: 'unavailable' });
     expect(authored.session.getState().working).toBe(before);
   });
@@ -669,7 +675,7 @@ describe('what each context creates in', () => {
     const reported: unknown[] = [];
     const spaces = openSpaces(undefined, (error) => reported.push(error));
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored } = await spaces.hold(TARGET);
     const failure = new Error('the save broke');
     let asked = 0;
     const commands = embeddedGraphAuthoringCommands({
@@ -743,7 +749,10 @@ const storedActiveGraph = (space: OpenSpace, mapId: MapId): GraphId | undefined 
  * owns.
  */
 const addStoredActive = (space: OpenSpace): GraphId => {
-  const result = space.app.authoring.completeInMap(SECOND_MAP, { kind: 'added-graph' });
+  const result = space.app.authoring.complete(
+    { kind: 'drawn', mapId: SECOND_MAP, graphId: null },
+    { kind: 'added-graph' },
+  );
   if (result.kind !== 'completed' || result.createdGraphId === undefined) {
     throw new Error(`Graph creation answered ${result.kind}`);
   }
@@ -865,11 +874,14 @@ describe.each(contexts)('Graph deletion through $name', ({ setup }) => {
     addressSelected();
     control.throwNext(new Error('offline'));
     expect(
-      authored.app.authoring.completeInMap(SECOND_MAP, {
-        kind: 'renamed-map',
-        mapId: SECOND_MAP,
-        title: 'Renamed',
-      }).kind,
+      authored.app.authoring.complete(
+        { kind: 'drawn', mapId: SECOND_MAP, graphId: null },
+        {
+          kind: 'renamed-map',
+          mapId: SECOND_MAP,
+          title: 'Renamed',
+        },
+      ).kind,
     ).toBe('completed');
     expect(await spaces.waitForPersistence(TARGET)).toBe(false);
     const remove = commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete;
@@ -942,7 +954,7 @@ describe('what each context deletes', () => {
   const embedded = async (control = new MemorySpaceBackendTestControl()) => {
     const spaces = openSpaces(control);
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored, release } = await spaces.hold(TARGET);
     const commands = embeddedGraphAuthoringCommands({
       target: authored,
       spaces,
@@ -950,7 +962,7 @@ describe('what each context deletes', () => {
       select: selectOn(source),
       available: () => true,
     });
-    return { spaces, source, authored, commands };
+    return { spaces, source, authored, commands, release };
   };
 
   it('continues the top-level canvas on the survivor', async () => {
@@ -1006,6 +1018,21 @@ describe('what each context deletes', () => {
     });
   });
 
+  it('moves an embedded target canvas showing the deleted Graph to the survivor, and the containing canvas nowhere', async () => {
+    const { source, authored, commands } = await embedded();
+    authored.app.navigation.openGraph(SECOND_MAP, SECOND_GRAPH);
+    expect(await commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete.invoke()).toEqual({
+      kind: 'completed',
+      mapId: SECOND_MAP,
+      graphId: THIRD_GRAPH,
+    });
+    expect(authored.app.navigation.getState()).toMatchObject({
+      selectedMapId: SECOND_MAP,
+      activeGraphId: THIRD_GRAPH,
+    });
+    expect(source.app.navigation.getState().selectedMapId).toBe(META_MAP);
+  });
+
   it('deletes a Graph an embedded target is not showing without moving either canvas', async () => {
     const { source, authored, commands } = await embedded();
     expect(await commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete.invoke()).toEqual({
@@ -1026,8 +1053,11 @@ describe('what each context deletes', () => {
     const { source, authored, commands } = await embedded(control);
     control.throwNext(new Error('offline'));
     expect(
-      source.app.authoring.complete({ kind: 'renamed-map', mapId: META_MAP, title: 'Renamed' })
-        .kind,
+      source.app.authoring.complete(CANVAS, {
+        kind: 'renamed-map',
+        mapId: META_MAP,
+        title: 'Renamed',
+      }).kind,
     ).toBe('completed');
     const deleteGraph = vi.spyOn(authored.spaceResources, 'deleteGraph');
     expect(await commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete.invoke()).toEqual({
@@ -1038,11 +1068,11 @@ describe('what each context deletes', () => {
     expect(graphsOf(authored, SECOND_MAP)).toEqual([SECOND_GRAPH, THIRD_GRAPH]);
   });
 
-  it('deletes nothing in an embedded target exited while its Spaces were saving', async () => {
-    const { spaces, authored, commands } = await embedded();
+  it('deletes nothing in an embedded target released while its Spaces were saving', async () => {
+    const { release, authored, commands } = await embedded();
     const deleteGraph = vi.spyOn(authored.spaceResources, 'deleteGraph');
     const deleting = commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete.invoke();
-    await spaces.exit(TARGET);
+    await release();
     expect(await deleting).toEqual({ kind: 'unavailable' });
     expect(deleteGraph).not.toHaveBeenCalled();
   });
@@ -1064,7 +1094,7 @@ describe('what each context addresses', () => {
   const embedded = async () => {
     const spaces = openSpaces();
     const source = await spaces.open(META);
-    const authored = await spaces.embed(TARGET);
+    const { entry: authored, release } = await spaces.hold(TARGET);
     const commands = embeddedGraphAuthoringCommands({
       target: authored,
       spaces,
@@ -1072,7 +1102,7 @@ describe('what each context addresses', () => {
       select: selectOn(source),
       available: () => true,
     });
-    return { spaces, authored, commands };
+    return { spaces, authored, commands, release };
   };
 
   it('does not author a Graph of the top-level Map that is not the Active Graph', async () => {
@@ -1149,10 +1179,10 @@ describe('what each context addresses', () => {
     expect(foreign.rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
   });
 
-  it('does not author through an embedded target that has been exited', async () => {
-    const { spaces, commands } = await embedded();
+  it('does not author through an embedded target that is no longer drawn', async () => {
+    const { spaces, release, commands } = await embedded();
     const graph = commands.map(SECOND_MAP).graph(SECOND_GRAPH);
-    await spaces.exit(TARGET);
+    await release();
     expect(spaces.entry(TARGET)).toBeUndefined();
     expect(graph.rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
     expect(graph.recolor.invoke(OTHER_COLOR)).toEqual({ kind: 'unavailable' });

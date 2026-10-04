@@ -25,6 +25,7 @@ const content: fc.Arbitrary<ResourceContent> = fc.oneof(
   fc.record({ kind: fc.constant('markdown' as const), source: fc.string(), via }),
   fc.record({ kind: fc.constant('image' as const), url: fc.webUrl(), via }),
   fc.record({ kind: fc.constant('space' as const), view: fc.constant(view), via }),
+  fc.record({ kind: fc.constant('ur' as const), via }),
   fc.constant({ kind: 'unresolved' as const, via: 'reference' as const }),
 );
 
@@ -78,6 +79,14 @@ describe('the display states only a Resource’s own content enters', () => {
         expect(atRest(replacing)).toEqual(value);
       }),
     );
+  });
+
+  it('neither edits nor replaces an Open Ur Resource, its own or a Target’s', () => {
+    for (const reached of ['self', 'reference'] as const) {
+      const open: ResourceDisplay = { shown: 'open', content: { kind: 'ur', via: reached } };
+      expect(beginEditing(open, editor, true)).toBe(open);
+      expect(beginReplacing(open, replacer)).toBe(open);
+    }
   });
 
   it('leaves every display that is neither editing nor replacing as it is at rest', () => {

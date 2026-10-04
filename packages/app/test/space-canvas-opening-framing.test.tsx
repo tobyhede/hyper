@@ -108,7 +108,7 @@ function stubEntry(
   app: OpenSpace['app'],
   spaceResources: OpenSpace['spaceResources'],
 ): OpenSpace {
-  return { images: unusedImageSources, id, session: spaceSession, app, spaceResources };
+  return { id, session: spaceSession, app, spaceResources };
 }
 
 beforeAll(() => {
@@ -134,7 +134,7 @@ describe('opening framing on a mounted canvas', () => {
   it('ignores the host seed while hidden and reads this canvas when it first becomes active', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-    const app = composeApp({ spaceSession });
+    const app = composeApp({ images: unusedImageSources, spaceSession });
     const spaceResources: OpenSpace['spaceResources'] = {
       create: unused,
       link: unused,
@@ -155,6 +155,8 @@ describe('opening framing on a mounted canvas', () => {
     let state: OpenSpacesState = {
       activeSpaceId: HOST_ID,
       entries,
+      composed: [],
+      replacingImage: false,
       openedFrom: new Map(),
     };
     const spaces: OpenSpaces = {
@@ -181,7 +183,7 @@ describe('opening framing on a mounted canvas', () => {
         return seed;
       },
       open: unused,
-      embed: unused,
+      hold: unused,
       waitForPersistence: unused,
       openPath: unused,
       enter: unused,
@@ -205,6 +207,7 @@ describe('opening framing on a mounted canvas', () => {
         <Subscribed spaces={spaces}>
           <ReactFlowProvider>
             <SpaceCanvas
+              imageReplacement={app.imageReplacement}
               commandOutcomes={app.commandOutcomes}
               deleteConfirmation={app.deleteConfirmation}
               nodes={[resourceNode()]}
@@ -238,7 +241,7 @@ describe('opening framing on a mounted canvas', () => {
               onDropImages={() => undefined}
               onPasteImageUrl={() => undefined}
               nameOnCreation={null}
-              authoring={app.authoring}
+              authoring={app.surface.authoring}
               spaceSession={spaceSession}
               onBodyEditingChange={() => undefined}
               onTitleEditingChange={() => undefined}
@@ -289,7 +292,7 @@ describe('opening framing on a mounted canvas', () => {
   it('reads this canvas seed on the first paint when it is already the active Space', async () => {
     const stored = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-    const app = composeApp({ spaceSession });
+    const app = composeApp({ images: unusedImageSources, spaceSession });
     const spaceResources: OpenSpace['spaceResources'] = {
       create: unused,
       link: unused,
@@ -305,6 +308,8 @@ describe('opening framing on a mounted canvas', () => {
     const state: OpenSpacesState = {
       activeSpaceId: TARGET_ID,
       entries: [],
+      composed: [],
+      replacingImage: false,
       openedFrom: new Map(),
     };
     const spaces: OpenSpaces = {
@@ -320,7 +325,7 @@ describe('opening framing on a mounted canvas', () => {
         return TARGET_FRAMING;
       },
       open: unused,
-      embed: unused,
+      hold: unused,
       waitForPersistence: unused,
       openPath: unused,
       enter: unused,
@@ -343,6 +348,7 @@ describe('opening framing on a mounted canvas', () => {
       <OpenSpacesContext.Provider value={spaces}>
         <ReactFlowProvider>
           <SpaceCanvas
+            imageReplacement={app.imageReplacement}
             commandOutcomes={app.commandOutcomes}
             deleteConfirmation={app.deleteConfirmation}
             nodes={[resourceNode()]}
@@ -376,7 +382,7 @@ describe('opening framing on a mounted canvas', () => {
             onDropImages={() => undefined}
             onPasteImageUrl={() => undefined}
             nameOnCreation={null}
-            authoring={app.authoring}
+            authoring={app.surface.authoring}
             spaceSession={spaceSession}
             onBodyEditingChange={() => undefined}
             onTitleEditingChange={() => undefined}

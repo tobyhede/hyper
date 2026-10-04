@@ -74,7 +74,7 @@ export const useSpaceResourceTargets = (
   read: (spaceId: UUID) => Promise<SpaceResourceTarget | undefined>,
 ): SpaceResourceTargets => {
   const spaces = useOpenSpaces();
-  const getEntries = useCallback(() => spaces?.getState().entries ?? NO_ENTRIES, [spaces]);
+  const getEntries = useCallback(() => spaces?.getState().composed ?? NO_ENTRIES, [spaces]);
   const entries = useSyncExternalStore(
     spaces?.subscribe ?? noSubscription,
     spaces === null ? noEntries : getEntries,

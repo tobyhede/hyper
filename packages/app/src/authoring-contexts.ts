@@ -11,7 +11,7 @@ import { describeAuthoringRefusal, describeSpaceResourceRefusal } from './author
 import type { ComposedApp } from './compose-app';
 import { failureMessage } from './failure-message';
 import type { OpenSpace, OpenSpaces } from './open-spaces';
-import type { AuthoringCompletion, AuthoringResult } from './space-authoring';
+import { CANVAS, type AuthoringCompletion, type AuthoringResult } from './space-authoring';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 
 /**
@@ -129,7 +129,7 @@ export function topLevelContext(space: AuthoredSpace): AuthoringContext {
       addressesMap(mapId) &&
       app.navigation.getState().activeGraphId === graphId &&
       owns(app, mapId, graphId),
-    complete: (_mapId, completion) => app.authoring.complete(completion),
+    complete: (_mapId, completion) => app.authoring.complete(CANVAS, completion),
     coordination: null,
   };
 }
@@ -152,7 +152,7 @@ export interface EmbeddedAuthoring {
  * It addresses any Map of the target, and any Graph of that Map, while the
  * target is still the open entry the rail was drawn from — an exited Space is
  * no longer authored through its old composition — and completes through
- * `completeInMap`, which authors the addressed Map without moving the
+ * a drawn target, which authors the addressed Map without moving the
  * target's own canvas. It waits for both Spaces around an Edit that crosses
  * them.
  */
@@ -171,7 +171,8 @@ export function embeddedContext({
     current,
     addressesMap,
     addressesGraph: (mapId, graphId) => addressesMap(mapId) && owns(target.app, mapId, graphId),
-    complete: (mapId, completion) => target.app.authoring.completeInMap(mapId, completion),
+    complete: (mapId, completion) =>
+      target.app.authoring.complete({ kind: 'drawn', mapId, graphId: null }, completion),
     coordination: {
       settled: async () => (await saved(target.id)) && (await saved(containingSpaceId)),
       targetSaved: () => saved(target.id),

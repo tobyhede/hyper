@@ -259,11 +259,16 @@ test(
       .getByRole('textbox', { name: 'Markdown source of Intake' })
       .press('ControlOrMeta+Enter');
     await expect(embedded).toContainText('Edited in the embedded Map');
-    // Crossing into the target Space to read the same edit there, through the
-    // Command Dock's Open Spaces menu (ADR 0082) — and the assertion is on the
-    // Space the Dock is now naming.
-    await page.getByRole('button', { name: /^Spaces\. \d+ open\.$/ }).click({ delay: 120 });
-    await page.getByRole('menuitemradio', { name: /^Architecture/ }).click();
+    // Crossing into the target Space to read the same edit there. A Space
+    // that is only drawn is held without being listed in Open Spaces, so it is
+    // entered through the Space Resource that draws it (ADR 0112) — and the
+    // assertion is on the Space the Dock is now naming.
+    await (
+      await resourceControls(page, spaceResource(page))
+    )
+      .getByRole('button', { name: /^Actions for Resource / })
+      .click();
+    await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
     // `:visible`, because every open Space stays mounted and only one is shown
     // (`OpenSpacesApplication`). A role query already skips the hidden ones —
     // they are out of the accessibility tree — but a test id does not.
@@ -381,7 +386,7 @@ test(
   { tag: '@parity:space-resource-context-menus-share-dock-actions' },
   async ({ page }) => {
     await open(page);
-    await exerciseSpaceResourceContextMenus(page, spaceResource(page));
+    await exerciseSpaceResourceContextMenus(page, spaceResource(page), 'Architecture');
   },
 );
 

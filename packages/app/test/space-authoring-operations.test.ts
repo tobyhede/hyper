@@ -14,7 +14,9 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { GRAPH_PALETTE, nextGraphColor } from '@project/graph';
 import { composeApp } from '../src/compose-app';
 
+import { CANVAS } from '../src/space-authoring';
 import { mintingIds } from './minting';
+import { unusedImageSources } from './image-sources';
 
 /**
  * The semantic operations Space Authoring offers for Resource and Graph
@@ -112,6 +114,7 @@ function open(
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring } = composeApp({
+    images: unusedImageSources,
     spaceSession: session,
     selection: mapId,
     newId,
@@ -129,7 +132,7 @@ describe('Add Map', () => {
       MAP_ID,
       mintingIds(MINTED, MINTED_GRAPH),
     );
-    expect(authoring.complete({ kind: 'created-map' })).toEqual({ kind: 'completed' });
+    expect(authoring.complete(CANVAS, { kind: 'created-map' })).toEqual({ kind: 'completed' });
 
     expect(session.getState().working.document.maps).toEqual([
       positionedSnapshot.document.maps![0],
@@ -163,7 +166,7 @@ describe('Add Map', () => {
       mintingIds(MINTED, MINTED_GRAPH),
     );
 
-    expect(authoring.complete({ kind: 'created-map' })).toEqual({ kind: 'completed' });
+    expect(authoring.complete(CANVAS, { kind: 'created-map' })).toEqual({ kind: 'completed' });
     expect(session.getState().working.document.maps).toHaveLength(2);
     expect(navigation.getState().selectedMapId).toBe(MINTED);
   });
@@ -173,7 +176,13 @@ describe('Add Resource', () => {
   it('creates one neutrally titled detached Resource at the anchor it was given', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'created-resource', anchor: CENTRE })).toEqual({
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'created-resource',
+        resourceKind: 'markdown',
+        anchor: CENTRE,
+      }),
+    ).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
     });
@@ -197,8 +206,16 @@ describe('Add Resource', () => {
     // real one.
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
-    authoring.complete({ kind: 'created-resource', anchor: CENTRE });
-    authoring.complete({ kind: 'created-resource', anchor: CENTRE });
+    authoring.complete(CANVAS, {
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: CENTRE,
+    });
+    authoring.complete(CANVAS, {
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: CENTRE,
+    });
 
     const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     const stacked = Object.values(positions).filter(
@@ -227,7 +244,11 @@ describe('Add Resource', () => {
     };
     const { authoring, session } = open(openedSnapshot);
 
-    authoring.complete({ kind: 'created-resource', anchor: { x: 500, y: 400 } });
+    authoring.complete(CANVAS, {
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: { x: 500, y: 400 },
+    });
 
     // A canvas coordinate is an authored one: A being Open moved its neighbours
     // when the Edit that opened it ran, and nothing converts a drop point on the
@@ -240,6 +261,57 @@ describe('Add Resource', () => {
   });
 });
 
+describe('Create Ur Resource', () => {
+  it('creates one neutrally titled Ur Resource at the anchor, in one Edit', () => {
+    const { authoring, session } = openPositioned();
+    const edits: number[] = [];
+    session.subscribe(() => edits.push(session.getState().working.resources.length));
+
+    expect(
+      authoring.complete(CANVAS, { kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE }),
+    ).toEqual({
+      kind: 'completed',
+      createdResourceId: MINTED,
+    });
+
+    // A Title and nothing else: the kind carries no content (ADR 0113).
+    expect(session.getState().working.resources[2]).toEqual({
+      id: MINTED,
+      document: { title: 'Resource 1', kind: 'ur' },
+    });
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual(CENTRE);
+    expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
+    expect(new Set(edits)).toEqual(new Set([3]));
+  });
+
+  it('survives a commit and a reload through intake', async () => {
+    const loaded = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
+    const backend = MemorySpaceBackend.asMeta(loaded);
+    const session = openSpaceSession(backend, loaded);
+    const { authoring } = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+    });
+
+    authoring.complete(CANVAS, { kind: 'created-resource', resourceKind: 'ur', anchor: CENTRE });
+    await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
+
+    const stored = await backend.loadSpace(SPACE_ID);
+    const reopened = composeApp({
+      images: unusedImageSources,
+      spaceSession: openSpaceSession(backend, stored!),
+      selection: MAP_ID,
+      newId: mintingIds(MINTED),
+    });
+    expect(reopened.currentSpace().lookup.resource(MINTED)).toMatchObject({
+      kind: 'ur',
+      title: 'Resource 1',
+    });
+  });
+});
+
 describe('Create Image Resources', () => {
   const STORED = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
   const THIRD_MINTED = uuidSchema.parse('00000000-0000-4000-8000-000000000033');
@@ -248,7 +320,7 @@ describe('Create Image Resources', () => {
     const { authoring, session } = openPositioned();
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'created-images',
         images: [{ url: STORED, naturalSize: { width: 640, height: 480 } }],
         anchor: CENTRE,
@@ -271,7 +343,7 @@ describe('Create Image Resources', () => {
   it('records no natural size for an image that did not load', () => {
     const { authoring, session } = openPositioned();
 
-    authoring.complete({
+    authoring.complete(CANVAS, {
       kind: 'created-images',
       images: [{ url: 'https://example.com/a.png' }],
       anchor: CENTRE,
@@ -291,7 +363,7 @@ describe('Create Image Resources', () => {
     session.subscribe(() => commits.push(session.getState().working.resources.length));
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'created-images',
         images: [
           { url: 'https://example.com/1.png' },
@@ -325,7 +397,7 @@ describe('Create Image Resources', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'created-images',
         images: [{ url: 'data:image/png;base64,AAAA' }],
         anchor: CENTRE,
@@ -348,7 +420,7 @@ describe('Edit Resource', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
         document: { title: '', kind: 'markdown', body: 'A' },
@@ -364,7 +436,7 @@ describe('Edit Resource', () => {
     // `z.string().min(1)` counts characters and a space is one, so this would
     // be stored and draw as a Resource with no name at all.
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
         document: { title: '   ', kind: 'markdown', body: 'A' },
@@ -380,7 +452,7 @@ describe('Edit Resource', () => {
     // rules apart: a whole-string trim leaves it, and the schema does not, so
     // the write path taking the trim would store a Title intake would not mint.
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
         document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', body: 'A' },
@@ -391,7 +463,7 @@ describe('Edit Resource', () => {
     // "Renaming a Title to the same Title plus a trailing newline is therefore
     // unchanged rather than an Edit" (ADR 0083).
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
         document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', body: 'A' },
@@ -404,19 +476,23 @@ describe('Open Resource geometry', () => {
   it('restores a resized Open Size after Closing and Opening again', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
+    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
+      {
+        kind: 'completed',
+      },
+    );
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'resized-resource',
         resourceId: RESOURCE_A,
         size: { width: 640, height: 480 },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(authoring.complete({ kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
+    expect(authoring.complete(CANVAS, { kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual(
+      {
+        kind: 'completed',
+      },
+    );
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
@@ -424,9 +500,11 @@ describe('Open Resource geometry', () => {
       openSize: { width: 640, height: 480 },
     });
 
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
+    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
+      {
+        kind: 'completed',
+      },
+    );
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
@@ -438,11 +516,13 @@ describe('Open Resource geometry', () => {
   it('Closes at the exact Closed rect without replacing the remembered Open Size', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual({
-      kind: 'completed',
-    });
+    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
+      {
+        kind: 'completed',
+      },
+    );
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'resized-resource',
         resourceId: RESOURCE_A,
         size: { width: 640, height: 480 },
@@ -450,7 +530,7 @@ describe('Open Resource geometry', () => {
     ).toEqual({ kind: 'completed' });
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'resized-resource',
         resourceId: RESOURCE_A,
         size: { width: 260, height: 146 },
@@ -469,7 +549,7 @@ describe('Open Resource geometry', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'resized-resource',
         resourceId: RESOURCE_A,
         size: { width: 560, height: 420 },
@@ -482,11 +562,15 @@ describe('Open Resource geometry', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'opened-resource', resourceId: UNKNOWN_RESOURCE })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: UNKNOWN_RESOURCE }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'resource-not-in-map' },
     });
-    expect(authoring.complete({ kind: 'closed-resource', resourceId: UNKNOWN_RESOURCE })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'closed-resource', resourceId: UNKNOWN_RESOURCE }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'resource-not-in-map' },
     });
@@ -495,11 +579,11 @@ describe('Open Resource geometry', () => {
 
   it('is unchanged and moves nobody when the proposal is the size the Resource already has', () => {
     const { authoring, session } = openPositioned();
-    authoring.complete({ kind: 'opened-resource', resourceId: RESOURCE_A });
+    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
     const before = session.getState().working;
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'resized-resource',
         resourceId: RESOURCE_A,
         size: DEFAULT_OPEN_SIZE,
@@ -514,7 +598,7 @@ describe('Add Reference Resource', () => {
     const { authoring, session } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'created-reference', target: RESOURCE_A, anchor: CENTRE }),
+      authoring.complete(CANVAS, { kind: 'created-reference', target: RESOURCE_A, anchor: CENTRE }),
     ).toEqual({
       kind: 'completed',
       createdResourceId: MINTED,
@@ -541,7 +625,7 @@ describe('Add Reference Resource', () => {
   it('keeps a title the author already entered, normalized the way a rename is', () => {
     const { authoring, session } = openPositioned();
 
-    authoring.complete({
+    authoring.complete(CANVAS, {
       kind: 'created-reference',
       target: RESOURCE_A,
       title: '  Recap  \n  the week  ',
@@ -567,7 +651,7 @@ describe('Add Reference Resource', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({ kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }),
+      authoring.complete(CANVAS, { kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }),
     ).toEqual({
       kind: 'refused',
       refusal: { code: 'reference-target-must-own-content', targetId: RESOURCE_B },
@@ -579,7 +663,11 @@ describe('Add Reference Resource', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'created-reference', target: UNKNOWN_RESOURCE, anchor: CENTRE }),
+      authoring.complete(CANVAS, {
+        kind: 'created-reference',
+        target: UNKNOWN_RESOURCE,
+        anchor: CENTRE,
+      }),
     ).toEqual({
       kind: 'refused',
       refusal: { code: 'reference-target-not-found', targetId: UNKNOWN_RESOURCE },
@@ -620,7 +708,7 @@ describe('Add Graph', () => {
     };
     const { authoring, session } = open(snapshot);
 
-    expect(authoring.complete({ kind: 'added-graph' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'added-graph' })).toEqual({
       kind: 'completed',
       createdGraphId: MINTED,
     });
@@ -633,7 +721,7 @@ describe('Add Graph', () => {
   it('counts a Graph with no stored colour as the colour the Map draws for it', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'added-graph' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'added-graph' })).toEqual({
       kind: 'completed',
       createdGraphId: MINTED,
     });
@@ -649,7 +737,7 @@ describe('Add Graph', () => {
   it('appends, colours and activates one empty Graph without touching the others', () => {
     const { authoring, session, navigation } = openPositioned();
 
-    expect(authoring.complete({ kind: 'added-graph' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'added-graph' })).toEqual({
       kind: 'completed',
       createdGraphId: MINTED,
     });
@@ -672,8 +760,8 @@ describe('Add Graph', () => {
   it('is literal and repeatable, so an already empty active Graph does not swallow it', () => {
     const { authoring, session } = openPositioned(mintingIds(MINTED, SECOND_MINTED));
 
-    authoring.complete({ kind: 'added-graph' });
-    authoring.complete({ kind: 'added-graph' });
+    authoring.complete(CANVAS, { kind: 'added-graph' });
+    authoring.complete(CANVAS, { kind: 'added-graph' });
 
     expect(graphsOf(session.getState().working).map((graph) => graph.title)).toEqual([
       'Main',
@@ -688,7 +776,11 @@ describe('Edit Graph', () => {
     const { authoring, session } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: '  Deep dive  ' }),
+      authoring.complete(CANVAS, {
+        kind: 'renamed-graph',
+        graphId: GRAPH_ID,
+        title: '  Deep dive  ',
+      }),
     ).toEqual({ kind: 'completed' });
     expect(graphsOf(session.getState().working)[0]?.title).toBe('Deep dive');
   });
@@ -697,7 +789,9 @@ describe('Edit Graph', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: '   ' })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'renamed-graph', graphId: GRAPH_ID, title: '   ' }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'graph-title-required' },
     });
@@ -709,7 +803,7 @@ describe('Edit Graph', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: ' Main ' }),
+      authoring.complete(CANVAS, { kind: 'renamed-graph', graphId: GRAPH_ID, title: ' Main ' }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
   });
@@ -718,12 +812,20 @@ describe('Edit Graph', () => {
     const { authoring, session } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'recolored-graph', graphId: GRAPH_ID, color: GRAPH_PALETTE[3] }),
+      authoring.complete(CANVAS, {
+        kind: 'recolored-graph',
+        graphId: GRAPH_ID,
+        color: GRAPH_PALETTE[3],
+      }),
     ).toEqual({ kind: 'completed' });
     expect(graphsOf(session.getState().working)[0]?.color).toBe(GRAPH_PALETTE[3]);
 
     expect(
-      authoring.complete({ kind: 'recolored-graph', graphId: GRAPH_ID, color: GRAPH_PALETTE[3] }),
+      authoring.complete(CANVAS, {
+        kind: 'recolored-graph',
+        graphId: GRAPH_ID,
+        color: GRAPH_PALETTE[3],
+      }),
     ).toEqual({ kind: 'unchanged' });
   });
 
@@ -735,7 +837,7 @@ describe('Edit Graph', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'changed-graph-head-shape',
         graphId: GRAPH_ID,
         headShape: current,
@@ -744,7 +846,7 @@ describe('Edit Graph', () => {
     expect(session.getState().working).toBe(before);
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'changed-graph-head-shape',
         graphId: GRAPH_ID,
         headShape: 'diamond',
@@ -753,7 +855,7 @@ describe('Edit Graph', () => {
     expect(graphsOf(session.getState().working)[0]?.headShape).toBe('diamond');
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'changed-graph-head-shape',
         graphId: GRAPH_ID,
         headShape: 'diamond',
@@ -768,7 +870,7 @@ describe('Edit Graph', () => {
     expect(stored).toBeDefined();
     expect(stored).not.toHaveProperty('headShape');
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'changed-graph-head-shape',
         graphId: GRAPH_ID,
         headShape: 'arrow',
@@ -780,7 +882,7 @@ describe('Edit Graph', () => {
   it('refuses a head shape for a Graph the Map does not own', () => {
     const { authoring } = openPositioned();
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'changed-graph-head-shape',
         graphId: OTHER_GRAPH_ID,
         headShape: 'dot',
@@ -795,7 +897,7 @@ describe('Rename Map', () => {
     const before = mapOf(session.getState().working, MAP_ID);
 
     expect(
-      authoring.complete({ kind: 'renamed-map', mapId: MAP_ID, title: '  Workshop  ' }),
+      authoring.complete(CANVAS, { kind: 'renamed-map', mapId: MAP_ID, title: '  Workshop  ' }),
     ).toEqual({
       kind: 'completed',
     });
@@ -810,12 +912,16 @@ describe('Rename Map', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'renamed-map', mapId: MAP_ID, title: '   ' })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'renamed-map', mapId: MAP_ID, title: '   ' }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'map-title-required' },
     });
     expect(session.getState().working).toBe(before);
-    expect(authoring.complete({ kind: 'renamed-map', mapId: MAP_ID, title: ' Map 1 ' })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'renamed-map', mapId: MAP_ID, title: ' Map 1 ' }),
+    ).toEqual({
       kind: 'unchanged',
     });
   });
@@ -831,7 +937,7 @@ describe('Rename Map', () => {
     const before = session.getState().working;
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'renamed-map',
         mapId: OTHER_MAP_ID,
         title: 'Workshop',
@@ -856,7 +962,9 @@ describe('Rename Space', () => {
   it('trims and replaces only the Space title', () => {
     const { authoring, session } = openPositioned();
 
-    expect(authoring.complete({ kind: 'renamed-space', title: '  Second draft  ' })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'renamed-space', title: '  Second draft  ' }),
+    ).toEqual({
       kind: 'completed',
     });
     const after = session.getState().working;
@@ -874,8 +982,8 @@ describe('Rename Space', () => {
    * Edit that re-resolves from the Map would therefore make a rename of the
    * Space activate a different Graph — moving the emphasis, the Dock's Graph
    * cluster and the product URL for a change that wrote only `document.title`.
-   * `created-map` and `deleted-map` re-resolve because each lands the
-   * reader in a different Map; this one lands nowhere.
+   * `created-map` re-resolves because it lands the reader in a different
+   * Map; this one lands nowhere.
    */
   it('leaves the Active Graph where Navigation put it', () => {
     const twoGraphs: SpaceSnapshot = {
@@ -896,7 +1004,7 @@ describe('Rename Space', () => {
     const { authoring, navigation } = open(twoGraphs);
     navigation.activateGraph(OTHER_GRAPH_ID);
 
-    expect(authoring.complete({ kind: 'renamed-space', title: 'Renamed' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'renamed-space', title: 'Renamed' })).toEqual({
       kind: 'completed',
     });
 
@@ -908,15 +1016,15 @@ describe('Rename Space', () => {
     const { authoring, session } = openPositioned();
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'renamed-space', title: '' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'renamed-space', title: '' })).toEqual({
       kind: 'refused',
       refusal: { code: 'space-title-required' },
     });
-    expect(authoring.complete({ kind: 'renamed-space', title: '  \t ' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'renamed-space', title: '  \t ' })).toEqual({
       kind: 'refused',
       refusal: { code: 'space-title-required' },
     });
-    expect(authoring.complete({ kind: 'renamed-space', title: ' Space ' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'renamed-space', title: ' Space ' })).toEqual({
       kind: 'unchanged',
     });
     expect(session.getState().working).toBe(before);
@@ -929,7 +1037,9 @@ describe('Rename Space', () => {
   it('does not require the current canvas placement to resolve', () => {
     const { authoring, session } = open();
 
-    expect(authoring.complete({ kind: 'renamed-space', title: 'Before any layout' })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'renamed-space', title: 'Before any layout' }),
+    ).toEqual({
       kind: 'completed',
     });
     expect(session.getState().working.document.title).toBe('Before any layout');
@@ -958,7 +1068,7 @@ describe('Rename Space', () => {
     };
     const { authoring, session } = open(opened);
 
-    expect(authoring.complete({ kind: 'renamed-space', title: 'Renamed' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'renamed-space', title: 'Renamed' })).toEqual({
       kind: 'completed',
     });
 
@@ -975,12 +1085,13 @@ describe('Rename Space', () => {
     const backend = MemorySpaceBackend.asMeta(loaded);
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
+      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
     });
 
-    expect(authoring.complete({ kind: 'renamed-space', title: 'Stored name' })).toEqual({
+    expect(authoring.complete(CANVAS, { kind: 'renamed-space', title: 'Stored name' })).toEqual({
       kind: 'completed',
     });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
@@ -990,6 +1101,7 @@ describe('Rename Space', () => {
 
     // Reload: a fresh session and composition over exactly what was stored.
     const reopened = composeApp({
+      images: unusedImageSources,
       spaceSession: openSpaceSession(backend, stored!),
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -998,111 +1110,7 @@ describe('Rename Space', () => {
   });
 });
 
-describe('Delete Map', () => {
-  const otherGraph: Graph = { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] };
-  const twoMaps: SpaceSnapshot = {
-    ...positionedSnapshot,
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        positionedSnapshot.document.maps![0]!,
-        {
-          id: OTHER_MAP_ID,
-          title: 'Map 2',
-          kind: 'positioned',
-          positions: {
-            [RESOURCE_B]: {
-              x: 80,
-              y: 90,
-              open: true,
-              openSize: { width: 640, height: 360 },
-            },
-          },
-          graphs: [otherGraph],
-          activeGraph: OTHER_GRAPH_ID,
-        },
-      ],
-    },
-  };
-
-  it('deletes only the selected Map and continues in the first survivor', () => {
-    const { authoring, navigation, session } = open(twoMaps, OTHER_MAP_ID);
-
-    expect(authoring.complete({ kind: 'deleted-map', mapId: OTHER_MAP_ID })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(session.getState().working.resources).toEqual(twoMaps.resources);
-    expect(session.getState().working.document.maps).toEqual([
-      positionedSnapshot.document.maps![0]!,
-    ]);
-    expect(navigation.getState().selectedMapId).toBe(MAP_ID);
-    expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    expect(authoring.mapPlacement().get(RESOURCE_A)).toEqual({ x: 10, y: 20, open: false });
-  });
-
-  it('refuses to delete the last Map with a stable identity', () => {
-    const { authoring, session } = openPositioned();
-    const before = session.getState().working;
-
-    expect(authoring.complete({ kind: 'deleted-map', mapId: MAP_ID })).toEqual({
-      kind: 'refused',
-      refusal: { code: 'space-must-keep-map' },
-    });
-    expect(session.getState().working).toBe(before);
-  });
-});
-
-describe('Delete Graph', () => {
-  const twoGraphs: SpaceSnapshot = {
-    ...positionedSnapshot,
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        {
-          ...positionedSnapshot.document.maps![0]!,
-          graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
-          activeGraph: OTHER_GRAPH_ID,
-        },
-      ],
-    },
-  };
-
-  it('removes exactly one Graph and activates the first survivor', () => {
-    const { authoring, session, navigation } = open(twoGraphs);
-
-    expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
-      kind: 'completed',
-    });
-
-    expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
-    expect(navigation.getState().activeGraphId).toBe(GRAPH_ID);
-    // Resources and positions are untouched; only the Graph left.
-    expect(session.getState().working.resources).toEqual(positionedSnapshot.resources);
-    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual(
-      positionedSnapshot.document.maps![0]!.positions,
-    );
-  });
-
-  it('keeps the emphasis where it was when another Graph was deleted', () => {
-    const { authoring, navigation } = open(twoGraphs);
-
-    authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID });
-
-    expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
-  });
-
-  it("refuses to delete a Map's last Graph", () => {
-    const { authoring, session } = openPositioned();
-    const before = session.getState().working;
-
-    expect(authoring.complete({ kind: 'deleted-graph', graphId: GRAPH_ID })).toEqual({
-      kind: 'refused',
-      refusal: { code: 'map-must-keep-graph' },
-    });
-    expect(session.getState().working).toBe(before);
-  });
-
+describe('Graph ownership', () => {
   it('refuses a Graph another Map owns, although the Space plainly holds it', () => {
     const twoMaps: SpaceSnapshot = {
       ...positionedSnapshot,
@@ -1122,7 +1130,13 @@ describe('Delete Graph', () => {
     };
     const { authoring } = open(twoMaps);
 
-    expect(authoring.complete({ kind: 'deleted-graph', graphId: OTHER_GRAPH_ID })).toEqual({
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'renamed-graph',
+        graphId: OTHER_GRAPH_ID,
+        title: 'Renamed',
+      }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'graph-not-owned' },
     });
@@ -1134,7 +1148,7 @@ describe('Edge lifecycle', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'deleted-edge',
         graphId: GRAPH_ID,
         edge: { from: RESOURCE_B, to: RESOURCE_A },
@@ -1146,7 +1160,7 @@ describe('Edge lifecycle', () => {
     const { authoring, session, navigation } = openPositioned();
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'deleted-edge',
         graphId: GRAPH_ID,
         edge: { from: RESOURCE_A, to: RESOURCE_B },
@@ -1195,7 +1209,7 @@ describe('Edge Title', () => {
       const { authoring, session } = open(withEdges([AB]));
 
       expect(
-        authoring.complete({
+        authoring.complete(CANVAS, {
           kind: 'titled-edge',
           graphId: GRAPH_ID,
           edge: AB,
@@ -1211,7 +1225,12 @@ describe('Edge Title', () => {
       );
 
       expect(
-        authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: 'After' }),
+        authoring.complete(CANVAS, {
+          kind: 'titled-edge',
+          graphId: GRAPH_ID,
+          edge: AB,
+          title: 'After',
+        }),
       ).toEqual({ kind: 'completed' });
       expect(edgesOf(session.getState().working)).toEqual([
         { ...AB, title: 'After', titleHidden: true },
@@ -1221,7 +1240,12 @@ describe('Edge Title', () => {
     it('stores the draft trimmed', () => {
       const { authoring, session } = open(withEdges([AB]));
 
-      authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: '  Retry \t' });
+      authoring.complete(CANVAS, {
+        kind: 'titled-edge',
+        graphId: GRAPH_ID,
+        edge: AB,
+        title: '  Retry \t',
+      });
       expect(edgesOf(session.getState().working)).toEqual([{ ...AB, title: 'Retry' }]);
     });
 
@@ -1233,7 +1257,7 @@ describe('Edge Title', () => {
         );
 
         expect(
-          authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title }),
+          authoring.complete(CANVAS, { kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title }),
         ).toEqual({ kind: 'completed' });
         expect(edgesOf(session.getState().working)).toEqual([AB]);
       },
@@ -1244,7 +1268,12 @@ describe('Edge Title', () => {
       const before = session.getState().working;
 
       expect(
-        authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: ' Same ' }),
+        authoring.complete(CANVAS, {
+          kind: 'titled-edge',
+          graphId: GRAPH_ID,
+          edge: AB,
+          title: ' Same ',
+        }),
       ).toEqual({ kind: 'unchanged' });
       expect(session.getState().working).toBe(before);
     });
@@ -1254,7 +1283,7 @@ describe('Edge Title', () => {
       const before = session.getState().working;
 
       expect(
-        authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: '' }),
+        authoring.complete(CANVAS, { kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: '' }),
       ).toEqual({ kind: 'unchanged' });
       expect(session.getState().working).toBe(before);
     });
@@ -1267,7 +1296,7 @@ describe('Edge Title', () => {
         const before = session.getState().working;
 
         expect(
-          authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title }),
+          authoring.complete(CANVAS, { kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title }),
         ).toEqual({ kind: 'refused', refusal: { code: EDGE_TITLE_ONE_LINE } });
         expect(session.getState().working).toBe(before);
       },
@@ -1277,7 +1306,7 @@ describe('Edge Title', () => {
       const { authoring, session } = open(withEdges([{ ...AB, title: 'Current' }]));
 
       expect(
-        authoring.complete({
+        authoring.complete(CANVAS, {
           kind: 'titled-edge',
           graphId: GRAPH_ID,
           edge: { ...AB, title: 'Stale', titleHidden: true },
@@ -1290,16 +1319,26 @@ describe('Edge Title', () => {
     it('keeps the Edge where it was in its Graph', () => {
       const { authoring, session } = open(withEdges([AB, BC]));
 
-      authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: 'First' });
+      authoring.complete(CANVAS, {
+        kind: 'titled-edge',
+        graphId: GRAPH_ID,
+        edge: AB,
+        title: 'First',
+      });
       expect(edgesOf(session.getState().working)).toEqual([{ ...AB, title: 'First' }, BC]);
     });
 
     it('refuses an Edge deleted since the surface held it', () => {
       const { authoring } = open(withEdges([AB]));
-      authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: AB });
+      authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_ID, edge: AB });
 
       expect(
-        authoring.complete({ kind: 'titled-edge', graphId: GRAPH_ID, edge: AB, title: 'Late' }),
+        authoring.complete(CANVAS, {
+          kind: 'titled-edge',
+          graphId: GRAPH_ID,
+          edge: AB,
+          title: 'Late',
+        }),
       ).toEqual({ kind: 'refused', refusal: { code: 'edge-not-found' } });
     });
 
@@ -1307,7 +1346,12 @@ describe('Edge Title', () => {
       const { authoring } = open(withEdges([AB]));
 
       expect(
-        authoring.complete({ kind: 'titled-edge', graphId: UNKNOWN_GRAPH, edge: AB, title: 'X' }),
+        authoring.complete(CANVAS, {
+          kind: 'titled-edge',
+          graphId: UNKNOWN_GRAPH,
+          edge: AB,
+          title: 'X',
+        }),
       ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
     });
   });
@@ -1316,7 +1360,9 @@ describe('Edge Title', () => {
     it('hides a titled Edge’s Title', () => {
       const { authoring, session } = open(withEdges([{ ...AB, title: 'Shown' }, BC]));
 
-      expect(authoring.complete({ kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB })).toEqual({
+      expect(
+        authoring.complete(CANVAS, { kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB }),
+      ).toEqual({
         kind: 'completed',
       });
       expect(edgesOf(session.getState().working)).toEqual([
@@ -1331,7 +1377,7 @@ describe('Edge Title', () => {
       );
 
       expect(
-        authoring.complete({ kind: 'showed-edge-title', graphId: GRAPH_ID, edge: AB }),
+        authoring.complete(CANVAS, { kind: 'showed-edge-title', graphId: GRAPH_ID, edge: AB }),
       ).toEqual({ kind: 'completed' });
       const [edge] = edgesOf(session.getState().working) ?? [];
       expect(edge).toEqual({ ...AB, title: 'Hidden' });
@@ -1341,7 +1387,9 @@ describe('Edge Title', () => {
     it('refuses hiding the Title of an Edge that has none', () => {
       const { authoring } = open(withEdges([AB]));
 
-      expect(authoring.complete({ kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB })).toEqual({
+      expect(
+        authoring.complete(CANVAS, { kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB }),
+      ).toEqual({
         kind: 'refused',
         refusal: { code: 'edge-title-required' },
       });
@@ -1350,18 +1398,26 @@ describe('Edge Title', () => {
     it('is unchanged hiding a hidden Title or showing a shown one', () => {
       const hidden = open(withEdges([{ ...AB, title: 'Hidden', titleHidden: true }]));
       expect(
-        hidden.authoring.complete({ kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB }),
+        hidden.authoring.complete(CANVAS, { kind: 'hid-edge-title', graphId: GRAPH_ID, edge: AB }),
       ).toEqual({ kind: 'unchanged' });
 
       const shown = open(withEdges([{ ...AB, title: 'Shown' }]));
       expect(
-        shown.authoring.complete({ kind: 'showed-edge-title', graphId: GRAPH_ID, edge: AB }),
+        shown.authoring.complete(CANVAS, {
+          kind: 'showed-edge-title',
+          graphId: GRAPH_ID,
+          edge: AB,
+        }),
       ).toEqual({ kind: 'unchanged' });
 
       // An untitled Edge has nothing hidden, so showing it is already true.
       const untitled = open(withEdges([AB]));
       expect(
-        untitled.authoring.complete({ kind: 'showed-edge-title', graphId: GRAPH_ID, edge: AB }),
+        untitled.authoring.complete(CANVAS, {
+          kind: 'showed-edge-title',
+          graphId: GRAPH_ID,
+          edge: AB,
+        }),
       ).toEqual({ kind: 'unchanged' });
     });
 
@@ -1369,7 +1425,7 @@ describe('Edge Title', () => {
       const { authoring, session } = open(withEdges([{ ...AB, title: 'Current' }]));
 
       expect(
-        authoring.complete({
+        authoring.complete(CANVAS, {
           kind: 'hid-edge-title',
           graphId: GRAPH_ID,
           edge: { ...AB, title: 'Stale', titleHidden: true },
@@ -1385,12 +1441,12 @@ describe('Edge Title', () => {
       (kind) => {
         const { authoring } = open(withEdges([{ ...AB, title: 'T' }]));
 
-        expect(authoring.complete({ kind, graphId: UNKNOWN_GRAPH, edge: AB })).toEqual({
+        expect(authoring.complete(CANVAS, { kind, graphId: UNKNOWN_GRAPH, edge: AB })).toEqual({
           kind: 'refused',
           refusal: { code: 'graph-not-owned' },
         });
-        authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: AB });
-        expect(authoring.complete({ kind, graphId: GRAPH_ID, edge: AB })).toEqual({
+        authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_ID, edge: AB });
+        expect(authoring.complete(CANVAS, { kind, graphId: GRAPH_ID, edge: AB })).toEqual({
           kind: 'refused',
           refusal: { code: 'edge-not-found' },
         });
@@ -1404,7 +1460,7 @@ describe('Edge Title', () => {
       const { authoring, session } = open(withEdges([{ ...AB, title: 'Goes' }, survivor]));
 
       expect(
-        authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
+        authoring.complete(CANVAS, { kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
       ).toEqual({ kind: 'completed' });
       expect(edgesOf(session.getState().working)).toEqual([survivor]);
     });
@@ -1413,7 +1469,7 @@ describe('Edge Title', () => {
       const titled = { ...AB, title: 'Kept' } as const;
       const { authoring, session } = open(withEdges([titled]));
 
-      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_B });
+      authoring.complete(CANVAS, { kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_B });
       expect(edgesOf(session.getState().working)).toEqual([titled]);
     });
   });
@@ -1433,12 +1489,12 @@ describe('Edge eligibility', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_B, to: RESOURCE_A }),
+      authoring.edgeEligibility(CANVAS, { kind: 'connect', from: RESOURCE_B, to: RESOURCE_A }),
     ).toEqual({
       kind: 'eligible',
     });
     expect(
-      authoring.complete({ kind: 'connected-resources', from: RESOURCE_B, to: RESOURCE_A }),
+      authoring.complete(CANVAS, { kind: 'connected-resources', from: RESOURCE_B, to: RESOURCE_A }),
     ).toEqual({
       kind: 'completed',
     });
@@ -1449,10 +1505,10 @@ describe('Edge eligibility', () => {
 
     const refusal = { kind: 'refused', refusal: { code: 'edge-already-exists' } };
     expect(
-      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_A, to: RESOURCE_B }),
+      authoring.edgeEligibility(CANVAS, { kind: 'connect', from: RESOURCE_A, to: RESOURCE_B }),
     ).toEqual(refusal);
     expect(
-      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_B }),
+      authoring.complete(CANVAS, { kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_B }),
     ).toEqual(refusal);
   });
 
@@ -1460,12 +1516,12 @@ describe('Edge eligibility', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_A, to: RESOURCE_A }),
+      authoring.edgeEligibility(CANVAS, { kind: 'connect', from: RESOURCE_A, to: RESOURCE_A }),
     ).toEqual({
       kind: 'eligible',
     });
     expect(
-      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_B, to: RESOURCE_A }),
+      authoring.edgeEligibility(CANVAS, { kind: 'connect', from: RESOURCE_B, to: RESOURCE_A }),
     ).toEqual({
       kind: 'eligible',
     });
@@ -1482,12 +1538,14 @@ describe('Edge eligibility', () => {
     const { authoring } = open(sparse);
 
     expect(
-      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_A, to: RESOURCE_C }),
+      authoring.edgeEligibility(CANVAS, { kind: 'connect', from: RESOURCE_A, to: RESOURCE_C }),
     ).toEqual({
       kind: 'refused',
       refusal: { code: 'edge-resource-outside-map' },
     });
-    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: RESOURCE_C })).toEqual({
+    expect(
+      authoring.edgeEligibility(CANVAS, { kind: 'create-and-connect', from: RESOURCE_C }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'edge-resource-outside-map' },
     });
@@ -1502,9 +1560,11 @@ describe('Edge eligibility', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.edgeEligibility({ kind: 'connect', from: RESOURCE_A, to: RESOURCE_B }).kind,
+      authoring.edgeEligibility(CANVAS, { kind: 'connect', from: RESOURCE_A, to: RESOURCE_B }).kind,
     ).toBe('refused');
-    expect(authoring.edgeEligibility({ kind: 'create-and-connect', from: RESOURCE_A })).toEqual({
+    expect(
+      authoring.edgeEligibility(CANVAS, { kind: 'create-and-connect', from: RESOURCE_A }),
+    ).toEqual({
       kind: 'eligible',
     });
   });
@@ -1524,7 +1584,11 @@ describe('Map membership', () => {
     const { authoring, session } = open(sparse);
 
     expect(
-      authoring.complete({ kind: 'added-resource-to-map', resourceId: RESOURCE_C, anchor: CENTRE }),
+      authoring.complete(CANVAS, {
+        kind: 'added-resource-to-map',
+        resourceId: RESOURCE_C,
+        anchor: CENTRE,
+      }),
     ).toEqual({ kind: 'completed' });
 
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
@@ -1539,7 +1603,7 @@ describe('Map membership', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'added-resource-to-map',
         resourceId: UNKNOWN_RESOURCE,
         anchor: CENTRE,
@@ -1551,7 +1615,11 @@ describe('Map membership', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'added-resource-to-map', resourceId: RESOURCE_A, anchor: CENTRE }),
+      authoring.complete(CANVAS, {
+        kind: 'added-resource-to-map',
+        resourceId: RESOURCE_A,
+        anchor: CENTRE,
+      }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-already-in-map' } });
   });
 
@@ -1559,7 +1627,7 @@ describe('Map membership', () => {
     const { authoring } = open(sparse);
 
     expect(
-      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_C }),
+      authoring.complete(CANVAS, { kind: 'removed-resource-from-map', resourceId: RESOURCE_C }),
     ).toEqual({
       kind: 'refused',
       refusal: { code: 'resource-not-in-map' },
@@ -1579,7 +1647,9 @@ describe('Delete Resource from Space', () => {
     const { authoring, session } = open(referenced);
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_A }),
+    ).toEqual({
       kind: 'refused',
       refusal: {
         code: 'resource-has-references',
@@ -1617,7 +1687,9 @@ describe('Delete Resource from Space', () => {
     const { authoring, session } = open(linked);
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_B }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'space-resource-deletion-unsupported' },
     });
@@ -1646,7 +1718,9 @@ describe('Delete Resource from Space', () => {
     const { authoring, session } = open(referencedSpace);
     const before = session.getState().working;
 
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_A })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_A }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'space-resource-deletion-unsupported' },
     });
@@ -1663,7 +1737,9 @@ describe('Delete Resource from Space', () => {
     };
     const { authoring, session } = open(referenced);
 
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: RESOURCE_B })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: RESOURCE_B }),
+    ).toEqual({
       kind: 'completed',
     });
     expect(session.getState().working.resources).toEqual([positionedSnapshot.resources[0]]);
@@ -1680,7 +1756,7 @@ describe('Delete Resource from Space', () => {
     const { authoring, session } = open(referenced);
 
     expect(
-      authoring.complete({ kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
+      authoring.complete(CANVAS, { kind: 'removed-resource-from-map', resourceId: RESOURCE_A }),
     ).toEqual({
       kind: 'completed',
     });
@@ -1690,7 +1766,9 @@ describe('Delete Resource from Space', () => {
   it('refuses a Resource the Space no longer holds', () => {
     const { authoring } = openPositioned();
 
-    expect(authoring.complete({ kind: 'deleted-resource', resourceId: UNKNOWN_RESOURCE })).toEqual({
+    expect(
+      authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: UNKNOWN_RESOURCE }),
+    ).toEqual({
       kind: 'refused',
       refusal: { code: 'resource-not-found' },
     });
@@ -1716,13 +1794,23 @@ describe('Keep local', () => {
     });
     const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
     const session = openSpaceSession(backend, local);
-    const { authoring } = composeApp({ spaceSession: session, selection: MAP_ID });
+    const { authoring } = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+    });
 
-    authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Before conflict' });
+    authoring.complete(CANVAS, {
+      kind: 'renamed-graph',
+      graphId: GRAPH_ID,
+      title: 'Before conflict',
+    });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
 
     // A later Edit, legal while the conflict stands.
-    expect(authoring.complete({ kind: 'added-graph' })).toMatchObject({ kind: 'completed' });
+    expect(authoring.complete(CANVAS, { kind: 'added-graph' })).toMatchObject({
+      kind: 'completed',
+    });
 
     authoring.keepLocalWork();
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
@@ -1749,7 +1837,11 @@ describe('Stale identities', () => {
     const { authoring } = openPositioned();
 
     expect(
-      authoring.complete({ kind: 'renamed-graph', graphId: UNKNOWN_GRAPH, title: 'Renamed' }),
+      authoring.complete(CANVAS, {
+        kind: 'renamed-graph',
+        graphId: UNKNOWN_GRAPH,
+        title: 'Renamed',
+      }),
     ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
   });
 });
@@ -1781,17 +1873,80 @@ describe('connecting Resources on an embedded Map', () => {
       { id: RESOURCE_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
     ],
   };
+  it('refuses a drawing whose Graph no longer belongs to its Map without changing the Space', () => {
+    const { session, authoring } = open(withOther);
+    const before = session.getState().working;
+    expect(
+      authoring.complete(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: UNKNOWN_GRAPH },
+        { kind: 'opened-resource', resourceId: RESOURCE_A },
+      ),
+    ).toEqual({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
+    expect(session.getState().working).toBe(before);
+  });
+  it('creates and connects in the explicitly drawn Map and Graph without changing Navigation', () => {
+    const { session, navigation, authoring } = open(withOther);
+    const initialNavigation = navigation.getState();
+    const context = { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: SHOWN_GRAPH_ID } as const;
+
+    expect(
+      authoring.edgeEligibility(context, { kind: 'create-and-connect', from: RESOURCE_A }),
+    ).toEqual({ kind: 'eligible' });
+    expect(
+      authoring.complete(context, {
+        kind: 'create-and-connect',
+        from: RESOURCE_A,
+        position: { x: 950, y: 650 },
+      }),
+    ).toEqual({ kind: 'completed', createdResourceId: MINTED });
+    expect(navigation.getState()).toEqual(initialNavigation);
+    expect(mapOf(session.getState().working, MAP_ID)).toEqual(mapOf(positionedSnapshot, MAP_ID));
+    expect(mapOf(session.getState().working, OTHER_MAP_ID)?.positions[MINTED]).toEqual({
+      x: 950,
+      y: 650,
+      open: false,
+    });
+    expect(mapOf(session.getState().working, OTHER_MAP_ID)?.graphs[1]?.edges).toEqual([
+      { from: RESOURCE_A, to: MINTED },
+    ]);
+  });
+  it('uses the drawn Graph for both duplicate eligibility and completed connections', () => {
+    const { authoring } = open(withOther);
+    const context = { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: SHOWN_GRAPH_ID } as const;
+    const proposal = { kind: 'connect' as const, from: RESOURCE_A, to: RESOURCE_C };
+    expect(authoring.edgeEligibility(context, proposal)).toEqual({ kind: 'eligible' });
+    expect(
+      authoring.complete(context, {
+        kind: 'connected-resources',
+        from: RESOURCE_A,
+        to: RESOURCE_C,
+      }),
+    ).toEqual({ kind: 'completed' });
+    expect(authoring.edgeEligibility(context, proposal)).toEqual({
+      kind: 'refused',
+      refusal: { code: 'edge-already-exists' },
+    });
+    expect(
+      authoring.edgeEligibility(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: OTHER_GRAPH_ID },
+        proposal,
+      ),
+    ).toEqual({ kind: 'eligible' });
+  });
   it('writes the Edge into the Graph the Space Resource is showing, not the canvas Active Graph', () => {
     const { session, navigation, authoring } = open(withOther);
     const initialNavigation = navigation.getState();
 
     expect(
-      authoring.completeInMap(OTHER_MAP_ID, {
-        kind: 'connected-resources',
-        from: RESOURCE_A,
-        to: RESOURCE_C,
-        graphId: SHOWN_GRAPH_ID,
-      }).kind,
+      authoring.complete(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+        {
+          kind: 'connected-resources',
+          from: RESOURCE_A,
+          to: RESOURCE_C,
+          graphId: SHOWN_GRAPH_ID,
+        },
+      ).kind,
     ).toBe('completed');
 
     expect(navigation.getState()).toEqual(initialNavigation);
@@ -1825,12 +1980,15 @@ describe('connecting Resources on an embedded Map', () => {
     });
 
     expect(
-      authoring.completeInMap(OTHER_MAP_ID, {
-        kind: 'connected-resources',
-        from: RESOURCE_A,
-        to: RESOURCE_C,
-        graphId: SHOWN_GRAPH_ID,
-      }),
+      authoring.complete(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+        {
+          kind: 'connected-resources',
+          from: RESOURCE_A,
+          to: RESOURCE_C,
+          graphId: SHOWN_GRAPH_ID,
+        },
+      ),
     ).toMatchObject({ kind: 'refused', refusal: { code: 'edge-already-exists' } });
   });
 });
@@ -1854,75 +2012,62 @@ describe('context commands on an embedded Map', () => {
     });
     const initialNavigation = navigation.getState();
     expect(
-      authoring.completeInMap(OTHER_MAP_ID, {
-        kind: 'renamed-map',
-        mapId: OTHER_MAP_ID,
-        title: 'Renamed context',
-      }).kind,
+      authoring.complete(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+        {
+          kind: 'renamed-map',
+          mapId: OTHER_MAP_ID,
+          title: 'Renamed context',
+        },
+      ).kind,
     ).toBe('completed');
     expect(
-      authoring.completeInMap(OTHER_MAP_ID, {
-        kind: 'renamed-graph',
-        graphId: OTHER_GRAPH_ID,
-        title: 'Renamed Graph',
-      }).kind,
+      authoring.complete(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+        {
+          kind: 'renamed-graph',
+          graphId: OTHER_GRAPH_ID,
+          title: 'Renamed Graph',
+        },
+      ).kind,
     ).toBe('completed');
     expect(
-      authoring.completeInMap(OTHER_MAP_ID, {
-        kind: 'recolored-graph',
-        graphId: OTHER_GRAPH_ID,
-        color: '#f472b6',
-      }).kind,
+      authoring.complete(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+        {
+          kind: 'recolored-graph',
+          graphId: OTHER_GRAPH_ID,
+          color: '#f472b6',
+        },
+      ).kind,
     ).toBe('completed');
-    expect(authoring.completeInMap(OTHER_MAP_ID, { kind: 'added-graph' })).toMatchObject({
+    expect(
+      authoring.complete(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+        { kind: 'added-graph' },
+      ),
+    ).toMatchObject({
       kind: 'completed',
       createdGraphId: MINTED,
     });
     expect(
-      authoring.completeInMap(OTHER_MAP_ID, { kind: 'deleted-graph', graphId: MINTED }).kind,
-    ).toBe('completed');
-    expect(
-      authoring.completeInMap(OTHER_MAP_ID, {
-        kind: 'renamed-graph',
-        graphId: GRAPH_ID,
-        title: 'Wrong owner',
-      }),
+      authoring.complete(
+        { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+        {
+          kind: 'renamed-graph',
+          graphId: GRAPH_ID,
+          title: 'Wrong owner',
+        },
+      ),
     ).toMatchObject({ kind: 'refused', refusal: { code: 'graph-not-owned' } });
     const working = session.getState().working;
     expect(mapOf(working, OTHER_MAP_ID)).toMatchObject({
       title: 'Renamed context',
       positions: other.positions,
-      graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed Graph', color: '#f472b6' }],
+      graphs: [{ id: OTHER_GRAPH_ID, title: 'Renamed Graph', color: '#f472b6' }, { id: MINTED }],
     });
     expect(mapOf(working, MAP_ID)).toEqual(mapOf(positionedSnapshot, MAP_ID));
     expect(working.document.defaultMap).toBe(MAP_ID);
     expect(navigation.getState()).toEqual(initialNavigation);
   });
-});
-
-it('repairs the target canvas when a context command deletes its active Graph', () => {
-  const { session, navigation, authoring } = open({
-    ...positionedSnapshot,
-    document: {
-      ...positionedSnapshot.document,
-      maps: [
-        {
-          id: MAP_ID,
-          title: 'Map 1',
-          kind: 'positioned',
-          positions: {
-            [RESOURCE_A]: { x: 10, y: 20, open: false },
-            [RESOURCE_B]: { x: 300, y: 40, open: false },
-          },
-          graphs: [MAIN_GRAPH, { id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
-          activeGraph: GRAPH_ID,
-        },
-      ],
-    },
-  });
-  expect(authoring.completeInMap(MAP_ID, { kind: 'deleted-graph', graphId: GRAPH_ID }).kind).toBe(
-    'completed',
-  );
-  expect(navigation.getState().activeGraphId).toBe(OTHER_GRAPH_ID);
-  expect(graphsOf(session.getState().working).map((graph) => graph.id)).toEqual([OTHER_GRAPH_ID]);
 });

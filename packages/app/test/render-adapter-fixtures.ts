@@ -43,15 +43,28 @@ export function fixtureDisplay(
   },
 ): ResourceDisplay {
   if (!open) return CLOSED_DISPLAY;
-  const content: ResourceContent =
-    kind === 'space'
-      ? {
-          kind: 'space',
-          view: { ...space, graph: FIXTURE_TARGET_GRAPH, framing: undefined },
-          via: 'self',
-        }
-      : { kind: 'markdown', source, via: kind === 'reference' ? 'reference' : 'self' };
-  return { shown: 'open', content };
+  return { shown: 'open', content: fixtureContent(kind, source, space) };
+}
+
+function fixtureContent(
+  kind: Exclude<Resource['kind'], 'image'>,
+  source: string,
+  space: { readonly spaceId: UUID; readonly map: UUID },
+): ResourceContent {
+  switch (kind) {
+    case 'markdown':
+      return { kind: 'markdown', source, via: 'self' };
+    case 'reference':
+      return { kind: 'markdown', source, via: 'reference' };
+    case 'space':
+      return {
+        kind: 'space',
+        view: { ...space, graph: FIXTURE_TARGET_GRAPH, framing: undefined },
+        via: 'self',
+      };
+    case 'ur':
+      return { kind: 'ur', via: 'self' };
+  }
 }
 
 export function moving(id: string, x: number, y: number): NodeChange<ResourceFlowNode>[] {

@@ -6,7 +6,14 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import { create, type StoreApi, type UseBoundStore } from 'zustand';
-import type { ResourceId, GraphEdge, GraphId, MapPosition } from '@project/core';
+import {
+  uuidSchema,
+  graphEdgeSchema,
+  type ResourceId,
+  type GraphEdge,
+  type GraphId,
+  type MapPosition,
+} from '@project/core';
 import { Placement } from '@project/graph';
 import {
   ROUTED_EDGE_TYPE,
@@ -14,7 +21,7 @@ import {
   type RoutedEdgeData,
 } from '@project/react-flow-adapter';
 import { snapResourceSizeToClose } from './resource';
-import type { SpaceAuthoring } from './space-authoring';
+import type { SurfaceAuthoring } from './space-authoring';
 
 /**
  * The render adapter owns React Flow's transient projection. Space Authoring
@@ -125,25 +132,19 @@ export const selectedResourceOf = (selection: CanvasSelection): ResourceId | nul
 /** The Edge subject alone, so a caller that only handles Edges need not narrow. */
 export type EdgeSelection = Extract<CanvasSelection, { kind: 'edge' }>;
 
-/**
- * The domain Edge behind a projected React Flow Edge, or `null` for any Edge
- * that is not of the routed type — the one type only the canvas projection
- * writes, from Resource ids. An embedded Map's Edges are minted under their own
- * type (`EMBEDDED_EDGE_TYPE`), so they never convert.
- *
- * The **one** place that translation happens. Every surface that acts on an Edge
- * needs it — the selection mirror here, the decoration and callbacks in Edge
- * Authoring, the toolbar inside the Edge itself — and three hand-rolled copies
- * would be three chances to widen `source` and `target` differently.
- */
+/** The domain subject behind an Edge, independent of the drawing's placement ids. */
 export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
+  if (edge.type === 'embedded') {
+    const graph = uuidSchema.safeParse(edge.data?.['graphId']);
+    const resourceEdge = graphEdgeSchema.safeParse(edge.data?.['resourceEdge']);
+    return graph.success && resourceEdge.success
+      ? { kind: 'edge', graphId: graph.data, edge: resourceEdge.data }
+      : null;
+  }
   if (edge.type !== ROUTED_EDGE_TYPE) return null;
   // SAFETY: only the canvas projection writes `ROUTED_EDGE_TYPE`, and it always
   // writes it with `RoutedEdgeData` and Resource-id endpoints, so a routed Edge's
-  // `data` and endpoints are those. An embedded Map's Edges, whose endpoints are
-  // another Space's (ADR 0068), are minted under `EMBEDDED_EDGE_TYPE` instead —
-  // held by embedded-map.test.ts, 'mints its Edges as its own type, which never
-  // converts to an Edge selection'.
+  // `data` and endpoints are those. Embedded Edges parse their explicit subject above.
   return {
     kind: 'edge',
     graphId: (edge.data as RoutedEdgeData).graphId,
@@ -428,7 +429,7 @@ function selecting(
 }
 
 export type RenderAdapterAuthoring = Pick<
-  SpaceAuthoring,
+  SurfaceAuthoring,
   'mapPlacement' | 'complete' | 'getState' | 'subscribe'
 >;
 

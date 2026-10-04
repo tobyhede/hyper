@@ -40,6 +40,7 @@ import {
   waitUntilMapContinuationReady,
 } from './command-dock';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -249,10 +250,9 @@ describe('Space app conflict recovery', () => {
     let view: RenderResult | undefined;
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -260,7 +260,7 @@ describe('Space app conflict recovery', () => {
         else view.rerender(app);
       },
     );
-    expect(screen.getByText('Local space')).toBeVisible();
+    expect(within(screen.getByTestId('command-dock')).getByText('Local space')).toBeVisible();
     expect(screen.getByRole('alertdialog', { name: 'Changes conflict' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Keep local and retry' })).toBeVisible();
@@ -322,10 +322,9 @@ describe('Space app conflict recovery', () => {
     let view: RenderResult | undefined;
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -334,6 +333,10 @@ describe('Space app conflict recovery', () => {
       },
     );
 
+    // The canvas is mounted while placement is pending, so its viewport
+    // controls settle once the Resources are placed; waiting for them keeps
+    // that update inside this test.
+    await screen.findByRole('heading', { name: 'Local resource', hidden: true });
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
     return { local, session };
   };
@@ -402,10 +405,9 @@ describe('Space app conflict recovery', () => {
     let view: RenderResult | undefined;
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -445,7 +447,7 @@ describe('Space app conflict recovery', () => {
   it('keeps the conflicted Space on screen when it refuses the remote snapshot', async () => {
     await refusedRemote();
 
-    expect(screen.getByText('Local space')).toBeVisible();
+    expect(within(screen.getByTestId('command-dock')).getByText('Local space')).toBeVisible();
     // Awaited because placement is asynchronous — the Resource arrives with the
     // placement, not with the mount.
     expect(
@@ -478,10 +480,9 @@ describe('Space app permanent save refusal', () => {
     let view: RenderResult | undefined;
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -530,10 +531,9 @@ describe('Space app failure reporting', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(addressed).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -603,10 +603,9 @@ describe('Space app failure reporting', () => {
       try {
         mountSpace(
           {
-            images: unusedImageSources,
             id: runtime(valid).id,
             session,
-            app: composeApp({ spaceSession: session }),
+            app: composeApp({ images: unusedImageSources, spaceSession: session }),
             spaceResources,
           },
           (app) => render(app),
@@ -686,10 +685,9 @@ describe('Space app failure reporting', () => {
     try {
       mountSpace(
         {
-          images: unusedImageSources,
           id: runtime(valid).id,
           session,
-          app: composeApp({ spaceSession: session }),
+          app: composeApp({ images: unusedImageSources, spaceSession: session }),
           spaceResources,
         },
         (app) => render(app),
@@ -731,7 +729,7 @@ describe('Space app failure reporting', () => {
         exportedRevision: null,
       },
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     // Written straight onto the session, past the validation every authoring
     // path performs first: reaching this state means an invariant has already
     // broken, which is what the guard is a backstop for.
@@ -745,7 +743,7 @@ describe('Space app failure reporting', () => {
     // was one. What is pinned here is the mount, not the location.
     expect(() =>
       mountSpaceApp(
-        { images: unusedImageSources, id: runtime(valid).id, session, app, spaceResources },
+        { id: runtime(valid).id, session, app, spaceResources },
         createBrowserLocation(recordingHistory()),
         (view) => {
           render(view);
@@ -778,10 +776,9 @@ describe('Space app failure reporting', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(valid).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => {
@@ -827,10 +824,9 @@ describe('Space app Resources list', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(empty).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -867,10 +863,9 @@ describe('Space app Resources list', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -913,10 +908,9 @@ describe('Space app Resources list', () => {
     );
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -967,10 +961,9 @@ describe('Space app Resources list', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1020,10 +1013,9 @@ describe('Space app Resources list', () => {
     );
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1073,10 +1065,9 @@ describe('Space app Resources list', () => {
     );
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1114,10 +1105,9 @@ describe('Space app Resources list', () => {
     );
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1170,10 +1160,9 @@ describe('Space app Resources list', () => {
     );
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1207,17 +1196,14 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     const complete = app.authoring.complete;
-    vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
+    vi.spyOn(app.authoring, 'complete').mockImplementation((target, completion) =>
       completion.kind === 'renamed-map'
         ? { kind: 'refused', refusal: { code: 'map-not-found' } }
-        : complete(completion),
+        : complete(target, completion),
     );
-    mountSpace(
-      { images: unusedImageSources, id: runtime(base).id, session, app, spaceResources },
-      (view) => render(view),
-    );
+    mountSpace({ id: runtime(base).id, session, app, spaceResources }, (view) => render(view));
 
     await beginRename('selected-canvas');
     const mapEditor = await screen.findByRole('textbox', { name: 'Map name' });
@@ -1249,17 +1235,14 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     const complete = app.authoring.complete;
-    vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
+    vi.spyOn(app.authoring, 'complete').mockImplementation((target, completion) =>
       completion.kind === 'renamed-graph'
         ? { kind: 'refused', refusal: { code: 'graph-not-owned' } }
-        : complete(completion),
+        : complete(target, completion),
     );
-    mountSpace(
-      { images: unusedImageSources, id: runtime(base).id, session, app, spaceResources },
-      (view) => render(view),
-    );
+    mountSpace({ id: runtime(base).id, session, app, spaceResources }, (view) => render(view));
 
     await beginRename('active-graph');
     const graphEditor = await screen.findByRole('textbox', { name: 'Graph name' });
@@ -1290,17 +1273,14 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     const complete = app.authoring.complete;
-    vi.spyOn(app.authoring, 'complete').mockImplementation((completion) =>
+    vi.spyOn(app.authoring, 'complete').mockImplementation((target, completion) =>
       completion.kind === 'created-map'
         ? { kind: 'refused', refusal: { code: 'map-not-found' } }
-        : complete(completion),
+        : complete(target, completion),
     );
-    mountSpace(
-      { images: unusedImageSources, id: runtime(base).id, session, app, spaceResources },
-      (view) => render(view),
-    );
+    mountSpace({ id: runtime(base).id, session, app, spaceResources }, (view) => render(view));
     await waitUntilMapContinuationReady();
 
     newMap('Map');
@@ -1327,19 +1307,16 @@ describe('Space app Resources list', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session });
+    const app = composeApp({ images: unusedImageSources, spaceSession: session });
     // A second Map, selected, so Delete is available on it.
-    expect(app.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+    expect(app.authoring.complete(CANVAS, { kind: 'created-map' }).kind).toBe('completed');
     const selected = app.navigation.getState().selectedMapId;
     const title = app.currentSpace().lookup.map(selected)?.map.title ?? '';
     vi.spyOn(spaceResources, 'deleteMap').mockResolvedValue({
       kind: 'refused',
       refusal: { code: 'map-not-found', mapId: selected },
     });
-    mountSpace(
-      { images: unusedImageSources, id: runtime(base).id, session, app, spaceResources },
-      (view) => render(view),
-    );
+    mountSpace({ id: runtime(base).id, session, app, spaceResources }, (view) => render(view));
     await waitUntilMapContinuationReady();
 
     openMapMenu(title);
@@ -1382,10 +1359,9 @@ describe('Space app Resources list', () => {
     );
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1424,10 +1400,9 @@ describe('Space app Resources list', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1462,10 +1437,9 @@ describe('Space app Resources list', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(base).id,
         session,
-        app: composeApp({ spaceSession: session }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session }),
         spaceResources,
       },
       (app) => render(app),
@@ -1521,10 +1495,9 @@ describe('Space app Resources list', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1617,10 +1590,9 @@ describe('Space app Resources list', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1682,10 +1654,9 @@ describe('Space app Resources list', () => {
 
     mountSpace(
       {
-        images: unusedImageSources,
         id: runtime(local).id,
         session,
-        app: composeApp({ spaceSession: session, selection: MAP_ID }),
+        app: composeApp({ images: unusedImageSources, spaceSession: session, selection: MAP_ID }),
         spaceResources,
       },
       (app) => render(app),
@@ -1742,11 +1713,12 @@ describe('Space app Resources list drop', () => {
       new MemorySpaceBackend(SPACE_ID, [stored]),
       stored,
     );
-    const app = composeApp({ spaceSession: session, selection: MAP_ID });
-    mountSpace(
-      { images: unusedImageSources, id: runtime(local).id, session, app, spaceResources },
-      (view) => render(view),
-    );
+    const app = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+    });
+    mountSpace({ id: runtime(local).id, session, app, spaceResources }, (view) => render(view));
     await waitFor(() => expect(unavailable(createResourceControl())).toBe(false));
 
     fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
@@ -1770,7 +1742,7 @@ describe('Space app Resources list drop', () => {
     // The Resource joins the Map while the drag is in flight — another tab, a
     // press elsewhere — so the drop is refused as already placed.
     act(() => {
-      app.authoring.complete({
+      app.authoring.complete(CANVAS, {
         kind: 'added-resource-to-map',
         resourceId: OUTSIDE_RESOURCE_ID,
         anchor: { x: 400, y: 20 },

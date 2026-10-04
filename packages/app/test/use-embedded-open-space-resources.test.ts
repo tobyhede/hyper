@@ -47,9 +47,12 @@ const reader = (
   embed: (spaceId: typeof TARGET) => Promise<OpenSpace | undefined>,
   entries: readonly OpenSpace[] = [],
 ): EmbeddedTargetReader => ({
-  getState: () => ({ entries }),
+  getState: () => ({ composed: entries }),
   subscribe: () => () => undefined,
-  embed,
+  hold: async (spaceId) => {
+    await embed(spaceId);
+    return { release: () => Promise.resolve() };
+  },
 });
 
 describe('useEmbeddedOpenSpaceResources', () => {
@@ -60,7 +63,12 @@ describe('useEmbeddedOpenSpaceResources', () => {
       return Promise.resolve(undefined);
     });
     const { rerender } = renderHook(
-      ({ nodes }) => useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG),
+      ({ nodes }) =>
+        useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG, {
+          spaceId: HOST,
+          mapId: OTHER_MAP,
+          policy: 'authoring',
+        }),
       {
         initialProps: { nodes: [spaceResource(HOST, MAP)] },
       },
@@ -75,6 +83,42 @@ describe('useEmbeddedOpenSpaceResources', () => {
     await waitFor(() => expect(asked).toEqual([TARGET, TARGET]));
   });
 
+  it('releases a drawing that closes before its target finishes loading', async () => {
+    let finish: (() => void) | undefined;
+    let released = 0;
+    const composed: readonly OpenSpace[] = [];
+    const spaces: EmbeddedTargetReader = {
+      getState: () => ({ composed }),
+      subscribe: () => () => undefined,
+      hold: async () => {
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+        return {
+          release: () => {
+            released += 1;
+            return Promise.resolve();
+          },
+        };
+      },
+    };
+    const { rerender } = renderHook(
+      ({ nodes }) =>
+        useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG, {
+          spaceId: HOST,
+          mapId: OTHER_MAP,
+          policy: 'authoring',
+        }),
+      { initialProps: { nodes: [spaceResource(HOST, MAP)] } },
+    );
+    rerender({ nodes: [] });
+    await act(async () => {
+      finish?.();
+      await Promise.resolve();
+    });
+    expect(released).toBe(1);
+  });
+
   it('surfaces a failed read keyed by the target Space and clears it on resume', async () => {
     let fail = true;
     const spaces = reader(() => {
@@ -82,7 +126,11 @@ describe('useEmbeddedOpenSpaceResources', () => {
       return Promise.resolve(undefined);
     });
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG),
+      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG, {
+        spaceId: HOST,
+        mapId: OTHER_MAP,
+        policy: 'authoring',
+      }),
     );
     await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
     fail = false;
@@ -95,7 +143,12 @@ describe('useEmbeddedOpenSpaceResources', () => {
   it('drops a failure whose embedding is no longer standing', async () => {
     const spaces = reader(() => Promise.reject(new Error('Target missing')));
     const { result, rerender } = renderHook(
-      ({ nodes }) => useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG),
+      ({ nodes }) =>
+        useEmbeddedOpenSpaceResources(nodes, spaces, NO_DRAG, {
+          spaceId: HOST,
+          mapId: OTHER_MAP,
+          policy: 'authoring',
+        }),
       { initialProps: { nodes: [spaceResource(HOST, MAP)] } },
     );
     await waitFor(() => expect(result.current.embeddedFailures.get(TARGET)).toBe('Target missing'));
@@ -106,7 +159,11 @@ describe('useEmbeddedOpenSpaceResources', () => {
   it('measures the title footer into embed bounds', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG),
+      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG, {
+        spaceId: HOST,
+        mapId: OTHER_MAP,
+        policy: 'authoring',
+      }),
     );
     await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
     expect(result.current.embeddedRequests[0]?.bounds.bottom).toBe(396);
@@ -119,7 +176,11 @@ describe('useEmbeddedOpenSpaceResources', () => {
   it('owns portal Edit membership and the in-flight framing draft', async () => {
     const spaces = reader(() => Promise.resolve(undefined));
     const { result } = renderHook(() =>
-      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG),
+      useEmbeddedOpenSpaceResources([spaceResource(HOST, MAP)], spaces, NO_DRAG, {
+        spaceId: HOST,
+        mapId: OTHER_MAP,
+        policy: 'authoring',
+      }),
     );
     await waitFor(() => expect(result.current.embeddedRequests).toHaveLength(1));
     const framing: SpaceResourceFraming = { centreX: 200, centreY: 100, zoom: 2 };

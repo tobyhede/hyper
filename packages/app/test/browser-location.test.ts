@@ -12,6 +12,8 @@ import { createBrowserHistory } from '../src/browser-history';
 import { createBrowserLocation, NavigationUnavailableError } from '../src/browser-location';
 import { composeApp } from '../src/compose-app';
 import { recordingHistory, standInBrowser } from './browser-history';
+import type { ImageSources } from '../src/image-creation';
+import { heldImageSources, unusedImageSources } from './image-sources';
 
 /**
  * The rules that decide a browser history entry, proved without a DOM.
@@ -90,9 +92,42 @@ const selfEdge: SpaceSnapshot = {
   resources: [{ id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 };
 
-const compose = (opened: SpaceSnapshot = snapshot) => {
+const compose = (opened: SpaceSnapshot = snapshot, images: ImageSources = unusedImageSources) => {
   const loaded = { snapshot: opened, revision: 0n, exportedRevision: null };
-  return composeApp({ spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded) });
+  return composeApp({
+    images,
+    spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded),
+  });
+};
+
+/** An Image Resource no Map places, so a replacement has something to replace. */
+const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
+
+/**
+ * The Space composed with a replacement of its Image Resource held while it
+ * measures, and the release that lets it finish.
+ */
+const composeReplacing = () => {
+  const held = heldImageSources();
+  const app = compose(
+    {
+      ...snapshot,
+      resources: [
+        ...snapshot.resources,
+        {
+          id: IMAGE_ID,
+          document: { title: 'Figure', kind: 'image', url: 'https://example.com/figure.png' },
+        },
+      ],
+    },
+    held.images,
+  );
+  const replace = () =>
+    app.imageReplacement.replace(IMAGE_ID, {
+      kind: 'url',
+      url: 'https://example.com/replacement.png',
+    });
+  return { app, replace, release: held.release };
 };
 
 const mapPath = (mapId: MapId): string =>
@@ -115,19 +150,18 @@ const resourcePath = (mapId: MapId, resourceId: ResourceId): string =>
 const deadPath = mapPath(MISSING_MAP_ID);
 
 it('holds Maps, Graphs and browser traversal during replacement, then permits navigation', async () => {
-  const app = compose();
+  const { app, replace, release } = composeReplacing();
   const history = recordingHistory(mapPath(MAP_ID));
   const location = createBrowserLocation(history);
   location.follow(app);
-  const release = Promise.withResolvers<undefined>();
-  const pending = app.imageReplacement.run(() => release.promise);
+  const pending = replace();
   location.activateGraph(SECOND_GRAPH_ID);
   location.chooseMap(OTHER_MAP_ID);
   history.popTo(mapPath(OTHER_MAP_ID));
   expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
   expect(history.pathname()).toBe(mapPath(MAP_ID));
   expect(history.writes).toEqual([]);
-  release.resolve(undefined);
+  release();
   await pending;
   history.popTo(mapPath(OTHER_MAP_ID));
   expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
@@ -136,8 +170,35 @@ it('holds Maps, Graphs and browser traversal during replacement, then permits na
   location.dispose();
 });
 
-it('holds a Back refused by a replacement while a later held Back is still returning', async () => {
+it('holds Back, Forward and deliberate navigation when another composed Space replaces an image', async () => {
   const app = compose();
+  const other = composeReplacing();
+  const history = recordingHistory(mapPath(MAP_ID));
+  const location = createBrowserLocation(history, undefined, undefined, () =>
+    other.app.imageReplacement.getState(),
+  );
+  location.follow(app);
+  const pending = other.replace();
+  location.activateGraph(SECOND_GRAPH_ID);
+  location.chooseMap(OTHER_MAP_ID);
+  history.popTo(mapPath(OTHER_MAP_ID));
+  expect(history.pathname()).toBe(mapPath(MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
+  expect(app.navigation.getState().activeGraphId).toBe(GRAPH_ID);
+  other.release();
+  await pending;
+  history.popTo(mapPath(OTHER_MAP_ID));
+  expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
+  const second = other.replace();
+  history.popTo(mapPath(MAP_ID));
+  expect(history.pathname()).toBe(mapPath(OTHER_MAP_ID));
+  other.release();
+  await second;
+  location.dispose();
+});
+
+it('holds a Back refused by a replacement while a later held Back is still returning', async () => {
+  const { app, replace, release } = composeReplacing();
   const stand = standInBrowser({ path: mapPath(MAP_ID) });
   const history = createBrowserHistory(stand.browser);
   history.push(mapGraphPath(MAP_ID, SECOND_GRAPH_ID));
@@ -154,8 +215,7 @@ it('holds a Back refused by a replacement while a later held Back is still retur
   location.follow(app);
   stand.back();
   stand.settle();
-  const release = Promise.withResolvers<undefined>();
-  const replacement = app.imageReplacement.run(() => release.promise);
+  const replacement = replace();
   // The second Back is held at once, and its rewind has not arrived when the
   // first Back's destination refuses to open.
   stand.back();
@@ -169,7 +229,7 @@ it('holds a Back refused by a replacement while a later held Back is still retur
   expect(history.pathname()).toBe(mapPath(OTHER_MAP_ID));
   expect(opened).toEqual([mapGraphPath(MAP_ID, SECOND_GRAPH_ID)]);
   expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
-  release.resolve(undefined);
+  release();
   await replacement;
   expect(history.pathname()).toBe(mapPath(OTHER_MAP_ID));
   location.dispose();

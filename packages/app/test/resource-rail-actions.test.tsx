@@ -46,6 +46,7 @@ const TARGET_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const TARGET_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
 const GRAPH_ID_2 = uuidSchema.parse('00000000-0000-4000-8000-00000000000c');
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000d');
+const UR_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000e');
 
 /**
  * Two placed Resources and no Edges.
@@ -132,6 +133,29 @@ const withImage: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
+/** The same Space with an Ur Resource in it, Open, for the commands a contentless Resource keeps. */
+const withUr: SpaceSnapshot = spaceSnapshotSchema.parse({
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    maps: [
+      {
+        ...snapshot.document.maps?.[0],
+        positions: {
+          ...snapshot.document.maps?.[0]?.positions,
+          [UR_ID]: {
+            x: 0,
+            y: 400,
+            open: true,
+            openSize: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
+          },
+        },
+      },
+    ],
+  },
+  resources: [...snapshot.resources, { id: UR_ID, document: { title: 'Gateway', kind: 'ur' } }],
+});
+
 /** A Space Resource with a target that the test backend also stores. */
 const withSpaceResource: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
@@ -210,10 +234,10 @@ function mount(
     stored,
   );
   let view: RenderResult | undefined;
-  const app = composeApp({ spaceSession: session, spaceResources });
+  const app = composeApp({ images: unusedImageSources, spaceSession: session, spaceResources });
   prepare?.(app);
   mountSpace(
-    { images: unusedImageSources, id: runtime(mounted).id, session, app, spaceResources },
+    { id: runtime(mounted).id, session, app, spaceResources },
     (app) => {
       if (view === undefined) view = render(app);
       else view.rerender(app);
@@ -393,10 +417,10 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('shows a refused removal as "Resource not removed" and dismisses it', async () => {
     const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
       const complete = authoring.complete;
-      vi.spyOn(authoring, 'complete').mockImplementation((completion) =>
+      vi.spyOn(authoring, 'complete').mockImplementation((target, completion) =>
         completion.kind === 'removed-resource-from-map'
           ? { kind: 'refused', refusal: { code: 'resource-not-found' } }
-          : complete(completion),
+          : complete(target, completion),
       );
     });
 
@@ -423,14 +447,14 @@ describe('a Resource’s commands on the canvas rail', () => {
   it('shows a refused Graph creation and Reference Resource creation, and dismisses each', async () => {
     const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
       const complete = authoring.complete;
-      vi.spyOn(authoring, 'complete').mockImplementation((completion) => {
+      vi.spyOn(authoring, 'complete').mockImplementation((target, completion) => {
         if (completion.kind === 'added-graph') {
           return { kind: 'refused', refusal: { code: 'map-not-found' } };
         }
         if (completion.kind === 'created-reference') {
           return { kind: 'refused', refusal: { code: 'resource-not-found' } };
         }
-        return complete(completion);
+        return complete(target, completion);
       });
     });
 
@@ -879,6 +903,43 @@ describe('a Resource’s commands on the canvas rail', () => {
     const editor = await screen.findByRole('textbox', { name: 'Resource title' });
     expect(editor).toHaveValue('Harbour');
     expect(editor).toHaveFocus();
+    await settled(session);
+  });
+
+  /**
+   * An Ur Resource has no content, so its rail offers no Edit (ADR 0113); every
+   * other Resource command is its as it is every Resource's.
+   */
+  it('offers an Ur Resource every Resource command and no Edit', async () => {
+    const session = mount(undefined, undefined, withUr);
+    await selectResource('Gateway');
+
+    expect(await screen.findByRole('button', { name: 'Close Resource Gateway' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource Gateway' }));
+    expectMenuGroups(await screen.findByRole('menu'), [
+      ['Create Reference'],
+      ['Connect to Resource'],
+      ['Copy link to Resource in Map', 'Copy link to Resource'],
+      ['Remove from Map', 'Delete from Space'],
+    ]);
+    await settled(session);
+  });
+
+  it('creates a Reference Resource from an Ur Resource, named after it', async () => {
+    const session = mount(undefined, undefined, withUr);
+    await selectResource('Gateway');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Gateway' }));
+    const row = await screen.findByRole('menuitem', { name: 'Create Reference' });
+    expect(row).not.toHaveAttribute('aria-disabled', 'true');
+    fireEvent.click(row);
+
+    await waitFor(() => expect(resourceIds(session)).toHaveLength(4));
+    expect(session.getState().working.resources.at(-1)?.document).toEqual({
+      title: 'Gateway',
+      kind: 'reference',
+      target: UR_ID,
+    });
     await settled(session);
   });
 

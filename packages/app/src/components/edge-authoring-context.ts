@@ -11,6 +11,7 @@ import type { EdgeSubject } from '../render-adapter';
  * Edge on the canvas would re-render whenever any command's identity moved. One context, read by whichever Edge is drawing its own chrome.
  */
 export interface EdgeAuthoringCommands {
+  readonly forEdge?: (edgeId: string) => EdgeAuthoringCommands;
   /** The Graph whose Edges draw Titles: the Active Graph, and only it. */
   readonly activeGraphId: GraphId | null;
   /** The Edge whose Title is being written, if any. */

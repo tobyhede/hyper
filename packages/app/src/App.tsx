@@ -1,4 +1,5 @@
-import { useRef, useSyncExternalStore } from 'react';
+import type { DrawnClipboardFailure } from './embedded-publication';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
@@ -12,8 +13,7 @@ import { useOpenSpacesStanding } from './open-spaces-context';
 import { useAddressedResource } from './addressed-resource';
 import { useMapView } from './map-view';
 import { useResourcePlacement } from './resource-placement';
-import { useCanvasRendering } from './canvas-rendering';
-import { useAuthoringAvailability } from './use-authoring-availability';
+import { useMapSurface } from './use-map-surface';
 import { useResourcesDisclosure } from './resources-disclosure';
 import { useSpaceAddresses } from './space-addresses';
 import { useResourceRailActions } from './resource-rail-actions';
@@ -30,7 +30,7 @@ import { CommandDock } from './components/CommandDock';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingChrome } from './components/PresentingChrome';
-import { CommandNotices, ShellNotice } from './components/ShellNotice';
+import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/ShellNotice';
 
 export const createApp = (
   opened: OpenSpace,
@@ -74,6 +74,37 @@ export const createApp = (
   }
 
   function App() {
+    const [drawnClipboardFailures, setDrawnClipboardFailures] = useState<
+      readonly DrawnClipboardFailure[]
+    >([]);
+    const reportDrawnClipboardFailures = useCallback(
+      (failures: readonly DrawnClipboardFailure[]) => {
+        setDrawnClipboardFailures((previous) =>
+          previous.length === failures.length &&
+          previous.every((failure, index) => {
+            const next = failures[index];
+            return (
+              failure.occurrence === next?.occurrence &&
+              failure.title === next.title &&
+              failure.message === next.message &&
+              failure.dismiss === next.dismiss
+            );
+          })
+            ? previous
+            : failures,
+        );
+      },
+      [],
+    );
+    const [drawnSpaces, setDrawnSpaces] = useState<readonly OpenSpace[]>([]);
+    const reportDrawnSpaces = useCallback((entries: readonly OpenSpace[]) => {
+      setDrawnSpaces((previous) =>
+        previous.length === entries.length &&
+        previous.every((entry, index) => entry === entries[index])
+          ? previous
+          : entries,
+      );
+    }, []);
     const replacingImage = useSyncExternalStore(
       composition.imageReplacement.subscribe,
       composition.imageReplacement.getState,
@@ -90,7 +121,8 @@ export const createApp = (
       selectedMapId,
     );
     const view = useMapView(readWorkingSpace, sessionState.working, selectedMapId);
-    const { renderedSpace, selectedMap, projection } = view;
+    const { renderedSpace, selectedMap } = view;
+    const { projection } = composition.surface.view();
     const placement = useResourcePlacement(opened, {
       map: selectedMap.map,
       presenting,
@@ -103,31 +135,20 @@ export const createApp = (
     // being presented is traversable at once, and nothing subscribes to the
     // array's identity.
     const moves = navigation.moves();
-    const canvasRendering = useCanvasRendering(useRenderAdapter, {
-      projection,
-      mapPlacement: view.mapPlacement,
-      activeGraphId,
-      activeResourceId,
-      presenting,
-    });
-    const { hasResourcesOnCanvas, liveProjection, projected, canvas } = canvasRendering;
     const {
+      canvasRendering,
       availability,
       editingResourceBody,
       setEditingResourceBody,
       setEditingResourceTitle,
       setEditingChromeTitle,
-    } = useAuthoringAvailability(
-      {
-        editable: hasResourcesOnCanvas,
-        replacingImage,
-        presenting,
-        spaceOnCanvas: active,
-        editingEmbeddedMap: canvasRendering.editingEmbeddedMap,
-        creatingSpaceResource: placement.creatingSpaceResource,
-      },
-      replacementEpoch,
-    );
+    } = useMapSurface(composition, composition.surface, {
+      activeResourceId,
+      presenting,
+      spaceOnCanvas: active,
+      creatingSpaceResource: placement.creatingSpaceResource,
+    });
+    const { hasResourcesOnCanvas, liveProjection, projected, canvas } = canvasRendering;
     const discloseResources = useResourcesDisclosure(availability.resourcesView, {
       addressedResourceId,
       mapId: selectedMapId,
@@ -204,7 +225,21 @@ export const createApp = (
                 {clipboardFailure}
               </ShellNotice>
             )}
+            {drawnClipboardFailures.map((failure) => (
+              <ShellNotice
+                key={failure.occurrence}
+                title={`${failure.title}: Link not copied`}
+                onDismiss={failure.dismiss}
+              >
+                {failure.message}
+              </ShellNotice>
+            ))}
             <CommandNotices commandOutcomes={commandOutcomes} />
+            {drawnSpaces
+              .filter((entry) => entry.id !== opened.id)
+              .map((entry) => (
+                <DrawnSpaceNotices key={entry.id} entry={entry} />
+              ))}
             {/* **The one report here with no dismissal, and it is not an
                 oversight.** The others are about a press that is over, so
                 putting one away changes nothing it is about. This one is about
@@ -249,7 +284,17 @@ export const createApp = (
             ? 'Persisted'
             : sessionState.persistence.kind}
         </span>
-        <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} />
+        {active ? <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} /> : null}
+        {active
+          ? drawnSpaces
+              .filter((entry) => entry.id !== opened.id)
+              .map((entry) => (
+                <ArmedDeleteConfirmation
+                  key={entry.id}
+                  deleteConfirmation={entry.app.deleteConfirmation}
+                />
+              ))
+          : null}
         {/* One child, not a row: the Resources list portals over this rather than
             sitting beside it, so a toggle that says nothing about the Map no
             longer re-flows the canvas and re-measures every Resource on it. */}
@@ -269,13 +314,15 @@ export const createApp = (
           )}
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />
-          ) : canvas.kind === 'resources' ? (
-            <ReactFlowProvider>
+          ) : (
+            // Keyed on the replacement epoch: React Flow's store holds a drag in
+            // flight, and the canvas stays mounted while placement is pending,
+            // so only a new store ends a drag begun in the replaced Space.
+            <ReactFlowProvider key={replacementEpoch}>
+              {canvas.kind === 'placeholder' ? <PlacementPending /> : null}
               {/* Inside the provider and outside the canvas: it reads React
                   Flow's viewport for controls that live in the toolbar and in
-                  the panes over the graph, and it is deliberately not keyed by
-                  the replacement epoch — the getter it reports describes the
-                  viewport, which a replaced Space does not invalidate. */}
+                  the panes over the graph. */}
               <CanvasCentre report={placement.reportVisibleCentre} />
               {/* The canvas half of where an Edit continues. Inside the
                   provider because `reveal` moves the camera and because an Edge
@@ -288,6 +335,9 @@ export const createApp = (
                 onSelectEdge={canvasRendering.selectEdge}
               />
               <SpaceCanvas
+                surface={composition.surface}
+                onDrawnClipboardFailuresChange={reportDrawnClipboardFailures}
+                onDrawnSpacesChange={reportDrawnSpaces}
                 commandOutcomes={commandOutcomes}
                 deleteConfirmation={deleteConfirmation}
                 // Keyed on the replacement epoch, so accepting the stored Space
@@ -317,16 +367,14 @@ export const createApp = (
                 onSelectEdge={canvasRendering.selectEdge}
                 placedResources={view.placedResources}
                 newResourceTitle={view.newResourceTitle}
-                onAddResource={placement.addResource}
+                onAddResource={() => placement.createResource('markdown')}
                 onAddExistingResource={placement.dropExistingResource}
                 onPlaceSpace={placement.dropSpace}
                 onDropImages={placement.dropImages}
                 onPasteImageUrl={placement.pasteImageUrl}
-                images={opened.images}
                 imageReplacement={composition.imageReplacement}
-                reportObserverError={reportObserverError}
                 nameOnCreation={nameOnCreation}
-                authoring={authoring}
+                authoring={composition.surface.authoring}
                 spaceSession={spaceSession}
                 onBodyEditingChange={setEditingResourceBody}
                 onTitleEditingChange={setEditingResourceTitle}
@@ -342,8 +390,6 @@ export const createApp = (
                 resourceEntityActions={resourceRailActions}
               />
             </ReactFlowProvider>
-          ) : (
-            <PlacementPending />
           )}
 
           {presenting && (

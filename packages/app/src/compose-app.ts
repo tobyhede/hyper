@@ -2,21 +2,30 @@ import { newUuid, type MapId, type SpaceSnapshot, type UUID } from '@project/cor
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createCommandOutcomes, type CommandOutcomes } from './command-outcomes';
-import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
-import { createContinuation, type Continuation } from './continuation';
-import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
+import type { ConnectionCompletion } from './connection-completion';
+import type { Continuation } from './continuation';
+import type { EdgeAuthoring } from './edge-authoring';
+import { createMapSurface, type MapSurface } from './map-surface';
 import { createDeleteConfirmation, type DeleteConfirmation } from './delete-confirmation';
 import { createResourceDeletion, type ResourceDeletion } from './resource-deletion';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 import { createNavigation, type Navigation } from './navigation';
-import { createRenderAdapter, type RenderAdapter } from './render-adapter';
+import type { RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
-import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
 import {
-  createImageReplacementActivity,
-  type ImageReplacementActivity,
-} from './image-replacement-activity';
+  createSpaceAuthoring,
+  type SpaceAuthoring,
+  type SurfaceAuthoring,
+} from './space-authoring';
+import {
+  createImageResources,
+  type ImageEditResult,
+  type ImageOrigin,
+  type ImageSources,
+  type ImageTarget,
+} from './image-creation';
+import { createImageReplacements, type ImageReplacements } from './image-replacement';
 
 /**
  * What an opened Space is composed of.
@@ -57,6 +66,16 @@ export interface ComposeCoreDependencies {
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
   /**
+   * Where this Space's created and replaced images are stored and measured
+   * (ADR 0106).
+   *
+   * Required with no default: both reach outside the process, so the caller
+   * that composes the Space names them, and a test supplies answers of its own.
+   * The composition is the only holder, so creating and replacing an image in
+   * this Space always use the same sources.
+   */
+  readonly images: ImageSources;
+  /**
    * Mints the identity of every Resource, Map and Graph a completed Edit creates
    * (ADR 0109).
    *
@@ -93,7 +112,7 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
 /** The pair a connection completion is written in terms of. */
 export interface EdgeCollaborators {
   readonly adapter: RenderAdapter;
-  readonly authoring: SpaceAuthoring;
+  readonly authoring: SurfaceAuthoring;
 }
 
 export interface AppCore {
@@ -119,9 +138,22 @@ export interface AppCore {
 }
 
 export interface ComposedApp extends AppCore {
-  readonly imageReplacement: ImageReplacementActivity;
+  /**
+   * Create Image Resources from one gesture's files or URL, over this Space's
+   * image sources and Authoring.
+   */
+  readonly createImageResources: (
+    origin: ImageOrigin,
+    target: ImageTarget,
+  ) => Promise<ImageEditResult>;
+  /**
+   * This Space's image replacements: the one way to replace an Image
+   * Resource's picture, and its busy state.
+   */
+  readonly imageReplacement: ImageReplacements;
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;
+  readonly surface: MapSurface;
   /**
    * Where the finished Edit leaves the author.
    *
@@ -145,14 +177,8 @@ export interface ComposedApp extends AppCore {
   /**
    * The sink this composition reports through, answered as well as taken.
    *
-   * A collaborator composed *over* a finished app rather than inside it — the
-   * embedded canvas's own authoring (`embedded-authoring.ts`) is the one —
-   * needs the same sink and holds nothing else that could name it. Answering
-   * it is what lets that module take its reporter required, with no default of
-   * its own: ADR 0109 puts the ambient `console.error` at the composition, and
-   * a module mounted from a canvas gesture minting a second one is exactly the
-   * invisible source the one owner exists to prevent. Resolved here when a
-   * caller supplies none, so what is answered is always a function.
+   * Every drawing of this Space uses this sink. Resolved here when a caller
+   * supplies none, so a drawn Map always receives a function (ADR 0109).
    */
   readonly reportObserverError: ObserverErrorReporter;
 }
@@ -182,6 +208,7 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
 export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   const {
     spaceSession,
+    images,
     newId = newUuid,
     reportObserverError,
     connections,
@@ -201,20 +228,25 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     newId,
     reportObserverError,
   });
-  const adapter = createRenderAdapter(authoring);
-  const continuation = createContinuation({ authoring, reportObserverError });
   const deleteConfirmation = createDeleteConfirmation({ authoring, reportObserverError });
-  // The Edge lifecycle, composed once beside the two collaborators it consumes.
-  // It owns neither: the render adapter stays authoritative for the projection
-  // and the canvas selection, Space Authoring for eligibility and every Edit.
-  const edgeAuthoring = createEdgeAuthoring({
-    authoring,
-    adapter,
-    connections: (connections ?? createConnectionCompletion)({ adapter, authoring }),
-    continuation,
-    deleteConfirmation,
-    reportObserverError,
-  });
+  const surface = createMapSurface(
+    {
+      authoring,
+      currentSpace,
+      deleteConfirmation,
+      reportObserverError: compositionReporter,
+    },
+    () => ({
+      kind: 'canvas',
+      mapId: navigation.getState().selectedMapId,
+      graphId: navigation.getState().activeGraphId,
+      presentingResourceId: navigation.activeResourceId(),
+      policy: 'authoring',
+    }),
+    connections,
+  );
+  surface.observe();
+  const { adapter, edgeAuthoring, continuation } = surface;
   const commandOutcomes = createCommandOutcomes({
     authoring,
     navigation,
@@ -230,9 +262,16 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   });
   return {
     ...core,
-    imageReplacement: createImageReplacementActivity(compositionReporter),
+    createImageResources: (origin, target) =>
+      createImageResources({ images, authoring }, origin, target),
+    imageReplacement: createImageReplacements({
+      images,
+      authoring,
+      reportObserverError: compositionReporter,
+    }),
     authoring,
     adapter,
+    surface,
     continuation,
     edgeAuthoring,
     commandOutcomes,
