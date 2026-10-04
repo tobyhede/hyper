@@ -28,3 +28,7 @@ Local checks passed: `pnpm typecheck:toolchain`, `pnpm typecheck`, `pnpm typeche
 ## Answer
 
 Implemented and verified on draft PR #334. All acceptance criteria are satisfied; ticket 07 remains out of scope.
+
+2026-10-04: Rebased onto `origin/main` 9cb40e16 (#332); the implementation commit is now `a0d61c0b`. Conflicts with ADR 0112's Map surface were resolved by keeping main's structure and asking `contentAction` where this ticket's sites did. Watched [CI run 37195903090](https://github.com/tobyhede/hyper/actions/runs/37195903090) finish with `CI passed` green for `4aa66e31`: static-checks, coverage, all three e2e shards, ladle, postgres and sqlite passed.
+
+2026-10-04 review follow-up: `unresolved` answered `drawsContentArea: false` while `useAreaContent` still mounts its "Target not found" notice, so the fact and the renderer disagreed and the notice lost the Title-below layout the old `[data-kind='reference']` rule gave it. It now answers `true`; `resource-content.property.test.ts` and `CanvasResource.test.tsx`'s unresolved case both fail on the old answer.

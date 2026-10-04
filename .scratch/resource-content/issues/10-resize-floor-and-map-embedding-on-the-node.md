@@ -10,7 +10,7 @@
 
 - [x] `core` property test: `embedsMap` and `openSizeFloor` are independent of `via`.
 - [x] A projection test proves a Reference Resource to a Space Resource publishes the Space floor and `embedsMap: true`, and a Reference to Markdown publishes neither. This replaces the decoration test's hand-built `kind: 'space'` floor case.
-- [x] No source site reads `node.data.kind` for anything but the glyph.
+- [x] No source site reads `node.data.kind` for a semantic decision; it is read for the glyph and for `ResourceNode`'s `frontOf` arms, which ticket 08 keeps as the rendering switch.
 - [x] CI passed on the draft PR.
 
 ## Comments
@@ -26,3 +26,5 @@ Local checks passed: `pnpm typecheck:toolchain`, `pnpm typecheck`, `pnpm typeche
 ## Answer
 
 Implemented and verified on draft PR #334. All acceptance criteria are satisfied; ticket 07 remains out of scope.
+
+2026-10-04: Rebased onto `origin/main` 9cb40e16 (#332); the implementation commit is now `a0d61c0b`. Conflicts with ADR 0112's Map surface were resolved by keeping main's structure and asking `contentAction` where this ticket's sites did. Watched [CI run 37195903090](https://github.com/tobyhede/hyper/actions/runs/37195903090) finish with `CI passed` green for `4aa66e31`: static-checks, coverage, all three e2e shards, ladle, postgres and sqlite passed.

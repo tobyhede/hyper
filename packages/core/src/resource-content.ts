@@ -106,7 +106,7 @@ const CONTENT_FACTS = {
     action: 'none',
     floor: COLLAPSED_RESOURCE_SIZE,
     embedsMap: false,
-    drawsContentArea: false,
+    drawsContentArea: true,
   },
 } satisfies Record<ResourceContent['kind'], ContentFacts>;
 

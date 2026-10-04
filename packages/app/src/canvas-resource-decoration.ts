@@ -178,8 +178,9 @@ export function decorateSharedResourceNode(
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);
   }
   if (resourceBelongsToWorkingSpace && node.data.open === true && context.authorOnCanvas) {
-    // Ordinary Open proposals preserve the Space footer. The gesture itself
-    // still reaches Closed Size so ADR 0066's magnet can Close it.
+    // Ordinary Open proposals stop at the content's floor, which keeps a drawn
+    // Map's footer clear. The gesture itself still reaches Closed Size so
+    // ADR 0066's magnet can Close it.
     const floor = node.data.openSizeFloor;
     patch.resize = {
       minWidth: RESOURCE_SIZE.width,

@@ -531,6 +531,7 @@ describe('CanvasResource kind and interaction state', () => {
     expect(resource).toHaveAttribute('data-open', 'true');
     expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
     expect(resource.querySelector('.markdown-resource-body')).toBeNull();
+    expect(resource).toHaveAttribute('data-content-area', 'true');
   });
 
   it('reflects dragging as its own external state, distinct from selected', () => {

@@ -32,3 +32,7 @@ Local checks passed: `pnpm typecheck:toolchain`, `pnpm typecheck`, `pnpm typeche
 ## Answer
 
 Implemented and verified on draft PR #334. All acceptance criteria are satisfied; ticket 07 remains out of scope.
+
+2026-10-04: Rebased onto `origin/main` 9cb40e16 (#332); the implementation commit is now `a0d61c0b`. Conflicts with ADR 0112's Map surface were resolved by keeping main's structure and asking `contentAction` where this ticket's sites did. Watched [CI run 37195903090](https://github.com/tobyhede/hyper/actions/runs/37195903090) finish with `CI passed` green for `4aa66e31`: static-checks, coverage, all three e2e shards, ladle, postgres and sqlite passed.
+
+2026-10-04 review follow-up: one guard did change meaning. `CanvasResource`'s `contentAuthoring` moved from `via === 'self'` to `contentAction(...) !== 'none'`, which is false for an Ur Resource's own content; an Ur Resource mounts no content area, so nothing it draws changes. `spaceFront` now asks for `author-space-view` content rather than an Open `space` front; a Space Resource's own content always answers that action, so the two agree. The core test is now a property over generated `ResourceContent` (action offered iff own content with an action; floor, Map embedding, content area and first Open Size independent of `via`), with the per-kind answers asserted against the named geometry constants.
