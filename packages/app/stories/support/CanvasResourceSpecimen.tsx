@@ -1,3 +1,4 @@
+import type { ResourceShape } from '@project/core';
 import {
   CanvasResource,
   CLOSED_DISPLAY,
@@ -10,6 +11,8 @@ interface CanvasResourceSpecimenProps {
   readonly kind?: CanvasResourceFront['kind'];
   readonly state?: Exclude<CanvasResourceState, 'editing'>;
   readonly graphColor?: string;
+  /** The Shape a Map records for the Resource, which its Closed front draws. */
+  readonly shape?: ResourceShape;
 }
 
 /**
@@ -26,6 +29,7 @@ export function CanvasResourceSpecimen({
   kind = 'markdown',
   state = 'rest',
   graphColor = '#ffc53d',
+  shape = 'rectangle',
 }: CanvasResourceSpecimenProps) {
   const front: CanvasResourceFront = { kind };
   return (
@@ -35,6 +39,7 @@ export function CanvasResourceSpecimen({
       title={title}
       state={state}
       graphColor={graphColor}
+      shape={shape}
     />
   );
 }

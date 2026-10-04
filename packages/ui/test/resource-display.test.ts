@@ -128,13 +128,9 @@ describe('the Space view a display shows', () => {
 describe('drawnResourceShape', () => {
   const shape = fc.constantFrom(...RESOURCE_SHAPES);
 
-  it('draws a Closed diamond as a diamond', () => {
-    expect(drawnResourceShape(CLOSED_DISPLAY, 'diamond')).toBe('diamond');
-  });
-
-  it('draws the Closed Shapes not yet drawn as the rectangle', () => {
-    for (const other of ['rectangle', 'pill', 'ellipse', 'hexagon'] as const) {
-      expect(drawnResourceShape(CLOSED_DISPLAY, other)).toBe('rectangle');
+  it('draws a Closed Resource in its Shape', () => {
+    for (const chosen of RESOURCE_SHAPES) {
+      expect(drawnResourceShape(CLOSED_DISPLAY, chosen)).toBe(chosen);
     }
   });
 

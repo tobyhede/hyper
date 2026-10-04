@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { COLLAPSED_RESOURCE_SIZE, RESOURCE_SHAPES } from '@project/core';
 import { resourceToolbar, selectResource } from '../e2e/graph';
+import { drawnOutline } from '../e2e/resource-shape-outline';
 
 const specimen = (page: Page, label: string): Locator =>
   page.locator('.inv-specimen', {
@@ -680,5 +682,34 @@ test(
     await expect(page.getByTestId('independent-open-report')).toHaveText(
       'Sent space 00000000-0000-4000-8000-000000000020 to a new tab.',
     );
+  },
+);
+
+/**
+ * Every Shape a Map may give a Resource, drawn Closed (ADR 0117): the one
+ * Closed Size whatever the Shape, an outline reaching the midpoint of each side
+ * where Edges attach, and the Title and kind glyph inside that outline. Every
+ * Shape but the rectangle leaves the rect's corner unfilled.
+ */
+test(
+  'a Closed Resource draws each Shape at the Closed Size, touching every side midpoint',
+  { tag: '@parity:closed-resource-draws-its-shape' },
+  async ({ page }) => {
+    await page.goto('/?story=components--resource--resource-shapes&mode=preview');
+
+    for (const shape of RESOURCE_SHAPES) {
+      for (const suffix of ['one line', 'three lines']) {
+        const resource = specimen(page, `${shape} · ${suffix}`).getByRole('article');
+        await expect(resource).toHaveAttribute('data-resource-shape', shape);
+        await expect(resource.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
+        expect(await drawnOutline(resource), `${shape} · ${suffix}`).toEqual({
+          shape,
+          size: [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height],
+          touchesSideMidpoints: true,
+          fillsCorner: shape === 'rectangle',
+          holdsTitleAndGlyph: true,
+        });
+      }
+    }
   },
 );

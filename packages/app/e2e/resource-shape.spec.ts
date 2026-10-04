@@ -12,6 +12,7 @@ import {
   selectCanvas,
   settled,
 } from './graph';
+import { drawnOutline } from './resource-shape-outline';
 
 /**
  * A Resource's Shape (ADR 0117): chosen from the Resource's Actions menu, drawn
@@ -51,8 +52,8 @@ const chosenResourceShape = (resourceShapes: Locator): Locator =>
   resourceShapes.getByRole('menuitemradio', { checked: true });
 
 /**
- * The drawn diamond's rect against its Resource's, in screen pixels: the
- * diamond is stretched to the rect, so its vertices are the side midpoints.
+ * The drawn outline's rect against its Resource's, in screen pixels: the
+ * outline is stretched to the rect, so it reaches the side midpoints.
  */
 const outlineOffset = (node: Locator) =>
   node.evaluate((element) => {
@@ -168,3 +169,40 @@ test('an Edge drawn to a Closed diamond meets its outline', async ({ page }) => 
   expect(Math.abs(end.y - (vertex.y + RADIUS)), 'the Edge ends at the vertex').toBeLessThan(2);
   await expect.poll(() => outlineOffset(a)).toBeLessThan(0.5);
 });
+
+test(
+  'each Shape chosen from the Actions menu is drawn Closed at the Closed Size, touching every side midpoint',
+  { tag: '@parity:closed-resource-draws-its-shape' },
+  async ({ page }) => {
+    await page.goto('/');
+    await selectCanvas(page, 'Collection 1');
+    const a = nodeByTitle(page, 'A').first();
+    await expect(a).toBeVisible();
+
+    for (const [name, shape] of [
+      ['Pill', 'pill'],
+      ['Ellipse', 'ellipse'],
+      ['Diamond', 'diamond'],
+      ['Hexagon', 'hexagon'],
+    ] as const) {
+      const resourceShapes = await resourceShapeChoice(page);
+      await resourceShapes.getByRole('menuitemradio', { name }).click();
+      await expect(face(a)).toHaveAttribute('data-resource-shape', shape);
+      await expect.poll(() => outlineOffset(a)).toBeLessThan(0.5);
+      expect(await drawnOutline(face(a)), name).toEqual({
+        shape,
+        size: [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height],
+        touchesSideMidpoints: true,
+        fillsCorner: false,
+        holdsTitleAndGlyph: true,
+      });
+    }
+
+    await page.reload();
+    await selectCanvas(page, 'Collection 1');
+    await expect(face(nodeByTitle(page, 'A').first())).toHaveAttribute(
+      'data-resource-shape',
+      'hexagon',
+    );
+  },
+);

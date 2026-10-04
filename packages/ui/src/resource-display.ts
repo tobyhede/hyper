@@ -129,21 +129,14 @@ export function spaceViewOf(
   }
 }
 
-/** The Shapes a Resource front draws other than the rectangle. */
-export type DrawnResourceShape = Extract<ResourceShape, 'rectangle' | 'diamond'>;
-
 /**
  * The Shape a Resource front is drawn in (ADR 0117).
  *
  * Only a Closed Resource draws its Map's Shape: an Open, editing, replacing or
  * presented Resource is read rather than drawn as notation, and is drawn as
  * the rectangle whatever its Shape. The Shape stays recorded on the Map and is
- * drawn again on Close. Pill, ellipse and hexagon are drawn as the rectangle.
+ * drawn again on Close.
  */
-export function drawnResourceShape(
-  display: ResourceDisplay,
-  shape: ResourceShape,
-): DrawnResourceShape {
-  if (display.shown !== 'closed') return 'rectangle';
-  return shape === 'diamond' ? 'diamond' : 'rectangle';
+export function drawnResourceShape(display: ResourceDisplay, shape: ResourceShape): ResourceShape {
+  return display.shown === 'closed' ? shape : 'rectangle';
 }

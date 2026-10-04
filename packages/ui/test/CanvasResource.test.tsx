@@ -2281,6 +2281,23 @@ describe('the Shape a Resource front is drawn in', () => {
     expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
   });
 
+  it.each([
+    ['pill', 'rect'],
+    ['ellipse', 'rect'],
+    ['diamond', 'polygon'],
+    ['hexagon', 'polygon'],
+  ] as const)('draws a Closed %s in its own outline', (shape, element) => {
+    render(<CanvasResource {...props} shape={shape} display={CLOSED_DISPLAY} />);
+    const resource = screen.getByRole('article', { name: 'Decide' });
+    expect(resource).toHaveAttribute('data-resource-shape', shape);
+    expect(outline(resource)?.firstElementChild?.tagName).toBe(element);
+  });
+
+  it('draws no outline for a Closed rectangle', () => {
+    render(<CanvasResource {...props} shape="rectangle" display={CLOSED_DISPLAY} />);
+    expect(outline(screen.getByRole('article', { name: 'Decide' }))).toBeNull();
+  });
+
   it('keeps the diamond while the Closed Title is being written', () => {
     render(
       <CanvasResource

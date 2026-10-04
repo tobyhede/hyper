@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import type { Story } from '@ladle/react';
-import { OPEN_RESOURCE_CHROME, uuidSchema, type Map, type Resource } from '@project/core';
+import {
+  OPEN_RESOURCE_CHROME,
+  RESOURCE_SHAPES,
+  uuidSchema,
+  type Map,
+  type Resource,
+} from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
   CanvasResource,
@@ -141,6 +147,36 @@ export const Front: Story = () => (
   </div>
 );
 Front.storyName = 'Front';
+
+/**
+ * Every Shape a Map may give a Resource (ADR 0117), drawn Closed at the one
+ * Closed Size: the rectangle is the front's own border, and every other Shape
+ * is an outline touching the midpoint of each side of that rect, with the
+ * Title Lines and kind glyph in the rectangle inscribed in it.
+ */
+export const ResourceShapes: Story = () => (
+  <div className="inv inv-sheet" style={resourceSizeVars}>
+    <CatalogueSection
+      title="Resource Shapes"
+      note="Each Shape a Map may give a Resource, drawn Closed at the one Closed Size, with a one-line Title above a three-line one. Every outline touches the midpoint of each side, where Edges attach, and the Title Lines and kind glyph sit inside it. An Open Resource is drawn as the rectangle whatever its Shape."
+    >
+      <div className="inv-row">
+        {RESOURCE_SHAPES.map((shape) => (
+          <Specimen key={shape} label={`${shape} · one line`}>
+            <CanvasResourceSpecimen shape={shape} title={ONE_LINE_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {RESOURCE_SHAPES.map((shape) => (
+          <Specimen key={shape} label={`${shape} · three lines`}>
+            <CanvasResourceSpecimen shape={shape} title={THREE_LINE_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+    </CatalogueSection>
+  </div>
+);
 
 export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>

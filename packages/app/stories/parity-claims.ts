@@ -226,6 +226,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'Every Resource front draws its kind glyph, its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
   },
   {
+    id: 'closed-resource-draws-its-shape',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'ResourceShapes',
+    claim:
+      'A Closed Resource draws the Shape its Map gives it — rectangle, pill, ellipse, diamond or hexagon — at the one Closed Size, its outline touching the midpoint of each side where Edges attach, with its Title and kind glyph inside the outline (ADR 0117).',
+  },
+  {
     id: 'image-resource-closed-front-draws-title-and-kind',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Front',
