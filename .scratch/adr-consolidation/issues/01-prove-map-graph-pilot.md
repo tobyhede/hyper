@@ -22,4 +22,4 @@ Evidence: [pilot/REPORT.md](../pilot/REPORT.md). Both specimen readers scored 10
 - G1: keep current behaviour as a live rule. Removing or deleting an Open Resource Closes it in the same Edit, then removes it.
 - D16: a Space opens on the Map most recently edited in.
 
-Ticket 02 is unblocked. It still needs the proposed ADR 0112, which is not yet committed on any branch.
+Ticket 02 is unblocked. The proposed ADR it revises is committed as 0115 (drafted as 0112).

@@ -14,7 +14,7 @@ Provide layered context: a concise project-wide entry point, one shared domain g
 
 Preserve historical ADR bodies, identifiers and existing status relationships. A current contract states accepted design in current language with the important reasons and source links. It is the ordinary reading entry point, not permission to overturn a decision. Explicitly identify accepted-but-unimplemented behavior and link its delivery issue. Conflicts are resolved explicitly rather than treating the latest prose or current code as automatic authority.
 
-Begin with a Map/Graph pilot. Compare fresh-reader comprehension before adopting the policy, then migrate the remaining topics in independently verifiable slices. Revise the existing proposed ADR 0112 rather than create a second proposal about the same choice.
+Begin with a Map/Graph pilot. Compare fresh-reader comprehension before adopting the policy, then migrate the remaining topics in independently verifiable slices. Revise the existing proposed ADR 0115 (drafted as 0112; renumbered after main took 0112) rather than create a second proposal about the same choice.
 
 ## User Stories
 
@@ -46,7 +46,7 @@ Begin with a Map/Graph pilot. Compare fresh-reader comprehension before adopting
 - Use existing scoped guides as the initial current-contract locations. Consider package-local guidance only where a reading-path evaluation supports relocation. Do not depend on implicit nested-file loading; retain explicit routing.
 - Place each architectural rule in one owning current contract. Keep concise definitions in the glossary, and references elsewhere. Historical quotations of earlier decisions remain historical evidence.
 - Keep current contracts editable. A wording correction or faithful restatement does not itself require a new ADR. A changed decision must follow the ADR admission policy and conflict-resolution process.
-- Revise proposed ADR 0112 to record the chosen ownership, authority, reading order and maintenance obligations. Preserve its provenance discipline and fresh-reader evaluation. Do not introduce consolidation statuses, archive directories or generations for this approach.
+- Revise proposed ADR 0115 to record the chosen ownership, authority, reading order and maintenance obligations. Preserve its provenance discipline and fresh-reader evaluation. Do not introduce consolidation statuses, archive directories or generations for this approach.
 - The pilot is non-normative until evaluated. Adoption integrates its current contract, policy, routing and removal of duplicate live accounts together. A failed pilot produces findings and an adjusted proposal rather than automatic rollout.
 - Retain existing ADR numbering, bodies, relationship metadata and navigation checks. Adapt consumers only when changed index or guidance links require it; preserve ADR identity and historical navigation.
 - Require every migrated rule and valuable rejected alternative to be accounted for in a reviewable source inventory. An omitted historical claim needs an explicit classification and reason; implemented code alone cannot retire an accepted decision.
@@ -83,6 +83,6 @@ Begin with a Map/Graph pilot. Compare fresh-reader comprehension before adopting
 
 The conversation's HTML sketch is explanatory, not an adopted policy. The prior ADR audit is useful source material, but its percentages and drift findings must be attributed to its dated snapshot and rechecked where used.
 
-The pilot precedes policy adoption; policy adoption precedes broader topic migration. Publication of this spec and its tickets authorizes planning artifacts, not a claim that ADR 0112 is already accepted or that any migration has passed evaluation.
+The pilot precedes policy adoption; policy adoption precedes broader topic migration. Publication of this spec and its tickets authorizes planning artifacts, not a claim that ADR 0115 is already accepted or that any migration has passed evaluation.
 
 The user approved the reader-task validation seam and the seven-ticket breakdown, including its blocking edges. Ticket 01 is the initial frontier; adoption remains gated on a successful pilot evaluation.

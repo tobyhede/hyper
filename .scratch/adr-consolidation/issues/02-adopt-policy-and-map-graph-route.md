@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] Revise existing proposed ADR 0112 around current-contract ownership, history preservation, reading order, conflict resolution and same-change maintenance; record adoption explicitly with supporting pilot evidence.
+- [ ] Revise existing proposed ADR 0115 around current-contract ownership, history preservation, reading order, conflict resolution and same-change maintenance; record adoption explicitly with supporting pilot evidence.
 - [ ] State that guidance cannot silently override accepted decisions and that implementation evidence is distinct from accepted design.
 - [ ] Integrate the pilot's contract and task pointers; replace duplicate live Map/Graph accounts with links in the same change while retaining glossary definitions.
 - [ ] Preserve historical ADR identities, bodies and existing relationships; introduce no consolidation statuses or generation machinery.
