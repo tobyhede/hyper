@@ -18,6 +18,7 @@ import type {
 } from '../src/space-authoring';
 
 import { completeDrag, fixtureDisplay, moving, node, settled } from './render-adapter-fixtures';
+import { unusedImageSources } from './image-sources';
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -120,7 +121,12 @@ function sessionBackedAdapter(
     stored === undefined ? loaded : { snapshot: stored, revision: 1n, exportedRevision: null },
   );
   const session = openSpaceSession(backend, loaded);
-  const { authoring, adapter } = composeApp({ spaceSession: session, selection: mapId, newId });
+  const { authoring, adapter } = composeApp({
+    images: unusedImageSources,
+    spaceSession: session,
+    selection: mapId,
+    newId,
+  });
   return { session, authoring, store: adapter };
 }
 

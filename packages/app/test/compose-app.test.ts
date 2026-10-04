@@ -4,6 +4,7 @@ import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp, composeCore } from '../src/compose-app';
 import { createConnectionCompletion } from '../src/connection-completion';
+import { unusedImageSources } from './image-sources';
 
 /**
  * What an opened Space is composed of, asserted at the composition.
@@ -66,7 +67,7 @@ describe('the composed working Space', () => {
    */
   it('answers a new Space once an Edit has been taken', () => {
     const spaceSession = openSession();
-    const { currentSpace, authoring } = composeApp({ spaceSession });
+    const { currentSpace, authoring } = composeApp({ images: unusedImageSources, spaceSession });
     const before = currentSpace();
 
     expect(
@@ -98,7 +99,7 @@ describe('what the composition opens on', () => {
   });
 
   it('opens a selected Map on the placement that Map already authored', () => {
-    const { authoring } = composeApp({ spaceSession: openSession() });
+    const { authoring } = composeApp({ images: unusedImageSources, spaceSession: openSession() });
 
     expect(authoring.mapPlacement()).toEqual(
       Placement.fromEntries([
@@ -119,6 +120,7 @@ describe('the connection completion Edge Authoring is given', () => {
   it('builds a supplied completion over the collaborators this composition made', () => {
     const seen: { adapter: unknown; authoring: unknown }[] = [];
     const composed = composeApp({
+      images: unusedImageSources,
       spaceSession: openSession(),
       connections: (collaborators) => {
         seen.push(collaborators);

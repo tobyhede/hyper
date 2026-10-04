@@ -8,9 +8,11 @@ const MARKDOWN = uuid('00000000-0000-4000-8000-000000000061');
 const IMAGE = uuid('00000000-0000-4000-8000-000000000062');
 const FRAMED_SPACE = uuid('00000000-0000-4000-8000-000000000063');
 const UNFRAMED_SPACE = uuid('00000000-0000-4000-8000-000000000064');
+const UR = uuid('00000000-0000-4000-8000-000000000065');
 const TO_MARKDOWN = uuid('00000000-0000-4000-8000-000000000071');
 const TO_IMAGE = uuid('00000000-0000-4000-8000-000000000072');
 const TO_SPACE = uuid('00000000-0000-4000-8000-000000000073');
+const TO_UR = uuid('00000000-0000-4000-8000-000000000074');
 const TARGET_SPACE = uuid('00000000-0000-4000-8000-0000000000aa');
 const TARGET_MAP = uuid('00000000-0000-4000-8000-0000000000ab');
 const TARGET_GRAPH = uuid('00000000-0000-4000-8000-0000000000ac');
@@ -48,12 +50,14 @@ function everyKind(): Space {
           graph: TARGET_GRAPH,
         },
       },
+      { id: UR, document: { title: 'Node', kind: 'ur' } },
       { id: TO_MARKDOWN, document: { title: 'Notes, again', kind: 'reference', target: MARKDOWN } },
       { id: TO_IMAGE, document: { title: 'Harbour, again', kind: 'reference', target: IMAGE } },
       {
         id: TO_SPACE,
         document: { title: 'Framed, again', kind: 'reference', target: FRAMED_SPACE },
       },
+      { id: TO_UR, document: { title: 'Node, again', kind: 'reference', target: UR } },
     ],
   });
   if (!result.ok) throw new Error('fixture should load');
@@ -102,6 +106,7 @@ describe('resolveResourceContent', () => {
         via: 'self',
       },
     ],
+    ['an Ur Resource', UR, { kind: 'ur', via: 'self' }],
     [
       'a Reference Resource to Markdown',
       TO_MARKDOWN,
@@ -117,6 +122,7 @@ describe('resolveResourceContent', () => {
       TO_SPACE,
       { kind: 'space', view: framedView, via: 'reference' },
     ],
+    ['a Reference Resource to an Ur Resource', TO_UR, { kind: 'ur', via: 'reference' }],
   ])('resolves %s', (_, id, expected) => {
     expect(resolveResourceContent(space, of(id))).toStrictEqual(expected);
   });

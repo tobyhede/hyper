@@ -14,6 +14,7 @@ import type { ResourceResize } from '../src/render-adapter';
 import { mountSettled } from './settled-mount';
 import { CLOSED_DISPLAY } from '@project/ui';
 import { fixtureDisplay } from './render-adapter-fixtures';
+import { unusedImageSources } from './image-sources';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -155,7 +156,10 @@ async function mountGraph(
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-  const { authoring, commandOutcomes, deleteConfirmation } = composeApp({ spaceSession });
+  const { authoring, commandOutcomes, deleteConfirmation } = composeApp({
+    images: unusedImageSources,
+    spaceSession,
+  });
   const testedAuthoring = {
     ...authoring,
     complete: (completion: Parameters<typeof authoring.complete>[0]) => {

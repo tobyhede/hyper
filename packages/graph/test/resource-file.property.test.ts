@@ -38,6 +38,12 @@ const referenceFrontmatterArb: fc.Arbitrary<ResourceFrontmatter> = fc.record({
   target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
 });
 
+const urFrontmatterArb: fc.Arbitrary<ResourceFrontmatter> = fc.record({
+  id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+  title: lineArb,
+  kind: fc.constant('ur' as const),
+});
+
 /**
  * Bodies built from the lines that make a fence parser wrong: a `---` rule, a
  * heading, a blank line, arbitrary prose. Left to `fc.string()` alone the
@@ -61,6 +67,7 @@ describe('resource file round-trip', () => {
     const resourceFileArb = fc.oneof(
       fc.tuple(markdownFrontmatterArb, bodyArb),
       fc.tuple(referenceFrontmatterArb, fc.constant('')),
+      fc.tuple(urFrontmatterArb, fc.constant('')),
     );
     fc.assert(
       fc.property(resourceFileArb, ([frontmatter, body]) => {

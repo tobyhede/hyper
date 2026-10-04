@@ -16,6 +16,7 @@ import type {
   SpaceResourceDeletionResult,
 } from '../src/space-resource-lifecycle';
 import { openTestSpace } from './opened-space';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Command outcomes through its interface, over a real composition: a real
@@ -77,6 +78,7 @@ function open(storedRevision = 0n) {
   const { spaceSession: session } = openTestSpace(backend, loaded);
   const reported: unknown[] = [];
   const composed = composeApp({
+    images: unusedImageSources,
     spaceSession: session,
     selection: MAP_A,
     reportObserverError: (error) => reported.push(error),

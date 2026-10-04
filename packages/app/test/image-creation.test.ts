@@ -41,6 +41,7 @@ const open = (...ids: Parameters<typeof mintingIds>) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { authoring, navigation } = composeApp({
+    images: unusedImageSources,
     spaceSession: session,
     newId: mintingIds(...ids),
   });
@@ -287,6 +288,7 @@ describe('an Image Resource gesture the author moves away from', () => {
     const loaded = { snapshot: twoMaps, revision: 0n, exportedRevision: null };
     const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
     const { authoring, navigation } = composeApp({
+      images: unusedImageSources,
       spaceSession: session,
       newId: mintingIds(FIRST),
     });

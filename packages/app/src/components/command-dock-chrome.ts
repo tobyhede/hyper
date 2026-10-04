@@ -367,14 +367,14 @@ export interface DockGraph {
 }
 
 /**
- * The three kinds Create offers, in the order the cluster draws them.
+ * The four kinds Create offers, in the order the cluster draws them.
  *
  * **`reference` is not one of them.** A Reference Resource is always created
  * *from* the Resource it points at, which supplies the Target (ADR 0089), so
  * the gesture is a row in that Resource's own command menu and there is
  * nothing here for it to be a peer of.
  */
-export const RESOURCE_KINDS = ['markdown', 'space', 'image'] as const;
+export const RESOURCE_KINDS = ['markdown', 'space', 'image', 'ur'] as const;
 
 /**
  * A kind the Create cluster draws a control for.
@@ -394,7 +394,8 @@ export type DockResourceKind = (typeof RESOURCE_KINDS)[number];
 export type DockCreation =
   | { readonly kind: 'markdown' }
   | { readonly kind: 'space' }
-  | { readonly kind: 'image'; readonly files: readonly File[] };
+  | { readonly kind: 'image'; readonly files: readonly File[] }
+  | { readonly kind: 'ur' };
 
 /**
  * What the Resources list draws and what activating a row does.

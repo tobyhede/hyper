@@ -5,9 +5,13 @@ import {
   activateGraph,
   activeResource,
   authoringHandle,
+  boxOf,
   connectHandles,
+  createResource,
   dock,
+  dragBy,
   nodeByTitle,
+  openResource,
   presentControl,
   resourceControls,
   selectCanvas,
@@ -450,6 +454,98 @@ test(
     expect((await camera(page)).x).not.toBe(beforeChoosing.x);
   },
 );
+
+/**
+ * An Ur Resource, Open on the canvas and then presented (ADR 0113).
+ *
+ * It has no content, so opening it draws its Title and nothing else, and the
+ * traversal stops on it to draw that Title as a title slide: the name alone,
+ * centred in the frame `styles.css` addresses by `data-content-kind`.
+ */
+test('an Ur Resource opens to its Title alone and presents as a centred title slide', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  await settled(page);
+
+  // `Short` runs A → B → C, so an Edge from C makes the Ur Resource the
+  // fourth stop.
+  await selectCanvas(page, 'Collection 1');
+  await activateGraph(page, 'Short');
+  await settled(page);
+
+  await createResource(page, 'Ur Resource');
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill('Title slide');
+  await title.press('Enter');
+  const ur = nodeByTitle(page, 'Title slide').first();
+  await expect(ur.locator('.canvas-resource')).toHaveAttribute('data-kind', 'ur');
+  await settled(page);
+
+  // A new Resource lands at the centre of the view, which on this Map is over
+  // C; moved clear of the row, each end's handles are reachable.
+  await dragBy(page, ur, 0, 250);
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+
+  const c = nodeByTitle(page, 'C').first();
+  await c.hover();
+  await connectHandles(
+    page,
+    authoringHandle(c, 'source', 'right'),
+    authoringHandle(ur, 'target', 'top'),
+  );
+  await expect(page.getByLabel(/^Edge from C to Title slide in Short$/)).toBeAttached();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await settled(page);
+
+  await openResource(ur, 'Title slide');
+  const controls = await resourceControls(page, ur);
+  await expect(controls.getByRole('button', { name: 'Close Resource Title slide' })).toBeVisible();
+  await settled(page);
+  // Open, and still only the Title: no content surface, and nothing to edit.
+  await expect(ur.locator('.canvas-resource')).toHaveAttribute('data-open', 'true');
+  await expect(ur.locator('.canvas-resource__content')).toHaveCount(0);
+  await expect(controls.getByRole('button', { name: 'Edit Resource Title slide' })).toHaveCount(0);
+  const face = await boxOf(ur.locator('.canvas-resource'), 'the Open Ur Resource');
+  const openTitle = await boxOf(
+    ur.getByRole('heading', { name: 'Title slide', exact: true }),
+    'the Open Ur Resource Title',
+  );
+  expect(openTitle.y).toBeGreaterThanOrEqual(face.y);
+  expect(openTitle.y + openTitle.height).toBeLessThanOrEqual(face.y + face.height);
+
+  await presentControl(page).click();
+  await expect(page.getByTestId('presenting-chrome')).toBeVisible();
+  await settled(page);
+  for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
+  await settled(page);
+
+  const slide = page.getByTestId('resource-content');
+  await expect(slide).toHaveAttribute('data-content-kind', 'ur');
+  await expect(slide.locator('.resource__title')).toHaveText('Title slide');
+  await expect(slide.locator('.resource__body')).toHaveCount(0);
+
+  // Centred on both axes, measured on screen at the presenting zoom. The
+  // text's own line box is measured rather than the heading's, because a
+  // heading stretched to fill the frame has a centred box with its text at the
+  // top.
+  const frame = await boxOf(slide, 'the presented frame');
+  const name = await slide.locator('.resource__title').evaluate((heading) => {
+    const range = document.createRange();
+    range.selectNodeContents(heading);
+    const { x, y, width, height } = range.getBoundingClientRect();
+    return { x, y, width, height };
+  });
+  const tolerance = 2;
+  expect(Math.abs(name.x + name.width / 2 - (frame.x + frame.width / 2))).toBeLessThanOrEqual(
+    tolerance,
+  );
+  expect(Math.abs(name.y + name.height / 2 - (frame.y + frame.height / 2))).toBeLessThanOrEqual(
+    tolerance,
+  );
+});
 
 /**
  * The presenting chrome at a phone width, where it has the whole viewport.

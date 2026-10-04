@@ -14,9 +14,13 @@ import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
 import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
 import {
-  createImageReplacementActivity,
-  type ImageReplacementActivity,
-} from './image-replacement-activity';
+  createImageResources,
+  type ImageEditResult,
+  type ImageOrigin,
+  type ImageSources,
+  type ImageTarget,
+} from './image-creation';
+import { createImageReplacements, type ImageReplacements } from './image-replacement';
 
 /**
  * What an opened Space is composed of.
@@ -56,6 +60,16 @@ export interface ComposeCoreDependencies {
 }
 
 export interface ComposeAppDependencies extends ComposeCoreDependencies {
+  /**
+   * Where this Space's created and replaced images are stored and measured
+   * (ADR 0106).
+   *
+   * Required with no default: both reach outside the process, so the caller
+   * that composes the Space names them, and a test supplies answers of its own.
+   * The composition is the only holder, so creating and replacing an image in
+   * this Space always use the same sources.
+   */
+  readonly images: ImageSources;
   /**
    * Mints the identity of every Resource, Map and Graph a completed Edit creates
    * (ADR 0109).
@@ -119,7 +133,19 @@ export interface AppCore {
 }
 
 export interface ComposedApp extends AppCore {
-  readonly imageReplacement: ImageReplacementActivity;
+  /**
+   * Create Image Resources from one gesture's files or URL, over this Space's
+   * image sources and Authoring.
+   */
+  readonly createImageResources: (
+    origin: ImageOrigin,
+    target: ImageTarget,
+  ) => Promise<ImageEditResult>;
+  /**
+   * This Space's image replacements: the one way to replace an Image
+   * Resource's picture, and its busy state.
+   */
+  readonly imageReplacement: ImageReplacements;
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;
   /**
@@ -182,6 +208,7 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
 export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   const {
     spaceSession,
+    images,
     newId = newUuid,
     reportObserverError,
     connections,
@@ -230,7 +257,13 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   });
   return {
     ...core,
-    imageReplacement: createImageReplacementActivity(compositionReporter),
+    createImageResources: (origin, target) =>
+      createImageResources({ images, authoring }, origin, target),
+    imageReplacement: createImageReplacements({
+      images,
+      authoring,
+      reportObserverError: compositionReporter,
+    }),
     authoring,
     adapter,
     continuation,

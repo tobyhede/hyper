@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MapId } from '@project/core';
+import type { MapId, Resource } from '@project/core';
 import { graphStartResource, loadSpaceSnapshot, outgoingEdges, type Space } from '@project/graph';
 import { requireDefaultMap } from '../src/map-resolution';
 import {
@@ -235,7 +235,9 @@ describe('the story Spaces', () => {
   });
 
   /**
-   * All three Resource kinds, in one Space, on both sides of placement.
+   * Every Resource kind, in one Space, on both sides of placement. `EVERY_KIND` is
+   * a `Record` over `Resource['kind']`, so a new kind fails to compile here until
+   * the fixture carries it.
    *
    * The Dock draws `ResourceKindIcon` on every list row while the canvas draws the
    * production `ResourceNode`, so a fixture whose placed Resources were all markdown
@@ -243,6 +245,13 @@ describe('the story Spaces', () => {
    * being wrong.
    */
   it('carries every Resource kind on the Command Dock canvas and in its Resources list', () => {
+    const EVERY_KIND = Object.keys({
+      markdown: true,
+      reference: true,
+      space: true,
+      image: true,
+      ur: true,
+    } satisfies Record<Resource['kind'], true>).sort();
     const opens = requireDefaultMap(commandDockSpace);
     const openingMap = commandDockSpace.lookup.map(opens)?.map;
     const kinds = (resources: readonly { readonly kind: string }[]): readonly string[] =>
@@ -255,8 +264,8 @@ describe('the story Spaces', () => {
       (resource) => openingMap?.positions[resource.id] === undefined,
     );
 
-    expect(kinds(placed)).toEqual(['markdown', 'reference', 'space']);
-    expect(kinds(unplaced)).toEqual(['markdown', 'reference', 'space']);
+    expect(kinds(placed)).toEqual(EVERY_KIND);
+    expect(kinds(unplaced)).toEqual(EVERY_KIND);
   });
 
   /**

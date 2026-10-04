@@ -368,6 +368,24 @@ describe('SnapshotEdit.createInMap properties', () => {
     );
   });
 
+  /** The document a Target of `kind` replaces the base Markdown Resource with, if any. */
+  const contentOwningTarget = (kind: 'markdown' | 'space' | 'ur'): ResourceDocument | undefined => {
+    switch (kind) {
+      case 'markdown':
+        return undefined;
+      case 'space':
+        return {
+          title: 'Nested',
+          kind: 'space',
+          spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
+          map: MAP_ID,
+          graph: GRAPH_ID,
+        };
+      case 'ur':
+        return { title: 'Node', kind: 'ur' };
+    }
+  };
+
   it('creates a Reference Resource to a Target that owns content, which intake accepts', () => {
     fc.assert(
       fc.property(
@@ -375,32 +393,24 @@ describe('SnapshotEdit.createInMap properties', () => {
         coordsArb,
         fc.nat({ max: 8 }),
         fc.uuid().map(uuid),
-        fc.boolean(),
-        (ids, coords, targetSeed, newResourceId, targetIsSpace) => {
+        fc.constantFrom<'markdown' | 'space' | 'ur'>('markdown', 'space', 'ur'),
+        (ids, coords, targetSeed, newResourceId, targetKind) => {
           fc.pre(!ids.includes(newResourceId));
           const target = ids[targetSeed % ids.length];
           if (target === undefined) return;
           const base = baseSnapshot(ids, Placement.toPositions(closedPlacement(ids, coords)));
           // A Space Resource owns content too: it draws its target's Map (ADR 0070).
-          const snapshot: SpaceSnapshot = targetIsSpace
-            ? {
-                ...base,
-                resources: base.resources.map((resource) =>
-                  resource.id === target
-                    ? {
-                        id: target,
-                        document: {
-                          title: 'Nested',
-                          kind: 'space',
-                          spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
-                          map: MAP_ID,
-                          graph: GRAPH_ID,
-                        },
-                      }
-                    : resource,
-                ),
-              }
-            : base;
+          // An Ur Resource's content is empty, and it is still a Target (ADR 0113).
+          const targetDocument = contentOwningTarget(targetKind);
+          const snapshot: SpaceSnapshot =
+            targetDocument === undefined
+              ? base
+              : {
+                  ...base,
+                  resources: base.resources.map((resource) =>
+                    resource.id === target ? { id: target, document: targetDocument } : resource,
+                  ),
+                };
 
           const outcome = SnapshotEdit.createInMap(
             snapshot,
@@ -420,6 +430,37 @@ describe('SnapshotEdit.createInMap properties', () => {
           });
         },
       ),
+    );
+  });
+
+  it('creates an Ur Resource, which intake accepts and which first Opens at the default Open Size', () => {
+    fc.assert(
+      fc.property(idsArb, coordsArb, fc.uuid().map(uuid), (ids, coords, newResourceId) => {
+        fc.pre(!ids.includes(newResourceId));
+        const base = baseSnapshot(ids, Placement.toPositions(closedPlacement(ids, coords)));
+        const document: ResourceDocument = { title: 'Node', kind: 'ur' };
+
+        const created = SnapshotEdit.createInMap(
+          base,
+          MAP_ID,
+          newResourceId,
+          document,
+          { x: 0, y: 0 },
+          'avoidingOverlap',
+        );
+        expect(created.kind).toBe('completed');
+        if (created.kind !== 'completed') return;
+        expect(loadSpaceSnapshot(created.snapshot).ok).toBe(true);
+        expect(created.snapshot.resources.at(-1)).toEqual({ id: newResourceId, document });
+
+        const opened = SnapshotEdit.open(created.snapshot, MAP_ID, newResourceId);
+        expect(opened.kind).toBe('completed');
+        if (opened.kind !== 'completed') return;
+        expect(opened.snapshot.document.maps?.[0]?.positions[newResourceId]).toMatchObject({
+          open: true,
+          openSize: DEFAULT_OPEN_SIZE,
+        });
+      }),
     );
   });
 
@@ -904,6 +945,59 @@ describe('SnapshotEdit.open, close and resize properties', () => {
         },
       ),
     );
+  });
+
+  it('Opens, Resizes, Closes and reopens an Ur Resource as any other, displacing its neighbours', () => {
+    // An Ur Resource has no content, and nothing in Open, Close, Resize or
+    // displacement may treat it differently from a Markdown Resource.
+    const [subjectId, besideId, belowId, beforeId] = RESOURCE_IDS;
+    const markdown = snapshotOf([
+      { x: 0, y: 0, open: false, openSize: undefined },
+      { x: COLLAPSED_RESOURCE_SIZE.width, y: 40, open: false, openSize: undefined },
+      { x: 40, y: COLLAPSED_RESOURCE_SIZE.height, open: false, openSize: undefined },
+      { x: -300, y: -300, open: false, openSize: undefined },
+      { x: -600, y: 600, open: false, openSize: undefined },
+    ]);
+    const start: SpaceSnapshot = {
+      ...markdown,
+      resources: markdown.resources.map((resource) =>
+        resource.id === subjectId
+          ? { id: resource.id, document: { title: 'Node', kind: 'ur' } }
+          : resource,
+      ),
+    };
+    expect(loadSpaceSnapshot(start).ok).toBe(true);
+
+    const opened = completed(SnapshotEdit.open(start, MAP_ID, subjectId));
+    const growth = Placement.growth(DEFAULT_OPEN_SIZE);
+    expect(positionsOf(opened)).toMatchObject({
+      [subjectId]: { x: 0, y: 0, open: true, openSize: DEFAULT_OPEN_SIZE },
+      [besideId]: { x: COLLAPSED_RESOURCE_SIZE.width + growth.width, y: 40 },
+      [belowId]: { x: 40, y: COLLAPSED_RESOURCE_SIZE.height + growth.height },
+      [beforeId]: { x: -300, y: -300 },
+    });
+
+    const resizedTo = { width: 700, height: 500 };
+    const resized = completed(SnapshotEdit.resize(opened, MAP_ID, subjectId, resizedTo));
+    const resizedGrowth = Placement.growth(resizedTo);
+    expect(positionsOf(resized)).toMatchObject({
+      [subjectId]: { x: 0, y: 0, open: true, openSize: resizedTo },
+      [besideId]: { x: COLLAPSED_RESOURCE_SIZE.width + resizedGrowth.width, y: 40 },
+      [belowId]: { x: 40, y: COLLAPSED_RESOURCE_SIZE.height + resizedGrowth.height },
+      [beforeId]: { x: -300, y: -300 },
+    });
+
+    const closed = completed(SnapshotEdit.close(resized, MAP_ID, subjectId));
+    expect(originsOf(closed)).toEqual(originsOf(start));
+    expect(positionsOf(closed)[subjectId]).toEqual({
+      x: 0,
+      y: 0,
+      open: false,
+      openSize: resizedTo,
+    });
+
+    const reopened = completed(SnapshotEdit.open(closed, MAP_ID, subjectId));
+    expect(positionsOf(reopened)).toEqual(positionsOf(resized));
   });
 
   it('refuses to Resize a Closed Resource, which has no Open Size to change', () => {

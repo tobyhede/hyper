@@ -19,7 +19,8 @@ export interface SpaceView {
 }
 
 /**
- * What a Resource's content is. `''` is a genuinely empty body. `unresolved`
+ * What a Resource's content is. `''` is a genuinely empty body; `ur` is no
+ * content at all, which is what an Ur Resource has (ADR 0113). `unresolved`
  * answers only states intake refuses: a Reference Resource whose Target is
  * missing or is itself a Reference Resource.
  */
@@ -27,4 +28,5 @@ export type ResourceContent =
   | { readonly kind: 'markdown'; readonly source: string; readonly via: ContentVia }
   | { readonly kind: 'image'; readonly url: string; readonly via: ContentVia }
   | { readonly kind: 'space'; readonly view: SpaceView; readonly via: ContentVia }
+  | { readonly kind: 'ur'; readonly via: ContentVia }
   | { readonly kind: 'unresolved'; readonly via: 'reference' };

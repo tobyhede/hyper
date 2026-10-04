@@ -52,10 +52,13 @@ const openEntry = (reportObserverError: ObserverErrorReporter): OpenSpace => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const opened = openTestSpace(MemorySpaceBackend.asMeta(loaded), loaded);
   return {
-    images: unusedImageSources,
     id: SPACE_ID,
     session: opened.spaceSession,
-    app: composeApp({ spaceSession: opened.spaceSession, reportObserverError }),
+    app: composeApp({
+      images: unusedImageSources,
+      spaceSession: opened.spaceSession,
+      reportObserverError,
+    }),
     spaceResources: opened.spaceResources,
   };
 };
@@ -82,6 +85,7 @@ describe('a completion an embedded Map does not support', () => {
 
     const result = composition.authoring.complete({
       kind: 'created-resource',
+      resourceKind: 'markdown',
       anchor: { x: 0, y: 0 },
     });
 
