@@ -9,14 +9,10 @@ For a topic with a current contract, read that contract before the ADRs: it
 states the live rules in current words, with their reasons and source links
 ([ADR 0115](0115-current-contracts-state-the-live-design-and-adrs-keep-its-history.md)).
 Open an ADR when you need the full argument, a rejected alternative or the
-history, or when you are about to change what it binds.
-
-| Topic | Current contract |
-| --- | --- |
-| Maps, Graphs, placement, Open and Close, initialization, layout strategies | [`docs/agents/maps-and-graphs.md`](../agents/maps-and-graphs.md) |
-
-Every other topic has no contract yet: read this index, `AGENTS.md`'s "Decided"
-entries and the scoped guide for the area.
+history, or when you are about to change what it binds. The topics that have a
+contract are listed in
+[`workflow.md`](../agents/workflow.md#current-contracts); a section below names
+its contract where one exists.
 
 - A retired decision moves to [`superseded/`](superseded/). It stays readable,
   and a live ADR that points at one still resolves. It is history, not a rule.

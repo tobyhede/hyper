@@ -1,6 +1,6 @@
 # 01 — Reorder a Map's Graphs
 
-Status: needs-triage
+**Status:** needs-triage
 
 **What to build:** an operation that lets the author change the order of the Graphs a Map owns.
 

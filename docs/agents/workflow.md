@@ -67,18 +67,18 @@ ADR 0115 decides this section. A **current contract** states one topic's accepte
 
 | Document | Owns |
 | --- | --- |
-| `AGENTS.md` | Routing, the project summary and universal constraints. It points to each contract and does not restate it. |
+| `AGENTS.md` | Pointers to each contract, with the tasks that call for it, plus the project summary and universal constraints. It does not restate a contract. |
 | `CONTEXT.md` | Definitions and distinctions between terms. Not behaviour, formats or build status. |
 | A current contract in `docs/agents/` | The topic's architectural rules. One owner per cross-package rule; other guides link to it and keep only their own operational gotchas. |
-| `docs/adr/README.md` | Discovering decisions, and routing current-design work to the owning contract. |
+| `docs/adr/README.md` | Discovering decisions, and pointing current-design work at the owning contract. |
 | ADR bodies | The reasoning, rejected alternatives and history, unchanged once accepted. |
 | `.scratch/` delivery issues | Build status, implementation gaps and completed-work narratives. |
 
-Topics with a contract so far:
+Topics with a contract so far (this is the one list; add to it when a topic migrates):
 
 - **Maps and Graphs:** [`maps-and-graphs.md`](maps-and-graphs.md).
 
-Every other topic keeps its existing route: `AGENTS.md`'s "Decided" entries, the scoped guide for the area, and the ADR catalogue.
+Every other topic is read as before: `AGENTS.md`'s "Decided" entries, the scoped guide for the area, and the ADR catalogue.
 
 **Reading order.** `AGENTS.md`, then `CONTEXT.md` for terms, then the owning contract. Open a source ADR for the full argument, a rejected alternative or the history.
 
@@ -86,7 +86,9 @@ Every other topic keeps its existing route: `AGENTS.md`'s "Decided" entries, the
 
 **Built is not decided.** Code shows what is built; it never retires an accepted rule. A contract lists accepted-but-unbuilt behaviour apart from its rules, links each gap to its delivery issue, and drops the note in the change that verifies the implementation.
 
-**Same-change maintenance.** Accepting an ADR updates the owning contract in the same change. A wording fix or faithful restatement in a contract needs no ADR. When migrating a topic, replace its duplicate live accounts in `AGENTS.md` and the scoped guides with pointers in that change, and keep its rule-to-source inventory reviewable.
+**Same-change maintenance.** Accepting an ADR updates the owning contract in the same change. A wording fix or faithful restatement in a contract needs no ADR.
+
+**Migrating a topic.** One topic per change. Inventory its live rules, important rejected alternatives, sources and gaps, and classify with a reason any historical claim left out. Fix reader questions and expected answers against the sources before drafting, and resolve open disagreements before scoring. Write the contract in current vocabulary, replace the topic's duplicate live accounts in `AGENTS.md` and the scoped guides with pointers in the same change, and add the topic to the list above. Then check fresh readers' answers through the adopted reading path and run the existing navigation, status and vocabulary checks. Those checks show that links resolve and vocabulary holds, not that the contract is faithful; the inventory review and the reader check are for that. The Map and Graph migration is the worked example: `.scratch/adr-consolidation/pilot/` and `.scratch/adr-consolidation/adoption/`.
 
 ## When to update CONTEXT.md
 

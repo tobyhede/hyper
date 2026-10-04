@@ -2,7 +2,7 @@
 
 The current contract for Maps, Graphs, placement, Open and Close, initialization and layout strategies. It states the accepted design in current words, with the reason for each rule, the alternatives that were rejected, and what is accepted but not built. How a current contract relates to the ADRs is [ADR 0115][0115]; [workflow.md](workflow.md#current-contracts) states the reading and update rules.
 
-This contract decides nothing on its own. Each rule names the ADRs it restates; follow them for the full argument or the history. Where this contract and an accepted ADR seem to disagree, raise the disagreement and resolve it explicitly; do not silently follow either one. Code shows what is built, not what is decided, and code alone never retires a rule.
+This contract decides nothing on its own. Each rule names the ADRs it restates; follow them for the full argument or the history. A disagreement with an ADR, and the difference between built and decided, are handled as [workflow.md](workflow.md#current-contracts) sets out.
 
 ## Read this before
 

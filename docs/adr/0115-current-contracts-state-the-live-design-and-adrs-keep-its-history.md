@@ -9,16 +9,16 @@ Adopt **current contracts**. A current contract states one topic's accepted desi
 
 ## Who owns what
 
-- **`AGENTS.md`** routes. It holds the project summary, universal constraints and a pointer to the contract for each topic. It does not restate a contract's rules.
+- **`AGENTS.md`** points the way. It holds the project summary, universal constraints and a pointer to the contract for each topic. It does not restate a contract's rules.
 - **`CONTEXT.md`** defines terms and the distinctions between them. A definition stays there; behaviour belongs in a contract.
 - **A current contract** owns its topic's architectural rules. Each cross-package rule has exactly one owning contract. Other guidance links to it instead of restating it, and keeps only operational gotchas specific to its own area. Contracts live in `docs/agents/`, in an existing scoped guide where one fits, and are reached through explicit pointers. Nothing depends on a harness loading nested files implicitly. Package-local guidance is added only where a reading-path evaluation shows it helps, and it then replaces the account it duplicates rather than copying it.
-- **The ADR catalogue** (`docs/adr/README.md`) discovers decisions, one line each, and routes current-design work to the owning contract.
+- **The ADR catalogue** (`docs/adr/README.md`) discovers decisions, one line each, and points current-design work at the owning contract.
 - **ADR bodies** keep the full reasoning, the rejected alternatives and the history. Their bodies, numbers, filenames and status relationships do not change: status-block maintenance remains the only edit an accepted ADR receives.
 - **Delivery issues** under `.scratch/` own build status, implementation gaps and completed-work narratives.
 
 ## Reading order
 
-Start at `AGENTS.md`, use `CONTEXT.md` for terms, then read the owning contract for the topic. Open a source ADR when you need the full argument for a rule or a rejected alternative, or the history. A topic without a contract keeps its existing route through the "Decided" entries in `AGENTS.md`, the scoped guides and the ADR catalogue, and `AGENTS.md` says which topics have a contract, so a partial migration cannot appear to cover the whole repository.
+Start at `AGENTS.md`, use `CONTEXT.md` for terms, then read the owning contract for the topic. Open a source ADR when you need the full argument for a rule or a rejected alternative, or the history. A topic without a contract is read as before, through the "Decided" entries in `AGENTS.md`, the scoped guides and the ADR catalogue, and `workflow.md` keeps the one list of topics that have a contract, so a partial migration cannot appear to cover the whole repository.
 
 ## Authority and conflicts
 
@@ -35,14 +35,7 @@ Implementation evidence is distinct from accepted design. Code shows what is bui
 
 ## Migration
 
-Topics move one per change. Each migration:
-
-1. inventories the topic's live rules, important rejected alternatives, sources and gaps, and classifies with a reason any historical claim it leaves out;
-2. fixes reader questions and expected answers against the sources before drafting, and resolves open disagreements before scoring;
-3. writes the contract in current vocabulary and replaces the duplicate live accounts in `AGENTS.md` and the scoped guides with pointers in the same change; and
-4. checks fresh readers' answers through the adopted route, and runs the existing navigation, status and vocabulary checks.
-
-Mechanical checks establish that links resolve and vocabulary holds. They do not establish that a contract is faithful to its sources, which is what the inventory review and the reader evaluation are for.
+Topics move one per change, each with a reviewable rule-to-source inventory, reader questions fixed against the sources before drafting, removal of the duplicate accounts it replaces, and a fresh-reader check through the adopted reading path. `workflow.md` states the steps. Mechanical checks show that links resolve and vocabulary holds; they do not show that a contract is faithful to its sources, which is what the inventory review and the reader check are for.
 
 ## Evidence
 
@@ -56,6 +49,6 @@ The Map and Graph pilot ([`REPORT.md`](../../.scratch/adr-consolidation/pilot/RE
 
 **Rewriting accepted ADR bodies.** This would erase the reasoning a reader reaches by following a code citation.
 
-**Package-local guidance everywhere.** Not supported by evidence yet. It is permitted where an evaluation shows a routing benefit.
+**Package-local guidance everywhere.** Not supported by evidence yet. It is permitted where an evaluation shows it helps readers find the rules.
 
 **The cost** is a second current-state document beside each topic's ADRs that must be kept accurate, and an extra hop from a rule to its full reasoning. One owner per rule, the same-change rule and the inventory keep that cost bounded. A contract can still misstate a rule while passing every mechanical check; review and the reader evaluation are the controls for that.

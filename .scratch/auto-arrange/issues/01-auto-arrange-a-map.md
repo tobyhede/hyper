@@ -1,6 +1,6 @@
 # 01 — Auto-arrange a Map
 
-Status: needs-triage
+**Status:** needs-triage
 
 **What to build:** an author-invoked Auto-arrange that rewrites the selected Map's positions with an automatic layout strategy in one destructive Edit.
 
