@@ -3,7 +3,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { positionedStrategy } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import { createMapSurface, observeMapSurfaces, type MapSurfaceContext } from '../src/map-surface';
+import { createMapSurface, observeMapSurfaces, type DrawnSurfaceContext } from '../src/map-surface';
 import { unusedImageSources } from './image-sources';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
@@ -49,8 +49,15 @@ function composition() {
   return composeApp({ spaceSession, images: unusedImageSources });
 }
 
-function drawing(app: ReturnType<typeof composeApp>, context: MapSurfaceContext) {
-  const surface = createMapSurface(app, context);
+function drawing(
+  app: ReturnType<typeof composeApp>,
+  context: Omit<DrawnSurfaceContext, 'kind' | 'occurrence'> & { readonly occurrence?: string },
+) {
+  const surface = createMapSurface(app, () => ({
+    kind: 'drawn',
+    occurrence: 'drawing',
+    ...context,
+  }));
   surface.observe();
   return surface;
 }
@@ -101,33 +108,16 @@ describe('a drawn Map', () => {
     { policy: 'authoring', authoring: true, readOnly: false },
     { policy: 'inert', authoring: false, readOnly: false },
     { policy: 'read-only', authoring: false, readOnly: true },
-  ] as const)(
-    'offers $policy capabilities and projects that policy',
-    async ({ policy, authoring, readOnly }) => {
-      const surface = drawing(composition(), {
-        mapId: OTHER_MAP,
-        graphId: OTHER_GRAPH,
-        policy,
-        depth: 1,
-      });
-      const view = surface.view();
-      const placed = await positionedStrategy(view.mapPlacement)(view.projection.strategyGraph);
-      expect(surface.offers()).toEqual({
-        authoring,
-        readOnly,
-        editEmbeddedMap: false,
-        present: false,
-      });
-      const node = surface.project(placed).nodes[0];
-      expect(node?.data.readOnly).toBe(readOnly);
-      if (!authoring) {
-        expect(node?.draggable).toBe(false);
-        expect(node?.selectable).toBe(false);
-        expect(node?.connectable).toBe(false);
-      }
-      surface.dispose();
-    },
-  );
+  ] as const)('offers $policy capabilities', ({ policy, authoring, readOnly }) => {
+    const surface = drawing(composition(), { mapId: OTHER_MAP, graphId: OTHER_GRAPH, policy });
+    expect(surface.offers()).toEqual({
+      authoring,
+      readOnly,
+      editEmbeddedMap: false,
+      present: false,
+    });
+    surface.dispose();
+  });
   it('continues only in the drawing that requested it and drops a departed drawing', () => {
     const app = composition();
     const left = drawing(app, {

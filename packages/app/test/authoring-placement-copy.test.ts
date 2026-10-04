@@ -9,6 +9,7 @@ import { recordingHistory } from './browser-history';
 import { openTestSpace } from './opened-space';
 import { node, settled } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * Authored placement has one home, the session's snapshot. Every assertion
@@ -88,7 +89,7 @@ describe('Map delete draws the right geometry', () => {
     // Graph — still writes the whole placement into the Map
     // (`updatePositionedMap`). The correct source for that write is the
     // surviving Map's own authored position for the shared Resource.
-    const renamed = app.authoring.complete({
+    const renamed = app.authoring.complete(CANVAS, {
       kind: 'renamed-graph',
       graphId: SURVIVING_GRAPH_ID,
       title: 'Renamed Graph',
@@ -186,7 +187,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     expect(entered.app.navigation.getState().selectedMapId).toBe(ENTERED_MAP_ID);
 
     // Again, an Edit that touches no position.
-    const renamed = entered.app.authoring.complete({
+    const renamed = entered.app.authoring.complete(CANVAS, {
       kind: 'renamed-graph',
       graphId: ENTERED_GRAPH_ID,
       title: 'Renamed Graph',
@@ -246,9 +247,7 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
    * What is pinned: an embedded Edit on a Map other than the one selected has
    * to produce a snapshot intake accepts, and a later top-level Edit has to see
    * it. It is exercised with `renamed-graph`, which changes an unselected
-   * Map's own content — `SpaceAuthoring.completeInMap`'s parameter type
-   * (`EmbeddedResourceCompletion | EmbeddedContextCompletion`) excludes
-   * `deleted-resource` — called directly through `completeInMap` exactly as
+   * Map's own content, completed for a drawn target exactly as
    * `space-authoring-operations.test.ts` does.
    */
   it('produces a snapshot intake accepts after a later top-level Edit', () => {
@@ -259,15 +258,18 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
 
     // An embedded Edit against a Map other than the one selected at the
     // top level.
-    const embedded = app.authoring.completeInMap(OTHER_MAP_ID, {
-      kind: 'renamed-graph',
-      graphId: OTHER_GRAPH_ID,
-      title: 'Renamed Other Graph',
-    });
+    const embedded = app.authoring.complete(
+      { kind: 'drawn', mapId: OTHER_MAP_ID, graphId: null },
+      {
+        kind: 'renamed-graph',
+        graphId: OTHER_GRAPH_ID,
+        title: 'Renamed Other Graph',
+      },
+    );
     expect(embedded.kind).toBe('completed');
 
     // The next top-level Edit, against the (still selected) other Map.
-    const renamed = app.authoring.complete({
+    const renamed = app.authoring.complete(CANVAS, {
       kind: 'renamed-map',
       mapId: TOP_MAP_ID,
       title: 'Renamed Top',
@@ -355,7 +357,7 @@ describe('A queued drag holds its drop point', () => {
         .projection?.nodes.find((resource) => resource.id === RESOURCE_B)?.position;
     });
     try {
-      const result = authoring.complete({
+      const result = authoring.complete(CANVAS, {
         kind: 'renamed-map',
         mapId: MAP_ID,
         title: 'Renamed',

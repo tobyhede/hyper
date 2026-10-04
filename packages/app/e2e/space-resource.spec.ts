@@ -44,16 +44,19 @@ import {
  */
 
 /**
- * Move to an open Space from the Command Dock's Open Spaces menu.
- *
- * The open set is disclosed from the bar as the tree the crossings make (ADR
- * 0082), and a row is a way *to* a Space rather than a tab beside it. `delay` is the
- * press a menu trigger needs — a zero-delay click puts mousedown and mouseup in
- * one tick and Base UI's dismissal never gets a turn between them.
+ * Enter the Space a Space Resource draws, through its own Enter command. A
+ * Space that is only drawn is held without being listed in Open Spaces
+ * (ADR 0112), so the Open Spaces menu does not reach it.
  */
-const switchToSpace = async (page: Page, title: string): Promise<void> => {
-  await page.getByRole('button', { name: /^Spaces\. \d+ open\.$/ }).click({ delay: 120 });
-  await page.getByRole('menuitemradio', { name: new RegExp(`^${title}`) }).click();
+const enterThrough = async (page: Page, resource: Locator, title: string): Promise<void> => {
+  // By keyboard, because a Resource the Space Resource draws may float its own
+  // toolbar over this one's.
+  const actions = (await resourceControls(page, resource)).getByRole('button', {
+    name: /^Actions for Resource /,
+  });
+  await actions.focus();
+  await actions.press('Enter');
+  await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
   await expect(showingSpace(page)).toContainText(title);
 };
 
@@ -748,7 +751,7 @@ test(
       .getByRole('button', { name: 'Save Resource Resource 1' })
       .click();
     await expect(embedded).toContainText('Written inside the Space Resource');
-    await switchToSpace(page, 'Space 1');
+    await enterThrough(page, nodeByTitle(page, 'Architecture'), 'Space 1');
     await expect(
       page.locator('.react-flow__node:visible').getByRole('heading', { name: 'Resource 1' }),
     ).toBeVisible();
@@ -808,6 +811,39 @@ test('a connect between two embedded Resources authors the shown Graph, not the 
   await settled(page);
   expect(await hostGraphEdgeCount(page, parent)).toBe(hostBefore);
   await expect.poll(() => embeddedGraphEdgeCount(page, parent)).toBe(shownBefore + 1);
+});
+
+/**
+ * An Edge joins Resources in one Space (ADR 0112), so a drag from a Resource a
+ * drawn Map shows to a Resource of the canvas is refused with wording and
+ * authors nothing in either Space.
+ */
+test('a connection from a drawn Map to a canvas Resource is refused with wording', async ({
+  page,
+}) => {
+  const parent = await openSpaceResourceOnItsMap(page);
+  await beginPortalEdit(page, parent);
+  const embedded = embeddedNodes(page);
+  await expect(embedded).toHaveCount(1);
+  const hostBefore = await hostGraphEdgeCount(page, parent);
+  const shownBefore = await embeddedGraphEdgeCount(page, parent);
+  await embedded.hover();
+  const sourceHandle = authoringHandle(embedded, 'source', 'right');
+  await expect(sourceHandle).toHaveCSS('opacity', '1');
+  const from = await boxOf(sourceHandle, 'the drawn source handle');
+  const to = await boxOf(nodeByTitle(page, 'A').first(), 'the canvas Resource');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 30, from.y + from.height / 2, { steps: 4 });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.up();
+
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'An Edge can connect Resources only within the same drawn Map.',
+  );
+  await settled(page);
+  expect(await hostGraphEdgeCount(page, parent)).toBe(hostBefore);
+  expect(await embeddedGraphEdgeCount(page, parent)).toBe(shownBefore);
 });
 
 /**
@@ -917,7 +953,7 @@ test(
     // Two Spaces open and neither entered, so the bar carries the Open Spaces
     // menu and no Opener control: there is nothing above `Map fixture`.
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
-    await switchToSpace(page, 'Space 1');
+    await enterThrough(page, nodeByTitle(page, 'Architecture'), 'Space 1');
 
     // Entered, so the crossing is named — and named as the Space, with the
     // OPEN mark carrying the relation rather than a word.
@@ -975,7 +1011,7 @@ test(
   { tag: '@parity:command-dock-always-reaches-meta' },
   async ({ page }) => {
     await openSpaceResourceOnItsMap(page);
-    await switchToSpace(page, 'Space 1');
+    await enterThrough(page, nodeByTitle(page, 'Architecture'), 'Space 1');
     await page.goto(page.url());
     await expect(showingSpace(page)).toContainText('Space 1');
     await expect(page.getByRole('button', { name: /^Go to / })).toHaveCount(0);
@@ -1155,7 +1191,7 @@ test(
   },
   async ({ page }) => {
     await openSpaceResourceOnItsMap(page);
-    await switchToSpace(page, 'Space 1');
+    await enterThrough(page, nodeByTitle(page, 'Architecture'), 'Space 1');
     await settled(page);
     // Only the next Edit is failed, while `Space 1` is the working Space.
     await page.route('**/api/spaces', async (route) => {

@@ -2,11 +2,13 @@ import type { ImageNaturalSize, MapId, MapPosition } from '@project/core';
 import type { PlacementMode } from '@project/graph';
 import { IMAGE_MEDIA_TYPES, refusalForDeclaredType, type ImageStoring } from '@project/persistence';
 import type { RefusedFile } from './authoring-refusal';
-import type {
-  AuthoringResult,
-  CreatedImage,
-  ImagesCompletion,
-  SpaceAuthoring,
+import type { SurfaceDrawing } from './map-surface-policy';
+import {
+  CANVAS,
+  type AuthoringResult,
+  type CreatedImage,
+  type ImagesCompletion,
+  type SpaceAuthoring,
 } from './space-authoring';
 
 /**
@@ -30,9 +32,14 @@ export interface ImageSources {
  */
 export const PICKED_IMAGE_TYPES = IMAGE_MEDIA_TYPES.join(',');
 
-/** Where a gesture was made: the Map it was aimed at, the point, and how that point is kept. */
+/**
+ * Where a gesture was made: the Map it was aimed at, whether that was the
+ * canvas's own Map or one drawn inside it, the point, and how that point is
+ * kept.
+ */
 export interface ImageTarget {
   readonly mapId: MapId;
+  readonly drawing: SurfaceDrawing;
   readonly anchor: MapPosition;
   readonly placement: PlacementMode;
 }
@@ -98,7 +105,7 @@ export const storeEach = async (
 export async function createImageResources(
   { images, authoring }: { readonly images: ImageSources; readonly authoring: SpaceAuthoring },
   origin: ImageOrigin,
-  { mapId, anchor, placement }: ImageTarget,
+  { mapId, drawing, anchor, placement }: ImageTarget,
 ): Promise<ImageEditResult> {
   let urls: readonly string[];
   if (origin.kind === 'url') {
@@ -121,11 +128,12 @@ export async function createImageResources(
     placement,
   };
   // Addressed to the Map the gesture was made on, because the anchor is a
-  // point on that Map. Storing and measuring outlast the gesture, so the author
-  // may have moved to another Map since. While the canvas still draws it this
-  // is the ordinary Edit; otherwise it writes the Map it was aimed at without
-  // moving the canvas, and a Map that has gone refuses `map-not-found`.
-  return authoring.getState().navigation.selectedMapId === mapId
-    ? authoring.complete(completion)
-    : authoring.completeInMap(mapId, completion);
+  // point on that Map. A drawn Map is written where it stands. Storing and
+  // measuring outlast the gesture, so the canvas may have moved to another Map
+  // since: while it still draws the Map this is the canvas's Edit; otherwise it
+  // writes the Map it was aimed at without moving the canvas. A Map that has
+  // gone refuses `map-not-found`.
+  return drawing === 'canvas' && authoring.getState().navigation.selectedMapId === mapId
+    ? authoring.complete(CANVAS, completion)
+    : authoring.complete({ kind: 'drawn', mapId, graphId: null }, completion);
 }

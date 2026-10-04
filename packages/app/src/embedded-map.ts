@@ -1,4 +1,4 @@
-import { surfaceOffers, type MapSurfacePolicy } from './map-surface-policy';
+import { withSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 import type { Edge, EdgeTypes } from '@xyflow/react';
 import {
   SPACE_RESOURCE_EMBED_INSET,
@@ -285,28 +285,31 @@ export function embeddedMap({
   bounds,
   tilt,
 }: EmbeddedMapRequest): CanvasNodesAndEdges {
-  const { authoring: enabled, readOnly } = surfaceOffers(policy, 1);
+  const enabled = policy === 'authoring';
   const nodes = projection.nodes.map((node): ResourceFlowNode => {
     const position = { x: node.position.x * zoom + offset.x, y: node.position.y * zoom + offset.y };
-    const next: ResourceFlowNode = {
-      ...node,
-      id: embeddedNodeId(parent.id, node.id),
-      parentId: parent.id,
-      position,
-      connectable: enabled && node.connectable !== false,
-      data: {
-        ...node.data,
-        readOnly,
-        connectionAuthoringEnabled: enabled && node.data.connectionAuthoringEnabled !== false,
-        dragTilted: tilt !== undefined,
+    const next = withSurfacePolicy(
+      {
+        ...node,
+        id: embeddedNodeId(parent.id, node.id),
+        parentId: parent.id,
+        position,
+        data: {
+          ...node.data,
+          dragTilted: tilt !== undefined,
+          connectionAuthoringEnabled: node.data.connectionAuthoringEnabled !== false,
+        },
+        // Explicit, because a child of the canvas would otherwise take the
+        // canvas's own gesture defaults rather than this drawing's.
+        draggable: node.draggable !== false,
+        selectable: node.selectable !== false,
+        focusable: node.focusable !== false,
+        connectable: node.connectable !== false,
+        deletable: false,
+        zIndex: (parent.zIndex ?? 10) + (node.data.open === true ? 2 : 1),
       },
-      draggable: enabled && node.draggable !== false,
-      selectable: enabled && node.selectable !== false,
-      focusable: enabled && node.focusable !== false,
-      deletable: false,
-      zIndex: (parent.zIndex ?? 10) + (node.data.open === true ? 2 : 1),
-    };
-    if (!enabled) next.className = 'nopan nowheel nodrag';
+      policy,
+    );
     const clipBounds = bounds ?? {
       top: SPACE_RESOURCE_EMBED_INSET.top,
       left: SPACE_RESOURCE_EMBED_INSET.left,
@@ -329,12 +332,7 @@ export function embeddedMap({
             },
           };
     const style = { ...placed.style, transition: 'none' };
-    return enabled
-      ? { ...placed, style }
-      : {
-          ...placed,
-          style: { ...style, pointerEvents: 'none' },
-        };
+    return { ...placed, style };
   });
   const ids = new Map(
     projection.nodes.map((node) => [node.id, embeddedNodeId(parent.id, node.id)]),

@@ -14,7 +14,7 @@ import {
 import { GRAPH_PALETTE, loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import type { AuthoringCompletion, AuthoringResult } from '../src/space-authoring';
+import { CANVAS, type AuthoringCompletion, type AuthoringResult } from '../src/space-authoring';
 import { unusedImageSources } from './image-sources';
 
 /**
@@ -206,7 +206,7 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
         });
 
         expect(
-          authoring.complete({
+          authoring.complete(CANVAS, {
             kind: 'edited-resource',
             resourceId: RESOURCE_C,
             document: { title: proposedTitle, kind: 'reference', target },
@@ -223,7 +223,7 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
 
         const beforeRetarget = session.getState().working;
         expect(
-          authoring.complete({
+          authoring.complete(CANVAS, {
             kind: 'edited-resource',
             resourceId: RESOURCE_C,
             document: { title: proposedTitle, kind: 'reference', target: alternativeTarget },
@@ -261,7 +261,7 @@ it('keeps the working Space loadable through any sequence of semantic operations
           const completion = resolve(generated, space.resources, graphs);
 
           const before = session.getState().working;
-          const result: AuthoringResult = authoring.complete(completion);
+          const result: AuthoringResult = authoring.complete(CANVAS, completion);
 
           expect(['completed', 'unchanged', 'refused']).toContain(result.kind);
           if (result.kind === 'refused') {

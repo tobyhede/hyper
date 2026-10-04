@@ -32,6 +32,12 @@ export interface EmbeddedTargetReader {
   readonly hold: (spaceId: ResourceId) => Promise<Pick<SpaceHold, 'release'>>;
 }
 
+/** One drawing's request for its target, holding the target once it is read. */
+interface EmbeddedHoldRequest {
+  readonly spaceId: ResourceId;
+  hold?: Pick<SpaceHold, 'release'>;
+}
+
 export interface EmbeddedOpenSpaceResources {
   readonly embeddedRequests: readonly EmbeddedOpenSpaceResourceRequest<OpenSpace>[];
   readonly embeddedPublications: ReadonlyMap<string, EmbeddedPublication>;
@@ -156,21 +162,11 @@ export function useEmbeddedOpenSpaceResources(
       setEmbeddedFailures(new Map([...embeddedFailures].filter(([id]) => asked.has(id))));
     }
   }
-  const requested = useRef(
-    new Map<
-      string,
-      {
-        readonly spaceId: ResourceId;
-        hold?: Pick<SpaceHold, 'release'>;
-      }
-    >(),
-  );
+  const requested = useRef(new Map<string, EmbeddedHoldRequest>());
   const acquire = useCallback(
     async (id: string, spaceId: ResourceId) => {
       if (spaces === null) return;
-      const request: { readonly spaceId: ResourceId; hold?: Pick<SpaceHold, 'release'> } = {
-        spaceId,
-      };
+      const request: EmbeddedHoldRequest = { spaceId };
       requested.current.set(id, request);
       try {
         const hold = await spaces.hold(spaceId);

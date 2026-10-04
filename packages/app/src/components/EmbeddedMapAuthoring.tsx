@@ -2,7 +2,7 @@ import { ChromeContinuation } from './ChromeContinuation';
 import { GraphIcon } from '@project/ui';
 import { ResourceConnect, type Connecting } from './ResourceConnect';
 import { nextResourceTitle } from '../titles';
-import { useEdgeAuthoring } from '../edge-authoring-react';
+import { useEdgeAuthoring, type EdgeDrawing } from '../edge-authoring-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { NodeChange } from '@xyflow/react';
 import { type ResourceId, type GraphId, type MapId, type MapPosition } from '@project/core';
@@ -20,6 +20,7 @@ import {
   constrainEmbeddedPosition,
   embeddedNodeId,
   embeddedMap,
+  parseEmbeddedNodeId,
   type EmbeddedBounds,
   type EmbeddedParentProjection,
   type EmbeddedTilt,
@@ -44,7 +45,6 @@ export function EmbeddedMapAuthoring({
   mapId,
   graphId,
   policy,
-  depth,
   spaceOnCanvas,
   framing,
   bounds: { left, top, right, bottom },
@@ -65,7 +65,6 @@ export function EmbeddedMapAuthoring({
    */
   readonly graphId: GraphId;
   readonly policy: MapSurfacePolicy;
-  readonly depth: number;
   readonly spaceOnCanvas: boolean;
   readonly framing: SpaceResourceFraming | undefined;
   readonly bounds: EmbeddedBounds;
@@ -85,12 +84,18 @@ export function EmbeddedMapAuthoring({
   const parentId = parent.id;
   const chromeRoot = useRef<HTMLElement>(null);
   const [composition] = useState(() =>
-    createMapSurface(entry.app, { mapId, graphId, policy, depth, occurrence: parentId }),
+    createMapSurface(entry.app, () => ({
+      kind: 'drawn',
+      mapId,
+      graphId,
+      policy,
+      occurrence: parentId,
+    })),
   );
   useEffect(() => composition.observe(), [composition]);
   useLayoutEffect(() => {
-    composition.update({ mapId, graphId, policy, depth, occurrence: parentId });
-  }, [composition, mapId, graphId, policy, depth, parentId]);
+    composition.update({ kind: 'drawn', mapId, graphId, policy, occurrence: parentId });
+  }, [composition, mapId, graphId, policy, parentId]);
   const {
     view,
     canvasRendering,
@@ -264,6 +269,34 @@ export function EmbeddedMapAuthoring({
     (resourceId: ResourceId) => embeddedNodeId(parentId, resourceId),
     [parentId],
   );
+  const cameraOffset = camera.offset;
+  const edgeDrawing = useMemo(
+    (): EdgeDrawing => ({
+      resourceOf: (nodeId) => {
+        const parsed = parseEmbeddedNodeId(nodeId);
+        return parsed?.parentId === parentId ? parsed.resourceId : undefined;
+      },
+      toMap: (point) =>
+        authoredFromDrawn(
+          { x: point.x - absoluteX, y: point.y - absoluteY },
+          cameraOffset,
+          camera.zoom,
+        ),
+      dropTargetOf: (element, point) => {
+        const within =
+          point.x >= absoluteX + left &&
+          point.x <= absoluteX + right &&
+          point.y >= absoluteY + top &&
+          point.y <= absoluteY + bottom;
+        if (!within) return 'off-canvas';
+        const under = element?.closest<HTMLElement>('.react-flow__node[data-id]')?.dataset['id'];
+        if (under === undefined || under === parentId) return 'empty-canvas';
+        return parseEmbeddedNodeId(under)?.parentId === parentId ? 'resource' : 'off-canvas';
+      },
+      previewScale: camera.zoom,
+    }),
+    [parentId, absoluteX, absoluteY, cameraOffset, camera.zoom, left, right, top, bottom],
+  );
   const edgeSurface = useEdgeAuthoring({
     authoring: composition.edgeAuthoring,
     edges,
@@ -276,6 +309,7 @@ export function EmbeddedMapAuthoring({
     resourceNodeId,
     enabled: availability.authorOnCanvas,
     onSelectEdge: state.selectEdge,
+    drawing: edgeDrawing,
   });
   const value = useMemo((): EmbeddedPublication => {
     const localIds = new Map(nodes.map((node) => [node.id, node.data.resourceId]));
@@ -319,10 +353,6 @@ export function EmbeddedMapAuthoring({
       },
       mayConnectResources: (from, to) =>
         composition.authoring.edgeEligibility({ kind: 'connect', from, to }).kind === 'eligible',
-      connectResources: (from, to) => {
-        composition.edgeAuthoring.connect(from, to, canvasRendering.liveProjection?.nodes ?? null);
-        return true;
-      },
       connectionAppearance: () =>
         connectionAppearance(pending.visibleGraphs, pending.colors, graphId),
       changeNodes: (changes) => {
@@ -359,7 +389,6 @@ export function EmbeddedMapAuthoring({
     parentId,
     space.title,
     edgeSurface,
-    canvasRendering.liveProjection,
     availability,
     placement,
     absoluteX,

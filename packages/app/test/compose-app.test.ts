@@ -5,6 +5,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp, composeCore } from '../src/compose-app';
 import { createConnectionCompletion } from '../src/connection-completion';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * What an opened Space is composed of, asserted at the composition.
@@ -71,7 +72,7 @@ describe('the composed working Space', () => {
     const before = currentSpace();
 
     expect(
-      authoring.complete({
+      authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
         document: { title: 'Renamed', kind: 'markdown', body: 'A' },

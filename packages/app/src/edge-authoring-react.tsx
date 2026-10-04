@@ -18,8 +18,9 @@ import {
   type OnConnect,
   type OnConnectEnd,
   type OnConnectStart,
+  type XYPosition,
 } from '@xyflow/react';
-import type { Resource, ResourceId, Graph, GraphId } from '@project/core';
+import type { Resource, ResourceId, Graph, GraphId, MapPosition } from '@project/core';
 import { shortTitle, uuidSchema } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
@@ -133,9 +134,40 @@ export interface EdgeAuthoringInput {
    * Active Graph — a Space Resource in Edit writing the Graph it is showing.
    */
   readonly mayOfferAlso?: (resourceId: ResourceId) => boolean;
+  /** How a Map drawn inside the canvas reads the canvas's pointer events; the canvas's own by default. */
+  readonly drawing?: EdgeDrawing;
+}
+
+/**
+ * How one drawing reads the gestures the canvas's React Flow reports: which of
+ * its Resources a node is, where a canvas point lies on its Map, and what the
+ * pointer is over to it (ADR 0112).
+ */
+export interface EdgeDrawing {
+  /** The Resource a canvas node draws in this drawing, or `undefined` for a node it does not draw. */
+  readonly resourceOf: (nodeId: string) => ResourceId | undefined;
+  /** A canvas point, on this drawing's Map. */
+  readonly toMap: (point: XYPosition) => MapPosition;
+  /** What the element under a canvas point is, to this drawing. */
+  readonly dropTargetOf: (element: Element | null, point: XYPosition) => ElementDropTarget;
+  /** How large this drawing draws a Resource, for the empty-drop preview. */
+  readonly previewScale: number;
 }
 
 const EDGE_TYPES: EdgeTypes = { [ROUTED_EDGE_TYPE]: AuthorableEdge };
+
+const resourceOfCanvasNode = (nodeId: string): ResourceId | undefined => {
+  const parsed = uuidSchema.safeParse(nodeId);
+  return parsed.success ? parsed.data : undefined;
+};
+
+/** The canvas's own Map: nodes are its Resources, and its points are already Map points. */
+const CANVAS_DRAWING: EdgeDrawing = {
+  resourceOf: resourceOfCanvasNode,
+  toMap: (point) => point,
+  dropTargetOf: (element) => elementDropTargetOf(element),
+  previewScale: 1,
+};
 
 /**
  * Which `ElementDropTarget` the element under the pointer is. Both class names
@@ -180,6 +212,7 @@ export function useEdgeAuthoring({
   mayOfferAlso,
   commandsByEdge,
   resourceNodeId,
+  drawing = CANVAS_DRAWING,
 }: EdgeAuthoringInput): EdgeAuthoringSurface {
   const state = useSyncExternalStore(authoring.subscribe, authoring.getState);
   const { screenToFlowPosition, getEdges } = useReactFlow();
@@ -199,9 +232,16 @@ export function useEdgeAuthoring({
   // every reader is a browser event: a pointer release or a key press arrives
   // from the event loop, always after the render that produced the value it
   // needs.
-  const latest = useRef({ projectedNodes, authoring, mayOfferAlso, edges, resourceNodeId });
+  const latest = useRef({
+    projectedNodes,
+    authoring,
+    mayOfferAlso,
+    edges,
+    resourceNodeId,
+    drawing,
+  });
   useEffect(() => {
-    latest.current = { projectedNodes, authoring, mayOfferAlso, edges, resourceNodeId };
+    latest.current = { projectedNodes, authoring, mayOfferAlso, edges, resourceNodeId, drawing };
   });
 
   useEffect(() => {
@@ -217,13 +257,14 @@ export function useEdgeAuthoring({
   }, []);
 
   const acceptsEmptyDrop = useCallback((from: string): boolean => {
-    const source = uuidSchema.safeParse(from);
+    const source = latest.current.drawing.resourceOf(from);
     // React Flow knows node ids as plain strings and asks per pointer frame.
-    // An id that is not a Resource identity is not a connection to accept —
-    // answering false is the honest reading, and a throw mid-drag the wrong one.
+    // An id that names no Resource of this drawing is not a connection to
+    // accept — answering false is the honest reading, and a throw mid-drag the
+    // wrong one.
     return (
-      source.success &&
-      latest.current.authoring.accepts({ kind: 'create-and-connect', from: source.data })
+      source !== undefined &&
+      latest.current.authoring.accepts({ kind: 'create-and-connect', from: source })
     );
   }, []);
 
@@ -243,62 +284,63 @@ export function useEdgeAuthoring({
 
   /** Whether the drag currently under the pointer may be released here. */
   const isValidConnection = useCallback<IsValidConnection>((connection) => {
-    const from = uuidSchema.safeParse(connection.source);
-    const to = uuidSchema.safeParse(connection.target);
-    if (!from.success || !to.success) return false;
-    return latest.current.authoring.accepts({ kind: 'connect', from: from.data, to: to.data });
+    const from = latest.current.drawing.resourceOf(connection.source);
+    const to = latest.current.drawing.resourceOf(connection.target);
+    if (from === undefined || to === undefined) return false;
+    return latest.current.authoring.accepts({ kind: 'connect', from, to });
   }, []);
 
   const handleConnectStart = useCallback<OnConnectStart>((event, params) => {
     connecting.current = true;
     setPointerOver('off-canvas');
     setModifierHeld('altKey' in event && event.altKey);
-    const from = uuidSchema.safeParse(params.nodeId);
-    if (from.success) latest.current.authoring.beginPointerConnect(from.data);
+    const from = latest.current.drawing.resourceOf(params.nodeId ?? '');
+    if (from !== undefined) latest.current.authoring.beginPointerConnect(from);
   }, []);
 
   const handleConnect = useCallback<OnConnect>((connection) => {
-    const from = uuidSchema.safeParse(connection.source);
-    const to = uuidSchema.safeParse(connection.target);
-    if (!from.success || !to.success) return;
-    latest.current.authoring.connect(from.data, to.data, latest.current.projectedNodes);
+    const from = latest.current.drawing.resourceOf(connection.source);
+    const to = latest.current.drawing.resourceOf(connection.target);
+    if (from === undefined || to === undefined) return;
+    latest.current.authoring.connect(from, to, latest.current.projectedNodes);
   }, []);
 
   const handleConnectEnd = useCallback<OnConnectEnd>(
     (event, connection) => {
-      const drop =
-        connection.fromNode === null || !('altKey' in event) || !('clientX' in event)
-          ? null
-          : newResourceDrop(
-              {
-                kind: 'dragging',
-                sourceId: connection.fromNode.id,
-                point: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
-                over: dropTarget({
-                  connectionTarget: connection.toNode !== null,
-                  // Resolved from the point rather than read off the event:
-                  // `event.target` is only the released-over element because
-                  // `XYHandle` happens not to capture the pointer, which is an
-                  // implementation detail rather than a documented guarantee.
-                  // `elementFromPoint` is what React Flow itself uses to resolve
-                  // a drop target.
-                  element: elementDropTargetOf(
-                    document.elementFromPoint(event.clientX, event.clientY),
-                  ),
-                }),
-                modifierHeld: event.altKey,
-              },
-              acceptsEmptyDrop,
-            );
-      if (drop !== null) {
-        const from = uuidSchema.safeParse(drop.sourceId);
-        if (from.success) {
-          latest.current.authoring.createConnectedResource(
-            from.data,
-            drop.position,
-            latest.current.projectedNodes,
-          );
-        }
+      const { drawing: reading } = latest.current;
+      let drop: ReturnType<typeof newResourceDrop> = null;
+      if (connection.fromNode !== null && 'altKey' in event && 'clientX' in event) {
+        const point = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+        drop = newResourceDrop(
+          {
+            kind: 'dragging',
+            sourceId: connection.fromNode.id,
+            point: reading.toMap(point),
+            over: dropTarget({
+              connectionTarget: connection.toNode !== null,
+              // Resolved from the point rather than read off the event:
+              // `event.target` is only the released-over element because
+              // `XYHandle` happens not to capture the pointer, which is an
+              // implementation detail rather than a documented guarantee.
+              // `elementFromPoint` is what React Flow itself uses to resolve
+              // a drop target.
+              element: reading.dropTargetOf(
+                document.elementFromPoint(event.clientX, event.clientY),
+                point,
+              ),
+            }),
+            modifierHeld: event.altKey,
+          },
+          acceptsEmptyDrop,
+        );
+      }
+      const from = drop === null ? undefined : reading.resourceOf(drop.sourceId);
+      if (drop !== null && from !== undefined) {
+        latest.current.authoring.createConnectedResource(
+          from,
+          drop.position,
+          latest.current.projectedNodes,
+        );
       }
       // The Resource a completed connection reached is published as a continuation
       // rather than selected here: selecting during the release would be undone
@@ -314,12 +356,18 @@ export function useEdgeAuthoring({
     [screenToFlowPosition, acceptsEmptyDrop],
   );
 
-  const handleMouseMove = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
-    if (!connecting.current) return;
-    const over = elementDropTargetOf(event.target);
-    setPointerOver(over);
-    if (over === 'empty-canvas') setModifierHeld(event.altKey);
-  }, []);
+  const handleMouseMove = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (!connecting.current) return;
+      const over = latest.current.drawing.dropTargetOf(
+        event.target instanceof Element ? event.target : null,
+        screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+      );
+      setPointerOver(over);
+      if (over === 'empty-canvas') setModifierHeld(event.altKey);
+    },
+    [screenToFlowPosition],
+  );
 
   /**
    * Where a caret target is drawn, read when the delete confirmation closes:
@@ -564,6 +612,7 @@ export function useEdgeAuthoring({
       <>
         <NewResourcePreview
           title={newResourceTitle}
+          scale={drawing.previewScale}
           modifierHeld={modifierHeld}
           pointerOver={pointerOver}
           accepts={acceptsEmptyDrop}
@@ -585,7 +634,14 @@ export function useEdgeAuthoring({
         )}
       </>
     ),
-    [newResourceTitle, modifierHeld, pointerOver, acceptsEmptyDrop, state.refusal],
+    [
+      newResourceTitle,
+      drawing.previewScale,
+      modifierHeld,
+      pointerOver,
+      acceptsEmptyDrop,
+      state.refusal,
+    ],
   );
 
   const reactFlowProps = useMemo<EdgeOwnedReactFlowProps>(

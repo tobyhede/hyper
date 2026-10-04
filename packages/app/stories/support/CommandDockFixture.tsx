@@ -6,6 +6,7 @@ import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';
 import { heldImageSources } from './image-sources';
 import type { OpenSpace, OpenSpaces } from '#src/open-spaces';
+import { CANVAS } from '#src/space-authoring';
 import {
   authoredSnapshot,
   commandDockSnapshot,
@@ -142,7 +143,7 @@ const blockSave = async (
 
   const notes = rendering.session.getState().working.resources[0];
   if (notes === undefined) throw new Error('The blocked scenario needs an editable Resource.');
-  const edited = rendering.app.authoring.complete({
+  const edited = rendering.app.authoring.complete(CANVAS, {
     kind: 'edited-resource',
     resourceId: notes.id,
     document: { ...notes.document, title: `${notes.document.title} edited` },
@@ -281,7 +282,7 @@ export async function openDockStory(scenario: DockScenario) {
     // on screen so recovery can be compared without changing the scenario.
     const resource = stored.working.resources[0];
     if (resource === undefined) throw new Error('The failure scenario needs an editable Resource.');
-    const result = target.app.authoring.complete({
+    const result = target.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: resource.id,
       document:

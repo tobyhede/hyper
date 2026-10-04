@@ -21,7 +21,7 @@ import {
   type GraphAuthoringCommands,
 } from '../src/graph-authoring-commands';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
-import type { AuthoringResult } from '../src/space-authoring';
+import { CANVAS, type AuthoringResult } from '../src/space-authoring';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 
@@ -124,7 +124,7 @@ const openSpaces = (
 const selectOn =
   (source: OpenSpace) =>
   (mapId: MapId, graphId: GraphId): string | null => {
-    const result = source.app.authoring.complete({
+    const result = source.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: RESOURCE,
       document: { ...document, map: mapId, graph: graphId },
@@ -250,7 +250,7 @@ const contexts: readonly {
           available = false;
         },
         answerNext: (answer) => {
-          vi.spyOn(authored.app.authoring, 'completeInMap').mockImplementationOnce(answer);
+          vi.spyOn(authored.app.authoring, 'complete').mockImplementationOnce(answer);
         },
         reported,
       };
@@ -625,8 +625,11 @@ describe('what each context creates in', () => {
     const { source, authored, commands, control } = await embedded();
     control.throwNext(new Error('offline'));
     expect(
-      source.app.authoring.complete({ kind: 'renamed-map', mapId: META_MAP, title: 'Renamed' })
-        .kind,
+      source.app.authoring.complete(CANVAS, {
+        kind: 'renamed-map',
+        mapId: META_MAP,
+        title: 'Renamed',
+      }).kind,
     ).toBe('completed');
     expect(await commands.map(SECOND_MAP).create.invoke()).toEqual({
       kind: 'refused',
@@ -746,7 +749,10 @@ const storedActiveGraph = (space: OpenSpace, mapId: MapId): GraphId | undefined 
  * owns.
  */
 const addStoredActive = (space: OpenSpace): GraphId => {
-  const result = space.app.authoring.completeInMap(SECOND_MAP, { kind: 'added-graph' });
+  const result = space.app.authoring.complete(
+    { kind: 'drawn', mapId: SECOND_MAP, graphId: null },
+    { kind: 'added-graph' },
+  );
   if (result.kind !== 'completed' || result.createdGraphId === undefined) {
     throw new Error(`Graph creation answered ${result.kind}`);
   }
@@ -868,11 +874,14 @@ describe.each(contexts)('Graph deletion through $name', ({ setup }) => {
     addressSelected();
     control.throwNext(new Error('offline'));
     expect(
-      authored.app.authoring.completeInMap(SECOND_MAP, {
-        kind: 'renamed-map',
-        mapId: SECOND_MAP,
-        title: 'Renamed',
-      }).kind,
+      authored.app.authoring.complete(
+        { kind: 'drawn', mapId: SECOND_MAP, graphId: null },
+        {
+          kind: 'renamed-map',
+          mapId: SECOND_MAP,
+          title: 'Renamed',
+        },
+      ).kind,
     ).toBe('completed');
     expect(await spaces.waitForPersistence(TARGET)).toBe(false);
     const remove = commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete;
@@ -1044,8 +1053,11 @@ describe('what each context deletes', () => {
     const { source, authored, commands } = await embedded(control);
     control.throwNext(new Error('offline'));
     expect(
-      source.app.authoring.complete({ kind: 'renamed-map', mapId: META_MAP, title: 'Renamed' })
-        .kind,
+      source.app.authoring.complete(CANVAS, {
+        kind: 'renamed-map',
+        mapId: META_MAP,
+        title: 'Renamed',
+      }).kind,
     ).toBe('completed');
     const deleteGraph = vi.spyOn(authored.spaceResources, 'deleteGraph');
     expect(await commands.map(SECOND_MAP).graph(SECOND_GRAPH).delete.invoke()).toEqual({

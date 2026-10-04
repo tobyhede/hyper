@@ -22,7 +22,7 @@ import type {
   AuthoringRefusal,
   EdgeEligibility,
   EdgeProposal,
-  SpaceAuthoring,
+  SurfaceAuthoring,
 } from './space-authoring';
 
 /**
@@ -331,7 +331,7 @@ export interface EdgeAuthoring {
 }
 
 export interface EdgeAuthoringDependencies {
-  readonly authoring: SpaceAuthoring;
+  readonly authoring: SurfaceAuthoring;
   readonly adapter: RenderAdapter;
   readonly connections: ConnectionCompletion;
   /** Where every focus move this lifecycle owes the author is published. */
@@ -473,7 +473,7 @@ export function createEdgeAuthoring({
    * the instant its subject really goes.
    */
   const completeStructural = (
-    completion: Parameters<SpaceAuthoring['complete']>[0] & EdgeSubject,
+    completion: Parameters<SurfaceAuthoring['complete']>[0] & EdgeSubject,
   ): AuthoringRefusal | 'settled' | 'queued' => {
     const result = authoring.complete(completion);
     if (result.kind === 'refused') {

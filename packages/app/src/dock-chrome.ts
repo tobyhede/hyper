@@ -28,6 +28,7 @@ import { graphDeletionWords, topLevelGraphAuthoringCommands } from './graph-auth
 import { mapDeletionWords, topLevelMapAuthoringCommands } from './map-authoring-commands';
 import type { OpenSpace, OpenSpaces, RejectedExitConfirmation } from './open-spaces';
 import type { ResourcePlacementCommands } from './resource-placement';
+import { CANVAS } from './space-authoring';
 import type { ResourcesDisclosure } from './resources-disclosure';
 import { useReferenceableSpaces } from './referenceable-spaces';
 
@@ -185,7 +186,7 @@ export function useDockChrome(
     (title: string): string | null => {
       // No id: the Edit writes `document.title` on the session this
       // composition is closed over, which is the Space the Dock draws.
-      const result = authoring.complete({ kind: 'renamed-space', title });
+      const result = authoring.complete(CANVAS, { kind: 'renamed-space', title });
       return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
     },
     [authoring],

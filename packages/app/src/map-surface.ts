@@ -1,35 +1,66 @@
 import type { GraphId, MapId, ResourceId } from '@project/core';
 import { Placement, type LayoutStrategyGraph } from '@project/graph';
+import { createObservableState } from '@project/persistence';
 import type { ComposedApp, EdgeCollaborators } from './compose-app';
 import type { CanvasNodesAndEdges } from './canvas-projection';
 import { mapView, type MapView } from './map-view';
-import { createObservableState } from '@project/persistence';
 import { createRenderAdapter, type RenderAdapter } from './render-adapter';
 import { createEdgeAuthoring, type EdgeAuthoring } from './edge-authoring';
 import { createConnectionCompletion, type ConnectionCompletion } from './connection-completion';
-import type { SpaceAuthoring, SpaceAuthoringState } from './space-authoring';
-
-import { surfaceOffers, surfaceAvailability, type MapSurfacePolicy } from './map-surface-policy';
+import {
+  CANVAS,
+  type EditTarget,
+  type SpaceAuthoringState,
+  type SurfaceAuthoring,
+} from './space-authoring';
+import {
+  surfaceAvailability,
+  surfaceOffers,
+  type MapSurfacePolicy,
+  type SurfaceOffers,
+} from './map-surface-policy';
 import type { AuthoringAvailability } from './authoring-availability';
 import { createContinuation, type Continuation } from './continuation';
 
-export interface MapSurfaceContext {
+/**
+ * Which drawing an occurrence names: the path of drawing Resources from the
+ * canvas's own Map to it (ADR 0112). The canvas's own Map is the empty path.
+ */
+export type Occurrence = string;
+
+export const CANVAS_OCCURRENCE: Occurrence = '';
+
+interface SurfaceContextBase {
   readonly mapId: MapId;
   readonly graphId: GraphId | null;
   readonly policy: MapSurfacePolicy;
-  readonly depth?: number;
-  readonly occurrence?: string;
-  readonly presentingResourceId?: ResourceId | null;
 }
 
+/** The canvas's own Map: Navigation's selection, presented from here alone. */
+export interface CanvasSurfaceContext extends SurfaceContextBase {
+  readonly kind: 'canvas';
+  readonly presentingResourceId: ResourceId | null;
+}
+
+/** A Map drawn inside the canvas, at an explicit Map and Graph. */
+export interface DrawnSurfaceContext extends SurfaceContextBase {
+  readonly kind: 'drawn';
+  readonly occurrence: Occurrence;
+}
+
+export type MapSurfaceContext = CanvasSurfaceContext | DrawnSurfaceContext;
+
 export interface MapSurface {
-  readonly offers: () => ReturnType<typeof surfaceOffers>;
+  readonly offers: () => SurfaceOffers;
   readonly availability: (available: AuthoringAvailability) => AuthoringAvailability;
   readonly continuation: Continuation;
-  readonly authoring: SpaceAuthoring;
+  readonly authoring: SurfaceAuthoring;
   readonly adapter: RenderAdapter;
   readonly edgeAuthoring: EdgeAuthoring;
   readonly context: () => MapSurfaceContext;
+  /** Where this drawing's Edits land. */
+  readonly target: () => EditTarget;
+  readonly occurrence: () => Occurrence;
   readonly update: (context: MapSurfaceContext) => void;
   readonly observe: () => () => void;
   readonly view: () => MapView;
@@ -50,64 +81,49 @@ type SurfaceComposition = Pick<
   'authoring' | 'currentSpace' | 'deleteConfirmation' | 'reportObserverError'
 >;
 
+const targetOf = (context: MapSurfaceContext): EditTarget =>
+  context.kind === 'canvas'
+    ? CANVAS
+    : { kind: 'drawn', mapId: context.mapId, graphId: context.graphId };
+
+/**
+ * One drawing of a Map. `follow` is read whenever the surface needs its
+ * context, so the canvas's surface follows Navigation; `update` replaces it
+ * with a fixed one, which is how a drawn Map follows its Space Resource.
+ */
 export function createMapSurface(
   app: SurfaceComposition,
-  supplied: MapSurfaceContext | (() => MapSurfaceContext),
+  follow: () => MapSurfaceContext,
   connections?: (collaborators: EdgeCollaborators) => ConnectionCompletion,
 ): MapSurface {
-  let heldContext = typeof supplied === 'function' ? supplied() : supplied;
-  let readContext = typeof supplied === 'function' ? supplied : () => heldContext;
+  let readContext = follow;
   const context = () => readContext();
+  const target = () => targetOf(context());
   let lastSpace: ReturnType<ComposedApp['currentSpace']> | undefined;
   let lastMap: MapId | undefined;
-  let lastPolicy: MapSurfacePolicy | undefined;
   let lastView: MapView;
   const view = () => {
     const space = app.currentSpace();
-    const mapId = context().mapId;
-    const policy = context().policy;
-    if (space !== lastSpace || mapId !== lastMap || policy !== lastPolicy) {
-      const derived = mapView(space, mapId);
-      lastView = {
-        ...derived,
-        projection: {
-          ...derived.projection,
-          project: (placed, interaction) => {
-            const projected = derived.projection.project(placed, {
-              ...interaction,
-              activeGraphId: context().graphId,
-            });
-            const permitted = surfaceOffers(context().policy, context().depth ?? 0);
-            return {
-              ...projected,
-              nodes: projected.nodes.map((node) => ({
-                ...node,
-                ...(permitted.authoring
-                  ? {}
-                  : { draggable: false, selectable: false, connectable: false, focusable: false }),
-                data: { ...node.data, readOnly: permitted.readOnly },
-              })),
-            };
-          },
-        },
-      };
-      lastPolicy = policy;
+    const { mapId } = context();
+    if (space !== lastSpace || mapId !== lastMap) {
+      lastView = mapView(space, mapId);
       lastSpace = space;
       lastMap = mapId;
     }
     return lastView;
   };
   const state = (): SpaceAuthoringState => {
-    const { mapId, graphId, presentingResourceId } = context();
+    const current = context();
+    const presentingResourceId = current.kind === 'canvas' ? current.presentingResourceId : null;
     return {
       ...app.authoring.getState(),
       navigation:
-        presentingResourceId == null
-          ? { mode: 'overview', selectedMapId: mapId, activeGraphId: graphId }
+        presentingResourceId === null
+          ? { mode: 'overview', selectedMapId: current.mapId, activeGraphId: current.graphId }
           : {
               mode: 'presenting',
-              selectedMapId: mapId,
-              activeGraphId: graphId,
+              selectedMapId: current.mapId,
+              activeGraphId: current.graphId,
               traversalHistory: [presentingResourceId],
               branchIndex: 0,
             },
@@ -127,17 +143,20 @@ export function createMapSurface(
     }
     return stopObserving;
   };
-  const authoring: SpaceAuthoring = {
-    ...app.authoring,
+  const authoring: SurfaceAuthoring = {
     getState: observable.getState,
     subscribe: observable.subscribe,
-    complete: (completion) => app.authoring.completeInContext(context(), completion),
-    edgeEligibility: (proposal) => app.authoring.edgeEligibilityInContext(context(), proposal),
+    complete: (completion) => {
+      const lands = target();
+      return lands.kind === 'canvas'
+        ? app.authoring.complete(lands, completion)
+        : app.authoring.complete(lands, completion);
+    },
+    edgeEligibility: (proposal) => app.authoring.edgeEligibility(target(), proposal),
     mapPlacement: () => {
       const resolved = app.currentSpace().lookup.map(context().mapId);
       return resolved === undefined ? Placement.empty() : Placement.fromMap(resolved.map);
     },
-    dispose: stopObserving,
   };
   let disposed = false;
   const ownedContinuation = createContinuation({
@@ -163,24 +182,23 @@ export function createMapSurface(
   });
   let lastAvailability:
     | {
-        input: AuthoringAvailability;
-        policy: MapSurfacePolicy;
-        depth: number;
-        result: AuthoringAvailability;
+        readonly input: AuthoringAvailability;
+        readonly context: MapSurfaceContext;
+        readonly result: AuthoringAvailability;
       }
     | undefined;
   return {
-    offers: () => surfaceOffers(context().policy, context().depth ?? 0),
+    offers: () => surfaceOffers(context().policy, context().kind),
     availability: (available) => {
-      const { policy, depth = 0 } = context();
+      const current = context();
       if (
         lastAvailability?.input === available &&
-        lastAvailability.policy === policy &&
-        lastAvailability.depth === depth
+        lastAvailability.context.policy === current.policy &&
+        lastAvailability.context.kind === current.kind
       )
         return lastAvailability.result;
-      const result = surfaceAvailability(available, policy, depth);
-      lastAvailability = { input: available, policy, depth, result };
+      const result = surfaceAvailability(available, current.policy, current.kind);
+      lastAvailability = { input: available, context: current, result };
       return result;
     },
     authoring,
@@ -188,10 +206,14 @@ export function createMapSurface(
     edgeAuthoring,
     continuation,
     context,
+    target,
+    occurrence: () => {
+      const current = context();
+      return current.kind === 'canvas' ? CANVAS_OCCURRENCE : current.occurrence;
+    },
     update: (next) => {
       const before = context();
-      heldContext = next;
-      readContext = () => heldContext;
+      readContext = () => next;
       if (before.mapId !== next.mapId) adapter.getState().selectMap();
       observable.publish(state());
     },
@@ -215,13 +237,17 @@ export function createMapSurface(
   };
 }
 
-/** Contextual collaborators for commands; the Space-owned lifetimes stay shared. */
+/**
+ * The composition a drawn Map's commands run over: the Space's own, drawing
+ * through this surface. Space-owned lifetimes — authoring, outcomes,
+ * confirmation, image work — stay the Space's; the drawn collaborators are
+ * the surface's.
+ */
 export function mapSurfaceComposition(app: ComposedApp, surface: MapSurface): ComposedApp {
   return {
     ...app,
     surface,
     continuation: surface.continuation,
-    authoring: surface.authoring,
     adapter: surface.adapter,
     edgeAuthoring: surface.edgeAuthoring,
   };

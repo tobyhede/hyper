@@ -50,6 +50,7 @@ it("writes a Map's identity and opening selection, preserving its positions and 
     mapId: MAP_ID,
     title: 'Renamed',
     activeGraphId: GRAPH_ID,
+    opening: true,
   });
 
   expect(changed.resources).toEqual(snapshot.resources);
@@ -77,6 +78,7 @@ it('refuses to write a Map the snapshot does not hold', () => {
       mapId: OTHER_MAP_ID,
       title: 'Map 2',
       activeGraphId: OTHER_GRAPH_ID,
+      opening: true,
     }),
   ).toThrow(OTHER_MAP_ID);
 });
@@ -114,6 +116,7 @@ it('leaves unrelated maps standing while writing one', () => {
     mapId: MAP_ID,
     title: 'Map',
     activeGraphId: GRAPH_ID,
+    opening: true,
   });
 
   expect(changed.document.maps).toHaveLength(2);
@@ -134,13 +137,19 @@ it('leaves an authored active Graph alone when the Edit names none', () => {
     mapId: MAP_ID,
     title: 'Map',
     activeGraphId: null,
+    opening: true,
   });
 
   expect(changed.document.maps?.[0]?.activeGraph).toBeUndefined();
 
   const authored = updatePositionedMap(
-    updatePositionedMap(snapshot, { mapId: MAP_ID, title: 'Map', activeGraphId: GRAPH_ID }),
-    { mapId: MAP_ID, title: 'Map', activeGraphId: null },
+    updatePositionedMap(snapshot, {
+      mapId: MAP_ID,
+      title: 'Map',
+      activeGraphId: GRAPH_ID,
+      opening: true,
+    }),
+    { mapId: MAP_ID, title: 'Map', activeGraphId: null, opening: true },
   );
 
   expect(authored.document.maps?.[0]?.activeGraph).toBe(GRAPH_ID);

@@ -31,7 +31,6 @@ export interface EmbeddedPublication extends EmbeddedPublicationSnapshot {
   readonly changeNodes: (changes: NodeChange<ResourceFlowNode>[]) => void;
   readonly removeResource: (id: string) => string | null;
   readonly mayConnectResources: (from: ResourceId, to: ResourceId) => boolean;
-  readonly connectResources: (from: ResourceId, to: ResourceId) => boolean;
   /** How a connection between this embedding's Resources is previewed: as the Graph it joins. */
   readonly connectionAppearance: () => GraphAppearance;
 }

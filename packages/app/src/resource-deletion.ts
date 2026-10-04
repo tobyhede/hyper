@@ -8,7 +8,7 @@ import {
 import { graphAppearance } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
 import type { DeleteConfirmation, DeleteQuestionWords, FocusFallback } from './delete-confirmation';
-import type { SpaceAuthoring } from './space-authoring';
+import { CANVAS, type SpaceAuthoring } from './space-authoring';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 
 /**
@@ -112,7 +112,7 @@ export function createResourceDeletion({
       return;
     }
     commandOutcomes.run('resource-delete', () =>
-      authoring.complete({ kind: 'deleted-resource', resourceId: resource.id }),
+      authoring.complete(CANVAS, { kind: 'deleted-resource', resourceId: resource.id }),
     );
   };
 

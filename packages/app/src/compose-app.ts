@@ -13,7 +13,11 @@ import { createNavigation, type Navigation } from './navigation';
 import type { RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
-import { createSpaceAuthoring, type SpaceAuthoring } from './space-authoring';
+import {
+  createSpaceAuthoring,
+  type SpaceAuthoring,
+  type SurfaceAuthoring,
+} from './space-authoring';
 import {
   createImageResources,
   type ImageEditResult,
@@ -108,7 +112,7 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
 /** The pair a connection completion is written in terms of. */
 export interface EdgeCollaborators {
   readonly adapter: RenderAdapter;
-  readonly authoring: SpaceAuthoring;
+  readonly authoring: SurfaceAuthoring;
 }
 
 export interface AppCore {
@@ -233,6 +237,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
       reportObserverError: compositionReporter,
     },
     () => ({
+      kind: 'canvas',
       mapId: navigation.getState().selectedMapId,
       graphId: navigation.getState().activeGraphId,
       presentingResourceId: navigation.activeResourceId(),

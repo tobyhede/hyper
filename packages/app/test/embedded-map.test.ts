@@ -526,7 +526,7 @@ describe('an embedded production projection', () => {
       selectable: false,
       focusable: false,
       connectable: false,
-      className: 'nopan nowheel nodrag',
+      className: 'rf-resource-node nopan nowheel nodrag',
       data: { connectionAuthoringEnabled: false },
     });
     expect(inert.nodes[0]?.style?.pointerEvents).toBe('none');

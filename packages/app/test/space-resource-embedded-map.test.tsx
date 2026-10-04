@@ -21,6 +21,7 @@ import { mountSettled } from './settled-mount';
 import { newUuid } from '@project/core';
 import { anyPresentControl, openSpaceMenu, unavailable } from './command-dock';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * What an Open Space Resource *shows* (ADR 0068).
@@ -720,6 +721,36 @@ describe('the Map an Open Space Resource draws', () => {
   });
 
   /**
+   * The canvas's transient withdrawals restrict a drawn Map's gestures as they
+   * restrict the canvas's own, and leave its policy alone (ADR 0112): an
+   * authoring Map stays authoring while a chrome rename runs, so it is not
+   * stamped inert, and its Resources still move.
+   */
+  it('keeps a drawn Map authoring during a chrome rename, its Resources moving as the canvas’s do', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    await mount(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    await waitFor(() => expect(embeddedNode(DRAWN_A).classList).toContain('draggable'));
+
+    openSpaceMenu('Home');
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    expect(screen.getByRole('textbox', { name: 'Space name' })).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(embeddedNode(DRAWN_A).classList).toContain('draggable');
+    expect(embeddedNode(DRAWN_A).classList).not.toContain('nodrag');
+  });
+
+  /**
    * Two host Space Resources, both Open, both in portal Edit. Wheel is debounced
    * 160 ms so a burst on one portal is one Edit; a burst that crosses two
    * portals must still author each. A canvas-root listener with a single
@@ -1060,7 +1091,7 @@ describe('the Map an Open Space Resource draws', () => {
       await spaces.exit(TARGET_ID);
     });
     act(() => {
-      initial.app.authoring.complete({
+      initial.app.authoring.complete(CANVAS, {
         kind: 'resized-resource',
         resourceId: SPACE_RESOURCE_ID,
         size: { width: 400, height: 400 },
@@ -1309,21 +1340,30 @@ describe('the Map an Open Space Resource draws', () => {
     // Close the containing Space Resource while the nested one is still Open, so
     // the read it leaves behind describes a Map that is about to change.
     act(() => {
-      initial.app.authoring.complete({ kind: 'closed-resource', resourceId: SPACE_RESOURCE_ID });
+      initial.app.authoring.complete(CANVAS, {
+        kind: 'closed-resource',
+        resourceId: SPACE_RESOURCE_ID,
+      });
     });
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).toBeNull());
     const targetEntry = spaces.entry(TARGET_ID);
     if (targetEntry === undefined) throw new Error('the target is not open');
     act(() => {
-      targetEntry.app.authoring.completeInMap(SELECTED_MAP_ID, {
-        kind: 'closed-resource',
-        resourceId: DRAWN_B,
-      });
+      targetEntry.app.authoring.complete(
+        { kind: 'drawn', mapId: SELECTED_MAP_ID, graphId: null },
+        {
+          kind: 'closed-resource',
+          resourceId: DRAWN_B,
+        },
+      );
     });
     await waitFor(() => expect(spaces.entry(thirdId)).toBeUndefined());
 
     act(() => {
-      initial.app.authoring.complete({ kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
+      initial.app.authoring.complete(CANVAS, {
+        kind: 'opened-resource',
+        resourceId: SPACE_RESOURCE_ID,
+      });
     });
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     for (let settle = 0; settle < 4; settle += 1) {
@@ -1693,7 +1733,10 @@ describe('the Map an Open Space Resource draws', () => {
     expect((await screen.findByText(new RegExp(GONE_B_ID))).textContent).toContain('Second gone');
 
     act(() => {
-      initial.app.authoring.complete({ kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
+      initial.app.authoring.complete(CANVAS, {
+        kind: 'opened-resource',
+        resourceId: SPACE_RESOURCE_ID,
+      });
     });
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
     expect(screen.queryByText(new RegExp(GONE_A_ID))).not.toBeNull();
@@ -1739,7 +1782,7 @@ describe('the Map an Open Space Resource draws', () => {
 
     for (let edit = 0; edit < 5; edit += 1) {
       act(() => {
-        initial.app.authoring.complete({
+        initial.app.authoring.complete(CANVAS, {
           kind: 'edited-resource',
           resourceId: HOME_RESOURCE_ID,
           document: { title: `Start here ${edit}`, kind: 'markdown', body: '' },

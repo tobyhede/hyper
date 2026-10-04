@@ -20,6 +20,8 @@ import {
 import { fixtureDisplay } from './render-adapter-fixtures';
 import type { ImageSources } from '../src/image-creation';
 import { heldImageSources, unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
+import { canvasAuthoring } from './canvas-authoring';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -166,7 +168,7 @@ const mountAuthoring = (
           creatingSpaceResource: false,
         }),
         nameOnCreation,
-        authoring,
+        authoring: canvasAuthoring(authoring),
         spaceSession,
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
@@ -418,7 +420,7 @@ describe('canvas Resource authoring', () => {
       'space',
     );
     act(() => {
-      authoring.complete({ kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
+      authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: SPACE_RESOURCE_ID });
     });
     rerender({
       open: true,
@@ -598,7 +600,7 @@ describe('canvas Resource authoring Space rail', () => {
           creatingSpaceResource: false,
         }),
         nameOnCreation: null,
-        authoring,
+        authoring: canvasAuthoring(authoring),
         spaceSession,
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
@@ -690,6 +692,7 @@ describe('canvas Resource authoring decoration identity', () => {
       images: unusedImageSources,
       spaceSession,
     });
+    const surfaceAuthoring = canvasAuthoring(authoring);
     const onSelectResource = () => undefined;
     const onPortalEditingChange = () => undefined;
     const resourceResize = adapter.getState().resourceResize;
@@ -710,7 +713,7 @@ describe('canvas Resource authoring decoration identity', () => {
             creatingSpaceResource: false,
           }),
           nameOnCreation: null,
-          authoring,
+          authoring: surfaceAuthoring,
           spaceSession,
           resourceResize,
           onSelectResource,
@@ -861,7 +864,7 @@ describe('canvas Resource authoring, replacing an image', () => {
           creatingSpaceResource: false,
         }),
         nameOnCreation: null,
-        authoring,
+        authoring: canvasAuthoring(authoring),
         spaceSession,
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,

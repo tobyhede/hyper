@@ -14,7 +14,7 @@ import type {
   AuthoringResult,
   EdgeEligibility,
   EdgeProposal,
-  SpaceAuthoring,
+  SurfaceAuthoring,
 } from '../src/space-authoring';
 
 import { completeDrag, fixtureDisplay, moving, node, settled } from './render-adapter-fixtures';
@@ -55,18 +55,9 @@ interface AuthoringCapabilities {
 /** A Space Authoring that records what it was told, without a session behind it. */
 function authoringSpy({ refusing, mapPlacement = Placement.empty() }: AuthoringCapabilities = {}) {
   const completions: unknown[] = [];
-  const authoring: SpaceAuthoring = {
-    completeInContext: () => {
-      throw new Error('Contextual authoring is outside this adapter test.');
-    },
-    edgeEligibilityInContext: () => {
-      throw new Error('Contextual eligibility is outside this adapter test.');
-    },
-    completeInMap: () => {
-      throw new Error('Embedded authoring is outside this adapter test.');
-    },
+  const authoring: SurfaceAuthoring = {
     // SAFETY: `getState` is never read by these tests — the spy only needs to
-    // satisfy `SpaceAuthoring`'s shape, not implement a real state.
+    // satisfy `SurfaceAuthoring`'s shape, not implement a real state.
     getState: () => ({}) as never,
     mapPlacement: () => mapPlacement,
     subscribe: () => () => undefined,
@@ -78,10 +69,6 @@ function authoringSpy({ refusing, mapPlacement = Placement.empty() }: AuthoringC
       completions.push(completion);
       return { kind: 'completed' };
     },
-    retryPersistence: () => undefined,
-    keepLocalWork: () => undefined,
-    acceptStoredSpace: () => null,
-    dispose: () => undefined,
   };
   return { authoring, completions };
 }
@@ -99,7 +86,7 @@ function adapter(): RenderAdapter {
  */
 function connections(
   store: RenderAdapter,
-  authoring: SpaceAuthoring,
+  authoring: SurfaceAuthoring,
   reportInvariant: (error: unknown) => void = () => undefined,
 ) {
   return createConnectionCompletion({ adapter: store, authoring, reportInvariant });
@@ -127,13 +114,13 @@ function sessionBackedAdapter(
     stored === undefined ? loaded : { snapshot: stored, revision: 1n, exportedRevision: null },
   );
   const session = openSpaceSession(backend, loaded);
-  const { authoring, adapter } = composeApp({
+  const { authoring, surface } = composeApp({
     images: unusedImageSources,
     spaceSession: session,
     selection: mapId,
     newId,
   });
-  return { session, authoring, store: adapter };
+  return { session, space: authoring, authoring: surface.authoring, store: surface.adapter };
 }
 
 /**
@@ -898,7 +885,7 @@ describe('render adapter', () => {
    */
   it('leaves the projected connection uncommitted when the completion fails', () => {
     const spy = authoringSpy();
-    const failing: SpaceAuthoring = {
+    const failing: SurfaceAuthoring = {
       ...spy.authoring,
       complete: () => {
         throw new Error('Authoring produced an invalid Space');
@@ -934,7 +921,7 @@ describe('render adapter', () => {
    */
   it('reports and draws nothing when a completion at the React Flow seam is queued', () => {
     const spy = authoringSpy();
-    const queueing: SpaceAuthoring = {
+    const queueing: SurfaceAuthoring = {
       ...spy.authoring,
       complete: () => ({ kind: 'queued' }),
     };
@@ -1008,7 +995,7 @@ describe('render adapter', () => {
    * (ADR 0030).
    */
   it('drops the published projection when a replacement Space is opened', async () => {
-    const { store, session, authoring } = storedSpaceAdapter();
+    const { store, session, authoring, space } = storedSpaceAdapter();
     store.getState().syncProjection(PROJECTED, [EDGE]);
     completeDrag(store, RESOURCE_A, 500, 400);
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
@@ -1020,7 +1007,7 @@ describe('render adapter', () => {
     expect(store.getState().projection).not.toBeNull();
     expect(store.getState().resizeDraft).not.toBeNull();
 
-    expect(authoring.acceptStoredSpace()).toBeNull();
+    expect(space.acceptStoredSpace()).toBeNull();
 
     expect(store.getState().projection).toBeNull();
     expect(store.getState().selection).toEqual({ kind: 'none' });

@@ -6,6 +6,7 @@ import { createOpenSpaces } from '../src/open-spaces';
 import { spaceResourceContextCommands } from '../src/space-resource-context-commands';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
@@ -100,7 +101,7 @@ async function setup(available = true) {
     history: recordingHistory(),
   });
   const source = await spaces.open(META);
-  const { entry: entry } = await spaces.hold(TARGET);
+  const { entry } = await spaces.hold(TARGET);
   const commands = spaceResourceContextCommands(
     {
       entry,
@@ -111,7 +112,7 @@ async function setup(available = true) {
     },
     document,
     (m, graph) => {
-      const result = source.app.authoring.complete({
+      const result = source.app.authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE,
         document: { ...document, map: m.id, graph },

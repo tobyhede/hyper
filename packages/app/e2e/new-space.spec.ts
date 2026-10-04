@@ -184,6 +184,10 @@ test('Alt empty-drop creates, connects and selects Resource 2 at the previewed p
   expect(previewBox.y + previewBox.height / 2).toBeCloseTo(dropPoint.y, 0);
   await page.mouse.up();
   await page.keyboard.up('Alt');
+  // The created Resource continues in its Title, as every creation does.
+  const naming = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(naming).toHaveValue('Resource 2');
+  await naming.press('Escape');
 
   const created = nodeByTitle(page, 'Resource 2');
   await expect(created).toBeVisible();
@@ -230,6 +234,7 @@ test('Alt empty-drop authors the first Edge into the Graph a selected Map owns',
   await sourceResource.hover();
 
   await connectToEmptyWithAlt(page, authoringHandle(sourceResource, 'source', 'right'));
+  await page.getByRole('textbox', { name: 'Resource title' }).press('Escape');
 
   await expect(nodeByTitle(page, 'Resource 2')).toBeVisible();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);

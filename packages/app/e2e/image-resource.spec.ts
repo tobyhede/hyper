@@ -457,30 +457,35 @@ test('dropping three images creates three Resources in one Edit, numbered in ord
 /**
  * Drag a picture over `target` and drop it there, answering whether the
  * `dragover` was taken and with which effect — a drag nothing takes is one the
- * browser answers by opening the file in place of the Space.
+ * browser answers by opening the file in place of the Space. `at` is where in
+ * the target's box, as fractions of its width and height; its centre by default.
  */
 async function dropPictureOn(
   target: Locator,
   picture: (typeof PICTURES)[number],
+  at: { readonly x: number; readonly y: number } = { x: 0.5, y: 0.5 },
 ): Promise<{ readonly taken: boolean; readonly dropEffect: string }> {
-  return target.evaluate((element, { name, base64 }) => {
-    const transfer = new DataTransfer();
-    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
-    transfer.items.add(new File([bytes], name, { type: 'image/png' }));
-    const box = element.getBoundingClientRect();
-    const init = {
-      dataTransfer: transfer,
-      clientX: box.left + box.width / 2,
-      clientY: box.top + box.height / 2,
-      bubbles: true,
-      cancelable: true,
-    };
-    const over = new DragEvent('dragover', init);
-    element.dispatchEvent(over);
-    const answer = { taken: over.defaultPrevented, dropEffect: transfer.dropEffect };
-    element.dispatchEvent(new DragEvent('drop', init));
-    return answer;
-  }, picture);
+  return target.evaluate(
+    (element, { name, base64, at: within }) => {
+      const transfer = new DataTransfer();
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      transfer.items.add(new File([bytes], name, { type: 'image/png' }));
+      const box = element.getBoundingClientRect();
+      const init = {
+        dataTransfer: transfer,
+        clientX: box.left + box.width * within.x,
+        clientY: box.top + box.height * within.y,
+        bubbles: true,
+        cancelable: true,
+      };
+      const over = new DragEvent('dragover', init);
+      element.dispatchEvent(over);
+      const answer = { taken: over.defaultPrevented, dropEffect: transfer.dropEffect };
+      element.dispatchEvent(new DragEvent('drop', init));
+      return answer;
+    },
+    { ...picture, at },
+  );
 }
 
 test('a picture dropped on a Resource, or on the Map an Open Space Resource draws, creates nothing', async ({
@@ -521,9 +526,11 @@ test('a picture dropped on a Resource, or on the Map an Open Space Resource draw
 
   // The empty canvas still takes a drop, which is what the refusals above are
   // measured against: once its Resource exists, any earlier drop that was
-  // taken would already have started storing its picture.
+  // taken would already have started storing its picture. Aimed at a corner,
+  // because the Open Space Resource's drawn Map covers the canvas's centre and
+  // a drop on it is refused rather than falling through to the canvas.
   const [, square] = PICTURES;
-  await dropPictureOn(pane(page), square);
+  await dropPictureOn(pane(page), square, { x: 0.04, y: 0.96 });
   const title = page.getByRole('textbox', { name: 'Resource title' });
   await expect(title).toBeFocused();
   await title.press('Escape');
@@ -1780,4 +1787,110 @@ test('drop and paste create in an edited embedded Map and an inert drop is refus
   await createdTitle.press('Escape');
   await expect.poll(async () => (await storedImages(page, targetId)).length).toBe(2);
   expect(await storedImages(page, rootId)).toHaveLength(0);
+});
+
+/** Create a Space Resource on the opened Space's Map and Open it, answering it and its target. */
+async function openSpaceResource(
+  page: Page,
+  rootId: UUID,
+): Promise<{
+  readonly drawing: Locator;
+  readonly id: UUID;
+  readonly title: string;
+  readonly targetId: UUID;
+}> {
+  await createResource(page, 'Space Resource');
+  const naming = page.getByRole('textbox', { name: 'Resource title' });
+  const title = await naming.inputValue();
+  await naming.press('Enter');
+  await settled(page);
+  const rootRead = await page.request.get(`/api/spaces/${rootId}`);
+  const frame = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
+    ({ document }) => document.kind === 'space' && document.title === title,
+  );
+  if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
+  const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
+  await drawing.focus();
+  await drawing.press('Enter');
+  await expect(
+    page.locator(`.react-flow__node[data-id^="embedded:${frame.id}:"]`).first(),
+  ).toBeVisible();
+  return { drawing, id: frame.id, title, targetId: frame.document.spaceId };
+}
+
+test('a drop on the Map a Reference Resource draws is refused as read-only', async ({ page }) => {
+  const rootId = await openForCreation(page);
+  const { drawing, id, title, targetId } = await openSpaceResource(page, rootId);
+  await (
+    await resourceControls(page, drawing)
+  )
+    .getByRole('button', { name: `Actions for Resource ${title}` })
+    .click();
+  await page.getByRole('menuitem', { name: 'Create Reference' }).click();
+  const naming = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(naming).toBeFocused();
+  await naming.press('Enter');
+  await settled(page);
+  const rootRead = await page.request.get(`/api/spaces/${rootId}`);
+  const reference = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
+    ({ document }) => document.kind === 'reference' && document.target === id,
+  );
+  if (reference === undefined) throw new Error('Reference Resource was not created');
+  const referenceNode = page.locator(`.react-flow__node[data-id="${reference.id}"]`);
+  await referenceNode.focus();
+  await referenceNode.press('Enter');
+  const child = page.locator(`.react-flow__node[data-id^="embedded:${reference.id}:"]`).first();
+  await expect(child).toBeVisible();
+
+  expect(await dropPictureOn(child, FIRST_PICTURE)).toEqual({ taken: true, dropEffect: 'none' });
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'This Map is shown read-only, so nothing can be added to it.',
+  );
+  expect(await storedImages(page, targetId)).toHaveLength(0);
+});
+
+test('a Resource dragged from the Resources list onto an edited drawn Map is refused', async ({
+  page,
+}) => {
+  const rootId = await openForCreation(page);
+  const { drawing, title, targetId } = await openSpaceResource(page, rootId);
+  const edit = (await resourceControls(page, drawing)).getByRole('button', {
+    name: `Edit Resource ${title}`,
+  });
+  await edit.focus();
+  await edit.press('Enter');
+  const child = page.locator(`.react-flow__node[data-id^="embedded:"]`).first();
+  await expect(child.locator('.rf-resource-node__inner')).toHaveAttribute(
+    'data-connection-authoring',
+    'true',
+  );
+  const before = await storedRevision(page, targetId);
+  const rootRead = await page.request.get(`/api/spaces/${rootId}`);
+  const canvasResource = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
+    ({ document }) => document.kind === 'markdown',
+  );
+  if (canvasResource === undefined) throw new Error('The opened Space holds no Markdown Resource.');
+
+  // The Resources list carries one of the canvas's own Resources, which no Map
+  // of another Space can place.
+  await child.evaluate((element, resourceId) => {
+    const transfer = new DataTransfer();
+    transfer.setData('application/x-hyper-resource-id', resourceId);
+    const box = element.getBoundingClientRect();
+    const init = {
+      dataTransfer: transfer,
+      clientX: box.left + box.width / 2,
+      clientY: box.top + box.height / 2,
+      bubbles: true,
+      cancelable: true,
+    };
+    element.dispatchEvent(new DragEvent('dragover', init));
+    element.dispatchEvent(new DragEvent('drop', init));
+  }, canvasResource.id);
+
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'A Resource can be placed only on a Map of its own Space.',
+  );
+  await settled(page);
+  expect(await storedRevision(page, targetId)).toBe(before);
 });

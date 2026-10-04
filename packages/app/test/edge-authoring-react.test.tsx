@@ -12,6 +12,8 @@ import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
+import { CANVAS } from '../src/space-authoring';
+import { canvasAuthoring } from './canvas-authoring';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { ArmedDeleteConfirmation } from '../src/components/DeleteConfirmation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
@@ -394,7 +396,7 @@ function CanvasHarness({
         onDropImages={() => undefined}
         onPasteImageUrl={() => undefined}
         nameOnCreation={null}
-        authoring={authoring}
+        authoring={canvasAuthoring(authoring)}
         spaceSession={session}
         resourceResize={{
           beginResize: () => undefined,
@@ -580,7 +582,7 @@ describe('the Edge toolbar', () => {
   it('makes the eye unavailable while the Title is being written, keeping the caret', async () => {
     const { adapter, session, authoring } = await mountCanvas();
     act(() => {
-      authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+      authoring.complete(CANVAS, { kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
     });
     act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
     act(() => adapter.getState().selectEdge(SUBJECT));
@@ -641,7 +643,7 @@ describe('the Edge toolbar', () => {
   it('hides a Title at rest from the eye, and dims it while the Edge is revealed', async () => {
     const { adapter, session, authoring } = await mountCanvas();
     act(() => {
-      authoring.complete({ kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
+      authoring.complete(CANVAS, { kind: 'titled-edge', ...SUBJECT, title: 'depends on' });
     });
     act(() => adapter.getState().syncProjection(NODES, titled(EDGES, 'depends on')));
     act(() => adapter.getState().selectEdge(SUBJECT));
@@ -1102,7 +1104,7 @@ describe('spending a continuation on the canvas', () => {
     document.body.focus();
 
     act(() => {
-      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
+      authoring.complete(CANVAS, { kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
       continuation.request(focusDrawn);
     });
 
@@ -1134,7 +1136,7 @@ describe('spending a continuation on the canvas', () => {
     document.body.focus();
 
     act(() => {
-      authoring.complete({ kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
+      authoring.complete(CANVAS, { kind: 'connected-resources', from: RESOURCE_A, to: RESOURCE_C });
       adapter.getState().selectEdge(DRAWN);
       continuation.request(focusDrawn);
     });

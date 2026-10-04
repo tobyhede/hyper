@@ -22,6 +22,7 @@ import {
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /** Where these tests' Map creations continue; what it names is not under test here. */
 const CONTINUE_IN_NAME: MapCreateContinuation = {
@@ -118,7 +119,7 @@ const PERSISTENCE_UNSETTLED = 'The change could not be saved. Check the Space pe
 const selectOn =
   (source: OpenSpace) =>
   (mapId: MapId, graphId: GraphId): string | null => {
-    const result = source.app.authoring.complete({
+    const result = source.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: RESOURCE,
       document: { ...document, map: mapId, graph: graphId },
@@ -483,8 +484,11 @@ describe('what each context creates in', () => {
     });
     control.throwNext(new Error('offline'));
     expect(
-      source.app.authoring.complete({ kind: 'renamed-map', mapId: META_MAP, title: 'Renamed' })
-        .kind,
+      source.app.authoring.complete(CANVAS, {
+        kind: 'renamed-map',
+        mapId: META_MAP,
+        title: 'Renamed',
+      }).kind,
     ).toBe('completed');
     const before = mapsOf(authored);
     expect(await commands.create.invoke()).toEqual({
@@ -624,7 +628,7 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
   it('continues on the Space’s opening Map, where the Resources that selected the deleted Map go too', async () => {
     const { authored, commands, spaces } = await setup();
     // `created-map` makes the new Map the Space's opening Map.
-    expect(authored.app.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+    expect(authored.app.authoring.complete(CANVAS, { kind: 'created-map' }).kind).toBe('completed');
     const opening = authored.app.currentSpace().defaultMap;
     const mapId = showSecond(authored);
     const outcome = await commands.map(mapId).delete.invoke();
@@ -639,7 +643,7 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
 
   it('leaves a canvas the author moved while the Map was being deleted where the author put it', async () => {
     const { authored, commands } = await setup();
-    expect(authored.app.authoring.complete({ kind: 'created-map' }).kind).toBe('completed');
+    expect(authored.app.authoring.complete(CANVAS, { kind: 'created-map' }).kind).toBe('completed');
     const opening = authored.app.currentSpace().defaultMap;
     const mapId = showSecond(authored);
     // The lifecycle Edit is held at its start, so the author's choice lands
@@ -700,7 +704,8 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
     const mapId = showSecond(authored);
     control.throwNext(new Error('offline'));
     expect(
-      authored.app.authoring.complete({ kind: 'renamed-map', mapId, title: 'Renamed' }).kind,
+      authored.app.authoring.complete(CANVAS, { kind: 'renamed-map', mapId, title: 'Renamed' })
+        .kind,
     ).toBe('completed');
     expect(await spaces.waitForPersistence(TARGET)).toBe(false);
     const outcome = await outcomes.run(
@@ -810,8 +815,11 @@ describe('what each context deletes', () => {
     });
     control.throwNext(new Error('offline'));
     expect(
-      source.app.authoring.complete({ kind: 'renamed-map', mapId: META_MAP, title: 'Renamed' })
-        .kind,
+      source.app.authoring.complete(CANVAS, {
+        kind: 'renamed-map',
+        mapId: META_MAP,
+        title: 'Renamed',
+      }).kind,
     ).toBe('completed');
     expect(await commands.map(SECOND_MAP).delete.invoke()).toEqual({
       kind: 'refused',

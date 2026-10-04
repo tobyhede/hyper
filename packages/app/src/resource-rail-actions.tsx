@@ -186,7 +186,7 @@ const railFocusFallback =
  * (`offers Remove from Map and Delete from Space while the Resource is Open`).
  */
 export function useResourceRailActions(
-  { authoring, commandOutcomes, currentSpace, resourceDeletion }: ComposedApp,
+  { surface: { authoring }, commandOutcomes, currentSpace, resourceDeletion }: ComposedApp,
   {
     space,
     map: selectedMap,

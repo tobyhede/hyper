@@ -134,15 +134,8 @@ export function useResourcePlacement(
   { map: selectedMap, presenting, replacementEpoch, reportBreak }: ResourcePlacementInput,
 ): ResourcePlacementCommands {
   const { reportVisibleCentre, centreAnchor } = useVisibleCentre();
-  const {
-    authoring,
-    adapter,
-    continuation,
-    commandOutcomes,
-    currentSpace,
-    createImageResources,
-    surface,
-  } = app;
+  const { commandOutcomes, currentSpace, createImageResources, surface } = app;
+  const { authoring, adapter, continuation } = surface;
   const mapId: MapId = selectedMap.id;
 
   /**
@@ -356,7 +349,7 @@ export function useResourcePlacement(
    */
   const createImages = useCallback(
     (origin: ImageOrigin, anchor: MapPosition, placementMode: PlacementMode) => {
-      const target = { mapId, anchor, placement: placementMode };
+      const target = { mapId, drawing: surface.target().kind, anchor, placement: placementMode };
       void commandOutcomes
         .run('image-create', () => createImageResources(origin, target))
         .then((result) => {

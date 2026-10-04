@@ -241,7 +241,7 @@ describe('opening framing on a mounted canvas', () => {
               onDropImages={() => undefined}
               onPasteImageUrl={() => undefined}
               nameOnCreation={null}
-              authoring={app.authoring}
+              authoring={app.surface.authoring}
               spaceSession={spaceSession}
               onBodyEditingChange={() => undefined}
               onTitleEditingChange={() => undefined}
@@ -382,7 +382,7 @@ describe('opening framing on a mounted canvas', () => {
             onDropImages={() => undefined}
             onPasteImageUrl={() => undefined}
             nameOnCreation={null}
-            authoring={app.authoring}
+            authoring={app.surface.authoring}
             spaceSession={spaceSession}
             onBodyEditingChange={() => undefined}
             onTitleEditingChange={() => undefined}

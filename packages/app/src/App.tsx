@@ -315,13 +315,14 @@ export const createApp = (
           {canvas.kind === 'failure' ? (
             <PlacementFailure error={canvas.error} />
           ) : (
-            <ReactFlowProvider>
+            // Keyed on the replacement epoch: React Flow's store holds a drag in
+            // flight, and the canvas stays mounted while placement is pending,
+            // so only a new store ends a drag begun in the replaced Space.
+            <ReactFlowProvider key={replacementEpoch}>
               {canvas.kind === 'placeholder' ? <PlacementPending /> : null}
               {/* Inside the provider and outside the canvas: it reads React
                   Flow's viewport for controls that live in the toolbar and in
-                  the panes over the graph, and it is deliberately not keyed by
-                  the replacement epoch — the getter it reports describes the
-                  viewport, which a replaced Space does not invalidate. */}
+                  the panes over the graph. */}
               <CanvasCentre report={placement.reportVisibleCentre} />
               {/* The canvas half of where an Edit continues. Inside the
                   provider because `reveal` moves the camera and because an Edge

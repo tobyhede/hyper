@@ -21,7 +21,7 @@ import {
   type RoutedEdgeData,
 } from '@project/react-flow-adapter';
 import { snapResourceSizeToClose } from './resource';
-import type { SpaceAuthoring } from './space-authoring';
+import type { SurfaceAuthoring } from './space-authoring';
 
 /**
  * The render adapter owns React Flow's transient projection. Space Authoring
@@ -429,7 +429,7 @@ function selecting(
 }
 
 export type RenderAdapterAuthoring = Pick<
-  SpaceAuthoring,
+  SurfaceAuthoring,
   'mapPlacement' | 'complete' | 'getState' | 'subscribe'
 >;
 

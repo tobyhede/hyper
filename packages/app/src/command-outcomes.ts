@@ -243,13 +243,13 @@ export interface MapCreateContinuation {
  * Whether this run's completion is what moves the Map these command outcomes
  * read.
  *
- * Required on every Map creation and deletion, because only the caller knows:
- * the Dock's creation selects the new Map on the canvas it stands on, and its
+ * Required on every Map creation and deletion, because only the caller knows.
+ * The Dock's creation selects the new Map on the canvas it stands on, and its
  * deletion leaves that canvas on the survivor, so both claim it. A Space
- * Resource's rail authors in the target Space and is held by the containing
- * canvas's command outcomes, whose Map it never moves, so it claims neither.
- * A claimed completion is not held to the Map the run was pressed on; every
- * other outcome, and every unclaimed completion, still is.
+ * Resource's rail reports through the target Space's command outcomes, and its
+ * creation and deletion move that Space's canvas in the same way, so it claims
+ * both too. A claimed completion is not held to the Map the run was pressed
+ * on; every other outcome, and every unclaimed completion, still is.
  */
 export interface MapCompletionClaim {
   readonly completionMovesMap: boolean;

@@ -18,6 +18,7 @@ import { RESOURCE_SIZE } from '../src/resource';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * Edge Authoring through its own interface: the one draft, what cancels it, what
@@ -440,7 +441,7 @@ describe('draft invalidation', () => {
     const { edges, authoring } = open();
     edges.beginTitleEdit(SUBJECT);
 
-    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
+    authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
 
     expect(edges.getState().draft).toBeNull();
   });
@@ -464,7 +465,7 @@ describe('draft invalidation', () => {
     });
     edges.beginTitleEdit(SUBJECT);
     // Force the conflict the accept resolves.
-    authoring.complete({ kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
+    authoring.complete(CANVAS, { kind: 'deleted-edge', graphId: GRAPH_ID, edge: EDGE });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));
 
     expect(authoring.acceptStoredSpace()).toBeNull();
@@ -520,7 +521,11 @@ describe('draft invalidation', () => {
     const { edges, authoring } = open();
     edges.beginTitleEdit(SUBJECT);
 
-    authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' });
+    authoring.complete(CANVAS, {
+      kind: 'renamed-graph',
+      graphId: OTHER_GRAPH_ID,
+      title: 'Renamed',
+    });
 
     expect(edges.getState().draft).toEqual({ kind: 'title', graphId: GRAPH_ID, edge: EDGE });
   });
@@ -564,7 +569,11 @@ describe('draft invalidation', () => {
     const { adapter, authoring } = open();
     adapter.getState().selectEdge(SUBJECT);
 
-    authoring.complete({ kind: 'renamed-graph', graphId: OTHER_GRAPH_ID, title: 'Renamed' });
+    authoring.complete(CANVAS, {
+      kind: 'renamed-graph',
+      graphId: OTHER_GRAPH_ID,
+      title: 'Renamed',
+    });
 
     expect(adapter.getState().selection).toEqual({
       kind: 'edge',

@@ -109,7 +109,7 @@ describe('creating Image Resources from files', () => {
     const created = await createImageResources(
       { images, authoring },
       { kind: 'files', files: [file('diagram.png'), file('photo.png')] },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({ kind: 'completed', createdResourceId: FIRST });
@@ -141,7 +141,7 @@ describe('creating Image Resources from files', () => {
     const created = await createImageResources(
       { images, authoring },
       { kind: 'files', files: [file('diagram.png'), file('notes.txt')] },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({
@@ -166,7 +166,7 @@ describe('creating Image Resources from files', () => {
     const created = await createImageResources(
       { images, authoring },
       { kind: 'files', files: [file('notes.txt'), file('diagram.png'), file('huge.png')] },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({
@@ -190,7 +190,7 @@ describe('creating Image Resources from files', () => {
         kind: 'files',
         files: [file('diagram.png'), new File(['bytes'], 'notes.pdf', { type: 'application/pdf' })],
       },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({
@@ -216,7 +216,7 @@ describe('creating Image Resources from files', () => {
           new File(['<svg/>'], 'figure.svg', { type: 'image/svg+xml' }),
         ],
       },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({
@@ -241,7 +241,7 @@ describe('creating Image Resources from files', () => {
         kind: 'files',
         files: [file('huge.png'), new File(['bytes'], 'notes.pdf', { type: 'application/pdf' })],
       },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({
@@ -259,7 +259,7 @@ describe('creating Image Resources from files', () => {
     const created = await createImageResources(
       { images, authoring },
       { kind: 'files', files: [new File(['bytes'], 'picture')] },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(created).toEqual({ kind: 'completed', createdResourceId: FIRST });
@@ -275,7 +275,7 @@ describe('creating Image Resources from files', () => {
       createImageResources(
         { images, authoring },
         { kind: 'files', files: [] },
-        { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+        { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
       ),
     ).resolves.toEqual({ kind: 'unchanged' });
     expect(images.sent).toEqual([]);
@@ -305,7 +305,7 @@ describe('an Image Resource gesture the author moves away from', () => {
     const created = createImageResources(
       { images, authoring },
       { kind: 'url', url },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
     await Promise.resolve();
     navigation.selectMap(OTHER_MAP_ID);
@@ -344,7 +344,7 @@ describe('an Image Resource gesture the author moves away from', () => {
     const created = createImageResources(
       { images, authoring },
       { kind: 'url', url },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
     await Promise.resolve();
     navigation.selectMap(OTHER_MAP_ID);
@@ -373,7 +373,7 @@ describe('creating an Image Resource from a URL', () => {
     await createImageResources(
       { images: sources({}, { [url]: { width: 32, height: 16 } }), authoring },
       { kind: 'url', url },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(session.getState().working.resources[1]?.document).toEqual({
@@ -391,7 +391,7 @@ describe('creating an Image Resource from a URL', () => {
     await createImageResources(
       { images: sources({}, {}), authoring },
       { kind: 'url', url },
-      { mapId: MAP_ID, anchor: AT, placement: 'exact' },
+      { mapId: MAP_ID, drawing: 'canvas', anchor: AT, placement: 'exact' },
     );
 
     expect(session.getState().working.resources[1]?.document).toEqual({

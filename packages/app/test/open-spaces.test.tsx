@@ -15,6 +15,7 @@ import { recordingHistory } from './browser-history';
 import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
 import { heldImageSources, unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -310,10 +311,13 @@ describe('Open Spaces', () => {
     const target = await openSpaces.open(OTHER_ID, SECOND_MAP_ID);
     const before = target.session.getState().working;
     expect(
-      target.app.authoring.completeInMap(MAP_ID, {
-        kind: 'opened-resource',
-        resourceId: OTHER_RESOURCE_ID,
-      }).kind,
+      target.app.authoring.complete(
+        { kind: 'drawn', mapId: MAP_ID, graphId: null },
+        {
+          kind: 'opened-resource',
+          resourceId: OTHER_RESOURCE_ID,
+        },
+      ).kind,
     ).toBe('completed');
     const after = target.session.getState().working;
     expect(
@@ -693,7 +697,7 @@ describe('Open Spaces', () => {
     const other = await openSpaces.open(OTHER_ID);
 
     expect(
-      other.app.authoring.complete({
+      other.app.authoring.complete(CANVAS, {
         kind: 'created-resource',
         resourceKind: 'markdown',
         anchor: { x: 100, y: 100 },

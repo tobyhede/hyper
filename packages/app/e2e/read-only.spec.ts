@@ -38,6 +38,10 @@ test('database persistence never writes structural edits back to imported author
   await expect(createResourceControl(page)).not.toHaveAttribute('aria-disabled', 'true');
   await resource.hover();
   await connectToEmptyWithAlt(page, authoringHandle(resource, 'source', 'right'));
+  // The created Resource continues in its Title, as every creation does.
+  const naming = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(naming).toHaveValue('Resource 1');
+  await naming.press('Escape');
   const created = nodeByTitle(page, 'Resource 1');
   await expect(created).toBeVisible();
   const createdId = await created.getAttribute('data-id');

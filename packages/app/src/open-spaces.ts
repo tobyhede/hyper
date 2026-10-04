@@ -721,6 +721,12 @@ export function createOpenSpaces({
     );
   };
 
+  const dropHold = (spaceId: UUID): void => {
+    const remaining = (drawingHolds.get(spaceId) ?? 1) - 1;
+    if (remaining > 0) drawingHolds.set(spaceId, remaining);
+    else drawingHolds.delete(spaceId);
+  };
+
   const hold = async (spaceId: UUID): Promise<SpaceHold> => {
     drawingHolds.set(spaceId, (drawingHolds.get(spaceId) ?? 0) + 1);
     try {
@@ -731,16 +737,12 @@ export function createOpenSpaces({
         release: async () => {
           if (released) return;
           released = true;
-          const remaining = (drawingHolds.get(spaceId) ?? 1) - 1;
-          if (remaining > 0) drawingHolds.set(spaceId, remaining);
-          else drawingHolds.delete(spaceId);
+          dropHold(spaceId);
           await releaseUnheld(entry);
         },
       };
     } catch (error) {
-      const remaining = (drawingHolds.get(spaceId) ?? 1) - 1;
-      if (remaining > 0) drawingHolds.set(spaceId, remaining);
-      else drawingHolds.delete(spaceId);
+      dropHold(spaceId);
       throw error;
     }
   };

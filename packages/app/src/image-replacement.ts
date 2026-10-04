@@ -12,7 +12,7 @@ import {
   describeImageReplacementPending,
 } from './authoring-refusal';
 import { storeEach, type ImageEditResult, type ImageSources } from './image-creation';
-import type { SpaceAuthoring } from './space-authoring';
+import { CANVAS, type SpaceAuthoring } from './space-authoring';
 
 /**
  * What one replacement attempt answers.
@@ -122,6 +122,7 @@ const attempt = async (
   const measured = await images.measure(url);
   if (authoring.getState().replacementEpoch !== epoch) return { kind: 'discarded' };
   return authoring.complete(
+    CANVAS,
     measured === undefined
       ? { kind: 'replaced-image', resourceId, url }
       : { kind: 'replaced-image', resourceId, url, naturalSize: measured },

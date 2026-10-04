@@ -16,7 +16,7 @@ import { describeImageReplacement, type ImageReplacements } from './image-replac
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { ResourceResize } from './render-adapter';
-import type { SpaceAuthoring } from './space-authoring';
+import type { SurfaceAuthoring } from './space-authoring';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import { useOpenSpaces } from './open-spaces-context';
 import type { CommandOutcomes } from './command-outcomes';
@@ -71,7 +71,7 @@ const spaceDocumentsKeyOf = (
  * fields they patch and the sentence a failed parse returns.
  */
 const completeEditedSpaceResource = (
-  authoring: Pick<SpaceAuthoring, 'complete'>,
+  authoring: Pick<SurfaceAuthoring, 'complete'>,
   spaceSession: SpaceSession,
   resourceId: ResourceId,
   nextDocument: (document: Extract<ResourceDocument, { kind: 'space' }>) => ResourceDocument,
@@ -104,7 +104,7 @@ export interface CanvasResourceAuthoringInput {
    */
   readonly availability: AuthoringAvailability;
   readonly nameOnCreation: string | null;
-  readonly authoring: Pick<SpaceAuthoring, 'complete' | 'getState'>;
+  readonly authoring: Pick<SurfaceAuthoring, 'complete' | 'getState'>;
   readonly spaceSession: SpaceSession;
   readonly resourceResize: ResourceResize;
   readonly onSelectResource: (resourceId: ResourceId) => void;

@@ -11,6 +11,7 @@ import { otherMapMemberships, type MapMemberships } from '#src/map-memberships';
 import type { SpaceDrag } from '#src/resources-drag';
 import { storelessImages } from '../support/image-sources';
 import { sparseAuthoredSnapshot, widelyPlacedSpace } from '../support/spaces';
+import { CANVAS } from '#src/space-authoring';
 
 export default { title: 'Surfaces/Resources Popover' };
 
@@ -160,7 +161,7 @@ function RefusedAdd() {
         open={open}
         onOpenChange={setOpen}
         onAdd={(resource) => {
-          const result = composed.authoring.complete({
+          const result = composed.authoring.complete(CANVAS, {
             kind: 'added-resource-to-map',
             resourceId: resource.id,
             anchor: { x: 0, y: 0 },

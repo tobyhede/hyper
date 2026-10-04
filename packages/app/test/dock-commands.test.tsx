@@ -20,6 +20,7 @@ import { Default, Replacing, SaveFailedElsewhere } from '../stories/space/comman
 // while it is withdrawn, so `aria-disabled` is the attribute and `toBeDisabled`
 // would call every one of them available.
 import { confirmDeletion, unavailable } from './command-dock';
+import { CANVAS } from '../src/space-authoring';
 
 /**
  * What the Command Dock owes an author, held over the application the catalogue mounts.
@@ -645,7 +646,7 @@ function TwoSpacesWithAnUnwellOpener() {
         control.queueResult({ kind: 'retryable-failure', code: 'network' });
         const resource = opener.resources[0];
         if (resource === undefined) throw new Error('The Opener needs a Resource');
-        const edit = openedOpener.app.authoring.complete({
+        const edit = openedOpener.app.authoring.complete(CANVAS, {
           kind: 'edited-resource',
           resourceId: resource.id,
           document: { ...resource.document, title: 'An edited Resource' },

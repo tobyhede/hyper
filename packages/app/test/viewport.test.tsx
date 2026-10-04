@@ -122,7 +122,7 @@ describe('graph viewport', () => {
         else view.rerender(app);
       },
     );
-    await screen.findByText('Local space');
+    await within(screen.getByTestId('command-dock')).findByText('Local space');
     expect(viewportTransform()).not.toMatch(/NaN/);
 
     fireEvent.click(screen.getByTestId('persistence-accept-remote'));
