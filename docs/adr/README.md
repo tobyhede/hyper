@@ -80,7 +80,7 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0003](0003-routes-may-conflict.md) | Graphs are independent, and their orders may disagree. |
 | [0032](0032-routes-may-contain-cycles.md) | A Graph may contain a cycle. |
 | [0041](0041-graph-is-the-first-public-name-for-route.md) | Graph is the first-public name for Route. |
-| [0116](0116-only-an-edit-on-the-canvas-moves-where-a-space-opens.md) | Only an Edit through the canvas's Map records it as `defaultMap` and writes its Active Graph; an Edit through a drawn Map leaves both alone. |
+| [0116](0116-only-an-edit-on-the-canvas-moves-where-a-space-opens.md) | Only an Edit through the canvas's Map records it as `defaultMap` and writes its Active Graph; an Edit through a drawn Map leaves both alone, except that Add Graph still activates its new Graph. |
 
 ## Editing and persistence
 

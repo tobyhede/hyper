@@ -95,3 +95,7 @@ Adopt, through ticket 02, with three adjustments:
 3. Keep the provenance table and the "Built vs accepted-but-unbuilt" section. They are what let a reader tell Auto-arrange and manual Graph reordering are unbuilt, and what let a reviewer check completeness.
 
 Findings for the existing record, independent of adoption: ADR 0040's Graph-id paragraph reads as live although ADR 0108 refines it; `rendering.md`'s fixture sentence reads as a general rule; `editing-and-persistence.md` says `map-resolution.ts` exports four names where it exports five; the `layout.ts:20` doc comment still says "the view"; CONTEXT cites ADR 0079 for new-Space completeness where ADR 0080 is the source. Auto-arrange has no delivery issue.
+
+## After adoption
+
+2026-10-04: D21 was resolved by the user as a rule and recorded as ADR 0116 (ticket 02), so the open D21 notes above describe this report's snapshot only. The adopted contract was checked with fresh readers in `../adoption/REPORT.md`.
