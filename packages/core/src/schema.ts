@@ -46,9 +46,9 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
  * all four the capability because they share a field type would be the model
  * following the implementation (ADR 0083).
  *
- * One instance, shared by the three kinds — `omit` and `extend` copy a field
- * schema by reference, so the stored document and the import variants inherit
- * this rule rather than restating it, which is what
+ * One instance, shared by every kind's frontmatter schema — `omit` and
+ * `extend` copy a field schema by reference, so the stored document and the
+ * import variants inherit this rule rather than restating it, which is what
  * `resource-document-equality.test.ts` holds them to.
  */
 const resourceTitleSchema = z

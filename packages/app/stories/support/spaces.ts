@@ -500,7 +500,8 @@ const DOCK_COLLECTION_ONE = dockId(0);
 const DOCK_COLLECTION_TWO = dockId(1);
 
 /**
- * The Resources `Collection 1` places, and all three kinds among them.
+ * The Resources `Collection 1` places, with the markdown, reference and space
+ * kinds among them.
  *
  * The kinds are the point rather than decoration: the Dock's Resources list draws
  * `ResourceKindIcon` on every row and the canvas draws the production `ResourceNode`,
