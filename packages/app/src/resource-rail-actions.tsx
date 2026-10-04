@@ -1,11 +1,20 @@
 import { useCallback } from 'react';
-import { titleName, type Map as SpaceMap, type Resource, type ResourceId } from '@project/core';
+import {
+  RESOURCE_SHAPES,
+  titleName,
+  type Map as SpaceMap,
+  type Resource,
+  type ResourceId,
+  type ResourceShape,
+} from '@project/core';
 import type { Space } from '@project/graph';
 import {
   DeleteIcon,
   EnterSpaceIcon,
   RemoveFromMapIcon,
   ResourceKindIcon,
+  ResourceShapeIcon,
+  type EntityActionChoice,
   type EntityActionGroup,
   type EntityActionOutcome,
 } from '@project/ui';
@@ -19,9 +28,26 @@ import type { OpenSpaces } from './open-spaces';
 /** The sentence a Reference Resource's unavailable Create Reference row carries. */
 export const REFERENCE_TERMINAL = 'A Reference Resource cannot be referenced.';
 
+/** How each Shape is named in the Shape choice, in `RESOURCE_SHAPES` order. */
+export const RESOURCE_SHAPE_TITLES = {
+  rectangle: 'Rectangle',
+  pill: 'Pill',
+  ellipse: 'Ellipse',
+  diamond: 'Diamond',
+  hexagon: 'Hexagon',
+} as const satisfies Record<ResourceShape, string>;
+
+/** The Shape the Map records for a Resource, and the Edit that changes it. */
+export interface ResourceShapeCommand {
+  readonly current: ResourceShape;
+  readonly choose: (shape: ResourceShape) => void;
+}
+
 export interface ResourceRailCommands {
   /** Create Reference, or `null` while no Resource may be added. */
   readonly createReference: (() => EntityActionOutcome) | null;
+  /** The Shape choice, or `null` while the Map may not be authored. */
+  readonly resourceShape: ResourceShapeCommand | null;
   /** Remove from Map, or `null` while it is unavailable. */
   readonly removeFromMap: (() => void) | null;
   /** Arm Delete from Space's confirmation, or `null` while it is unavailable. */
@@ -39,10 +65,14 @@ export interface ResourceRailCommands {
  * the commands that are the Resource's own: creating a Reference Resource from
  * it, removing it from the Map, and deleting it.
  *
- * Create Reference leads, then Connect to Resource, then the addresses, then
- * the two commands that leave the Resource behind sharing the trailing
- * destructive group. A Space
- * Resource's menu pairs Enter with Open in New Tab ahead of its copy links.
+ * Create Reference leads, then Connect to Resource, then the Shape choice,
+ * then the addresses, then the two commands that leave the Resource behind
+ * sharing the trailing destructive group. A Space Resource's menu pairs Enter
+ * with Open in New Tab ahead of its copy links.
+ *
+ * The Shape choice is the same whether the Resource is Open or Closed (ADR
+ * 0117): an Open Resource draws the rectangle, and the Shape it records is
+ * drawn again on Close.
  */
 export function resourceRailGroups(
   resource: Resource,
@@ -50,7 +80,9 @@ export function resourceRailGroups(
   connect: EntityActionGroup,
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
-  const { createReference, removeFromMap, deleteFromSpace, enter } = commands;
+  const { createReference, resourceShape, removeFromMap, deleteFromSpace, enter } = commands;
+  const shaping: readonly EntityActionGroup[] =
+    resourceShape === null ? [] : [[resourceShapeChoice(resourceShape)]];
   const terminal = resource.kind === 'reference' ? REFERENCE_TERMINAL : null;
   const reference: readonly EntityActionGroup[] =
     createReference === null
@@ -135,13 +167,47 @@ export function resourceRailGroups(
     return [
       reference.flat(),
       connect,
+      ...shaping,
       [...entering, ...links.filter((action) => action.id === OPEN_INDEPENDENTLY_ACTION_ID)],
       links.filter((action) => action.id !== OPEN_INDEPENDENTLY_ACTION_ID),
       leaving,
     ];
   }
-  return [...reference, connect, ...addresses, ...(leaving.length > 0 ? [leaving] : [])];
+  return [
+    ...reference,
+    connect,
+    ...shaping,
+    ...addresses,
+    ...(leaving.length > 0 ? [leaving] : []),
+  ];
 }
+
+/**
+ * The Shape choice for a Resource the Map places, while the Map may be
+ * authored; `null` otherwise.
+ */
+const resourceShapeCommandOf = (
+  drawnMap: SpaceMap,
+  resourceId: ResourceId,
+  authorOnCanvas: boolean,
+  choose: (shape: ResourceShape) => void,
+): ResourceShapeCommand | null => {
+  const at = drawnMap.positions[resourceId];
+  return authorOnCanvas && at !== undefined ? { current: at.shape, choose } : null;
+};
+
+/** The Shape choice: the five Shapes, the recorded one chosen, each one Edit. */
+const resourceShapeChoice = ({ current, choose }: ResourceShapeCommand): EntityActionChoice => ({
+  id: 'resource-shape',
+  label: 'Shape',
+  icon: <ResourceShapeIcon />,
+  options: RESOURCE_SHAPES.map((shape) => ({
+    id: shape,
+    title: RESOURCE_SHAPE_TITLES[shape],
+    chosen: shape === current,
+    onChoose: () => choose(shape),
+  })),
+});
 
 export interface ResourceRailInput {
   readonly space: Space;
@@ -210,6 +276,16 @@ export function useResourceRailActions(
         connect,
         {
           createReference: addResource ? () => createReferenceFrom(resource) : null,
+          resourceShape: resourceShapeCommandOf(
+            selectedMap,
+            resourceId,
+            authorOnCanvas,
+            (shape) => {
+              commandOutcomes.run('resource-shape', () =>
+                authoring.complete({ kind: 'changed-resource-shape', resourceId, shape }),
+              );
+            },
+          ),
           removeFromMap:
             authorOnCanvas && !editingResourceBody
               ? () => {

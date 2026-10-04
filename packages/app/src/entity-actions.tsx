@@ -5,7 +5,6 @@ import {
   EditIcon,
   OpenIndependentlyIcon,
   type EntityAction,
-  type EntityActionGroup,
   type EntityActionOutcome,
 } from '@project/ui';
 
@@ -35,7 +34,7 @@ import {
  *
  * Exported so a consumer spells each from here instead of from a second
  * literal that happens to agree: the Dock's clusters draw their own menus and
- * cannot render an `EntityActionGroup[]`
+ * cannot render an `EntityCommandGroup[]`
  * whole, so they reach into this list by id. Do not spell one as a bare
  * literal: `runEntityCommand` looks an id up and spends `?.onSelect()` on the
  * miss, so a renamed id leaves the copy commands silently inert with `tsc` and
@@ -43,6 +42,13 @@ import {
  * what stops another being invented.
  */
 export const COPY_LINK_ACTION_ID = 'copy-link';
+
+/**
+ * An entity's commands, ruled into groups: what {@link spaceEntityActions}
+ * answers. Every member runs on the press, so a surface that draws its own menu
+ * can spend one by id.
+ */
+export type EntityCommandGroup = readonly EntityAction[];
 export const COPY_RESOURCE_LINK_ACTION_ID = 'copy-resource-link';
 export const COPY_SPACE_LINK_ACTION_ID = 'copy-space-link';
 export const COPY_LINK_TO_TARGET_ACTION_ID = 'copy-link-to-target';
@@ -178,8 +184,8 @@ export function spaceEntityActions({
   onCopy,
   onOpenIndependently,
   onRename,
-}: SpaceEntityActionsOptions): (entity: SpaceEntity) => readonly EntityActionGroup[] {
-  const renameAction = (subject: SpaceChromeTitleSubject, title: string): EntityActionGroup =>
+}: SpaceEntityActionsOptions): (entity: SpaceEntity) => readonly EntityCommandGroup[] {
+  const renameAction = (subject: SpaceChromeTitleSubject, title: string): EntityCommandGroup =>
     onRename === null
       ? []
       : [

@@ -3647,7 +3647,7 @@ test('Escape discards a Reference Resource rename without undoing the Reference 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
-test('the Resource menu groups Create Reference, Connect, both copy links, then Remove and Delete', async ({
+test('the Resource menu groups Create Reference, Connect, Shape, both copy links, then Remove and Delete', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3659,6 +3659,7 @@ test('the Resource menu groups Create Reference, Connect, both copy links, then 
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
+    ['Shape'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -3681,6 +3682,7 @@ test(
     const groups = [
       ['Create Reference'],
       ['Connect to Resource'],
+      ['Shape'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ];
@@ -3724,6 +3726,7 @@ test('Create Reference is drawn unavailable on a Reference Resource, still leadi
   await expectMenuGroups(menu, [
     [/^Create Reference/],
     ['Connect to Resource'],
+    ['Shape'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],
   ]);

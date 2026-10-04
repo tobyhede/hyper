@@ -1,11 +1,12 @@
 import fc from 'fast-check';
-import { uuidSchema, type ResourceContent, type SpaceView } from '@project/core';
+import { RESOURCE_SHAPES, uuidSchema, type ResourceContent, type SpaceView } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import {
   atRest,
   beginEditing,
   beginReplacing,
   CLOSED_DISPLAY,
+  drawnResourceShape,
   spaceViewOf,
   type ResourceDisplay,
 } from '../src/resource-display';
@@ -121,5 +122,50 @@ describe('the Space view a display shows', () => {
       }),
     );
     expect(spaceViewOf(CLOSED_DISPLAY)).toBeUndefined();
+  });
+});
+
+describe('drawnResourceShape', () => {
+  const shape = fc.constantFrom(...RESOURCE_SHAPES);
+
+  it('draws a Closed diamond as a diamond', () => {
+    expect(drawnResourceShape(CLOSED_DISPLAY, 'diamond')).toBe('diamond');
+  });
+
+  it('draws the Closed Shapes not yet drawn as the rectangle', () => {
+    for (const other of ['rectangle', 'pill', 'ellipse', 'hexagon'] as const) {
+      expect(drawnResourceShape(CLOSED_DISPLAY, other)).toBe('rectangle');
+    }
+  });
+
+  it('draws an Open, presented, editing or replacing Resource as the rectangle whatever its Shape', () => {
+    fc.assert(
+      fc.property(content, shape, (drawn, chosen) => {
+        const displays: readonly ResourceDisplay[] = [
+          { shown: 'open', content: drawn },
+          { shown: 'presented', content: drawn },
+          beginEditing(
+            { shown: 'open', content: { kind: 'markdown', source: '', via: 'self' } },
+            editor,
+            false,
+          ),
+          beginReplacing(
+            {
+              shown: 'open',
+              content: {
+                kind: 'image',
+                url: 'https://example.test/a.png',
+                naturalSize: undefined,
+                via: 'self',
+              },
+            },
+            replacer,
+          ),
+        ];
+        for (const display of displays) {
+          expect(drawnResourceShape(display, chosen)).toBe('rectangle');
+        }
+      }),
+    );
   });
 });

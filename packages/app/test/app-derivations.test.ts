@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Resource } from '@project/core';
+import { RESOURCE_SHAPES, type Resource, type ResourceShape } from '@project/core';
 import { Placement } from '@project/graph';
 import type { EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { activeGraphOf } from '../src/dock-chrome';
@@ -217,8 +217,15 @@ describe('resourceRailGroups', () => {
   const connect: EntityActionGroup = [
     { id: 'connect-resource', label: 'Connect to Resource', onSelect: () => 'done' },
   ];
+  const chosenResourceShapes: ResourceShape[] = [];
   const everything = {
     createReference: (): EntityActionOutcome => 'done',
+    resourceShape: {
+      current: 'diamond' as const,
+      choose: (shape: ResourceShape) => {
+        chosenResourceShapes.push(shape);
+      },
+    },
     removeFromMap: () => undefined,
     deleteFromSpace: () => undefined,
     enter: () => undefined,
@@ -230,9 +237,42 @@ describe('resourceRailGroups', () => {
     expect(ids(resourceRailGroups(resource(PLACED_A), addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
+      ['resource-shape'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
+  });
+
+  it('offers the five Shapes with the current one chosen, and each choice chooses it', () => {
+    const choice = resourceRailGroups(resource(PLACED_A), addresses, connect, everything)
+      .flat()
+      .find((entry) => entry.id === 'resource-shape');
+    if (choice === undefined || !('options' in choice)) throw new Error('No Shape choice');
+    expect(choice.label).toBe('Shape');
+    expect(choice.options.map(({ id, title, chosen }) => ({ id, title, chosen }))).toEqual([
+      { id: 'rectangle', title: 'Rectangle', chosen: false },
+      { id: 'pill', title: 'Pill', chosen: false },
+      { id: 'ellipse', title: 'Ellipse', chosen: false },
+      { id: 'diamond', title: 'Diamond', chosen: true },
+      { id: 'hexagon', title: 'Hexagon', chosen: false },
+    ]);
+    chosenResourceShapes.length = 0;
+    for (const option of choice.options) option.onChoose();
+    expect(chosenResourceShapes).toEqual(RESOURCE_SHAPES);
+  });
+
+  it('offers the Shape choice on a Space Resource beside its Connect group', () => {
+    const spaceResource: Resource = {
+      id: OUTSIDE,
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: SPACE_ID,
+      map: MAP_ID,
+      graph: GRAPH_ID,
+      framing: undefined,
+    };
+    const groups = ids(resourceRailGroups(spaceResource, addresses, connect, everything));
+    expect(groups.slice(1, 3)).toEqual([['connect-resource'], ['resource-shape']]);
   });
 
   it('draws only Connect to Resource and the addresses while nothing else is available', () => {
@@ -240,6 +280,7 @@ describe('resourceRailGroups', () => {
       ids(
         resourceRailGroups(resource(PLACED_A), addresses, connect, {
           createReference: null,
+          resourceShape: null,
           removeFromMap: null,
           deleteFromSpace: null,
           enter: null,
@@ -256,8 +297,11 @@ describe('resourceRailGroups', () => {
       target: PLACED_A,
     };
     const row = resourceRailGroups(reference, addresses, connect, everything)[0]?.[0];
-    expect(row).toMatchObject({ id: 'create-reference', disabled: true });
-    expect(row?.description).toBe(REFERENCE_TERMINAL);
+    expect(row).toMatchObject({
+      id: 'create-reference',
+      disabled: true,
+      description: REFERENCE_TERMINAL,
+    });
   });
 });
 

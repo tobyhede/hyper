@@ -93,6 +93,7 @@ describe('the Open front chrome, where the commands float outside the Resource',
       ".canvas-resource[data-open='false'] > .canvas-resource__body",
       `.canvas-resource${RAIL_ACTIONS} .canvas-resource__content`,
       `.canvas-resource[data-open='false']${RAIL_ACTIONS} > .canvas-resource__body`,
+      ".canvas-resource[data-open='false'][data-resource-shape='diamond'] > .canvas-resource__body",
     ]);
   });
 

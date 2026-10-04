@@ -14,6 +14,7 @@ import {
   titleName,
   type ContentVia,
   type ResourceContent,
+  type ResourceShape,
 } from '@project/core';
 import { Button } from './Button';
 import {
@@ -50,7 +51,7 @@ import { InlineTitleEditor } from './InlineTitleEditor';
 import { ResourceImage } from './ResourceImage';
 import { ImageReplaceTarget } from './ImageReplaceTarget';
 import { UnresolvedContent } from './UnresolvedContent';
-import { atRest, type FrontDisplay } from './resource-display';
+import { atRest, drawnResourceShape, type FrontDisplay } from './resource-display';
 
 /**
  * What a Resource front offers beyond its shared Title (ADR 0051): a kind-owned
@@ -141,6 +142,12 @@ interface CanvasResourceCommonProps {
    * display the projection made from it.
    */
   readonly display: FrontDisplay;
+  /**
+   * The Shape the Map records for this Resource (ADR 0117), drawn while the
+   * display is Closed. Absent where no Map places the Resource — a creation
+   * ghost, a drag preview — which draws the rectangle.
+   */
+  readonly shape?: ResourceShape;
   /**
    * Where the Resource's command toolbar is drawn, and when.
    *
@@ -342,6 +349,7 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const display = readOnly ? atRest(props.display) : props.display;
   const open = display.shown !== 'closed';
+  const frontResourceShape = drawnResourceShape(display, props.shape ?? 'rectangle');
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const openableFront = front.kind === 'preview' ? undefined : front;
@@ -615,6 +623,9 @@ export function CanvasResource(props: CanvasResourceProps) {
       // layout remains invariant; no wall-clock presentation state is allowed
       // to become a second Open fact and move the Title mid-close.
       data-open={open}
+      // The Shape the front is drawn in, which `canvas-resource.css` reads to
+      // draw the outline below and inset the Title and glyph within it.
+      data-resource-shape={frontResourceShape}
       // A running edit is not a hover, so `canvas-resource.css` draws the active
       // face off this as well as `:hover` — a Resource being written in reads as
       // active without the pointer on it.
@@ -625,6 +636,7 @@ export function CanvasResource(props: CanvasResourceProps) {
           shared command surface. The Graph's colour is on this Resource — `--canvas-resource-graph` below draws the
           Title's own hover and caret treatment — and on the handles and
           Edges the adapter draws around it. */}
+      {frontResourceShape === 'diamond' && <ResourceShapeOutline />}
       {rail}
       {props.renderToolbar?.(toolbar)}
       <CardContent ref={bodyControl} className="canvas-resource__body">
@@ -712,6 +724,29 @@ export function CanvasResource(props: CanvasResourceProps) {
     <EntityActions groups={readOnly ? [] : entityActions} render={resource} />
   ) : (
     resource
+  );
+}
+
+/**
+ * A Closed diamond's paper and edge, drawn in place of the front's own border
+ * and fill, which `canvas-resource.css` withdraws for it.
+ *
+ * Stretched to the Resource's rect, so its four vertices are the midpoints of
+ * the rect's sides, where the adapter's handles sit and Edges attach (ADR 0110,
+ * ADR 0117). The stroke keeps the border's width at any rect because it does
+ * not scale with the drawing.
+ */
+function ResourceShapeOutline() {
+  return (
+    <svg
+      className="canvas-resource__outline"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <polygon points="50,0 100,50 50,100 0,50" />
+    </svg>
   );
 }
 

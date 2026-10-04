@@ -101,7 +101,9 @@
   :not([data-state='rest']),
   [data-content-editing='true']
 ) {
-  background: var(--canvas-resource-active-face);
+  /* The face rather than the background, so a Shape drawn in place of the
+     Resource's own paper takes the same active face. */
+  --canvas-resource-face: var(--canvas-resource-active-face);
 }
 
 .canvas-resource[data-kind='reference']:is(
@@ -447,4 +449,63 @@
 .canvas-resource[data-open='false']:has(> .canvas-resource__rail .canvas-resource__actions)
   > .canvas-resource__body {
   padding-top: 46px;
+}
+
+/* A Closed diamond (ADR 0117). The Resource keeps its fixed Closed Size and
+   rect; the front's own paper and edge are withdrawn and `ResourceShapeOutline`
+   draws them as a diamond whose vertices touch the midpoint of each side,
+   where Edges attach. `overflow` is released so the stroke at those vertices
+   is not cut by the rect. */
+.canvas-resource[data-resource-shape='diamond'] {
+  --canvas-resource-title-ladder-lines: 2;
+
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.canvas-resource__outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.canvas-resource__outline polygon {
+  fill: var(--canvas-resource-face);
+  stroke: var(--canvas-resource-ink);
+  stroke-width: var(--canvas-resource-border-width);
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: fill var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
+}
+
+/* The Title and kind glyph lay out in the rectangle inscribed in the diamond:
+   the middle half of the rect on each axis. The glyph keeps the inscribed
+   rectangle's top-right corner and the Title fills the room below it, clamped
+   to the two lines that room holds and clipped as every Title is. */
+.canvas-resource[data-resource-shape='diamond'] > .canvas-resource__rail {
+  inset: 25% 25% auto;
+  padding: 0;
+}
+
+.canvas-resource[data-open='false'][data-resource-shape='diamond'] > .canvas-resource__body {
+  position: absolute;
+  inset: 25%;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 0 0;
+  overflow: hidden;
+  text-align: center;
+}
+
+.canvas-resource[data-resource-shape='diamond'] .canvas-resource__title-line[data-role='title'] {
+  -webkit-line-clamp: 2;
+}
+
+.canvas-resource[data-resource-shape='diamond'] .canvas-resource__title-control {
+  margin-inline: auto;
 }

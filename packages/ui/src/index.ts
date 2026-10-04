@@ -97,7 +97,10 @@ export {
 export { EntityActions, EntityActionsTrigger } from './EntityActionsMenu';
 export type {
   EntityAction,
+  EntityActionChoice,
+  EntityActionEntry,
   EntityActionGroup,
+  EntityActionOption,
   EntityActionOutcome,
   EntityActionReport,
   EntityActionsProps,
@@ -161,6 +164,7 @@ export {
   UrIcon,
   PlusIcon,
   RemoveFromMapIcon,
+  ResourceShapeIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,

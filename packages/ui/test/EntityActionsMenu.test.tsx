@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   EntityActions,
   EntityActionsTrigger,
   type EntityAction,
+  type EntityActionChoice,
   type EntityActionOutcome,
 } from '../src/EntityActionsMenu';
 
@@ -343,5 +344,68 @@ describe('the entity actions menu', () => {
     await press(/Connect to Resource/);
 
     expect(onSelect).toHaveBeenCalledWith(screen.getByTestId('row'));
+  });
+});
+
+describe('a choice in the entity actions menu', () => {
+  const chooseOf = (chosen: string, onChoose: (id: string) => void): EntityActionChoice => ({
+    id: 'resource-shape',
+    label: 'Shape',
+    options: ['Rectangle', 'Diamond', 'Hexagon'].map((title) => ({
+      id: title.toLowerCase(),
+      title,
+      chosen: title.toLowerCase() === chosen,
+      onChoose: () => onChoose(title.toLowerCase()),
+    })),
+  });
+
+  const checked = (group: HTMLElement) =>
+    within(group)
+      .getAllByRole('menuitemradio')
+      .filter((item) => item.getAttribute('aria-checked') === 'true')
+      .map((item) => item.textContent);
+
+  it('opens its set as a labelled radio list with the current member chosen', async () => {
+    render(
+      <EntityActionsTrigger
+        label="Actions"
+        groups={[[copyCommand(() => 'done')], [chooseOf('diamond', () => undefined)]]}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Shape' }));
+
+    const group = await screen.findByRole('group', { name: 'Shape' });
+    expect(
+      within(group)
+        .getAllByRole('menuitemradio')
+        .map((item) => item.textContent),
+    ).toEqual(['Rectangle', 'Diamond', 'Hexagon']);
+    expect(checked(group)).toEqual(['Diamond']);
+  });
+
+  it('runs only the chosen member, from the icon and the right click alike', async () => {
+    const chosen: string[] = [];
+    const { unmount } = render(
+      <EntityActionsTrigger
+        label="Actions"
+        groups={[[chooseOf('diamond', (id) => chosen.push(id))]]}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Shape' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Hexagon' }));
+    expect(chosen).toEqual(['hexagon']);
+    unmount();
+
+    render(
+      <EntityActions groups={[[chooseOf('rectangle', (id) => chosen.push(id))]]}>
+        <div data-testid="row">Row</div>
+      </EntityActions>,
+    );
+    fireEvent.contextMenu(screen.getByTestId('row'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Shape' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Diamond' }));
+    expect(chosen).toEqual(['hexagon', 'diamond']);
   });
 });

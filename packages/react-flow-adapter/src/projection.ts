@@ -10,6 +10,7 @@ import {
   embedsMap,
   type Resource,
   type ResourceId,
+  type ResourceShape,
   type GraphHeadShape,
   type GraphId,
 } from '@project/core';
@@ -190,6 +191,12 @@ export type ResourceNodeData = {
    * resize and displacement read it — and never chooses what is drawn.
    */
   display: ResourceDisplay;
+  /**
+   * The Shape the Map records for this Resource (ADR 0117), carried whatever
+   * the display: the front draws it only while the display is Closed. Absent
+   * where the projection was given no Map's Shapes.
+   */
+  shape?: ResourceShape;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
@@ -244,6 +251,8 @@ export interface ProjectResourceNodesOptions {
   resourceIds?: readonly ResourceId[];
   /** Map-authored Open Resources whose Markdown body is drawn in place. */
   openResourceIds?: ReadonlySet<ResourceId>;
+  /** The Shape the Map records for each Resource it places (ADR 0117). */
+  resourceShapes?: ReadonlyMap<ResourceId, ResourceShape>;
 }
 
 /**
@@ -356,6 +365,8 @@ export function projectResourceNodes(
       node.height = placedResource.height;
       node.handles = declaredHandles(placedResource);
     }
+    const shape = options.resourceShapes?.get(resource.id);
+    if (shape !== undefined) node.data.shape = shape;
     if (open) {
       node.data.open = true;
       node.zIndex = 10;

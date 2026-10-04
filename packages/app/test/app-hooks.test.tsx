@@ -540,13 +540,37 @@ describe('useResourceRailActions', () => {
     expect(ids(groups)).toEqual([
       ['create-reference'],
       ['connect-resource'],
+      ['resource-shape'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
+    const remove = groups[4]?.[0];
     act(() => {
-      void groups[3]?.[0]?.onSelect(null);
+      if (remove !== undefined && 'onSelect' in remove) void remove.onSelect(null);
     });
     await waitFor(() => expect(placedIds(opened)).not.toContain(PLACED_A));
+  });
+
+  it('offers the Shape the Map records, and choosing one changes it on that Map', async () => {
+    const opened = openDerivationSpace();
+    const choice = railFor(opened, true)
+      .result.current(PLACED_A, connect)
+      .flat()
+      .find((entry) => entry.id === 'resource-shape');
+    if (choice === undefined || !('options' in choice)) throw new Error('No Shape choice');
+    expect(choice.options.find((option) => option.chosen)?.id).toBe('rectangle');
+
+    act(() => {
+      choice.options.find((option) => option.id === 'diamond')?.onChoose();
+    });
+
+    await waitFor(() =>
+      expect(
+        opened.session.getState().working.document.maps?.find(({ id }) => id === MAP_ID)?.positions[
+          PLACED_A
+        ]?.shape,
+      ).toBe('diamond'),
+    );
   });
 });
 

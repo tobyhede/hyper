@@ -151,6 +151,23 @@ describe('projectResourceNodes', () => {
     expect('markdown' in a.data).toBe(false);
   });
 
+  it('carries the Shape the Map records for each Resource it was given', () => {
+    const a = uuid('00000000-0000-4000-8000-000000000002');
+    const nodes = projectResourceNodes(space, { resourceShapes: new Map([[a, 'diamond']]) });
+    expect(nodes.find((n) => n.id === a)?.data.shape).toBe('diamond');
+    // The Shape travels whatever the display, Open included: the front decides
+    // what it draws from the two together.
+    const opened = projectResourceNodes(space, {
+      resourceShapes: new Map([[a, 'diamond']]),
+      openResourceIds: new Set([a]),
+    });
+    expect(opened.find((n) => n.id === a)?.data).toMatchObject({
+      shape: 'diamond',
+      display: { shown: 'open' },
+    });
+    expect(projectResourceNodes(space).find((n) => n.id === a)?.data).not.toHaveProperty('shape');
+  });
+
   it('uses the positions a map put on the resources', () => {
     const nodes = projectResourceNodes(space, {
       strategyGraph: {

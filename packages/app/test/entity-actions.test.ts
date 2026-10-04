@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Resource, type Graph, type Map } from '@project/core';
 import type { ProductDestination } from '@project/http';
-import type { EntityActionGroup } from '@project/ui';
-import { spaceEntityActions, type SpaceEntity } from '../src/entity-actions';
+import {
+  spaceEntityActions,
+  type EntityCommandGroup,
+  type SpaceEntity,
+} from '../src/entity-actions';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -52,7 +55,7 @@ const referenceResource = (
 
 const build = (
   overrides: Partial<Parameters<typeof spaceEntityActions>[0]> = {},
-): ((entity: SpaceEntity) => readonly EntityActionGroup[]) =>
+): ((entity: SpaceEntity) => readonly EntityCommandGroup[]) =>
   spaceEntityActions({
     spaceId: SPACE_ID,
     spaceTitle: 'Fixture Space',
@@ -63,8 +66,8 @@ const build = (
   });
 
 /** Every command a menu holds, flattened past the grouping. */
-const commands = (groups: readonly EntityActionGroup[]) => groups.flat();
-const labels = (groups: readonly EntityActionGroup[]) =>
+const commands = (groups: readonly EntityCommandGroup[]) => groups.flat();
+const labels = (groups: readonly EntityCommandGroup[]) =>
   commands(groups).map((action) => action.label);
 
 /** The destination one command would copy, taken from the callback it fires. */

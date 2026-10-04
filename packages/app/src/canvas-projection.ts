@@ -1,4 +1,4 @@
-import type { ResourceId, Graph, GraphHeadShape, GraphId } from '@project/core';
+import type { ResourceId, ResourceShape, Graph, GraphHeadShape, GraphId } from '@project/core';
 import {
   buildGraphRenderEdges,
   buildLayoutStrategyGraph,
@@ -88,6 +88,9 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
   const openResourceIds = new Set(
     [...authored].filter(([, at]) => at.open).map(([resourceId]) => resourceId),
   );
+  const resourceShapes = new Map<ResourceId, ResourceShape>(
+    [...authored].map(([resourceId, at]) => [resourceId, at.shape]),
+  );
   const strategyGraph = buildLayoutStrategyGraph(resourceIds, edges, (resourceId) => {
     const at = authored.get(resourceId);
     return at?.open === true ? at.openSize : RESOURCE_SIZE;
@@ -110,6 +113,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           strategyGraph: laidOut,
           resourceIds,
           openResourceIds,
+          resourceShapes,
         }),
         edges: projectGraphEdges(edges, colors, { activeGraphId, headShapes }),
       };

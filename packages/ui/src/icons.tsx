@@ -23,6 +23,7 @@ import {
   Plus,
   Route,
   Search,
+  Diamond,
   Square,
   StickyNote,
   Trash2,
@@ -383,6 +384,11 @@ export const HideTitleIcon = (props: ResourceActionIconProps) => <EyeOff size={1
 
 /** Remove the entity the surrounding command names. */
 export const DeleteIcon = (props: ResourceActionIconProps) => <Trash2 size={14} {...props} />;
+
+/** Choose the Shape a Resource is drawn in on this Map (ADR 0117). */
+export const ResourceShapeIcon = (props: ResourceActionIconProps) => (
+  <Diamond size={14} {...props} />
+);
 
 /** Remove a Resource from this Map while it stays in the Space. */
 export const RemoveFromMapIcon = (props: ResourceActionIconProps) => (

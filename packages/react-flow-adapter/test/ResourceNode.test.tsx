@@ -552,6 +552,19 @@ describe('ResourceNode draws what the display shows', () => {
    * node's own `data-open` — never what is drawn. A Resource both presented and
    * Open is presented, and keeps its authored Open state.
    */
+  it("draws the Map's Shape on the Closed front and the rectangle on the Open one", () => {
+    const withResourceShape = (open: boolean): NodeProps<ResourceFlowNode> => {
+      const node = props({ open });
+      return { ...node, data: { ...node.data, shape: 'diamond' } };
+    };
+    const { unmount } = render(<ResourceNode {...withResourceShape(false)} />);
+    expect(screen.getByTestId('resource')).toHaveAttribute('data-resource-shape', 'diamond');
+    unmount();
+
+    render(<ResourceNode {...withResourceShape(true)} />);
+    expect(screen.getByTestId('resource')).toHaveAttribute('data-resource-shape', 'rectangle');
+  });
+
   it('presents a Resource that is also Open, keeping its authored Open state on the node', () => {
     const { container } = render(
       <ResourceNode

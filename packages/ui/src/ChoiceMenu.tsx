@@ -8,6 +8,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
 import { ChevronDownIcon } from './icons';
@@ -66,6 +69,15 @@ export interface ChoiceMenuProps<Id extends string> {
    * Omitted, Base UI's own restoration stands.
    */
   readonly restoresFocusOnClose?: () => boolean;
+  /**
+   * Drawn as a submenu of the menu this list sits in, hanging off a
+   * {@link ChoiceMenuSubmenuTrigger} row, rather than as a menu of its own. A
+   * Resource's Shape is chosen this way from its Actions menu (ADR 0117).
+   * `triggerId`, `side`, `align`, `sideOffset` and `restoresFocusOnClose` are
+   * a root menu's and are not read here: a submenu opens beside its row and
+   * closes with the menu it belongs to.
+   */
+  readonly nested?: boolean;
 }
 
 /**
@@ -107,7 +119,48 @@ export function ChoiceMenu<Id extends string>({
   sideOffset = 6,
   className = 'w-72',
   restoresFocusOnClose,
+  nested = false,
 }: ChoiceMenuProps<Id>) {
+  const list = (
+    <>
+      <DropdownMenuRadioGroup<Id | null>
+        value={chosen}
+        onValueChange={(next) => {
+          // Base UI spells an empty controlled selection `null`, and no
+          // surface here has a clear-selection action: a reader picks another
+          // member or dismisses the list.
+          if (next !== null) onChoose(next);
+        }}
+      >
+        <DropdownMenuLabel>{label}</DropdownMenuLabel>
+        {choices.map((choice) => (
+          <DropdownMenuRadioItem<Id | null>
+            key={choice.id}
+            value={choice.id}
+            closeOnClick
+            className="gap-2"
+          >
+            {choice.icon}
+            {choice.title}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+      {Children.toArray(children).length > 0 && (
+        <>
+          <DropdownMenuSeparator />
+          {children}
+        </>
+      )}
+    </>
+  );
+  if (nested) {
+    return (
+      <DropdownMenuSub open={open} onOpenChange={onOpenChange}>
+        {trigger}
+        <DropdownMenuSubContent className={className}>{list}</DropdownMenuSubContent>
+      </DropdownMenuSub>
+    );
+  }
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
       {trigger}
@@ -118,34 +171,7 @@ export function ChoiceMenu<Id extends string>({
         className={className}
         finalFocus={restoresFocusOnClose}
       >
-        <DropdownMenuRadioGroup<Id | null>
-          value={chosen}
-          onValueChange={(next) => {
-            // Base UI spells an empty controlled selection `null`, and no
-            // surface here has a clear-selection action: a reader picks another
-            // member or dismisses the list.
-            if (next !== null) onChoose(next);
-          }}
-        >
-          <DropdownMenuLabel>{label}</DropdownMenuLabel>
-          {choices.map((choice) => (
-            <DropdownMenuRadioItem<Id | null>
-              key={choice.id}
-              value={choice.id}
-              closeOnClick
-              className="gap-2"
-            >
-              {choice.icon}
-              {choice.title}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-        {Children.toArray(children).length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            {children}
-          </>
-        )}
+        {list}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -194,3 +220,14 @@ export const ChoiceMenuTrigger = forwardRef<HTMLButtonElement, ChoiceMenuTrigger
     );
   },
 );
+
+export type ChoiceMenuSubmenuTriggerProps = ComponentProps<typeof DropdownMenuSubTrigger>;
+
+/**
+ * The row a nested {@link ChoiceMenu} hangs off: a menu row naming the set,
+ * trailed by the submenu chevron. It opens the list on hover, on a press, on
+ * Enter, on Space and on ArrowRight, as Base UI's submenu trigger does.
+ */
+export function ChoiceMenuSubmenuTrigger(props: ChoiceMenuSubmenuTriggerProps) {
+  return <DropdownMenuSubTrigger {...props} />;
+}

@@ -2253,3 +2253,57 @@ describe('CanvasResource Ur front', () => {
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway, again' })).toBeNull();
   });
 });
+
+describe('the Shape a Resource front is drawn in', () => {
+  const props = {
+    front: { kind: 'ur' as const },
+    state: 'rest' as const,
+    title: 'Decide',
+    graphColor: '#ffc53d',
+  };
+  const outline = (resource: HTMLElement) => resource.querySelector('.canvas-resource__outline');
+
+  it('draws a Closed diamond as a diamond, and an Open one as the rectangle', () => {
+    const { rerender } = render(
+      <CanvasResource {...props} shape="diamond" display={CLOSED_DISPLAY} />,
+    );
+    const resource = screen.getByRole('article', { name: 'Decide' });
+    expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+    expect(outline(resource)).not.toBeNull();
+
+    rerender(
+      <CanvasResource {...props} shape="diamond" display={opened({ kind: 'ur', via: 'self' })} />,
+    );
+    expect(resource).toHaveAttribute('data-resource-shape', 'rectangle');
+    expect(outline(resource)).toBeNull();
+
+    rerender(<CanvasResource {...props} shape="diamond" display={CLOSED_DISPLAY} />);
+    expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+  });
+
+  it('keeps the diamond while the Closed Title is being written', () => {
+    render(
+      <CanvasResource
+        {...props}
+        state="editing"
+        shape="diamond"
+        display={CLOSED_DISPLAY}
+        onCompleteTitleEdit={() => null}
+        onCancelTitleEdit={() => undefined}
+        onReturnFocus={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('article', { name: 'Decide' })).toHaveAttribute(
+      'data-resource-shape',
+      'diamond',
+    );
+  });
+
+  it('draws the rectangle where no Map gives a Shape', () => {
+    render(<CanvasResource {...props} display={CLOSED_DISPLAY} />);
+    expect(screen.getByRole('article', { name: 'Decide' })).toHaveAttribute(
+      'data-resource-shape',
+      'rectangle',
+    );
+  });
+});
