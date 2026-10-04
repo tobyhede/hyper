@@ -5,6 +5,7 @@ import {
   type ResourceId,
   type GraphEdge,
   type GraphId,
+  type Resource,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -500,8 +501,7 @@ const DOCK_COLLECTION_ONE = dockId(0);
 const DOCK_COLLECTION_TWO = dockId(1);
 
 /**
- * The Resources `Collection 1` places, with the markdown, reference, space and
- * ur kinds among them.
+ * The Resources `Collection 1` places, one of each Resource kind.
  *
  * The kinds are the point rather than decoration: the Dock's Resources list draws
  * `ResourceKindIcon` on every row and the canvas draws the production `ResourceNode`,
@@ -512,7 +512,9 @@ const DOCK_COLLECTION_TWO = dockId(1);
  * the same reason it exists there: three lines at 18px in a 260px Resource is what
  * the balance and the clamp are there to survive, and a Dock that occludes a
  * Resource is judged against a Resource that is actually full. It is the Ur
- * Resource because a Closed Resource draws its Title alone whatever its kind.
+ * Resource because a Closed Resource draws its Title alone whatever its kind,
+ * which is also why `Strategies` can be the Image Resource: Closed, it draws no
+ * picture and fetches none.
  */
 const DOCK_PLACED = [
   { id: dockId(0x10), title: 'Opening', kind: 'markdown' },
@@ -521,7 +523,7 @@ const DOCK_PLACED = [
     title: 'Why authored placement beats a layout engine that reshuffles on every edit',
     kind: 'ur',
   },
-  { id: dockId(0x12), title: 'Strategies', kind: 'markdown' },
+  { id: dockId(0x12), title: 'Strategies', kind: 'image' },
   { id: dockId(0x13), title: 'Design system', kind: 'space' },
   { id: dockId(0x14), title: 'Strategy overview', kind: 'reference' },
 ] as const;
@@ -543,7 +545,7 @@ const DOCK_PLACED = [
  */
 const DOCK_UNPLACED = [
   { title: 'Constraints', kind: 'markdown' },
-  { title: 'Prior art', kind: 'markdown' },
+  { title: 'Prior art', kind: 'image' },
   { title: 'Persistence', kind: 'space' },
   { title: 'Revision history', kind: 'markdown' },
   { title: 'Optimistic commit', kind: 'markdown' },
@@ -624,7 +626,14 @@ const dockReferenceTarget = (title: string): UUID => {
   return dockResourceId(target);
 };
 
-type DockResourceKind = 'markdown' | 'space' | 'reference' | 'ur';
+/**
+ * The picture every Image Resource here names. Nothing serves it: the fixture's
+ * Image Resources are drawn Closed, and the recorded natural size is what a
+ * first Open reads (ADR 0106).
+ */
+const DOCK_IMAGE_URL = 'https://example.com/dock-figure.png';
+
+type DockResourceKind = Resource['kind'];
 
 const dockResourceDocument = (
   title: string,
@@ -633,6 +642,8 @@ const dockResourceDocument = (
 ): SpaceSnapshot['resources'][number]['document'] => {
   if (kind === 'space') return spaceResourceDocument(title, dockTargetSpace(index));
   if (kind === 'reference') return { title, kind, target: dockReferenceTarget(title) };
+  if (kind === 'image')
+    return { title, kind, url: DOCK_IMAGE_URL, naturalSize: { width: 400, height: 300 } };
   if (kind === 'ur') return { title, kind };
   return { title, kind, body: '' };
 };

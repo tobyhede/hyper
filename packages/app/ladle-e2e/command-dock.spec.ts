@@ -908,12 +908,13 @@ test(
     // The Image Resource's one press opens the file picker, and a picker
     // closed with nothing chosen creates nothing.
     const images = page.locator('.react-flow__node:visible .canvas-resource[data-kind="image"]');
+    const imagesBefore = await images.count();
     const chooser = page.waitForEvent('filechooser');
     await strip.getByRole('button', { name: 'Create Image Resource', exact: true }).click();
     await (await chooser).setFiles([]);
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
-    await expect(images).toHaveCount(0);
+    await expect(images).toHaveCount(imagesBefore);
   },
 );
 
