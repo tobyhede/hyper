@@ -8,12 +8,13 @@ import {
 } from '@project/persistence';
 import { NavigationUnavailableError } from '../src/browser-location';
 import { createOpenSpaces } from '../src/open-spaces';
+import type { ImageSources } from '../src/image-creation';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
-import { unusedImageSources } from './image-sources';
+import { heldImageSources, unusedImageSources } from './image-sources';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -41,6 +42,8 @@ const THIRD_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010
 const THIRD_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
 const THIRD_GRAPH_ONE = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
 const THIRD_GRAPH_TWO = uuidSchema.parse('00000000-0000-4000-8000-000000000013');
+/** An Image Resource `Other` holds and no Map places, so a replacement has something to replace. */
+const OTHER_IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000014');
 
 /**
  * Two aggregate-valid Spaces. Every Resource, Map and Graph id is distinct
@@ -114,7 +117,21 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
             },
           },
         ]
-      : [{ id: resourceId, document: { title: 'Resource', kind: 'markdown', body: '' } }],
+      : [
+          { id: resourceId, document: { title: 'Resource', kind: 'markdown', body: '' } },
+          ...(id === OTHER_ID
+            ? [
+                {
+                  id: OTHER_IMAGE_ID,
+                  document: {
+                    title: 'Figure',
+                    kind: 'image' as const,
+                    url: 'https://example.com/figure.png',
+                  },
+                },
+              ]
+            : []),
+        ],
   };
 };
 
@@ -139,6 +156,7 @@ const setup = (
     [META_ID, 'Meta'],
     [OTHER_ID, 'Other'],
   ],
+  images: ImageSources = unusedImageSources,
 ) => {
   const history = recordingHistory();
   const backend = new MemorySpaceBackend(
@@ -150,7 +168,7 @@ const setup = (
     backend,
     history,
     openSpaces: createOpenSpaces({
-      images: unusedImageSources,
+      images,
       backend,
       metaSpaceId: META_ID,
       metaSpaceTitle: spaces.find(([id]) => id === META_ID)?.[1] ?? 'Meta',
@@ -162,60 +180,60 @@ const setup = (
 
 it('holds Space navigation and an Exit already waiting on persistence during replacement', async () => {
   const control = new MemorySpaceBackendTestControl();
-  const { openSpaces } = setup(control);
+  const held = heldImageSources();
+  const { openSpaces } = setup(control, undefined, undefined, held.images);
   await openSpaces.open(META_ID);
   const other = await openSpaces.open(OTHER_ID);
   const releaseCommit = control.deferNextCommit();
   other.session.submit(edit(other.session.getState().working));
   const exiting = openSpaces.exit(OTHER_ID);
-  const held = Promise.withResolvers<undefined>();
-  const replacement = other.app.imageReplacement.run(() => held.promise);
+  const replacement = other.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
   await expect(openSpaces.select(META_ID)).rejects.toThrow('Navigation is unavailable');
   const refusedExit = expect(exiting).rejects.toThrow('Navigation is unavailable');
   releaseCommit();
   await refusedExit;
   expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
   expect(openSpaces.entry(OTHER_ID)).toBe(other);
-  held.resolve(undefined);
+  held.release();
   await replacement;
   await openSpaces.select(META_ID);
   expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
 });
 
 it('refuses opening an address and entering a Space during replacement', async () => {
-  const { openSpaces, history } = setup();
+  const held = heldImageSources();
+  const { openSpaces, history } = setup(undefined, undefined, undefined, held.images);
   await openSpaces.open(META_ID);
   const other = await openSpaces.open(OTHER_ID);
   const writes = [...history.writes];
-  const held = Promise.withResolvers<undefined>();
-  const replacement = other.app.imageReplacement.run(() => held.promise);
+  const replacement = other.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
   const metaPath = productDestinationPath({ kind: 'map', spaceId: META_ID, mapId: META_MAP_ID });
   await expect(openSpaces.openPath(metaPath)).rejects.toThrow(NavigationUnavailableError);
   await expect(openSpaces.enter(META_ID)).rejects.toThrow(NavigationUnavailableError);
   await expect(openSpaces.open(META_ID)).rejects.toThrow(NavigationUnavailableError);
   expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
   expect(history.writes).toEqual(writes);
-  held.resolve(undefined);
+  held.release();
   await replacement;
   await openSpaces.enter(META_ID);
   expect(openSpaces.getState().activeSpaceId).toBe(META_ID);
 });
 
 it('holds a Back to another Space when a replacement starts while that Space opens', async () => {
-  const { openSpaces, history } = setup();
+  const held = heldImageSources();
+  const { openSpaces, history } = setup(undefined, undefined, undefined, held.images);
   await openSpaces.open(META_ID);
   const metaPath = productDestinationPath({ kind: 'map', spaceId: META_ID, mapId: META_MAP_ID });
   const other = await openSpaces.open(OTHER_ID);
   const otherPath = history.pathname();
-  const held = Promise.withResolvers<undefined>();
   history.popTo(metaPath);
   // The traversal passed the lock check; the replacement begins while the
   // destination is still being resolved.
-  const replacement = other.app.imageReplacement.run(() => held.promise);
+  const replacement = other.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
   await vi.waitFor(() => expect(history.pathname()).toBe(otherPath));
   expect(openSpaces.getState().activeSpaceId).toBe(OTHER_ID);
   expect(openSpaces.browserLocation.getState().destinationNotFound).toBe(false);
-  held.resolve(undefined);
+  held.release();
   await replacement;
   history.popTo(metaPath);
   await vi.waitFor(() => expect(openSpaces.getState().activeSpaceId).toBe(META_ID));
@@ -227,6 +245,9 @@ const countingIds = (): (() => UUID) => {
   let next = 0x20;
   return () => uuidSchema.parse(`00000000-0000-4000-8000-0000000000${(next++).toString(16)}`);
 };
+
+/** A replacement of `Other`'s Image Resource, held by {@link heldImageSources} while it measures. */
+const HELD_REPLACEMENT = { kind: 'url', url: 'https://example.com/replacement.png' } as const;
 
 const edit = (space: SpaceSnapshot): SpaceSnapshot => ({
   ...space,

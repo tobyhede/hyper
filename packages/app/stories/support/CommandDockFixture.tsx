@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { newUuid } from '@project/core';
+import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackendTestControl, type SpaceSessionState } from '@project/persistence';
 import { Application } from '#components/Application';
 import { snapshotFromSpace } from '#src/snapshot';
 import { storyOpening, storySpaces } from './application';
+import { heldImageSources } from './image-sources';
 import type { OpenSpace, OpenSpaces } from '#src/open-spaces';
 import {
   authoredSnapshot,
@@ -165,6 +166,21 @@ const blockSave = async (
   });
 };
 
+/** An Image Resource the Rendering Space holds for `replacing` and no Map places. */
+const HELD_IMAGE = uuidSchema.parse('00000000-0000-4000-8000-0000000009c0');
+
+/** The Rendering Space with {@link HELD_IMAGE} beside its Resources, off every Map. */
+const withHeldImage = (snapshot: SpaceSnapshot): SpaceSnapshot => ({
+  ...snapshot,
+  resources: [
+    ...snapshot.resources,
+    {
+      id: HELD_IMAGE,
+      document: { title: 'Figure', kind: 'image', url: 'https://example.com/figure.png' },
+    },
+  ],
+});
+
 /** Open the authored crossing chain through the real session owner. */
 export async function openDockStory(scenario: DockScenario) {
   const control = new MemorySpaceBackendTestControl();
@@ -172,7 +188,7 @@ export async function openDockStory(scenario: DockScenario) {
     metaSnapshot,
     platformSnapshot,
     designSystemSnapshot,
-    commandDockSnapshot,
+    scenario === 'replacing' ? withHeldImage(commandDockSnapshot) : commandDockSnapshot,
     traversalSnapshot,
     authoredSnapshot,
     deepDiveSnapshot,
@@ -196,7 +212,10 @@ export async function openDockStory(scenario: DockScenario) {
     ]);
     return storyOpening(spaces, await spaces.open(snapshot.id));
   }
-  const spaces = storySpaces(metaSnapshot.id, snapshots, control);
+  const spaces =
+    scenario === 'replacing'
+      ? storySpaces(metaSnapshot.id, snapshots, control, heldImageSources().images)
+      : storySpaces(metaSnapshot.id, snapshots, control);
   await spaces.open(metaSnapshot.id);
   await spaces.enter(platformSnapshot.id);
   await spaces.enter(designSystemSnapshot.id);
@@ -206,10 +225,13 @@ export async function openDockStory(scenario: DockScenario) {
   await spaces.switchTo(rendering.id);
 
   if (scenario === 'presenting') rendering.app.navigation.present();
-  // The real exclusive activity an Image Resource's replacement runs under,
-  // held open for as long as the story is mounted.
+  // A real replacement of the Rendering Space's Image Resource, held while it
+  // measures for as long as the story is mounted.
   if (scenario === 'replacing')
-    void rendering.app.imageReplacement.run(() => new Promise<never>(() => undefined));
+    void rendering.app.imageReplacement.replace(HELD_IMAGE, {
+      kind: 'url',
+      url: 'https://example.com/replacement.png',
+    });
   if (scenario === 'save-blocked') {
     await quiesced(spaces);
     await blockSave(spaces, control, rendering);

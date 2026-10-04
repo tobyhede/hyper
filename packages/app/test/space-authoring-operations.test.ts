@@ -15,6 +15,7 @@ import { GRAPH_PALETTE, nextGraphColor } from '@project/graph';
 import { composeApp } from '../src/compose-app';
 
 import { mintingIds } from './minting';
+import { unusedImageSources } from './image-sources';
 
 /**
  * The semantic operations Space Authoring offers for Resource and Graph
@@ -112,6 +113,7 @@ function open(
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring } = composeApp({
+    images: unusedImageSources,
     spaceSession: session,
     selection: mapId,
     newId,
@@ -1030,6 +1032,7 @@ describe('Rename Space', () => {
     const backend = MemorySpaceBackend.asMeta(loaded);
     const session = openSpaceSession(backend, loaded);
     const { authoring } = composeApp({
+      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -1045,6 +1048,7 @@ describe('Rename Space', () => {
 
     // Reload: a fresh session and composition over exactly what was stored.
     const reopened = composeApp({
+      images: unusedImageSources,
       spaceSession: openSpaceSession(backend, stored!),
       selection: MAP_ID,
       newId: mintingIds(MINTED),
@@ -1771,7 +1775,11 @@ describe('Keep local', () => {
     });
     const local = { snapshot: positionedSnapshot, revision: 3n, exportedRevision: null };
     const session = openSpaceSession(backend, local);
-    const { authoring } = composeApp({ spaceSession: session, selection: MAP_ID });
+    const { authoring } = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+    });
 
     authoring.complete({ kind: 'renamed-graph', graphId: GRAPH_ID, title: 'Before conflict' });
     await vi.waitFor(() => expect(session.getState().persistence.kind).toBe('conflicted'));

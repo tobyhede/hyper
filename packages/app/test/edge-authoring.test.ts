@@ -17,6 +17,7 @@ import {
 import { RESOURCE_SIZE } from '../src/resource';
 import { mintingIds } from './minting';
 import { node } from './render-adapter-fixtures';
+import { unusedImageSources } from './image-sources';
 
 /**
  * Edge Authoring through its own interface: the one draft, what cancels it, what
@@ -100,11 +101,7 @@ function open(
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const session = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
   const { navigation, authoring, adapter, continuation, edgeAuthoring, deleteConfirmation } =
-    composeApp({
-      spaceSession: session,
-      selection: mapId,
-      newId,
-    });
+    composeApp({ images: unusedImageSources, spaceSession: session, selection: mapId, newId });
   adapter.getState().syncProjection(PROJECTED, []);
   return {
     session,
@@ -461,6 +458,7 @@ describe('draft invalidation', () => {
     });
     const session = openSpaceSession(backend, loaded);
     const { authoring, edgeAuthoring: edges } = composeApp({
+      images: unusedImageSources,
       spaceSession: session,
       selection: MAP_ID,
     });
