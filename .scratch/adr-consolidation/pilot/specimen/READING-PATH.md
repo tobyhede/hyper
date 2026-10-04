@@ -27,12 +27,13 @@ It also applies if you touch any of these paths:
 - `packages/graph/src/validate.ts`, for Map, Graph or Edge refusals
 - `packages/core/src/schema.ts`, for the Map, Graph or position schemas
 - `packages/persistence/src/working-space.ts` (first working load)
-- `packages/persistence/src/session-registry.ts` `deleteMap` and `deleteGraph`
+- `packages/persistence/src/session-registry.ts` `deleteMap` and `deleteGraph`, and `packages/persistence/src/space-resource-planning.ts` `planContextDeletion` (Map and Graph deletion, its survivor and `defaultMap` movement)
 - `packages/app/src/map-resolution.ts`, `placement-rendering.ts` or `navigation.ts` (Graph activation)
-- `packages/app/src/space-authoring.ts`, for its Map and Graph Edits (`created-map`, Map deletion, `added-graph`, Graph deletion)
+- `packages/app/src/map-authoring-commands.ts` and `graph-authoring-commands.ts` (Add, Delete and their availability, including the last Map and the last Graph)
+- `packages/app/src/space-authoring.ts`, for `created-map`, `added-graph`, and which Edit target records `defaultMap`
 - `packages/app/src/snapshot.ts` `updatePositionedMap`
 
-The contract states each rule with its reason, the alternatives that were rejected, what is accepted but not built, and two points still awaiting a decision. Follow its source ADR links only when you need deeper history or the full argument for a rejected alternative. Do not treat code as the design: an accepted rule can be ahead of the code, and code alone never retires a rule.
+The contract states each rule with its reason, the alternatives that were rejected, what is accepted but not built, and one point still awaiting a decision (D21, whether an Edit through a drawn Map should record `defaultMap`). Follow its source ADR links only when you need deeper history or the full argument for a rejected alternative. Do not treat code as the design: an accepted rule can be ahead of the code, and code alone never retires a rule.
 
 ### Everything else
 

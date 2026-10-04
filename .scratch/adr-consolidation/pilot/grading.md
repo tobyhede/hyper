@@ -2,6 +2,8 @@
 
 Graded against `questions.md` (rubric, Must state, Must not contradict, Ambiguities 1–5), with `inventory.md` and the ADRs under `docs/adr/` used to check disputed claims. Readers are graded on content only.
 
+This grading is frozen evidence for the snapshots in `REPORT.md`. The refusal codes `space-must-keep-map` and `map-must-keep-graph` it records (Q4, Q5) existed then; PR #336 later removed both, and the last Map and last Graph are now simply not offered for deletion. The grades were not revisited.
+
 ## How errors were treated
 
 - **A missing Must-state item fails the question.** Where a "why" is required, a restatement of the rule or an appeal to authority ("AGENTS.md says don't") does not count as the reason.

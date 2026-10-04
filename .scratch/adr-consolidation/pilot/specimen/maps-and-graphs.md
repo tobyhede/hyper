@@ -1,6 +1,8 @@
 # Maps and Graphs: current contract
 
-> **Non-normative pilot specimen** (`.scratch/adr-consolidation/issues/01-prove-map-graph-pilot.md`, snapshot `e836ecab`). It restates accepted ADRs, decides nothing, supersedes no ADR and adopts no policy. Where it disagrees with an accepted ADR, the ADR governs.
+> **Non-normative pilot specimen** (`.scratch/adr-consolidation/issues/01-prove-map-graph-pilot.md`). It restates accepted ADRs, decides nothing, supersedes no ADR and adopts no policy. Where it disagrees with an accepted ADR, the ADR governs.
+>
+> **Snapshot.** Built from the inventory pinned to `e836ecab`. Readers were graded on this file as committed at `8b0b42df`. It was corrected afterwards without re-grading: avoided words replaced and the D12, G1 and D16 resolutions recorded (see `../REPORT.md`), then R10, R12 and R27 corrected against `main` at `9cb40e16`, after PR #336 removed the last-Map and last-Graph refusal codes and PR #332 stopped an Edit through a drawn Map recording `defaultMap`. The grades describe the `8b0b42df` text.
 
 ## Orientation
 
@@ -22,9 +24,9 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 
 - **R8. A Map is the only canvas context.** It alone is selectable and addressable (`/spaces/:spaceId/maps/:mapId`), and the canvas shows only its Graphs. No Computed or Space Views, no flatten across Maps, no dormant compatibility: obsolete identities are invalid input and their URLs are not found. ([0079], [0069])
 - **R9. A working Space always has a durable `defaultMap`,** its persisted opening selection. ([0079])
-- **R10. Choosing a Map is navigation, not an Edit.** It dirties nothing. A Space opens on the Map most recently edited in: every Edit in a Map records it as `defaultMap`, Add Map included, and writes the Map's resolved `activeGraph` explicitly. Viewing a Map without editing saves nothing, and reading never writes. Remembering the last Map viewed, or letting the author pin a default, would be a new decision. ([0079], [0028]; D16)
+- **R10. Choosing a Map is navigation, not an Edit.** It dirties nothing. A Space opens on the Map most recently edited in on its own canvas: every Edit through the canvas's Map records it as `defaultMap`, Add Map included, and writes the Map's resolved `activeGraph` explicitly. An Edit through a Map drawn inside an Open Space Resource writes that Map where it stands, keeps its stored `activeGraph`, and leaves its Space's `defaultMap` unchanged (`snapshot.ts` `updatePositionedMap`, whose `opening` flag `space-authoring.ts` sets only for a canvas target). [0112] records no reason for that difference, so whether it is a rule or a defect is undecided (D21). Viewing a Map without editing saves nothing, and reading never writes. Remembering the last Map viewed, or letting the author pin a default, would be a new decision. ([0079], [0028], [0112]; D16, D21)
 - **R11. Add Map creates and selects an empty Map in one Edit.** It has no Resources and owns one empty Graph, its Active Graph. Existing Resources are not copied in; authors add them, for example from the Resources View. ([0079], [0040], [0041])
-- **R12. The last Map cannot be deleted** (`space-must-keep-map`), because a working Space must keep a durable default. ([0079])
+- **R12. The last Map cannot be deleted,** because a working Space must keep a durable default. Delete Map is not offered while one Map remains (`map-authoring-commands.ts`), and `planContextDeletion` (`space-resource-planning.ts`) answers unchanged when no survivor exists. There is no refusal code. ([0079])
 - **R13. Deleting a Map or Graph atomically relocates every Space Resource that selects it,** so no selection dangles. ([0091])
 
 ## 3. Space completeness and first working load
@@ -45,7 +47,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R24. A Graph id is unique across its Space** (`duplicate-graph-id`), because lookup, the Graph URL and render keys resolve a Graph without a Map. ([0108])
 - **R25. Graph order is authored.** Creating appends, deleting keeps survivors' order, and manual reordering is a separate operation. ([0040])
 - **R26. Add Graph appends an empty Graph and activates it, in one Edit.** ([0040])
-- **R27. The last Graph of a Map cannot be deleted** (`map-must-keep-graph`). Deleting the Active Graph activates the first survivor. ([0040], [0041])
+- **R27. The last Graph of a Map cannot be deleted.** Delete Graph is not offered while the Map has one Graph (`graph-authoring-commands.ts`), and `planContextDeletion` answers unchanged when no survivor exists. There is no refusal code. Deleting the Active Graph activates the first survivor. ([0040], [0041])
 - **R28. A Map may name its opening Graph** in `activeGraph`; otherwise its first Graph opens. That fallback is a read, never a write. Intake rejects an `activeGraph` that dangles or names another Map's Graph. ([0040], [0041], [0028])
 - **R29. Activating a Graph is navigation, and it is emphasis, not filtering.** Every owned Graph is still drawn. It is deliberate, never a side effect of drawing or reading, and neither submits nor dirties, because it changes nothing authored. There is no second "selected Graph". Cost, intended: an activation is not durable until a later Edit in that Map records it (A18). ([0028], [0041], [0079])
 - **R30. An empty Graph is valid and may be active, but cannot be presented until it has an Edge.** Stated in CONTEXT.md and built; no ADR states it in Graph terms ([0015] has an older form).
@@ -118,7 +120,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 | R7 | §1; Built vs | [0086], [0013], [0025] |
 | R8 | §2 | [0079], [0069] |
 | R9, R12 | §2 | [0079] |
-| R10 | §2 | [0079], [0028] |
+| R10 | §2 | [0079], [0028], [0112] |
 | R11 | §2 | [0079], [0040], [0041] |
 | R13 | §2 | [0091] |
 | R14 | §3 | [0080], [0018] |
@@ -145,6 +147,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 | A1–A18 | Rejected alternatives | Cited in each row |
 | D12 | §6 note | [0086], [0084], [0048], [0074] |
 | G1 | §5, R35 (resolved) | CONTEXT.md, [0040], [0084] |
+| D21 | §2, R10 (open) | [0112]; `snapshot.ts`, `space-authoring.ts` |
 
 [context]: ../../../../CONTEXT.md
 [0004]: ../../../../docs/adr/0004-cards-are-the-graph.md
@@ -168,6 +171,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 [0093]: ../../../../docs/adr/0093-a-thing-makes-room-on-one-axis-once-clear-of-the-collapsed-subject.md
 [0101]: ../../../../docs/adr/0101-map-and-resource-are-the-first-public-names-for-diagram-and-thing.md
 [0108]: ../../../../docs/adr/0108-graph-identity-is-unique-within-the-space.md
+[0112]: ../../../../docs/adr/0112-a-map-behaves-the-same-wherever-it-is-drawn.md
 [0013]: ../../../../docs/adr/superseded/0013-editing-requires-a-positioned-layout.md
 [0022]: ../../../../docs/adr/superseded/0022-a-layout-names-the-routes-it-shows.md
 [0025]: ../../../../docs/adr/superseded/0025-a-layout-is-optional-and-editing-makes-it-positioned.md

@@ -7,7 +7,8 @@ This inventory is the input to the specimen contract. It is non-normative. It re
 
 - Commit: `e836ecab07d339425320513d52c9ccb39b158db4` (branch `adr-consolidation-pilot`, worktree clean)
 - Date: 2026-10-03
-- The main checkout has uncommitted edits to `CONTEXT.md` and `docs/adr/README.md`, plus untracked ADRs 0112 and 0113. None of these is in this snapshot, and none was read.
+- On 2026-10-03 the main checkout held uncommitted edits to `CONTEXT.md` and `docs/adr/README.md`, plus then-untracked ADRs 0112 and 0113. None of these is in this snapshot, and none was read.
+- Code locators below are as of `e836ecab`. R10, R12, R25 and R27 carry a later note where `main` at `9cb40e16` (after PRs #332 and #336) changed what they describe; D21 records the disagreement that change opened.
 
 ## Scope
 
@@ -206,7 +207,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
   - CONTEXT "Active Graph", paragraph 2
   - `editing-and-persistence.md`, Map/Graph bullet 2
 - **Negatives:** Selecting a Map does not dirty or submit anything.
-- **Status:** Built. `updatePositionedMap` in `packages/app/src/snapshot.ts:91–113` writes `defaultMap: mapId` on every Map-writing Edit, and writes `activeGraph` when one is named. The code always records where 0079 says "may"; the user confirmed "always" as the rule (D16).
+- **Status:** Built. `updatePositionedMap` in `packages/app/src/snapshot.ts:91–113` writes `defaultMap: mapId` on every Map-writing Edit, and writes `activeGraph` when one is named. The code always records where 0079 says "may"; the user confirmed "always" as the rule (D16). *On `9cb40e16`:* only an Edit through the canvas's Map records it; see D21.
 
 **R11. Add Map creates and selects an empty Map in one Edit.**
 - **Statement:** Add Map creates and selects an empty Map, with no Resource members, owning exactly one empty Graph that is its Active Graph. Existing Resources stay outside the new Map until an author adds them, for example from the Resources View.
@@ -227,7 +228,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 - **Statement:** The last Map of a Space cannot be deleted.
 - **Sources:** ADR 0079, paragraph 5 ("A working Space always has a durable default Layout, so its last Layout cannot be deleted").
 - **Reason:** The working Space must keep a durable default.
-- **Status:** Built. The refusal is `space-must-keep-map` (`space-authoring.ts:1033`). Deleting the default Map re-points `defaultMap` to a survivor: the selected one if it survives, otherwise the first (`space-authoring.ts:1036–1049`). The choice of survivor is code-level treatment with no ADR; see G5.
+- **Status:** Built. The refusal is `space-must-keep-map` (`space-authoring.ts:1033`). *On `9cb40e16`:* PR #336 removed the code and the `deleted-map` completion; Delete Map is not offered while one Map remains (`map-authoring-commands.ts`), and `planContextDeletion` (`packages/persistence/src/space-resource-planning.ts`) answers `unchanged` when no survivor exists, choosing the shown Map, else the stored default, else the first. Deleting the default Map re-points `defaultMap` to a survivor: the selected one if it survives, otherwise the first (`space-authoring.ts:1036–1049`). The choice of survivor is code-level treatment with no ADR; see G5.
 
 **R13. Deleting a Map or Graph relocates the Space Resources that select it.**
 - **Statement:** Deleting a Map or Graph atomically relocates every Space Resource that selected it, rather than leaving a dangling selection.
@@ -347,7 +348,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
 - **Sources:**
   - ADR 0040, Consequences
   - CONTEXT "Graph", paragraph 3
-- **Status:** Built for append and delete (`space-authoring.ts`). Reordering was not checked.
+- **Status:** Built for append and delete (`space-authoring.ts`). Reordering was not checked. *On `9cb40e16`:* deletion is `planContextDeletion` in `space-resource-planning.ts`, which keeps survivors' order.
 
 **R26. Add Graph appends and activates in one Edit.**
 - **Statement:** Add Graph appends a new empty Graph to the Map and makes it active, in one Edit.
@@ -362,7 +363,7 @@ The audit's per-ADR live-decision lists were used only to cross-check this inven
   - ADR 0040, paragraph 3
   - ADR 0041, paragraph 3
   - CONTEXT "Graph"
-- **Status:** Built. Refusal `map-must-keep-graph` and `survivors[0]` (`space-authoring.ts:1502–1511`).
+- **Status:** Built. Refusal `map-must-keep-graph` and `survivors[0]` (`space-authoring.ts:1502–1511`). *On `9cb40e16`:* PR #336 removed the code and the `deleted-graph` completion; Delete Graph is not offered while the Map has one Graph (`graph-authoring-commands.ts`), and `planContextDeletion` answers `unchanged` when no survivor exists. Deleting the Active Graph still activates the first survivor.
 
 **R28. A Map may name its opening Graph.**
 - **Statement:** A Map may name `activeGraph`; otherwise its first Graph is active. Intake rejects an `activeGraph` that is dangling or that names another Map's Graph.
@@ -874,6 +875,7 @@ Classification: implementation-history, and out-of-pilot-scope (answered by 0087
 - 0079 says a later successful Edit "**may** record" the Map as default.
 - The code records it on **every** Map-writing Edit (`snapshot.ts:111`), and Add Map records its new Map as default (`space-authoring.ts:1015`).
 - Resolution: **Resolved by the user, 2026-10-04: the code's behaviour is the rule.** A Space opens on the Map most recently edited in. Selecting a Map is navigation and saves nothing; every Edit in a Map records it as `defaultMap`, Add Map included, and writes the Map's resolved `activeGraph` explicitly. This narrows 0079's "may" to "does" and confirms existing behaviour, so it needs no ADR and no code change. Remembering the last Map viewed, or a pinned default, would be a new decision.
+- *On `9cb40e16`:* PR #332 narrowed the code. `updatePositionedMap` (`snapshot.ts:113`) records `defaultMap` only when `opening` is set, and `space-authoring.ts:1532` sets it only for a canvas target, so an Edit through a Map drawn inside an Open Space Resource leaves that Space's `defaultMap` unchanged. See D21.
 
 **D17. ADR 0086's open question on which side an Edge attaches, versus 0087 and 0110.**
 - Resolution: Resolved. 0087 `Refines: 0086`. Out of pilot scope.
@@ -888,6 +890,11 @@ Classification: implementation-history, and out-of-pilot-scope (answered by 0087
 
 **D20. ADR 0040's Graph-scoped View "architectural allowance" versus ADRs 0045 and 0079.**
 - Resolution: Resolved. 0045 replaced the section, then 0079 superseded 0045.
+
+**D21. ADR 0112 versus the code: does an Edit through a drawn Map record `defaultMap`?**
+- ADR 0112: a Map drawn inside an Open Space Resource offers everything the canvas Map does, and "a difference without a recorded reason is a defect". It says nothing about `defaultMap`.
+- The code (PR #332, commit `b5c63561`: "only a canvas Edit makes its Map the opening one") records `defaultMap` for canvas Edits only. No ADR or `.scratch/a-map-is-a-map/` ticket records a reason.
+- Resolution: **Open, awaiting the user.** Either the difference is a rule and needs its reason recorded, or it is an ADR 0112 defect. Found after evaluation; no grade depends on it.
 
 ### Source gaps (no contradiction, but the rule has no accepted ADR as its source)
 

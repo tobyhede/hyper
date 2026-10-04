@@ -8,6 +8,7 @@ Status: evaluation complete, non-normative. This report adopts no policy; adopti
 - Candidate route: branch `adr-consolidation-pilot` at `8b0b42df`, read in a detached checkout holding only the two specimen files from this pilot (inventory, questions, readings, research audit, spec and tickets removed). At that snapshot the entry file was `specimen/ROUTE.md`; after review it was renamed `READING-PATH.md` and four avoided words were replaced (see "Changes after evaluation").
 - Inventory and questions: pinned to `e836ecab` (2026-10-03). Four locator corrections were applied afterwards (see "Inventory corrections"); none changes a rule or an expected answer.
 - Date: 2026-10-03.
+- Later corrections: the specimen and inventory were corrected against `main` at `9cb40e16` on 2026-10-04, without re-reading or re-grading (see "Corrections against current code"). The grades describe the `8b0b42df` text.
 
 ## Method
 
@@ -40,7 +41,7 @@ Neither specimen reader reported a contradiction, a dead-end pointer, or a point
 
 ## Verdict
 
-**Correctness: pass.** Every fixed question passed on the specimen route for both readers, preserving the applicable rules and important negatives, with no dead-end pointer. At grading, the specimen carried two source disagreements (D12, G1) that it surfaced rather than created; no specimen reader treated either as settled. Scoring ran before the user resolved D12, G1 and D16, contrary to the spec's order. All three were resolved afterwards (below). Every grade they touched stands, so the pass is final and the specimen now carries no unresolved contradiction.
+**Correctness: pass.** Every fixed question passed on the specimen route for both readers, preserving the applicable rules and important negatives, with no dead-end pointer. At grading, the specimen carried two source disagreements (D12, G1) that it surfaced rather than created; no specimen reader treated either as settled. Scoring ran before the user resolved D12, G1 and D16, contrary to the spec's order. All three were resolved afterwards (below) and no reader was re-scored. The grades they touch were reviewed against the resolutions and judged unaffected, but the spec's order was not met, and whether that warrants a re-score is for the user. A later correction against current code opened one new disagreement, D21, which arose after evaluation and touches no graded answer.
 
 **Reading effort, assessed separately:** about 3,660 words in 2 files against 16,000–18,600 words in 6–11 files, a reduction of roughly 78–80%, with fewer tool calls. The saving does not drive the verdict; the existing route also failed on correctness, so the comparison is not a shorter answer passing over a longer one.
 
@@ -69,17 +70,27 @@ Review against the repository's vocabulary rules found avoided words in the spec
 - "engine" and "algorithm" (CONTEXT avoids both for a layout strategy) replaced in R6, R7, the Built section and the reading path.
 - "A Map is authored placement" (CONTEXT avoids placement as a name for a Map) reworded.
 
+## Corrections against current code
+
+After the merge of `main` at `9cb40e16`, the specimen and inventory were checked against code that PRs #332 and #336 had changed. Corrected without re-reading or re-grading:
+
+- R10: PR #332 records `defaultMap` only for an Edit through the canvas's Map; an Edit through a Map drawn inside an Open Space Resource leaves it unchanged. ADR 0112 records no reason, so this is open as D21.
+- R12 and R27: PR #336 removed the `space-must-keep-map` and `map-must-keep-graph` refusals. The last Map and last Graph are not offered for deletion, and `planContextDeletion` answers unchanged when no survivor exists.
+- The reading path routes Map and Graph deletion to `map-authoring-commands.ts`, `graph-authoring-commands.ts` and `space-resource-planning.ts`.
+
+The reader answers and `grading.md` are left as they were; they cite the removed codes because the graded text did.
+
 ## Decisions resolved after evaluation
 
 1. **D12 — undo. Resolved 2026-10-04.** Undo is not built and is a planned future feature; every Edit is derived, submitted and stored as one atomic unit, so a future undo reverses an Edit whole. The specimen's pending note now states this, and the grades it affected stand unchanged. Whether Auto-arrange asks for confirmation while undo does not exist is left to its future delivery issue. Ticket 02 must correct the `AGENTS.md` 0084 entry, whose "undoing it undoes all of them" reads as if undo exists (two baseline failures).
 2. **G1 — room given back on removal. Resolved 2026-10-04: keep the current behaviour, as a live rule.** Removing or deleting an Open Resource Closes it in the same Edit, then removes it; removing a Closed Resource moves nothing; removal itself never displaces. Sourced to ADR 0084, CONTEXT and the property test, with no new ADR. Leaving the gap was considered and declined. All four readers stated this rule in Q6, so no grade changes.
-3. **D16 — recording the default Map. Resolved 2026-10-04: the code's behaviour is the rule.** A Space opens on the Map most recently edited in. Selecting a Map saves nothing, and every Edit in a Map records it as `defaultMap`, Add Map included. This narrows ADR 0079's "may" without changing code. No grade changes.
+3. **D16 — recording the default Map. Resolved 2026-10-04: the code's behaviour is the rule.** A Space opens on the Map most recently edited in. Selecting a Map saves nothing, and every Edit in a Map records it as `defaultMap`, Add Map included. This narrows ADR 0079's "may" without changing code. No grade changes. PR #332 later narrowed the code to Edits through the canvas's Map; see D21.
 
 ## Recommendation
 
 Adopt, through ticket 02, with three adjustments:
 
-1. Carry the D12, G1 and D16 resolutions into the adopted contract, and correct the `AGENTS.md` 0084 entry's undo wording.
+1. Carry the D12, G1 and D16 resolutions into the adopted contract, settle D21 before adopting R10, and correct the `AGENTS.md` 0084 entry's undo wording.
 2. When integrating, replace the Map/Graph entries in `AGENTS.md` (ADR 0079, 0084, 0064's displacement sentences, 0041's model sentences) and the overlapping Map/Graph accounts in `docs/agents/editing-and-persistence.md` and `rendering.md` with pointers, then rerun the fixed questions through the adopted route with fresh readers. That rerun removes this pilot's main confound.
 3. Keep the provenance table and the "Built vs accepted-but-unbuilt" section. They are what let a reader tell Auto-arrange and manual Graph reordering are unbuilt, and what let a reviewer check completeness.
 
