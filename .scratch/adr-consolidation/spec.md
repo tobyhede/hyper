@@ -14,7 +14,7 @@ Provide layered context: a concise project-wide entry point, one shared domain g
 
 Preserve historical ADR bodies, identifiers and existing status relationships. A current contract states accepted design in current language with the important reasons and source links. It is the ordinary reading entry point, not permission to overturn a decision. Explicitly identify accepted-but-unimplemented behavior and link its delivery issue. Conflicts are resolved explicitly rather than treating the latest prose or current code as automatic authority.
 
-Begin with a Map/Graph pilot. Compare fresh-reader comprehension before adopting the policy, then migrate the remaining topics in independently verifiable slices. Revise the existing proposed ADR 0115 (drafted as 0112; renumbered after main took 0112) rather than create a second proposal about the same choice.
+Begin with a Map/Graph pilot. Compare fresh-reader comprehension before adopting the policy, then migrate the remaining topics in independently verifiable slices. Revise the existing proposed ADR 0115 rather than create a second proposal about the same choice.
 
 ## User Stories
 
