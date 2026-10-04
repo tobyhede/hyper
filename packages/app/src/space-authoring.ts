@@ -232,7 +232,8 @@ export type AuthoringCompletion =
    * Derived beside `created-map`, ahead of the general per-Map path below:
    * both write keys of `document` directly, read `session.getState().working`
    * themselves, and still owe `CompletedEdit` a Map and Active Graph to
-   * continue in even though this one changes neither. It resolves the selected Map only for that pair.
+   * continue in even though this one changes neither. It resolves the
+   * selected Map only for that pair.
    *
    * Do not move it beside `renamed-map` on the general path: that demands a
    * `MapRequiredOperation` answer and a Map lookup for an Edit that touches no
@@ -1053,12 +1054,12 @@ export function createSpaceAuthoring({
           // Graph routinely differs from the `activeGraph` the Map stores
           // until some other Edit writes it. `created-map` re-resolves
           // legitimately, landing the reader in a *different* Map; this Edit
-          // changes no Map and no selection, so re-resolving would answer a question nobody asked and
-          // snap the emphasis, the Dock's Graph cluster and the product URL back
-          // to the stored Graph — a rename of the Space silently activating a
-          // different Graph. So this carries the current one forward, exactly as
-          // the general path below does for the same reason (`navigation.ts`
-          // writes out the harm at length).
+          // changes no Map and no selection, so re-resolving would answer a
+          // question nobody asked and snap the emphasis, the Dock's Graph
+          // cluster and the product URL back to the stored Graph — a rename of
+          // the Space silently activating a different Graph. So this carries the
+          // current one forward, exactly as the general path below does for the
+          // same reason (`navigation.ts` writes out the harm at length).
           //
           // The embedded arm mirrors the one below, and it is written for that
           // reason alone. `selection` is then the embedded Map rather than

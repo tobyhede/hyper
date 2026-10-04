@@ -159,6 +159,9 @@ const publicationsOf = (space: OpenSpace) => {
   return { count: () => count };
 };
 
+const deleteMapOf = (space: OpenSpace, mapId: MapId) =>
+  space.spaceResources.deleteMap({ targetSpaceId: TARGET, mapId, preferredMapId: null });
+
 const contexts: readonly {
   readonly name: string;
   readonly setup: () => Promise<ContractContext>;
@@ -258,12 +261,7 @@ describe.each(contexts)('Map rename through $name', ({ setup }) => {
   it('answers a rename of a Map that has gone as unavailable', async () => {
     const { authored, mapId, commands } = await setup();
     const rename = commands.map(mapId).rename;
-    const gone = await authored.spaceResources.deleteMap({
-      targetSpaceId: TARGET,
-      mapId,
-      preferredMapId: null,
-    });
-    expect(gone.kind).toBe('completed');
+    expect((await deleteMapOf(authored, mapId)).kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -681,12 +679,7 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
     const { authored, commands } = await setup();
     const remove = commands.map(showSecond(authored)).delete;
     expect(remove.available).toBe(true);
-    const other = await authored.spaceResources.deleteMap({
-      targetSpaceId: TARGET,
-      mapId: FIRST_MAP,
-      preferredMapId: null,
-    });
-    expect(other.kind).toBe('completed');
+    expect((await deleteMapOf(authored, FIRST_MAP)).kind).toBe('completed');
     expect(commands.map(SECOND_MAP).delete.available).toBe(false);
     expect(await remove.invoke()).toEqual({ kind: 'unavailable' });
     expect(mapsOf(authored)).toEqual([SECOND_MAP]);
@@ -695,12 +688,7 @@ describe.each(contexts)('Map deletion through $name', ({ setup }) => {
   it('answers a Map that has gone as unavailable', async () => {
     const { authored, commands } = await setup();
     const remove = commands.map(showSecond(authored)).delete;
-    const gone = await authored.spaceResources.deleteMap({
-      targetSpaceId: TARGET,
-      mapId: SECOND_MAP,
-      preferredMapId: null,
-    });
-    expect(gone.kind).toBe('completed');
+    expect((await deleteMapOf(authored, SECOND_MAP)).kind).toBe('completed');
     const deleteMap = vi.spyOn(authored.spaceResources, 'deleteMap');
     expect(await remove.invoke()).toEqual({ kind: 'unavailable' });
     expect(deleteMap).not.toHaveBeenCalled();

@@ -4,7 +4,7 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** resolved — draft PR #336, `CI passed` green.
+**Status:** resolved — PR #336, `CI passed` green.
 
 - [x] Remove `deleted-map` and `deleted-graph` from Space Authoring's completion vocabulary, implementation and embedded completion admissions, including the navigation fix-up that exists exclusively for deleted Graph completions.
 - [x] Leave no compatibility, forwarding or alternative deletion path in Space Authoring. Existing production Map and Graph authoring commands continue to call the coordinated Space Resource lifecycle.

@@ -455,7 +455,8 @@ describe('planContextDeletion', () => {
     });
     // The surviving Map and the target's Resources are carried as they were.
     const target = stored[1]!;
-    expect(outcome.kind === 'changes' && outcome.changes[0]).toEqual({
+    if (outcome.kind !== 'changes') throw new Error('expected changes');
+    expect(outcome.changes[0]).toEqual({
       kind: 'update',
       spaceId: spaceOf(1),
       snapshot: {
@@ -496,7 +497,8 @@ describe('planContextDeletion', () => {
     // Only the Graph goes: the Map keeps its positions, and the target its Resources.
     const target = stored[1]!;
     const targetMap = target.document.maps![0]!;
-    expect(outcome.kind === 'changes' && outcome.changes[0]).toEqual({
+    if (outcome.kind !== 'changes') throw new Error('expected changes');
+    expect(outcome.changes[0]).toEqual({
       kind: 'update',
       spaceId: spaceOf(1),
       snapshot: {
@@ -532,6 +534,33 @@ describe('planContextDeletion', () => {
 
   it('is unchanged when what the plan reads leaves no successor', () => {
     expect(planContextDeletion(view([space(0, [1]), space(1, [])]), deleteMap)).toEqual({
+      kind: 'unchanged',
+    });
+  });
+
+  it('is unchanged when the Graph is the last one its Map owns', () => {
+    const deleteGraph = {
+      targetSpaceId: spaceOf(1),
+      mapId: mapOf(1),
+      graphId: graphOf(1),
+      preferredGraphId: null,
+    };
+    const twoGraphs = space(1, []);
+    const oneGraph: SpaceSnapshot = {
+      ...twoGraphs,
+      document: {
+        ...twoGraphs.document,
+        maps: twoGraphs.document.maps?.map((map) => ({ ...map, graphs: map.graphs.slice(0, 1) })),
+      },
+    };
+
+    expect(precheckContextDeletion(new Map(), () => oneGraph, deleteGraph)).toEqual({
+      kind: 'unchanged',
+    });
+    expect(precheckContextDeletion(new Map(), () => twoGraphs, deleteGraph)).toEqual({
+      kind: 'proceed',
+    });
+    expect(planContextDeletion(view([space(0, [1]), oneGraph]), deleteGraph)).toEqual({
       kind: 'unchanged',
     });
   });

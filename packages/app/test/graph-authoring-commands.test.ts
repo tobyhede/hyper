@@ -157,6 +157,9 @@ const publicationsOf = (space: OpenSpace) => {
   return { count: () => count };
 };
 
+const deleteMapOf = (space: OpenSpace, mapId: MapId) =>
+  space.spaceResources.deleteMap({ targetSpaceId: TARGET, mapId, preferredMapId: null });
+
 /** One context, as far as the contract needs to drive it. */
 interface ContractContext {
   /** The Space whose Graph the context authors. */
@@ -297,12 +300,7 @@ describe.each(contexts)('Graph rename through $name', ({ setup }) => {
   it('answers a rename of a Map that has gone as unavailable', async () => {
     const { authored, mapId, graphId, commands } = await setup();
     const rename = commands.map(mapId).graph(graphId).rename;
-    const gone = await authored.spaceResources.deleteMap({
-      targetSpaceId: TARGET,
-      mapId,
-      preferredMapId: null,
-    });
-    expect(gone.kind).toBe('completed');
+    expect((await deleteMapOf(authored, mapId)).kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(rename.invoke('Renamed')).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -378,12 +376,7 @@ describe.each(contexts)('Graph recolour through $name', ({ setup }) => {
   it('answers a recolour of a Map that has gone as unavailable', async () => {
     const { authored, mapId, graphId, commands } = await setup();
     const recolor = commands.map(mapId).graph(graphId).recolor;
-    const gone = await authored.spaceResources.deleteMap({
-      targetSpaceId: TARGET,
-      mapId,
-      preferredMapId: null,
-    });
-    expect(gone.kind).toBe('completed');
+    expect((await deleteMapOf(authored, mapId)).kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(recolor.invoke(OTHER_COLOR)).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
@@ -469,12 +462,7 @@ describe.each(contexts)('Graph creation through $name', ({ setup }) => {
   it('answers a creation in a Map that has gone as unavailable', async () => {
     const { authored, mapId, commands } = await setup();
     const create = commands.map(mapId).create;
-    const gone = await authored.spaceResources.deleteMap({
-      targetSpaceId: TARGET,
-      mapId,
-      preferredMapId: null,
-    });
-    expect(gone.kind).toBe('completed');
+    expect((await deleteMapOf(authored, mapId)).kind).toBe('completed');
     const publications = publicationsOf(authored);
     expect(await create.invoke()).toEqual({ kind: 'unavailable' });
     expect(publications.count()).toBe(0);
