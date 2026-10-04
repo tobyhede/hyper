@@ -90,7 +90,10 @@ const SPINE = [RESOURCE_A, RESOURCE_B, RESOURCE_C, RESOURCE_D, RESOURCE_E] as co
 
 const positions = (count: number): Record<string, ResourcePlacement> =>
   Object.fromEntries(
-    SPINE.slice(0, count).map((id, index) => [id, { x: index * 420, y: 0, open: false }]),
+    SPINE.slice(0, count).map((id, index) => [
+      id,
+      { x: index * 420, y: 0, open: false, shape: 'rectangle' },
+    ]),
   );
 
 /** The first `links` steps along the spine: three Graphs of one shape at three lengths. */
@@ -375,7 +378,9 @@ export const storyGraphIds = (): (() => GraphId) => {
  * judge a row of choices whose labels are all the same length.
  */
 const traversalPositions = (ids: readonly ResourceId[]): Record<string, ResourcePlacement> =>
-  Object.fromEntries(ids.map((id, index) => [id, { x: index * 420, y: 0, open: false }]));
+  Object.fromEntries(
+    ids.map((id, index) => [id, { x: index * 420, y: 0, open: false, shape: 'rectangle' }]),
+  );
 
 const traversalResources = (
   titled: readonly (readonly [ResourceId, string])[],
@@ -670,7 +675,7 @@ const dockPositions = (count: number): Record<string, ResourcePlacement> =>
   Object.fromEntries(
     DOCK_PLACED.slice(0, count).map((resource, index) => [
       resource.id,
-      { x: index * 420, y: 0, open: false },
+      { x: index * 420, y: 0, open: false, shape: 'rectangle' },
     ]),
   );
 
@@ -775,7 +780,12 @@ const crossingSpace = (
         positions: Object.fromEntries(
           targets.map((_, index): [string, ResourcePlacement] => [
             chainId(block + 3 + index),
-            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
+            {
+              x: (index % 2) * 420,
+              y: Math.floor(index / 2) * 320,
+              open: false,
+              shape: 'rectangle',
+            },
           ]),
         ),
         graphs: [{ id: chainId(block + 2), title: 'Catalogue', edges: [] }],
@@ -872,7 +882,12 @@ export const metaSnapshot: SpaceSnapshot = {
         positions: Object.fromEntries(
           META_TARGETS.map((_, index): [string, ResourcePlacement] => [
             metaId(0x8 + index),
-            { x: (index % 2) * 420, y: Math.floor(index / 2) * 320, open: false },
+            {
+              x: (index % 2) * 420,
+              y: Math.floor(index / 2) * 320,
+              open: false,
+              shape: 'rectangle',
+            },
           ]),
         ),
         graphs: [{ id: META_GRAPH, title: 'Catalogue', edges: [] }],
@@ -950,12 +965,17 @@ export const edgeToolbarSnapshot: SpaceSnapshot = {
         title: 'Titled Edges',
         kind: 'positioned',
         positions: {
-          [EDGE_R1]: { x: 0, y: 0, open: false },
-          [EDGE_R2]: { x: 260 + EDGE_SHORT_GAP, y: 0, open: false },
-          [EDGE_R3]: { x: 2 * 260 + EDGE_SHORT_GAP + EDGE_LONG_GAP, y: 0, open: false },
-          [EDGE_R4]: { x: 0, y: 420, open: false },
-          [EDGE_R5]: { x: 260 + EDGE_LONG_GAP, y: 420, open: false },
-          [EDGE_R6]: { x: 2 * (260 + EDGE_LONG_GAP), y: 420, open: false },
+          [EDGE_R1]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [EDGE_R2]: { x: 260 + EDGE_SHORT_GAP, y: 0, open: false, shape: 'rectangle' },
+          [EDGE_R3]: {
+            x: 2 * 260 + EDGE_SHORT_GAP + EDGE_LONG_GAP,
+            y: 0,
+            open: false,
+            shape: 'rectangle',
+          },
+          [EDGE_R4]: { x: 0, y: 420, open: false, shape: 'rectangle' },
+          [EDGE_R5]: { x: 260 + EDGE_LONG_GAP, y: 420, open: false, shape: 'rectangle' },
+          [EDGE_R6]: { x: 2 * (260 + EDGE_LONG_GAP), y: 420, open: false, shape: 'rectangle' },
         },
         graphs: [
           {
@@ -1027,10 +1047,10 @@ export const imageReferenceSnapshot: SpaceSnapshot = {
         title: 'Pictures',
         kind: 'positioned',
         positions: {
-          [imageReferenceIds.harbour]: { x: 0, y: 0, open: false },
-          [imageReferenceIds.harbourReference]: { x: 360, y: 0, open: false },
-          [imageReferenceIds.missing]: { x: 0, y: 200, open: false },
-          [imageReferenceIds.missingReference]: { x: 360, y: 200, open: false },
+          [imageReferenceIds.harbour]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [imageReferenceIds.harbourReference]: { x: 360, y: 0, open: false, shape: 'rectangle' },
+          [imageReferenceIds.missing]: { x: 0, y: 200, open: false, shape: 'rectangle' },
+          [imageReferenceIds.missingReference]: { x: 360, y: 200, open: false, shape: 'rectangle' },
         },
         graphs: [{ id: imageReferenceId(1), title: 'Main', edges: [] }],
         activeGraph: imageReferenceId(1),

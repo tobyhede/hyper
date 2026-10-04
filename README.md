@@ -178,8 +178,8 @@ Resources, Maps and Graphs are parts of the Space aggregate, so they have produc
       "id": "00000000-0000-4000-8000-000000000048",
       "title": "Working",
       "positions": {
-        "00000000-0000-4000-8000-000000000027": { "x": 0, "y": 0, "open": false },
-        "00000000-0000-4000-8000-000000000043": { "x": 340, "y": 0, "open": false }
+        "00000000-0000-4000-8000-000000000027": { "x": 0, "y": 0, "open": false, "shape": "rectangle" },
+        "00000000-0000-4000-8000-000000000043": { "x": 340, "y": 0, "open": false, "shape": "rectangle" }
       },
       "graphs": [
         {

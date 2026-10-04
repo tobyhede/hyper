@@ -67,8 +67,8 @@ const start: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false },
-          [RESOURCE_B]: { x: 300, y: 40, open: false },
+          [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+          [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -80,8 +80,8 @@ const start: SpaceSnapshot = {
         title: 'Map 2',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 400, open: false },
-          [RESOURCE_C]: { x: 0, y: 600, open: false },
+          [RESOURCE_A]: { x: 0, y: 400, open: false, shape: 'rectangle' },
+          [RESOURCE_C]: { x: 0, y: 600, open: false, shape: 'rectangle' },
         },
         graphs: [
           {

@@ -39,8 +39,10 @@ function compoundAt(
 function containsForbiddenSymbolName(
   name: string,
   allowedCompounds: readonly (readonly string[])[],
+  allowedNames: ReadonlySet<string>,
 ): boolean {
   if (!name.toLowerCase().includes(FORBIDDEN_SYMBOL_NAME)) return false;
+  if (allowedNames.has(name)) return false;
   const words = wordsOf(name);
   const allowed = new Set<number>();
   words.forEach((_, start) => {
@@ -69,6 +71,17 @@ function allowedCompoundsOption(option: unknown): readonly (readonly string[])[]
   });
 }
 
+/** The configured whole names, each matched exactly. */
+function allowedNamesOption(option: unknown): ReadonlySet<string> {
+  if (typeof option !== "object" || option === null || !("allowedNames" in option)) {
+    return new Set();
+  }
+  const { allowedNames } = option;
+  if (!Array.isArray(allowedNames)) return new Set();
+  const entries: readonly unknown[] = allowedNames;
+  return new Set(entries.filter((entry): entry is string => typeof entry === "string"));
+}
+
 /** Ban the case-insensitive substring "shape" in every JavaScript and TypeScript symbol name. */
 export const noForbiddenTermInSymbolNamesRule = defineRule({
   meta: {
@@ -86,17 +99,19 @@ export const noForbiddenTermInSymbolNamesRule = defineRule({
         type: "object",
         properties: {
           allowedCompounds: { type: "array", items: { type: "string" } },
+          allowedNames: { type: "array", items: { type: "string" } },
         },
         additionalProperties: false,
       },
     ],
-    defaultOptions: [{ allowedCompounds: [] }],
+    defaultOptions: [{ allowedCompounds: [], allowedNames: [] }],
   },
   createOnce(context) {
     let allowedCompounds: readonly (readonly string[])[] = [];
+    let allowedNames: ReadonlySet<string> = new Set();
 
     const reportForbiddenSymbolName = (node: ESTree.Node & { name: string }) => {
-      if (!containsForbiddenSymbolName(node.name, allowedCompounds)) return;
+      if (!containsForbiddenSymbolName(node.name, allowedCompounds, allowedNames)) return;
       context.report({
         node,
         messageId: "forbiddenSymbolName",
@@ -107,6 +122,7 @@ export const noForbiddenTermInSymbolNamesRule = defineRule({
     return {
       before() {
         allowedCompounds = allowedCompoundsOption(context.options?.[0]);
+        allowedNames = allowedNamesOption(context.options?.[0]);
       },
       Identifier: reportForbiddenSymbolName,
       PrivateIdentifier: reportForbiddenSymbolName,

@@ -9,6 +9,7 @@ import {
   type MapId,
   type MapPosition,
   type ResourcePlacement,
+  type ResourceShape,
   COLLAPSED_RESOURCE_SIZE,
   EDGE_TITLE_ONE_LINE,
   IMAGE_URL_UNSUPPORTED,
@@ -149,6 +150,16 @@ export type AuthoringCompletion =
       readonly kind: 'resized-resource';
       readonly resourceId: ResourceId;
       readonly size: { readonly width: number; readonly height: number };
+    }
+  /**
+   * Change Shape: the outline one Resource is drawn in on the Map the Edit is
+   * written into (ADR 0115). Open or Closed alike; the Shape it already has is
+   * `unchanged`.
+   */
+  | {
+      readonly kind: 'changed-resource-shape';
+      readonly resourceId: ResourceId;
+      readonly shape: ResourceShape;
     }
   | {
       readonly kind: 'connected-resources';
@@ -307,6 +318,7 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'opened-resource' }
   | { readonly kind: 'closed-resource' }
   | { readonly kind: 'resized-resource' }
+  | { readonly kind: 'changed-resource-shape' }
   | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
@@ -1256,6 +1268,15 @@ export function createSpaceAuthoring({
       // Only an exact Closed Size reaches here as a Close: the magnetic range
       // that snaps a near miss to it is the canvas's (ADR 0066).
       const outcome = SnapshotEdit.resize(snapshot, mapId, completion.resourceId, completion.size);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
+    } else if (completion.kind === 'changed-resource-shape') {
+      const outcome = SnapshotEdit.changeResourceShape(
+        snapshot,
+        mapId,
+        completion.resourceId,
+        completion.shape,
+      );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'created-resource') {

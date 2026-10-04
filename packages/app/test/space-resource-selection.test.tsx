@@ -81,7 +81,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: FIRST_MAP_ID,
         title: 'Collection 1',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
         graphs: [
           { id: FIRST_GRAPH_ID, title: 'Overview', edges: [] },
           { id: SECOND_GRAPH_ID, title: 'Detail', edges: [] },
@@ -91,7 +91,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: SECOND_MAP_ID,
         title: 'Collection 2',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0, open: false } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0, open: false, shape: 'rectangle' } },
         graphs: [{ id: THIRD_GRAPH_ID, title: 'Second pass', edges: [] }],
       },
       // The one Map that has authored an Active Graph, and deliberately not
@@ -102,7 +102,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: THIRD_MAP_ID,
         title: 'Collection 3',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 400, y: 0, open: false } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 400, y: 0, open: false, shape: 'rectangle' } },
         graphs: [
           { id: FOURTH_GRAPH_ID, title: 'Draft', edges: [] },
           { id: FIFTH_GRAPH_ID, title: 'Current', edges: [] },
@@ -137,8 +137,8 @@ const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): Spac
           title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
-            [SPACE_RESOURCE_ID]: { x: 600, y: 20, open: false },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+            [SPACE_RESOURCE_ID]: { x: 600, y: 20, open: false, shape: 'rectangle' },
           },
           graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
         },
@@ -183,9 +183,9 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
-          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false },
+          [META_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [META_TO_HOME_ID]: { x: 300, y: 0, open: false, shape: 'rectangle' },
+          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false, shape: 'rectangle' },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },

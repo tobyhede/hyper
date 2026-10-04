@@ -40,15 +40,15 @@ describe('Placement.fromMap', () => {
       title: 'Map 1',
       kind: 'positioned',
       positions: {
-        [RESOURCE_A]: { x: 10, y: 20, open: false },
-        [RESOURCE_B]: { x: 300, y: 40, open: false },
+        [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+        [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
       },
       graphs: [],
     };
 
     expect(asObject(Placement.fromMap(authored))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
     });
   });
 
@@ -77,16 +77,19 @@ describe('Placement.fromLayoutStrategyGraph', () => {
     )(graph);
 
     expect(asObject(Placement.fromLayoutStrategyGraph(laid))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 300, y: 20, open: false },
-      [RESOURCE_C]: { x: 600, y: 20, open: false },
+      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 300, y: 20, open: false, shape: 'rectangle' },
+      [RESOURCE_C]: { x: 600, y: 20, open: false, shape: 'rectangle' },
     });
   });
 
   it('carries no Open state across, which is why only a View may be converted', async () => {
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
-      [RESOURCE_B, { x: 300, y: 0, open: false }],
+      [
+        RESOURCE_A,
+        { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 }, shape: 'rectangle' },
+      ],
+      [RESOURCE_B, { x: 300, y: 0, open: false, shape: 'rectangle' }],
     ]);
     const laid = await positionedStrategy(authored)({
       resources: resourcesOf(RESOURCE_A, RESOURCE_B),
@@ -101,7 +104,7 @@ describe('Placement.fromLayoutStrategyGraph', () => {
     expect([...converted.values()].every((at) => !at.open)).toBe(true);
     // B's coordinate is untouched, because A being Open does not move it at
     // render time: the Edit that opened A did (ADR 0084).
-    expect(converted.get(RESOURCE_B)).toEqual({ x: 300, y: 0, open: false });
+    expect(converted.get(RESOURCE_B)).toEqual({ x: 300, y: 0, open: false, shape: 'rectangle' });
   });
 
   it('omits a resource no strategy placed, rather than calling it the origin', () => {
@@ -120,25 +123,37 @@ describe('Placement.next', () => {
     // so B's reported coordinate is already B's authored one and the report
     // round-trips as itself (ADR 0084).
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 360, height: 196 } }],
-      [RESOURCE_B, { x: 300, y: 200, open: false }],
+      [
+        RESOURCE_A,
+        { x: 10, y: 20, open: true, openSize: { width: 360, height: 196 }, shape: 'rectangle' },
+      ],
+      [RESOURCE_B, { x: 300, y: 200, open: false, shape: 'rectangle' }],
     ]);
     const rendered = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: false }],
-      [RESOURCE_B, { x: 300, y: 200, open: false }],
+      [RESOURCE_A, { x: 10, y: 20, open: false, shape: 'rectangle' }],
+      [RESOURCE_B, { x: 300, y: 200, open: false, shape: 'rectangle' }],
     ]);
 
     expect(Placement.next(authored, rendered, [RESOURCE_A, RESOURCE_B])).toBe(authored);
   });
 
-  it('preserves an Open Resource rect when the renderer reports only its moved position', () => {
+  it('preserves an Open Resource rect and its Shape when the renderer reports only its moved position', () => {
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
+      [
+        RESOURCE_A,
+        { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 }, shape: 'diamond' },
+      ],
     ]);
-    const rendered = Placement.fromEntries([[RESOURCE_A, { x: 90, y: 80, open: false }]]);
+    const rendered = Placement.fromEntries([[RESOURCE_A, { x: 90, y: 80 }]]);
 
     expect(asObject(Placement.next(authored, rendered, [RESOURCE_A]))).toEqual({
-      [RESOURCE_A]: { x: 90, y: 80, open: true, openSize: { width: 560, height: 420 } },
+      [RESOURCE_A]: {
+        x: 90,
+        y: 80,
+        open: true,
+        openSize: { width: 560, height: 420 },
+        shape: 'diamond',
+      },
     });
   });
 
@@ -146,13 +161,24 @@ describe('Placement.next', () => {
     // Admission reads the report as authorship too. A's Open rect decides
     // nothing about where B lands.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
+      [
+        RESOURCE_A,
+        { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 }, shape: 'rectangle' },
+      ],
     ]);
-    const rendered = Placement.fromEntries([[RESOURCE_B, { x: 500, y: 400, open: false }]]);
+    const rendered = Placement.fromEntries([
+      [RESOURCE_B, { x: 500, y: 400, open: false, shape: 'rectangle' }],
+    ]);
 
     expect(asObject(Placement.next(authored, rendered, [RESOURCE_B]))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
-      [RESOURCE_B]: { x: 500, y: 400, open: false },
+      [RESOURCE_A]: {
+        x: 10,
+        y: 20,
+        open: true,
+        openSize: { width: 560, height: 420 },
+        shape: 'rectangle',
+      },
+      [RESOURCE_B]: { x: 500, y: 400, open: false, shape: 'rectangle' },
     });
   });
 
@@ -176,8 +202,8 @@ describe('Placement.next', () => {
     });
 
     expect(asObject(Placement.next(authored, rendered, [RESOURCE_B]))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 500, y: 60, open: false },
+      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 500, y: 60, open: false, shape: 'rectangle' },
     });
   });
 
@@ -186,7 +212,7 @@ describe('Placement.next', () => {
     const rendered = at({ '00000000-0000-4000-8000-000000000002': [90, 90] });
 
     expect(asObject(Placement.next(authored, rendered, [RESOURCE_A]))).toEqual({
-      [RESOURCE_A]: { x: 90, y: 90, open: false },
+      [RESOURCE_A]: { x: 90, y: 90, open: false, shape: 'rectangle' },
     });
   });
 
@@ -200,7 +226,7 @@ describe('Placement.next', () => {
     const rendered = at({ '00000000-0000-4000-8000-000000000002': [90, 90] });
 
     expect(asObject(Placement.next(authored, rendered, []))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
+      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
     });
     expect(Placement.next(authored, rendered, [])).toBe(authored);
   });
@@ -221,8 +247,8 @@ describe('Placement.next', () => {
     });
 
     expect(asObject(Placement.next(authored, rendered, [RESOURCE_B]))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false },
-      [RESOURCE_B]: { x: 500, y: 60, open: false },
+      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 500, y: 60, open: false, shape: 'rectangle' },
     });
   });
 
@@ -250,12 +276,28 @@ describe('Placement.place', () => {
     // which cannot arrive through `next` because nothing has rendered it.
     const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
 
-    expect(asObject(Placement.place(authored, RESOURCE_B, { x: 640, y: 80, open: false }))).toEqual(
-      {
-        [RESOURCE_A]: { x: 10, y: 20, open: false },
-        [RESOURCE_B]: { x: 640, y: 80, open: false },
-      },
-    );
+    expect(
+      asObject(
+        Placement.place(authored, RESOURCE_B, { x: 640, y: 80, open: false, shape: 'rectangle' }),
+      ),
+    ).toEqual({
+      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 640, y: 80, open: false, shape: 'rectangle' },
+    });
+  });
+
+  it('gives a Resource placed at a bare point the rectangle, Closed (ADR 0115)', () => {
+    expect(asObject(Placement.place(Placement.empty(), RESOURCE_B, { x: 640, y: 80 }))).toEqual({
+      [RESOURCE_B]: { x: 640, y: 80, open: false, shape: 'rectangle' },
+    });
+  });
+
+  it('keeps the Shape of a whole entry it is given', () => {
+    expect(
+      asObject(
+        Placement.place(Placement.empty(), RESOURCE_B, { x: 0, y: 0, open: false, shape: 'pill' }),
+      ),
+    ).toEqual({ [RESOURCE_B]: { x: 0, y: 0, open: false, shape: 'pill' } });
   });
 });
 
@@ -270,7 +312,7 @@ describe('Placement.remove', () => {
     });
 
     expect(asObject(Placement.remove(authored, RESOURCE_A))).toEqual({
-      [RESOURCE_B]: { x: 300, y: 40, open: false },
+      [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
     });
   });
 
@@ -304,8 +346,11 @@ describe('Placement.growth', () => {
 
   it('displaces nobody when the growth it computed is a floored one', () => {
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 100, height: 100 } }],
-      [RESOURCE_B, { x: 400, y: 400, open: false }],
+      [
+        RESOURCE_A,
+        { x: 0, y: 0, open: true, openSize: { width: 100, height: 100 }, shape: 'rectangle' },
+      ],
+      [RESOURCE_B, { x: 400, y: 400, open: false, shape: 'rectangle' }],
     ]);
 
     expect(
@@ -323,15 +368,15 @@ describe('Placement.displace', () => {
     // and does not move, and one exactly on it does.
     const { width, height } = COLLAPSED_RESOURCE_SIZE;
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false }],
-      [RESOURCE_B, { x: width - 1, y: height - 1, open: false }],
-      [RESOURCE_C, { x: width, y: 0, open: false }],
+      [RESOURCE_A, { x: 0, y: 0, open: false, shape: 'rectangle' }],
+      [RESOURCE_B, { x: width - 1, y: height - 1, open: false, shape: 'rectangle' }],
+      [RESOURCE_C, { x: width, y: 0, open: false, shape: 'rectangle' }],
     ]);
 
     expect(asObject(Placement.displace(authored, RESOURCE_A, growth))).toEqual({
-      [RESOURCE_A]: { x: 0, y: 0, open: false },
-      [RESOURCE_B]: { x: width - 1, y: height - 1, open: false },
-      [RESOURCE_C]: { x: width + 300, y: 0, open: false },
+      [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: width - 1, y: height - 1, open: false, shape: 'rectangle' },
+      [RESOURCE_C]: { x: width + 300, y: 0, open: false, shape: 'rectangle' },
     });
   });
 
@@ -340,15 +385,15 @@ describe('Placement.displace', () => {
     // inside the subject's column so roomAxis takes y rather than x first.
     const { width, height } = COLLAPSED_RESOURCE_SIZE;
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false }],
-      [RESOURCE_B, { x: width - 1, y: height - 1, open: false }],
-      [RESOURCE_C, { x: width - 1, y: height, open: false }],
+      [RESOURCE_A, { x: 0, y: 0, open: false, shape: 'rectangle' }],
+      [RESOURCE_B, { x: width - 1, y: height - 1, open: false, shape: 'rectangle' }],
+      [RESOURCE_C, { x: width - 1, y: height, open: false, shape: 'rectangle' }],
     ]);
 
     expect(asObject(Placement.displace(authored, RESOURCE_A, growth))).toEqual({
-      [RESOURCE_A]: { x: 0, y: 0, open: false },
-      [RESOURCE_B]: { x: width - 1, y: height - 1, open: false },
-      [RESOURCE_C]: { x: width - 1, y: height + 274, open: false },
+      [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: width - 1, y: height - 1, open: false, shape: 'rectangle' },
+      [RESOURCE_C]: { x: width - 1, y: height + 274, open: false, shape: 'rectangle' },
     });
   });
 
@@ -358,15 +403,15 @@ describe('Placement.displace', () => {
     // beside the subject whose top is lower than the subject's is beside it, not
     // below it, so it moves on one axis only (ADR 0093).
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 100, y: 100, open: false }],
-      [RESOURCE_B, { x: 100, y: 500, open: false }],
-      [RESOURCE_C, { x: 500, y: 500, open: false }],
+      [RESOURCE_A, { x: 100, y: 100, open: false, shape: 'rectangle' }],
+      [RESOURCE_B, { x: 100, y: 500, open: false, shape: 'rectangle' }],
+      [RESOURCE_C, { x: 500, y: 500, open: false, shape: 'rectangle' }],
     ]);
 
     expect(asObject(Placement.displace(authored, RESOURCE_A, growth))).toEqual({
-      [RESOURCE_A]: { x: 100, y: 100, open: false },
-      [RESOURCE_B]: { x: 100, y: 774, open: false },
-      [RESOURCE_C]: { x: 800, y: 500, open: false },
+      [RESOURCE_A]: { x: 100, y: 100, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 100, y: 774, open: false, shape: 'rectangle' },
+      [RESOURCE_C]: { x: 800, y: 500, open: false, shape: 'rectangle' },
     });
   });
 
@@ -374,8 +419,8 @@ describe('Placement.displace', () => {
     // The reported jump: a Resource to the right of an Open subject, its top a
     // little below the subject's, gives back only the width on Close.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false }],
-      [RESOURCE_B, { x: 931, y: 48, open: false }],
+      [RESOURCE_A, { x: 0, y: 0, open: false, shape: 'rectangle' }],
+      [RESOURCE_B, { x: 931, y: 48, open: false, shape: 'rectangle' }],
     ]);
 
     expect(
@@ -383,30 +428,33 @@ describe('Placement.displace', () => {
         width: -growth.width,
         height: -growth.height,
       }).get(RESOURCE_B),
-    ).toEqual({ x: 631, y: 48, open: false });
+    ).toEqual({ x: 631, y: 48, open: false, shape: 'rectangle' });
   });
 
   it('never moves the subject, whatever the growth', () => {
     // A Resource does not displace itself: the subject is never clear of its own
     // collapsed rect on either axis.
-    const authored = Placement.fromEntries([[RESOURCE_A, { x: -50, y: -50, open: false }]]);
+    const authored = Placement.fromEntries([
+      [RESOURCE_A, { x: -50, y: -50, open: false, shape: 'rectangle' }],
+    ]);
 
     expect(Placement.displace(authored, RESOURCE_A, growth).get(RESOURCE_A)).toEqual({
       x: -50,
       y: -50,
       open: false,
+      shape: 'rectangle',
     });
   });
 
   it('reclaims the room again under the negated growth', () => {
     // How Close is expressed: the same operation, the sign reversed.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false }],
-      [RESOURCE_B, { x: 400, y: 400, open: false }],
+      [RESOURCE_A, { x: 0, y: 0, open: false, shape: 'rectangle' }],
+      [RESOURCE_B, { x: 400, y: 400, open: false, shape: 'rectangle' }],
     ]);
     const opened = Placement.displace(authored, RESOURCE_A, growth);
 
-    expect(opened.get(RESOURCE_B)).toEqual({ x: 700, y: 400, open: false });
+    expect(opened.get(RESOURCE_B)).toEqual({ x: 700, y: 400, open: false, shape: 'rectangle' });
     expect(
       asObject(
         Placement.displace(opened, RESOURCE_A, { width: -growth.width, height: -growth.height }),
@@ -421,30 +469,57 @@ describe('Placement.displace', () => {
     // follows skips it because it is no longer clear of A. Unreachable in the product:
     // Open floors its growth at zero and Close only negates one already applied.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false }],
-      [RESOURCE_B, { x: COLLAPSED_RESOURCE_SIZE.width, y: 0, open: false }],
+      [RESOURCE_A, { x: 0, y: 0, open: false, shape: 'rectangle' }],
+      [RESOURCE_B, { x: COLLAPSED_RESOURCE_SIZE.width, y: 0, open: false, shape: 'rectangle' }],
     ]);
     const shrunk = Placement.displace(authored, RESOURCE_A, { width: -2, height: 0 });
     const restored = Placement.displace(shrunk, RESOURCE_A, { width: 2, height: 0 });
-    const inside = { x: COLLAPSED_RESOURCE_SIZE.width - 2, y: 0, open: false };
+    const inside = { x: COLLAPSED_RESOURCE_SIZE.width - 2, y: 0, open: false, shape: 'rectangle' };
 
     expect(shrunk.get(RESOURCE_B)).toEqual(inside);
     expect(restored.get(RESOURCE_B)).toEqual(inside);
   });
 
-  it('carries Open/Closed state and the remembered Open Size through untouched', () => {
-    // Only `x` and `y` move. Open Size is stored on the Resource's own entry and
-    // survives everything that happens to its neighbours (ADR 0066).
+  it('carries Open/Closed state, the remembered Open Size and the Shape through untouched', () => {
+    // Only `x` and `y` move. Open Size and Shape are stored on the Resource's own
+    // entry and survive everything that happens to its neighbours (ADR 0066, ADR 0115).
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
-      [RESOURCE_B, { x: 400, y: 400, open: true, openSize: { width: 800, height: 600 } }],
-      [RESOURCE_C, { x: 400, y: 400, open: false, openSize: { width: 700, height: 500 } }],
+      [
+        RESOURCE_A,
+        { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 }, shape: 'diamond' },
+      ],
+      [
+        RESOURCE_B,
+        { x: 400, y: 400, open: true, openSize: { width: 800, height: 600 }, shape: 'pill' },
+      ],
+      [
+        RESOURCE_C,
+        { x: 400, y: 400, open: false, openSize: { width: 700, height: 500 }, shape: 'hexagon' },
+      ],
     ]);
 
     expect(asObject(Placement.displace(authored, RESOURCE_A, growth))).toEqual({
-      [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-      [RESOURCE_B]: { x: 700, y: 400, open: true, openSize: { width: 800, height: 600 } },
-      [RESOURCE_C]: { x: 700, y: 400, open: false, openSize: { width: 700, height: 500 } },
+      [RESOURCE_A]: {
+        x: 0,
+        y: 0,
+        open: true,
+        openSize: { width: 560, height: 420 },
+        shape: 'diamond',
+      },
+      [RESOURCE_B]: {
+        x: 700,
+        y: 400,
+        open: true,
+        openSize: { width: 800, height: 600 },
+        shape: 'pill',
+      },
+      [RESOURCE_C]: {
+        x: 700,
+        y: 400,
+        open: false,
+        openSize: { width: 700, height: 500 },
+        shape: 'hexagon',
+      },
     });
   });
 
@@ -474,8 +549,8 @@ describe('Placement.displace', () => {
     Placement.displace(authored, RESOURCE_A, growth);
 
     expect(asObject(authored)).toEqual({
-      [RESOURCE_A]: { x: 0, y: 0, open: false },
-      [RESOURCE_B]: { x: 400, y: 400, open: false },
+      [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 400, y: 400, open: false, shape: 'rectangle' },
     });
   });
 });
@@ -486,15 +561,24 @@ describe('Placement.reclaim', () => {
     // already written into RESOURCE_B's coordinates by the Open Edit — B is clear
     // of A on `x`, so the Open took the width alone.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } }],
-      [RESOURCE_B, { x: 400, y: 0, open: false }],
+      [
+        RESOURCE_A,
+        { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 }, shape: 'rectangle' },
+      ],
+      [RESOURCE_B, { x: 400, y: 0, open: false, shape: 'rectangle' }],
     ]);
 
     expect(asObject(Placement.reclaim(authored, RESOURCE_A))).toEqual({
       // Still Open, and still remembering the size: reclaiming is the
       // displacement half alone, and the caller writes the entry it wants.
-      [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } },
-      [RESOURCE_B]: { x: 260, y: 0, open: false },
+      [RESOURCE_A]: {
+        x: 0,
+        y: 0,
+        open: true,
+        openSize: { width: 400, height: 300 },
+        shape: 'rectangle',
+      },
+      [RESOURCE_B]: { x: 260, y: 0, open: false, shape: 'rectangle' },
     });
   });
 
@@ -502,8 +586,11 @@ describe('Placement.reclaim', () => {
     // A remembered Open Size is not room the Resource holds — nothing was displaced
     // for it — so there is nothing to give back (ADR 0066).
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false, openSize: { width: 400, height: 300 } }],
-      [RESOURCE_B, { x: 140, y: 154, open: false }],
+      [
+        RESOURCE_A,
+        { x: 0, y: 0, open: false, openSize: { width: 400, height: 300 }, shape: 'rectangle' },
+      ],
+      [RESOURCE_B, { x: 140, y: 154, open: false, shape: 'rectangle' }],
     ]);
 
     expect(Placement.reclaim(authored, RESOURCE_A)).toBe(authored);
@@ -516,19 +603,19 @@ describe('Placement.reclaim', () => {
 
   it('undoes exactly the Open that applied the growth', () => {
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: false }],
-      [RESOURCE_B, { x: 400, y: 400, open: false }],
+      [RESOURCE_A, { x: 10, y: 20, open: false, shape: 'rectangle' }],
+      [RESOURCE_B, { x: 400, y: 400, open: false, shape: 'rectangle' }],
     ]);
     const openSize = { width: 560, height: 420 };
     const opened = Placement.place(
       Placement.displace(authored, RESOURCE_A, Placement.growth(openSize)),
       RESOURCE_A,
-      { x: 10, y: 20, open: true, openSize },
+      { x: 10, y: 20, open: true, openSize, shape: 'rectangle' },
     );
 
     expect(asObject(Placement.reclaim(opened, RESOURCE_A))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: true, openSize },
-      [RESOURCE_B]: { x: 400, y: 400, open: false },
+      [RESOURCE_A]: { x: 10, y: 20, open: true, openSize, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 400, y: 400, open: false, shape: 'rectangle' },
     });
   });
 
@@ -540,8 +627,8 @@ describe('Placement.reclaim', () => {
     // particular Open happened, which is the per-Resource history ADR 0084 forbids.
     const openSize = { width: 560, height: 420 };
     const opened = Placement.fromEntries([
-      [RESOURCE_A, { x: 5000, y: 5000, open: true, openSize }],
-      [RESOURCE_B, { x: 600, y: 474, open: false }],
+      [RESOURCE_A, { x: 5000, y: 5000, open: true, openSize, shape: 'rectangle' }],
+      [RESOURCE_B, { x: 600, y: 474, open: false, shape: 'rectangle' }],
     ]);
 
     expect(Placement.reclaim(opened, RESOURCE_A)).toBe(opened);
@@ -570,13 +657,15 @@ describe('Placement immutability', () => {
     });
 
     Placement.next(authored, rendered, [RESOURCE_A, RESOURCE_B]);
-    Placement.place(authored, RESOURCE_C, { x: 1, y: 2, open: false });
+    Placement.place(authored, RESOURCE_C, { x: 1, y: 2, open: false, shape: 'rectangle' });
     Placement.remove(authored, RESOURCE_A);
 
-    expect(asObject(authored)).toEqual({ [RESOURCE_A]: { x: 10, y: 20, open: false } });
+    expect(asObject(authored)).toEqual({
+      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+    });
     expect(asObject(rendered)).toEqual({
-      [RESOURCE_A]: { x: 90, y: 90, open: false },
-      [RESOURCE_B]: { x: 500, y: 60, open: false },
+      [RESOURCE_A]: { x: 90, y: 90, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 500, y: 60, open: false, shape: 'rectangle' },
     });
   });
 
@@ -584,12 +673,12 @@ describe('Placement immutability', () => {
     // `fromEntries` is built from React Flow's live `node.position` objects. A
     // Placement holding those would follow the next drag frame, which is exactly
     // the authored-from-a-report mistake this module exists to prevent.
-    const live: ResourcePlacement = { x: 10, y: 20, open: false };
+    const live: ResourcePlacement = { x: 10, y: 20, open: false, shape: 'rectangle' };
     const placement = Placement.fromEntries([[RESOURCE_A, live]]);
 
     live.x = 999;
 
-    expect(placement.get(RESOURCE_A)).toEqual({ x: 10, y: 20, open: false });
+    expect(placement.get(RESOURCE_A)).toEqual({ x: 10, y: 20, open: false, shape: 'rectangle' });
   });
 });
 
@@ -625,6 +714,18 @@ describe('Placement.equals', () => {
       ),
     ).toBe(false);
     expect(Placement.equals(base, Placement.empty())).toBe(false);
+  });
+
+  it('notices a Resource drawn in another Shape', () => {
+    const withResourceShape = (shape: ResourcePlacement['shape']) =>
+      Placement.fromEntries([[RESOURCE_A, { x: 10, y: 20, open: false, shape }]]);
+
+    expect(Placement.equals(withResourceShape('rectangle'), withResourceShape('rectangle'))).toBe(
+      true,
+    );
+    expect(Placement.equals(withResourceShape('rectangle'), withResourceShape('ellipse'))).toBe(
+      false,
+    );
   });
 });
 
@@ -691,8 +792,8 @@ describe('Placement properties', () => {
               return [
                 id,
                 openSize === undefined
-                  ? { ...point, open: false as const }
-                  : { ...point, open: true as const, openSize },
+                  ? { ...point, open: false as const, shape: 'rectangle' as const }
+                  : { ...point, open: true as const, openSize, shape: 'rectangle' as const },
               ] as const;
             }),
           );
@@ -719,7 +820,7 @@ describe('Placement properties', () => {
         const positions = Placement.fromEntries(
           ids.map((id, i) => [
             id,
-            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
+            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false, shape: 'rectangle' },
           ]),
         );
         const laid = await positionedStrategy(positions)({
@@ -747,7 +848,7 @@ describe('Placement properties', () => {
         const authored = Placement.fromEntries(
           authoredIds.map((id, i) => [
             id,
-            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
+            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false, shape: 'rectangle' },
           ]),
         );
         // A positioned projection contains exactly the authored Map members.
@@ -775,14 +876,19 @@ describe('Placement properties', () => {
         const authored = Placement.fromEntries(
           authoredIds.map((id, i) => [
             id,
-            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
+            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false, shape: 'rectangle' },
           ]),
         );
         // Every Resource on screen, each one somewhere unrelated to what was authored.
         const rendered = Placement.fromEntries(
           ids.map((id, i) => [
             id,
-            { x: coords[60 + i * 2] ?? 0, y: coords[60 + i * 2 + 1] ?? 0, open: false },
+            {
+              x: coords[60 + i * 2] ?? 0,
+              y: coords[60 + i * 2 + 1] ?? 0,
+              open: false,
+              shape: 'rectangle',
+            },
           ]),
         );
 
@@ -797,15 +903,21 @@ describe('Placement.next over an Open Resource', () => {
     // Every canvas coordinate is an authored one (ADR 0084), so a Resource
     // dropped over an Open one lands on the drop point.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
-      [RESOURCE_B, { x: 1000, y: 1000, open: false }],
+      [
+        RESOURCE_A,
+        { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 }, shape: 'rectangle' },
+      ],
+      [RESOURCE_B, { x: 1000, y: 1000, open: false, shape: 'rectangle' }],
     ]);
-    const rendered = Placement.fromEntries([[RESOURCE_B, { x: 50, y: 30, open: false }]]);
+    const rendered = Placement.fromEntries([
+      [RESOURCE_B, { x: 50, y: 30, open: false, shape: 'rectangle' }],
+    ]);
 
     expect(Placement.next(authored, rendered, [RESOURCE_B]).get(RESOURCE_B)).toEqual({
       x: 50,
       y: 30,
       open: false,
+      shape: 'rectangle',
     });
   });
 });

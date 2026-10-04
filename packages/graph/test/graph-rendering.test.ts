@@ -22,9 +22,24 @@ function loadFixture(): Space {
           id: uuid('00000000-0000-4000-8000-000000000022'),
           title: 'Working',
           positions: {
-            [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false },
-            [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0, open: false },
-            [uuid('00000000-0000-4000-8000-000000000005')]: { x: 640, y: 0, open: false },
+            [uuid('00000000-0000-4000-8000-000000000002')]: {
+              x: 0,
+              y: 0,
+              open: false,
+              shape: 'rectangle',
+            },
+            [uuid('00000000-0000-4000-8000-000000000003')]: {
+              x: 320,
+              y: 0,
+              open: false,
+              shape: 'rectangle',
+            },
+            [uuid('00000000-0000-4000-8000-000000000005')]: {
+              x: 640,
+              y: 0,
+              open: false,
+              shape: 'rectangle',
+            },
           },
           graphs: [
             {
@@ -157,8 +172,18 @@ describe('buildGraphRenderEdges', () => {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
             positions: {
-              [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false },
-              [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0, open: false },
+              [uuid('00000000-0000-4000-8000-000000000002')]: {
+                x: 0,
+                y: 0,
+                open: false,
+                shape: 'rectangle',
+              },
+              [uuid('00000000-0000-4000-8000-000000000003')]: {
+                x: 320,
+                y: 0,
+                open: false,
+                shape: 'rectangle',
+              },
             },
             graphs: [
               {
@@ -229,9 +254,9 @@ describe('buildGraphRenderEdges', () => {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
             positions: {
-              [a]: { x: 0, y: 0, open: false },
-              [b]: { x: 320, y: 0, open: false },
-              [c]: { x: 640, y: 0, open: false },
+              [a]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+              [b]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              [c]: { x: 640, y: 0, open: false, shape: 'rectangle' },
             },
             graphs: [
               {
@@ -292,9 +317,24 @@ describe('buildGraphRenderEdges', () => {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
             positions: {
-              [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false },
-              [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0, open: false },
-              [uuid('00000000-0000-4000-8000-000000000005')]: { x: 640, y: 0, open: false },
+              [uuid('00000000-0000-4000-8000-000000000002')]: {
+                x: 0,
+                y: 0,
+                open: false,
+                shape: 'rectangle',
+              },
+              [uuid('00000000-0000-4000-8000-000000000003')]: {
+                x: 320,
+                y: 0,
+                open: false,
+                shape: 'rectangle',
+              },
+              [uuid('00000000-0000-4000-8000-000000000005')]: {
+                x: 640,
+                y: 0,
+                open: false,
+                shape: 'rectangle',
+              },
             },
             graphs: [
               {
@@ -339,9 +379,24 @@ describe('buildGraphRenderEdges', () => {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
             positions: {
-              [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false },
-              [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0, open: false },
-              [uuid('00000000-0000-4000-8000-000000000005')]: { x: 320, y: 200, open: false },
+              [uuid('00000000-0000-4000-8000-000000000002')]: {
+                x: 0,
+                y: 0,
+                open: false,
+                shape: 'rectangle',
+              },
+              [uuid('00000000-0000-4000-8000-000000000003')]: {
+                x: 320,
+                y: 0,
+                open: false,
+                shape: 'rectangle',
+              },
+              [uuid('00000000-0000-4000-8000-000000000005')]: {
+                x: 320,
+                y: 200,
+                open: false,
+                shape: 'rectangle',
+              },
             },
             graphs: [
               {

@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   COLLAPSED_RESOURCE_SIZE,
   DEFAULT_OPEN_SIZE,
+  RESOURCE_SHAPES,
   type Graph,
   type GraphEdge,
   type Map as SpaceMap,
   type SpaceSnapshot,
   type ResourceDocument,
   type ResourcePlacement,
+  type ResourceShape,
   type UUID,
 } from '@project/core';
 import {
@@ -89,7 +91,12 @@ const closedPlacement = (ids: readonly UUID[], coords: readonly number[]): Place
   Placement.fromEntries(
     ids.map((id, i) => [
       id,
-      { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false as const },
+      {
+        x: coords[i * 2] ?? 0,
+        y: coords[i * 2 + 1] ?? 0,
+        open: false as const,
+        shape: 'rectangle' as const,
+      },
     ]),
   );
 
@@ -232,8 +239,8 @@ describe('deletionReach properties', () => {
           const at = { x: generated.coords[r * 2] ?? 0, y: generated.coords[r * 2 + 1] ?? 0 };
           positions[id] =
             generated.open[r] === true
-              ? { ...at, open: true, openSize: DEFAULT_OPEN_SIZE }
-              : { ...at, open: false };
+              ? { ...at, open: true, openSize: DEFAULT_OPEN_SIZE, shape: 'rectangle' }
+              : { ...at, open: false, shape: 'rectangle' };
         });
         const graphs = generated.graphs.map((pairs, g): Graph => {
           const seen = new Set<string>();
@@ -490,10 +497,12 @@ describe('SnapshotEdit.createInMap properties', () => {
           expect(outcome.kind).toBe('completed');
           if (outcome.kind !== 'completed') return;
           expect(loadSpaceSnapshot(outcome.snapshot).ok).toBe(true);
+          // Add Resource gives it the rectangle, written rather than implied (ADR 0115).
           expect(outcome.snapshot.document.maps?.[0]?.positions[newResourceId]).toEqual({
             x: anchor.x,
             y: anchor.y,
             open: false,
+            shape: 'rectangle',
           });
         },
       ),
@@ -602,6 +611,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     readonly y: number;
     readonly open: boolean;
     readonly openSize: Extent | undefined;
+    readonly shape: ResourceShape;
   };
 
   /**
@@ -638,6 +648,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       y: coordinateArb,
       open: fc.boolean(),
       openSize: fc.option(sizeArb, { nil: undefined }),
+      shape: fc.constantFrom(...RESOURCE_SHAPES),
     }),
     { minLength: RESOURCE_IDS.length, maxLength: RESOURCE_IDS.length },
   );
@@ -645,12 +656,13 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   const subjectArb = fc.nat({ max: RESOURCE_IDS.length - 1 });
 
   const placementOf = (entry: GeneratedEntry): ResourcePlacement => {
+    const { x, y, shape } = entry;
     if (entry.open) {
-      return { x: entry.x, y: entry.y, open: true, openSize: entry.openSize ?? DEFAULT_OPEN_SIZE };
+      return { x, y, open: true, openSize: entry.openSize ?? DEFAULT_OPEN_SIZE, shape };
     }
     return entry.openSize === undefined
-      ? { x: entry.x, y: entry.y, open: false }
-      : { x: entry.x, y: entry.y, open: false, openSize: entry.openSize };
+      ? { x, y, open: false, shape }
+      : { x, y, open: false, openSize: entry.openSize, shape };
   };
 
   const with_ = (
@@ -899,7 +911,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
                   ...firstMap,
                   positions: {
                     ...firstMap.positions,
-                    [witnessId]: { ...destination, open: false },
+                    [witnessId]: { ...destination, open: false, shape: 'rectangle' },
                   },
                 },
               ],
@@ -952,11 +964,23 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     // displacement may treat it differently from a Markdown Resource.
     const [subjectId, besideId, belowId, beforeId] = RESOURCE_IDS;
     const markdown = snapshotOf([
-      { x: 0, y: 0, open: false, openSize: undefined },
-      { x: COLLAPSED_RESOURCE_SIZE.width, y: 40, open: false, openSize: undefined },
-      { x: 40, y: COLLAPSED_RESOURCE_SIZE.height, open: false, openSize: undefined },
-      { x: -300, y: -300, open: false, openSize: undefined },
-      { x: -600, y: 600, open: false, openSize: undefined },
+      { x: 0, y: 0, open: false, openSize: undefined, shape: 'rectangle' },
+      {
+        x: COLLAPSED_RESOURCE_SIZE.width,
+        y: 40,
+        open: false,
+        openSize: undefined,
+        shape: 'rectangle',
+      },
+      {
+        x: 40,
+        y: COLLAPSED_RESOURCE_SIZE.height,
+        open: false,
+        openSize: undefined,
+        shape: 'rectangle',
+      },
+      { x: -300, y: -300, open: false, openSize: undefined, shape: 'rectangle' },
+      { x: -600, y: 600, open: false, openSize: undefined, shape: 'rectangle' },
     ]);
     const start: SpaceSnapshot = {
       ...markdown,
@@ -994,10 +1018,106 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       y: 0,
       open: false,
       openSize: resizedTo,
+      shape: 'rectangle',
     });
 
     const reopened = completed(SnapshotEdit.open(closed, MAP_ID, subjectId));
     expect(positionsOf(reopened)).toEqual(positionsOf(resized));
+  });
+
+  /** Every Shape the Map records, so a whole Map can be compared at once. */
+  const resourceShapesOf = (snapshot: SpaceSnapshot) =>
+    Object.fromEntries(
+      Object.entries(positionsOf(snapshot)).map(([resourceId, at]) => [resourceId, at?.shape]),
+    );
+
+  it('keeps every Shape through Open, any number of Resizes, a magnetic Close and Close', () => {
+    // A Shape is drawn inside the fixed Closed Size and changes no rect, so the
+    // Edits that move and grow Resources carry every entry's Shape through
+    // untouched — the subject's and each displaced neighbour's (ADR 0115).
+    fc.assert(
+      fc.property(
+        entriesArb,
+        subjectArb,
+        fc.array(resizeArb, { maxLength: 4 }),
+        fc.boolean(),
+        (entries, subjectIndex, resizes, magnetic) => {
+          const subjectId = RESOURCE_IDS[subjectIndex];
+          if (subjectId === undefined) return;
+          const start = snapshotOf(entries);
+          const resourceShapes = resourceShapesOf(start);
+
+          let current = settled(start, SnapshotEdit.open(start, MAP_ID, subjectId));
+          expect(resourceShapesOf(current)).toEqual(resourceShapes);
+          for (const size of resizes) {
+            current = settled(current, SnapshotEdit.resize(current, MAP_ID, subjectId, size));
+            expect(resourceShapesOf(current)).toEqual(resourceShapes);
+          }
+          current = magnetic
+            ? completed(SnapshotEdit.resize(current, MAP_ID, subjectId, COLLAPSED_RESOURCE_SIZE))
+            : completed(SnapshotEdit.close(current, MAP_ID, subjectId));
+          expect(resourceShapesOf(current)).toEqual(resourceShapes);
+        },
+      ),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+
+  it("changes one Resource's Shape and nothing else, and the Shape it has is unchanged", () => {
+    fc.assert(
+      fc.property(
+        entriesArb,
+        subjectArb,
+        fc.constantFrom(...RESOURCE_SHAPES),
+        (entries, subjectIndex, shape) => {
+          const subjectId = RESOURCE_IDS[subjectIndex];
+          const subject = entries[subjectIndex];
+          if (subjectId === undefined || subject === undefined) return;
+          const snapshot = snapshotOf(entries);
+
+          const outcome = SnapshotEdit.changeResourceShape(snapshot, MAP_ID, subjectId, shape);
+
+          if (shape === subject.shape) {
+            expect(outcome).toEqual({ kind: 'unchanged' });
+            return;
+          }
+          const changed = completed(outcome);
+          expect(positionsOf(changed)).toEqual({
+            ...positionsOf(snapshot),
+            [subjectId]: { ...positionsOf(snapshot)[subjectId], shape },
+          });
+          expect({ ...changed, document: { ...changed.document, maps: [] } }).toEqual({
+            ...snapshot,
+            document: { ...snapshot.document, maps: [] },
+          });
+          expect(changed.document.maps?.[0]?.graphs).toEqual(snapshot.document.maps?.[0]?.graphs);
+          // Undone by changing it back: the Edit's inverse is the same Edit.
+          expect(
+            completed(SnapshotEdit.changeResourceShape(changed, MAP_ID, subjectId, subject.shape)),
+          ).toEqual(snapshot);
+        },
+      ),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+
+  it('refuses a Shape for a Map the snapshot does not name or a Resource the Map does not hold', () => {
+    fc.assert(
+      fc.property(entriesArb, fc.uuid().map(uuid), (entries, stranger) => {
+        fc.pre(!RESOURCE_IDS.some((id) => id === stranger) && stranger !== MAP_ID);
+        const snapshot = snapshotOf(entries);
+        const subjectId = RESOURCE_IDS[0];
+
+        expect(SnapshotEdit.changeResourceShape(snapshot, stranger, subjectId, 'diamond')).toEqual({
+          kind: 'refused',
+          refusal: { code: 'map-not-found' },
+        });
+        expect(SnapshotEdit.changeResourceShape(snapshot, MAP_ID, stranger, 'diamond')).toEqual({
+          kind: 'refused',
+          refusal: { code: 'resource-not-in-map' },
+        });
+      }),
+    );
   });
 
   it('refuses to Resize a Closed Resource, which has no Open Size to change', () => {
@@ -1036,8 +1156,13 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
     const first = Placement.toPositions(
       Placement.fromEntries(
         members.map((id): [UUID, ResourcePlacement] => {
-          const at = placement.get(id) ?? { x: 0, y: 0, open: false };
-          return [id, open ? { x: at.x, y: at.y, open: true, openSize: DEFAULT_OPEN_SIZE } : at];
+          const at = placement.get(id) ?? { x: 0, y: 0, open: false, shape: 'rectangle' };
+          return [
+            id,
+            open
+              ? { x: at.x, y: at.y, open: true, openSize: DEFAULT_OPEN_SIZE, shape: at.shape }
+              : at,
+          ];
         }),
       ),
     );
@@ -1130,10 +1255,12 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
           const exact = completed(
             SnapshotEdit.addToMap(snapshot, MAP_ID, subject, anchor, 'exact'),
           );
+          // Add to Map gives it the rectangle (ADR 0115).
           expect(mapIn(exact, MAP_ID)?.positions[subject]).toEqual({
             x: anchor.x,
             y: anchor.y,
             open: false,
+            shape: 'rectangle',
           });
         },
       ),
@@ -1272,8 +1399,8 @@ describe('first Open content geometry', () => {
           for (const document of documents) {
             const snapshot: SpaceSnapshot = {
               ...baseSnapshot([target, reference], {
-                [target]: { x: 0, y: 0, open: false },
-                [reference]: { x: 1000, y: 0, open: false },
+                [target]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [reference]: { x: 1000, y: 0, open: false, shape: 'rectangle' },
               }),
               resources: [
                 { id: target, document },

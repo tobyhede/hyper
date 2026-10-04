@@ -46,11 +46,17 @@ async function projection(open = false) {
             title: 'Map',
             kind: 'positioned',
             positions: {
-              [A]: { x: 0, y: 0, open: false },
-              [B]: { x: 400, y: 0, open: false },
+              [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+              [B]: { x: 400, y: 0, open: false, shape: 'rectangle' },
               [REFERENCE]: open
-                ? { x: 0, y: 300, open: true, openSize: { width: 560, height: 420 } }
-                : { x: 0, y: 300, open: false },
+                ? {
+                    x: 0,
+                    y: 300,
+                    open: true,
+                    openSize: { width: 560, height: 420 },
+                    shape: 'rectangle',
+                  }
+                : { x: 0, y: 300, open: false, shape: 'rectangle' },
             },
             graphs: [{ id: GRAPH, title: 'Graph', edges: [{ from: A, to: B }] }],
           },

@@ -1,8 +1,10 @@
 import fc from 'fast-check';
 import {
   COLLAPSED_RESOURCE_SIZE,
+  RESOURCE_SHAPES,
   uuidSchema,
   type PositionedMap,
+  type ResourceShape,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -45,7 +47,12 @@ const S_LINK_TO_T = idAt(51);
 const META_LINK_TO_T = idAt(60);
 const META_LINK_TO_S = idAt(61);
 
-const closed = (x: number, y: number) => ({ x, y, open: false as const });
+const closed = (x: number, y: number) => ({
+  x,
+  y,
+  open: false as const,
+  shape: 'rectangle' as const,
+});
 
 const markdown = (id: UUID, title: string) => ({
   id,
@@ -140,7 +147,7 @@ const SNAPSHOTS = [meta, target, selector] as const;
 type Maps = readonly PositionedMap[];
 
 /**
- * One generated change to a Space's Maps. The first thirteen change only what
+ * One generated change to a Space's Maps. The first fourteen change only what
  * lies inside a Map; the rest change a Map id, a Graph id, which Map owns a
  * Graph, or `defaultMap`, unless they have nothing to act on or a later op
  * undoes them.
@@ -161,6 +168,12 @@ type Op =
       readonly height: number;
     }
   | { readonly kind: 'close'; readonly map: number; readonly resource: number }
+  | {
+      readonly kind: 'reshape';
+      readonly map: number;
+      readonly resource: number;
+      readonly shape: ResourceShape;
+    }
   | {
       readonly kind: 'place';
       readonly map: number;
@@ -227,6 +240,12 @@ const op: fc.Arbitrary<Op> = fc.oneof(
     height: fc.integer({ min: COLLAPSED_RESOURCE_SIZE.height, max: 2000 }),
   }),
   fc.record({ kind: fc.constant('close' as const), map: index, resource: index }),
+  fc.record({
+    kind: fc.constant('reshape' as const),
+    map: index,
+    resource: index,
+    shape: fc.constantFrom(...RESOURCE_SHAPES),
+  }),
   fc.record({
     kind: fc.constant('place' as const),
     map: index,
@@ -313,7 +332,11 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
             ...m,
             positions: {
               ...m.positions,
-              [resource]: { ...(placed ?? { open: false as const }), x: current.x, y: current.y },
+              [resource]: {
+                ...(placed ?? { open: false as const, shape: 'rectangle' as const }),
+                x: current.x,
+                y: current.y,
+              },
             },
           };
         });
@@ -331,9 +354,21 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
                   y: placed.y,
                   open: true as const,
                   openSize: { width: current.width, height: current.height },
+                  shape: placed.shape,
                 }
               : { ...placed, open: false as const };
           return { ...m, positions: { ...m.positions, [resource]: next } };
+        });
+        break;
+      case 'reshape':
+        withMap(current.map, (m) => {
+          const resource = at(resourceIds, current.resource);
+          const placed = resource === undefined ? undefined : m.positions[resource];
+          if (resource === undefined || placed === undefined) return undefined;
+          return {
+            ...m,
+            positions: { ...m.positions, [resource]: { ...placed, shape: current.shape } },
+          };
         });
         break;
       case 'unplace':
@@ -525,6 +560,7 @@ describe('the SQL fast-path decision', () => {
     const next = applyOps(target, [
       { kind: 'move', map: 0, resource: 2, x: 40, y: 80 },
       { kind: 'open', map: 0, resource: 0, width: 600, height: 400 },
+      { kind: 'reshape', map: 0, resource: 1, shape: 'diamond' },
       { kind: 'add-edge', map: 0, graph: 1, from: 2, to: 3 },
       { kind: 'retitle-graph', map: 1, graph: 0, title: 'Renamed' },
       { kind: 'activate-graph', map: 0, graph: 1 },

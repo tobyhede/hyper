@@ -441,8 +441,8 @@ describe('runHyper', () => {
             title: 'Authored map',
             kind: 'positioned',
             positions: {
-              [THIRD_SPACE_ID]: { x: 30, y: 40, open: false },
-              [RESOURCE_ID]: { x: 10, y: 20, open: false },
+              [THIRD_SPACE_ID]: { x: 30, y: 40, open: false, shape: 'rectangle' },
+              [RESOURCE_ID]: { x: 10, y: 20, open: false, shape: 'rectangle' },
             },
             graphs: [
               {
@@ -815,7 +815,7 @@ describe('runHyper', () => {
               id: OTHER_SPACE_ID,
               title: 'First owner',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
               graphs: [
                 { id: GRAPH_ID, title: 'Shared', edges: [{ from: RESOURCE_ID, to: RESOURCE_ID }] },
               ],
@@ -824,7 +824,7 @@ describe('runHyper', () => {
               id: THIRD_SPACE_ID,
               title: 'Second owner',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 10, y: 10, open: false } },
+              positions: { [RESOURCE_ID]: { x: 10, y: 10, open: false, shape: 'rectangle' } },
               graphs: [
                 { id: GRAPH_ID, title: 'Shared', edges: [{ from: RESOURCE_ID, to: RESOURCE_ID }] },
               ],

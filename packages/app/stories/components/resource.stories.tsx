@@ -645,7 +645,7 @@ const CONTAINING_MAP: Map = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
   title: 'Collection 1',
   kind: 'positioned',
-  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0, open: false } },
+  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
   graphs: [
     { id: uuidSchema.parse('00000000-0000-4000-8000-000000000004'), title: 'Overview', edges: [] },
   ],

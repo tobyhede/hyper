@@ -6,6 +6,12 @@ const RULE = 'no-shape-in-symbol-names';
 /** The domain compound `.oxlintrc.json` allows, as it configures the rule. */
 const HEAD_SHAPE = ['error', { allowedCompounds: ['head shape'] }] as const;
 
+/** The Resource Shape terms `.oxlintrc.json` allows beside it (ADR 0115). */
+const RESOURCE_SHAPE = [
+  'error',
+  { allowedCompounds: ['head shape', 'resource shape'], allowedNames: ['shape'] },
+] as const;
+
 describe('no-shape-in-symbol-names', () => {
   it('flags "shape" in a symbol name when nothing is allowed', () => {
     const diagnostics = lintFixture('const headShape = 1;\nexport { headShape };', {
@@ -68,5 +74,25 @@ describe('no-shape-in-symbol-names', () => {
     expect(diagnostics.every((diagnostic) => diagnostic.message.includes('"headShapeShape"'))).toBe(
       true,
     );
+  });
+
+  // ADR 0115 stores a Map entry's Shape as `shape`: the domain term is the
+  // one word, so the field is allowed as a whole name and nowhere else.
+  it('allows a configured whole name, and the word nowhere else', () => {
+    const diagnostics = lintFixture(
+      [
+        'type ResourceShape = "rectangle";',
+        'const RESOURCE_SHAPES: readonly ResourceShape[] = ["rectangle"];',
+        'const entry = { shape: RESOURCE_SHAPES[0] };',
+        'const { shape } = entry;',
+        'const shapes = [shape];',
+        'const shapeOf = () => shape;',
+        'const entryShape = shape;',
+        'export { entry, shapes, shapeOf, entryShape };',
+      ].join('\n'),
+      { [RULE]: RESOURCE_SHAPE },
+    );
+    const named = diagnostics.map((diagnostic) => /"([^"]+)"/.exec(diagnostic.message)?.[1]);
+    expect(new Set(named)).toEqual(new Set(['shapes', 'shapeOf', 'entryShape']));
   });
 });

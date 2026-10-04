@@ -369,10 +369,38 @@ const openSizeSchema = z.object({
   height: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.height),
 });
 
-/** What a Map stores for one Resource: its origin, Open/Closed state and remembered Open Size. */
+/**
+ * The outline a Closed Resource is drawn in on a Map (ADR 0115). Closed, because
+ * every member touches the midpoint of each side of the Closed rect, where Edges
+ * attach.
+ */
+export const RESOURCE_SHAPES = ['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon'] as const;
+
+export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
+
+/**
+ * The Shape a Resource is given when it is added to a Map — Add Resource, Add to
+ * Map, and every seed and fixture that places one. It is written, never
+ * inferred from an absent field.
+ */
+export const ADDED_RESOURCE_SHAPE = 'rectangle' satisfies (typeof RESOURCE_SHAPES)[number];
+
+/**
+ * What a Map stores for one Resource: its origin, Open/Closed state, remembered
+ * Open Size and Shape. The Shape is required: nothing reads a missing one as a
+ * rectangle (ADR 0115).
+ */
 export const resourcePlacementSchema = z.discriminatedUnion('open', [
-  mapPositionSchema.extend({ open: z.literal(true), openSize: openSizeSchema }),
-  mapPositionSchema.extend({ open: z.literal(false), openSize: openSizeSchema.optional() }),
+  mapPositionSchema.extend({
+    open: z.literal(true),
+    openSize: openSizeSchema,
+    shape: resourceShapeSchema,
+  }),
+  mapPositionSchema.extend({
+    open: z.literal(false),
+    openSize: openSizeSchema.optional(),
+    shape: resourceShapeSchema,
+  }),
 ]);
 
 /**

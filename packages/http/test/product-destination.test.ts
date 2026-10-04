@@ -24,7 +24,7 @@ const loaded: LoadedSpace = {
           id: MAP_ID,
           title: 'Map',
           kind: 'positioned',
-          positions: { [RESOURCE_ID]: { x: 10, y: 20, open: false } },
+          positions: { [RESOURCE_ID]: { x: 10, y: 20, open: false, shape: 'rectangle' } },
           graphs: [
             { id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_ID, to: OTHER_RESOURCE_ID }] },
           ],
@@ -234,7 +234,7 @@ describe('product destinations', () => {
               id: otherMap,
               title: 'Other Map',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 30, y: 40, open: false } },
+              positions: { [RESOURCE_ID]: { x: 30, y: 40, open: false, shape: 'rectangle' } },
               graphs: [],
             },
           ],

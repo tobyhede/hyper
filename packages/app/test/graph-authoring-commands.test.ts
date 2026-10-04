@@ -60,7 +60,7 @@ const meta: SpaceSnapshot = {
         id: META_MAP,
         title: 'Meta Map',
         kind: 'positioned',
-        positions: { [RESOURCE]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
         graphs: [{ id: META_GRAPH, title: 'Meta Graph', edges: [] }],
       },
     ],

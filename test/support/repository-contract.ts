@@ -2,6 +2,7 @@ import {
   uuidSchema,
   type GraphEdge,
   type GraphHeadShape,
+  type ResourceShape,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -158,8 +159,8 @@ const graphedSpace = (
           title: 'Owner',
           kind: 'positioned',
           positions: {
-            [from]: { x: 0, y: 0, open: false },
-            [to]: { x: 300, y: 0, open: false },
+            [from]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+            [to]: { x: 300, y: 0, open: false, shape: 'rectangle' },
           },
           graphs: [{ id: graphId, title: input.graphTitle ?? 'Graph', edges: [{ from, to }] }],
           activeGraph: graphId,
@@ -188,7 +189,7 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
         id: MAP_ID,
         title: 'Dangling',
         kind: 'positioned',
-        positions: { [memberId]: { x: 0, y: 0, open: false } },
+        positions: { [memberId]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
         graphs: [
           { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_RESOURCE_ID }] },
         ],
@@ -1119,6 +1120,53 @@ export const spaceRepositoryContract = (
     });
   });
 
+  it(`${name} keeps every Resource's Shape through initialization, commit and load`, async () => {
+    await withHarness(async (repository) => {
+      const withResourceShapes = (
+        first: ResourceShape,
+        second: ResourceShape,
+        secondOpen: boolean,
+      ): SpaceSnapshot => {
+        const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
+        return {
+          ...base,
+          document: {
+            ...base.document,
+            maps: (base.document.maps ?? []).map((m) => ({
+              ...m,
+              positions: {
+                [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: first },
+                [SECOND_RESOURCE_ID]: secondOpen
+                  ? {
+                      x: 300,
+                      y: 0,
+                      open: true,
+                      openSize: { width: 560, height: 420 },
+                      shape: second,
+                    }
+                  : { x: 300, y: 0, open: false, shape: second },
+              },
+            })),
+          },
+        };
+      };
+      const initial = withResourceShapes('diamond', 'pill', false);
+
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(initial, 0n, null));
+
+      const changed = withResourceShapes('ellipse', 'hexagon', true);
+      await expect(commitUpdate(repository, changed, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, null));
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(changed, 1n, null)] },
+      });
+    });
+  });
+
   /*
    * On the SQL repository (`sql-space-repository.ts`), the shared
    * `#writeUpdate` helper runs an unconditional `deleteExcept` after every
@@ -1311,7 +1359,7 @@ export const spaceRepositoryContract = (
               id: MAP_ID,
               title: 'First map',
               kind: 'positioned',
-              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
               graphs: [
                 { id: GRAPH_ID, title: 'First graph', edges: [] },
                 { id: THIRD_GRAPH_ID, title: 'Second graph', edges: [] },
@@ -1322,7 +1370,9 @@ export const spaceRepositoryContract = (
               id: SECOND_MAP_ID,
               title: 'Second map',
               kind: 'positioned',
-              positions: { [OTHER_RESOURCE_ID]: { x: 100, y: 100, open: false } },
+              positions: {
+                [OTHER_RESOURCE_ID]: { x: 100, y: 100, open: false, shape: 'rectangle' },
+              },
               graphs: [
                 { id: SECOND_GRAPH_ID, title: 'Third graph', edges: [] },
                 { id: FOURTH_GRAPH_ID, title: 'Fourth graph', edges: [] },
@@ -1940,8 +1990,8 @@ export const spaceRepositoryContract = (
               ...firstMap,
               positions: {
                 ...firstMap.positions,
-                [RESOURCE_ID]: { x: 40, y: 40, open: false },
-                [OTHER_RESOURCE_ID]: { x: 600, y: 0, open: false },
+                [RESOURCE_ID]: { x: 40, y: 40, open: false, shape: 'rectangle' },
+                [OTHER_RESOURCE_ID]: { x: 600, y: 0, open: false, shape: 'rectangle' },
               },
             },
           ],

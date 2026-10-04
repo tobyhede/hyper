@@ -95,7 +95,10 @@ const spaceFileArb = resourceIdPool.chain((pool) =>
             title: 'Only map',
             kind: 'positioned',
             positions: Object.fromEntries(
-              visited.map((id, index) => [id, { x: index * 300, y: 0, open: false }]),
+              visited.map((id, index) => [
+                id,
+                { x: index * 300, y: 0, open: false, shape: 'rectangle' },
+              ]),
             ),
             graphs: graphs.map((graph, index) => ({
               id: uuidFrom(index + 100),

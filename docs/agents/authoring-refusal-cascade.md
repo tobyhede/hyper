@@ -59,6 +59,7 @@ Guards above are omitted below.
 | `opened-resource` | `resource-not-in-map` → (already Open ⇒ `unchanged`) → completed |
 | `closed-resource` | `resource-not-in-map` → (already Closed ⇒ `unchanged`) → completed |
 | `resized-resource` | `resource-not-in-map` → `resource-not-open` → (same size ⇒ `unchanged`) → completed |
+| `changed-resource-shape` | `resource-not-in-map` → (same Shape ⇒ `unchanged`) → completed |
 | `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |

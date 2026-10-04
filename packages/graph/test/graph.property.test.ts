@@ -31,7 +31,10 @@ function mapOver(index: number, ids: number[], graphCount: number) {
     title: `Map ${index}`,
     kind: 'positioned' as const,
     positions: Object.fromEntries(
-      ids.map((id, i) => [resourceId(id), { x: i * 320, y: index * 200, open: false }]),
+      ids.map((id, i) => [
+        resourceId(id),
+        { x: i * 320, y: index * 200, open: false, shape: 'rectangle' },
+      ]),
     ),
     graphs: Array.from({ length: graphCount }, (_, g) => ({
       id: graphId(index * 100 + g),

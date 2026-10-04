@@ -53,7 +53,10 @@ function spaceFile(
         title: 'Only map',
         kind: 'positioned',
         positions: Object.fromEntries(
-          members.map((id, index) => [uuid(id), { x: index * 300, y: 0, open: false }]),
+          members.map((id, index) => [
+            uuid(id),
+            { x: index * 300, y: 0, open: false, shape: 'rectangle' },
+          ]),
         ),
         graphs: graphs.map(({ id, title, edges }) => ({
           id: uuid(id),

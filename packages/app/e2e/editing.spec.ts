@@ -732,8 +732,8 @@ test('dragging an Open Resource across a neighbour moves nothing but the dragged
   // Apart on `y` by more than a Resource's height, so the two never overlap and
   // the drag below crosses `x` alone.
   await seedGeometry(page, 'Drag Geometry', {
-    [SUBJECT.id]: { x: 120, y: 400, open: false },
-    [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
+    [SUBJECT.id]: { x: 120, y: 400, open: false, shape: 'rectangle' },
+    [NEIGHBOUR.id]: { x: 0, y: 0, open: false, shape: 'rectangle' },
   });
   const subject = seededNode(page, SUBJECT);
 
@@ -790,8 +790,8 @@ test('a closed Resource released inside an Open Resource lands at the drop point
   page,
 }) => {
   await seedGeometry(page, 'Drop Geometry', {
-    [SUBJECT.id]: { x: 150, y: 150, open: false },
-    [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
+    [SUBJECT.id]: { x: 150, y: 150, open: false, shape: 'rectangle' },
+    [NEIGHBOUR.id]: { x: 0, y: 0, open: false, shape: 'rectangle' },
   });
   const subject = seededNode(page, SUBJECT);
   const mover = seededNode(page, NEIGHBOUR);
@@ -847,9 +847,9 @@ test('opening a Resource displaces its neighbours once, and dragging it never di
   page,
 }) => {
   await seedGeometry(page, 'Open Geometry', {
-    [SUBJECT.id]: { x: 0, y: 0, open: false },
-    [NEIGHBOUR.id]: { x: 300, y: 250, open: false },
-    [BEHIND.id]: { x: -200, y: -150, open: false },
+    [SUBJECT.id]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+    [NEIGHBOUR.id]: { x: 300, y: 250, open: false, shape: 'rectangle' },
+    [BEHIND.id]: { x: -200, y: -150, open: false, shape: 'rectangle' },
   });
   const subject = seededNode(page, SUBJECT);
   const closed = await allPositions(page);

@@ -24,8 +24,8 @@ const snapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false },
-          [RESOURCE_B]: { x: 200, y: 0, open: false },
+          [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [RESOURCE_B]: { x: 200, y: 0, open: false, shape: 'rectangle' },
         },
         graphs: [MAIN],
       },
@@ -61,8 +61,8 @@ it("writes a Map's identity and opening selection, preserving its positions and 
       title: 'Renamed',
       kind: 'positioned',
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: false },
-        [RESOURCE_B]: { x: 200, y: 0, open: false },
+        [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+        [RESOURCE_B]: { x: 200, y: 0, open: false, shape: 'rectangle' },
       },
       graphs: [MAIN],
       activeGraph: GRAPH_ID,
@@ -103,7 +103,7 @@ it('leaves unrelated maps standing while writing one', () => {
           id: OTHER_MAP_ID,
           title: 'Other',
           kind: 'positioned',
-          positions: { [RESOURCE_A]: { x: 0, y: 400, open: false } },
+          positions: { [RESOURCE_A]: { x: 0, y: 400, open: false, shape: 'rectangle' } },
           graphs: [
             { id: OTHER_GRAPH_ID, title: 'Aside', edges: [{ from: RESOURCE_A, to: RESOURCE_A }] },
           ],

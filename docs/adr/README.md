@@ -56,6 +56,7 @@ under `superseded/`.
 | [0106](0106-an-image-resource-owns-a-url-not-bytes.md) | An Image Resource owns a URL, not bytes. The host stores images at `/images/<sha256>`, named for what they are and outside the aggregate. The repo-state rule is deliberately waived for the picture. |
 | [0113](0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md) | Every capability is a Resource's, and a kind only adds actions; Reference is the terminal exception. An Ur Resource has no content and no Edit. A self-targeting Reference Resource was rejected. |
 | [0114](0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md) | First Open Size, resize floor, Map embedding and content area are decided from resolved content, so a Reference Resource takes its Target's; its kind withholds only content actions. |
+| [0115](0115-a-shape-is-a-maps-and-only-a-closed-resource-draws-it.md) | A Resource's Shape (rectangle, pill, ellipse, diamond, hexagon) is stored on its Map entry, required and given the rectangle on Add; only a Closed Resource draws it, within the fixed Closed Size. |
 
 ## Layout, View and Graph
 

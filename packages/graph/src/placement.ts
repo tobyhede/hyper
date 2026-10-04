@@ -1,4 +1,5 @@
 import {
+  ADDED_RESOURCE_SHAPE,
   COLLAPSED_RESOURCE_SIZE,
   type ResourceId,
   type ResourcePlacement,
@@ -70,25 +71,31 @@ export type Placement = ReadonlyMap<ResourceId, Readonly<ResourcePlacement>> & {
 const brand = (positions: ReadonlyMap<ResourceId, Readonly<ResourcePlacement>>): Placement =>
   positions as Placement;
 
+/**
+ * A whole entry, or a bare point for a Resource joining the placement, which
+ * joins Closed and is given the rectangle (ADR 0115).
+ */
 type PlacementPoint = ResourcePlacement | (MapPosition & { readonly open?: never });
 
 const point = (at: PlacementPoint): ResourcePlacement => {
-  if (at.open === undefined) return { x: at.x, y: at.y, open: false };
+  if (at.open === undefined) return { x: at.x, y: at.y, open: false, shape: ADDED_RESOURCE_SHAPE };
   if (at.open) {
     return {
       x: at.x,
       y: at.y,
       open: true,
       openSize: { width: at.openSize.width, height: at.openSize.height },
+      shape: at.shape,
     };
   }
   return at.openSize === undefined
-    ? { x: at.x, y: at.y, open: false }
+    ? { x: at.x, y: at.y, open: false, shape: at.shape }
     : {
         x: at.x,
         y: at.y,
         open: false,
         openSize: { width: at.openSize.width, height: at.openSize.height },
+        shape: at.shape,
       };
 };
 
@@ -119,7 +126,7 @@ function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement 
   const positions = new Map<ResourceId, ResourcePlacement>();
   for (const resource of strategyGraph.resources) {
     if (resource.x === undefined || resource.y === undefined) continue;
-    positions.set(resource.id, { x: resource.x, y: resource.y, open: false });
+    positions.set(resource.id, point({ x: resource.x, y: resource.y }));
   }
   return brand(positions);
 }
@@ -137,7 +144,7 @@ function fromEntries(entries: Iterable<readonly [ResourceId, PlacementPoint]>): 
   return brand(positions);
 }
 
-/** Value equality: the same resources, each at the same coordinates. */
+/** Value equality: the same resources, each with the same coordinates, state, Open Size and Shape. */
 function equals(a: Placement | null, b: Placement | null): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -149,6 +156,7 @@ function equals(a: Placement | null, b: Placement | null): boolean {
     if (other.open !== at.open) return false;
     if (other.openSize?.width !== at.openSize?.width) return false;
     if (other.openSize?.height !== at.openSize?.height) return false;
+    if (other.shape !== at.shape) return false;
   }
   return true;
 }
@@ -181,9 +189,9 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * there is no derivation to invert. A settled drag therefore authors the drop
  * point exactly, whatever is Open and wherever it sits.
  *
- * The resource's own Open/Closed state and Open Size survive the merge: a renderer
- * reports React Flow node positions and nothing else, so only `x` and `y` are
- * read out of it.
+ * The resource's own Open/Closed state, Open Size and Shape survive the merge: a
+ * renderer reports React Flow node positions and nothing else, so only `x` and
+ * `y` are read out of it.
  *
  * Returns `authored` itself when nothing changes, so an unchanged placement
  * keeps its identity and a settled graph is not re-arranged by the projection
@@ -364,12 +372,12 @@ function roomAxis(at: MapPosition, subject: MapPosition): 'x' | 'y' | null {
  * this compares against wherever the subject now sits rather than wherever it
  * was when it Opened.
  *
- * Open/Closed state and the remembered Open Size ride through untouched; only
- * `x` and `y` move (ADR 0066). Answers the placement it was given whenever no
- * Resource actually moves — a subject the map does not hold, a growth that is zero
- * on both axes, and the case neither of those catches: a nonzero growth with
- * nothing clear of the subject, which `reclaim` reaches for a subject the
- * author dragged past its own displaced neighbours. Like `remove`, so an Edit
+ * Open/Closed state, the remembered Open Size and the Shape ride through
+ * untouched; only `x` and `y` move (ADR 0066, ADR 0115). Answers the placement
+ * it was given whenever no Resource actually moves — a subject the map does not
+ * hold, a growth that is zero on both axes, and the case neither of those
+ * catches: a nonzero growth with nothing clear of the subject, which `reclaim`
+ * reaches for a subject the author dragged past its own displaced neighbours. Like `remove`, so an Edit
  * that moves nothing keeps the placement's identity and a settled graph is not
  * laid out again.
  */

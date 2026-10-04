@@ -19,7 +19,7 @@ async function openPicturesAndElsewhere(page: Page): Promise<void> {
   const seeded = await seedPositionedMap(
     page,
     'Pictures',
-    () => ({ [IMAGE_ID]: { x: 400, y: 0, open: false } }),
+    () => ({ [IMAGE_ID]: { x: 400, y: 0, open: false, shape: 'rectangle' } }),
     [
       {
         id: IMAGE_ID,

@@ -59,7 +59,7 @@ const targetSpace = (
         id: mapId,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [resourceId]: { x: 0, y: 0, open: false } },
+        positions: { [resourceId]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
         graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
         activeGraph: graphId,
       },
@@ -87,10 +87,16 @@ const metaSpace = (): SpaceSnapshot => ({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, open: false },
-          [FIRST_LINK_ID]: { x: 340, y: 0, open: false },
-          [SECOND_LINK_ID]: { x: 680, y: 0, open: true, openSize: { width: 480, height: 270 } },
-          [CONVERGING_LINK_ID]: { x: 1020, y: 0, open: false },
+          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [FIRST_LINK_ID]: { x: 340, y: 0, open: false, shape: 'rectangle' },
+          [SECOND_LINK_ID]: {
+            x: 680,
+            y: 0,
+            open: true,
+            openSize: { width: 480, height: 270 },
+            shape: 'rectangle',
+          },
+          [CONVERGING_LINK_ID]: { x: 1020, y: 0, open: false, shape: 'rectangle' },
         },
         graphs: [
           {
@@ -317,6 +323,49 @@ describe('exporting and importing one complete aggregate', () => {
         expect(graph).not.toHaveProperty('headShape');
       }
     }
+  });
+
+  it("preserves every Resource's Shape on its Map, Open and Closed alike", async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const [meta, ...targets] = completeAggregate();
+    if (meta === undefined) throw new Error('The aggregate names no Meta Space');
+    const withResourceShapes: SpaceSnapshot = {
+      ...meta,
+      document: {
+        ...meta.document,
+        maps: meta.document.maps?.map((m) => ({
+          ...m,
+          positions: Object.fromEntries(
+            Object.entries(m.positions).map(([id, at]) => [
+              id,
+              at === undefined
+                ? at
+                : {
+                    ...at,
+                    shape:
+                      id === FIRST_LINK_ID
+                        ? 'diamond'
+                        : id === SECOND_LINK_ID
+                          ? 'hexagon'
+                          : at.shape,
+                  },
+            ]),
+          ),
+        })),
+      },
+    };
+
+    await exportTo(repositoryHolding([withResourceShapes, ...targets]), destination);
+    const written = await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8');
+    // Written last on the entry, after an Open Resource's remembered Open Size.
+    expect(written).toMatch(/"openSize": \{[^}]*\},\s*"shape": "hexagon"/);
+    const reimported = await importFrom(destination);
+
+    const positions = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID)
+      ?.document.maps?.[0]?.positions;
+    expect(positions?.[FIRST_LINK_ID]?.shape).toBe('diamond');
+    expect(positions?.[SECOND_LINK_ID]).toMatchObject({ open: true, shape: 'hexagon' });
+    expect(positions?.[MARKDOWN_RESOURCE_ID]?.shape).toBe('rectangle');
   });
 
   /*

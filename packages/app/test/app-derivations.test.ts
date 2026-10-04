@@ -86,7 +86,7 @@ describe('referenceAnchor', () => {
   const centre = () => ({ x: -7, y: -9 });
 
   it('steps three quarters of a collapsed Resource from a Closed source', () => {
-    expect(referenceAnchor({ x: 10, y: 20, open: false }, centre)).toEqual({
+    expect(referenceAnchor({ x: 10, y: 20, open: false, shape: 'rectangle' }, centre)).toEqual({
       x: 10 + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO),
       y: 20 + Math.round(RESOURCE_HEIGHT * REFERENCE_OFFSET_RATIO),
     });
@@ -95,7 +95,10 @@ describe('referenceAnchor', () => {
   it('adds the room an Open source holds', () => {
     const openSize = { width: 600, height: 400 };
     const growth = Placement.growth(openSize);
-    const anchor = referenceAnchor({ x: 0, y: 0, open: true, openSize }, centre);
+    const anchor = referenceAnchor(
+      { x: 0, y: 0, open: true, openSize, shape: 'rectangle' },
+      centre,
+    );
 
     expect(anchor.x).toBe(
       Math.max(RESOURCE_WIDTH, growth.width + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO)),

@@ -33,8 +33,8 @@ const load = (defaultMap: MapId | undefined) =>
           // answers in `space.resources` order, and a Placement that agreed with
           // that order could not tell the two apart.
           positions: {
-            [ALSO_PLACED]: { x: 40, y: 50, open: false },
-            [PLACED]: { x: 12, y: 24, open: false },
+            [ALSO_PLACED]: { x: 40, y: 50, open: false, shape: 'rectangle' },
+            [PLACED]: { x: 12, y: 24, open: false, shape: 'rectangle' },
           },
           graphs: [{ id: GRAPH, title: 'Graph 1', edges: [] }],
           activeGraph: GRAPH,

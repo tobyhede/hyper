@@ -43,8 +43,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [INTAKE]: { x: 0, y: 0, open: false },
-          [STORAGE]: { x: 264, y: 0, open: false },
+          [INTAKE]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [STORAGE]: { x: 264, y: 0, open: false, shape: 'rectangle' },
         },
         graphs: [
           { id: TARGET_GRAPH_ID, title: 'Overview', edges: [{ from: INTAKE, to: STORAGE }] },
@@ -75,6 +75,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
             y: 0,
             open: true,
             openSize: { width: 700, height: 500 },
+            shape: 'rectangle',
           },
         },
         graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -107,8 +108,8 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_TO_HOME_ID]: { x: 0, y: 0, open: false },
-          [META_TO_TARGET_ID]: { x: 300, y: 0, open: false },
+          [META_TO_HOME_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [META_TO_TARGET_ID]: { x: 300, y: 0, open: false, shape: 'rectangle' },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },

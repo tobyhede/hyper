@@ -29,14 +29,14 @@ function composition(newId?: () => ReturnType<typeof id>) {
           id: OPENING_MAP,
           title: 'Opening',
           kind: 'positioned',
-          positions: { [RESOURCE]: { x: 0, y: 0, open: false } },
+          positions: { [RESOURCE]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
           graphs: [{ id: OPENING_GRAPH, title: 'Opening Graph', edges: [] }],
         },
         {
           id: OTHER_MAP,
           title: 'Other',
           kind: 'positioned',
-          positions: { [RESOURCE]: { x: 40, y: 40, open: false } },
+          positions: { [RESOURCE]: { x: 40, y: 40, open: false, shape: 'rectangle' } },
           graphs: [
             { id: STORED_GRAPH, title: 'Stored Graph', edges: [] },
             { id: SHOWN_GRAPH, title: 'Shown Graph', edges: [] },

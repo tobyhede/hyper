@@ -45,7 +45,7 @@ describe('newSpace', () => {
     expect(onlyMap.graphs).toMatchObject([{ title: 'Graph 1', edges: [] }]);
     // An empty Map's first Graph stores the colour the one creation rule picks.
     expect(onlyMap.graphs[0]?.color).toBe(nextGraphColor([]));
-    expect(onlyMap.positions[resource.id]).toEqual({ x: 0, y: 0, open: false });
+    expect(onlyMap.positions[resource.id]).toEqual({ x: 0, y: 0, open: false, shape: 'rectangle' });
     expect(result.space.defaultMap).toBe(onlyMap.id);
   });
 
@@ -97,7 +97,7 @@ describe('initializeSpace', () => {
         id: MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
         graphs: [
           {
             id: GRAPH_ID,

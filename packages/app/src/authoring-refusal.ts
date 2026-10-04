@@ -95,6 +95,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
         return 'Select a Map to add an existing Resource to it.';
       if (refusal.operation === 'removed-resource-from-map')
         return 'Select a Map to remove a Resource from it.';
+      if (refusal.operation === 'changed-resource-shape')
+        return 'Select a Map to change the Shape a Resource is drawn in.';
       if (
         refusal.operation === 'renamed-graph' ||
         refusal.operation === 'recolored-graph' ||

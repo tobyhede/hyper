@@ -37,8 +37,8 @@ const mapOwning = (...graphs: readonly object[]) => ({
   title: 'Working',
   kind: 'positioned',
   positions: {
-    [RESOURCE_A]: { x: 0, y: 0, open: false },
-    [RESOURCE_B]: { x: 400, y: 0, open: false },
+    [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+    [RESOURCE_B]: { x: 400, y: 0, open: false, shape: 'rectangle' },
   },
   graphs,
 });
@@ -236,8 +236,14 @@ describe('canvasProjection', () => {
     const authoredMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-        [RESOURCE_B]: { x: 700, y: 0, open: false },
+        [RESOURCE_A]: {
+          x: 0,
+          y: 0,
+          open: true,
+          openSize: { width: 560, height: 420 },
+          shape: 'rectangle',
+        },
+        [RESOURCE_B]: { x: 700, y: 0, open: false, shape: 'rectangle' },
       },
     };
     const space = spaceWith({ maps: [authoredMap] });

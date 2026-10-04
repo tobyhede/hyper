@@ -21,7 +21,7 @@ export const contractLoaded: LoadedSpace = {
           id: MAP_ID,
           title: 'Map 1',
           kind: 'positioned',
-          positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+          positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
           graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
           activeGraph: GRAPH_ID,
         },
@@ -133,7 +133,7 @@ export const spaceBackendContract = (
           id: MAP_ID,
           title: 'Owner',
           kind: 'positioned',
-          positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
+          positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
           graphs: [
             { id: GRAPH_ID, title: 'Dangling', edges: [{ from: RESOURCE_ID, to: MISSING_ID }] },
           ],

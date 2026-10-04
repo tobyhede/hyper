@@ -138,7 +138,10 @@ const simple = (defaultMap?: string): Document => {
     maps: [
       positionedMap(
         WORKING,
-        { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+        {
+          [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+        },
         [graph(MAIN, 'Main', [{ from: A, to: B }])],
       ),
     ],
@@ -177,13 +180,18 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [
                 graph(MAIN, 'Main', [{ from: A, to: B }]),
                 graph(ASIDE, 'Aside', [{ from: B, to: A }]),
               ],
             ),
-            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(THIRD, 'Third')]),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false, shape: 'rectangle' } }, [
+              graph(THIRD, 'Third'),
+            ]),
           ],
         }),
       );
@@ -218,7 +226,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
               { activeGraph: ASIDE },
             ),
@@ -237,7 +248,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
             ),
           ],
@@ -282,7 +296,9 @@ describe.each([
         load({
           resources: [image],
           maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false, shape: 'rectangle' } }, [
+              graph(MAIN, 'Graph 1'),
+            ]),
           ],
         }),
       );
@@ -297,7 +313,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Graph 1', [{ from: A, to: B }])],
             ),
           ],
@@ -313,7 +332,9 @@ describe.each([
         load({
           resources: [markdown(A, 'A')],
           maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Graph 1')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false, shape: 'rectangle' } }, [
+              graph(MAIN, 'Graph 1'),
+            ]),
           ],
         }),
       );
@@ -330,9 +351,9 @@ describe.each([
             positionedMap(
               WORKING,
               {
-                [A]: { x: 0, y: 0, open: false },
-                [B]: { x: 320, y: 0, open: false },
-                [C]: { x: 640, y: 0, open: false },
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+                [C]: { x: 640, y: 0, open: false, shape: 'rectangle' },
               },
               [
                 graph(MAIN, 'Main', [
@@ -357,7 +378,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [
                 graph(MAIN, 'Main', [{ from: A, to: B }]),
                 graph(ASIDE, 'Alt', [{ from: A, to: B }]),
@@ -376,7 +400,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [
                 graph(MAIN, 'Main', [
                   { from: A, to: B },
@@ -399,7 +426,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [
                 graph(MAIN, 'Main', [
                   { from: A, to: B, title: 'On success' },
@@ -423,7 +453,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [edge])],
             ),
           ],
@@ -439,7 +472,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
             ),
           ],
@@ -463,7 +499,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: B, to: C }])],
             ),
           ],
@@ -482,10 +521,15 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: C }])],
             ),
-            positionedMap(SECOND, { [C]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(SECOND, { [C]: { x: 0, y: 200, open: false, shape: 'rectangle' } }, [
+              graph(ASIDE, 'Aside'),
+            ]),
           ],
         }),
       );
@@ -501,7 +545,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [ABSENT]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: ABSENT }])],
             ),
           ],
@@ -519,7 +566,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
             ),
           ],
@@ -537,7 +587,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(ASIDE, 'Aside')],
               { activeGraph: ASIDE },
             ),
@@ -554,7 +607,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
               { activeGraph: ABSENT },
             ),
@@ -576,11 +632,16 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
               { activeGraph: ASIDE },
             ),
-            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false, shape: 'rectangle' } }, [
+              graph(ASIDE, 'Aside'),
+            ]),
           ],
         }),
       );
@@ -603,10 +664,13 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: B }]), graph(MAIN, 'Main again')],
             ),
-            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false } }, [
+            positionedMap(SECOND, { [A]: { x: 0, y: 200, open: false, shape: 'rectangle' } }, [
               graph(MAIN, 'Main a third time'),
             ]),
           ],
@@ -628,12 +692,18 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [B]: { x: 320, y: 0, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main', [{ from: A, to: B }])],
             ),
             positionedMap(
               SECOND,
-              { [A]: { x: 0, y: 200, open: false }, [B]: { x: 320, y: 200, open: false } },
+              {
+                [A]: { x: 0, y: 200, open: false, shape: 'rectangle' },
+                [B]: { x: 320, y: 200, open: false, shape: 'rectangle' },
+              },
               [graph(ASIDE, 'Aside', [{ from: B, to: A }])],
             ),
           ],
@@ -647,8 +717,12 @@ describe.each([
         load({
           resources: [markdown(A, 'A')],
           maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-            positionedMap(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false, shape: 'rectangle' } }, [
+              graph(MAIN, 'Main'),
+            ]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 200, open: false, shape: 'rectangle' } }, [
+              graph(ASIDE, 'Aside'),
+            ]),
           ],
         }),
       );
@@ -745,8 +819,12 @@ describe.each([
         load({
           resources: [markdown(A, 'A'), referenceTo(B, ABSENT)],
           maps: [
-            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false } }, [graph(MAIN, 'Main')]),
-            positionedMap(WORKING, { [A]: { x: 0, y: 200, open: false } }, [graph(ASIDE, 'Aside')]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false, shape: 'rectangle' } }, [
+              graph(MAIN, 'Main'),
+            ]),
+            positionedMap(WORKING, { [A]: { x: 0, y: 200, open: false, shape: 'rectangle' } }, [
+              graph(ASIDE, 'Aside'),
+            ]),
           ],
           defaultMap: ABSENT,
         }),
@@ -764,7 +842,10 @@ describe.each([
           maps: [
             positionedMap(
               WORKING,
-              { [A]: { x: 0, y: 0, open: false }, [ABSENT]: { x: 1, y: 1, open: false } },
+              {
+                [A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+                [ABSENT]: { x: 1, y: 1, open: false, shape: 'rectangle' },
+              },
               [graph(MAIN, 'Main'), graph(MAIN, 'Main again')],
             ),
           ],

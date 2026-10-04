@@ -129,12 +129,12 @@ export const colorByGraphId = {
  * distinguish Resources with different Graph membership.
  */
 export const positions = {
-  [resourceIds.opening]: { x: 40, y: 170, open: false },
-  [resourceIds.problem]: { x: 380, y: 30, open: false },
-  [resourceIds.strategies]: { x: 720, y: 170, open: false },
-  [resourceIds.traversal]: { x: 1060, y: 30, open: false },
-  [resourceIds.openingReference]: { x: 1400, y: 170, open: false },
-  [resourceIds.closing]: { x: 1060, y: 330, open: false },
+  [resourceIds.opening]: { x: 40, y: 170, open: false, shape: 'rectangle' },
+  [resourceIds.problem]: { x: 380, y: 30, open: false, shape: 'rectangle' },
+  [resourceIds.strategies]: { x: 720, y: 170, open: false, shape: 'rectangle' },
+  [resourceIds.traversal]: { x: 1060, y: 30, open: false, shape: 'rectangle' },
+  [resourceIds.openingReference]: { x: 1400, y: 170, open: false, shape: 'rectangle' },
+  [resourceIds.closing]: { x: 1060, y: 330, open: false, shape: 'rectangle' },
 } as const;
 
 export const maps: readonly Map[] = [
@@ -145,7 +145,7 @@ export const maps: readonly Map[] = [
     positions: Object.fromEntries(
       resources.map((resource) => [
         resource.id,
-        positions[resource.id] ?? { x: 0, y: 0, open: false },
+        positions[resource.id] ?? { x: 0, y: 0, open: false, shape: 'rectangle' },
       ]),
     ),
     graphs: [...graphs],

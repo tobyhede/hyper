@@ -1,4 +1,5 @@
 import {
+  ADDED_RESOURCE_SHAPE,
   COLLAPSED_RESOURCE_SIZE,
   titleName,
   firstOpenSize,
@@ -6,6 +7,7 @@ import {
   type Map,
   type MapPosition,
   type ResourcePlacement,
+  type ResourceShape,
   type SpaceSnapshot,
   type ResourceDocument,
   type UUID,
@@ -15,8 +17,8 @@ import { resolveDocumentContent } from './content-resolution';
 
 /**
  * The Resource membership rules that turn a Space snapshot into the next one when
- * a Resource joins, grows, shrinks or leaves a Map — Add, Open, Close, Resize,
- * Remove from Map, Delete from Space.
+ * a Resource joins, grows, shrinks, changes Shape or leaves a Map — Add, Open,
+ * Close, Resize, change Shape, Remove from Map, Delete from Space.
  *
  * `SnapshotEdit` operates on `SpaceSnapshot` — the one representation both
  * Space Authoring and the session registry already hold — rather than the
@@ -33,8 +35,8 @@ import { resolveDocumentContent } from './content-resolution';
  *
  * Operations arrive with their first real caller rather than ahead of one.
  * Both callers create and delete through `createInMap` and `deleteFromSpace`;
- * `open`, `close`, `resize`, `addToMap` and `removeFromMap` are Space
- * Authoring's alone.
+ * `open`, `close`, `resize`, `changeResourceShape`, `addToMap` and
+ * `removeFromMap` are Space Authoring's alone.
  */
 
 /** Why a `SnapshotEdit` operation refused, with the typed context a sentence needs. */
@@ -154,7 +156,10 @@ function createInMap(
           m.id === mapId
             ? {
                 ...m,
-                positions: { ...m.positions, [resourceId]: { ...at, open: false } },
+                positions: {
+                  ...m.positions,
+                  [resourceId]: { x: at.x, y: at.y, open: false, shape: ADDED_RESOURCE_SHAPE },
+                },
               }
             : m,
         ),
@@ -462,13 +467,39 @@ function resize(
 }
 
 /**
+ * Draw a Resource in another Shape in one Map (ADR 0115).
+ *
+ * The Shape is drawn inside the fixed Closed Size and changes no rect, so no
+ * neighbour moves and the Resource's Open/Closed state and Open Size are kept.
+ * `unchanged` for the Shape it already has, including while it is Open.
+ */
+function changeResourceShape(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  shape: ResourceShape,
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  const at = placed.placement.get(resourceId);
+  if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  if (at.shape === shape) return UNCHANGED;
+  return withPlacement(
+    snapshot,
+    mapId,
+    Placement.place(placed.placement, resourceId, { ...at, shape }),
+  );
+}
+
+/**
  * Add a Resource the Space already holds to one Map, Closed, with no Edge.
  *
- * Membership and a position and nothing else: a Resource added back to a Map
- * is detached, and the Edges it once had there are never inferred back. The
- * position is an authored one (ADR 0084); `avoidingOverlap` steps off a point
- * another Resource already occupies exactly, as a creation from a menu does
- * ({@link freeAnchor}), and `exact` keeps it.
+ * Membership, a position and the rectangle, and nothing else: a Resource added
+ * back to a Map is detached, and neither the Edges nor the Shape it once had
+ * there are inferred back (ADR 0115). The position is an authored one
+ * (ADR 0084); `avoidingOverlap` steps off a point another Resource already
+ * occupies exactly, as a creation from a menu does ({@link freeAnchor}), and
+ * `exact` keeps it.
  */
 function addToMap(
   snapshot: SpaceSnapshot,
@@ -487,7 +518,12 @@ function addToMap(
   return withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, { x: at.x, y: at.y, open: false }),
+    Placement.place(placed.placement, resourceId, {
+      x: at.x,
+      y: at.y,
+      open: false,
+      shape: ADDED_RESOURCE_SHAPE,
+    }),
   );
 }
 
@@ -533,6 +569,7 @@ export const SnapshotEdit = {
   open,
   close,
   resize,
+  changeResourceShape,
   addToMap,
   removeFromMap,
 } as const;

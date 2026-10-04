@@ -91,7 +91,7 @@ const otherSnapshot = (): SpaceSnapshot => {
           id: OTHER_MAP_ID,
           title: 'Map 1',
           kind: 'positioned',
-          positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+          positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
           graphs: [{ id: OTHER_GRAPH_ID, title: 'Graph 1', edges: [] }],
           activeGraph: OTHER_GRAPH_ID,
         },
@@ -229,7 +229,9 @@ describe('HTTP space startup composition', () => {
               id: MAP_ID,
               title: 'Map 1',
               kind: 'positioned' as const,
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
+              positions: {
+                [RESOURCE_ID]: { x: 0, y: 0, open: false as const, shape: 'rectangle' as const },
+              },
               graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
             },
           ],
@@ -284,7 +286,9 @@ describe('HTTP space startup composition', () => {
               id: MAP_ID,
               title: 'Map',
               kind: 'positioned' as const,
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
+              positions: {
+                [RESOURCE_ID]: { x: 0, y: 0, open: false as const, shape: 'rectangle' as const },
+              },
               graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
             },
           ],
@@ -323,8 +327,13 @@ describe('HTTP space startup composition', () => {
               title: 'Map',
               kind: 'positioned' as const,
               positions: {
-                [RESOURCE_ID]: { x: 0, y: 0, open: false as const },
-                [OTHER_RESOURCE_ID]: { x: 320, y: 0, open: false as const },
+                [RESOURCE_ID]: { x: 0, y: 0, open: false as const, shape: 'rectangle' as const },
+                [OTHER_RESOURCE_ID]: {
+                  x: 320,
+                  y: 0,
+                  open: false as const,
+                  shape: 'rectangle' as const,
+                },
               },
               graphs: [
                 {
@@ -370,7 +379,9 @@ describe('HTTP space startup composition', () => {
               id: mapId,
               title: 'Map',
               kind: 'positioned' as const,
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
+              positions: {
+                [RESOURCE_ID]: { x: 0, y: 0, open: false as const, shape: 'rectangle' as const },
+              },
               graphs: [
                 {
                   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),
@@ -418,7 +429,9 @@ describe('HTTP space startup composition', () => {
               id: mapId,
               title: 'Map',
               kind: 'positioned' as const,
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false as const } },
+              positions: {
+                [RESOURCE_ID]: { x: 0, y: 0, open: false as const, shape: 'rectangle' as const },
+              },
               graphs: [
                 {
                   id: uuidSchema.parse('00000000-0000-4000-8000-000000000006'),

@@ -32,8 +32,8 @@ const snapshotWith = (naturalSize?: { width: number; height: number }): SpaceSna
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [IMAGE_ID]: { x: 0, y: 0, open: false },
-          [NEIGHBOUR_ID]: { x: 300, y: 0, open: false },
+          [IMAGE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [NEIGHBOUR_ID]: { x: 300, y: 0, open: false, shape: 'rectangle' },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -154,7 +154,10 @@ const withReference = (snapshot: SpaceSnapshot): SpaceSnapshot => ({
     ...snapshot.document,
     maps: (snapshot.document.maps ?? []).map((authoredMap) => ({
       ...authoredMap,
-      positions: { ...authoredMap.positions, [REFERENCE_ID]: { x: 0, y: 400, open: false } },
+      positions: {
+        ...authoredMap.positions,
+        [REFERENCE_ID]: { x: 0, y: 400, open: false, shape: 'rectangle' },
+      },
     })),
   },
   resources: [

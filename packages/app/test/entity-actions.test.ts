@@ -20,7 +20,7 @@ const MAP: Map = {
   id: MAP_ID,
   title: 'Collection 1',
   kind: 'positioned',
-  positions: { [PLACED_RESOURCE_ID]: { x: 0, y: 0, open: false } },
+  positions: { [PLACED_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
   graphs: [GRAPH],
 };
 const resource = (id: Resource['id'], title: string): Resource => ({

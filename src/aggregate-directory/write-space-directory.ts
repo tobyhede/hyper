@@ -24,10 +24,11 @@ const exists = async (path: string): Promise<boolean> => {
 };
 
 /**
- * One placement, rebuilt key by key — the remembered Open Size included, on both
- * arms of the union, because a rect carried through would export whatever order
- * `jsonb` handed it back in. `Placement.point` establishes width-then-height as
- * the canonical order and this is the same order written to disk.
+ * One placement, rebuilt key by key — the remembered Open Size and the Shape
+ * included, on both arms of the union, because a rect carried through would
+ * export whatever order `jsonb` handed it back in. `Placement.point` establishes
+ * that key order, width-then-height included, and this is the same order
+ * written to disk.
  */
 const canonicalPlacement = (point: ResourcePlacement): ResourcePlacement => {
   if (point.open) {
@@ -36,15 +37,17 @@ const canonicalPlacement = (point: ResourcePlacement): ResourcePlacement => {
       y: point.y,
       open: true,
       openSize: { width: point.openSize.width, height: point.openSize.height },
+      shape: point.shape,
     };
   }
   return point.openSize === undefined
-    ? { x: point.x, y: point.y, open: false }
+    ? { x: point.x, y: point.y, open: false, shape: point.shape }
     : {
         x: point.x,
         y: point.y,
         open: false,
         openSize: { width: point.openSize.width, height: point.openSize.height },
+        shape: point.shape,
       };
 };
 

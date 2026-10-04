@@ -953,8 +953,14 @@ describe('Space session registry', () => {
                     y: 0,
                     open: true as const,
                     openSize: { width: 400, height: 300 },
+                    shape: 'rectangle' as const,
                   },
-                  [DISPLACED_RESOURCE_ID]: { x: 400, y: 0, open: false as const },
+                  [DISPLACED_RESOURCE_ID]: {
+                    x: 400,
+                    y: 0,
+                    open: false as const,
+                    shape: 'rectangle' as const,
+                  },
                 },
                 graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
               },
@@ -1014,7 +1020,7 @@ describe('Space session registry', () => {
       expect(result).toEqual({ kind: 'completed' });
       const stored = await backend.loadSpace(SPACE_ID);
       expect(stored?.snapshot.document.maps?.[0]?.positions).toEqual({
-        [DISPLACED_RESOURCE_ID]: { x: 260, y: 0, open: false },
+        [DISPLACED_RESOURCE_ID]: { x: 260, y: 0, open: false, shape: 'rectangle' },
       });
     });
 
@@ -1040,8 +1046,18 @@ describe('Space session registry', () => {
                 title: 'Map 1',
                 kind: 'positioned' as const,
                 positions: {
-                  [REFERENCED_SPACE_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
-                  [REFERENCE_ID]: { x: 300, y: 0, open: false as const },
+                  [REFERENCED_SPACE_RESOURCE_ID]: {
+                    x: 0,
+                    y: 0,
+                    open: false as const,
+                    shape: 'rectangle' as const,
+                  },
+                  [REFERENCE_ID]: {
+                    x: 300,
+                    y: 0,
+                    open: false as const,
+                    shape: 'rectangle' as const,
+                  },
                 },
                 graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
               },
@@ -1149,7 +1165,12 @@ describe('Space session registry', () => {
                   title: 'Map 1',
                   kind: 'positioned' as const,
                   positions: {
-                    [REFERENCED_SPACE_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
+                    [REFERENCED_SPACE_RESOURCE_ID]: {
+                      x: 0,
+                      y: 0,
+                      open: false as const,
+                      shape: 'rectangle' as const,
+                    },
                   },
                   graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
                 },
@@ -1213,7 +1234,12 @@ describe('Space session registry', () => {
               ...m,
               positions: {
                 ...m.positions,
-                [LATE_REFERENCE_ID]: { x: 300, y: 0, open: false as const },
+                [LATE_REFERENCE_ID]: {
+                  x: 300,
+                  y: 0,
+                  open: false as const,
+                  shape: 'rectangle' as const,
+                },
               },
             }));
             containingSession.submit({
@@ -1327,11 +1353,21 @@ describe('Space session registry', () => {
                   title: 'Map 1',
                   kind: 'positioned' as const,
                   positions: {
-                    [REFERENCING_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
+                    [REFERENCING_RESOURCE_ID]: {
+                      x: 0,
+                      y: 0,
+                      open: false as const,
+                      shape: 'rectangle' as const,
+                    },
                     // Keeps Other reachable from Meta independently of the
                     // deletion below, so the scenario isolates what happens to
                     // Target rather than also depending on Other's own reachability.
-                    [OTHER_REFERENCE_RESOURCE_ID]: { x: 240, y: 0, open: false as const },
+                    [OTHER_REFERENCE_RESOURCE_ID]: {
+                      x: 240,
+                      y: 0,
+                      open: false as const,
+                      shape: 'rectangle' as const,
+                    },
                   },
                   graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
                 },
@@ -1428,7 +1464,12 @@ describe('Space session registry', () => {
               ...m,
               positions: {
                 ...m.positions,
-                [LATE_REFERENCE_RESOURCE_ID]: { x: 0, y: 0, open: false as const },
+                [LATE_REFERENCE_RESOURCE_ID]: {
+                  x: 0,
+                  y: 0,
+                  open: false as const,
+                  shape: 'rectangle' as const,
+                },
               },
             }));
             const committed = await commit({
@@ -1531,7 +1572,11 @@ describe('Space session registry', () => {
                 title: 'Map 1',
                 kind: 'positioned' as const,
                 positions: {
-                  [OCCUPYING_RESOURCE_ID]: { ...OCCUPIED_ANCHOR, open: false as const },
+                  [OCCUPYING_RESOURCE_ID]: {
+                    ...OCCUPIED_ANCHOR,
+                    open: false as const,
+                    shape: 'rectangle' as const,
+                  },
                 },
                 graphs: [{ id: CONTAINING_GRAPH, title: 'Graph 1', edges: [] }],
               },
@@ -1578,6 +1623,7 @@ describe('Space session registry', () => {
         x: OCCUPIED_ANCHOR.x + 24,
         y: OCCUPIED_ANCHOR.y + 24,
         open: false,
+        shape: 'rectangle',
       });
     });
 

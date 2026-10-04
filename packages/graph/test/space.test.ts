@@ -29,8 +29,13 @@ const WORKING = {
   title: 'Working',
   kind: 'positioned',
   positions: {
-    [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false },
-    [uuid('00000000-0000-4000-8000-000000000003')]: { x: 320, y: 0, open: false },
+    [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+    [uuid('00000000-0000-4000-8000-000000000003')]: {
+      x: 320,
+      y: 0,
+      open: false,
+      shape: 'rectangle',
+    },
   },
   graphs: [MAIN],
 };
@@ -150,7 +155,12 @@ describe('loadSpace', () => {
             id: uuid('00000000-0000-4000-8000-000000000022'),
             title: 'Working',
             positions: {
-              [uuid('00000000-0000-4000-8000-000000000002')]: { x: 0, y: 0, open: false },
+              [uuid('00000000-0000-4000-8000-000000000002')]: {
+                x: 0,
+                y: 0,
+                open: false,
+                shape: 'rectangle',
+              },
             },
           },
         ],
@@ -216,7 +226,7 @@ describe('loadSpace', () => {
       result.space.lookup.map(uuid('00000000-0000-4000-8000-000000000022'))?.map.positions[
         uuid('00000000-0000-4000-8000-000000000003')
       ],
-    ).toEqual({ x: 320, y: 0, open: false });
+    ).toEqual({ x: 320, y: 0, open: false, shape: 'rectangle' });
   });
 
   /**

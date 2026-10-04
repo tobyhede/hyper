@@ -39,9 +39,12 @@ describe('positionedStrategy', () => {
     const positions = Placement.fromEntries([
       [
         uuid('00000000-0000-4000-8000-000000000002'),
-        { x: 0, y: 0, open: true, openSize: { width: 360, height: 196 } },
+        { x: 0, y: 0, open: true, openSize: { width: 360, height: 196 }, shape: 'rectangle' },
       ],
-      [uuid('00000000-0000-4000-8000-000000000003'), { x: 300, y: 200, open: false }],
+      [
+        uuid('00000000-0000-4000-8000-000000000003'),
+        { x: 300, y: 200, open: false, shape: 'rectangle' },
+      ],
     ]);
     const laid = await positionedStrategy(positions)({
       resources: resourcesOf(
@@ -153,7 +156,7 @@ describe('positionedStrategy properties', () => {
         const positions = Placement.fromEntries(
           authored.map((id, i) => [
             id,
-            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false },
+            { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false, shape: 'rectangle' },
           ]),
         );
         const laid = await positionedStrategy(positions)({

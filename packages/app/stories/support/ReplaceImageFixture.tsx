@@ -55,9 +55,15 @@ export const picturesSnapshot: SpaceSnapshot = {
         title: 'Pictures',
         kind: 'positioned',
         positions: {
-          [FIGURE]: { x: 0, y: 0, open: false },
-          [MISSING]: { x: 360, y: 0, open: true, openSize: { width: 460, height: 380 } },
-          [THUMBNAIL]: { x: 900, y: 0, open: false },
+          [FIGURE]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [MISSING]: {
+            x: 360,
+            y: 0,
+            open: true,
+            openSize: { width: 460, height: 380 },
+            shape: 'rectangle',
+          },
+          [THUMBNAIL]: { x: 900, y: 0, open: false, shape: 'rectangle' },
         },
         graphs: [{ id: PICTURES_GRAPH, title: 'Main', edges: [] }],
         activeGraph: PICTURES_GRAPH,
