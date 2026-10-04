@@ -133,6 +133,7 @@ An answer that is correct but omits a "Must state" item **fails**. A shorter ans
 - **No Map without a Graph:** A Map is never without a Graph.
 - **The empty Graph:** It is valid and may be active. It cannot be presented until it has an Edge.
 - **Deletion limit:** The last Map of a Space cannot be deleted, because a working Space must keep a durable default Map.
+- **Default Map:** Add Map records the new Map as `defaultMap` (D16; Add Map is always a canvas Edit, so ADR 0116's drawn-Map exception does not apply).
 - **Choosing a Map:** Choosing between existing Maps is navigation, not an Edit.
 
 **Rules preserved:** R11, R9, R10, R12, R22, R30.
@@ -141,11 +142,11 @@ An answer that is correct but omits a "Must state" item **fails**. A shorter ans
 - The new Map is empty, owns one empty Active Graph, and is created and selected in one Edit.
 - Existing Resources are not added.
 - The last Map cannot be deleted, with the default-Map reason.
+- The new Map is recorded as `defaultMap` (R10, D16).
 
 **Must not contradict:**
 - Map selection is not an Edit (R10).
 - A Map always owns at least one Graph (R22).
-- Whether the new Map becomes the recorded default: see Ambiguity 3. Neither "always" nor "never" is required.
 
 **Sources:** ADR 0079 (paragraph 5), ADR 0040 (paragraph 4), ADR 0041 (paragraph 3), CONTEXT "Graph".
 
@@ -210,11 +211,11 @@ Contrast: Deleting the Resource from the Space would run this same cascade in ev
 - Incident Edges removed in this Map's Graphs, in the same Edit.
 - Emptied Graphs remain.
 - The Resource remains in the Space and the other Map.
+- Because it was Open, it is Closed in the same Edit and the room it held is reclaimed (R35, G1).
 
 **Must not contradict:**
 - Omission means absent, never the origin (R31).
 - No automatic placement for omitted Resources (R31).
-- Room reclaim for an Open Resource (R35, see Ambiguity 2).
 - Earlier Edges are not inferred back on re-add (R33).
 
 **Sources:** ADR 0040 (paragraphs 2–3, Consequences), CONTEXT "Map", "Graph" and "Placement", `snapshot-edits.ts` (build evidence only).
@@ -390,12 +391,13 @@ Contrast: Deleting the Resource from the Space would run this same cascade in ev
 2. **Room reclaimed on removal (G1, resolved 2026-10-04: a live rule; removal Closes an Open Resource in the same Edit, then removes it).**
    - The gap: R35 is stated by CONTEXT and built, but no ADR states it.
    - This affects: Q6.
-   - Acceptable answers: Q6 lists reclaim under "Must not contradict" rather than "Must state", so an answer that omits it can still pass, but one that says the neighbours stay displaced fails.
-   - The user confirmed R35 as a live rule. It now belongs under "Must state". All four graded readers stated it in Q6, so no grade changes.
+   - Under the pre-resolution rubric, Q6 listed reclaim under "Must not contradict", so an answer omitting it could pass and only one saying the neighbours stay displaced failed. The four pilot readers were graded under that rubric; all four stated it, and their recorded scores stand.
+   - Under the resolved rule, reclaim is a "Must state" item in Q6, and an answer that omits it fails.
 3. **Recording the default Map (D16, resolved 2026-10-04: every Edit in a Map records it as `defaultMap`, Add Map included).**
    - The difference: ADR 0079 says a later Edit "may" record the Map as default. The code always does, including for Add Map.
    - This affects: Q4 and Q9.
-   - Acceptable answers: any position consistent with "may" (as graded). Under the resolution, "every Edit records it" is the precise answer. "May" stays acceptable, being less precise rather than wrong. No reader said "never" or "at selection", so no grade changes.
+   - Under the pre-resolution rubric, any position consistent with "may" passed; the four pilot readers were graded so, none said "never" or "at selection", and their recorded scores stand.
+   - Under the resolved rule, Q4 must state that Add Map records the new Map as `defaultMap`. For Q9, every Edit through the canvas's Map records it, and an Edit through a Map drawn inside an Open Space Resource does not (D21, ADR 0116).
    - Fails: an answer saying selecting a Map is itself an Edit or is persisted at selection time.
 4. **Auto-arrange scope details (G6, and Open state).**
    - The gap: No source says whether Auto-arrange respects Open Sizes, which strategy it uses, or whether it records provenance.
