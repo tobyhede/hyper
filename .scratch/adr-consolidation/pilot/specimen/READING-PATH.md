@@ -1,5 +1,7 @@
 # Reading path: where to read before you work
 
+> **Adopted 2026-10-04 as `docs/agents/maps-and-graphs.md`** (ticket 02, ADR 0115). This file is the evaluated snapshot, kept as evidence; it is not maintained. Read the adopted contract instead.
+
 > **Non-normative pilot specimen** (`.scratch/adr-consolidation/issues/01-prove-map-graph-pilot.md`). This page stands in for the routing guidance a contributor would meet in `AGENTS.md`, for a reading-path evaluation only. It adopts no policy and changes no accepted decision. Only the Map and Graph topic has a current contract here; every other topic keeps its existing route.
 
 ## The project in brief

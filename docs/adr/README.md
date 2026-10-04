@@ -4,7 +4,19 @@ Every accepted ADR, one line each. The line states what the decision **binds** â
 the thing that must change if the decision is reversed. It is not a summary of
 the document.
 
-Read this first. Open an ADR when you are about to change what it binds.
+This index discovers decisions. It is not where the current design is stated.
+For a topic with a current contract, read that contract before the ADRs: it
+states the live rules in current words, with their reasons and source links
+([ADR 0115](0115-current-contracts-state-the-live-design-and-adrs-keep-its-history.md)).
+Open an ADR when you need the full argument, a rejected alternative or the
+history, or when you are about to change what it binds.
+
+| Topic | Current contract |
+| --- | --- |
+| Maps, Graphs, placement, Open and Close, initialization, layout strategies | [`docs/agents/maps-and-graphs.md`](../agents/maps-and-graphs.md) |
+
+Every other topic has no contract yet: read this index, `AGENTS.md`'s "Decided"
+entries and the scoped guide for the area.
 
 - A retired decision moves to [`superseded/`](superseded/). It stays readable,
   and a live ADR that points at one still resolves. It is history, not a rule.
@@ -50,6 +62,8 @@ under `superseded/`.
 
 ## Layout, View and Graph
 
+The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](../agents/maps-and-graphs.md).
+
 | ADR | Binds |
 | --- | --- |
 | [0002](0002-layout-view-separation.md) | A Layout and a View are different entities. |
@@ -70,6 +84,7 @@ under `superseded/`.
 | [0003](0003-routes-may-conflict.md) | Graphs are independent, and their orders may disagree. |
 | [0032](0032-routes-may-contain-cycles.md) | A Graph may contain a cycle. |
 | [0041](0041-graph-is-the-first-public-name-for-route.md) | Graph is the first-public name for Route. |
+| [0116](0116-only-an-edit-on-the-canvas-moves-where-a-space-opens.md) | Only an Edit through the canvas's Map records it as `defaultMap` and writes its Active Graph; an Edit through a drawn Map leaves both alone. |
 
 ## Editing and persistence
 
@@ -142,3 +157,9 @@ under `superseded/`.
 | [0061](0061-typescript-7-is-the-compiler-and-typescript-6-is-a-bridge.md) | `tsc` is TypeScript 7. The name `typescript` is a TypeScript 6 bridge. |
 | [0062](0062-the-narrowing-assertions-we-have-are-the-most-we-will-have.md) | The narrowing assertions in the tree are a ceiling. Nothing new joins them. |
 | [0071](0071-native-typed-array-codecs-set-the-platform-floor.md) | Native Typed Array codecs set the platform floor. |
+
+## Guidance and records
+
+| ADR | Binds |
+| --- | --- |
+| [0115](0115-current-contracts-state-the-live-design-and-adrs-keep-its-history.md) | A topic's current contract in `docs/agents/` owns its live rules and is updated with each accepted decision; ADR bodies stay unchanged as the history. |

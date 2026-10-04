@@ -894,7 +894,7 @@ Classification: implementation-history, and out-of-pilot-scope (answered by 0087
 **D21. ADR 0112 versus the code: does an Edit through a drawn Map record `defaultMap`?**
 - ADR 0112: a Map drawn inside an Open Space Resource offers everything the canvas Map does, and "a difference without a recorded reason is a defect". It says nothing about `defaultMap`.
 - The code (PR #332, commit `b5c63561`: "only a canvas Edit makes its Map the opening one") records `defaultMap` for canvas Edits only. No ADR or `.scratch/a-map-is-a-map/` ticket records a reason.
-- Resolution: **Open, awaiting the user.** Either the difference is a rule and needs its reason recorded, or it is an ADR 0112 defect. Found after evaluation; no grade depends on it.
+- Resolution: **Resolved 2026-10-04 by the user: it is a rule.** `defaultMap` and the Active Graph record where the author was working in that Space, which is navigation; editing a drawn Map does not navigate into its Space. ADR 0112 permits a difference only when an ADR records its reason, so ADR 0116 records it, refining 0112 and 0079. Found after evaluation; no grade depends on it.
 
 ### Source gaps (no contradiction, but the rule has no accepted ADR as its source)
 
