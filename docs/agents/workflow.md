@@ -8,7 +8,7 @@ The skills that drive this are **tracked** (see _Skills_ below), so a fresh clon
 
 1. **Survey** — `/improve-codebase-architecture` reads `CONTEXT.md`, the ADRs and the code, and proposes candidate changes. Pick one.
 2. **Grill** — `/grilling` walks the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. **No code until it is.**
-3. **Record** — decisions that firm up language go into `CONTEXT.md`; decisions that lock a trade-off become an ADR. This is not a phase. It fires mid-conversation, the moment something settles.
+3. **Record** — decisions that firm up language go into `CONTEXT.md`; decisions that lock a trade-off become an ADR, and the topic's current contract is updated in the same change (see _Current contracts_). This is not a phase. It fires mid-conversation, the moment something settles.
 4. **Implement** — code and tests together.
 5. **Verify** — see the bar below.
 6. **Capture** — resolve the ticket with an `## Answer`, and fix any doc that described the old state. AGENTS.md and README both carried the ELK port-id collision as a known bug; both needed editing when it was fixed.
@@ -23,7 +23,7 @@ Only when the decision is all three:
 - **Surprising** — someone who knows the domain would not guess it.
 - **A real trade-off** — a credible alternative was rejected, for a reason.
 
-Record the rejected alternative and the cost accepted, not just the decision.
+Record the rejected alternative and the cost accepted, not just the decision. Update the topic's current contract in the same change, where one exists.
 
 The most valuable ADRs capture a **negative** — the proposal a future review will otherwise re-suggest. ADR 0005 exists mainly to say *don't introduce an Arrangement type*; ADR 0004 to say *don't reintroduce a placement layer*. Both are proposals that look like improvements until you know why they were rejected.
 
@@ -47,7 +47,7 @@ Format: a title that states the decision as a sentence, a status block, then a f
 
 An accepted ADR is **immutable**. It records why a decision looked right *at the time, with what was known then* — not what the design is now. That is why the log is worth keeping: the wrong turns are the most instructive part of it. The "overlaying routes turns to spaghetti" rule was believed and acted on for a while before measurement disproved it; a tidied document would show only the correction.
 
-So: **never merge, rewrite or consolidate ADRs.** When a decision changes, write a new one and amend the old one's status line — that line is the only edit an accepted ADR ever receives.
+So: **never merge, rewrite or consolidate ADRs.** When a decision changes, write a new one and amend the old one's status line — that line is the only edit an accepted ADR ever receives. The current statement of a topic lives in its current contract (below), never in a rewritten ADR.
 
 ```
 Status: accepted | superseded | proposed
@@ -61,7 +61,34 @@ Relationships are recorded from both ends. A reader landing on ADR 0002 must be 
 
 There is no periodic re-review. The review point is `proposed → accepted`; after that an ADR changes only by being superseded.
 
-Consolidation belongs in `CONTEXT.md`, which is the derived current-state view. Two layers: the glossary says what is true now, the ADR log says how it got that way.
+## Current contracts
+
+ADR 0115 decides this section. A **current contract** states one topic's accepted design in current words: each rule with its reason, the rejected alternatives and their costs, links to the source ADRs, and what is accepted but not built. It decides nothing; it restates. The responsibilities are:
+
+| Document | Owns |
+| --- | --- |
+| `AGENTS.md` | Pointers to each contract, with the tasks that call for it, plus the project summary and universal constraints. It does not restate a contract. |
+| `CONTEXT.md` | Definitions and distinctions between terms. Not behaviour, formats or build status. |
+| A current contract in `docs/agents/` | The topic's architectural rules. One owner per cross-package rule; other guides link to it and keep only their own operational gotchas. |
+| `docs/adr/README.md` | Discovering decisions, and pointing current-design work at the owning contract. |
+| ADR bodies | The reasoning, rejected alternatives and history, unchanged once accepted. |
+| `.scratch/` delivery issues | Build status, implementation gaps and completed-work narratives. |
+
+Topics with a contract so far (this is the one list; add to it when a topic migrates):
+
+- **Maps and Graphs:** [`maps-and-graphs.md`](maps-and-graphs.md).
+
+Every other topic is read as before: `AGENTS.md`'s "Decided" entries, the scoped guide for the area, and the ADR catalogue.
+
+**Reading order.** `AGENTS.md`, then `CONTEXT.md` for terms, then the owning contract. Open a source ADR for the full argument, a rejected alternative or the history.
+
+**Authority.** A contract cannot silently override an accepted ADR, and neither the latest prose nor the current code wins a disagreement by default. When a contract and an ADR disagree, or two ADRs do, surface it and get it resolved. A resolution that changes what an ADR decides, or one an ADR requires to be recorded, is a new ADR. A resolution that only settles which accepted source holds, or that records treatment no ADR states, goes into the contract with its date and into the topic's source inventory.
+
+**Built is not decided.** Code shows what is built; it never retires an accepted rule. A contract lists accepted-but-unbuilt behaviour apart from its rules, links each gap to its delivery issue, and drops the note in the change that verifies the implementation.
+
+**Same-change maintenance.** Accepting an ADR updates the owning contract in the same change. A wording fix or faithful restatement in a contract needs no ADR.
+
+**Migrating a topic.** One topic per change. Inventory its live rules, important rejected alternatives, sources and gaps, and classify with a reason any historical claim left out. Fix reader questions and expected answers against the sources before drafting, and resolve open disagreements before scoring. Write the contract in current vocabulary, replace the topic's duplicate live accounts in `AGENTS.md` and the scoped guides with pointers in the same change, and add the topic to the list above. Then check fresh readers' answers through the adopted reading path and run the existing navigation, status and vocabulary checks. Those checks show that links resolve and vocabulary holds, not that the contract is faithful; the inventory review and the reader check are for that. The Map and Graph migration is the worked example: `.scratch/adr-consolidation/pilot/` and `.scratch/adr-consolidation/adoption/`.
 
 ## When to update CONTEXT.md
 
