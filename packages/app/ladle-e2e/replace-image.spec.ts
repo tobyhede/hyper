@@ -20,7 +20,9 @@ const FIGURE_URL = 'https://example.com/figure.png';
 const THUMBNAIL_URL = 'https://example.com/thumbnail.png';
 const NEW_URL = 'https://example.com/replacement.png';
 const STORED_URL = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
-const HARBOUR = readFileSync(new URL('../fixture-images/harbour-400x300.png', import.meta.url));
+const HARBOUR = readFileSync(
+  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+);
 
 const open = async (page: Page): Promise<void> => {
   for (const url of [FIGURE_URL, THUMBNAIL_URL, NEW_URL, `**${STORED_URL}`]) {

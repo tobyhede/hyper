@@ -10,6 +10,7 @@ export {
   imageFileName,
   IMAGES_DIRECTORY_NAME,
   loadReferencedImages,
+  storedImageId,
   writeAggregateImages,
 } from './images';
 export { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';

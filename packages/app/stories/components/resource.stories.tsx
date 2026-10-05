@@ -17,7 +17,7 @@ import { requireDefaultMap } from '#src/map-resolution';
 import { CanvasResourceNodeSpecimen, type DrawnMap } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
 import { authoredSpace, imageReferenceIds, imageReferenceSpace } from '../support/spaces';
-import harbour from '#fixture-images/harbour-400x300.png';
+import harbour from '#fixture-images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png';
 import '../support/inventory.css';
 
 export default { title: 'Components/Resource' };

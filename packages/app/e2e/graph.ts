@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { aggregateFileSchema } from '@project/core';
 import { expect, type JSHandle, type Locator, type Page } from '@playwright/test';
@@ -37,12 +37,20 @@ const fixtureDir = `${fixtureRoot}/${fixtureMetaId}`;
 /**
  * Ordinary Spaces the fixture aggregate already holds, excluding Meta.
  *
+ * A child directory is a Space when it holds a `space.json`, as Import
+ * discovers them; `images/` and any other directory are not.
+ *
  * `space-resource.spec.ts` (`stops offering a Space…`, `deleting the last Space
  * Resource…`) lands back on this count after destroying a Space it just created.
  */
 export const FIXTURE_ORDINARY_SPACE_COUNT = readdirSync(fixtureRoot, {
   withFileTypes: true,
-}).filter((entry) => entry.isDirectory() && entry.name !== fixtureMetaId).length;
+}).filter(
+  (entry) =>
+    entry.isDirectory() &&
+    entry.name !== fixtureMetaId &&
+    existsSync(`${fixtureRoot}/${entry.name}/space.json`),
+).length;
 
 const markdownFileCount = (directory: string): number =>
   readdirSync(directory, { withFileTypes: true }).filter(

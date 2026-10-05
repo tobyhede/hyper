@@ -6,7 +6,9 @@ import { expectPictureAtOwnSize, expectPictureLoaded, HARBOUR_SIZE } from '../e2
 const openCloseStory = '/?story=components--resource--open-and-close&mode=preview';
 const markdownStory = '/?story=components--resource--editing--markdown&mode=preview';
 const resizeControlStory = '/?story=components--resource--resize-control&mode=preview';
-const HARBOUR = readFileSync(new URL('../fixture-images/harbour-400x300.png', import.meta.url));
+const HARBOUR = readFileSync(
+  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+);
 const openReferenceStory = '/?story=components--resource--open-reference-resource&mode=preview';
 
 const open = async (page: Page, story: string): Promise<void> => {

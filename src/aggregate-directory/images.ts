@@ -110,7 +110,7 @@ export const readAggregateImages = async (
 const STORED_IMAGE_PREFIX = `${IMAGE_COLLECTION_PATH}/`;
 
 /** The stored image an Image Resource's URL names, or `undefined` for an external URL. */
-const storedImageId = (url: string): ImageId | undefined => {
+export const storedImageId = (url: string): ImageId | undefined => {
   if (!url.startsWith(STORED_IMAGE_PREFIX)) return undefined;
   const id = url.slice(STORED_IMAGE_PREFIX.length);
   return isImageId(id) ? id : undefined;
