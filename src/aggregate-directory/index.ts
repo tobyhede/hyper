@@ -14,5 +14,5 @@ export {
   writeAggregateImages,
 } from './images';
 export { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
-export { AggregateDirectoryError, readSingleSpace } from './space-directory';
+export { AggregateDirectoryError, isMissingFile, readSingleSpace } from './space-directory';
 export { writeSpaceDirectory } from './write-space-directory';
