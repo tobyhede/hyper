@@ -1,5 +1,4 @@
 import {
-  ADDED_RESOURCE_SHAPE,
   COLLAPSED_RESOURCE_SIZE,
   titleName,
   firstOpenSize,
@@ -143,29 +142,13 @@ function createInMap(
       return refused({ code: 'reference-target-must-own-content', targetId });
     }
   }
-  const at =
-    mode === 'avoidingOverlap' ? freeAnchor(Placement.fromMap(target), position) : position;
-  return {
-    kind: 'completed',
-    snapshot: {
-      ...snapshot,
-      resources: [...snapshot.resources, { id: resourceId, document }],
-      document: {
-        ...snapshot.document,
-        maps: maps.map((m) =>
-          m.id === mapId
-            ? {
-                ...m,
-                positions: {
-                  ...m.positions,
-                  [resourceId]: { x: at.x, y: at.y, open: false, shape: ADDED_RESOURCE_SHAPE },
-                },
-              }
-            : m,
-        ),
-      },
-    },
-  };
+  const placement = Placement.fromMap(target);
+  const at = mode === 'avoidingOverlap' ? freeAnchor(placement, position) : position;
+  return withPlacement(
+    { ...snapshot, resources: [...snapshot.resources, { id: resourceId, document }] },
+    mapId,
+    Placement.place(placement, resourceId, { x: at.x, y: at.y }),
+  );
 }
 
 /**
@@ -477,17 +460,17 @@ function changeResourceShape(
   snapshot: SpaceSnapshot,
   mapId: UUID,
   resourceId: UUID,
-  shape: ResourceShape,
+  resourceShape: ResourceShape,
 ): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
-  if (at.shape === shape) return UNCHANGED;
+  if (at.shape === resourceShape) return UNCHANGED;
   return withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, { ...at, shape }),
+    Placement.place(placed.placement, resourceId, { ...at, shape: resourceShape }),
   );
 }
 
@@ -518,12 +501,7 @@ function addToMap(
   return withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, {
-      x: at.x,
-      y: at.y,
-      open: false,
-      shape: ADDED_RESOURCE_SHAPE,
-    }),
+    Placement.place(placed.placement, resourceId, { x: at.x, y: at.y }),
   );
 }
 

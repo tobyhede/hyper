@@ -1,5 +1,4 @@
 import {
-  ADDED_RESOURCE_SHAPE,
   DEFAULT_GRAPH_HEAD_SHAPE,
   SPACE_FILE_VERSION,
   type Graph,
@@ -8,6 +7,7 @@ import {
   type UUID,
 } from '@project/core';
 import { nextGraphColor } from './graph-color';
+import { Placement } from './placement';
 import { serializeResourceFile, type ResourceFile } from './resource-file';
 
 /**
@@ -102,7 +102,9 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
           id: mapId,
           title: 'Map 1',
           kind: 'positioned',
-          positions: { [resourceId]: { x: 0, y: 0, open: false, shape: ADDED_RESOURCE_SHAPE } },
+          positions: Placement.toPositions(
+            Placement.place(Placement.empty(), resourceId, { x: 0, y: 0 }),
+          ),
           graphs: [newGraph(graphId, 'Graph 1', [])],
           activeGraph: graphId,
         },

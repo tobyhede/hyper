@@ -116,17 +116,25 @@ function fromMap(m: Map): Placement {
 }
 
 /**
- * The placement a laid-out strategy graph describes — `positionedStrategy`
- * run backwards.
+ * The placement a laid-out strategy graph describes over the Map it arranged —
+ * `positionedStrategy` run backwards.
  *
- * A resource the strategy left unplaced is omitted rather than defaulted, because
+ * An arrangement moves positions and nothing else: each Resource `authored`
+ * holds keeps its Open/Closed state, Open Size and Shape (ADR 0086, ADR 0117),
+ * and a Resource it does not hold joins Closed with the rectangle. A resource
+ * the strategy left unplaced is omitted rather than defaulted, because
  * collapsing that to `(0, 0)` would assert a placement no strategy made.
  */
-function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement {
+function fromLayoutStrategyGraph(
+  strategyGraph: LayoutStrategyGraph,
+  authored: Placement,
+): Placement {
   const positions = new Map<ResourceId, ResourcePlacement>();
   for (const resource of strategyGraph.resources) {
     if (resource.x === undefined || resource.y === undefined) continue;
-    positions.set(resource.id, point({ x: resource.x, y: resource.y }));
+    const entry = authored.get(resource.id);
+    const moved = { x: resource.x, y: resource.y };
+    positions.set(resource.id, point(entry === undefined ? moved : { ...entry, ...moved }));
   }
   return brand(positions);
 }
@@ -230,9 +238,10 @@ function next(
 /**
  * The placement with one more resource authored at a named point.
  *
- * The atomic create-and-connect Edit places its new Resource where the author
- * dropped it, which is authorship rather than a report — no renderer has drawn
- * that Resource yet, so it cannot come through `next`.
+ * Add Resource and Add to Map place a Resource where the author aimed it, which
+ * is authorship rather than a report — no renderer has drawn that Resource yet,
+ * so it cannot come through `next`. A bare point joins Closed with the
+ * rectangle, so this is the one place a new entry is built (ADR 0117).
  */
 function place(placement: Placement, resourceId: ResourceId, at: PlacementPoint): Placement {
   const placed = new Map(placement);
