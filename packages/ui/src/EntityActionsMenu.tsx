@@ -20,7 +20,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
-import { ChoiceMenuSubmenuTrigger, ChoiceSubmenu } from './ChoiceMenu';
 import { EntityActionsIcon } from './icons';
 import { cn } from './lib/utils';
 
@@ -138,41 +137,6 @@ export interface EntityAction {
   ) => EntityActionOutcome | Promise<EntityActionOutcome>;
 }
 
-/** One member of an {@link EntityActionChoice}, carrying what choosing it does. */
-export interface EntityActionOption {
-  /** Stable within its choice; what the list keys and selects the member by. */
-  readonly id: string;
-  readonly title: string;
-  /** Whether this is the member the entity has now. At most one option is. */
-  readonly chosen: boolean;
-  readonly onChoose: () => void;
-}
-
-/**
- * One of a closed set the entity has, chosen from a submenu of the menu — a
- * Resource's Shape on a Map (ADR 0121).
- *
- * Drawn as a row naming the set, which opens the set as a
- * {@link ChoiceSubmenu}: a labelled radio list with the current member marked.
- * Each member carries its own operation, so a caller spends no id: the row
- * resolves the chosen id back to its member itself. Choosing closes the whole
- * menu.
- */
-export interface EntityActionChoice {
-  /** Stable within one menu; what React keys the row on. */
-  readonly id: string;
-  /** The row's name, and the caption above the list it opens. */
-  readonly label: string;
-  /** The glyph in the menu's leading column, as {@link EntityAction.icon}. */
-  readonly icon?: ReactNode;
-  readonly options: readonly EntityActionOption[];
-}
-
-/** What a menu row is: a command run on the press, or a choice opening a list. */
-export type EntityActionEntry = EntityAction | EntityActionChoice;
-
-const isChoice = (entry: EntityActionEntry): entry is EntityActionChoice => 'options' in entry;
-
 /**
  * Commands drawn together, ruled off from the next group.
  *
@@ -181,7 +145,7 @@ const isChoice = (entry: EntityActionEntry): entry is EntityActionChoice => 'opt
  * leading rule, a trailing one, two in a row where the command between them was
  * withheld. Here an empty group draws nothing, and its rule goes with it.
  */
-export type EntityActionGroup = readonly EntityActionEntry[];
+export type EntityActionGroup = readonly EntityAction[];
 
 /**
  * How wide either menu draws, so the two are the same menu in both senses.
@@ -311,7 +275,7 @@ function useConfirmation() {
 }
 
 /** A group's key: what it holds, since a group has no identity beyond that. */
-const groupKey = (group: EntityActionGroup): string => group.map((entry) => entry.id).join('+');
+const groupKey = (group: EntityActionGroup): string => group.map((action) => action.id).join('+');
 
 /**
  * The one item list, rendered under whichever root opened it.
@@ -346,84 +310,45 @@ function EntityActionItems({
       {drawn.map((group, index) => (
         <MenuGroup key={groupKey(group)}>
           {index > 0 && <Separator />}
-          {group.map((action) =>
-            isChoice(action) ? (
-              <EntityActionChoiceRow key={action.id} choice={action} iconColumn={iconColumn} />
-            ) : (
-              <Item
-                key={action.id}
-                // Held open only while there is a swap to see — either way the
-                // command goes, since a failure has still less business being
-                // reported behind a menu that has gone. A command that reports
-                // nothing closes the menu the way every menu item does.
-                closeOnClick={!reports(action)}
-                variant={action.variant ?? 'default'}
-                disabled={action.disabled ?? false}
-                // `items-start`, because an item is two lines whenever it carries
-                // a destination sentence and the primitive's own `items-center`
-                // would then hang the glyph between them. The column below is
-                // `h-5` — the `text-sm` line box — so the glyph centres on the
-                // label's line whether or not a second line follows it.
-                className="items-start"
-                onClick={() => fire(action)}
-              >
-                {iconColumn && <MenuIconColumn>{action.icon}</MenuIconColumn>}
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span>{action.id === report?.id ? report.word : action.label}</span>
-                  {action.description !== undefined && (
-                    <span className="text-xs text-muted-foreground">{action.description}</span>
-                  )}
+          {group.map((action) => (
+            <Item
+              key={action.id}
+              // Held open only while there is a swap to see — either way the
+              // command goes, since a failure has still less business being
+              // reported behind a menu that has gone. A command that reports
+              // nothing closes the menu the way every menu item does.
+              closeOnClick={!reports(action)}
+              variant={action.variant ?? 'default'}
+              disabled={action.disabled ?? false}
+              // `items-start`, because an item is two lines whenever it carries
+              // a destination sentence and the primitive's own `items-center`
+              // would then hang the glyph between them. The column below is
+              // `h-5` — the `text-sm` line box — so the glyph centres on the
+              // label's line whether or not a second line follows it.
+              className="items-start"
+              onClick={() => fire(action)}
+            >
+              {/* `w-4` fixed rather than content-sized, so an item with no
+                  glyph still spends the column and the labels stay a column. */}
+              {iconColumn && (
+                <span
+                  aria-hidden="true"
+                  className="flex h-5 w-4 shrink-0 items-center justify-center"
+                >
+                  {action.icon}
                 </span>
-              </Item>
-            ),
-          )}
+              )}
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span>{action.id === report?.id ? report.word : action.label}</span>
+                {action.description !== undefined && (
+                  <span className="text-xs text-muted-foreground">{action.description}</span>
+                )}
+              </span>
+            </Item>
+          ))}
         </MenuGroup>
       ))}
     </>
-  );
-}
-
-/**
- * A choice's row and the list it opens, the same under either root: Base UI's
- * context menu takes the plain Menu's submenu parts, as it takes its items.
- */
-function EntityActionChoiceRow({
-  choice,
-  iconColumn,
-}: {
-  readonly choice: EntityActionChoice;
-  readonly iconColumn: boolean;
-}) {
-  const chosen = choice.options.find((option) => option.chosen)?.id ?? null;
-  return (
-    <ChoiceSubmenu<string>
-      label={choice.label}
-      choices={choice.options}
-      chosen={chosen}
-      onChoose={(id) => choice.options.find((option) => option.id === id)?.onChoose()}
-      className="w-40"
-      trigger={
-        <ChoiceMenuSubmenuTrigger>
-          {iconColumn && <MenuIconColumn>{choice.icon}</MenuIconColumn>}
-          <span>{choice.label}</span>
-        </ChoiceMenuSubmenuTrigger>
-      }
-    />
-  );
-}
-
-/**
- * The menu's leading glyph column on one row.
- *
- * `w-4` fixed rather than content-sized, so a row with no glyph still spends
- * the column and the labels stay a column. `h-5` is the `text-sm` line box, so
- * the glyph centres on the label's first line whether or not a second follows.
- */
-function MenuIconColumn({ children }: { readonly children: ReactNode }) {
-  return (
-    <span aria-hidden="true" className="flex h-5 w-4 shrink-0 items-center justify-center">
-      {children}
-    </span>
   );
 }
 

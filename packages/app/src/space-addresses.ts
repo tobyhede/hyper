@@ -1,14 +1,15 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { UUID } from '@project/core';
 import type { ProductDestination } from '@project/http';
+import type { EntityActionGroup } from '@project/ui';
 import type { BrowserLocation } from './browser-location';
 import { copyLink } from './clipboard';
-import { spaceEntityActions, type EntityCommandGroup, type SpaceEntity } from './entity-actions';
+import { spaceEntityActions, type SpaceEntity } from './entity-actions';
 import { openIndependently } from './open-independently';
 
 export interface SpaceAddresses {
   /** The addresses each entity of this Space offers, as its command menu draws them. */
-  readonly entityActions: (entity: SpaceEntity) => readonly EntityCommandGroup[];
+  readonly entityActions: (entity: SpaceEntity) => readonly EntityActionGroup[];
   /** Copy one address, answering whether it reached the clipboard. */
   readonly copyProductDestination: (destination: ProductDestination) => Promise<boolean>;
   /** Why the last copy did not reach the clipboard, or `null`. */

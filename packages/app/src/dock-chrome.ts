@@ -11,7 +11,7 @@ import {
 } from '@project/core';
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSessionState } from '@project/persistence';
-import { FALLBACK_GRAPH_COLOR } from '@project/ui';
+import { FALLBACK_GRAPH_COLOR, type EntityActionGroup } from '@project/ui';
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
 import type { BrowserLocation } from './browser-location';
@@ -22,12 +22,7 @@ import type {
   DockResourcesList,
   SpaceExitReport,
 } from './components/command-dock-chrome';
-import {
-  COPY_LINK_ACTION_ID,
-  type EntityCommandGroup,
-  type EntityCommandId,
-  type SpaceEntity,
-} from './entity-actions';
+import { COPY_LINK_ACTION_ID, type EntityCommandId, type SpaceEntity } from './entity-actions';
 import { offered, renameDraftAnswer } from './authoring-commands';
 import { graphDeletionWords, topLevelGraphAuthoringCommands } from './graph-authoring-commands';
 import { mapDeletionWords, topLevelMapAuthoringCommands } from './map-authoring-commands';
@@ -82,7 +77,7 @@ export interface DockChromeInput {
   readonly availability: AuthoringAvailability;
   /** Reported while one of the Dock's names is being renamed in place. */
   readonly onRenamingChange: (renaming: boolean) => void;
-  readonly entityActions: (entity: SpaceEntity) => readonly EntityCommandGroup[];
+  readonly entityActions: (entity: SpaceEntity) => readonly EntityActionGroup[];
   readonly spaces: OpenSpaces | null;
   readonly resources: DockResourcesInput;
   /** The containing Space's id, read when the referenceable Spaces are. */

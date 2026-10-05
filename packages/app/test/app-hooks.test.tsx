@@ -543,9 +543,8 @@ describe('useResourceRailActions', () => {
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
-    const remove = groups[3]?.[0];
     act(() => {
-      if (remove !== undefined && 'onSelect' in remove) void remove.onSelect(null);
+      void groups[3]?.[0]?.onSelect(null);
     });
     await waitFor(() => expect(placedIds(opened)).not.toContain(PLACED_A));
   });

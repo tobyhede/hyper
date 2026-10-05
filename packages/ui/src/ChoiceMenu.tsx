@@ -8,9 +8,6 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
 import { ChevronDownIcon } from './icons';
@@ -77,12 +74,6 @@ export interface ChoiceMenuProps<Id extends string> {
   readonly restoresFocusOnClose?: () => boolean;
 }
 
-/** What a {@link ChoiceMenu} and a {@link ChoiceSubmenu} draw alike: the set and its commands. */
-type ChoiceListProps<Id extends string> = Pick<
-  ChoiceMenuProps<Id>,
-  'label' | 'captioned' | 'choices' | 'chosen' | 'onChoose' | 'children'
->;
-
 /**
  * One of a named set, chosen from a list — the Command Dock's Map and Graph
  * clusters, and the Map and Graph an Open Space Resource selects.
@@ -134,89 +125,37 @@ export function ChoiceMenu<Id extends string>({
         className={className}
         finalFocus={restoresFocusOnClose}
       >
-        <ChoiceList<Id>
-          label={label}
-          captioned={captioned}
-          choices={choices}
-          chosen={chosen}
-          onChoose={onChoose}
+        <DropdownMenuRadioGroup<Id | null>
+          aria-label={captioned ? undefined : label}
+          value={chosen}
+          onValueChange={(next) => {
+            // Base UI spells an empty controlled selection `null`, and no
+            // surface here has a clear-selection action: a reader picks another
+            // member or dismisses the list.
+            if (next !== null) onChoose(next);
+          }}
         >
-          {children}
-        </ChoiceList>
+          {captioned && <DropdownMenuLabel>{label}</DropdownMenuLabel>}
+          {choices.map((choice) => (
+            <DropdownMenuRadioItem<Id | null>
+              key={choice.id}
+              value={choice.id}
+              closeOnClick
+              className="gap-2"
+            >
+              {choice.icon}
+              {choice.title}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        {Children.toArray(children).length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            {children}
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-export interface ChoiceSubmenuProps<Id extends string> extends ChoiceListProps<Id> {
-  /** The row this list hangs off, a {@link ChoiceMenuSubmenuTrigger}. */
-  readonly trigger: ReactNode;
-  /** The popup's own class, which is where its width is set. */
-  readonly className?: string;
-}
-
-/**
- * The list a {@link ChoiceMenu} draws, as a submenu of the menu it sits in
- * rather than as a menu of its own — a Resource's Shape, chosen from its
- * Actions menu (ADR 0121). It takes no placement or focus props: a submenu
- * opens beside its row and closes with the menu it belongs to.
- */
-export function ChoiceSubmenu<Id extends string>({
-  trigger,
-  className = 'w-72',
-  ...list
-}: ChoiceSubmenuProps<Id>) {
-  return (
-    <DropdownMenuSub>
-      {trigger}
-      <DropdownMenuSubContent className={className}>
-        <ChoiceList<Id> {...list} />
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
-  );
-}
-
-/** The labelled radio group of the set, and the caller's commands below a rule. */
-function ChoiceList<Id extends string>({
-  label,
-  captioned = true,
-  choices,
-  chosen,
-  onChoose,
-  children,
-}: ChoiceListProps<Id>) {
-  return (
-    <>
-      <DropdownMenuRadioGroup<Id | null>
-        aria-label={captioned ? undefined : label}
-        value={chosen}
-        onValueChange={(next) => {
-          // Base UI spells an empty controlled selection `null`, and no
-          // surface here has a clear-selection action: a reader picks another
-          // member or dismisses the list.
-          if (next !== null) onChoose(next);
-        }}
-      >
-        {captioned && <DropdownMenuLabel>{label}</DropdownMenuLabel>}
-        {choices.map((choice) => (
-          <DropdownMenuRadioItem<Id | null>
-            key={choice.id}
-            value={choice.id}
-            closeOnClick
-            className="gap-2"
-          >
-            {choice.icon}
-            {choice.title}
-          </DropdownMenuRadioItem>
-        ))}
-      </DropdownMenuRadioGroup>
-      {Children.toArray(children).length > 0 && (
-        <>
-          <DropdownMenuSeparator />
-          {children}
-        </>
-      )}
-    </>
   );
 }
 
@@ -263,14 +202,3 @@ export const ChoiceMenuTrigger = forwardRef<HTMLButtonElement, ChoiceMenuTrigger
     );
   },
 );
-
-export type ChoiceMenuSubmenuTriggerProps = ComponentProps<typeof DropdownMenuSubTrigger>;
-
-/**
- * The row a {@link ChoiceSubmenu} hangs off: a menu row naming the set,
- * trailed by the submenu chevron. It opens the list on hover, on a press, on
- * Enter, on Space and on ArrowRight, as Base UI's submenu trigger does.
- */
-export function ChoiceMenuSubmenuTrigger(props: ChoiceMenuSubmenuTriggerProps) {
-  return <DropdownMenuSubTrigger {...props} />;
-}
