@@ -9,10 +9,12 @@ import type { Locator } from '@playwright/test';
  * an outline that stood in from any side would answer false. `fillsCorner`
  * asks the same of the top-left corner, which only the rectangle fills.
  * `holdsTitleAndGlyph` asks whether every corner of the Title's box and the kind
- * glyph is inside the fill. `wholeTitleLines` asks whether every drawn Title
- * Line lies wholly inside the heading and the body's content box, so none is
- * cut partway. The rectangle draws no outline: its outline is the Resource's
- * own border, and it answers from the rect itself.
+ * glyph is inside the fill. `shortTitle` is the short Title a Shape other
+ * than the rectangle draws in place of the Title ladder — its text, whether it
+ * is drawn on one line and ellipsised where it is too wide, and whether it lies
+ * inside the body's content box — and null where the front draws the ladder.
+ * The rectangle draws no outline: its outline is the Resource's own border, and
+ * it answers from the rect itself.
  */
 export interface DrawnOutline {
   readonly shape: string | null;
@@ -20,13 +22,20 @@ export interface DrawnOutline {
   readonly touchesSideMidpoints: boolean;
   readonly fillsCorner: boolean;
   readonly holdsTitleAndGlyph: boolean;
-  readonly wholeTitleLines: boolean;
+  readonly shortTitle: DrawnShortTitle | null;
+}
+
+/** The short Title a Closed Shape draws. */
+export interface DrawnShortTitle {
+  readonly text: string;
+  readonly oneLine: boolean;
+  readonly insideBody: boolean;
 }
 
 /** The outline a `.canvas-resource` element draws. */
 export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
   resource.evaluate((element): DrawnOutline => {
-    const shape = element.getAttribute('data-resource-shape');
+    const resourceShape = element.getAttribute('data-resource-shape');
     const size = [
       element instanceof HTMLElement ? element.offsetWidth : 0,
       element instanceof HTMLElement ? element.offsetHeight : 0,
@@ -72,34 +81,35 @@ export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
     });
 
     const body = element.querySelector('.canvas-resource__body');
-    const heading = element.querySelector('.canvas-resource__title-heading');
-    const wholeTitleLines =
-      body !== null &&
-      heading !== null &&
-      (() => {
-        const bodyBox = body.getBoundingClientRect();
-        const bodyStyle = getComputedStyle(body);
-        const room = {
-          top: bodyBox.top + Number.parseFloat(bodyStyle.paddingTop),
-          bottom: bodyBox.bottom - Number.parseFloat(bodyStyle.paddingBottom),
-        };
-        const headingBox = heading.getBoundingClientRect();
-        return [...heading.querySelectorAll('.canvas-resource__title-line')].every((line) => {
-          const box = line.getBoundingClientRect();
-          if (box.height === 0) return true;
-          return [room, headingBox].every(
-            (clip) => box.top >= clip.top - 0.5 && box.bottom <= clip.bottom + 0.5,
-          );
-        });
-      })();
+    const line = element.querySelector('.canvas-resource__title-short');
+    const shortTitle =
+      body === null || line === null
+        ? null
+        : (() => {
+            const bodyBox = body.getBoundingClientRect();
+            const box = line.getBoundingClientRect();
+            const style = getComputedStyle(line);
+            return {
+              text: line.textContent,
+              oneLine:
+                style.whiteSpace === 'nowrap' &&
+                style.textOverflow === 'ellipsis' &&
+                box.height <= Number.parseFloat(style.lineHeight) + 0.5,
+              insideBody:
+                box.left >= bodyBox.left - 0.5 &&
+                box.right <= bodyBox.right + 0.5 &&
+                box.top >= bodyBox.top - 0.5 &&
+                box.bottom <= bodyBox.bottom + 0.5,
+            };
+          })();
 
     return {
-      shape,
+      shape: resourceShape,
       size,
       touchesSideMidpoints,
       fillsCorner: inside(outer.left + 2, outer.top + 2),
       holdsTitleAndGlyph,
-      wholeTitleLines,
+      shortTitle,
     };
   });
 

@@ -222,8 +222,8 @@ describe('resourceRailGroups', () => {
     createReference: (): EntityActionOutcome => 'done',
     resourceShape: {
       current: 'diamond' as const,
-      choose: (shape: ResourceShape) => {
-        chosenResourceShapes.push(shape);
+      choose: (resourceShape: ResourceShape) => {
+        chosenResourceShapes.push(resourceShape);
       },
     },
     removeFromMap: () => undefined,

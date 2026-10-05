@@ -77,18 +77,47 @@ describe('no-shape-in-symbol-names', () => {
   });
 
   // ADR 0117 stores a Map entry's Shape as `shape`: the domain term is the
-  // one word, so the field is allowed as a whole name and nowhere else.
-  it('allows a configured whole name, and the word nowhere else', () => {
+  // one word, so it is allowed as that field's name — wherever a property is
+  // named — and nowhere else.
+  it('allows a configured whole name where it names a property', () => {
     const diagnostics = lintFixture(
       [
         'type ResourceShape = "rectangle";',
+        'interface Entry { readonly shape: ResourceShape }',
         'const RESOURCE_SHAPES: readonly ResourceShape[] = ["rectangle"];',
-        'const entry = { shape: RESOURCE_SHAPES[0] };',
-        'const { shape } = entry;',
-        'const shapes = [shape];',
-        'const shapeOf = () => shape;',
-        'const entryShape = shape;',
-        'export { entry, shapes, shapeOf, entryShape };',
+        'const entry: Entry = { shape: RESOURCE_SHAPES[0] };',
+        'const { shape: resourceShape } = entry;',
+        'const drawn = entry.shape;',
+        'const props = <div shape={drawn} />;',
+        'export { entry, resourceShape, drawn, props };',
+      ].join('\n'),
+      { [RULE]: RESOURCE_SHAPE },
+      'tsx',
+    );
+    expect(diagnostics).toEqual([]);
+  });
+
+  it.each([
+    [
+      'a destructured local',
+      'const entry = { shape: 1 };\nconst { shape } = entry;\nexport { shape };',
+    ],
+    ['a declared local', 'const shape = 1;\nexport { shape };'],
+    ['a parameter', 'export const read = (shape: number) => shape + 1;'],
+  ])('flags a configured whole name bound as %s', (_, source) => {
+    const diagnostics = lintFixture(source, { [RULE]: RESOURCE_SHAPE });
+    const named = diagnostics.map((diagnostic) => /"([^"]+)"/.exec(diagnostic.message)?.[1]);
+    expect(named).toContain('shape');
+  });
+
+  it('still flags the word in any other name beside an allowed field', () => {
+    const diagnostics = lintFixture(
+      [
+        'const entry = { shape: "rectangle" };',
+        'const shapes = [entry.shape];',
+        'const shapeOf = () => entry.shape;',
+        'const entryShape = entry.shape;',
+        'export { shapes, shapeOf, entryShape };',
       ].join('\n'),
       { [RULE]: RESOURCE_SHAPE },
     );

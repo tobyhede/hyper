@@ -193,10 +193,9 @@ export type ResourceNodeData = {
   display: ResourceDisplay;
   /**
    * The Shape the Map records for this Resource (ADR 0117), carried whatever
-   * the display: the front draws it only while the display is Closed. Absent
-   * where the projection was given no Map's Shapes.
+   * the display: the front draws it only while the display is Closed.
    */
-  shape?: ResourceShape;
+  shape: ResourceShape;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
@@ -251,8 +250,8 @@ export interface ProjectResourceNodesOptions {
   resourceIds?: readonly ResourceId[];
   /** Map-authored Open Resources whose Markdown body is drawn in place. */
   openResourceIds?: ReadonlySet<ResourceId>;
-  /** The Shape the Map records for each Resource it places (ADR 0117). */
-  resourceShapes?: ReadonlyMap<ResourceId, ResourceShape>;
+  /** The Shape the Map records for each projected Resource (ADR 0117). */
+  resourceShape: (resourceId: ResourceId) => ResourceShape;
 }
 
 /**
@@ -304,7 +303,7 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
  */
 export function projectResourceNodes(
   space: Space,
-  options: ProjectResourceNodesOptions = {},
+  options: ProjectResourceNodesOptions,
 ): ResourceFlowNode[] {
   const activeResourceId = options.activeResourceId ?? null;
   const showActiveResourceContent = options.showActiveResourceContent ?? false;
@@ -340,6 +339,7 @@ export function projectResourceNodes(
         active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         display,
+        shape: options.resourceShape(resource.id),
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
       },
@@ -365,8 +365,6 @@ export function projectResourceNodes(
       node.height = placedResource.height;
       node.handles = declaredHandles(placedResource);
     }
-    const shape = options.resourceShapes?.get(resource.id);
-    if (shape !== undefined) node.data.shape = shape;
     if (open) {
       node.data.open = true;
       node.zIndex = 10;

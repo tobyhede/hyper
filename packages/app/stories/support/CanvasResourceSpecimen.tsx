@@ -29,7 +29,7 @@ export function CanvasResourceSpecimen({
   kind = 'markdown',
   state = 'rest',
   graphColor = '#ffc53d',
-  shape = 'rectangle',
+  shape: resourceShape = 'rectangle',
 }: CanvasResourceSpecimenProps) {
   const front: CanvasResourceFront = { kind };
   return (
@@ -39,7 +39,7 @@ export function CanvasResourceSpecimen({
       title={title}
       state={state}
       graphColor={graphColor}
-      shape={shape}
+      shape={resourceShape}
     />
   );
 }

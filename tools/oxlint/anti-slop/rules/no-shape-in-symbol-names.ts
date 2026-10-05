@@ -36,13 +36,40 @@ function compoundAt(
   });
 }
 
+/**
+ * Whether an identifier is written where it names a property rather than a
+ * binding: an object literal's or a destructuring pattern's key, a member
+ * access's property, a type or interface member, or a JSX attribute. A
+ * shorthand destructuring key also binds a local of the same name, so it is
+ * not one.
+ */
+function namesProperty(node: ESTree.Node): boolean {
+  const { parent } = node;
+  switch (parent?.type) {
+    case "Property":
+      return (
+        parent.key === node &&
+        !parent.computed &&
+        !(parent.shorthand && parent.parent.type === "ObjectPattern")
+      );
+    case "MemberExpression":
+      return parent.property === node && !parent.computed;
+    case "TSPropertySignature":
+      return parent.key === node && !parent.computed;
+    case "JSXAttribute":
+      return parent.name === node;
+    default:
+      return false;
+  }
+}
+
 function containsForbiddenSymbolName(
   name: string,
   allowedCompounds: readonly (readonly string[])[],
-  allowedNames: ReadonlySet<string>,
+  allowedName: boolean,
 ): boolean {
   if (!name.toLowerCase().includes(FORBIDDEN_SYMBOL_NAME)) return false;
-  if (allowedNames.has(name)) return false;
+  if (allowedName) return false;
   const words = wordsOf(name);
   const allowed = new Set<number>();
   words.forEach((_, start) => {
@@ -71,7 +98,7 @@ function allowedCompoundsOption(option: unknown): readonly (readonly string[])[]
   });
 }
 
-/** The configured whole names, each matched exactly. */
+/** The configured whole names, each matched exactly and only where it names a property. */
 function allowedNamesOption(option: unknown): ReadonlySet<string> {
   if (typeof option !== "object" || option === null || !("allowedNames" in option)) {
     return new Set();
@@ -111,7 +138,8 @@ export const noForbiddenTermInSymbolNamesRule = defineRule({
     let allowedNames: ReadonlySet<string> = new Set();
 
     const reportForbiddenSymbolName = (node: ESTree.Node & { name: string }) => {
-      if (!containsForbiddenSymbolName(node.name, allowedCompounds, allowedNames)) return;
+      const allowedName = allowedNames.has(node.name) && namesProperty(node);
+      if (!containsForbiddenSymbolName(node.name, allowedCompounds, allowedName)) return;
       context.report({
         node,
         messageId: "forbiddenSymbolName",

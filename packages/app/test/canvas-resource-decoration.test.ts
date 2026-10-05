@@ -53,6 +53,7 @@ const projectionNode = (
   width: open ? 640 : RESOURCE_SIZE.width,
   height: open ? 480 : RESOURCE_SIZE.height,
   data: {
+    shape: 'rectangle',
     resourceId,
     title: 'A',
     readOnly,
@@ -221,6 +222,7 @@ describe('decorateSharedResourceNode', () => {
     } satisfies SpaceSnapshot);
     if (!loaded.ok) throw new Error('Expected a valid reference fixture');
     const node = projectResourceNodes(loaded.space, {
+      resourceShape: () => 'rectangle',
       openResourceIds: new Set([REFERENCE_ID]),
     }).find((candidate) => candidate.id === REFERENCE_ID);
     if (node === undefined) throw new Error('Expected the Reference projection');

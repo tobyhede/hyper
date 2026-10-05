@@ -85,6 +85,7 @@ function resourceNode(): ResourceFlowNode {
     height: RESOURCE_SIZE.height,
     selected: false,
     data: {
+      shape: 'rectangle',
       resourceId: RESOURCE_ID,
       title: 'A',
       readOnly: false,

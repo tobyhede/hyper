@@ -137,7 +137,7 @@ function project(generated: { file: unknown; resourceFiles: ResourceFile[] }) {
   };
 
   return {
-    nodes: projectResourceNodes(space, { strategyGraph }),
+    nodes: projectResourceNodes(space, { resourceShape: () => 'rectangle', strategyGraph }),
     edges: projectGraphEdges(buildGraphRenderEdges(space), {}),
   };
 }
@@ -266,6 +266,7 @@ describe('what each node shows', () => {
         if (!result.ok) throw new Error(JSON.stringify(result.errors));
         const space = result.space;
         const nodes = projectResourceNodes(space, {
+          resourceShape: () => 'rectangle',
           openResourceIds: new Set(space.resources.map((resource) => resource.id)),
         });
 
@@ -297,6 +298,7 @@ describe('what each node shows', () => {
           const openIds = new Set(ids.filter((_, index) => openings[index % openings.length]));
           const presented = ids[presentedIndex % ids.length];
           const nodes = projectResourceNodes(space, {
+            resourceShape: () => 'rectangle',
             openResourceIds: openIds,
             activeResourceId: presented ?? null,
             showActiveResourceContent: true,

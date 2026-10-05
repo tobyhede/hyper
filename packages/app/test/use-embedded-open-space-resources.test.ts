@@ -30,6 +30,7 @@ const spaceResource = (resourceId: typeof HOST, mapId: typeof MAP): ResourceFlow
   width: 700,
   height: 500,
   data: {
+    shape: 'rectangle',
     resourceId,
     title: 'Elsewhere',
     readOnly: false,

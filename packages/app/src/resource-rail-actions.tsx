@@ -40,7 +40,7 @@ export const RESOURCE_SHAPE_TITLES = {
 /** The Shape the Map records for a Resource, and the Edit that changes it. */
 export interface ResourceShapeCommand {
   readonly current: ResourceShape;
-  readonly choose: (shape: ResourceShape) => void;
+  readonly choose: (resourceShape: ResourceShape) => void;
 }
 
 export interface ResourceRailCommands {
@@ -190,7 +190,7 @@ const resourceShapeCommandOf = (
   drawnMap: SpaceMap,
   resourceId: ResourceId,
   authorOnCanvas: boolean,
-  choose: (shape: ResourceShape) => void,
+  choose: (resourceShape: ResourceShape) => void,
 ): ResourceShapeCommand | null => {
   const at = drawnMap.positions[resourceId];
   return authorOnCanvas && at !== undefined ? { current: at.shape, choose } : null;
@@ -201,11 +201,11 @@ const resourceShapeChoice = ({ current, choose }: ResourceShapeCommand): EntityA
   id: 'resource-shape',
   label: 'Shape',
   icon: <ResourceShapeIcon />,
-  options: RESOURCE_SHAPES.map((shape) => ({
-    id: shape,
-    title: RESOURCE_SHAPE_TITLES[shape],
-    chosen: shape === current,
-    onChoose: () => choose(shape),
+  options: RESOURCE_SHAPES.map((resourceShape) => ({
+    id: resourceShape,
+    title: RESOURCE_SHAPE_TITLES[resourceShape],
+    chosen: resourceShape === current,
+    onChoose: () => choose(resourceShape),
   })),
 });
 
@@ -280,9 +280,13 @@ export function useResourceRailActions(
             selectedMap,
             resourceId,
             authorOnCanvas,
-            (shape) => {
+            (resourceShape) => {
               commandOutcomes.run('resource-shape', () =>
-                authoring.complete({ kind: 'changed-resource-shape', resourceId, shape }),
+                authoring.complete({
+                  kind: 'changed-resource-shape',
+                  resourceId,
+                  shape: resourceShape,
+                }),
               );
             },
           ),

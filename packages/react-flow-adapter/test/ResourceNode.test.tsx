@@ -279,6 +279,7 @@ function props({
 }: Overrides = {}): NodeProps<ResourceFlowNode> {
   const resolved = content ?? ownContent(kind, source, url);
   const data: ResourceFlowNode['data'] = {
+    shape: 'rectangle',
     resourceId,
     title,
     kind,

@@ -33,4 +33,4 @@ An embedded Map draws its Resources' Shapes, because one surface draws every Map
 
 ## Consequences
 
-The Map entry schema, intake, export and import gain a required `shape` field. Every tracked fixture and seed writes `rectangle`. Add Resource and Add to Map write it. A new Edit changes one Resource's Shape on one Map. The Closed Resource front draws the outline, insets its Title and glyph, and has its selection ring and Reference border follow the outline. The Open, presented and editing fronts are unchanged.
+The Map entry schema, intake, export and import gain a required `shape` field. Every tracked fixture and seed writes `rectangle`. Add Resource and Add to Map write it. A new Edit changes one Resource's Shape on one Map. The Closed Resource front draws the outline, insets its Title and glyph, and has its selection ring and Reference border follow the outline. A Closed Resource in a Shape other than the rectangle shows its short Title: its name on one line, with an ellipsis when more Title Lines follow. The Open, presented and editing fronts are unchanged.

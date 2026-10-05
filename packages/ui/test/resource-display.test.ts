@@ -126,7 +126,7 @@ describe('the Space view a display shows', () => {
 });
 
 describe('drawnResourceShape', () => {
-  const shape = fc.constantFrom(...RESOURCE_SHAPES);
+  const resourceShape = fc.constantFrom(...RESOURCE_SHAPES);
 
   it('draws a Closed Resource in its Shape', () => {
     for (const chosen of RESOURCE_SHAPES) {
@@ -136,7 +136,7 @@ describe('drawnResourceShape', () => {
 
   it('draws an Open, presented, editing or replacing Resource as the rectangle whatever its Shape', () => {
     fc.assert(
-      fc.property(content, shape, (drawn, chosen) => {
+      fc.property(content, resourceShape, (drawn, chosen) => {
         const displays: readonly ResourceDisplay[] = [
           { shown: 'open', content: drawn },
           { shown: 'presented', content: drawn },

@@ -11,6 +11,7 @@ import {
   COLLAPSED_RESOURCE_SIZE,
   contentAction,
   drawsContentArea,
+  shortTitle,
   titleLines,
   titleName,
   type ContentVia,
@@ -146,10 +147,10 @@ interface CanvasResourceCommonProps {
   readonly display: FrontDisplay;
   /**
    * The Shape the Map records for this Resource (ADR 0117), drawn while the
-   * display is Closed. Absent where no Map places the Resource — a creation
-   * ghost, a drag preview — which draws the rectangle.
+   * display is Closed. A front no Map places — a creation ghost, a specimen —
+   * is given the rectangle by its caller.
    */
-  readonly shape?: ResourceShape;
+  readonly shape: ResourceShape;
   /**
    * Where the Resource's command toolbar is drawn, and when.
    *
@@ -353,7 +354,9 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const display = readOnly ? atRest(props.display) : props.display;
   const open = display.shown !== 'closed';
-  const frontResourceShape = drawnResourceShape(display, props.shape ?? 'rectangle');
+  const frontResourceShape = drawnResourceShape(display, props.shape);
+  // A Shape's inscribed rectangle has room for the name and not the ladder.
+  const drawsShortTitle = frontResourceShape !== 'rectangle';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const openableFront = front.kind === 'preview' ? undefined : front;
@@ -670,7 +673,7 @@ export function CanvasResource(props: CanvasResourceProps) {
             data-editable={onBeginTitleEdit !== undefined && visibleContentEdit === null}
           >
             {onBeginTitleEdit === undefined || visibleContentEdit !== null ? (
-              <TitleHeading title={title} />
+              <TitleHeading title={title} short={drawsShortTitle} />
             ) : (
               // ADR 0065's one-activation control, wrapping the heading rather
               // than sitting inside it (ADR 0083).
@@ -699,7 +702,7 @@ export function CanvasResource(props: CanvasResourceProps) {
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                <TitleHeading title={title} />
+                <TitleHeading title={title} short={drawsShortTitle} />
               </Button>
             )}
           </CardTitle>
@@ -752,8 +755,8 @@ export function CanvasResource(props: CanvasResourceProps) {
  * is being written, then the edge, whose fill covers the ring's inner half. So
  * the ring and a Reference Resource's dotted edge both follow the outline.
  */
-function ResourceShapeOutlineDrawing({ shape }: { readonly shape: ResourceShape }) {
-  const outline = resourceShapeOutline(shape);
+function ResourceShapeOutlineDrawing({ shape: resourceShape }: { readonly shape: ResourceShape }) {
+  const outline = resourceShapeOutline(resourceShape);
   const { width, height } = COLLAPSED_RESOURCE_SIZE;
   return (
     <svg
@@ -834,6 +837,11 @@ function TitleLadder({ title }: TitleLadderProps) {
   );
 }
 
+interface TitleHeadingProps extends TitleLadderProps {
+  /** Whether the front draws the short Title in place of the ladder. */
+  readonly short: boolean;
+}
+
 /**
  * The Resource's Title Lines, as the one heading the Resource front draws.
  *
@@ -845,11 +853,27 @@ function TitleLadder({ title }: TitleLadderProps) {
  *
  * It carries no `aria-label`. Its name is the Title Lines it draws, which is
  * the whole reason the control wraps it rather than the other way round.
+ *
+ * A Closed Shape other than the rectangle draws the short Title instead: the
+ * name on one line, with an ellipsis when more Title Lines follow. The ladder
+ * stays in the heading for assistive technology, visually hidden, so the
+ * heading is named by every Title Line whatever Shape the front is drawn in.
  */
-function TitleHeading({ title }: TitleLadderProps) {
+function TitleHeading({ title, short }: TitleHeadingProps) {
   return (
     <span className="canvas-resource__title-heading" role="heading" aria-level={2}>
-      <TitleLadder title={title} />
+      {short ? (
+        <>
+          <span className="sr-only">
+            <TitleLadder title={title} />
+          </span>
+          <span className="canvas-resource__title-short" aria-hidden="true">
+            {shortTitle(title)}
+          </span>
+        </>
+      ) : (
+        <TitleLadder title={title} />
+      )}
     </span>
   );
 }

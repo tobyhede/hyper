@@ -656,13 +656,19 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   const subjectArb = fc.nat({ max: RESOURCE_IDS.length - 1 });
 
   const placementOf = (entry: GeneratedEntry): ResourcePlacement => {
-    const { x, y, shape } = entry;
+    const { x, y, shape: resourceShape } = entry;
     if (entry.open) {
-      return { x, y, open: true, openSize: entry.openSize ?? DEFAULT_OPEN_SIZE, shape };
+      return {
+        x,
+        y,
+        open: true,
+        openSize: entry.openSize ?? DEFAULT_OPEN_SIZE,
+        shape: resourceShape,
+      };
     }
     return entry.openSize === undefined
-      ? { x, y, open: false, shape }
-      : { x, y, open: false, openSize: entry.openSize, shape };
+      ? { x, y, open: false, shape: resourceShape }
+      : { x, y, open: false, openSize: entry.openSize, shape: resourceShape };
   };
 
   const with_ = (
@@ -1069,22 +1075,27 @@ describe('SnapshotEdit.open, close and resize properties', () => {
         entriesArb,
         subjectArb,
         fc.constantFrom(...RESOURCE_SHAPES),
-        (entries, subjectIndex, shape) => {
+        (entries, subjectIndex, resourceShape) => {
           const subjectId = RESOURCE_IDS[subjectIndex];
           const subject = entries[subjectIndex];
           if (subjectId === undefined || subject === undefined) return;
           const snapshot = snapshotOf(entries);
 
-          const outcome = SnapshotEdit.changeResourceShape(snapshot, MAP_ID, subjectId, shape);
+          const outcome = SnapshotEdit.changeResourceShape(
+            snapshot,
+            MAP_ID,
+            subjectId,
+            resourceShape,
+          );
 
-          if (shape === subject.shape) {
+          if (resourceShape === subject.shape) {
             expect(outcome).toEqual({ kind: 'unchanged' });
             return;
           }
           const changed = completed(outcome);
           expect(positionsOf(changed)).toEqual({
             ...positionsOf(snapshot),
-            [subjectId]: { ...positionsOf(snapshot)[subjectId], shape },
+            [subjectId]: { ...positionsOf(snapshot)[subjectId], shape: resourceShape },
           });
           expect({ ...changed, document: { ...changed.document, maps: [] } }).toEqual({
             ...snapshot,

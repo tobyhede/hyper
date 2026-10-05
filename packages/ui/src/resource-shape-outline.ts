@@ -41,8 +41,8 @@ const ARC_INSET = 1 - Math.SQRT1_2;
 const HEXAGON_BLOCK_INSET = 0.15;
 
 /** The outline each Shape is drawn in at the Closed Size. */
-export function resourceShapeOutline(shape: ResourceShape): ResourceShapeOutline {
-  switch (shape) {
+export function resourceShapeOutline(resourceShape: ResourceShape): ResourceShapeOutline {
+  switch (resourceShape) {
     case 'rectangle':
       return { kind: 'rect', rx: 0, ry: 0, inscribed: { inline: 0, block: 0 } };
     case 'pill': {

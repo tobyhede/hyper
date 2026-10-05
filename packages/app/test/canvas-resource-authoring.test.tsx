@@ -108,6 +108,7 @@ const node = (
   width: open ? 640 : RESOURCE_SIZE.width,
   height: open ? 480 : RESOURCE_SIZE.height,
   data: {
+    shape: 'rectangle',
     resourceId,
     title: 'A',
     readOnly: false,
@@ -828,6 +829,7 @@ describe('canvas Resource authoring, replacing an image', () => {
     width: 640,
     height: 480,
     data: {
+      shape: 'rectangle',
       resourceId: IMAGE_ID,
       title: 'Figure',
       readOnly: false,

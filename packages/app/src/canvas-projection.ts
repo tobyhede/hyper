@@ -88,9 +88,15 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
   const openResourceIds = new Set(
     [...authored].filter(([, at]) => at.open).map(([resourceId]) => resourceId),
   );
-  const resourceShapes = new Map<ResourceId, ResourceShape>(
-    [...authored].map(([resourceId, at]) => [resourceId, at.shape]),
-  );
+  // Every Resource drawn is one of `resourceIds`, the Map's own members, so
+  // each has an entry and a Shape on it.
+  const resourceShape = (resourceId: ResourceId): ResourceShape => {
+    const at = authored.get(resourceId);
+    if (at === undefined) {
+      throw new Error(`Resource ${resourceId} is drawn on Map ${resolved.map.id} without an entry`);
+    }
+    return at.shape;
+  };
   const strategyGraph = buildLayoutStrategyGraph(resourceIds, edges, (resourceId) => {
     const at = authored.get(resourceId);
     return at?.open === true ? at.openSize : RESOURCE_SIZE;
@@ -113,7 +119,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           strategyGraph: laidOut,
           resourceIds,
           openResourceIds,
-          resourceShapes,
+          resourceShape,
         }),
         edges: projectGraphEdges(edges, colors, { activeGraphId, headShapes }),
       };

@@ -32,26 +32,17 @@
   --canvas-resource-subtitle-weight: 500;
   --canvas-resource-caption-weight: 400;
 
-  /* How many visual lines each rung draws. Placement is authored, so a Title
-     is clamped to the room available and never accommodated (ADR 0014, ADR
-     0066, ADR 0083), and it is truncated at whole lines: each rung clamps its
-     own visual lines, at most three rungs are drawn, and the clamps are chosen
-     so the tallest ladder they allow fits the room a Closed front gives the
-     Title in each Shape. A Shape narrows them below.
+  /* The ladder's ceiling, in lines of the `title` role. Placement is authored,
+     so a Title is clamped to the room available and never accommodated (ADR
+     0014, ADR 0066, ADR 0083) — a Title with more lines than fit is clipped.
 
-     Numbers rather than the room the Resource happens to have, because the
-     ladder has to draw the same whether the Resource is Open or Closed:
-     room-relative clipping would reveal more rungs on Opening and teach an
-     author that Opening edits the Title.
-     `packages/ui/test/canvas-resource-title-ladder.test.ts` holds every Shape's
-     clamps to that Shape's own room. */
-  --canvas-resource-title-clamp: 3;
-  --canvas-resource-subtitle-clamp: 1;
-  --canvas-resource-caption-clamp: 1;
-
-  /* The ceiling of the field the Title is written in, in lines of the `title`
-     role, chosen to fit inside the body of a Closed Resource, which is the
-     smaller of the two and the authored default. The field scrolls past it. */
+     A number rather than the room the Resource happens to have, because the ladder
+     has to draw the same whether the Resource is Open or Closed: room-relative
+     clipping would reveal more rungs on Opening and teach an author that
+     Opening edits the Title. The number is chosen to fit inside the body of a
+     Closed Resource, which is the smaller of the two and the authored default;
+     `packages/ui/test/canvas-resource-title-ladder.test.ts` holds it to that
+     Resource's own geometry. */
   --canvas-resource-title-ladder-lines: 4;
 
   /* Three singleton values with nowhere else to be looked up from: the Title
@@ -177,6 +168,10 @@
    declarations alone. */
 .canvas-resource__title {
   display: block;
+  max-height: calc(
+    var(--canvas-resource-title-size) * var(--canvas-resource-title-leading) *
+      var(--canvas-resource-title-ladder-lines)
+  );
   margin: 0;
   overflow: hidden;
   color: var(--canvas-resource-title);
@@ -218,32 +213,25 @@
   min-height: 1lh;
 }
 
-/* A rung past the third is not drawn, so the clamps above bound the ladder's
-   height. It keeps its place in the heading, whose name is every Title Line. */
-.canvas-resource__title-line:nth-child(n + 4) {
-  min-height: 0;
-  max-height: 0;
-}
-
 /* The three rungs. The first restates the heading's own type rather than
    inheriting it silently, so the ladder reads as a ladder at the one place a
    reader looks for it. */
 .canvas-resource__title-line[data-role='title'] {
   font-size: var(--canvas-resource-title-size);
   font-weight: var(--canvas-resource-title-weight);
-  -webkit-line-clamp: var(--canvas-resource-title-clamp);
+  -webkit-line-clamp: 3;
 }
 
 .canvas-resource__title-line[data-role='subtitle'] {
   font-size: calc(var(--canvas-resource-title-size) * var(--canvas-resource-subtitle-ratio));
   font-weight: var(--canvas-resource-subtitle-weight);
-  -webkit-line-clamp: var(--canvas-resource-subtitle-clamp);
+  -webkit-line-clamp: 2;
 }
 
 .canvas-resource__title-line[data-role='caption'] {
   font-size: calc(var(--canvas-resource-title-size) * var(--canvas-resource-caption-ratio));
   font-weight: var(--canvas-resource-caption-weight);
-  -webkit-line-clamp: var(--canvas-resource-caption-clamp);
+  -webkit-line-clamp: 1;
 }
 
 /* The Title's one-activation control (ADR 0065) must claim only the pixels it
@@ -369,14 +357,14 @@
    everything around it, and the Title jumped size and baseline at the one
    moment the drawn Title and the field are meant to be indistinguishable.
 
-   And it stops growing at the field's ceiling. `field-sizing: content`
+   And it stops growing where the drawn ladder stops. `field-sizing: content`
    is what makes the field exactly as tall as the Title being written, and
    uncapped that is a box with no limit inside a Resource whose height is authored
    (ADR 0014, ADR 0083): at the fifth line the body — bottom-pinned, so it
    grows upward — pushes the rail off the top of a Closed Resource, where the
    Resource's own `overflow: hidden` takes the kind glyph, the Actions menu and
-   Open with it while the author is still typing. The ceiling is
-   `--canvas-resource-title-ladder-lines`, which fits the Closed body.
+   Open with it while the author is still typing. The ceiling is the ladder's
+   own, so what an author can see while writing is what the Resource will draw.
    Scrolled rather than clipped, because the field is the one place the whole
    Title has to stay reachable however many lines it has. */
 .canvas-resource .resource__title-input {
@@ -469,7 +457,6 @@
    touches the midpoint of each side, where Edges attach. `overflow` is released
    so the stroke at those points is not cut by the rect. */
 .canvas-resource:not([data-resource-shape='rectangle']) {
-  --canvas-resource-title-clamp: 2;
   --canvas-resource-title-ladder-lines: 3;
 
   overflow: visible;
@@ -543,10 +530,9 @@
 /* The Title and kind glyph lay out in the rectangle inscribed in the Shape,
    whose insets `CanvasResource` publishes from the Shape's outline. The glyph
    keeps the inscribed rectangle's top-right corner and the Title fills the
-   room below it, clamped to the whole lines that room holds. The diamond's
-   inscribed rectangle is the smallest: one line of each rung. */
+   room below it. The field the Title is written in is capped at the lines that
+   room holds; the diamond's inscribed rectangle is the smallest. */
 .canvas-resource[data-resource-shape='diamond'] {
-  --canvas-resource-title-clamp: 1;
   --canvas-resource-title-ladder-lines: 2;
 }
 
@@ -568,4 +554,20 @@
 
 .canvas-resource:not([data-resource-shape='rectangle']) .canvas-resource__title-control {
   margin-inline: auto;
+}
+
+/* A Closed Shape draws the short Title — the name, with an ellipsis when more
+   Title Lines follow — on one line at the `title` role, ellipsised where it is
+   wider than the inscribed rectangle. The heading and its control are held to
+   the body's width so the line has a width to ellipsise at. */
+.canvas-resource:not([data-resource-shape='rectangle']) .canvas-resource__title {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.canvas-resource__title-short {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }

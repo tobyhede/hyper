@@ -19,6 +19,7 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
     position: { x, y },
     className: 'rf-resource-node',
     data: {
+      shape: 'rectangle',
       resourceId: uuidSchema.parse(id),
       title,
       readOnly: false,

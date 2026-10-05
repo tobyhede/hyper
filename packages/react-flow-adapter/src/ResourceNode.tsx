@@ -233,10 +233,9 @@ export function ResourceNode({
   const canvasResourceOptionalProps: Mutable<
     Pick<
       CanvasResourceProps,
-      'onBeginTitleEdit' | 'entityActions' | 'onBodyHeightChange' | 'contextNotice' | 'shape'
+      'onBeginTitleEdit' | 'entityActions' | 'onBodyHeightChange' | 'contextNotice'
     >
   > = {};
-  if (data.shape !== undefined) canvasResourceOptionalProps.shape = data.shape;
   if (data.contextNotice !== undefined && data.contextNotice !== null) {
     canvasResourceOptionalProps.contextNotice = data.contextNotice;
   }
@@ -482,6 +481,7 @@ export function ResourceNode({
           readOnly={data.readOnly}
           front={front}
           display={display}
+          shape={data.shape}
           renderToolbar={renderToolbar}
           title={data.title}
           graphColor={data.activeGraphColor}
@@ -496,6 +496,7 @@ export function ResourceNode({
           readOnly={data.readOnly}
           front={front}
           display={display}
+          shape={data.shape}
           renderToolbar={renderToolbar}
           title={data.title}
           graphColor={data.activeGraphColor}

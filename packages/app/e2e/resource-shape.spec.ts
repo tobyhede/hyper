@@ -179,7 +179,7 @@ test(
     const a = nodeByTitle(page, 'A').first();
     await expect(a).toBeVisible();
 
-    for (const [name, shape] of [
+    for (const [name, resourceShape] of [
       ['Pill', 'pill'],
       ['Ellipse', 'ellipse'],
       ['Diamond', 'diamond'],
@@ -187,15 +187,15 @@ test(
     ] as const) {
       const resourceShapes = await resourceShapeChoice(page);
       await resourceShapes.getByRole('menuitemradio', { name }).click();
-      await expect(face(a)).toHaveAttribute('data-resource-shape', shape);
+      await expect(face(a)).toHaveAttribute('data-resource-shape', resourceShape);
       await expect.poll(() => outlineOffset(a)).toBeLessThan(0.5);
       expect(await drawnOutline(face(a)), name).toEqual({
-        shape,
+        shape: resourceShape,
         size: [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height],
         touchesSideMidpoints: true,
         fillsCorner: false,
         holdsTitleAndGlyph: true,
-        wholeTitleLines: true,
+        shortTitle: { text: 'A', oneLine: true, insideBody: true },
       });
     }
 

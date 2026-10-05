@@ -35,9 +35,12 @@ test red rather than going unnoticed.
   takes no options. Pinned by
   `test/unit/anti-slop/no-shape-in-symbol-names.test.ts`.
 - `rules/no-shape-in-symbol-names.ts`: added an `allowedNames` option. A
-  listed name is exempt only when the whole identifier equals it, so the Map
-  entry's `shape` field (ADR 0117) can be written while `shapes`, `shapeOf` or
-  `entryShape` is still reported. Read in the same `before` hook. Pinned by
+  listed name is exempt only when the whole identifier equals it and the
+  identifier names a property — a non-computed object or destructuring key
+  (not a shorthand destructuring key, which also binds a local), a member
+  access's property, a type member or a JSX attribute — so the Map entry's
+  `shape` field (ADR 0117) can be written while a local or parameter named
+  `shape`, and `shapes`, `shapeOf` or `entryShape`, is still reported. Read in the same `before` hook. Pinned by
   `test/unit/anti-slop/no-shape-in-symbol-names.test.ts`.
 
 See `.scratch/anti-slop/research.md` and `.scratch/anti-slop/spec.md` for the

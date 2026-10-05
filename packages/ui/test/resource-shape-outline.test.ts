@@ -81,15 +81,21 @@ function insideOutline(outline: ResourceShapeOutline, p: Point): boolean {
 }
 
 describe('resourceShapeOutline', () => {
-  it.each(RESOURCE_SHAPES)('draws %s touching the midpoint of every side of its rect', (shape) => {
-    const outline = resourceShapeOutline(shape);
-    for (const midpoint of SIDE_MIDPOINTS) {
-      expect(onOutline(outline, midpoint), `${shape} at (${midpoint.x}, ${midpoint.y})`).toBe(true);
-    }
-  });
+  it.each(RESOURCE_SHAPES)(
+    'draws %s touching the midpoint of every side of its rect',
+    (resourceShape) => {
+      const outline = resourceShapeOutline(resourceShape);
+      for (const midpoint of SIDE_MIDPOINTS) {
+        expect(
+          onOutline(outline, midpoint),
+          `${resourceShape} at (${midpoint.x}, ${midpoint.y})`,
+        ).toBe(true);
+      }
+    },
+  );
 
-  it.each(RESOURCE_SHAPES)('draws %s within its rect', (shape) => {
-    const outline = resourceShapeOutline(shape);
+  it.each(RESOURCE_SHAPES)('draws %s within its rect', (resourceShape) => {
+    const outline = resourceShapeOutline(resourceShape);
     if (outline.kind === 'rect') {
       expect(outline.rx).toBeLessThanOrEqual(width / 2);
       expect(outline.ry).toBeLessThanOrEqual(height / 2);
@@ -105,8 +111,8 @@ describe('resourceShapeOutline', () => {
 
   it.each(RESOURCE_SHAPES)(
     'lays out the Title of %s in a rectangle inside the outline',
-    (shape) => {
-      const outline = resourceShapeOutline(shape);
+    (resourceShape) => {
+      const outline = resourceShapeOutline(resourceShape);
       const { inline, block } = outline.inscribed;
       expect(inline).toBeGreaterThanOrEqual(0);
       expect(block).toBeGreaterThanOrEqual(0);
@@ -117,9 +123,10 @@ describe('resourceShapeOutline', () => {
         { x: inline, y: height - block },
       ];
       for (const corner of corners) {
-        expect(insideOutline(outline, corner), `${shape} corner (${corner.x}, ${corner.y})`).toBe(
-          true,
-        );
+        expect(
+          insideOutline(outline, corner),
+          `${resourceShape} corner (${corner.x}, ${corner.y})`,
+        ).toBe(true);
       }
     },
   );

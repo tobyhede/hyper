@@ -689,8 +689,9 @@ test(
  * Every Shape a Map may give a Resource, drawn Closed (ADR 0117): the one
  * Closed Size whatever the Shape, an outline reaching the midpoint of each side
  * where Edges attach, and the Title and kind glyph inside that outline. Every
- * Shape but the rectangle leaves the rect's corner unfilled, and every Shape
- * truncates an overlong Title at whole lines.
+ * Shape but the rectangle leaves the rect's corner unfilled and draws the short
+ * Title on one line, ellipsised where it is too wide; the rectangle draws the
+ * Title ladder.
  */
 test(
   'a Closed Resource draws each Shape at the Closed Size, touching every side midpoint',
@@ -698,18 +699,23 @@ test(
   async ({ page }) => {
     await page.goto('/?story=components--resource--resource-shapes&mode=preview');
 
-    for (const shape of RESOURCE_SHAPES) {
-      for (const suffix of ['one line', 'three lines', 'overlong']) {
-        const resource = specimen(page, `${shape} · ${suffix}`).getByRole('article');
-        await expect(resource).toHaveAttribute('data-resource-shape', shape);
+    for (const resourceShape of RESOURCE_SHAPES) {
+      for (const [suffix, text] of [
+        ['one line', 'Strategies'],
+        ['three lines', 'Strategies…'],
+        ['overlong', 'Why authored placement beats a layout engine…'],
+      ] as const) {
+        const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
+        await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
         await expect(resource.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
-        expect(await drawnOutline(resource), `${shape} · ${suffix}`).toEqual({
-          shape,
+        expect(await drawnOutline(resource), `${resourceShape} · ${suffix}`).toEqual({
+          shape: resourceShape,
           size: [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height],
           touchesSideMidpoints: true,
-          fillsCorner: shape === 'rectangle',
+          fillsCorner: resourceShape === 'rectangle',
           holdsTitleAndGlyph: true,
-          wholeTitleLines: true,
+          shortTitle:
+            resourceShape === 'rectangle' ? null : { text, oneLine: true, insideBody: true },
         });
       }
     }
@@ -726,26 +732,28 @@ test(
   async ({ page }) => {
     await page.goto('/?story=components--resource--resource-shape-treatments&mode=preview');
 
-    for (const shape of RESOURCE_SHAPES.filter((each) => each !== 'rectangle')) {
+    for (const resourceShape of RESOURCE_SHAPES.filter((each) => each !== 'rectangle')) {
       const resource = (suffix: string) =>
-        specimen(page, `${shape} · ${suffix}`).getByRole('article');
+        specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
 
-      await expect(resource('selected')).toHaveAttribute('data-resource-shape', shape);
-      expect(await outlineTreatment(resource('selected')), `${shape} · selected`).toEqual({
+      await expect(resource('selected')).toHaveAttribute('data-resource-shape', resourceShape);
+      expect(await outlineTreatment(resource('selected')), `${resourceShape} · selected`).toEqual({
         ringShown: true,
         ringFollowsOutline: true,
         edge: 'solid',
         rectBorder: false,
       });
-      expect(await outlineTreatment(resource('reference')), `${shape} · reference`).toEqual({
-        ringShown: false,
-        ringFollowsOutline: false,
-        edge: 'dotted',
-        rectBorder: false,
-      });
+      expect(await outlineTreatment(resource('reference')), `${resourceShape} · reference`).toEqual(
+        {
+          ringShown: false,
+          ringFollowsOutline: false,
+          edge: 'dotted',
+          rectBorder: false,
+        },
+      );
       expect(
         await outlineTreatment(resource('reference selected')),
-        `${shape} · reference selected`,
+        `${resourceShape} · reference selected`,
       ).toEqual({
         ringShown: true,
         ringFollowsOutline: true,

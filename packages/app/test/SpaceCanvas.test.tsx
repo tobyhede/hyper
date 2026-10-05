@@ -69,6 +69,7 @@ const resourceNode = (
   height: RESOURCE_SIZE.height,
   selected,
   data: {
+    shape: 'rectangle',
     resourceId: id,
     title,
     readOnly: false,

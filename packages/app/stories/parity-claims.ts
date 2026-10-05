@@ -230,7 +230,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResourceShapes',
     claim:
-      'A Closed Resource draws the Shape its Map gives it — rectangle, pill, ellipse, diamond or hexagon — at the one Closed Size, its outline touching the midpoint of each side where Edges attach, with its Title and kind glyph inside the outline and its Title Lines truncated at whole lines (ADR 0117).',
+      'A Closed Resource draws the Shape its Map gives it — rectangle, pill, ellipse, diamond or hexagon — at the one Closed Size, its outline touching the midpoint of each side where Edges attach, with its Title and kind glyph inside the outline; every Shape but the rectangle draws the short Title, on one line and ellipsised where it is too wide (ADR 0117).',
   },
   {
     id: 'closed-resource-treatments-follow-its-shape',

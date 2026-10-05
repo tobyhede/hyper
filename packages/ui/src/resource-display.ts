@@ -137,6 +137,9 @@ export function spaceViewOf(
  * the rectangle whatever its Shape. The Shape stays recorded on the Map and is
  * drawn again on Close.
  */
-export function drawnResourceShape(display: ResourceDisplay, shape: ResourceShape): ResourceShape {
-  return display.shown === 'closed' ? shape : 'rectangle';
+export function drawnResourceShape(
+  display: ResourceDisplay,
+  resourceShape: ResourceShape,
+): ResourceShape {
+  return display.shown === 'closed' ? resourceShape : 'rectangle';
 }

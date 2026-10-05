@@ -516,18 +516,18 @@ describe('space file maps', () => {
 
     it('accepts each of the five Shapes, Closed and Open', () => {
       expect(RESOURCE_SHAPES).toEqual(['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon']);
-      for (const shape of RESOURCE_SHAPES) {
-        const closed = parseEntry({ x: 0, y: 0, open: false, shape });
-        expect(closed.success, shape).toBe(true);
-        expect(closed.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape } });
+      for (const resourceShape of RESOURCE_SHAPES) {
+        const closed = parseEntry({ x: 0, y: 0, open: false, shape: resourceShape });
+        expect(closed.success, resourceShape).toBe(true);
+        expect(closed.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape: resourceShape } });
         const opened = parseEntry({
           x: 0,
           y: 0,
           open: true,
           openSize: { width: 400, height: 300 },
-          shape,
+          shape: resourceShape,
         });
-        expect(opened.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape } });
+        expect(opened.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape: resourceShape } });
       }
     });
 
@@ -539,8 +539,11 @@ describe('space file maps', () => {
     });
 
     it('refuses a Shape outside the five', () => {
-      for (const shape of ['triangle', 'cloud', 'Rectangle', 'square', '', 1, null]) {
-        expect(parseEntry({ x: 0, y: 0, open: false, shape }).success, String(shape)).toBe(false);
+      for (const resourceShape of ['triangle', 'cloud', 'Rectangle', 'square', '', 1, null]) {
+        expect(
+          parseEntry({ x: 0, y: 0, open: false, shape: resourceShape }).success,
+          String(resourceShape),
+        ).toBe(false);
       }
     });
   });

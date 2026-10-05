@@ -122,6 +122,7 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
     height: RESOURCE_SIZE.height,
     handles: anchors,
     data: {
+      shape: 'rectangle',
       resourceId: uuidSchema.parse(id),
       title,
       readOnly: false,
