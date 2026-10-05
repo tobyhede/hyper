@@ -18,8 +18,8 @@ const identified = {
         title: 'Working',
         kind: 'positioned' as const,
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [RESOURCE_B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+          [RESOURCE_A]: { x: 0, y: 0, open: false },
+          [RESOURCE_B]: { x: 320, y: 0, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
       },
@@ -50,7 +50,7 @@ describe('import space schema', () => {
       maps: [
         {
           title: 'Generated map',
-          positions: { [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+          positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
           graphs: [{ title: 'Generated graph', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] }],
         },
       ],
@@ -79,7 +79,7 @@ describe('import space schema', () => {
         maps: [
           {
             title: 'Working',
-            positions: { [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
             graphs: [{ ...graph, id: undefined }],
           },
         ],

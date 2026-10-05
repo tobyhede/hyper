@@ -57,7 +57,7 @@ const UNKNOWN_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000098');
 const UNLOADED_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000097');
 const UNLOADED_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000096');
 
-const CENTRE = { x: 400, y: 300, open: false, shape: 'rectangle' };
+const CENTRE = { x: 400, y: 300, open: false };
 
 const BLUE = GRAPH_PALETTE[0];
 
@@ -88,8 +88,8 @@ const positionedSnapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-          [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 40, open: false },
         },
         graphs: [MAIN_GRAPH],
       },
@@ -192,8 +192,8 @@ describe('Add Resource', () => {
       document: { title: 'Resource 1', kind: 'markdown', body: '' },
     });
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-      [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
+      [RESOURCE_A]: { x: 10, y: 20, open: false },
+      [RESOURCE_B]: { x: 300, y: 40, open: false },
       [MINTED]: CENTRE,
     });
     // No Edge, and no second Graph: Add Resource adds neither (ADR 0040).
@@ -223,10 +223,7 @@ describe('Add Resource', () => {
     );
     // A visible stack, not collision avoidance: the first Resource never moves, and
     // the second takes one small diagonal step off it.
-    expect(stacked).toEqual([
-      CENTRE,
-      { x: CENTRE.x + 24, y: CENTRE.y + 24, open: false, shape: 'rectangle' },
-    ]);
+    expect(stacked).toEqual([CENTRE, { x: CENTRE.x + 24, y: CENTRE.y + 24, open: false }]);
   });
 
   it('stores the canvas anchor as authored, whatever else is Open', () => {
@@ -238,14 +235,8 @@ describe('Add Resource', () => {
           {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [RESOURCE_A]: {
-                x: 10,
-                y: 20,
-                open: true,
-                openSize: { width: 560, height: 420 },
-                shape: 'rectangle',
-              },
-              [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
+              [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+              [RESOURCE_B]: { x: 300, y: 40, open: false },
             },
           },
         ],
@@ -266,7 +257,6 @@ describe('Add Resource', () => {
       x: 500,
       y: 400,
       open: false,
-      shape: 'rectangle',
     });
   });
 });
@@ -394,9 +384,9 @@ describe('Create Image Resources', () => {
     const positions = mapOf(session.getState().working, MAP_ID)?.positions ?? {};
     // Side by side, one collapsed width and a gap apart, all on the anchor's row.
     expect([MINTED, SECOND_MINTED, THIRD_MINTED].map((id) => positions[id])).toEqual([
-      { x: 100, y: 200, open: false, shape: 'rectangle' },
-      { x: 400, y: 200, open: false, shape: 'rectangle' },
-      { x: 700, y: 200, open: false, shape: 'rectangle' },
+      { x: 100, y: 200, open: false },
+      { x: 400, y: 200, open: false },
+      { x: 700, y: 200, open: false },
     ]);
     // One Edit: the working Space moved once, from two Resources to five.
     expect(new Set(commits.filter((count) => count !== 2))).toEqual(new Set([5]));
@@ -508,7 +498,6 @@ describe('Open Resource geometry', () => {
       y: 20,
       open: false,
       openSize: { width: 640, height: 480 },
-      shape: 'rectangle',
     });
 
     expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
@@ -521,7 +510,6 @@ describe('Open Resource geometry', () => {
       y: 20,
       open: true,
       openSize: { width: 640, height: 480 },
-      shape: 'rectangle',
     });
   });
 
@@ -553,7 +541,6 @@ describe('Open Resource geometry', () => {
       y: 20,
       open: false,
       openSize: { width: 640, height: 480 },
-      shape: 'rectangle',
     });
   });
 
@@ -631,7 +618,7 @@ describe('Change Shape', () => {
     const after = session.getState().working;
     expect(mapOf(after, MAP_ID)?.positions).toEqual({
       [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'diamond' },
-      [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
+      [RESOURCE_B]: { x: 300, y: 40, open: false },
     });
     expect(after.resources).toEqual(before.resources);
     expect(graphsOf(after)).toEqual(graphsOf(before));
@@ -639,7 +626,27 @@ describe('Change Shape', () => {
 
   it('is unchanged for the Shape the Resource already has', () => {
     const { authoring, session } = open(urSnapshot);
+    authoring.complete(CANVAS, {
+      kind: 'changed-resource-shape',
+      resourceId: RESOURCE_A,
+      shape: 'diamond',
+    });
     const before = session.getState().working;
+
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'changed-resource-shape',
+        resourceId: RESOURCE_A,
+        shape: 'diamond',
+      }),
+    ).toEqual({ kind: 'unchanged' });
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('is unchanged for the rectangle on an entry that stores no Shape, which draws as one', () => {
+    const { authoring, session } = open(urSnapshot);
+    const before = session.getState().working;
+    expect(mapOf(before, MAP_ID)?.positions[RESOURCE_A]).not.toHaveProperty('shape');
 
     expect(
       authoring.complete(CANVAS, {
@@ -651,9 +658,8 @@ describe('Change Shape', () => {
     expect(session.getState().working).toBe(before);
   });
 
-  it('is undone by choosing the Shape it had, which restores the placement exactly', () => {
+  it('is undone by choosing the Shape it had, which the entry then stores', () => {
     const { authoring, session } = open(urSnapshot);
-    const before = session.getState().working;
 
     authoring.complete(CANVAS, {
       kind: 'changed-resource-shape',
@@ -667,9 +673,12 @@ describe('Change Shape', () => {
         shape: 'rectangle',
       }),
     ).toEqual({ kind: 'completed' });
-    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual(
-      mapOf(before, MAP_ID)?.positions,
-    );
+    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
+      x: 10,
+      y: 20,
+      open: false,
+      shape: 'rectangle',
+    });
   });
 
   it('is recorded while the Resource is Open, and kept through Resize and Close', () => {
@@ -727,7 +736,7 @@ describe('Change Shape', () => {
     });
   });
 
-  it('forgets the Shape with the rest of the entry, so Add to Map gives the rectangle again', () => {
+  it('forgets the Shape with the rest of the entry, so Add to Map stores none again', () => {
     const { authoring, session } = open(urSnapshot);
     authoring.complete(CANVAS, {
       kind: 'changed-resource-shape',
@@ -746,7 +755,6 @@ describe('Change Shape', () => {
       x: 10,
       y: 20,
       open: false,
-      shape: 'rectangle',
     });
   });
 
@@ -775,7 +783,7 @@ describe('Change Shape', () => {
             id: OTHER_MAP_ID,
             title: 'Map 2',
             kind: 'positioned',
-            positions: { [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other', edges: [] }],
           },
         ],
@@ -951,8 +959,8 @@ describe('Add Graph', () => {
             title: 'Map 2',
             kind: 'positioned',
             positions: {
-              [RESOURCE_A]: { x: 20, y: 30, open: false, shape: 'rectangle' },
-              [RESOURCE_B]: { x: 310, y: 50, open: false, shape: 'rectangle' },
+              [RESOURCE_A]: { x: 20, y: 30, open: false },
+              [RESOURCE_B]: { x: 310, y: 50, open: false },
             },
             // The colour this Map's Graphs alone would choose, carried by
             // another Map, so counting it would choose something else.
@@ -1322,20 +1330,8 @@ describe('Rename Space', () => {
           {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [RESOURCE_A]: {
-                x: 10,
-                y: 20,
-                open: false,
-                openSize: { width: 500, height: 300 },
-                shape: 'rectangle',
-              },
-              [RESOURCE_B]: {
-                x: 300,
-                y: 40,
-                open: true,
-                openSize: { width: 640, height: 360 },
-                shape: 'rectangle',
-              },
+              [RESOURCE_A]: { x: 10, y: 20, open: false, openSize: { width: 500, height: 300 } },
+              [RESOURCE_B]: { x: 300, y: 40, open: true, openSize: { width: 640, height: 360 } },
             },
           },
         ],
@@ -1397,7 +1393,7 @@ describe('Graph ownership', () => {
             id: OTHER_MAP_ID,
             title: 'Map 2',
             kind: 'positioned',
-            positions: { [RESOURCE_A]: { x: 0, y: 400, open: false, shape: 'rectangle' } },
+            positions: { [RESOURCE_A]: { x: 0, y: 400, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Aside', edges: [] }],
           },
         ],
@@ -1467,9 +1463,9 @@ describe('Edge Title', () => {
         {
           ...positionedSnapshot.document.maps![0]!,
           positions: {
-            [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-            [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
-            [RESOURCE_C]: { x: 600, y: 40, open: false, shape: 'rectangle' },
+            [RESOURCE_A]: { x: 10, y: 20, open: false },
+            [RESOURCE_B]: { x: 300, y: 40, open: false },
+            [RESOURCE_C]: { x: 600, y: 40, open: false },
           },
           graphs: [{ id: GRAPH_ID, title: 'Main', edges }],
         },
@@ -1867,8 +1863,8 @@ describe('Map membership', () => {
     ).toEqual({ kind: 'completed' });
 
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-      [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
+      [RESOURCE_A]: { x: 10, y: 20, open: false },
+      [RESOURCE_B]: { x: 300, y: 40, open: false },
       [RESOURCE_C]: CENTRE,
     });
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
@@ -2128,8 +2124,8 @@ describe('connecting Resources on an embedded Map', () => {
     title: 'Other Map',
     kind: 'positioned' as const,
     positions: {
-      [RESOURCE_A]: { x: 500, y: 600, open: false as const, shape: 'rectangle' as const },
-      [RESOURCE_C]: { x: 800, y: 600, open: false as const, shape: 'rectangle' as const },
+      [RESOURCE_A]: { x: 500, y: 600, open: false as const },
+      [RESOURCE_C]: { x: 800, y: 600, open: false as const },
     },
     graphs: [
       { id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] },
@@ -2180,7 +2176,6 @@ describe('connecting Resources on an embedded Map', () => {
       x: 950,
       y: 650,
       open: false,
-      shape: 'rectangle',
     });
     expect(mapOf(session.getState().working, OTHER_MAP_ID)?.graphs[1]?.edges).toEqual([
       { from: RESOURCE_A, to: MINTED },
@@ -2275,9 +2270,7 @@ describe('context commands on an embedded Map', () => {
       id: OTHER_MAP_ID,
       title: 'Other Map',
       kind: 'positioned' as const,
-      positions: {
-        [RESOURCE_A]: { x: 500, y: 600, open: false as const, shape: 'rectangle' as const },
-      },
+      positions: { [RESOURCE_A]: { x: 500, y: 600, open: false as const } },
       graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       activeGraph: OTHER_GRAPH_ID,
     };

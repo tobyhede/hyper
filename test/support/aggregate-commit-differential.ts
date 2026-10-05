@@ -227,7 +227,7 @@ const fixtureFor = ({
       const positions = Object.fromEntries(
         selectedParent.resources.map((resource, index) => [
           resource.id,
-          { x: index * 300, y: seed % 400, open: false as const, shape: 'rectangle' as const },
+          { x: index * 300, y: seed % 400, open: false as const },
         ]),
       );
       commit = {

@@ -35,8 +35,8 @@ const snapshot: SpaceSnapshot = {
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-          [RESOURCE_B]: { x: 300, y: 40, open: false, shape: 'rectangle' },
+          [RESOURCE_A]: { x: 10, y: 20, open: false },
+          [RESOURCE_B]: { x: 300, y: 40, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [EDGE] }],
       },

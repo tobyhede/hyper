@@ -49,10 +49,7 @@ const space = (
         title: 'Map 1',
         kind: 'positioned',
         positions: Object.fromEntries(
-          links.map((j, index) => [
-            linkOf(i, j),
-            { x: index * 300, y: 0, open: false, shape: 'rectangle' },
-          ]),
+          links.map((j, index) => [linkOf(i, j), { x: index * 300, y: 0, open: false }]),
         ),
         graphs: [
           { id: graphOf(i), title: 'Graph 1', edges: [] },

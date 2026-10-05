@@ -450,7 +450,6 @@ function Instance({
         onClick={() => setSelected(true)}
       >
         <CanvasResource
-          shape="rectangle"
           front={front}
           display={display}
           state={state}
@@ -717,7 +716,6 @@ export const EnterSpace: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', onOpenChange: changeOpen }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -758,7 +756,7 @@ const CONTAINING_MAP: Map = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),
   title: 'Collection 1',
   kind: 'positioned',
-  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+  positions: { [ARCHITECTURE_ID]: { x: 0, y: 0, open: false } },
   graphs: [
     { id: uuidSchema.parse('00000000-0000-4000-8000-000000000004'), title: 'Overview', edges: [] },
   ],
@@ -785,7 +783,6 @@ export const OpenIndependently: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', onOpenChange: changeOpen }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -828,7 +825,6 @@ export const RailActions: Story = () => {
       <div className="flex flex-wrap items-start gap-6">
         {authoredSpace.resources.slice(0, 2).map((resource, index) => (
           <CanvasResource
-            shape="rectangle"
             key={resource.id}
             front={{ kind: 'markdown', onOpenChange: () => 'retained' }}
             display={CLOSED_DISPLAY}

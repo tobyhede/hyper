@@ -47,12 +47,7 @@ const S_LINK_TO_T = idAt(51);
 const META_LINK_TO_T = idAt(60);
 const META_LINK_TO_S = idAt(61);
 
-const closed = (x: number, y: number) => ({
-  x,
-  y,
-  open: false as const,
-  shape: 'rectangle' as const,
-});
+const closed = (x: number, y: number) => ({ x, y, open: false as const });
 
 const markdown = (id: UUID, title: string) => ({
   id,
@@ -335,11 +330,7 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
             ...m,
             positions: {
               ...m.positions,
-              [resource]: {
-                ...(placed ?? { open: false as const, shape: 'rectangle' as const }),
-                x: current.x,
-                y: current.y,
-              },
+              [resource]: { ...(placed ?? { open: false as const }), x: current.x, y: current.y },
             },
           };
         });
@@ -353,11 +344,9 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
           const next =
             current.kind === 'open'
               ? {
-                  x: placed.x,
-                  y: placed.y,
+                  ...placed,
                   open: true as const,
                   openSize: { width: current.width, height: current.height },
-                  shape: placed.shape,
                 }
               : { ...placed, open: false as const };
           return { ...m, positions: { ...m.positions, [resource]: next } };

@@ -66,8 +66,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false, shape: 'rectangle' },
+          [RESOURCE_ID]: { x: 0, y: 0, open: false },
+          [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -90,7 +90,7 @@ const withReference: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [REFERENCE_ID]: { x: 0, y: 400, open: false, shape: 'rectangle' },
+          [REFERENCE_ID]: { x: 0, y: 400, open: false },
         },
       },
     ],
@@ -114,7 +114,7 @@ const withImage: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [IMAGE_ID]: { x: 0, y: 400, open: false, shape: 'rectangle' },
+          [IMAGE_ID]: { x: 0, y: 400, open: false },
         },
       },
     ],
@@ -148,7 +148,6 @@ const withUr: SpaceSnapshot = spaceSnapshotSchema.parse({
             y: 400,
             open: true,
             openSize: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
-            shape: 'rectangle',
           },
         },
       },
@@ -167,7 +166,7 @@ const withSpaceResource: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps?.[0],
         positions: {
           ...snapshot.document.maps?.[0]?.positions,
-          [SPACE_RESOURCE_ID]: { x: 0, y: 400, open: false, shape: 'rectangle' },
+          [SPACE_RESOURCE_ID]: { x: 0, y: 400, open: false },
         },
       },
     ],
@@ -511,7 +510,6 @@ describe('a Resource’s commands on the canvas rail', () => {
                 y: 0,
                 open: true,
                 openSize: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
-                shape: 'rectangle',
               },
             },
           },
@@ -660,7 +658,6 @@ describe('a Resource’s commands on the canvas rail', () => {
                   y: 0,
                   open: true,
                   openSize: { width, height },
-                  shape: 'rectangle',
                 },
               },
             },
@@ -941,6 +938,23 @@ describe('a Resource’s commands on the canvas rail', () => {
     expect(await screen.findByRole('button', { name: 'Close Resource Gateway' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource Gateway' }));
     expect(await screen.findByRole('menuitem', { name: /^Shape/ })).toBeVisible();
+    await settled(session);
+  });
+
+  it('marks the rectangle chosen for an Ur Resource whose entry stores no Shape', async () => {
+    expect(withUr.document.maps?.[0]?.positions[UR_ID]).not.toHaveProperty('shape');
+    const session = mount(undefined, undefined, withUr);
+    await selectResource('Gateway');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Gateway' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: /^Shape/ }));
+    const group = await screen.findByRole('group', { name: 'Shape' });
+    expect(
+      within(group)
+        .getAllByRole('menuitemradio')
+        .filter((item) => item.getAttribute('aria-checked') === 'true')
+        .map((item) => item.textContent),
+    ).toEqual(['Rectangle']);
     await settled(session);
   });
 
@@ -1266,8 +1280,8 @@ describe('Connect to Resource in a Resource’s Actions menu', () => {
             title: 'Other Map',
             kind: 'positioned',
             positions: {
-              [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-              [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false, shape: 'rectangle' },
+              [RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [OTHER_RESOURCE_ID]: { x: 400, y: 0, open: false },
             },
             graphs: [{ id: GRAPH_ID_2, title: 'Graph', edges: [] }],
           },

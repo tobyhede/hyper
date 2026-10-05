@@ -53,10 +53,7 @@ function spaceFile(
         title: 'Only map',
         kind: 'positioned',
         positions: Object.fromEntries(
-          members.map((id, index) => [
-            uuid(id),
-            { x: index * 300, y: 0, open: false, shape: 'rectangle' },
-          ]),
+          members.map((id, index) => [uuid(id), { x: index * 300, y: 0, open: false }]),
         ),
         graphs: graphs.map(({ id, title, edges }) => ({
           id: uuid(id),
@@ -122,7 +119,6 @@ describe('projectResourceNodes', () => {
       );
       for (const open of [false, true]) {
         const nodes = projectResourceNodes(loaded, {
-          resourceShape: () => 'rectangle',
           openResourceIds: new Set(open ? [referenceId] : []),
         });
         expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
@@ -143,7 +139,7 @@ describe('projectResourceNodes', () => {
   );
 
   it('maps resources to resource nodes carrying the title, not the content', () => {
-    const nodes = projectResourceNodes(space, { resourceShape: () => 'rectangle' });
+    const nodes = projectResourceNodes(space);
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     expect(a.type).toBe('resource');
     expect(a.data.title).toBe('Resource A');
@@ -172,7 +168,6 @@ describe('projectResourceNodes', () => {
 
   it('uses the positions a map put on the resources', () => {
     const nodes = projectResourceNodes(space, {
-      resourceShape: () => 'rectangle',
       strategyGraph: {
         resources: [
           {
@@ -206,7 +201,6 @@ describe('projectResourceNodes', () => {
     // only for an Open one (ADR 0064) — and it has to, or an Edge attaches
     // partway down a box the Resource no longer fills.
     const nodes = projectResourceNodes(space, {
-      resourceShape: () => 'rectangle',
       strategyGraph: {
         resources: [
           {
@@ -267,7 +261,6 @@ describe('projectResourceNodes', () => {
 
   it('declares no geometry for a resource the strategy has not placed, leaving React Flow to measure it', () => {
     const nodes = projectResourceNodes(space, {
-      resourceShape: () => 'rectangle',
       strategyGraph: {
         resources: [
           {
@@ -293,7 +286,6 @@ describe('projectResourceNodes', () => {
 
   it('flags the active resource', () => {
     const nodes = projectResourceNodes(space, {
-      resourceShape: () => 'rectangle',
       activeResourceId: uuid('00000000-0000-4000-8000-000000000003'),
     });
     expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.data.active).toBe(
@@ -326,7 +318,6 @@ describe('projectResourceNodes', () => {
     );
 
     const nodes = projectResourceNodes(withReference, {
-      resourceShape: () => 'rectangle',
       openResourceIds: new Set([referenceId]),
     });
     expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
@@ -360,24 +351,15 @@ describe('projectResourceNodes', () => {
       projectResourceNodes(withImage, options).find((node) => node.id === imageId)?.data;
 
     const picture = { kind: 'image', url, naturalSize: undefined, via: 'self' };
-    expect(imageNode({ resourceShape: () => 'rectangle' })).toMatchObject({
-      kind: 'image',
-      display: { shown: 'closed' },
-    });
-    expect(
-      imageNode({ resourceShape: () => 'rectangle', openResourceIds: new Set([imageId]) }),
-    ).toMatchObject({
+    expect(imageNode({})).toMatchObject({ kind: 'image', display: { shown: 'closed' } });
+    expect(imageNode({ openResourceIds: new Set([imageId]) })).toMatchObject({
       kind: 'image',
       open: true,
       display: { shown: 'open', content: picture },
     });
-    expect(
-      imageNode({
-        resourceShape: () => 'rectangle',
-        activeResourceId: imageId,
-        showActiveResourceContent: true,
-      }),
-    ).toMatchObject({ kind: 'image', display: { shown: 'presented', content: picture } });
+    expect(imageNode({ activeResourceId: imageId, showActiveResourceContent: true })).toMatchObject(
+      { kind: 'image', display: { shown: 'presented', content: picture } },
+    );
   });
 });
 
@@ -408,25 +390,21 @@ describe('projectResourceNodes display', () => {
 
   it('carries no content on a Closed Resource', () => {
     for (const id of [markdownId, imageId, referenceId]) {
-      expect(display(id, { resourceShape: () => 'rectangle' })).toStrictEqual({ shown: 'closed' });
+      expect(display(id, {})).toStrictEqual({ shown: 'closed' });
     }
   });
 
   it('carries the resolved content on an Open Resource, its own or its Target’s', () => {
     const openResourceIds = new Set([markdownId, imageId, referenceId]);
-    expect(
-      display(markdownId, { resourceShape: () => 'rectangle', openResourceIds }),
-    ).toStrictEqual({
+    expect(display(markdownId, { openResourceIds })).toStrictEqual({
       shown: 'open',
       content: { kind: 'markdown', source: '## Authored once', via: 'self' },
     });
-    expect(display(imageId, { resourceShape: () => 'rectangle', openResourceIds })).toStrictEqual({
+    expect(display(imageId, { openResourceIds })).toStrictEqual({
       shown: 'open',
       content: { kind: 'image', url, naturalSize: undefined, via: 'self' },
     });
-    expect(
-      display(referenceId, { resourceShape: () => 'rectangle', openResourceIds }),
-    ).toStrictEqual({
+    expect(display(referenceId, { openResourceIds })).toStrictEqual({
       shown: 'open',
       content: { kind: 'image', url, naturalSize: undefined, via: 'reference' },
     });
@@ -434,7 +412,6 @@ describe('projectResourceNodes display', () => {
 
   it('presents the presented Resource even while it is Open, keeping its authored Open state', () => {
     const nodes = projectResourceNodes(withKinds, {
-      resourceShape: () => 'rectangle',
       openResourceIds: new Set([referenceId]),
       activeResourceId: referenceId,
       showActiveResourceContent: true,
@@ -450,11 +427,7 @@ describe('projectResourceNodes display', () => {
 
   it('shows the active Resource Open, not presented, while nothing is being presented', () => {
     expect(
-      display(markdownId, {
-        resourceShape: () => 'rectangle',
-        openResourceIds: new Set([markdownId]),
-        activeResourceId: markdownId,
-      }),
+      display(markdownId, { openResourceIds: new Set([markdownId]), activeResourceId: markdownId }),
     ).toMatchObject({ shown: 'open' });
   });
 });

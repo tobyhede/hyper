@@ -64,8 +64,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_ID]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-          [OTHER_RESOURCE_ID]: { x: 300, y: 20, open: false, shape: 'rectangle' },
+          [RESOURCE_ID]: { x: 10, y: 20, open: false },
+          [OTHER_RESOURCE_ID]: { x: 300, y: 20, open: false },
         },
         graphs: [
           { id: GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_ID, to: OTHER_RESOURCE_ID }] },
@@ -98,8 +98,8 @@ const twiceReferenced: SpaceSnapshot = spaceSnapshotSchema.parse({
         ...snapshot.document.maps![0],
         positions: {
           ...snapshot.document.maps![0]!.positions,
-          [REFERENCE_ID]: { x: 600, y: 20, open: false, shape: 'rectangle' },
-          [SECOND_REFERENCE_ID]: { x: 900, y: 20, open: false, shape: 'rectangle' },
+          [REFERENCE_ID]: { x: 600, y: 20, open: false },
+          [SECOND_REFERENCE_ID]: { x: 900, y: 20, open: false },
         },
       },
     ],
@@ -149,7 +149,7 @@ const secondMap: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP_ID,
         title: 'Other Map',
         kind: 'positioned',
-        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
       },
     ],
@@ -518,7 +518,7 @@ describe('authoring an opened Resource', () => {
             ...snapshot.document.maps![0],
             positions: {
               ...snapshot.document.maps![0]!.positions,
-              [REFERENCE_ID]: { x: 600, y: 20, open: false, shape: 'rectangle' },
+              [REFERENCE_ID]: { x: 600, y: 20, open: false },
             },
           },
         ],

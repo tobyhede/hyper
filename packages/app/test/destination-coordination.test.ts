@@ -45,8 +45,8 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map',
         kind: 'positioned',
         positions: {
-          [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [RESOURCE_B]: { x: 320, y: 0, open: false, shape: 'rectangle' },
+          [RESOURCE_A]: { x: 0, y: 0, open: false },
+          [RESOURCE_B]: { x: 320, y: 0, open: false },
         },
         graphs: [
           { id: OPENING_GRAPH, title: 'Opening', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -58,7 +58,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP,
         title: 'Other Map',
         kind: 'positioned',
-        positions: { [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [RESOURCE_A]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_MAP_GRAPH, title: 'Other Map Graph', edges: [] }],
       },
     ],

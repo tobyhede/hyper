@@ -57,10 +57,8 @@ describe('the question Delete from Space asks', () => {
       edges: touching ? [{ from: subject.id, to: other }] : [],
     });
     const spaceMap = (suffix: string, title: string, graphs: Graph[], places = true): SpaceMap => {
-      const positions: SpaceMap['positions'] = {
-        [other]: { x: 300, y: 0, open: false, shape: 'rectangle' },
-      };
-      if (places) positions[subject.id] = { x: 0, y: 0, open: false, shape: 'rectangle' };
+      const positions: SpaceMap['positions'] = { [other]: { x: 300, y: 0, open: false } };
+      if (places) positions[subject.id] = { x: 0, y: 0, open: false };
       return { id: id(suffix), title, kind: 'positioned', positions, graphs };
     };
 

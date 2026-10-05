@@ -37,7 +37,7 @@ export const restartProofFixture = (input: {
         id: input.mapId,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [input.resourceId]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [input.resourceId]: { x: 0, y: 0, open: false } },
         graphs: [{ id: input.graphId, title: 'Graph 1', edges: [] }],
         activeGraph: input.graphId,
       },

@@ -89,7 +89,7 @@ describe('defaultContentAggregate', () => {
                 id: MAP_ID,
                 title: 'Map 1',
                 kind: 'positioned',
-                positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+                positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
                 graphs: [
                   {
                     id: GRAPH_ID,
@@ -547,7 +547,7 @@ describe('resolveDatabaseStartup', () => {
                 id: MAP_ID,
                 title: 'Map 1',
                 kind: 'positioned',
-                positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+                positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
                 graphs: [
                   {
                     id: GRAPH_ID,
@@ -625,7 +625,7 @@ describe('resolveDatabaseStartup', () => {
               id: CHILD_MAP_ID,
               title: 'Map 1',
               kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
               graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
               activeGraph: CHILD_GRAPH_ID,
             },

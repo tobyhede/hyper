@@ -142,8 +142,8 @@ function sparsePositionedAdapter(newId?: () => UUID) {
           title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20, open: false, shape: 'rectangle' },
+            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20, open: false },
+            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20, open: false },
           },
           graphs: [
             {
@@ -187,8 +187,8 @@ function storedSpaceAdapter() {
           title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20, open: false, shape: 'rectangle' },
+            [uuidSchema.parse(RESOURCE_A)]: { x: 10, y: 20, open: false },
+            [uuidSchema.parse(RESOURCE_B)]: { x: 300, y: 20, open: false },
           },
           graphs: [
             {
@@ -507,8 +507,8 @@ describe('render adapter', () => {
 
     expect(authoring.mapPlacement()).toEqual(
       Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: false, shape: 'rectangle' }],
-        [RESOURCE_B, { x: 300, y: 20, open: false, shape: 'rectangle' }],
+        [RESOURCE_A, { x: 10, y: 20, open: false }],
+        [RESOURCE_B, { x: 300, y: 20, open: false }],
       ]),
     );
   });
@@ -526,9 +526,9 @@ describe('render adapter', () => {
     ).toEqual({ kind: 'completed', resourceId: CREATED_RESOURCE_ID });
 
     expect(session.getState().working.document.maps?.[0]?.positions).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-      [RESOURCE_B]: { x: 300, y: 20, open: false, shape: 'rectangle' },
-      [CREATED_RESOURCE_ID]: { x: 420, y: 360, open: false, shape: 'rectangle' },
+      [RESOURCE_A]: { x: 10, y: 20, open: false },
+      [RESOURCE_B]: { x: 300, y: 20, open: false },
+      [CREATED_RESOURCE_ID]: { x: 420, y: 360, open: false },
     });
   });
 
@@ -611,10 +611,7 @@ describe('render adapter', () => {
   it('answers one resize capability across writes resize knows nothing about', () => {
     const spy = authoringSpy({
       mapPlacement: Placement.fromEntries([
-        [
-          RESOURCE_A,
-          { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 }, shape: 'rectangle' },
-        ],
+        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
@@ -639,11 +636,8 @@ describe('render adapter', () => {
     // This is why the render adapter holds no `move` draft: a dragged Resource
     // displaces nobody either.
     const authored = Placement.fromEntries([
-      [
-        RESOURCE_A,
-        { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 }, shape: 'rectangle' },
-      ],
-      [RESOURCE_B, { x: 300, y: 200, open: false, shape: 'rectangle' }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [RESOURCE_B, { x: 300, y: 200, open: false }],
     ]);
     const spy = authoringSpy({ mapPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
@@ -655,11 +649,8 @@ describe('render adapter', () => {
       resourceId: RESOURCE_A,
       size: { width: 620, height: 440 },
       placement: Placement.fromEntries([
-        [
-          RESOURCE_A,
-          { x: 10, y: 20, open: true, openSize: { width: 620, height: 440 }, shape: 'rectangle' },
-        ],
-        [RESOURCE_B, { x: 300, y: 200, open: false, shape: 'rectangle' }],
+        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 620, height: 440 } }],
+        [RESOURCE_B, { x: 300, y: 200, open: false }],
       ]),
     });
     expect(spy.completions).toEqual([]);
@@ -674,10 +665,7 @@ describe('render adapter', () => {
 
   it('snaps both dimensions inside the Close range to the exact Closed rect', () => {
     const authored = Placement.fromEntries([
-      [
-        RESOURCE_A,
-        { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 }, shape: 'rectangle' },
-      ],
+      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
     ]);
     const spy = authoringSpy({ mapPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
@@ -694,7 +682,6 @@ describe('render adapter', () => {
       y: 20,
       open: true,
       openSize: { width: 260, height: 146 },
-      shape: 'rectangle',
     });
 
     store.getState().resourceResize.finishResize(RESOURCE_A);
@@ -706,10 +693,7 @@ describe('render adapter', () => {
 
   it('keeps an Open resize proposal when only one dimension reaches the Close range', () => {
     const authored = Placement.fromEntries([
-      [
-        RESOURCE_A,
-        { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 }, shape: 'rectangle' },
-      ],
+      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
     ]);
     const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
 
@@ -733,11 +717,8 @@ describe('render adapter', () => {
    */
   it('leaves the published projection alone while the resize draft grows', () => {
     const authored = Placement.fromEntries([
-      [
-        RESOURCE_A,
-        { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 }, shape: 'rectangle' },
-      ],
-      [RESOURCE_B, { x: 300, y: 200, open: false, shape: 'rectangle' }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [RESOURCE_B, { x: 300, y: 200, open: false }],
     ]);
     const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
     const open = node(RESOURCE_A, 10, 20);
@@ -756,10 +737,7 @@ describe('render adapter', () => {
   it('discards the complete resize draft without an Edit when the gesture is cancelled', () => {
     const spy = authoringSpy({
       mapPlacement: Placement.fromEntries([
-        [
-          RESOURCE_A,
-          { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 }, shape: 'rectangle' },
-        ],
+        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);

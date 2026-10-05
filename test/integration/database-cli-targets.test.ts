@@ -118,7 +118,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
                 id: firstMap.id,
                 title: 'Map 1',
                 kind: 'positioned',
-                positions: { [resourceId]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+                positions: { [resourceId]: { x: 0, y: 0, open: false } },
                 graphs: [
                   {
                     id: graph.id,

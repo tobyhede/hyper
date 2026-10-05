@@ -4,6 +4,7 @@ import {
   EDGE_TITLE_ONE_LINE,
   GRAPH_HEAD_SHAPES,
   IMAGE_URL_UNSUPPORTED,
+  DEFAULT_RESOURCE_SHAPE,
   RESOURCE_SHAPES,
   graphEdgeSchema,
   graphSchema,
@@ -11,7 +12,9 @@ import {
   resourceDocumentSchema,
   resourceFrontmatterSchema,
   resourceSchema,
+  resourceShape,
   spaceFileSchema,
+  uuidSchema,
 } from '../src/index';
 
 const MAIN = {
@@ -28,8 +31,8 @@ const WORKING = {
   title: 'Working',
   kind: 'positioned',
   positions: {
-    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false, shape: 'rectangle' },
-    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false, shape: 'rectangle' },
+    '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
+    '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
   },
   graphs: [MAIN],
 };
@@ -64,13 +67,8 @@ describe('space file schema', () => {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
           positions: {
-            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false, shape: 'rectangle' },
-            '00000000-0000-4000-8000-000000000003': {
-              x: 320,
-              y: -40,
-              open: false,
-              shape: 'rectangle',
-            },
+            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
+            '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
           },
           graphs: [
             {
@@ -153,9 +151,7 @@ describe('space file schema', () => {
         {
           id: '00000000-0000-4000-8000-000000000010',
           title: 'Working',
-          positions: {
-            '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false, shape: 'rectangle' },
-          },
+          positions: { '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false } },
           activeGraph: '00000000-0000-4000-8000-000000000004',
         },
       ],
@@ -175,7 +171,7 @@ describe('space file schema', () => {
         {
           id: 'working',
           title: 'Working',
-          positions: { a: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+          positions: { a: { x: 0, y: 0, open: false } },
           graphs: [{ id: 'main', title: 'Main', edges: [{ from: 'a', to: 'b' }] }],
         },
       ],
@@ -417,8 +413,8 @@ describe('space file maps', () => {
     const parsed = file.maps?.[0];
     expect(parsed?.kind).toBe('positioned');
     expect(parsed?.positions).toEqual({
-      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false, shape: 'rectangle' },
-      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false, shape: 'rectangle' },
+      '00000000-0000-4000-8000-000000000002': { x: 0, y: 0, open: false },
+      '00000000-0000-4000-8000-000000000003': { x: 320, y: -40, open: false },
     });
   });
 
@@ -436,7 +432,7 @@ describe('space file maps', () => {
         maps: [
           {
             ...working,
-            positions: { ...working.positions, [A]: { ...placement, shape: 'rectangle' } },
+            positions: { ...working.positions, [A]: { ...placement } },
           },
         ],
       }).success;
@@ -531,11 +527,24 @@ describe('space file maps', () => {
       }
     });
 
-    it('refuses an entry with no Shape — a missing one is not read as a rectangle', () => {
-      expect(parseEntry({ x: 0, y: 0, open: false }).success).toBe(false);
-      expect(
-        parseEntry({ x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } }).success,
-      ).toBe(false);
+    it('accepts an entry with no Shape, Closed and Open, which draws as the rectangle', () => {
+      for (const entry of [
+        { x: 0, y: 0, open: false },
+        { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } },
+      ]) {
+        const parsed = parseEntry(entry);
+        expect(parsed.success).toBe(true);
+        const placed = parsed.data?.maps?.[0]?.positions[uuidSchema.parse(A)];
+        expect(placed).not.toHaveProperty('shape');
+        expect(placed === undefined ? undefined : resourceShape(placed)).toBe('rectangle');
+      }
+    });
+
+    it('answers a stored Shape as the one drawn, the rectangle included', () => {
+      for (const stored of RESOURCE_SHAPES) {
+        expect(resourceShape({ shape: stored })).toBe(stored);
+      }
+      expect(DEFAULT_RESOURCE_SHAPE).toBe('rectangle');
     });
 
     it('refuses a Shape outside the five', () => {
@@ -555,7 +564,6 @@ describe('space file maps', () => {
         y: 0,
         open: true,
         openSize: { width, height },
-        shape: 'rectangle',
       },
     });
 
@@ -617,7 +625,7 @@ describe('space file maps', () => {
   it('rejects a position keyed by an empty resource id', () => {
     const result = spaceFileSchema.safeParse({
       ...validSpaceFile,
-      maps: [{ ...working, positions: { '': { x: 0, y: 0, open: false, shape: 'rectangle' } } }],
+      maps: [{ ...working, positions: { '': { x: 0, y: 0, open: false } } }],
     });
     expect(result.success).toBe(false);
   });

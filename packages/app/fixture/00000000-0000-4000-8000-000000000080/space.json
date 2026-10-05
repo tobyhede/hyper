@@ -12,14 +12,12 @@
         "00000000-0000-4000-8000-000000000083": {
           "x": 12,
           "y": 12,
-          "open": false,
-          "shape": "rectangle"
+          "open": false
         },
         "00000000-0000-4000-8000-000000000084": {
           "x": 432,
           "y": 12,
-          "open": false,
-          "shape": "rectangle"
+          "open": false
         }
       },
       "graphs": [

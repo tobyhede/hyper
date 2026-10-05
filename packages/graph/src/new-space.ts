@@ -7,7 +7,6 @@ import {
   type UUID,
 } from '@project/core';
 import { nextGraphColor } from './graph-color';
-import { Placement } from './placement';
 import { serializeResourceFile, type ResourceFile } from './resource-file';
 
 /**
@@ -102,9 +101,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
           id: mapId,
           title: 'Map 1',
           kind: 'positioned',
-          positions: Placement.toPositions(
-            Placement.place(Placement.empty(), resourceId, { x: 0, y: 0 }),
-          ),
+          positions: { [resourceId]: { x: 0, y: 0, open: false } },
           graphs: [newGraph(graphId, 'Graph 1', [])],
           activeGraph: graphId,
         },

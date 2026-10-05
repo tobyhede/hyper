@@ -95,12 +95,7 @@ const closedPlacement = (ids: readonly UUID[], coords: readonly number[]): Place
   Placement.fromEntries(
     ids.map((id, i) => [
       id,
-      {
-        x: coords[i * 2] ?? 0,
-        y: coords[i * 2 + 1] ?? 0,
-        open: false as const,
-        shape: 'rectangle' as const,
-      },
+      { x: coords[i * 2] ?? 0, y: coords[i * 2 + 1] ?? 0, open: false as const },
     ]),
   );
 
@@ -243,8 +238,8 @@ describe('deletionReach properties', () => {
           const at = { x: generated.coords[r * 2] ?? 0, y: generated.coords[r * 2 + 1] ?? 0 };
           positions[id] =
             generated.open[r] === true
-              ? { ...at, open: true, openSize: DEFAULT_OPEN_SIZE, shape: 'rectangle' }
-              : { ...at, open: false, shape: 'rectangle' };
+              ? { ...at, open: true, openSize: DEFAULT_OPEN_SIZE }
+              : { ...at, open: false };
         });
         const graphs = generated.graphs.map((pairs, g): Graph => {
           const seen = new Set<string>();
@@ -501,12 +496,11 @@ describe('SnapshotEdit.createInMap properties', () => {
           expect(outcome.kind).toBe('completed');
           if (outcome.kind !== 'completed') return;
           expect(loadSpaceSnapshot(outcome.snapshot).ok).toBe(true);
-          // Add Resource gives it the rectangle, written rather than implied (ADR 0120).
+          // No Shape is stored, so it draws as the rectangle (ADR 0120).
           expect(outcome.snapshot.document.maps?.[0]?.positions[newResourceId]).toEqual({
             x: anchor.x,
             y: anchor.y,
             open: false,
-            shape: 'rectangle',
           });
         },
       ),
@@ -615,7 +609,8 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     readonly y: number;
     readonly open: boolean;
     readonly openSize: Extent | undefined;
-    readonly shape: ResourceShape;
+    /** Absent as often as not: an entry with none stored draws as the rectangle. */
+    readonly shape?: ResourceShape;
   };
 
   /**
@@ -647,32 +642,28 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   );
 
   const entriesArb = fc.array(
-    fc.record({
-      x: coordinateArb,
-      y: coordinateArb,
-      open: fc.boolean(),
-      openSize: fc.option(sizeArb, { nil: undefined }),
-      shape: fc.constantFrom(...RESOURCE_SHAPES),
-    }),
+    fc.record(
+      {
+        x: coordinateArb,
+        y: coordinateArb,
+        open: fc.boolean(),
+        openSize: fc.option(sizeArb, { nil: undefined }),
+        shape: fc.constantFrom(...RESOURCE_SHAPES),
+      },
+      { requiredKeys: ['x', 'y', 'open', 'openSize'] },
+    ),
     { minLength: RESOURCE_IDS.length, maxLength: RESOURCE_IDS.length },
   );
 
   const subjectArb = fc.nat({ max: RESOURCE_IDS.length - 1 });
 
   const placementOf = (entry: GeneratedEntry): ResourcePlacement => {
-    const { x, y, shape: resourceShape } = entry;
-    if (entry.open) {
-      return {
-        x,
-        y,
-        open: true,
-        openSize: entry.openSize ?? DEFAULT_OPEN_SIZE,
-        shape: resourceShape,
-      };
-    }
-    return entry.openSize === undefined
-      ? { x, y, open: false, shape: resourceShape }
-      : { x, y, open: false, openSize: entry.openSize, shape: resourceShape };
+    const placement: ResourcePlacement = entry.open
+      ? { x: entry.x, y: entry.y, open: true, openSize: entry.openSize ?? DEFAULT_OPEN_SIZE }
+      : entry.openSize === undefined
+        ? { x: entry.x, y: entry.y, open: false }
+        : { x: entry.x, y: entry.y, open: false, openSize: entry.openSize };
+    return entry.shape === undefined ? placement : { ...placement, shape: entry.shape };
   };
 
   const with_ = (
@@ -921,7 +912,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
                   ...firstMap,
                   positions: {
                     ...firstMap.positions,
-                    [witnessId]: { ...destination, open: false, shape: 'rectangle' },
+                    [witnessId]: { ...destination, open: false },
                   },
                 },
               ],
@@ -974,23 +965,11 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     // displacement may treat it differently from a Markdown Resource.
     const [subjectId, besideId, belowId, beforeId] = RESOURCE_IDS;
     const markdown = snapshotOf([
-      { x: 0, y: 0, open: false, openSize: undefined, shape: 'rectangle' },
-      {
-        x: COLLAPSED_RESOURCE_SIZE.width,
-        y: 40,
-        open: false,
-        openSize: undefined,
-        shape: 'rectangle',
-      },
-      {
-        x: 40,
-        y: COLLAPSED_RESOURCE_SIZE.height,
-        open: false,
-        openSize: undefined,
-        shape: 'rectangle',
-      },
-      { x: -300, y: -300, open: false, openSize: undefined, shape: 'rectangle' },
-      { x: -600, y: 600, open: false, openSize: undefined, shape: 'rectangle' },
+      { x: 0, y: 0, open: false, openSize: undefined },
+      { x: COLLAPSED_RESOURCE_SIZE.width, y: 40, open: false, openSize: undefined },
+      { x: 40, y: COLLAPSED_RESOURCE_SIZE.height, open: false, openSize: undefined },
+      { x: -300, y: -300, open: false, openSize: undefined },
+      { x: -600, y: 600, open: false, openSize: undefined },
     ]);
     const start: SpaceSnapshot = {
       ...markdown,
@@ -1028,7 +1007,6 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       y: 0,
       open: false,
       openSize: resizedTo,
-      shape: 'rectangle',
     });
 
     const reopened = completed(SnapshotEdit.open(closed, MAP_ID, subjectId));
@@ -1092,7 +1070,8 @@ describe('SnapshotEdit.open, close and resize properties', () => {
             resourceShape,
           );
 
-          if (resourceShape === subject.shape) {
+          const drawn = subject.shape ?? 'rectangle';
+          if (resourceShape === drawn) {
             expect(outcome).toEqual({ kind: 'unchanged' });
             return;
           }
@@ -1106,10 +1085,16 @@ describe('SnapshotEdit.open, close and resize properties', () => {
             document: { ...snapshot.document, maps: [] },
           });
           expect(changed.document.maps?.[0]?.graphs).toEqual(snapshot.document.maps?.[0]?.graphs);
-          // Undone by changing it back: the Edit's inverse is the same Edit.
+          // Undone by changing it back: the Edit's inverse is the same Edit, which
+          // writes the Shape chosen, so an entry that stored none now stores the
+          // rectangle it drew as.
           expect(
-            completed(SnapshotEdit.changeResourceShape(changed, MAP_ID, subjectId, subject.shape)),
-          ).toEqual(snapshot);
+            completed(SnapshotEdit.changeResourceShape(changed, MAP_ID, subjectId, drawn)),
+          ).toEqual(
+            subject.shape === undefined
+              ? snapshotOf(with_(entries, subjectIndex, { shape: 'rectangle' }))
+              : snapshot,
+          );
         },
       ),
       { seed: SEED, numRuns: RUNS },
@@ -1171,7 +1156,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
     const first = Placement.toPositions(
       Placement.fromEntries(
         members.map((id): [UUID, ResourcePlacement] => {
-          const at = placement.get(id) ?? { x: 0, y: 0, open: false, shape: 'rectangle' };
+          const at = placement.get(id) ?? { x: 0, y: 0, open: false };
           return [
             id,
             open
@@ -1275,7 +1260,6 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
             x: anchor.x,
             y: anchor.y,
             open: false,
-            shape: 'rectangle',
           });
         },
       ),
@@ -1414,8 +1398,8 @@ describe('first Open content geometry', () => {
           for (const document of documents) {
             const snapshot: SpaceSnapshot = {
               ...baseSnapshot([target, reference], {
-                [target]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-                [reference]: { x: 1000, y: 0, open: false, shape: 'rectangle' },
+                [target]: { x: 0, y: 0, open: false },
+                [reference]: { x: 1000, y: 0, open: false },
               }),
               resources: [
                 { id: target, document },

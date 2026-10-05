@@ -5,6 +5,7 @@ import { CLOSED_DISPLAY } from '@project/ui';
 import type { CanvasSpaceResourceSelection, EntityActionGroup, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
+  DEFAULT_RESOURCE_SHAPE,
   contentAction,
   openSizeFloor,
   embedsMap,
@@ -192,8 +193,8 @@ export type ResourceNodeData = {
    */
   display: ResourceDisplay;
   /**
-   * The Shape the Map records for this Resource, carried whatever the display:
-   * the front draws it only while the display is Closed.
+   * The Shape the Map draws this Resource in, resolved — the rectangle where
+   * its entry stores none — and drawn Open and Closed alike (ADR 0120).
    */
   shape: ResourceShape;
   active: boolean;
@@ -250,8 +251,8 @@ export interface ProjectResourceNodesOptions {
   resourceIds?: readonly ResourceId[];
   /** Map-authored Open Resources whose Markdown body is drawn in place. */
   openResourceIds?: ReadonlySet<ResourceId>;
-  /** The Shape the Map records for each projected Resource. */
-  resourceShape: (resourceId: ResourceId) => ResourceShape;
+  /** The Shape the Map draws each projected Resource in; absent, every one is the rectangle. */
+  resourceShape?: (resourceId: ResourceId) => ResourceShape;
 }
 
 /**
@@ -303,7 +304,7 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
  */
 export function projectResourceNodes(
   space: Space,
-  options: ProjectResourceNodesOptions,
+  options: ProjectResourceNodesOptions = {},
 ): ResourceFlowNode[] {
   const activeResourceId = options.activeResourceId ?? null;
   const showActiveResourceContent = options.showActiveResourceContent ?? false;
@@ -339,7 +340,7 @@ export function projectResourceNodes(
         active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         display,
-        shape: options.resourceShape(resource.id),
+        shape: options.resourceShape?.(resource.id) ?? DEFAULT_RESOURCE_SHAPE,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
       },

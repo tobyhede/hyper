@@ -72,10 +72,10 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
           kind: 'positioned',
           positions: meta
             ? {
-                [resourceId]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-                [META_SPACE_RESOURCE_ID]: { x: 0, y: 40, open: false, shape: 'rectangle' },
+                [resourceId]: { x: 0, y: 0, open: false },
+                [META_SPACE_RESOURCE_ID]: { x: 0, y: 40, open: false },
               }
-            : { [resourceId]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            : { [resourceId]: { x: 0, y: 0, open: false } },
           graphs: [
             { id: graphOne, title: 'One', edges: [] },
             { id: graphTwo, title: 'Two', edges: [] },

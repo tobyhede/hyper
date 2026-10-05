@@ -63,7 +63,7 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
           id: MAP_ID,
           title: 'Map',
           kind: 'positioned',
-          positions: { [RESOURCE_ID]: { x, y, open: false, shape: 'rectangle' } },
+          positions: { [RESOURCE_ID]: { x, y, open: false } },
           // A Map owns at least one Graph (ADR 0040), and one Resource has
           // nothing to connect — so the Graph it opens on holds no Edges.
           graphs: [{ id: OWNED_GRAPH_ID, title: 'Graph', edges: [] }],
@@ -1573,7 +1573,7 @@ describe('Space app Resources list', () => {
             // The Resource is placed here too, so this Map stays editable: an
             // empty Map withdraws chrome editing on its own and would clear
             // the draft for a reason that has nothing to do with the arrival.
-            positions: { [RESOURCE_ID]: { x: 40, y: 50, open: false, shape: 'rectangle' } },
+            positions: { [RESOURCE_ID]: { x: 40, y: 50, open: false } },
             graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
           },
         ],

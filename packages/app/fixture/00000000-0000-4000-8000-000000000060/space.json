@@ -12,32 +12,27 @@
         "00000000-0000-4000-8000-000000000063": {
           "x": 12,
           "y": 12,
-          "open": false,
-          "shape": "rectangle"
+          "open": false
         },
         "00000000-0000-4000-8000-000000000064": {
           "x": 432,
           "y": 12,
-          "open": false,
-          "shape": "rectangle"
+          "open": false
         },
         "00000000-0000-4000-8000-000000000065": {
           "x": 852,
           "y": 12,
-          "open": false,
-          "shape": "rectangle"
+          "open": false
         },
         "00000000-0000-4000-8000-000000000066": {
           "x": 12,
           "y": 178,
-          "open": false,
-          "shape": "rectangle"
+          "open": false
         },
         "00000000-0000-4000-8000-000000000067": {
           "x": 432,
           "y": 178,
-          "open": false,
-          "shape": "rectangle"
+          "open": false
         }
       },
       "graphs": [

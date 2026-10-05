@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0113
-Related: 0064, 0066, 0084, 0093, 0110, 0112, 0114
+Related: 0064, 0066, 0084, 0093, 0105, 0110, 0112, 0114
 
 ADR 0113 gave the author the Ur Resource so they can diagram: draw named things and the Edges between them. A diagram also needs notation. A decision reads as a diamond and a start or end reads as a pill, so a Resource needs a way to be drawn in something other than the rectangle every front has now.
 
@@ -12,7 +12,7 @@ A Resource on a Map has a **Shape**: the outline its front is drawn in, Open or 
 
 **Only an Ur Resource takes a Shape.** A Shape is diagram notation, and the Ur Resource is the kind a diagram is drawn with: it has no content, so its outline is all a reader sees of it. A Markdown document, a picture or an embedded Map in a hexagon is notation nobody needs, and offering it would clutter every Resource's Actions menu. Every other kind is the rectangle. A Shape is the Ur kind's, so ADR 0113's rule that a kind adds what its content supports and takes nothing away from the others is unaffected. A Shape Edit on any other kind is refused, and intake refuses a stored Map entry giving any other kind a Shape but the rectangle.
 
-**The Shape is required, and a Resource added to a Map is given the rectangle.** Add Resource and Add to Map write the rectangle, as a new Graph is given the arrow head shape. There is no rule that reads a missing Shape as a rectangle. The schema and fixtures roll forward in the same change (ADR 0054, ADR 0056). Remove from Map forgets the Shape along with the rest of the entry.
+**The Shape is optional, and the application's default is the rectangle.** An entry with no Shape stored draws as the rectangle, as a Graph with no head shape stored draws the arrow (ADR 0105). Add Resource and Add to Map write no Shape, so every entry that never had one chosen, and every tracked fixture and seed, stays as it was. Choosing a Shape writes the one chosen, the rectangle included, and choosing the Shape the Resource already draws as changes nothing. `rectangle` is a legal stored value on every kind. Remove from Map forgets the Shape along with the rest of the entry.
 
 **The Shape is drawn at the Resource's rect and changes no rect.** A Closed Resource is its Shape at the fixed Closed Size, and an Open one is its Shape at its Open Size. Open, Close, Resize, Open Size and displacement (ADR 0064, ADR 0066, ADR 0084, ADR 0093) and Edge attachment (ADR 0110) read the rect and are unchanged. Ellipse, diamond and hexagon fill the rect proportionally; a pill's ends stay half-circles at any size. That is why the set is closed. Every member touches the midpoint of each side of its bounding rect at every size, where Edges attach, so an Edge meets the drawn outline. A triangle, parallelogram, cylinder or cloud would not, and is excluded. The kind glyph and Title sit in the rectangle inscribed in the Shape, and a Shape other than the rectangle shows the short Title: the name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline.
 
@@ -30,8 +30,8 @@ An embedded Map draws its Ur Resources' Shapes, Open or Closed, because one surf
 - **A Shape changes the Closed Size**, for example a square for a circle. Rejected: displacement, Edge attachment and the fixed Closed Size would all have to depend on the Shape, for a difference an ellipse in the same rect already shows.
 - **Only a Closed Resource draws its Shape.** Rejected: a diagram could not hold a large diamond, an ellipse sized to its label or a pill stretched across a lane, and Opening would change the notation. The reason first given for it — that content needs the rectangle — no longer applies once only the contentless Ur Resource takes a Shape.
 - **An open set**, such as a free corner radius or an arbitrary path. Rejected: Edges could no longer be guaranteed to meet the outline, and the set would stop being notation a reader can learn.
-- **A missing Shape reads as a rectangle.** Rejected: the repo is the only source of state, so the schema and fixtures move forward together instead of carrying a rule for reading a missing field.
+- **The Shape is required on every entry, and Add writes the rectangle.** Rejected: a field is optional and the application chooses its default, as `headShape` is (ADR 0105). Requiring it would put notation only an Ur Resource uses on every entry of every kind, in every fixture, seed and hand-written file.
 
 ## Consequences
 
-The Map entry schema, intake, export and import gain a required `shape` field. Every tracked fixture and seed writes `rectangle`. Add Resource and Add to Map write it. A new Edit changes one Resource's Shape on one Map. The Resource front draws the outline at its current rect, Open or Closed, insets its Title and glyph, and has its selection ring follow the outline. A Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow. The presented Resource is unchanged.
+The Map entry schema, intake, export and import gain an optional `shape` field, absent meaning the rectangle; one resolver in `@project/core` answers the Shape an entry draws as. Tracked fixtures and seeds are unchanged, and Add Resource and Add to Map write no Shape. A new Edit changes one Resource's Shape on one Map. The Resource front draws the outline at its current rect, Open or Closed, insets its Title and glyph, and has its selection ring follow the outline. A Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow. The presented Resource is unchanged.

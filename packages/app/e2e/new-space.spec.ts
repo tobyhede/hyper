@@ -26,7 +26,7 @@ const seedNewSpaceMap = (page: Page) =>
   seedPositionedMap(page, 'Authored Map', (snapshot) => {
     const resourceId = snapshot.resources[0]?.id;
     if (resourceId === undefined) throw new Error('The new Space must hold Resource 1.');
-    return { [resourceId]: { x: 0, y: 0, open: false, shape: 'rectangle' } };
+    return { [resourceId]: { x: 0, y: 0, open: false } };
   });
 
 /** A new Space already owns its complete first Map and centered Resource. */
@@ -494,7 +494,7 @@ test(
                   id: mapId,
                   title: 'Map',
                   kind: 'positioned',
-                  positions: { [resourceId]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+                  positions: { [resourceId]: { x: 0, y: 0, open: false } },
                   graphs: [
                     {
                       id: graphId,

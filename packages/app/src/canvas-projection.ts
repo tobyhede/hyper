@@ -1,4 +1,11 @@
-import type { ResourceId, ResourceShape, Graph, GraphHeadShape, GraphId } from '@project/core';
+import {
+  resourceShape,
+  type ResourceId,
+  type ResourceShape,
+  type Graph,
+  type GraphHeadShape,
+  type GraphId,
+} from '@project/core';
 import {
   buildGraphRenderEdges,
   buildLayoutStrategyGraph,
@@ -89,13 +96,13 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
     [...authored].filter(([, at]) => at.open).map(([resourceId]) => resourceId),
   );
   // Every Resource drawn is one of `resourceIds`, the Map's own members, so
-  // each has an entry and a Shape on it.
-  const resourceShape = (resourceId: ResourceId): ResourceShape => {
+  // each has an entry; one with no Shape stored draws as the rectangle.
+  const drawnResourceShape = (resourceId: ResourceId): ResourceShape => {
     const at = authored.get(resourceId);
     if (at === undefined) {
       throw new Error(`Resource ${resourceId} is drawn on Map ${resolved.map.id} without an entry`);
     }
-    return at.shape;
+    return resourceShape(at);
   };
   const strategyGraph = buildLayoutStrategyGraph(resourceIds, edges, (resourceId) => {
     const at = authored.get(resourceId);
@@ -119,7 +126,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           strategyGraph: laidOut,
           resourceIds,
           openResourceIds,
-          resourceShape,
+          resourceShape: drawnResourceShape,
         }),
         edges: projectGraphEdges(edges, colors, { activeGraphId, headShapes }),
       };

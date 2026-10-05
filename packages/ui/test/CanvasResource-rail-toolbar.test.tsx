@@ -21,7 +21,6 @@ const tabStops = () => railButtons().filter((button) => button.tabIndex === 0);
 const openMarkdownResource = () =>
   render(
     <CanvasResource
-      shape="rectangle"
       front={{
         kind: 'markdown',
         onOpenChange: vi.fn(),
@@ -54,7 +53,6 @@ describe('the Resource rail is one toolbar', () => {
     // because a canvas draws many Resources and each one has a rail.
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange: vi.fn(),
@@ -95,7 +93,6 @@ describe('the Resource rail is one toolbar', () => {
     const onOpenChange = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange,
@@ -138,7 +135,6 @@ describe('the Resource rail is one toolbar', () => {
     render(
       <div onKeyDown={onKeyDown}>
         <CanvasResource
-          shape="rectangle"
           front={{
             kind: 'markdown',
             onOpenChange: vi.fn(),
@@ -197,7 +193,6 @@ describe('the rail says whose command each one is', () => {
   it("keeps the shared group while an edit replaces the kind's own commands", () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange: vi.fn(),
@@ -229,7 +224,6 @@ describe('the rail says whose command each one is', () => {
   it('draws Reference Resource Open in the shared Resource command group', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference', onOpenChange: () => 'completed' }}
         display={CLOSED_DISPLAY}
         state="rest"

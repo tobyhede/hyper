@@ -219,9 +219,7 @@ test('a canonical Resource omitted by the default Map is revealed only in the Re
   const seeded = await seedPositionedMap(page, 'Sparse Map', (snapshot) => {
     const included = snapshot.resources[0];
     expect(included).toBeDefined();
-    return included === undefined
-      ? {}
-      : { [included.id]: { x: 0, y: 0, open: false as const, shape: 'rectangle' as const } };
+    return included === undefined ? {} : { [included.id]: { x: 0, y: 0, open: false as const } };
   });
   const omitted = seeded.snapshot.resources[1];
   expect(omitted).toBeDefined();
@@ -249,9 +247,7 @@ test('returning to a canonical Resource address reveals it again', async ({ page
   const seeded = await seedPositionedMap(page, 'Sparse Map', (snapshot) => {
     const included = snapshot.resources[0];
     expect(included).toBeDefined();
-    return included === undefined
-      ? {}
-      : { [included.id]: { x: 0, y: 0, open: false as const, shape: 'rectangle' as const } };
+    return included === undefined ? {} : { [included.id]: { x: 0, y: 0, open: false as const } };
   });
   const omitted = seeded.snapshot.resources[1];
   expect(omitted).toBeDefined();
@@ -548,7 +544,7 @@ test('entering, advancing and retreating each append presentation history', asyn
  */
 test('a self-Edge presentation move takes no browser entry', async ({ page }) => {
   const seeded = await seedPositionedMap(page, 'Self Edge', () => ({
-    [RESOURCE_A_ID]: { x: 20, y: 20, open: false, shape: 'rectangle' },
+    [RESOURCE_A_ID]: { x: 20, y: 20, open: false },
   }));
   const snapshot = {
     ...seeded.snapshot,

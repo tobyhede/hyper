@@ -15,10 +15,7 @@ const strategyGraph: LayoutStrategyGraph = {
 /** A `Placement` over the resource/point pairs given, all Closed. */
 const placementOf = (
   entries: readonly (readonly [typeof RESOURCE_A, { readonly x: number; readonly y: number }])[],
-): Placement =>
-  Placement.fromEntries(
-    entries.map(([id, at]) => [id, { ...at, open: false, shape: 'rectangle' }]),
-  );
+): Placement => Placement.fromEntries(entries.map(([id, at]) => [id, { ...at, open: false }]));
 
 describe('usePlacementRendering', () => {
   it('is pending until the placement resolves the current strategyGraph', async () => {

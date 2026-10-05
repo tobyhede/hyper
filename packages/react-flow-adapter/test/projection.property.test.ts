@@ -95,10 +95,7 @@ const spaceFileArb = resourceIdPool.chain((pool) =>
             title: 'Only map',
             kind: 'positioned',
             positions: Object.fromEntries(
-              visited.map((id, index) => [
-                id,
-                { x: index * 300, y: 0, open: false, shape: 'rectangle' },
-              ]),
+              visited.map((id, index) => [id, { x: index * 300, y: 0, open: false }]),
             ),
             graphs: graphs.map((graph, index) => ({
               id: uuidFrom(index + 100),
@@ -137,7 +134,7 @@ function project(generated: { file: unknown; resourceFiles: ResourceFile[] }) {
   };
 
   return {
-    nodes: projectResourceNodes(space, { resourceShape: () => 'rectangle', strategyGraph }),
+    nodes: projectResourceNodes(space, { strategyGraph }),
     edges: projectGraphEdges(buildGraphRenderEdges(space), {}),
   };
 }
@@ -266,7 +263,6 @@ describe('what each node shows', () => {
         if (!result.ok) throw new Error(JSON.stringify(result.errors));
         const space = result.space;
         const nodes = projectResourceNodes(space, {
-          resourceShape: () => 'rectangle',
           openResourceIds: new Set(space.resources.map((resource) => resource.id)),
         });
 
@@ -298,7 +294,6 @@ describe('what each node shows', () => {
           const openIds = new Set(ids.filter((_, index) => openings[index % openings.length]));
           const presented = ids[presentedIndex % ids.length];
           const nodes = projectResourceNodes(space, {
-            resourceShape: () => 'rectangle',
             openResourceIds: openIds,
             activeResourceId: presented ?? null,
             showActiveResourceContent: true,

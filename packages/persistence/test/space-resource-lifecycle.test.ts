@@ -48,7 +48,7 @@ const metaSnapshot: SpaceSnapshot = {
         id: META_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [META_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [META_RESOURCE_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: META_GRAPH_ID,
       },
@@ -94,7 +94,7 @@ const targetSnapshot: SpaceSnapshot = {
         id: TARGET_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: TARGET_GRAPH_ID,
       },
@@ -221,7 +221,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
       },
@@ -320,7 +320,7 @@ describe('Space Resource lifecycle', () => {
             id: CHILD_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
           },
@@ -503,7 +503,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
       },
@@ -576,7 +576,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
       },
@@ -1200,7 +1200,6 @@ describe('Space Resource lifecycle', () => {
       x: 240,
       y: 80,
       open: false,
-      shape: 'rectangle',
     });
     expect(await backend.loadSpace(TARGET_ID)).toEqual({
       revision: 0n,
@@ -1216,7 +1215,7 @@ describe('Space Resource lifecycle', () => {
               id: TARGET_MAP_ID,
               title: 'Map 1',
               kind: 'positioned',
-              positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+              positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
               graphs: [
                 {
                   id: TARGET_GRAPH_ID,
@@ -1265,7 +1264,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
       },
@@ -1297,7 +1296,7 @@ describe('Space Resource lifecycle', () => {
             id: CHILD_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
           },
@@ -1486,7 +1485,7 @@ describe('Space Resource lifecycle', () => {
             id: TARGET_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [
               { id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] },
               { id: SECOND_TARGET_GRAPH_ID, title: 'Graph 2', edges: [] },
@@ -1744,7 +1743,7 @@ describe('Space Resource lifecycle', () => {
             id: TARGET_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
             // Names a Resource this Space does not hold, which is what single-Space
             // intake refuses and what no repair here would mend.
             graphs: [
@@ -1847,7 +1846,7 @@ describe('Space Resource lifecycle', () => {
             id: CHILD_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
           },
@@ -2127,7 +2126,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
       },
@@ -2144,8 +2143,8 @@ describe('Space Resource lifecycle', () => {
             title: 'Map 1',
             kind: 'positioned',
             positions: {
-              [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-              [CHILD_LINK_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
+              [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false },
+              [CHILD_LINK_ID]: { x: 240, y: 80, open: false },
             },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
@@ -2236,7 +2235,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
       },
@@ -2292,7 +2291,7 @@ describe('Space Resource lifecycle', () => {
             id: CHILD_MAP_ID,
             title: 'Map 1',
             kind: 'positioned',
-            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [CHILD_RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
             activeGraph: CHILD_GRAPH_ID,
           },
@@ -2353,7 +2352,7 @@ describe('Space Resource lifecycle', () => {
           ...m,
           positions: {
             ...m.positions,
-            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
+            [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false },
           },
         })),
       },
@@ -2398,10 +2397,7 @@ describe('Space Resource coordination paths', () => {
       ...metaSnapshot.document,
       maps: metaSnapshot.document.maps?.map((m) => ({
         ...m,
-        positions: {
-          ...m.positions,
-          [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false, shape: 'rectangle' },
-        },
+        positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 240, y: 80, open: false } },
       })),
     },
   };

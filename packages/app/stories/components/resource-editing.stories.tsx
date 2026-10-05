@@ -56,7 +56,6 @@ function TitleEditingResource({
         data-testid="resource-group"
       >
         <CanvasResource
-          shape="rectangle"
           front={front}
           display={display}
           title={title}
@@ -178,7 +177,6 @@ export const Markdown: Story = () => {
       </div>
       <div style={openFrame}>
         <CanvasResource
-          shape="rectangle"
           front={front}
           display={display}
           state="selected"

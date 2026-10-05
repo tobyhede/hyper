@@ -68,7 +68,6 @@ const ordinarySpace = (
       x: (index % COLUMNS) * 340,
       y: Math.floor(index / COLUMNS) * 220,
       open: false,
-      shape: 'rectangle',
     };
   });
   const edges = resourceIds.flatMap((from, index) => {
@@ -128,7 +127,7 @@ export const scenario = (workload: Workload): Scenario => {
   const spaceResourceIds = referenced.map((_, index) => id(100 + index));
   const positions: Record<UUID, ResourcePlacement> = {};
   spaceResourceIds.forEach((resourceId, index) => {
-    positions[resourceId] = { x: index * 340, y: 0, open: false, shape: 'rectangle' };
+    positions[resourceId] = { x: index * 340, y: 0, open: false };
   });
   const meta = spaceSnapshotSchema.parse({
     id: id(1),
@@ -325,7 +324,7 @@ export const applyEdit = (
       );
       const withResource = withPositions(snapshot, (positions) => ({
         ...positions,
-        [added]: { x: -400, y: sample * 220, open: false, shape: 'rectangle' },
+        [added]: { x: -400, y: sample * 220, open: false },
       }));
       return {
         ...withResource,

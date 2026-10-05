@@ -1,5 +1,4 @@
 import {
-  ADDED_RESOURCE_SHAPE,
   COLLAPSED_RESOURCE_SIZE,
   type ResourceId,
   type ResourcePlacement,
@@ -73,30 +72,28 @@ const brand = (positions: ReadonlyMap<ResourceId, Readonly<ResourcePlacement>>):
 
 /**
  * A whole entry, or a bare point for a Resource joining the placement, which
- * joins Closed and is given the rectangle (ADR 0120).
+ * joins Closed with no Shape stored, so it draws as the rectangle (ADR 0120).
  */
 type PlacementPoint = ResourcePlacement | (MapPosition & { readonly open?: never });
 
 const point = (at: PlacementPoint): ResourcePlacement => {
-  if (at.open === undefined) return { x: at.x, y: at.y, open: false, shape: ADDED_RESOURCE_SHAPE };
-  if (at.open) {
-    return {
-      x: at.x,
-      y: at.y,
-      open: true,
-      openSize: { width: at.openSize.width, height: at.openSize.height },
-      shape: at.shape,
-    };
-  }
-  return at.openSize === undefined
-    ? { x: at.x, y: at.y, open: false, shape: at.shape }
-    : {
+  if (at.open === undefined) return { x: at.x, y: at.y, open: false };
+  const entry: ResourcePlacement = at.open
+    ? {
         x: at.x,
         y: at.y,
-        open: false,
+        open: true,
         openSize: { width: at.openSize.width, height: at.openSize.height },
-        shape: at.shape,
-      };
+      }
+    : at.openSize === undefined
+      ? { x: at.x, y: at.y, open: false }
+      : {
+          x: at.x,
+          y: at.y,
+          open: false,
+          openSize: { width: at.openSize.width, height: at.openSize.height },
+        };
+  return at.shape === undefined ? entry : { ...entry, shape: at.shape };
 };
 
 /** The placement a Map holds. */
@@ -144,7 +141,7 @@ function fromEntries(entries: Iterable<readonly [ResourceId, PlacementPoint]>): 
   return brand(positions);
 }
 
-/** Value equality: the same resources, each with the same coordinates, state, Open Size and Shape. */
+/** Value equality: the same resources, each with the same coordinates, state, Open Size and stored Shape. */
 function equals(a: Placement | null, b: Placement | null): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -232,8 +229,8 @@ function next(
  *
  * Add Resource and Add to Map place a Resource where the author aimed it, which
  * is authorship rather than a report — no renderer has drawn that Resource yet,
- * so it cannot come through `next`. A bare point joins Closed with the
- * rectangle (ADR 0120).
+ * so it cannot come through `next`. A bare point joins Closed with no Shape
+ * stored (ADR 0120).
  */
 function place(placement: Placement, resourceId: ResourceId, at: PlacementPoint): Placement {
   const placed = new Map(placement);

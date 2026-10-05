@@ -62,7 +62,7 @@ const targetSpace = (
         id: mapId,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [resourceId]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [resourceId]: { x: 0, y: 0, open: false } },
         graphs: [{ id: graphId, title: 'Graph 1', edges: [] }],
         activeGraph: graphId,
       },
@@ -90,16 +90,10 @@ const metaSpace = (): SpaceSnapshot => ({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [FIRST_LINK_ID]: { x: 340, y: 0, open: false, shape: 'rectangle' },
-          [SECOND_LINK_ID]: {
-            x: 680,
-            y: 0,
-            open: true,
-            openSize: { width: 480, height: 270 },
-            shape: 'rectangle',
-          },
-          [CONVERGING_LINK_ID]: { x: 1020, y: 0, open: false, shape: 'rectangle' },
+          [MARKDOWN_RESOURCE_ID]: { x: 0, y: 0, open: false },
+          [FIRST_LINK_ID]: { x: 340, y: 0, open: false },
+          [SECOND_LINK_ID]: { x: 680, y: 0, open: true, openSize: { width: 480, height: 270 } },
+          [CONVERGING_LINK_ID]: { x: 1020, y: 0, open: false },
         },
         graphs: [
           {
@@ -328,7 +322,7 @@ describe('exporting and importing one complete aggregate', () => {
     }
   });
 
-  it("preserves every Resource's Shape on its Map, Open and Closed alike", async () => {
+  it("preserves every Resource's Shape on its Map, Open and Closed alike, and its absence", async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const [meta, ...targets] = completeAggregate();
     if (meta === undefined) throw new Error('The aggregate names no Meta Space');
@@ -342,6 +336,8 @@ describe('exporting and importing one complete aggregate', () => {
           ...m,
           positions: {
             ...m.positions,
+            // A stored rectangle is legal on any kind, and kept as stored.
+            [FIRST_LINK_ID]: { x: 340, y: 0, open: false, shape: 'rectangle' },
             [CLOSED_UR_ID]: { x: 0, y: 400, open: false, shape: 'diamond' },
             [OPEN_UR_ID]: {
               x: 340,
@@ -376,7 +372,9 @@ describe('exporting and importing one complete aggregate', () => {
       openSize: { width: 480, height: 270 },
       shape: 'hexagon',
     });
-    expect(positions?.[MARKDOWN_RESOURCE_ID]?.shape).toBe('rectangle');
+    expect(positions?.[FIRST_LINK_ID]).toEqual({ x: 340, y: 0, open: false, shape: 'rectangle' });
+    // An entry with no Shape stored is written and read back without one.
+    expect(positions?.[MARKDOWN_RESOURCE_ID]).toEqual({ x: 0, y: 0, open: false });
   });
 
   /*

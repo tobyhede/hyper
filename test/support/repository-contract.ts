@@ -159,8 +159,8 @@ const graphedSpace = (
           title: 'Owner',
           kind: 'positioned',
           positions: {
-            [from]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-            [to]: { x: 300, y: 0, open: false, shape: 'rectangle' },
+            [from]: { x: 0, y: 0, open: false },
+            [to]: { x: 300, y: 0, open: false },
           },
           graphs: [{ id: graphId, title: input.graphTitle ?? 'Graph', edges: [{ from, to }] }],
           activeGraph: graphId,
@@ -189,7 +189,7 @@ const spaceWithDanglingEdge = (id: UUID, title: string, memberId: UUID): SpaceSn
         id: MAP_ID,
         title: 'Dangling',
         kind: 'positioned',
-        positions: { [memberId]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [memberId]: { x: 0, y: 0, open: false } },
         graphs: [
           { id: GRAPH_ID, title: 'Dangling', edges: [{ from: memberId, to: MISSING_RESOURCE_ID }] },
         ],
@@ -1369,7 +1369,7 @@ export const spaceRepositoryContract = (
               id: MAP_ID,
               title: 'First map',
               kind: 'positioned',
-              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+              positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
               graphs: [
                 { id: GRAPH_ID, title: 'First graph', edges: [] },
                 { id: THIRD_GRAPH_ID, title: 'Second graph', edges: [] },
@@ -1380,9 +1380,7 @@ export const spaceRepositoryContract = (
               id: SECOND_MAP_ID,
               title: 'Second map',
               kind: 'positioned',
-              positions: {
-                [OTHER_RESOURCE_ID]: { x: 100, y: 100, open: false, shape: 'rectangle' },
-              },
+              positions: { [OTHER_RESOURCE_ID]: { x: 100, y: 100, open: false } },
               graphs: [
                 { id: SECOND_GRAPH_ID, title: 'Third graph', edges: [] },
                 { id: FOURTH_GRAPH_ID, title: 'Fourth graph', edges: [] },
@@ -2000,8 +1998,8 @@ export const spaceRepositoryContract = (
               ...firstMap,
               positions: {
                 ...firstMap.positions,
-                [RESOURCE_ID]: { x: 40, y: 40, open: false, shape: 'rectangle' },
-                [OTHER_RESOURCE_ID]: { x: 600, y: 0, open: false, shape: 'rectangle' },
+                [RESOURCE_ID]: { x: 40, y: 40, open: false },
+                [OTHER_RESOURCE_ID]: { x: 600, y: 0, open: false },
               },
             },
           ],

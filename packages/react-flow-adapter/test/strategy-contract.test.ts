@@ -75,27 +75,12 @@ function sampleGraph(): LayoutStrategyGraph {
  */
 const authored = (): Placement =>
   Placement.fromEntries([
-    [
-      uuid('00000000-0000-4000-8000-000000000002'),
-      { x: 0, y: 100, open: false, shape: 'rectangle' },
-    ],
-    [
-      uuid('00000000-0000-4000-8000-000000000003'),
-      { x: 400, y: 0, open: false, shape: 'rectangle' },
-    ],
-    [
-      uuid('00000000-0000-4000-8000-000000000005'),
-      { x: 400, y: 200, open: false, shape: 'rectangle' },
-    ],
-    [
-      uuid('00000000-0000-4000-8000-000000000006'),
-      { x: 800, y: 100, open: false, shape: 'rectangle' },
-    ],
-    [
-      uuid('00000000-0000-4000-8000-000000000008'),
-      { x: 1200, y: 100, open: false, shape: 'rectangle' },
-    ],
-    [uuid('00000000-0000-4000-8000-000000000099'), { x: 0, y: 0, open: false, shape: 'rectangle' }],
+    [uuid('00000000-0000-4000-8000-000000000002'), { x: 0, y: 100, open: false }],
+    [uuid('00000000-0000-4000-8000-000000000003'), { x: 400, y: 0, open: false }],
+    [uuid('00000000-0000-4000-8000-000000000005'), { x: 400, y: 200, open: false }],
+    [uuid('00000000-0000-4000-8000-000000000006'), { x: 800, y: 100, open: false }],
+    [uuid('00000000-0000-4000-8000-000000000008'), { x: 1200, y: 100, open: false }],
+    [uuid('00000000-0000-4000-8000-000000000099'), { x: 0, y: 0, open: false }],
   ]);
 
 const STRATEGIES: [name: string, make: () => LayoutStrategy][] = [

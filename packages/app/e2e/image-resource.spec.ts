@@ -69,8 +69,8 @@ async function openPictures(
       const markdown = snapshot.resources.find(({ document }) => document.kind === 'markdown');
       if (markdown === undefined) throw new Error('The opened Space holds no Markdown Resource.');
       return {
-        [markdown.id]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-        [IMAGE_ID]: { x: 400, y: 0, open: false, shape: 'rectangle' },
+        [markdown.id]: { x: 0, y: 0, open: false },
+        [IMAGE_ID]: { x: 400, y: 0, open: false },
       };
     },
     [
@@ -327,7 +327,7 @@ async function openForCreation(page: Page): Promise<UUID> {
   const seeded = await seedPositionedMap(page, 'Pictures', (snapshot) => {
     const markdown = snapshot.resources.find(({ document }) => document.kind === 'markdown');
     if (markdown === undefined) throw new Error('The opened Space holds no Markdown Resource.');
-    return { [markdown.id]: { x: 0, y: 0, open: false, shape: 'rectangle' } };
+    return { [markdown.id]: { x: 0, y: 0, open: false } };
   });
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(selectedCanvas(page)).toContainText('Pictures');
@@ -1201,10 +1201,7 @@ async function seedPresentationFigure(page: Page): Promise<void> {
     authored.id === OVERVIEW_MAP_ID
       ? {
           ...authored,
-          positions: {
-            ...authored.positions,
-            [IMAGE_ID]: { x: 1272, y: 12, open: false, shape: 'rectangle' },
-          },
+          positions: { ...authored.positions, [IMAGE_ID]: { x: 1272, y: 12, open: false } },
         }
       : authored,
   );
@@ -1657,13 +1654,7 @@ test('replacing an image in an only-drawn Space holds Back and Forward and edits
         {
           ...targetMap,
           positions: {
-            [HARBOUR_ID]: {
-              x: 0,
-              y: 0,
-              open: true,
-              openSize: { width: 408, height: 359 },
-              shape: 'rectangle',
-            },
+            [HARBOUR_ID]: { x: 0, y: 0, open: true, openSize: { width: 408, height: 359 } },
           },
           graphs: targetMap.graphs.map((graph) => ({ ...graph, edges: [] })),
         },
@@ -1685,13 +1676,7 @@ test('replacing an image in an only-drawn Space holds Back and Forward and edits
   expect(committed.ok()).toBe(true);
   const drawingId = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
   const root = await seedPositionedMap(page, 'Embedded pictures', () => ({
-    [drawingId]: {
-      x: 0,
-      y: 0,
-      open: true,
-      openSize: { width: 900, height: 700 },
-      shape: 'rectangle',
-    },
+    [drawingId]: { x: 0, y: 0, open: true, openSize: { width: 900, height: 700 } },
   }));
   await page.goto(`/spaces/${encodeCompactUuid(root.snapshot.id)}`);
   await expect(selectedCanvas(page)).toHaveText('Embedded pictures');

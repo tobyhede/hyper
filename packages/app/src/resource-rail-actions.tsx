@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import {
   RESOURCE_SHAPES,
+  resourceShape,
   takesResourceShape,
   titleName,
   type Map as SpaceMap,
@@ -38,7 +39,7 @@ export const RESOURCE_SHAPE_TITLES = {
   hexagon: 'Hexagon',
 } as const satisfies Record<ResourceShape, string>;
 
-/** The Shape the Map records for a Resource, and the Edit that changes it. */
+/** The Shape the Map draws a Resource in, and the Edit that changes it. */
 export interface ResourceShapeCommand {
   readonly current: ResourceShape;
   readonly choose: (resourceShape: ResourceShape) => void;
@@ -81,11 +82,12 @@ export function resourceRailGroups(
   connect: EntityActionGroup,
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
-  const { createReference, resourceShape, removeFromMap, deleteFromSpace, enter } = commands;
+  const { createReference, removeFromMap, deleteFromSpace, enter } = commands;
+  const resourceShapeCommand = commands.resourceShape;
   const shaping: readonly EntityActionGroup[] =
-    resourceShape === null || !takesResourceShape(resource.kind)
+    resourceShapeCommand === null || !takesResourceShape(resource.kind)
       ? []
-      : [[resourceShapeChoice(resourceShape)]];
+      : [[resourceShapeChoice(resourceShapeCommand)]];
   const terminal = resource.kind === 'reference' ? REFERENCE_TERMINAL : null;
   const reference: readonly EntityActionGroup[] =
     createReference === null
@@ -190,11 +192,11 @@ const resourceShapeChoice = ({ current, choose }: ResourceShapeCommand): EntityA
   id: 'resource-shape',
   label: 'Shape',
   icon: <ResourceShapeIcon />,
-  options: RESOURCE_SHAPES.map((resourceShape) => ({
-    id: resourceShape,
-    title: RESOURCE_SHAPE_TITLES[resourceShape],
-    chosen: resourceShape === current,
-    onChoose: () => choose(resourceShape),
+  options: RESOURCE_SHAPES.map((candidate) => ({
+    id: candidate,
+    title: RESOURCE_SHAPE_TITLES[candidate],
+    chosen: candidate === current,
+    onChoose: () => choose(candidate),
   })),
 });
 
@@ -269,13 +271,13 @@ export function useResourceRailActions(
           resourceShape:
             authorOnCanvas && placed !== undefined
               ? {
-                  current: placed.shape,
-                  choose: (resourceShape) => {
+                  current: resourceShape(placed),
+                  choose: (chosen) => {
                     commandOutcomes.run('resource-shape', () =>
                       authoring.complete({
                         kind: 'changed-resource-shape',
                         resourceId,
-                        shape: resourceShape,
+                        shape: chosen,
                       }),
                     );
                   },

@@ -26,7 +26,7 @@ const loaded = loadSpace(
         id: SELECTED,
         title: 'Selected',
         kind: 'positioned',
-        positions: { [EVERYWHERE]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [EVERYWHERE]: { x: 0, y: 0, open: false } },
         graphs: [
           {
             id: id('000000000011'),
@@ -40,8 +40,8 @@ const loaded = loadSpace(
         title: 'Overview',
         kind: 'positioned',
         positions: {
-          [EVERYWHERE]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [ELSEWHERE]: { x: 300, y: 0, open: false, shape: 'rectangle' },
+          [EVERYWHERE]: { x: 0, y: 0, open: false },
+          [ELSEWHERE]: { x: 300, y: 0, open: false },
         },
         graphs: [
           { id: id('000000000021'), title: 'Main', edges: [{ from: EVERYWHERE, to: ELSEWHERE }] },
@@ -58,8 +58,8 @@ const loaded = loadSpace(
         title: 'Deep dive',
         kind: 'positioned',
         positions: {
-          [EVERYWHERE]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [OFF_GRAPH]: { x: 300, y: 0, open: false, shape: 'rectangle' },
+          [EVERYWHERE]: { x: 0, y: 0, open: false },
+          [OFF_GRAPH]: { x: 300, y: 0, open: false },
         },
         graphs: [{ id: id('000000000031'), title: 'Walkthrough', edges: [] }],
       },

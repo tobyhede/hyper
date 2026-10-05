@@ -50,7 +50,7 @@ const metaSnapshot: SpaceSnapshot = {
         id: META_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [META_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [META_RESOURCE_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: META_GRAPH_ID,
       },
@@ -70,7 +70,7 @@ const targetSnapshot: SpaceSnapshot = {
         id: TARGET_MAP_ID,
         title: 'Map 1',
         kind: 'positioned',
-        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [TARGET_RESOURCE_ID]: { x: 0, y: 0, open: false } },
         graphs: [{ id: TARGET_GRAPH_ID, title: 'Graph 1', edges: [] }],
         activeGraph: TARGET_GRAPH_ID,
       },
@@ -138,7 +138,7 @@ describe('what a Space Resource may reference', () => {
             id: SECOND_MAP_ID,
             title: 'Map 2',
             kind: 'positioned',
-            positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [TARGET_RESOURCE_ID]: { x: 200, y: 0, open: false } },
             graphs: [
               {
                 id: SECOND_GRAPH_ID,

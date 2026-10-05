@@ -37,8 +37,8 @@ describe('identifySpace', () => {
             title: 'Minted map',
             kind: 'positioned',
             positions: {
-              [RESOURCE_ID]: { x: 4, y: 8, open: false, shape: 'rectangle' },
-              [SECOND_RESOURCE_ID]: { x: 12, y: 16, open: false, shape: 'rectangle' },
+              [RESOURCE_ID]: { x: 4, y: 8, open: false },
+              [SECOND_RESOURCE_ID]: { x: 12, y: 16, open: false },
             },
             graphs: [
               { title: 'Minted graph', edges: [{ from: RESOURCE_ID, to: SECOND_RESOURCE_ID }] },
@@ -47,7 +47,7 @@ describe('identifySpace', () => {
           {
             title: 'Second minted map',
             kind: 'positioned',
-            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [{ id: GRAPH_ID, title: 'Explicit graph', edges: [] }],
           },
         ],

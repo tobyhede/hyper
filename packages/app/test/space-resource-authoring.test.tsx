@@ -144,7 +144,7 @@ const meta = (target: SpaceSnapshot): SpaceSnapshot => {
           positions: Object.fromEntries(
             resources.map((resource, index) => [
               resource.id,
-              { x: index * 300, y: 0, open: false, shape: 'rectangle' },
+              { x: index * 300, y: 0, open: false },
             ]),
           ),
           graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -168,8 +168,8 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-          [HOME_NEXT_RESOURCE_ID]: { x: 310, y: 20, open: false, shape: 'rectangle' },
+          [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
+          [HOME_NEXT_RESOURCE_ID]: { x: 310, y: 20, open: false },
         },
         // An Edge, so this Space can be presented: a Graph with no Edge
         // declines to start (ADR 0032).
@@ -204,7 +204,7 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP_ID,
         title: 'Collection 1',
         kind: 'positioned',
-        positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [OTHER_RESOURCE_ID]: { x: 0, y: 0, open: false } },
         graphs: [
           { id: OTHER_DRAFT_GRAPH_ID, title: 'Draft', edges: [] },
           { id: OTHER_GRAPH_ID, title: 'Current', edges: [] },

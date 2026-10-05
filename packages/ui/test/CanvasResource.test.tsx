@@ -36,17 +36,12 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
     graphColor: '#ffc53d',
   };
   const { rerender } = render(
-    <CanvasResource
-      shape="rectangle"
-      {...props}
-      display={opened({ kind: 'ur', via: 'reference' })}
-    />,
+    <CanvasResource {...props} display={opened({ kind: 'ur', via: 'reference' })} />,
   );
   const resource = screen.getByRole('article', { name: 'A' });
   expect(resource).not.toHaveAttribute('data-content-area');
   rerender(
     <CanvasResource
-      shape="rectangle"
       {...props}
       display={opened({ kind: 'markdown', source: 'Target body', via: 'reference' })}
     />,
@@ -70,7 +65,6 @@ it('keeps a pending replacement mounted when its entity actions become unavailab
   );
   const { rerender } = render(
     <CanvasResource
-      shape="rectangle"
       state="selected"
       front={front}
       display={display}
@@ -84,7 +78,6 @@ it('keeps a pending replacement mounted when its entity actions become unavailab
   fireEvent.submit(field);
   rerender(
     <CanvasResource
-      shape="rectangle"
       state="selected"
       front={front}
       display={display}
@@ -120,7 +113,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('does not expose entity actions when every supplied group is empty', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -138,7 +130,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('leaves the native context menu and the article role alone when no action is offered', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -159,7 +150,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('draws a creation preview without authored Markdown or open state', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'preview' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -179,7 +169,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('presents a Markdown front and its resting state', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
         state="rest"
@@ -200,7 +189,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('presents a Reference Resource front by its kind alone', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference', onOpenChange: vi.fn(() => 'completed' as const) }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -223,7 +211,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('presents a Closed Image Resource by its Title and kind alone, with no picture', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -243,7 +230,6 @@ describe('CanvasResource kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image', onOpenChange }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -259,7 +245,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('draws an Open Image Resource as the Open Markdown front with its image as the content', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
@@ -285,7 +270,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('names the URL when an Open Image Resource cannot load its image, keeping the Title', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
@@ -309,7 +293,6 @@ describe('CanvasResource kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image', onOpenChange }}
         display={{
           shown: 'open',
@@ -337,7 +320,6 @@ describe('CanvasResource kind and interaction state', () => {
     const onBeginEdit = vi.fn(() => calls.push('replace'));
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image', onOpenChange, onBeginEdit }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -357,7 +339,6 @@ describe('CanvasResource kind and interaction state', () => {
     const onEnd = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'image',
           onOpenChange: () => 'completed',
@@ -394,7 +375,6 @@ describe('CanvasResource kind and interaction state', () => {
     const onEnd = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'image',
           onOpenChange: () => 'completed',
@@ -426,7 +406,6 @@ describe('CanvasResource kind and interaction state', () => {
     const onBeginEdit = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image', onBeginEdit }}
         display={{
           shown: 'open',
@@ -447,7 +426,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('offers no Replace from the failed-image state of a read-only Resource', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image', onBeginEdit: () => undefined }}
         display={{
           shown: 'open',
@@ -470,7 +448,6 @@ describe('CanvasResource kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference', onOpenChange }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -487,7 +464,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('draws an Open Reference Resource to an Image Resource as its Target’s image, with no Replace', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference', onOpenChange: () => 'completed' }}
         display={opened({
           kind: 'image',
@@ -521,7 +497,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('offers no Replace for an image it draws through a Reference Resource', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image', onBeginEdit: () => undefined }}
         display={opened({
           kind: 'image',
@@ -544,7 +519,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('draws an unresolved Target as a notice, not an empty document', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference', onOpenChange: () => 'completed' }}
         display={opened({ kind: 'unresolved', via: 'reference' })}
         state="rest"
@@ -563,7 +537,6 @@ describe('CanvasResource kind and interaction state', () => {
   it('reflects dragging as its own external state, distinct from selected', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
         state="dragging"
@@ -583,7 +556,6 @@ describe('CanvasResource Open and Close operation', () => {
   it('owns its read-only state and withholds supplied authoring operations', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         readOnly
         front={{
           kind: 'markdown',
@@ -616,7 +588,6 @@ describe('CanvasResource Open and Close operation', () => {
     );
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={front}
         display={display}
         state="rest"
@@ -628,7 +599,6 @@ describe('CanvasResource Open and Close operation', () => {
 
     rerender(
       <CanvasResource
-        shape="rectangle"
         readOnly
         front={front}
         display={display}
@@ -648,7 +618,6 @@ describe('CanvasResource Open and Close operation', () => {
   it('draws rendered Markdown with no editor for a read-only Resource given an editing display', () => {
     const { container } = render(
       <CanvasResource
-        shape="rectangle"
         readOnly
         front={{ kind: 'markdown' }}
         display={beginEditing(
@@ -675,7 +644,6 @@ describe('CanvasResource Open and Close operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown', onOpenChange }}
         display={{
           shown: 'open',
@@ -695,7 +663,6 @@ describe('CanvasResource Open and Close operation', () => {
   it('offers no action when neither operation is supplied', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -711,7 +678,6 @@ describe('CanvasResource Open and Close operation', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown', onOpenChange }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -727,7 +693,6 @@ describe('CanvasResource Open and Close operation', () => {
 
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown', onOpenChange }}
         display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
         state="selected"
@@ -746,7 +711,6 @@ describe('CanvasResource Open and Close operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange,
@@ -776,7 +740,6 @@ describe('CanvasResource Open and Close operation', () => {
 
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange,
@@ -799,7 +762,6 @@ describe('CanvasResource Open and Close operation', () => {
   it('withholds Edit from a collapsed Resource that cannot be opened', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown', onBeginEdit: vi.fn() }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -817,7 +779,6 @@ describe('CanvasResource Open and Close operation', () => {
     const onBeginContentEdit = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange: () => 'retained',
@@ -841,7 +802,6 @@ describe('CanvasResource Open and Close operation', () => {
     const onBeginContentEdit = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange: vi.fn(),
@@ -895,7 +855,6 @@ describe('CanvasResource Open and Close operation', () => {
   it('draws those two ends as the rail actions beside them, not as a second kind', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange: vi.fn(),
@@ -934,7 +893,6 @@ describe('CanvasResource Open and Close operation', () => {
   it('keeps the caret in the content when one of those two ends is pressed', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange: vi.fn(),
@@ -965,7 +923,6 @@ describe('CanvasResource Open and Close operation', () => {
   it('hides both actions while the title is being edited', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown', onOpenChange: () => 'completed' }}
         display={CLOSED_DISPLAY}
         state="editing"
@@ -983,7 +940,6 @@ describe('CanvasResource Open and Close operation', () => {
   it('hides both actions while dragging', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown', onOpenChange: () => 'completed' }}
         display={CLOSED_DISPLAY}
         state="dragging"
@@ -1000,7 +956,6 @@ describe('CanvasResource title', () => {
   it('draws a heading, not an editor, when no title-edit operation is supplied', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1019,7 +974,6 @@ describe('CanvasResource title', () => {
     const onBeginTitleEdit = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1054,7 +1008,6 @@ describe('CanvasResource title', () => {
     render(
       <div onClick={selectedResource} onKeyDown={pressedResource}>
         <CanvasResource
-          shape="rectangle"
           front={{ kind: 'markdown' }}
           display={CLOSED_DISPLAY}
           state="rest"
@@ -1098,7 +1051,6 @@ describe('CanvasResource Title ladder', () => {
   it('draws a Title with no break as one element at the title role', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1114,7 +1066,6 @@ describe('CanvasResource Title ladder', () => {
   it('gives each authored line its role, and every line past the third the last one', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1135,7 +1086,6 @@ describe('CanvasResource Title ladder', () => {
   it('keeps an interior blank line as a line of its own', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1174,7 +1124,6 @@ describe('CanvasResource Title ladder', () => {
     for (const [front, display] of fronts) {
       const { unmount } = render(
         <CanvasResource
-          shape="rectangle"
           front={front}
           display={display}
           state="rest"
@@ -1205,7 +1154,6 @@ describe('CanvasResource Title ladder', () => {
   it('puts the whole ladder inside the one Title control', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1238,7 +1186,6 @@ describe('CanvasResource Title ladder', () => {
     const title = 'Strategies\nNo strategy is privileged\nADR 0014';
     const resource = (open: boolean) => (
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'markdown',
           onOpenChange: () => 'completed' as const,
@@ -1294,7 +1241,6 @@ describe('CanvasResource title editor', () => {
   it('focuses and selects the draft on mount', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="editing"
@@ -1318,7 +1264,6 @@ describe('CanvasResource title editor', () => {
     const onReturnFocus = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="editing"
@@ -1347,7 +1292,6 @@ describe('CanvasResource title editor', () => {
   it('restores focus to a title draft refused on blur', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="editing"
@@ -1375,7 +1319,6 @@ describe('CanvasResource title editor', () => {
     render(
       <div onClick={leakedClick} onPointerDown={leakedPointer} onKeyDown={leakedKey}>
         <CanvasResource
-          shape="rectangle"
           front={{ kind: 'markdown' }}
           display={CLOSED_DISPLAY}
           state="editing"
@@ -1418,7 +1361,6 @@ describe('CanvasResource title editor', () => {
     const onCompleteTitleEdit = vi.fn(() => null);
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="editing"
@@ -1457,7 +1399,6 @@ describe('CanvasResource title editor', () => {
     const onCompleteTitleEdit = vi.fn(() => null);
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="editing"
@@ -1490,7 +1431,6 @@ describe('CanvasResource open Markdown front', () => {
     const style = vi.spyOn(window, 'getComputedStyle').mockReturnValue(computed);
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={{
           shown: 'open',
@@ -1504,7 +1444,6 @@ describe('CanvasResource open Markdown front', () => {
 
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1524,7 +1463,6 @@ describe('CanvasResource open Markdown front', () => {
   it('draws nothing below its Title while authored closed state says so', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1542,7 +1480,6 @@ describe('CanvasResource open Markdown front', () => {
   it('draws its Markdown below the Title and reports itself open', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={{
           shown: 'open',
@@ -1562,7 +1499,6 @@ describe('CanvasResource open Markdown front', () => {
   it('draws no body on a closed Reference Resource', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1580,7 +1516,6 @@ describe('CanvasResource open Markdown front', () => {
   it('holds the Markdown body open while the Title is being renamed', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={{
           shown: 'open',
@@ -1632,7 +1567,6 @@ describe('CanvasResource Space front', () => {
   it('inserts a provided spaceRail into the Resource rail', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', spaceRail }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="rest"
@@ -1652,7 +1586,6 @@ describe('CanvasResource Space front', () => {
   it('draws a context notice supplied by decoration', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', spaceRail }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         contextNotice="Link copied."
@@ -1670,7 +1603,6 @@ describe('CanvasResource Space front', () => {
     render(
       <>
         <CanvasResource
-          shape="rectangle"
           front={{
             kind: 'space',
             selection: selection({
@@ -1709,7 +1641,6 @@ describe('CanvasResource Space front', () => {
     let rejectCreate: () => void = () => undefined;
     render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'space',
           selection: selection({
@@ -1752,7 +1683,6 @@ describe('CanvasResource Space front', () => {
   it('withholds both selectors while closed', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', selection: selection() }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1775,7 +1705,6 @@ describe('CanvasResource Space front', () => {
   it('withholds a supplied spaceRail while closed', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', spaceRail }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -1801,7 +1730,6 @@ describe('CanvasResource Space front', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', onOpenChange }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -1818,7 +1746,6 @@ describe('CanvasResource Space front', () => {
 
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', onOpenChange }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="selected"
@@ -1834,7 +1761,6 @@ describe('CanvasResource Space front', () => {
   it('offers both selectors seeded with the Resource’s own selections when open', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', selection: selection() }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="rest"
@@ -1868,7 +1794,6 @@ describe('CanvasResource Space front', () => {
     const onMapChange = vi.fn();
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', selection: selection({ onMapChange }) }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="rest"
@@ -1901,7 +1826,6 @@ describe('CanvasResource Space front', () => {
   it('draws a selection the target no longer holds as unavailable', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space', selection: selection({ mapId: null, graphs: [], graphId: null }) }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="rest"
@@ -1927,7 +1851,6 @@ describe('CanvasResource Space front', () => {
     const onEditingChange = vi.fn();
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'space',
           onOpenChange: () => 'completed',
@@ -1950,7 +1873,6 @@ describe('CanvasResource Space front', () => {
 
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{
           kind: 'space',
           onOpenChange: () => 'completed',
@@ -1977,7 +1899,6 @@ describe('CanvasResource Space front', () => {
   it('stands a plain note in for the selectors while the Space is unread', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space' }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="rest"
@@ -1997,7 +1918,6 @@ describe('CanvasResource Space front', () => {
   it('withholds both selectors from a read-only Resource', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         readOnly
         front={{ kind: 'space', selection: selection() }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
@@ -2014,7 +1934,6 @@ describe('CanvasResource Space front', () => {
   it('withholds a supplied spaceRail from a read-only Resource', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         readOnly
         front={{ kind: 'space', spaceRail }}
         display={{ shown: 'open', content: SPACE_CONTENT }}
@@ -2031,7 +1950,6 @@ describe('CanvasResource Space front', () => {
   it('keeps Enter off the rail', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'space' }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -2052,7 +1970,6 @@ describe('CanvasResource Open Markdown body', () => {
    */
   const openMarkdown = (state: 'rest' | 'selected', onBeginEdit: () => void) => (
     <CanvasResource
-      shape="rectangle"
       front={{
         kind: 'markdown',
         onOpenChange: () => 'completed' as const,
@@ -2090,7 +2007,6 @@ describe('CanvasResource Close fade', () => {
   it('keeps the Markdown it last drew while the content fades out', () => {
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={{ shown: 'open', content: { kind: 'markdown', source: '## Hello', via: 'self' } }}
         state="rest"
@@ -2100,7 +2016,6 @@ describe('CanvasResource Close fade', () => {
     );
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -2115,7 +2030,6 @@ describe('CanvasResource Close fade', () => {
   it('draws the new content when re-opened while leaving', () => {
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={{ shown: 'open', content: { kind: 'markdown', source: 'Before', via: 'self' } }}
         state="rest"
@@ -2125,7 +2039,6 @@ describe('CanvasResource Close fade', () => {
     );
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -2135,7 +2048,6 @@ describe('CanvasResource Close fade', () => {
     );
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={{ shown: 'open', content: { kind: 'markdown', source: 'After', via: 'self' } }}
         state="rest"
@@ -2155,7 +2067,6 @@ describe('CanvasResource Close fade', () => {
   it('fades out rendered Markdown, not the editor, when closed while its body is edited', () => {
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={beginEditing(
           opened({ kind: 'markdown', source: 'Hello', via: 'self' }),
@@ -2174,7 +2085,6 @@ describe('CanvasResource Close fade', () => {
 
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -2192,7 +2102,6 @@ describe('CanvasResource Close fade', () => {
   it('keeps the picture an Image Resource last drew while the content fades out', () => {
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
@@ -2205,7 +2114,6 @@ describe('CanvasResource Close fade', () => {
     );
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'image' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -2220,7 +2128,6 @@ describe('CanvasResource Close fade', () => {
   it('keeps the Target’s picture a Reference Resource last drew while the content fades out', () => {
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference' }}
         display={opened({
           kind: 'image',
@@ -2235,7 +2142,6 @@ describe('CanvasResource Close fade', () => {
     );
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -2258,7 +2164,6 @@ describe('CanvasResource Ur front', () => {
   it('presents a Closed Ur Resource by its Title and kind alone', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'ur' }}
         display={CLOSED_DISPLAY}
         state="rest"
@@ -2279,7 +2184,6 @@ describe('CanvasResource Ur front', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     const { rerender } = render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'ur', onOpenChange }}
         display={CLOSED_DISPLAY}
         state="selected"
@@ -2295,7 +2199,6 @@ describe('CanvasResource Ur front', () => {
 
     rerender(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'ur', onOpenChange }}
         display={UR_OPEN}
         state="selected"
@@ -2314,7 +2217,6 @@ describe('CanvasResource Ur front', () => {
   it('draws only its Title while Open, with no content area and no placeholder', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'ur' }}
         display={UR_OPEN}
         state="rest"
@@ -2334,7 +2236,6 @@ describe('CanvasResource Ur front', () => {
   it('draws an Open Reference Resource to an Ur Resource the same, read-only', () => {
     render(
       <CanvasResource
-        shape="rectangle"
         front={{ kind: 'reference', onOpenChange: () => 'completed' }}
         display={opened({ kind: 'ur', via: 'reference' })}
         state="selected"

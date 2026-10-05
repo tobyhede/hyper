@@ -39,7 +39,7 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
           id: MAP_ID,
           title: 'Map',
           kind: 'positioned',
-          positions: { [RESOURCE_ID]: { x, y, open: false, shape: 'rectangle' } },
+          positions: { [RESOURCE_ID]: { x, y, open: false } },
           // A Map owns at least one Graph (ADR 0040); this one holds no
           // Edges, which is all a single-Resource Space has to connect.
           graphs: [{ id: GRAPH_ID, title: 'Main', edges: [] }],

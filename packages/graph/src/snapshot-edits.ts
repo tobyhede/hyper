@@ -2,6 +2,7 @@ import {
   COLLAPSED_RESOURCE_SIZE,
   titleName,
   firstOpenSize,
+  resourceShape,
   takesResourceShape,
   type Graph,
   type Map,
@@ -457,14 +458,16 @@ function resize(
  * kind is the rectangle, so a Shape Edit on one is refused whatever it asks for.
  *
  * The Shape is drawn at the Resource's rect and changes none, so no neighbour
- * moves and the Resource's Open/Closed state and Open Size are kept.
- * `unchanged` for the Shape it already has, including while it is Open.
+ * moves and the Resource's Open/Closed state and Open Size are kept. The chosen
+ * Shape is written, the rectangle included; `unchanged` for the Shape the
+ * Resource already draws as, so the rectangle is `unchanged` on an entry that
+ * stores none.
  */
 function changeResourceShape(
   snapshot: SpaceSnapshot,
   mapId: UUID,
   resourceId: UUID,
-  resourceShape: ResourceShape,
+  chosen: ResourceShape,
 ): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
@@ -474,20 +477,20 @@ function changeResourceShape(
   if (resource === undefined) return refused({ code: 'resource-not-found' });
   if (!takesResourceShape(resource.document.kind))
     return refused({ code: 'shape-requires-ur-resource' });
-  if (at.shape === resourceShape) return UNCHANGED;
+  if (resourceShape(at) === chosen) return UNCHANGED;
   return withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, { ...at, shape: resourceShape }),
+    Placement.place(placed.placement, resourceId, { ...at, shape: chosen }),
   );
 }
 
 /**
  * Add a Resource the Space already holds to one Map, Closed, with no Edge.
  *
- * Membership, a position and the rectangle, and nothing else: a Resource added
- * back to a Map is detached, and neither the Edges nor the Shape it once had
- * there are inferred back (ADR 0120). The position is an authored one
+ * Membership and a position, and nothing else: a Resource added back to a Map
+ * is detached, and neither the Edges nor the Shape it once had there are
+ * inferred back, so it draws as the rectangle (ADR 0120). The position is an authored one
  * (ADR 0084); `avoidingOverlap` steps off a point another Resource already
  * occupies exactly, as a creation from a menu does ({@link freeAnchor}), and
  * `exact` keeps it.

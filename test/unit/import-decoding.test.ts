@@ -109,7 +109,7 @@ describe('import decoding', () => {
             id: MAP_ID,
             title: title(2, 'Map 1'),
             kind: 'positioned',
-            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
             graphs: [{ id: GRAPH_ID, title: title(3, 'Graph 1'), edges: [] }],
             activeGraph: GRAPH_ID,
           },

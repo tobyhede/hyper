@@ -54,8 +54,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [DRAWN_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [DRAWN_B]: { x: 264, y: 0, open: false, shape: 'rectangle' },
+          [DRAWN_A]: { x: 0, y: 0, open: false },
+          [DRAWN_B]: { x: 264, y: 0, open: false },
         },
         graphs: [
           { id: SELECTED_GRAPH_ID, title: 'Overview', edges: [{ from: DRAWN_A, to: DRAWN_B }] },
@@ -65,7 +65,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP_ID,
         title: 'Collection 2',
         kind: 'positioned',
-        positions: { [UNPLACED]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [UNPLACED]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Second pass', edges: [] }],
       },
     ],
@@ -89,8 +89,8 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false, shape: 'rectangle' },
-          [SPACE_RESOURCE_ID]: { x: 600, y: 20, open: false, shape: 'rectangle' },
+          [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
+          [SPACE_RESOURCE_ID]: { x: 600, y: 20, open: false },
         },
         graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -123,9 +123,9 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [META_TO_HOME_ID]: { x: 300, y: 0, open: false, shape: 'rectangle' },
-          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false, shape: 'rectangle' },
+          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
+          [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
+          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },

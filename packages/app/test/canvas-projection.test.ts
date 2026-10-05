@@ -38,8 +38,8 @@ const mapOwning = (...graphs: readonly object[]) => ({
   title: 'Working',
   kind: 'positioned',
   positions: {
-    [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-    [RESOURCE_B]: { x: 400, y: 0, open: false, shape: 'rectangle' },
+    [RESOURCE_A]: { x: 0, y: 0, open: false },
+    [RESOURCE_B]: { x: 400, y: 0, open: false },
   },
   graphs,
 });
@@ -240,14 +240,8 @@ describe('canvasProjection', () => {
     const authoredMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: {
-          x: 0,
-          y: 0,
-          open: true,
-          openSize: { width: 560, height: 420 },
-          shape: 'rectangle',
-        },
-        [RESOURCE_B]: { x: 700, y: 0, open: false, shape: 'rectangle' },
+        [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
+        [RESOURCE_B]: { x: 700, y: 0, open: false },
       },
     };
     const space = spaceWith({ maps: [authoredMap] });
@@ -292,6 +286,22 @@ describe('canvasProjection', () => {
     expect(nodes.map(({ id, data }) => [id, data.shape, data.display.shown])).toEqual([
       [RESOURCE_A, 'diamond', 'closed'],
       [RESOURCE_B, 'diamond', 'open'],
+    ]);
+  });
+
+  it('draws an entry with no Shape stored, and one storing the rectangle, as the rectangle', async () => {
+    const rectangleMap = {
+      ...mapOwning(DRAWN),
+      positions: {
+        [RESOURCE_A]: { x: 0, y: 0, open: false },
+        [RESOURCE_B]: { x: 700, y: 0, open: false, shape: 'rectangle' },
+      },
+    };
+    const { nodes } = await projectThrough(spaceWith({ maps: [rectangleMap] }), AT_REST, MAP);
+
+    expect(nodes.map(({ id, data }) => [id, data.shape])).toEqual([
+      [RESOURCE_A, 'rectangle'],
+      [RESOURCE_B, 'rectangle'],
     ]);
   });
 });

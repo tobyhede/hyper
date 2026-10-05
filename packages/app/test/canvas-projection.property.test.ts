@@ -58,10 +58,7 @@ const mapSpaceArb = resourceIdPool.chain((pool) =>
             title: 'Working',
             kind: 'positioned',
             positions: Object.fromEntries(
-              resources.map((id, index) => [
-                id,
-                { x: index * 400, y: 0, open: false, shape: 'rectangle' },
-              ]),
+              resources.map((id, index) => [id, { x: index * 400, y: 0, open: false }]),
             ),
             graphs: graphs.map((graph, index) => ({
               id: uuidFrom(index + 100),

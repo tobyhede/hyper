@@ -96,8 +96,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [DRAWN_A]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [DRAWN_B]: { x: 264, y: 0, open: false, shape: 'rectangle' },
+          [DRAWN_A]: { x: 0, y: 0, open: false },
+          [DRAWN_B]: { x: 264, y: 0, open: false },
         },
         graphs: [
           { id: SELECTED_GRAPH_ID, title: 'Overview', edges: [{ from: DRAWN_A, to: DRAWN_B }] },
@@ -107,7 +107,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         id: OTHER_MAP_ID,
         title: 'Collection 2',
         kind: 'positioned',
-        positions: { [UNPLACED]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+        positions: { [UNPLACED]: { x: 0, y: 0, open: false } },
         graphs: [{ id: OTHER_GRAPH_ID, title: 'Second pass', edges: [] }],
       },
     ],
@@ -133,13 +133,12 @@ const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): Spac
           title: 'Map 1',
           kind: 'positioned',
           positions: {
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
             [SPACE_RESOURCE_ID]: {
               x: 600,
               y: 20,
               open: true,
               openSize: { width: 700, height: 500 },
-              shape: 'rectangle',
             },
           },
           graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -164,9 +163,9 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [META_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [META_TO_HOME_ID]: { x: 300, y: 0, open: false, shape: 'rectangle' },
-          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false, shape: 'rectangle' },
+          [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
+          [META_TO_HOME_ID]: { x: 300, y: 0, open: false },
+          [META_TO_TARGET_ID]: { x: 600, y: 0, open: false },
         },
         graphs: [{ id: META_GRAPH_ID, title: 'Graph 1', edges: [] }],
       },
@@ -779,13 +778,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: {
-              x: 10,
-              y: 20,
-              open: true,
-              openSize: { width: 700, height: 500 },
-              shape: 'rectangle',
-            },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
           },
         })),
       },
@@ -938,13 +931,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: {
-              x: 10,
-              y: 20,
-              open: true,
-              openSize: { width: 700, height: 500 },
-              shape: 'rectangle',
-            },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
           },
         })),
       },
@@ -1014,13 +1001,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: {
-              x: 10,
-              y: 20,
-              open: true,
-              openSize: { width: 700, height: 500 },
-              shape: 'rectangle',
-            },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
           },
         })),
       },
@@ -1188,7 +1169,7 @@ describe('the Map an Open Space Resource draws', () => {
             id: thirdMap,
             title: 'Nested Map',
             kind: 'positioned',
-            positions: { [thirdResource]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [thirdResource]: { x: 0, y: 0, open: false } },
             graphs: [{ id: thirdGraph, title: 'Nested Graph', edges: [] }],
           },
         ],
@@ -1222,13 +1203,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: {
-                    x: 264,
-                    y: 0,
-                    open: true,
-                    openSize: { width: 700, height: 500 },
-                    shape: 'rectangle',
-                  },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1295,7 +1270,7 @@ describe('the Map an Open Space Resource draws', () => {
             id: thirdMap,
             title: 'Nested Map',
             kind: 'positioned',
-            positions: { [thirdResource]: { x: 0, y: 0, open: false, shape: 'rectangle' } },
+            positions: { [thirdResource]: { x: 0, y: 0, open: false } },
             graphs: [{ id: thirdGraph, title: 'Nested Graph', edges: [] }],
           },
         ],
@@ -1329,13 +1304,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: {
-                    x: 264,
-                    y: 0,
-                    open: true,
-                    openSize: { width: 700, height: 500 },
-                    shape: 'rectangle',
-                  },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1439,13 +1408,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: {
-                    x: 264,
-                    y: 0,
-                    open: true,
-                    openSize: { width: 700, height: 500 },
-                    shape: 'rectangle',
-                  },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1679,22 +1642,20 @@ describe('the Map an Open Space Resource draws', () => {
             title: 'Map 1',
             kind: 'positioned',
             positions: {
-              [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false, shape: 'rectangle' },
+              [HOME_RESOURCE_ID]: { x: 10, y: 20, open: false },
               [GONE_A_RESOURCE_ID]: {
                 x: 600,
                 y: 20,
                 open: true,
                 openSize: { width: 700, height: 500 },
-                shape: 'rectangle',
               },
               [GONE_B_RESOURCE_ID]: {
                 x: 1400,
                 y: 20,
                 open: true,
                 openSize: { width: 700, height: 500 },
-                shape: 'rectangle',
               },
-              [SPACE_RESOURCE_ID]: { x: 2200, y: 20, open: false, shape: 'rectangle' },
+              [SPACE_RESOURCE_ID]: { x: 2200, y: 20, open: false },
             },
             graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
           },
@@ -2025,7 +1986,7 @@ it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing i
     Object.values(
       spaces.entry(HOME_ID)?.session.getState().working.document.maps?.[0]?.positions ?? {},
     ).map((entry) => entry?.shape),
-  ).toEqual(['rectangle', 'rectangle']);
+  ).toEqual([undefined, undefined]);
   await waitFor(() =>
     expect(embeddedNode(DRAWN_A).querySelector('.canvas-resource')).toHaveAttribute(
       'data-resource-shape',

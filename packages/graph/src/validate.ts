@@ -1,4 +1,12 @@
-import { takesResourceShape, uuidSchema, type Resource, type Map, type UUID } from '@project/core';
+import {
+  DEFAULT_RESOURCE_SHAPE,
+  resourceShape,
+  takesResourceShape,
+  uuidSchema,
+  type Resource,
+  type Map,
+  type UUID,
+} from '@project/core';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
@@ -173,12 +181,12 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       if (
         !takesResourceShape(member.kind) &&
         placement !== undefined &&
-        placement.shape !== 'rectangle'
+        resourceShape(placement) !== DEFAULT_RESOURCE_SHAPE
       ) {
         errors.push({
           kind: 'shape-requires-ur-resource',
           ref: resourceId,
-          message: `Map "${subject.id}" draws ${member.kind} resource "${resourceId}" as a ${placement.shape}; only an Ur Resource takes a Shape other than the rectangle`,
+          message: `Map "${subject.id}" draws ${member.kind} resource "${resourceId}" as a ${resourceShape(placement)}; only an Ur Resource takes a Shape other than the rectangle`,
         });
       }
     }

@@ -55,8 +55,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 1',
         kind: 'positioned',
         positions: {
-          [INTAKE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [STORAGE_ID]: { x: 300, y: 0, open: false, shape: 'rectangle' },
+          [INTAKE_ID]: { x: 0, y: 0, open: false },
+          [STORAGE_ID]: { x: 300, y: 0, open: false },
         },
         graphs: [
           {
@@ -73,7 +73,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Collection 2',
         kind: 'positioned',
         positions: {
-          [REVIEW_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [REVIEW_ID]: { x: 0, y: 0, open: false },
         },
         graphs: [{ id: TARGET_SECOND_GRAPH_ID, title: 'Detail', edges: [] }],
       },
@@ -110,13 +110,12 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Map 1',
         kind: 'positioned',
         positions: {
-          [HOME_RESOURCE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
+          [HOME_RESOURCE_ID]: { x: 0, y: 0, open: false },
           [SPACE_RESOURCE_ID]: {
             x: 340,
             y: 0,
             open: true,
             openSize: { width: 640, height: 420 },
-            shape: 'rectangle',
           },
         },
         graphs: [
@@ -208,8 +207,8 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Overview',
         kind: 'positioned',
         positions: {
-          [PAIR_INTAKE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [PAIR_STORAGE_ID]: { x: 220, y: 0, open: false, shape: 'rectangle' },
+          [PAIR_INTAKE_ID]: { x: 0, y: 0, open: false },
+          [PAIR_STORAGE_ID]: { x: 220, y: 0, open: false },
         },
         graphs: [
           {
@@ -224,8 +223,8 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
         title: 'Detail',
         kind: 'positioned',
         positions: {
-          [PAIR_STORAGE_ID]: { x: 0, y: 0, open: false, shape: 'rectangle' },
-          [PAIR_INDEX_ID]: { x: 220, y: 0, open: false, shape: 'rectangle' },
+          [PAIR_STORAGE_ID]: { x: 0, y: 0, open: false },
+          [PAIR_INDEX_ID]: { x: 220, y: 0, open: false },
         },
         graphs: [
           {
@@ -275,14 +274,12 @@ const pairHome: SpaceSnapshot = spaceSnapshotSchema.parse({
             y: 0,
             open: true,
             openSize: { width: 460, height: 320 },
-            shape: 'rectangle',
           },
           [PAIR_DETAIL_RESOURCE_ID]: {
             x: 500,
             y: 0,
             open: true,
             openSize: { width: 460, height: 320 },
-            shape: 'rectangle',
           },
         },
         graphs: [{ id: PAIR_HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],

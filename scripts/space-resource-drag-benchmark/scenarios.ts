@@ -88,7 +88,6 @@ export function benchmarkScenario(
       x: (index % 10) * 340,
       y: Math.floor(index / 10) * 180,
       open: false,
-      shape: 'rectangle',
     };
   });
   targetPositions[nestedParentId] = {
@@ -96,17 +95,15 @@ export function benchmarkScenario(
     y: Math.ceil(scale / 10) * 180,
     open: true,
     openSize: { width: 640, height: 360 },
-    shape: 'rectangle',
   };
   const metaPositions: Record<UUID, ResourcePlacement> = {};
-  metaPositions[ordinaryId] = { x: 20, y: 20, open: false, shape: 'rectangle' };
+  metaPositions[ordinaryId] = { x: 20, y: 20, open: false };
   parentIds.forEach((resourceId, index) => {
     metaPositions[resourceId] = {
       x: 380 + index * 760,
       y: 20,
       open: true,
       openSize: { width: 700, height: 620 },
-      shape: 'rectangle',
     };
   });
 
@@ -121,7 +118,7 @@ export function benchmarkScenario(
           id: leafMap,
           title: 'Leaf',
           kind: 'positioned',
-          positions: { [leafResourceId]: { x: 24, y: 24, open: false, shape: 'rectangle' } },
+          positions: { [leafResourceId]: { x: 24, y: 24, open: false } },
           graphs: [{ id: leafGraph, title: 'Leaf graph', edges: [] }],
           activeGraph: leafGraph,
         },

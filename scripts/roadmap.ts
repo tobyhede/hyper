@@ -779,14 +779,14 @@ export const writeReleaseSpace = (
         criticalSlotByDepth.set(planned.depth, slot + 1);
         return [
           resourceId(planned.reference),
-          { x: slot * 420, y: planned.depth * 300, open: false, shape: 'rectangle' },
+          { x: slot * 420, y: planned.depth * 300, open: false },
         ];
       }
       const slot = parallelSlotByDepth.get(planned.depth) ?? 0;
       parallelSlotByDepth.set(planned.depth, slot + 1);
       return [
         resourceId(planned.reference),
-        { x: 460 + slot * 420, y: planned.depth * 300, open: false, shape: 'rectangle' },
+        { x: 460 + slot * 420, y: planned.depth * 300, open: false },
       ];
     }),
   );

@@ -386,19 +386,13 @@ export const takesResourceShape = (kind: z.infer<typeof resourceSchema>['kind'])
   kind === 'ur';
 
 /**
- * The Shape a Resource is given when an Edit adds it to a Map — Add Resource,
- * Add to Map and a new Space's first Resource. It is written, never inferred
- * from an absent field.
- */
-export const ADDED_RESOURCE_SHAPE = 'rectangle' satisfies (typeof RESOURCE_SHAPES)[number];
-
-/**
  * Where a Map puts a Resource and the Shape it draws it in, whatever its
- * Open/Closed state. The Shape is required: nothing reads a missing one as a
- * rectangle (ADR 0120).
+ * Open/Closed state. Optional, as a Graph's `headShape` is: an entry with none
+ * stored draws as the rectangle (`resourceShape`), and only an Ur Resource may
+ * store another (ADR 0120).
  */
 const drawnPositionSchema = mapPositionSchema.extend({
-  shape: resourceShapeSchema,
+  shape: resourceShapeSchema.optional(),
 });
 
 /**

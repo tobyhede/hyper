@@ -9,6 +9,7 @@ import {
 } from 'react';
 import {
   COLLAPSED_RESOURCE_SIZE,
+  DEFAULT_RESOURCE_SHAPE,
   contentAction,
   drawsContentArea,
   shortTitle,
@@ -151,11 +152,11 @@ interface CanvasResourceCommonProps {
    */
   readonly display: FrontDisplay;
   /**
-   * The Shape the Map records for this Resource (ADR 0120), drawn whatever the
-   * display. A front no Map places — a creation ghost, a specimen — is given the
-   * rectangle by its caller.
+   * The Shape the Map draws this Resource in (ADR 0120), whatever the display.
+   * Absent, as on a front no Map places — a creation ghost, a specimen — the
+   * front is drawn as the rectangle.
    */
-  readonly shape: ResourceShape;
+  readonly shape?: ResourceShape;
   /**
    * The rect the Resource is drawn at, in canvas units, which its Shape's
    * outline and inscribed rectangle are answered for. A canvas adapter supplies
@@ -368,7 +369,8 @@ export function CanvasResource(props: CanvasResourceProps) {
   const open = display.shown !== 'closed';
   // Every Shape but the rectangle is drawn as an outline, and its inscribed
   // rectangle has room for the short Title and not the ladder.
-  const drawsOutline = props.shape !== 'rectangle';
+  const drawnResourceShape = props.shape ?? DEFAULT_RESOURCE_SHAPE;
+  const drawsOutline = drawnResourceShape !== 'rectangle';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const openableFront = front.kind === 'preview' ? undefined : front;
@@ -438,7 +440,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       actionableEntityActions ||
       beginContentEdit !== undefined);
   const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
-  const outline = resourceShapeOutline(props.shape, size);
+  const outline = resourceShapeOutline(drawnResourceShape, size);
   const style: CanvasResourceStyle = {
     '--canvas-resource-graph': graphColor,
     '--canvas-resource-drag-tilt': `${CANVAS_RESOURCE_DRAG_TILT_DEGREES}deg`,
@@ -652,7 +654,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       data-open={open}
       // The Shape the front is drawn in, which `canvas-resource.css` reads to
       // draw the outline below and inset the Title and glyph within it.
-      data-resource-shape={props.shape}
+      data-resource-shape={drawnResourceShape}
       // A running edit is not a hover, so `canvas-resource.css` draws the active
       // face off this as well as `:hover` — a Resource being written in reads as
       // active without the pointer on it.
