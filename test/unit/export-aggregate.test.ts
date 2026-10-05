@@ -335,11 +335,8 @@ describe('canonical export', () => {
   });
 
   /*
-   * Staging is a copy of the destination, and verification re-reads the staged
-   * copy through the ordinary import reader — which refuses a Space directory
-   * whose name is not its Space's id. So a directory the author put there would
-   * fail every export from that moment on, and the path the diagnostic names
-   * lives inside a staging root deleted before the operator can read it.
+   * Import refuses a Space directory whose name is not its Space's id, so a
+   * directory the author put there would make every export unimportable.
    *
    * The destination is checked first, and by the path that is really there.
    */
@@ -355,8 +352,7 @@ describe('canonical export', () => {
     );
 
     expect(thrown?.message).toContain(drafts);
-    expect(thrown?.message).not.toContain('hyper-export-');
-    // Nothing was staged beside the destination and nothing was written into it.
+    // Nothing was written beside the destination or into it.
     await expect(readdir(root)).resolves.toEqual(['exported']);
     await expect(readdir(destination)).resolves.toEqual(['drafts']);
   });
@@ -406,12 +402,11 @@ describe('canonical export', () => {
    * a state the command reports rather than a failure it recovers from.
    *
    * The parent directory is what proves nothing was written, not the
-   * destination: the staging root is minted *beside* the destination, so an
-   * exporter that started work and then noticed would leave a sibling behind
-   * where a check on the destination alone would still pass.
+   * destination: an exporter that created the destination and then noticed
+   * would leave it behind.
    */
   /*
-   * Staged verification is the last safeguard standing between a serialization
+   * Checking that the files read back is the last safeguard standing between a serialization
    * defect and a destination that cannot be imported, and the only way it can
    * fail is one: `loadAggregate` has already validated, so a refusal here means
    * the canonical bytes say something the stored aggregate did not.
@@ -422,9 +417,9 @@ describe('canonical export', () => {
    * `src/cli/aggregate-refusal.ts` prevents.
    *
    * `loadAggregate` is stubbed because a valid repository cannot reach here; the
-   * refusal has to come from the staged bytes disagreeing with Meta rooting.
+   * refusal has to come from the serialised bytes disagreeing with Meta rooting.
    */
-  it('answers invalid-staged-aggregate when verifying the staged aggregate refuses', async () => {
+  it('answers would-not-read-back and writes nothing when the files would not read back', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const orphan = uuidSchema.parse('c0000000-0000-4000-8000-0000000000aa');
@@ -446,11 +441,11 @@ describe('canonical export', () => {
 
     const result = await exportAggregate(repository, destination);
     expect(result).toMatchObject({
-      kind: 'invalid-staged-aggregate',
+      kind: 'would-not-read-back',
       metaSpaceId: SPACE_ID,
       errors: [{ kind: 'ordinary-space-unreferenced', spaceId: orphan }],
     });
-    if (result.kind !== 'invalid-staged-aggregate') return;
+    if (result.kind !== 'would-not-read-back') return;
     expect(result.spaces.map((space) => space.id).sort()).toEqual([SPACE_ID, orphan].sort());
     await expect(readdir(destination).catch(() => [])).resolves.toEqual([]);
   });

@@ -6,6 +6,7 @@ import {
   readFile,
   rename,
   rm,
+  stat,
   symlink,
   writeFile,
 } from 'node:fs/promises';
@@ -159,6 +160,33 @@ describe('Running an Aggregate directory', () => {
     clock.advance(1);
     await written;
     expect(await spaceTitle(directory, META_SPACE_ID)).toBe('Renamed during the run');
+    await run.stop();
+  });
+
+  /*
+   * A shell, an editor or a file watcher inside the directory keeps working
+   * across a write, because the write replaces files and never the directory
+   * or a Space directory inside it.
+   */
+  it('writes into the directory it was started on, keeping it and its Space directory', async () => {
+    const directory = await fixtureCopy();
+    const before = {
+      directory: (await stat(directory)).ino,
+      space: (await stat(join(directory, META_SPACE_ID))).ino,
+    };
+    const { clock, start, nextEvent } = await started(directory);
+    const run = running(start);
+
+    await renameMeta(run, 'Renamed in place');
+    const written = nextEvent();
+    clock.advance(RUN_QUIET_MILLISECONDS);
+    await written;
+
+    expect(await spaceTitle(directory, META_SPACE_ID)).toBe('Renamed in place');
+    expect({
+      directory: (await stat(directory)).ino,
+      space: (await stat(join(directory, META_SPACE_ID))).ino,
+    }).toEqual(before);
     await run.stop();
   });
 

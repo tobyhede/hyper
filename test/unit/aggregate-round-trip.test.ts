@@ -674,7 +674,7 @@ describe('re-exporting over an earlier export', () => {
 });
 
 describe('recording what was exported', () => {
-  it('records the revision of every Space, after the destination is replaced', async () => {
+  it('records the revision of every Space, after every file is written', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const source = new MemorySpaceRepository(
       completeAggregate().map((snapshot) => ({

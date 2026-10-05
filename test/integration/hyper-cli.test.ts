@@ -96,13 +96,17 @@ describe('hyper CLI', () => {
     return directory;
   };
 
-  /** One Space of an aggregate, in the directory named for its own Id. */
+  /**
+   * One Space of an aggregate, in the directory named for its own Id, with a
+   * `resources/` directory for a test to write hand-authored Resources into.
+   */
   const writeSpaceDirectory = async (
     aggregate: string,
     snapshot: SpaceSnapshot,
   ): Promise<string> => {
     const directory = join(aggregate, snapshot.id);
     await writeLoadedSpaceDirectory({ snapshot, revision: 0n, exportedRevision: null }, directory);
+    await mkdir(join(directory, 'resources'), { recursive: true });
     return directory;
   };
 

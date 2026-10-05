@@ -112,7 +112,7 @@ const createWriter = (
       if (result.kind === 'uninitialized') {
         throw new Error('The run holds no aggregate to write');
       }
-      if (result.kind === 'invalid-staged-aggregate') {
+      if (result.kind === 'would-not-read-back') {
         throw new Error(
           `The written aggregate does not read back as a valid aggregate:\n${describeAggregateRefusal(result.errors, result.spaces).join('\n')}`,
         );

@@ -1,8 +1,10 @@
 export {
   AGGREGATE_FILE_NAME,
+  aggregateFiles,
   assertExportableDestination,
-  pruneObsoleteSpaceDirectories,
   readAggregate,
+  readAggregateFiles,
+  scannedAggregateFiles,
   writeAggregateDirectory,
   type AggregateDirectoryContents,
 } from './aggregate-file';
@@ -11,8 +13,8 @@ export {
   IMAGES_DIRECTORY_NAME,
   loadReferencedImages,
   storedImageId,
-  writeAggregateImages,
 } from './images';
 export { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
 export { AggregateDirectoryError, isMissingFile, readSingleSpace } from './space-directory';
+export { rejectSymbolicLinks, writeInPlace, type DirectoryFiles } from './write-in-place';
 export { writeSpaceDirectory } from './write-space-directory';

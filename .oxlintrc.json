@@ -161,24 +161,6 @@
       }
     },
     {
-      // Design debt flagged rather than fixed (research.md: no-module-mocking
-      // findings are design feedback, not free syntax fixes). This mocks
-      // `node:fs/promises` to fault-inject ENOSPC/EPERM on specific paths so
-      // export's cleanup-after-partial-failure paths are reachable at all —
-      // real disk-full/permission-denied conditions aren't practically
-      // triggerable in a test. Unlike the Base UI/React Flow boundary above,
-      // a real fix exists in principle: give `exportAggregate` an injected
-      // filesystem seam (ADR 0109's composition-time pattern) so this test
-      // could supply a faithful in-memory implementation that fails on
-      // command. That is a production-code change this bounded, zero-prod-risk
-      // phase deliberately does not make — left for whoever next touches
-      // `src/export/export-aggregate.ts`.
-      "files": ["test/unit/export-aggregate-recovery.test.ts"],
-      "rules": {
-        "anti-slop/no-module-mocking": "off"
-      }
-    },
-    {
       // `graphColorsByGraphId` builds its map at runtime, keyed by however many graphs
       // a Space holds — there is no static literal for `satisfies` to check and
       // no narrower key type escapes the rule's own unconditional `Record<...>`
@@ -299,8 +281,8 @@
       // (`typeof window/document/Element !== 'undefined'`, `vitest.setup.ts`'s
       // whole reason for existing) or to discriminate a closed union or
       // optional-function property a library's own types declare (React Flow's
-      // `nodeColor`, Node's `net.Server.address(): AddressInfo | string | null`
-      // and `fs.writeFile`'s `PathLike` parameter, Vite's optional
+      // `nodeColor`, Node's `net.Server.address(): AddressInfo | string | null`,
+      // Vite's optional
       // `configureServer`/`configurePreviewServer` plugin hooks, an ESLint
       // `unknown` config result shape-checked once, the untyped arguments of a
       // `console.error` call the unowned-update guard reads) — none of these are
@@ -313,7 +295,6 @@
         "test/unit/vite-hono-host.test.ts",
         "test/integration/start-command.test.ts",
         "test/unit/vite-space-http-plugin.test.ts",
-        "test/unit/export-aggregate-recovery.test.ts",
         "test/support/refusing-postgres-server.ts",
         "test/support/unowned-react-updates.ts"
       ],

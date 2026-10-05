@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs';
-import { mkdir, readdir, readFile, rm, rmdir, writeFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { SpaceSnapshot } from '@project/core';
 import {
@@ -47,7 +47,7 @@ const listImagesDirectory = async (directory: string): Promise<readonly Dirent[]
 
 /**
  * The visible regular files among those entries, in ordinal order. These are
- * what Import admits and so exactly what Export replaces; a dotfile, a
+ * what Import admits and so exactly what Export owns; a dotfile, a
  * directory or a link in `images/` is the author's and is left.
  */
 const imageFileNames = (entries: readonly Dirent[]): readonly string[] =>
@@ -56,13 +56,16 @@ const imageFileNames = (entries: readonly Dirent[]): readonly string[] =>
     .map(({ name }) => name)
     .sort(compareOrdinal);
 
-const readImageFile = async (path: string, name: string): Promise<StoredImage> => {
-  let bytes: Uint8Array<ArrayBuffer>;
-  try {
-    bytes = new Uint8Array(await readFile(path));
-  } catch (error) {
-    throw new AggregateDirectoryError('discovery', [`${path}: ${String(error)}`]);
-  }
+/**
+ * Admit one image file's bytes by the rule storing an uploaded picture uses,
+ * and insist it is named for its content. Import's reader and Export's
+ * in-memory check both admit through this.
+ */
+export const admitImageFile = async (
+  path: string,
+  name: string,
+  bytes: Uint8Array<ArrayBuffer>,
+): Promise<StoredImage> => {
   const admission = await admitImage(bytes);
   if (admission.kind === 'refused') {
     throw new AggregateDirectoryError('parsing', [
@@ -76,6 +79,16 @@ const readImageFile = async (path: string, name: string): Promise<StoredImage> =
     ]);
   }
   return admission.image;
+};
+
+const readImageFile = async (path: string, name: string): Promise<StoredImage> => {
+  let bytes: Uint8Array<ArrayBuffer>;
+  try {
+    bytes = new Uint8Array(await readFile(path));
+  } catch (error) {
+    throw new AggregateDirectoryError('discovery', [`${path}: ${String(error)}`]);
+  }
+  return admitImageFile(path, name, bytes);
 };
 
 /**
@@ -139,24 +152,8 @@ export const loadReferencedImages = async (
 };
 
 /**
- * Rewrite `images/` whole: remove every file Import would admit, then write
- * these images. An image no Resource shows any more therefore leaves the
- * directory, and an `images/` left holding nothing is removed.
+ * The names of the files in `images/` that Import admits, in ordinal order:
+ * what Export owns there, and so what it removes when no Resource shows one.
  */
-export const writeAggregateImages = async (
-  images: readonly StoredImage[],
-  directory: string,
-): Promise<void> => {
-  const imagesDirectory = join(directory, IMAGES_DIRECTORY_NAME);
-  const entries = await listImagesDirectory(directory);
-  const scanned = imageFileNames(entries ?? []);
-  for (const name of scanned) await rm(join(imagesDirectory, name));
-  if (images.length === 0) {
-    if (entries?.length === scanned.length) await rmdir(imagesDirectory);
-    return;
-  }
-  await mkdir(imagesDirectory, { recursive: true });
-  for (const image of images) {
-    await writeFile(join(imagesDirectory, imageFileName(image)), image.bytes);
-  }
-};
+export const scannedImageFileNames = async (directory: string): Promise<readonly string[]> =>
+  imageFileNames((await listImagesDirectory(directory)) ?? []);
