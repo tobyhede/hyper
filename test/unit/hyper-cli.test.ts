@@ -8,7 +8,7 @@ import { runCliMain } from '../../src/cli/main';
 import { runHyper, type CliIo } from '../../src/cli/run';
 import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
 import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');

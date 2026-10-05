@@ -24,7 +24,7 @@ import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { Contract } from '../../src/prisma/contract.d';
 import { postgresOptionsFor } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 import { startRefusingPostgresServer } from '../support/refusing-postgres-server';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');

@@ -19,14 +19,14 @@ import type {
   InitializeAggregateResult,
   ReplaceAggregateResult,
   SpaceRepository,
-} from '../../src/persistence/space-repository';
-import { classifyInitializedAggregate } from '../../src/persistence/aggregate-lifecycle';
+} from './space-repository';
+import { classifyInitializedAggregate } from './aggregate-lifecycle';
 
 const clone = <T>(value: T): T => structuredClone(value);
 
 /* `readInIdOrder` and its ordering rule are `@project/persistence`'s, shared
- * with `MemorySpaceBackend` so the two doubles cannot drift apart from each
- * other or from the SQL adapters. `listSpaces` below still sorts by collation,
+ * with `MemorySpaceBackend` so the two in-memory stores cannot drift apart from
+ * each other or from the SQL adapters. `listSpaces` below still sorts by collation,
  * and its order stays outside the contract for the reason stated there. */
 
 const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): LoadedAggregate => ({
@@ -34,7 +34,12 @@ const loadedAggregate = (metaSpaceId: UUID, spaces: Iterable<LoadedSpace>): Load
   spaces: [...spaces].map(read).sort((left, right) => ascendingById(left.snapshot, right.snapshot)),
 });
 
-/** Behavioral repository for server-side startup tests. */
+/**
+ * The in-process `SpaceRepository`: the whole aggregate held in memory for the
+ * life of the process, deciding commits and the aggregate lifecycle by the same
+ * rules as `SqlSpaceRepository`, and held to the same shared contract
+ * (`test/unit/memory-space-repository.test.ts`).
+ */
 export class MemorySpaceRepository implements SpaceRepository {
   readonly #spaces = new Map<UUID, LoadedSpace>();
   #metaSpaceId: UUID | undefined;
@@ -46,7 +51,7 @@ export class MemorySpaceRepository implements SpaceRepository {
    * stored Spaces under the Meta identity the fixture *names*. There is no
    * third shape, because "these Spaces, and whichever one happens to be first
    * is Meta" is the ordering inference ADR 0078 refuses every adapter, and a
-   * double that takes it decides an aggregate's validity by array position:
+   * repository that takes it decides an aggregate's validity by array position:
    * seeded the other way round, the same two Spaces leave the one Meta does not
    * reach unreferenced, and `loadAggregate` refuses what it accepted before.
    *

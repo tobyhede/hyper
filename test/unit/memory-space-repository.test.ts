@@ -1,6 +1,6 @@
 import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { describe, expect, it } from 'vitest';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 import { spaceRepositoryContract } from '../support/repository-contract';
 
 spaceRepositoryContract('MemorySpaceRepository', () =>

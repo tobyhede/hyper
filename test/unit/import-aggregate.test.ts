@@ -21,7 +21,7 @@ import type {
   SpaceRepository,
 } from '../../src/persistence/space-repository';
 import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 import { captureError } from '../support/capture-error';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');

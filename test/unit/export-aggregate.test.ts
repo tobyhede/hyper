@@ -6,7 +6,7 @@ import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { captureError } from '../support/capture-error';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');

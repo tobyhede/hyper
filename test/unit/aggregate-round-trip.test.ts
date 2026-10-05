@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { importAggregate } from '../../src/import/import-aggregate';
 import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');

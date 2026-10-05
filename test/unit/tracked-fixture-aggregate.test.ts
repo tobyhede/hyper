@@ -7,7 +7,7 @@ import { loadSpaceAggregate } from '@project/graph';
 import { isImageId } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 

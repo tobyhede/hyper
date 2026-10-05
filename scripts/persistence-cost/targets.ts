@@ -11,7 +11,7 @@ import type { Contract as SqliteContract } from '../../src/sqlite/contract.d';
 import sqliteContractJson from '../../src/sqlite/contract.json' with { type: 'json' };
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { clearSqlContent } from '../../test/support/clear-sql-content';
-import { MemorySpaceRepository } from '../../test/support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 import { migrateSqliteFile } from '../../test/support/sqlite-harness';
 
 /*
