@@ -24,7 +24,7 @@ Work from the root of the Hyper clone. Each step ends on its completion criterio
    Done when you know the absolute path and whether it is new or existing.
 
 4. **Start.** For the person, in their terminal: `pnpm start <dir>`. It prints the address it serves (port 4173, or the next free port) and opens their browser. Add `--port <port>` to choose the port and `--no-open` to leave the browser alone.
-   If you start it yourself, use `pnpm start <dir> --no-open`, read the printed `Running <dir> at <url>` line for the address, and stop it with SIGINT to the process group you started, so its last write lands. A refused directory exits non-zero and prints its problems; fix those (the `hyper-authoring` skill covers the format) and start again.
+   If you start it yourself, use `pnpm start <dir> --no-open`, read the printed `Running <dir> at <url>` line for the address, and stop it with SIGINT to the process group you started, so its last write lands. A stop that wrote everything prints `Stopped; <dir> holds every edit.` and exits zero; one that prints `Stopped, but the last edits were not written:` and exits 1 has lost those edits, so tell the person what it printed rather than treating the directory as written. A refused directory exits non-zero and prints its problems; fix those (the `hyper-authoring` skill covers the format) and start again.
    Done when the `Running … at <url>` line has printed and the URL answers.
 
 5. **Git.** Make the directory a git repository if it is not in one: `git -C <dir> init`. It can be done before the first start or while Hyper runs.
@@ -33,7 +33,7 @@ Work from the root of the Hyper clone. Each step ends on its completion criterio
 6. **Explain how the run treats their files.** Tell the person, in your own words:
    - Edits are written into the directory about a second after they stop editing, and again when they press Ctrl-C. A second Ctrl-C exits without waiting.
    - **Git is the undo.** To recover an edit, or after a `git pull` or a second run on the same directory, use git: Hyper's next write replaces what is on disk with what it holds. Pull, and edit files by hand, with Hyper stopped.
-   - Killing Hyper outright within that second loses the edits not yet written; stopping it normally never does.
+   - Killing Hyper outright within that second, or a second Ctrl-C, loses the edits not yet written. A write can also fail, for example on a full disk: Hyper prints `Could not write the directory:` and tries again, but if the write on stopping fails it prints `Stopped, but the last edits were not written:`, exits 1, and those edits are lost. Check that stopping ends with `Stopped; <dir> holds every edit.` before treating the directory as complete.
    - Hyper writes only its own files, in place, and changes only the ones whose content changed. Anything else in the directory (`.git`, a README at the top, a `notes/` directory) is left alone. A crash in the middle of a write can leave some files new and some old; git restores them.
    - A `*.md` file beside `space.json` is read as a Resource and removed or rewritten by the next write, so notes belong in another directory.
    - Uploaded pictures are written to `images/` and committed with everything else.
