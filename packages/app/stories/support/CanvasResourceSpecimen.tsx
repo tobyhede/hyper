@@ -16,7 +16,7 @@ interface CanvasResourceSpecimenCommonProps {
 }
 
 /** The two custom properties the stylesheet sizes a Resource from. */
-type OpenFrameStyle = CSSProperties & {
+export type ResourceFrameStyle = CSSProperties & {
   readonly '--resource-width': string;
   readonly '--resource-height': string;
 };
@@ -66,7 +66,7 @@ export function CanvasResourceSpecimen({
       />
     );
   }
-  const sized: OpenFrameStyle = {
+  const sized: ResourceFrameStyle = {
     '--resource-width': `${openSize.width}px`,
     '--resource-height': `${openSize.height}px`,
   };

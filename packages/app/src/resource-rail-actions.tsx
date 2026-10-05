@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import {
   RESOURCE_SHAPES,
+  takesResourceShape,
   titleName,
   type Map as SpaceMap,
   type Resource,
@@ -82,7 +83,9 @@ export function resourceRailGroups(
 ): readonly EntityActionGroup[] {
   const { createReference, resourceShape, removeFromMap, deleteFromSpace, enter } = commands;
   const shaping: readonly EntityActionGroup[] =
-    resourceShape === null || resource.kind !== 'ur' ? [] : [[resourceShapeChoice(resourceShape)]];
+    resourceShape === null || !takesResourceShape(resource.kind)
+      ? []
+      : [[resourceShapeChoice(resourceShape)]];
   const terminal = resource.kind === 'reference' ? REFERENCE_TERMINAL : null;
   const reference: readonly EntityActionGroup[] =
     createReference === null

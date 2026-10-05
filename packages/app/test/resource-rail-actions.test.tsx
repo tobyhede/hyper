@@ -932,8 +932,18 @@ describe('a Resource’s commands on the canvas rail', () => {
 
   /**
    * Only an Ur Resource takes a Shape (ADR 0120), so the choice is its alone,
-   * Open (`withUr`, above) and Closed alike.
+   * Open and Closed alike.
    */
+  it('offers an Open Ur Resource the Shape choice', async () => {
+    const session = mount(undefined, undefined, withUr);
+    await selectResource('Gateway');
+
+    expect(await screen.findByRole('button', { name: 'Close Resource Gateway' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource Gateway' }));
+    expect(await screen.findByRole('menuitem', { name: /^Shape/ })).toBeVisible();
+    await settled(session);
+  });
+
   it('offers a Closed Ur Resource the Shape choice', async () => {
     const closed = spaceSnapshotSchema.parse({
       ...withUr,

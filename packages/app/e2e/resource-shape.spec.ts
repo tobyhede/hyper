@@ -114,7 +114,7 @@ async function edgeEnd(page: Page, edge: string): Promise<{ x: number; y: number
 }
 
 /** The four non-rectangle Shapes, by the name the Shape choice gives each. */
-const DRAWN_SHAPES = [
+const DRAWN_RESOURCE_SHAPES = [
   ['Pill', 'pill'],
   ['Ellipse', 'ellipse'],
   ['Diamond', 'diamond'],
@@ -122,7 +122,7 @@ const DRAWN_SHAPES = [
 ] as const;
 
 /** Choose a Shape from U's Actions menu and wait for it to be drawn. */
-async function chooseShape(
+async function chooseResourceShape(
   page: Page,
   ur: Locator,
   name: string,
@@ -247,7 +247,7 @@ test('an Edge drawn to a Closed diamond meets its outline', async ({ page }) => 
   expect(Math.abs(at.x - tAt.x)).toBeLessThan(width / 2);
   expect(at.y).toBeGreaterThan(tAt.y + height);
 
-  await chooseShape(page, ur, 'Diamond', 'diamond');
+  await chooseResourceShape(page, ur, 'Diamond', 'diamond');
   await page.keyboard.press('Escape');
   await settled(page);
 
@@ -279,8 +279,8 @@ test(
   async ({ page }) => {
     const ur = await createUr(page);
 
-    for (const [name, resourceShape] of DRAWN_SHAPES) {
-      await chooseShape(page, ur, name, resourceShape);
+    for (const [name, resourceShape] of DRAWN_RESOURCE_SHAPES) {
+      await chooseResourceShape(page, ur, name, resourceShape);
       await expect.poll(() => outlineOffset(ur)).toBeLessThan(0.5);
       expect(await drawnOutline(face(ur)), name).toEqual({
         shape: resourceShape,
@@ -302,8 +302,8 @@ test(
     expect(openWidth).toBeGreaterThan(COLLAPSED_RESOURCE_SIZE.width + 100);
     expect(openHeight).toBeGreaterThan(COLLAPSED_RESOURCE_SIZE.height + 60);
 
-    for (const [name, resourceShape] of DRAWN_SHAPES) {
-      await chooseShape(page, ur, name, resourceShape);
+    for (const [name, resourceShape] of DRAWN_RESOURCE_SHAPES) {
+      await chooseResourceShape(page, ur, name, resourceShape);
       await page.keyboard.press('Escape');
       await expect(face(ur)).toHaveAttribute('data-open', 'true');
       await expect.poll(() => outlineOffset(ur)).toBeLessThan(0.5);
@@ -344,7 +344,7 @@ test('an Open diamond resized back into the Closed Size Closes, still a diamond'
   page,
 }) => {
   const ur = await createUr(page);
-  await chooseShape(page, ur, 'Diamond', 'diamond');
+  await chooseResourceShape(page, ur, 'Diamond', 'diamond');
   await page.keyboard.press('Escape');
   await openResource(ur, UR);
   await expect(face(ur)).toHaveAttribute('data-open', 'true');

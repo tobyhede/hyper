@@ -2,6 +2,7 @@ import {
   COLLAPSED_RESOURCE_SIZE,
   titleName,
   firstOpenSize,
+  takesResourceShape,
   type Graph,
   type Map,
   type MapPosition,
@@ -471,7 +472,8 @@ function changeResourceShape(
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
   if (resource === undefined) return refused({ code: 'resource-not-found' });
-  if (resource.document.kind !== 'ur') return refused({ code: 'shape-requires-ur-resource' });
+  if (!takesResourceShape(resource.document.kind))
+    return refused({ code: 'shape-requires-ur-resource' });
   if (at.shape === resourceShape) return UNCHANGED;
   return withPlacement(
     snapshot,

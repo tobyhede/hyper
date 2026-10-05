@@ -2565,7 +2565,7 @@ describe('the Title a Shape draws', () => {
     expect(ladder(resource)).toEqual(['Decide', 'which branch', 'and when']);
   });
 
-  it('writes the whole Title in a Closed Shape', () => {
+  it('writes the whole Title of a Closed Resource drawn in a diamond', () => {
     render(
       <CanvasResource
         {...props}

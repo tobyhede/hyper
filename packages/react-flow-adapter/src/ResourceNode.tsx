@@ -239,8 +239,9 @@ export function ResourceNode({
     >
   > = {};
   // The rect React Flow draws this Resource at, which the projection declares
-  // from its Placement and republishes on every resize frame. Absent until the
-  // layout resolves, when the front is drawn at the Closed Size.
+  // from the Resource's Placement (`canvas-projection.test.ts`, "carries each
+  // authored Open rect through strategy input and node projection"). Where React
+  // Flow gives none, the front is drawn at the Closed Size.
   if (width !== undefined && height !== undefined) {
     canvasResourceOptionalProps.size = { width, height };
   }

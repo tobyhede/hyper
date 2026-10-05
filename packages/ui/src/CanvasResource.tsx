@@ -524,8 +524,8 @@ export function CanvasResource(props: CanvasResourceProps) {
   }, [onBodyHeightChange]);
 
   // An Open Resource's content already says what it is, so its kind is not
-  // drawn. A Resource drawn in a Shape has no content area and draws its kind
-  // Open and Closed alike.
+  // drawn. A Resource drawn in a Shape other than the rectangle has no content
+  // area and draws its kind Open and Closed alike.
   const kindMark = open && !drawsOutline ? null : <ResourceRailKind kind={visualKind} />;
   const toolbar = showActions ? (
     // ADR 0073. One tab stop for the whole rail, arrows between its
@@ -761,8 +761,8 @@ export function CanvasResource(props: CanvasResourceProps) {
  * Drawn in the units of the rect the Resource is drawn at, so the drawing is
  * not stretched and the outline touches the midpoint of each of the rect's
  * sides, where the adapter's handles sit and Edges attach (ADR 0110, ADR
- * 0120). The stroke keeps the border's width at any zoom because it does not
- * scale with the drawing.
+ * 0120). The stroke keeps the border's width however the drawing is scaled,
+ * because `canvas-resource.css` gives it `vector-effect: non-scaling-stroke`.
  *
  * The geometry is drawn twice: first the selection ring, a wider stroke that
  * `canvas-resource.css` shows only while the Resource is selected or its Title

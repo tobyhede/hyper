@@ -1,4 +1,4 @@
-import { uuidSchema, type Resource, type Map, type UUID } from '@project/core';
+import { takesResourceShape, uuidSchema, type Resource, type Map, type UUID } from '@project/core';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
@@ -169,10 +169,12 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         });
         continue;
       }
-      // Only an Ur Resource takes a Shape (ADR 0120); every other kind is the
-      // rectangle. The kind is read from the Resource, because the entry does
-      // not carry it.
-      if (member.kind !== 'ur' && placement !== undefined && placement.shape !== 'rectangle') {
+      // The kind is read from the Resource, because the entry does not carry it.
+      if (
+        !takesResourceShape(member.kind) &&
+        placement !== undefined &&
+        placement.shape !== 'rectangle'
+      ) {
         errors.push({
           kind: 'shape-requires-ur-resource',
           ref: resourceId,

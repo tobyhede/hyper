@@ -379,6 +379,13 @@ export const RESOURCE_SHAPES = ['rectangle', 'pill', 'ellipse', 'diamond', 'hexa
 export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 
 /**
+ * Whether a Resource of this kind takes a Shape other than the rectangle (ADR
+ * 0120). Only an Ur Resource does; every other kind is the rectangle.
+ */
+export const takesResourceShape = (kind: z.infer<typeof resourceSchema>['kind']): boolean =>
+  kind === 'ur';
+
+/**
  * The Shape a Resource is given when an Edit adds it to a Map — Add Resource,
  * Add to Map and a new Space's first Resource. It is written, never inferred
  * from an absent field.
@@ -390,7 +397,7 @@ export const ADDED_RESOURCE_SHAPE = 'rectangle' satisfies (typeof RESOURCE_SHAPE
  * Open/Closed state. The Shape is required: nothing reads a missing one as a
  * rectangle (ADR 0120).
  */
-const shapedPositionSchema = mapPositionSchema.extend({
+const drawnPositionSchema = mapPositionSchema.extend({
   shape: resourceShapeSchema,
 });
 
@@ -399,11 +406,11 @@ const shapedPositionSchema = mapPositionSchema.extend({
  * state and its remembered Open Size.
  */
 export const resourcePlacementSchema = z.discriminatedUnion('open', [
-  shapedPositionSchema.extend({
+  drawnPositionSchema.extend({
     open: z.literal(true),
     openSize: openSizeSchema,
   }),
-  shapedPositionSchema.extend({
+  drawnPositionSchema.extend({
     open: z.literal(false),
     openSize: openSizeSchema.optional(),
   }),

@@ -14,7 +14,7 @@ const sizes = fc.record({
   width: fc.double({ min: 1, max: 4000, noNaN: true }),
   height: fc.double({ min: 1, max: 4000, noNaN: true }),
 });
-const shapes = fc.constantFrom(...RESOURCE_SHAPES);
+const resourceShapes = fc.constantFrom(...RESOURCE_SHAPES);
 
 /** The tolerance a coordinate is compared at, relative to the rect it lies in. */
 const toleranceAt = ({ width, height }: OutlineSize): number => 1e-9 * Math.max(width, height);
@@ -111,7 +111,7 @@ function insideOutline(outline: ResourceShapeOutline, size: OutlineSize, p: Poin
 describe('resourceShapeOutline', () => {
   it('draws every Shape touching the midpoint of every side of its rect, at any size', () => {
     fc.assert(
-      fc.property(shapes, sizes, (resourceShape, size) => {
+      fc.property(resourceShapes, sizes, (resourceShape, size) => {
         const outline = resourceShapeOutline(resourceShape, size);
         for (const midpoint of sideMidpoints(size)) {
           expect(
@@ -125,7 +125,7 @@ describe('resourceShapeOutline', () => {
 
   it('draws every Shape within its rect, at any size', () => {
     fc.assert(
-      fc.property(shapes, sizes, (resourceShape, size) => {
+      fc.property(resourceShapes, sizes, (resourceShape, size) => {
         const { width, height } = size;
         const outline = resourceShapeOutline(resourceShape, size);
         if (outline.kind === 'rect') {
@@ -145,7 +145,7 @@ describe('resourceShapeOutline', () => {
 
   it('lays out the Title of every Shape in a rectangle inside the outline, at any size', () => {
     fc.assert(
-      fc.property(shapes, sizes, (resourceShape, size) => {
+      fc.property(resourceShapes, sizes, (resourceShape, size) => {
         const { width, height } = size;
         const outline = resourceShapeOutline(resourceShape, size);
         const { inline, block } = outline.inscribed;
