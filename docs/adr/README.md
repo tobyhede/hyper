@@ -104,6 +104,7 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0096](0096-the-aggregate-lifecycle-decision-stays-inside-each-repository.md) | Initialization and replacement decide their outcome inside each repository; there is no pure lifecycle decision beside `decideCommit`. |
 | [0088](0088-aggregate-names-the-meta-rooted-collection.md) | Aggregate names the complete Meta-rooted collection of Spaces. One Space plus its Things is a snapshot. |
 | [0098](0098-a-commit-outcome-is-named-once-on-both-sides-of-the-seam.md) | `CommitOutcome` is shared by both commit seams, its status codes are one table, and the identity rule is the store's alone. |
+| [0117](0117-running-serves-an-aggregate-directory-as-the-durable-copy.md) | `pnpm start <dir>` runs an Aggregate directory: the directory is the durable copy, the memory store is discarded, and git answers for history, undo and concurrent writers. Edits are Exported after a quiet period and on stop; a crash before that write loses them. |
 
 ## HTTP
 
