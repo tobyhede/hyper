@@ -32,7 +32,6 @@ import {
   SPACE_ID,
   derivationSpace,
   openDerivationSpace,
-  urDerivationSnapshot,
 } from './app-derivation-fixtures';
 import { mintingIds } from './minting';
 
@@ -502,7 +501,7 @@ describe('useSpaceAddresses', () => {
 
 describe('useResourceRailActions', () => {
   const railFor = (opened: OpenSpace, available: boolean) => {
-    const space = derivationSpace(opened.session.getState().working);
+    const space = derivationSpace();
     return renderHook(() =>
       useResourceRailActions(opened.app, {
         space,
@@ -549,28 +548,6 @@ describe('useResourceRailActions', () => {
       if (remove !== undefined && 'onSelect' in remove) void remove.onSelect(null);
     });
     await waitFor(() => expect(placedIds(opened)).not.toContain(PLACED_A));
-  });
-
-  it('offers an Ur Resource the Shape the Map records, and choosing one changes it on that Map', async () => {
-    const opened = openDerivationSpace(undefined, undefined, urDerivationSnapshot);
-    const choice = railFor(opened, true)
-      .result.current(PLACED_A, connect)
-      .flat()
-      .find((entry) => entry.id === 'resource-shape');
-    if (choice === undefined || !('options' in choice)) throw new Error('No Shape choice');
-    expect(choice.options.find((option) => option.chosen)?.id).toBe('rectangle');
-
-    act(() => {
-      choice.options.find((option) => option.id === 'diamond')?.onChoose();
-    });
-
-    await waitFor(() =>
-      expect(
-        opened.session.getState().working.document.maps?.find(({ id }) => id === MAP_ID)?.positions[
-          PLACED_A
-        ]?.shape,
-      ).toBe('diamond'),
-    );
   });
 });
 

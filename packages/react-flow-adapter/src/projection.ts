@@ -78,6 +78,11 @@ export type ResourceNodeData = {
    * `markdown` and `image`.
    */
   onEditResource?: (open: boolean) => 'completed' | 'retained';
+  /**
+   * Draw this Ur Resource in another Shape on its Map (ADR 0120). Absent on
+   * every other kind, and wherever the Map may not be authored.
+   */
+  onResourceShapeChange?: (resourceShape: ResourceShape) => void;
   onBeginTitleEditing?: () => void;
   /**
    * The inline title editor this Resource is currently showing, absent on one that

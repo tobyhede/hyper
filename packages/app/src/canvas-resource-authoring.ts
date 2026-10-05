@@ -6,6 +6,7 @@ import {
   uuidSchema,
   type ResourceDocument,
   type ResourceId,
+  type ResourceShape,
   type GraphId,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
@@ -91,7 +92,7 @@ const completeEditedSpaceResource = (
 export interface CanvasResourceAuthoringInput {
   readonly continuation?: Continuation | undefined;
   /** This canvas Space's outcomes; target rails resolve their target's composition. */
-  readonly commandOutcomes?: CommandOutcomes;
+  readonly commandOutcomes?: CommandOutcomes | undefined;
   /** This canvas Space's confirmation; target rails use the target's confirmation. */
   readonly deleteConfirmation?: DeleteConfirmation;
   readonly nodes: readonly ResourceFlowNode[];
@@ -316,6 +317,27 @@ export function useCanvasResourceAuthoring({
     [authoring, spaceSession],
   );
 
+  /**
+   * One Edit per choice, its refusal reported as the Actions menu's commands
+   * are. Without command outcomes there is nowhere to say a refusal, so the
+   * choice is not offered.
+   */
+  const changeResourceShape = useMemo(
+    () =>
+      commandOutcomes === undefined
+        ? undefined
+        : (resourceId: ResourceId, resourceShape: ResourceShape): void => {
+            commandOutcomes.run('resource-shape', () =>
+              authoring.complete({
+                kind: 'changed-resource-shape',
+                resourceId,
+                shape: resourceShape,
+              }),
+            );
+          },
+    [authoring, commandOutcomes],
+  );
+
   const replaceResourceImage = useMemo(() => {
     return async (resourceId: ResourceId, replacement: ImageReplacement): Promise<string | null> =>
       describeImageReplacement(await imageReplacement.replace(resourceId, replacement));
@@ -470,6 +492,7 @@ export function useCanvasResourceAuthoring({
       completeResourceTitle,
       clearCaret,
       resourceEntityActions,
+      changeResourceShape,
     }),
     [
       availability.authorOnCanvas,
@@ -485,6 +508,7 @@ export function useCanvasResourceAuthoring({
       completeResourceTitle,
       clearCaret,
       resourceEntityActions,
+      changeResourceShape,
     ],
   );
   const markdownContext = useMemo(

@@ -1941,14 +1941,11 @@ it('offers no Shape choice on a Markdown Resource inside a drawn Map', async () 
   );
   await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
   beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
-  fireEvent.click(
-    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', {
-      name: 'Actions for Resource Intake',
-    }),
-  );
-
-  expect(await screen.findByRole('menuitem', { name: 'Remove from Map' })).toBeVisible();
-  expect(screen.queryByRole('menuitem', { name: 'Shape' })).toBeNull();
+  const controls = controlsOf(embeddedNode(DRAWN_A));
+  expect(
+    within(controls).getByRole('button', { name: 'Actions for Resource Intake' }),
+  ).toBeVisible();
+  expect(within(controls).queryByRole('button', { name: /^Shape/ })).toBeNull();
 });
 
 it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing it there', async () => {
@@ -1965,11 +1962,8 @@ it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing i
   await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
   beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
   fireEvent.click(
-    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', {
-      name: 'Actions for Resource Intake',
-    }),
+    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: 'Shape: Rectangle' }),
   );
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Shape' }));
   fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Diamond' }));
 
   await waitFor(() =>

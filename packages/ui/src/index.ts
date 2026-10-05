@@ -28,6 +28,8 @@ export type {
   CanvasResourceState,
 } from './CanvasResource';
 export { SpaceResourceSelectors } from './SpaceResourceSelectors';
+export { ResourceShapeMenu, resourceShapeName } from './ResourceShapeMenu';
+export type { ResourceShapeMenuProps } from './ResourceShapeMenu';
 export type {
   CanvasSpaceResourceChoice,
   CanvasSpaceResourceGraphChoice,

@@ -59,24 +59,12 @@ export const derivationSpace = (snapshot: SpaceSnapshot = derivationSnapshot): S
   return loaded.space;
 };
 
-/**
- * `derivationSnapshot` with `PLACED_A` an Ur Resource, the one kind a Map may
- * draw in a Shape other than the rectangle (ADR 0120).
- */
-export const urDerivationSnapshot: SpaceSnapshot = {
-  ...derivationSnapshot,
-  resources: derivationSnapshot.resources.map((resource) =>
-    resource.id === PLACED_A ? { id: PLACED_A, document: { title: 'A', kind: 'ur' } } : resource,
-  ),
-};
-
 /** The fixture Space opened and composed the way Open Spaces opens one. */
 export const openDerivationSpace = (
   newId: () => UUID = newUuid,
   images: ImageSources = unusedImageSources,
-  snapshot: SpaceSnapshot = derivationSnapshot,
 ): OpenSpace => {
-  const stored = { snapshot, revision: 0n, exportedRevision: null };
+  const stored = { snapshot: derivationSnapshot, revision: 0n, exportedRevision: null };
   const { spaceSession, spaceResources } = openTestSpace(
     new MemorySpaceBackend(SPACE_ID, [stored]),
     stored,

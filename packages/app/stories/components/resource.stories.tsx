@@ -6,6 +6,7 @@ import {
   uuidSchema,
   type Map,
   type Resource,
+  type ResourceShape,
 } from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
@@ -252,6 +253,27 @@ export const ResourceShapeTreatments: Story = () => (
     </CatalogueSection>
   </div>
 );
+
+/**
+ * An Ur Resource's Shape chosen from its rail (ADR 0120): the control's face is
+ * the Shape it is drawn in, and its list draws each Shape beside its name.
+ */
+export const ResourceShapeChoice: Story = () => {
+  const [resourceShape, setResourceShape] = useState<ResourceShape>('rectangle');
+  return (
+    <div className="p-8" style={resourceSizeVars}>
+      <CanvasResource
+        front={{ kind: 'ur', onResourceShapeChange: setResourceShape }}
+        display={CLOSED_DISPLAY}
+        shape={resourceShape}
+        title="Decide"
+        state="selected"
+        graphColor="#ffc53d"
+      />
+    </div>
+  );
+};
+ResourceShapeChoice.meta = { iframed: true };
 
 export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>

@@ -801,6 +801,22 @@ export async function resourceControls(page: Page, resource: Locator): Promise<L
 }
 
 /**
+ * Open an Ur Resource's Shape choice from its rail (ADR 0120), selecting the
+ * Resource first when its toolbar is not drawn, and answer the list of Shapes.
+ * The list is uncaptioned; the control's face names the current Shape.
+ */
+export async function resourceShapeChoice(page: Page, resource: Locator): Promise<Locator> {
+  await (
+    await resourceControls(page, resource)
+  )
+    .getByRole('button', { name: /^Shape: / })
+    .click({ delay: 120 });
+  const resourceShapes = page.getByRole('group', { name: 'Shape' });
+  await expect(resourceShapes).toBeVisible();
+  return resourceShapes;
+}
+
+/**
  * Assert a menu's rows read as the given groups, in order, with exactly one
  * separator between each pair of groups — the one grouping grammar every
  * entity, Map, Graph and Space menu in this product shares.

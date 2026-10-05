@@ -83,9 +83,13 @@ function kindFrontOf(data: ResourceFlowNode['data']): MutableFront {
       }
       return front;
     }
-    case 'ur':
-      // An Ur Resource has no content, so it offers no edit.
-      return { kind: 'ur' };
+    case 'ur': {
+      // An Ur Resource has no content, so it offers no edit; it takes a Shape.
+      const front: UrFront = { kind: 'ur' };
+      if (data.onResourceShapeChange !== undefined)
+        front.onResourceShapeChange = data.onResourceShapeChange;
+      return front;
+    }
     case 'reference':
       return { kind: 'reference' };
     case 'space': {

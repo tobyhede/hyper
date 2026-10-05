@@ -414,6 +414,16 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(onEditResource).toHaveBeenCalledWith(true);
   });
 
+  it("passes an Ur Resource's Shape choice through its own front", () => {
+    const onResourceShapeChange = vi.fn();
+    const node = props({ kind: 'ur', title: 'Gateway', selected: true });
+    render(
+      <ResourceNode {...node} data={{ ...node.data, shape: 'diamond', onResourceShapeChange }} />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Shape: Diamond' })).toBeVisible();
+  });
+
   it('draws a Markdown Resource kind glyph like any other kind', () => {
     render(
       <ResourceNode {...props({ kind: 'markdown', selected: true, onEditResource: vi.fn() })} />,

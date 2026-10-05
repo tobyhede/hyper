@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RESOURCE_SHAPES, type Resource, type ResourceShape } from '@project/core';
+import type { Resource } from '@project/core';
 import { Placement } from '@project/graph';
 import type { EntityActionGroup, EntityActionOutcome } from '@project/ui';
 import { activeGraphOf } from '../src/dock-chrome';
@@ -214,53 +214,28 @@ describe('resourceRailGroups', () => {
   const connect: EntityActionGroup = [
     { id: 'connect-resource', label: 'Connect to Resource', onSelect: () => 'done' },
   ];
-  const chosenResourceShapes: ResourceShape[] = [];
   const everything = {
     createReference: (): EntityActionOutcome => 'done',
-    resourceShape: {
-      current: 'diamond' as const,
-      choose: (resourceShape: ResourceShape) => {
-        chosenResourceShapes.push(resourceShape);
-      },
-    },
     removeFromMap: () => undefined,
     deleteFromSpace: () => undefined,
     enter: () => undefined,
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
-  /** The one kind that takes a Shape (ADR 0120). */
+  /** The one kind that takes a Shape, which its rail offers rather than this menu (ADR 0120). */
   const ur: Resource = { id: OUTSIDE, title: 'Gateway', kind: 'ur' };
 
   it('leads with Create Reference and ends with the commands that leave the Resource', () => {
     expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
-      ['resource-shape'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
   });
 
-  it('offers the five Shapes with the current one chosen, and each choice chooses it', () => {
-    const choice = resourceRailGroups(ur, addresses, connect, everything)
-      .flat()
-      .find((entry) => entry.id === 'resource-shape');
-    if (choice === undefined || !('options' in choice)) throw new Error('No Shape choice');
-    expect(choice.label).toBe('Shape');
-    expect(choice.options.map(({ id, title, chosen }) => ({ id, title, chosen }))).toEqual([
-      { id: 'rectangle', title: 'Rectangle', chosen: false },
-      { id: 'pill', title: 'Pill', chosen: false },
-      { id: 'ellipse', title: 'Ellipse', chosen: false },
-      { id: 'diamond', title: 'Diamond', chosen: true },
-      { id: 'hexagon', title: 'Hexagon', chosen: false },
-    ]);
-    chosenResourceShapes.length = 0;
-    for (const option of choice.options) option.onChoose();
-    expect(chosenResourceShapes).toEqual(RESOURCE_SHAPES);
-  });
-
   it.each<Resource>([
+    ur,
     resource(PLACED_A),
     {
       id: OUTSIDE,
@@ -279,7 +254,7 @@ describe('resourceRailGroups', () => {
       framing: undefined,
     },
     { id: OUTSIDE, title: 'A reference', kind: 'reference', target: PLACED_A },
-  ])('offers no Shape choice on a $kind Resource, which is always the rectangle', (subject) => {
+  ])('offers no Shape choice in the menu of a $kind Resource', (subject) => {
     expect(
       resourceRailGroups(subject, addresses, connect, everything)
         .flat()
@@ -292,7 +267,6 @@ describe('resourceRailGroups', () => {
       ids(
         resourceRailGroups(resource(PLACED_A), addresses, connect, {
           createReference: null,
-          resourceShape: null,
           removeFromMap: null,
           deleteFromSpace: null,
           enter: null,

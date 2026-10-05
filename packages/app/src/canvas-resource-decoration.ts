@@ -1,5 +1,12 @@
 import type { Continuation } from './continuation';
-import { type GraphId, type ResourceDocument, type ResourceId, type UUID } from '@project/core';
+import {
+  takesResourceShape,
+  type GraphId,
+  type ResourceDocument,
+  type ResourceId,
+  type ResourceShape,
+  type UUID,
+} from '@project/core';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
 import {
   beginEditing,
@@ -23,6 +30,7 @@ export type CanvasResourceDataPatch = Partial<
   Pick<
     ResourceNodeData,
     | 'onEditResource'
+    | 'onResourceShapeChange'
     | 'onBeginTitleEditing'
     | 'resize'
     | 'titleEditor'
@@ -66,6 +74,12 @@ export interface CanvasResourceDecorationContext {
   readonly imageAccept: string;
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
+  /**
+   * Draw an Ur Resource in another Shape on this Map, reporting a refusal.
+   * Absent where this canvas has no command outcomes to report one through.
+   */
+  readonly changeResourceShape?:
+    ((resourceId: ResourceId, resourceShape: ResourceShape) => void) | undefined;
   readonly continuation?: Continuation | undefined;
   readonly containingSpaceId: UUID;
   readonly spaceDocuments: ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: 'space' }>>;
@@ -108,6 +122,7 @@ type SharedResourceDecorationContext = Pick<
   | 'completeResourceTitle'
   | 'clearCaret'
   | 'resourceEntityActions'
+  | 'changeResourceShape'
 >;
 
 type MarkdownResourceDecorationContext = Pick<
@@ -160,7 +175,12 @@ export function decorateSharedResourceNode(
   const patch: Mutable<
     Pick<
       ResourceNodeData,
-      'onEditResource' | 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'
+      | 'onEditResource'
+      | 'onResourceShapeChange'
+      | 'onBeginTitleEditing'
+      | 'resize'
+      | 'titleEditor'
+      | 'entityActions'
     >
   > = {};
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
@@ -173,6 +193,17 @@ export function decorateSharedResourceNode(
     // `CanvasResource` draws it disabled while the edit runs; withdrawn, it
     // also retains rather than running an Open or Close Edit.
     patch.onEditResource = () => 'retained';
+  }
+  const changeResourceShape = context.changeResourceShape;
+  if (
+    resourceBelongsToWorkingSpace &&
+    context.authorOnCanvas &&
+    changeResourceShape !== undefined &&
+    takesResourceShape(node.data.kind)
+  ) {
+    // Open and Closed alike (ADR 0120); every other kind is the rectangle.
+    patch.onResourceShapeChange = (resourceShape) =>
+      changeResourceShape(node.data.resourceId, resourceShape);
   }
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);

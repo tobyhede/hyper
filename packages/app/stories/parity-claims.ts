@@ -240,6 +240,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'An Ur Resource drawn in a Shape other than the rectangle rings its outline while selected, Open or Closed, rather than the bounding rect (ADR 0120).',
   },
   {
+    id: 'ur-resource-shape-chosen-from-its-rail',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'ResourceShapeChoice',
+    claim:
+      "An Ur Resource's rail draws its Shape as a control whose face is the Shape it is drawn in, named `Shape: <Shape>`; it opens the five Shapes as an uncaptioned radio list, each row the Shape's glyph and its name with the current one chosen, and choosing one redraws the Resource in it (ADR 0120).",
+  },
+  {
     id: 'image-resource-closed-front-draws-title-and-kind',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Front',

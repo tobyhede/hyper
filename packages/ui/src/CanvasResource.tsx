@@ -33,6 +33,7 @@ import {
 } from './SpaceResourceSelectors';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ResourceRail, ResourceRailKind } from './ResourceRail';
+import { ResourceShapeMenu } from './ResourceShapeMenu';
 import { Card, CardContent, CardTitle } from './components/card';
 import {
   AbandonEditIcon,
@@ -95,6 +96,11 @@ export type CanvasResourceFront =
       readonly kind: 'ur';
       /** An Ur Resource Opens through the shared Resource operation, and has nothing to edit. */
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
+      /**
+       * Draw this Resource in another Shape on its Map (ADR 0120), chosen from
+       * its rail Open and Closed alike. Absent where the Map may not be authored.
+       */
+      readonly onResourceShapeChange?: (resourceShape: ResourceShape) => void;
     }
   | {
       readonly kind: 'space';
@@ -423,6 +429,8 @@ export function CanvasResource(props: CanvasResourceProps) {
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
   const actionableEntityActions =
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
+  const onResourceShapeChange =
+    !readOnly && front.kind === 'ur' ? front.onResourceShapeChange : undefined;
   const [selectorNotice, setContextNotice] = useState<string | null>(null);
   const contextNotice = props.contextNotice ?? selectorNotice;
   const spaceSelection = spaceFront?.selection;
@@ -437,6 +445,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       portal !== undefined ||
       visibleContentEdit !== null ||
       onOpenChange !== undefined ||
+      onResourceShapeChange !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
   const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
@@ -563,6 +572,9 @@ export function CanvasResource(props: CanvasResourceProps) {
       )}
       {spaceRail}
       <ResourceRailKindActions kind={visualKind}>
+        {onResourceShapeChange !== undefined && (
+          <ResourceShapeMenu shape={drawnResourceShape} onChoose={onResourceShapeChange} />
+        )}
         {visibleContentEdit !== null ? (
           <ContentEditActions name={name} edit={visibleContentEdit} />
         ) : beginContentEdit !== undefined ? (

@@ -920,7 +920,6 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(await screen.findByRole('menu'), [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Shape'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -928,26 +927,16 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * Only an Ur Resource takes a Shape (ADR 0120), so the choice is its alone,
-   * Open and Closed alike.
+   * Only an Ur Resource takes a Shape (ADR 0120), chosen from its rail Open
+   * and Closed alike: the control's face is the Shape it is drawn in.
    */
-  it('offers an Open Ur Resource the Shape choice', async () => {
-    const session = mount(undefined, undefined, withUr);
-    await selectResource('Gateway');
-
-    expect(await screen.findByRole('button', { name: 'Close Resource Gateway' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource Gateway' }));
-    expect(await screen.findByRole('menuitem', { name: /^Shape/ })).toBeVisible();
-    await settled(session);
-  });
-
-  it('marks the rectangle chosen for an Ur Resource whose entry stores no Shape', async () => {
+  it('offers an Open Ur Resource its Shape on the rail, the rectangle where its entry stores none', async () => {
     expect(withUr.document.maps?.[0]?.positions[UR_ID]).not.toHaveProperty('shape');
     const session = mount(undefined, undefined, withUr);
     await selectResource('Gateway');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Gateway' }));
-    fireEvent.click(await screen.findByRole('menuitem', { name: /^Shape/ }));
+    expect(await screen.findByRole('button', { name: 'Close Resource Gateway' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Shape: Rectangle' }));
     const group = await screen.findByRole('group', { name: 'Shape' });
     expect(
       within(group)
@@ -958,7 +947,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     await settled(session);
   });
 
-  it('offers a Closed Ur Resource the Shape choice', async () => {
+  it('changes a Closed Ur Resource’s Shape from its rail in one Edit', async () => {
     const closed = spaceSnapshotSchema.parse({
       ...withUr,
       document: {
@@ -977,18 +966,25 @@ describe('a Resource’s commands on the canvas rail', () => {
     const session = mount(undefined, undefined, closed);
     await selectResource('Gateway');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Gateway' }));
-    expect(await screen.findByRole('menuitem', { name: /^Shape/ })).toBeVisible();
+    fireEvent.click(await screen.findByRole('button', { name: 'Shape: Diamond' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Hexagon' }));
+    await waitFor(() =>
+      expect(session.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape).toBe(
+        'hexagon',
+      ),
+    );
+    expect(await screen.findByRole('button', { name: 'Shape: Hexagon' })).toBeVisible();
     await settled(session);
   });
 
-  it('offers an Image Resource no Shape choice', async () => {
+  it('offers an Image Resource no Shape', async () => {
     const session = mount(undefined, undefined, withImage);
     await selectResource('Harbour');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Harbour' }));
-    await screen.findByRole('menuitem', { name: 'Create Reference' });
-    expect(screen.queryByRole('menuitem', { name: /^Shape/ })).toBeNull();
+    expect(
+      await screen.findByRole('button', { name: 'Actions for Resource Harbour' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Shape/ })).toBeNull();
     await settled(session);
   });
 

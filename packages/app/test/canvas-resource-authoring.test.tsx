@@ -134,10 +134,11 @@ interface HookProps {
 const mountAuthoring = (
   onBodyEditingChange?: (editing: boolean) => void,
   projectedKind: 'markdown' | 'reference' | 'space' | 'ur' = 'markdown',
+  reportsOutcomes = false,
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter, imageReplacement } = composeApp({
+  const { authoring, adapter, imageReplacement, commandOutcomes } = composeApp({
     images: unusedImageSources,
     spaceSession,
   });
@@ -175,12 +176,13 @@ const mountAuthoring = (
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
         onBodyEditingChange,
+        commandOutcomes: reportsOutcomes ? commandOutcomes : undefined,
       }),
     {
       initialProps,
     },
   );
-  return { ...hook, spaceSession, authoring, adapter };
+  return { ...hook, spaceSession, authoring, adapter, commandOutcomes };
 };
 
 const onlyNode = (nodes: readonly ResourceFlowNode[]): ResourceFlowNode => {
@@ -279,6 +281,36 @@ describe('canvas Resource authoring', () => {
 
     act(() => expect(ur.data.onEditResource?.(false)).toBe('completed'));
     expect(spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.open).toBe(false);
+  });
+
+  /**
+   * An Ur Resource's Shape is chosen on its rail (ADR 0120): one Edit on the
+   * Map, Open and Closed alike, offered only where a refusal can be reported.
+   */
+  it('changes an Ur Resource’s Shape on its Map, and offers no choice without command outcomes', () => {
+    const resourceShapeOf = (spaceSession: ReturnType<typeof mountAuthoring>['spaceSession']) =>
+      spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape;
+    const props = {
+      open: false,
+      enabled: true,
+      presenting: false,
+      nameOnCreation: null,
+      resourceId: UR_ID,
+    };
+
+    const silent = mountAuthoring(undefined, 'ur');
+    silent.rerender(props);
+    expect(onlyNode(silent.result.current.nodes).data.onResourceShapeChange).toBeUndefined();
+    silent.unmount();
+
+    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur', true);
+    rerender(props);
+    act(() => onlyNode(result.current.nodes).data.onResourceShapeChange?.('diamond'));
+    expect(resourceShapeOf(spaceSession)).toBe('diamond');
+
+    rerender({ ...props, open: true });
+    act(() => onlyNode(result.current.nodes).data.onResourceShapeChange?.('hexagon'));
+    expect(resourceShapeOf(spaceSession)).toBe('hexagon');
   });
 
   /**

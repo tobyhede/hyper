@@ -1,4 +1,10 @@
-import { confirmDeletion, resourceControls, resourceToolbar, selectResource } from './graph';
+import {
+  confirmDeletion,
+  resourceControls,
+  resourceShapeChoice,
+  resourceToolbar,
+  selectResource,
+} from './graph';
 import {
   beginPortalEdit,
   embeddedGraphEdgeCount,
@@ -767,7 +773,7 @@ test(
 
 /**
  * A drawn Map draws its Ur Resources' Shapes, Open and Closed alike, and,
- * while it may be authored, offers the Shape choice on them alone (ADR 0120,
+ * while it may be authored, offers the Shape choice on their rails alone (ADR 0120,
  * ADR 0112). The choice writes the target Space's Map, so the target draws it
  * when entered; a Reference Resource to the Space Resource draws the same Map
  * read-only, with the Shape and no commands.
@@ -788,10 +794,10 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
   await expect(
     page.getByRole('menu').last().getByRole('menuitem', { name: 'Remove from Map' }),
   ).toBeVisible();
-  await expect(page.getByRole('menu').last().getByRole('menuitem', { name: 'Shape' })).toHaveCount(
-    0,
-  );
   await page.keyboard.press('Escape');
+  await expect(
+    (await resourceControls(page, markdown)).getByRole('button', { name: /^Shape: / }),
+  ).toHaveCount(0);
   await (
     await resourceToolbar(page, parent)
   )
@@ -819,13 +825,8 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
   });
   await expect(embedded).toHaveCount(1);
   await (
-    await resourceControls(page, embedded)
+    await resourceShapeChoice(page, embedded)
   )
-    .getByRole('button', { name: 'Actions for Resource Step' })
-    .click({ delay: 120 });
-  await page.getByRole('menu').last().getByRole('menuitem', { name: 'Shape' }).click();
-  await page
-    .getByRole('group', { name: 'Shape' })
     .getByRole('menuitemradio', { name: 'Diamond' })
     .click();
   await expect(embedded.locator('.canvas-resource')).toHaveAttribute(

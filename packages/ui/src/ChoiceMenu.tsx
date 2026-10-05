@@ -28,7 +28,13 @@ export type ChoiceMenuSide = 'top' | 'right' | 'bottom' | 'left';
 
 export interface ChoiceMenuProps<Id extends string> {
   /** What the set is, captioning the list: `Maps`, `Graphs in Collection 1`. */
-  readonly label: ReactNode;
+  readonly label: string;
+  /**
+   * Whether the list draws `label` as its caption. Uncaptioned, `label` still
+   * names the list to assistive technology — for a set whose trigger already
+   * says what it is, as an Ur Resource's Shape control does.
+   */
+  readonly captioned?: boolean;
   readonly choices: readonly ChoiceMenuChoice<Id>[];
   /** The chosen member, or `null` where the caller has chosen none. */
   readonly chosen: Id | null;
@@ -74,7 +80,7 @@ export interface ChoiceMenuProps<Id extends string> {
 /** What a {@link ChoiceMenu} and a {@link ChoiceSubmenu} draw alike: the set and its commands. */
 type ChoiceListProps<Id extends string> = Pick<
   ChoiceMenuProps<Id>,
-  'label' | 'choices' | 'chosen' | 'onChoose' | 'children'
+  'label' | 'captioned' | 'choices' | 'chosen' | 'onChoose' | 'children'
 >;
 
 /**
@@ -103,6 +109,7 @@ type ChoiceListProps<Id extends string> = Pick<
  */
 export function ChoiceMenu<Id extends string>({
   label,
+  captioned = true,
   choices,
   chosen,
   onChoose,
@@ -127,7 +134,13 @@ export function ChoiceMenu<Id extends string>({
         className={className}
         finalFocus={restoresFocusOnClose}
       >
-        <ChoiceList<Id> label={label} choices={choices} chosen={chosen} onChoose={onChoose}>
+        <ChoiceList<Id>
+          label={label}
+          captioned={captioned}
+          choices={choices}
+          chosen={chosen}
+          onChoose={onChoose}
+        >
           {children}
         </ChoiceList>
       </DropdownMenuContent>
@@ -166,6 +179,7 @@ export function ChoiceSubmenu<Id extends string>({
 /** The labelled radio group of the set, and the caller's commands below a rule. */
 function ChoiceList<Id extends string>({
   label,
+  captioned = true,
   choices,
   chosen,
   onChoose,
@@ -174,6 +188,7 @@ function ChoiceList<Id extends string>({
   return (
     <>
       <DropdownMenuRadioGroup<Id | null>
+        aria-label={captioned ? undefined : label}
         value={chosen}
         onValueChange={(next) => {
           // Base UI spells an empty controlled selection `null`, and no
@@ -182,7 +197,7 @@ function ChoiceList<Id extends string>({
           if (next !== null) onChoose(next);
         }}
       >
-        <DropdownMenuLabel>{label}</DropdownMenuLabel>
+        {captioned && <DropdownMenuLabel>{label}</DropdownMenuLabel>}
         {choices.map((choice) => (
           <DropdownMenuRadioItem<Id | null>
             key={choice.id}

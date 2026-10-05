@@ -756,3 +756,54 @@ test(
     }
   },
 );
+
+/**
+ * An Ur Resource's Shape is chosen from its rail (ADR 0120): the control's face
+ * is the Shape it is drawn in, and the list draws each Shape beside its name,
+ * uncaptioned, with the current one chosen.
+ */
+test(
+  "an Ur Resource's Shape is chosen from its rail, drawn as the Shape it is",
+  { tag: '@parity:ur-resource-shape-chosen-from-its-rail' },
+  async ({ page }) => {
+    await page.goto('/?story=components--resource--resource-shape-choice&mode=preview');
+    const resource = page.getByRole('article', { name: 'Decide' });
+    await expect(resource).toHaveAttribute('data-resource-shape', 'rectangle');
+
+    const face = page.getByRole('button', { name: 'Shape: Rectangle' });
+    await expect(face.locator('svg[data-resource-shape]')).toHaveAttribute(
+      'data-resource-shape',
+      'rectangle',
+    );
+    await face.click();
+    const resourceShapes = page.getByRole('group', { name: 'Shape' });
+    await expect(resourceShapes.getByRole('menuitemradio')).toHaveText([
+      'Rectangle',
+      'Pill',
+      'Ellipse',
+      'Diamond',
+      'Hexagon',
+    ]);
+    for (const [index, resourceShape] of RESOURCE_SHAPES.entries()) {
+      await expect(
+        resourceShapes.getByRole('menuitemradio').nth(index).locator('svg[data-resource-shape]'),
+      ).toHaveAttribute('data-resource-shape', resourceShape);
+    }
+    await expect(resourceShapes).not.toContainText('Shape');
+    await expect(resourceShapes.getByRole('menuitemradio', { checked: true })).toHaveText(
+      'Rectangle',
+    );
+
+    await resourceShapes.getByRole('menuitemradio', { name: 'Diamond' }).click();
+    await expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+    await expect(page.getByRole('button', { name: 'Shape: Diamond' })).toBeVisible();
+    await expect(resourceShapes).toHaveCount(0);
+
+    // The keyboard reaches it too, as any menu button.
+    await page.getByRole('button', { name: 'Shape: Diamond' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('group', { name: 'Shape' }).getByRole('menuitemradio', { checked: true }),
+    ).toHaveText('Diamond');
+  },
+);

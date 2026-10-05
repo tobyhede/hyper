@@ -277,6 +277,46 @@ describe('an Ur Resource’s decoration', () => {
     expect(patch.onBeginBodyEditing).toBeUndefined();
   });
 
+  /** Only an Ur Resource takes a Shape (ADR 0120), Open and Closed alike. */
+  it('offers the Shape choice where the Map may be authored, and on an Ur Resource alone', () => {
+    const changeResourceShape = vi.fn();
+    for (const open of [false, true]) {
+      const patch = decorateSharedResourceNode(
+        projectionNode(UR_ID, 'ur', open),
+        context({ changeResourceShape }),
+      );
+      patch.onResourceShapeChange?.('hexagon');
+    }
+    expect(changeResourceShape.mock.calls).toEqual([
+      [UR_ID, 'hexagon'],
+      [UR_ID, 'hexagon'],
+    ]);
+
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(UR_ID, 'ur'),
+        context({ changeResourceShape, authorOnCanvas: false }),
+      ).onResourceShapeChange,
+    ).toBeUndefined();
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(UR_ID, 'ur'),
+        context({ changeResourceShape, editableResourceIds: new Set() }),
+      ).onResourceShapeChange,
+    ).toBeUndefined();
+    expect(
+      decorateSharedResourceNode(projectionNode(UR_ID, 'ur'), context()).onResourceShapeChange,
+    ).toBeUndefined();
+    for (const kind of ['markdown', 'reference', 'space'] as const) {
+      expect(
+        decorateSharedResourceNode(
+          projectionNode(RESOURCE_ID, kind),
+          context({ changeResourceShape }),
+        ).onResourceShapeChange,
+      ).toBeUndefined();
+    }
+  });
+
   it('is given no editor, replacer or rail, although its caret is live', () => {
     const ur = projectionNode(UR_ID, 'ur', true);
     const live = context({

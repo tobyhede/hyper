@@ -2481,3 +2481,113 @@ describe('the Title a Shape draws', () => {
     expect(screen.getByRole('textbox', { name: 'Resource title' })).toHaveValue(title);
   });
 });
+
+/*
+ * An Ur Resource's Shape is chosen from its rail (ADR 0120): one control whose
+ * face is the Shape it is drawn in, opening the five Shapes as a radio list.
+ */
+describe('choosing an Ur Resource’s Shape from its rail', () => {
+  const props = {
+    state: 'selected' as const,
+    title: 'Decide',
+    graphColor: '#ffc53d',
+  };
+  const trigger = (name: string) => screen.getByRole('button', { name });
+  const checked = () =>
+    screen
+      .getAllByRole('menuitemradio')
+      .filter((item) => item.getAttribute('aria-checked') === 'true')
+      .map((item) => item.textContent);
+
+  it('draws the current Shape on the rail, Open and Closed alike', () => {
+    for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+      const { unmount } = render(
+        <CanvasResource
+          {...props}
+          front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
+          shape="hexagon"
+          display={display}
+        />,
+      );
+      const face = trigger('Shape: Hexagon');
+      expect(face.querySelector('svg[data-resource-shape="hexagon"]')).not.toBeNull();
+      unmount();
+    }
+  });
+
+  it('names the rectangle for a front given no Shape', () => {
+    render(
+      <CanvasResource
+        {...props}
+        front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    expect(trigger('Shape: Rectangle')).toBeVisible();
+  });
+
+  it('lists the five Shapes, each drawn and named, with the current one chosen and no caption', async () => {
+    render(
+      <CanvasResource
+        {...props}
+        front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
+        shape="diamond"
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    fireEvent.click(trigger('Shape: Diamond'));
+    const list = await screen.findByRole('group', { name: 'Shape' });
+    const items = screen.getAllByRole('menuitemradio');
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Rectangle',
+      'Pill',
+      'Ellipse',
+      'Diamond',
+      'Hexagon',
+    ]);
+    expect(
+      items.map((item) =>
+        item.querySelector('svg[data-resource-shape]')?.getAttribute('data-resource-shape'),
+      ),
+    ).toEqual(['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon']);
+    expect(checked()).toEqual(['Diamond']);
+    expect(list).not.toHaveTextContent(/^Shape/u);
+  });
+
+  it('runs the chosen Shape', async () => {
+    const onResourceShapeChange = vi.fn();
+    render(
+      <CanvasResource
+        {...props}
+        front={{ kind: 'ur', onResourceShapeChange }}
+        shape="rectangle"
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    fireEvent.click(trigger('Shape: Rectangle'));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Pill' }));
+    expect(onResourceShapeChange).toHaveBeenCalledWith('pill');
+    expect(onResourceShapeChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no Shape where it cannot be changed, or is read-only', () => {
+    const { rerender } = render(
+      <CanvasResource
+        {...props}
+        front={{ kind: 'ur', onOpenChange: () => 'completed' }}
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
+
+    rerender(
+      <CanvasResource
+        {...props}
+        readOnly
+        front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
+  });
+});

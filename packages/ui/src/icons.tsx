@@ -23,7 +23,6 @@ import {
   Plus,
   Route,
   Search,
-  Diamond,
   Square,
   StickyNote,
   Trash2,
@@ -31,7 +30,8 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
-import type { Resource } from '@project/core';
+import type { Resource, ResourceShape } from '@project/core';
+import { resourceShapeOutline } from './resource-shape-outline';
 
 type ResourceActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
@@ -385,10 +385,50 @@ export const HideTitleIcon = (props: ResourceActionIconProps) => <EyeOff size={1
 /** Remove the entity the surrounding command names. */
 export const DeleteIcon = (props: ResourceActionIconProps) => <Trash2 size={14} {...props} />;
 
-/** Choose the Shape a Resource is drawn in on this Map. */
-export const ResourceShapeIcon = (props: ResourceActionIconProps) => (
-  <Diamond size={14} {...props} />
-);
+/** The box a Shape glyph is drawn in: landscape, as the Closed Size is, inside Lucide's 24-unit grid. */
+const RESOURCE_SHAPE_GLYPH_BOX = { x: 2, y: 6, width: 20, height: 12 } as const;
+
+export interface ResourceShapeIconProps {
+  readonly shape: ResourceShape;
+  readonly size?: number;
+}
+
+/**
+ * A Shape, drawn as the glyph that names it.
+ *
+ * Lucide has no ellipse or capsule, so every Shape is drawn from the outline
+ * the canvas draws it in (`resourceShapeOutline`), answered for the glyph's own
+ * box and stroked at Lucide's weight — the glyph is the Shape, not a picture of
+ * one. Decorative: the control or row it sits in names the Shape.
+ */
+export function ResourceShapeIcon({ shape: resourceShape, size = 14 }: ResourceShapeIconProps) {
+  const { x, y, width, height } = RESOURCE_SHAPE_GLYPH_BOX;
+  const outline = resourceShapeOutline(resourceShape, { width, height });
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      data-resource-shape={resourceShape}
+    >
+      {outline.kind === 'polygon' ? (
+        <polygon
+          points={outline.points.map((point) => `${point.x + x},${point.y + y}`).join(' ')}
+        />
+      ) : (
+        <rect x={x} y={y} width={width} height={height} rx={outline.rx} ry={outline.ry} />
+      )}
+    </svg>
+  );
+}
 
 /** Remove a Resource from this Map while it stays in the Space. */
 export const RemoveFromMapIcon = (props: ResourceActionIconProps) => (

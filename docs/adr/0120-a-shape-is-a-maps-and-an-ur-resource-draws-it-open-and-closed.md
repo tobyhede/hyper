@@ -10,7 +10,7 @@ A Resource on a Map has a **Shape**: the outline its front is drawn in, Open or 
 
 **The Shape is the Map's.** It is stored in the Map's entry for the Resource, beside position, Open/Closed state and Open Size. It is not stored on the Resource. A Shape is notation, and notation belongs to the diagram. The same Resource can be a decision in one Map and a step in another. A Resource is a Title and a kind, and the kind owns everything else. A presentation field on the Resource would be the shared second slot the model rules out.
 
-**Only an Ur Resource takes a Shape.** A Shape is diagram notation, and the Ur Resource is the kind a diagram is drawn with: it has no content, so its outline is all a reader sees of it. A Markdown document, a picture or an embedded Map in a hexagon is notation nobody needs, and offering it would clutter every Resource's Actions menu. Every other kind is the rectangle. A Shape is the Ur kind's, so ADR 0113's rule that a kind adds what its content supports and takes nothing away from the others is unaffected. A Shape Edit on any other kind is refused, and intake refuses a stored Map entry giving any other kind a Shape but the rectangle.
+**Only an Ur Resource takes a Shape.** A Shape is diagram notation, and the Ur Resource is the kind a diagram is drawn with: it has no content, so its outline is all a reader sees of it. A Markdown document, a picture or an embedded Map in a hexagon is notation nobody needs, and offering it would clutter every Resource's rail. Every other kind is the rectangle. A Shape is the Ur kind's, so ADR 0113's rule that a kind adds what its content supports and takes nothing away from the others is unaffected. A Shape Edit on any other kind is refused, and intake refuses a stored Map entry giving any other kind a Shape but the rectangle.
 
 **The Shape is optional, and the application's default is the rectangle.** An entry with no Shape stored draws as the rectangle, as a Graph with no head shape stored draws the arrow (ADR 0105). Add Resource and Add to Map write no Shape, so every entry that never had one chosen, and every tracked fixture and seed, stays as it was. Choosing a Shape writes the one chosen, the rectangle included, and choosing the Shape the Resource already draws as changes nothing. `rectangle` is a legal stored value on every kind. Remove from Map forgets the Shape along with the rest of the entry.
 
@@ -18,14 +18,14 @@ A Resource on a Map has a **Shape**: the outline its front is drawn in, Open or 
 
 **A Shape is drawn Open and Closed alike.** Open/Closed is the Map's, and it has nothing to do with the Shape: an author who Opens a diamond to make it bigger gets a bigger diamond, and Close returns it to the diamond at the Closed Size. Only an Ur Resource takes a Shape, and an Ur Resource has no content, so nothing an Open Resource reads is ever drawn inside an outline. The resize control stays at the rect's bottom-right corner. A presented Resource is drawn by the presented surface, not on the Map, and is always the rectangle.
 
-**The author changes it through a Shape choice in the Resource's Actions menu**, drawn with `ChoiceMenu`. Each choice is one Edit. The choice is offered Open and Closed, so the menu doesn't change between states.
+**The author changes it through a Shape choice on the Resource's rail**, drawn with `ChoiceMenu`: a control whose face is the Shape the Resource is drawn in, opening the five Shapes, each drawn and named. Each choice is one Edit. The choice is offered Open and Closed, so the rail doesn't change between states.
 
 An embedded Map draws its Ur Resources' Shapes, Open or Closed, because one surface draws every Map (ADR 0112).
 
 ## Considered options
 
 - **The Shape belongs to the Resource.** It would look the same in every Map. Rejected: notation is the diagram's, and a field on the Resource would add the shared slot the model rules out.
-- **Every kind may take any Shape.** Rejected: a Markdown, Image, Space or Reference Resource in a Shape is notation nobody needs, and the choice would clutter every Resource's menu.
+- **Every kind may take any Shape.** Rejected: a Markdown, Image, Space or Reference Resource in a Shape is notation nobody needs, and the choice would clutter every Resource's rail.
 - **A Shape fixed by kind.** Rejected: an Ur Resource is a decision in one diagram and a step in another, so its Shape is chosen per Map rather than given by its kind.
 - **A Shape changes the Closed Size**, for example a square for a circle. Rejected: displacement, Edge attachment and the fixed Closed Size would all have to depend on the Shape, for a difference an ellipse in the same rect already shows.
 - **Only a Closed Resource draws its Shape.** Rejected: a diagram could not hold a large diamond, an ellipse sized to its label or a pill stretched across a lane, and Opening would change the notation. The reason first given for it — that content needs the rectangle — no longer applies once only the contentless Ur Resource takes a Shape.
