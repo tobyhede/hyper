@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0113
-Related: 0051, 0054, 0056, 0070, 0074, 0106, 0107, 0109
+Related: 0051, 0054, 0056, 0070, 0074, 0106, 0107, 0109, 0114
 
 A Resource kind is a behaviour: it says what a Resource's content is, how it is stored, resolved, drawn and created, and which actions it adds (ADR 0113). A media type is the format of content. They are different things, so `kind` never holds a media type. A built-in id may share a word with one, as `image` and `markdown` do, without being one. A kind whose content has a format declares the media types it can hold and be created from, and creating a Resource from data an author brings — a dropped or pasted file, a picked file — chooses the kind by that data's media type, `type/*` wildcards included.
 

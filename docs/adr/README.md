@@ -57,7 +57,7 @@ under `superseded/`.
 | [0118](0118-an-aggregate-directory-carries-stored-image-bytes.md) | An Aggregate directory carries the bytes of every stored image the aggregate references in `images/<content-id>.<ext>`; Export rewrites `images/` whole and Import admits it before storing the aggregate, on every store (amends 0106). |
 | [0113](0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md) | Every capability is a Resource's, and a kind only adds actions; Reference is the terminal exception. An Ur Resource has no content and no Edit. A self-targeting Reference Resource was rejected. |
 | [0114](0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md) | First Open Size, resize floor, Map embedding and content area are decided from resolved content, so a Reference Resource takes its Target's; its kind withholds only content actions. |
-| [0114](0114-a-kind-is-a-behaviour-and-a-media-type-is-its-contents-format.md) | A kind is a behaviour and a media type is its content's format; `kind` never holds a media type. Content kinds are modules registered at composition, built in today with namespaced ids so runtime kinds stay possible. Reference and Space stay the domain's. |
+| [0120](0120-a-kind-is-a-behaviour-and-a-media-type-is-its-contents-format.md) | A kind is a behaviour and a media type is its content's format; `kind` never holds a media type. Content kinds are modules registered at composition, built in today with namespaced ids so runtime kinds stay possible. Reference and Space stay the domain's. |
 
 ## Layout, View and Graph
 

@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0051
-Refined by: 0114
+Refined by: 0120
 Related: 0009, 0064, 0070, 0089, 0101, 0106
 
 Every capability belongs to Resource, not to a kind. Every Resource is titled, placed, connected, Opened and Closed, resized, presented and referenced alike. A kind adds only the actions its content supports, and a difference in what Resources *can* do is tied to their kind and to nothing else. This governs capability, not availability: whether a capability is available at a given moment may still depend on interaction state (Close is disabled while content editing is live, ADR 0064), and structural invariants still refuse Edits that would break them (an Edge needs both its Resources on the Map). Those apply to every kind alike. ADR 0051 gave a kind everything beyond the Title. This ADR states the converse: a kind takes nothing away.
