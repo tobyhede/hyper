@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] The memory repository lives in production source and no longer in test support
-- [ ] It passes the shared `SpaceRepository` contract from its new home
-- [ ] The E2E memory runtime, its subclass and the fixture importer import it from there and behave as before
+- [x] The memory repository lives in production source and no longer in test support
+- [x] It passes the shared `SpaceRepository` contract from its new home
+- [x] The E2E memory runtime, its subclass and the fixture importer import it from there and behave as before
 - [ ] `pnpm typecheck`, `pnpm typecheck:packages`, eslint on touched files and the affected unit tests pass locally; the draft PR's `CI passed` is green

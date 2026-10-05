@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] The quick start uses only commands that exist, and was run as written on a fresh temp directory
-- [ ] "How Running works" says: content lives in its own git repo at any path; Hyper writes the working tree on every edit; git is your undo, including for a pull mid-run or two runs on one directory; a crash before a write is the one accepted loss; a `*.md` beside `space.json` is removed by Export; pictures are written to `images/`
-- [ ] "Using Hyper with agents" names the two skills from ticket 05
-- [ ] "Developing Hyper" keeps every contributor instruction the current README has
-- [ ] `docs/aggregate-directory.md` holds the moved format reference, including `images/`
-- [ ] No retired vocabulary (`CONTEXT.md` _Avoid_ lists); `prettier --check` passes on the changed files
+- [x] The quick start uses only commands that exist, and was run as written on a fresh temp directory
+- [x] "How Running works" says: content lives in its own git repo at any path; Hyper writes the working tree on every edit; git is your undo, including for a pull mid-run or two runs on one directory; a crash before a write is the one accepted loss; a `*.md` beside `space.json` is removed by Export; pictures are written to `images/`
+- [x] "Using Hyper with agents" names the two skills from ticket 05
+- [x] "Developing Hyper" keeps every contributor instruction the current README has
+- [x] `docs/aggregate-directory.md` holds the moved format reference, including `images/`
+- [x] No retired vocabulary (`CONTEXT.md` _Avoid_ lists); `prettier --check` passes on the changed files
