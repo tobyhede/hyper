@@ -116,25 +116,17 @@ function fromMap(m: Map): Placement {
 }
 
 /**
- * The placement a laid-out strategy graph describes over the Map it arranged —
- * `positionedStrategy` run backwards.
+ * The placement a laid-out strategy graph describes — `positionedStrategy`
+ * run backwards.
  *
- * An arrangement moves positions and nothing else: each Resource `authored`
- * holds keeps its Open/Closed state, Open Size and Shape (ADR 0086, ADR 0117),
- * and a Resource it does not hold joins Closed with the rectangle. A resource
- * the strategy left unplaced is omitted rather than defaulted, because
+ * A resource the strategy left unplaced is omitted rather than defaulted, because
  * collapsing that to `(0, 0)` would assert a placement no strategy made.
  */
-function fromLayoutStrategyGraph(
-  strategyGraph: LayoutStrategyGraph,
-  authored: Placement,
-): Placement {
+function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement {
   const positions = new Map<ResourceId, ResourcePlacement>();
   for (const resource of strategyGraph.resources) {
     if (resource.x === undefined || resource.y === undefined) continue;
-    const entry = authored.get(resource.id);
-    const moved = { x: resource.x, y: resource.y };
-    positions.set(resource.id, point(entry === undefined ? moved : { ...entry, ...moved }));
+    positions.set(resource.id, point({ x: resource.x, y: resource.y }));
   }
   return brand(positions);
 }

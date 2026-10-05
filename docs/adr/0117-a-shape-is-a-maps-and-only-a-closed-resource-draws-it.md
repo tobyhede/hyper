@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0113
-Related: 0064, 0066, 0084, 0086, 0093, 0110, 0112, 0114
+Related: 0064, 0066, 0084, 0093, 0110, 0112, 0114
 
 ADR 0113 gave the author the Ur Resource so they can diagram: draw named things and the Edges between them. A diagram also needs notation. A decision reads as a diamond and a start or end reads as a pill, so a Resource needs a way to be drawn in something other than the rectangle every front has now.
 
@@ -14,13 +14,13 @@ A Resource on a Map has a **Shape**: the outline its Closed front is drawn in. T
 
 **The Shape is required, and a Resource added to a Map is given the rectangle.** Add Resource and Add to Map write the rectangle, as a new Graph is given the arrow head shape. There is no rule that reads a missing Shape as a rectangle. The schema and fixtures roll forward in the same change (ADR 0054, ADR 0056). Remove from Map forgets the Shape along with the rest of the entry.
 
-**The Shape is drawn inside the fixed Closed Size and changes no rect.** Every Closed Resource keeps the same Closed Size. Displacement (ADR 0084, ADR 0093) and Edge attachment (ADR 0110) read the rect and are unchanged. That is why the set is closed. Every member touches the midpoint of each side of its bounding rect, where Edges attach, so an Edge meets the drawn outline. A triangle, parallelogram, cylinder or cloud would not, and is excluded. The Title Lines and kind glyph sit in the rectangle inscribed in the Shape and are truncated as they are now. The selection ring and a Reference Resource's dotted border follow the outline.
+**The Shape is drawn inside the fixed Closed Size and changes no rect.** Every Closed Resource keeps the same Closed Size. Displacement (ADR 0084, ADR 0093) and Edge attachment (ADR 0110) read the rect and are unchanged. That is why the set is closed. Every member touches the midpoint of each side of its bounding rect, where Edges attach, so an Edge meets the drawn outline. A triangle, parallelogram, cylinder or cloud would not, and is excluded. The kind glyph and Title sit in the rectangle inscribed in the Shape, and a Shape other than the rectangle shows the short Title: the name on one line, with an ellipsis when more Title Lines follow. The selection ring and a Reference Resource's dotted border follow the outline.
 
 **Only a Closed Resource draws its Shape.** An Open Resource and a presented Resource are always rectangles. They are read, not diagrammed, and an Open Markdown body or image inside a diamond would lose its corners and its resize control. The Shape stays recorded while the Resource is Open and returns when it Closes.
 
 **The author changes it through a Shape choice in the Resource's Actions menu**, drawn with `ChoiceMenu`. Each choice is one Edit. The choice is offered while the Resource is Open too, so the menu doesn't change between states.
 
-An embedded Map draws its Resources' Shapes, because one surface draws every Map (ADR 0112). An automatic arrangement (ADR 0086) moves positions and keeps every Shape. Whether a strategy may assign Shapes is a separate, later decision.
+An embedded Map draws its Resources' Shapes, because one surface draws every Map (ADR 0112).
 
 ## Considered options
 

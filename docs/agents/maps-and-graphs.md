@@ -109,7 +109,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R47. The Shape is required, and a Resource added to a Map is given the rectangle.** Add Resource and Add to Map write it; no rule reads a missing Shape as the rectangle (A23). Every other Edit that rewrites an entry keeps it. Remove from Map forgets it with the rest of the entry. Choosing the Shape a Resource already has is `unchanged`. ([0117])
 - **R48. A Shape changes no rect.** It is drawn inside the fixed Closed Size, so displacement (R38–R41) and Edge attachment are unchanged. Every Shape in the set touches the midpoint of each side of its bounding rect, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title and kind glyph lay out in the rectangle inscribed in the Shape, and a Closed Resource in a Shape other than the rectangle shows its short Title: its name on one line, with an ellipsis when more Title Lines follow. The selection ring and a Reference Resource's dotted border follow the outline. ([0117], [0110])
 - **R49. Only a Closed Resource draws its Shape.** An Open, editing or presented Resource is drawn as a rectangle whatever its Shape, and the Shape returns on Close. The Shape choice is offered while Open as well, so the menu does not change between states. ([0117], [0064])
-- **R50. An embedded Map draws its Resources' Shapes, and an automatic arrangement keeps every Shape.** Whether a strategy may assign Shapes is a separate, later decision. ([0117], [0112], [0086])
+- **R50. An embedded Map draws its Resources' Shapes**, because one surface draws every Map. ([0117], [0112])
 
 ## Rejected alternatives
 
@@ -192,7 +192,7 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R45, R47, R49 | §7 | [0117] (R49 also [0064]) |
 | R46 | §7 | [0117], [0113] |
 | R48 | §7 | [0117], [0110] |
-| R50 | §7 | [0117], [0112], [0086] |
+| R50 | §7 | [0117], [0112] |
 | A1–A23 | Rejected alternatives | Cited in each row |
 | D12 | §6, Undo | [0086], [0084], [0048], [0074] |
 

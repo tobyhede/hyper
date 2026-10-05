@@ -45,7 +45,9 @@ Format: a title that states the decision as a sentence, a status block, then a f
 
 ## ADRs are append-only
 
-An accepted ADR is **immutable**. It records why a decision looked right *at the time, with what was known then* — not what the design is now. That is why the log is worth keeping: the wrong turns are the most instructive part of it. The "overlaying routes turns to spaghetti" rule was believed and acted on for a while before measurement disproved it; a tidied document would show only the correction.
+An ADR becomes a historical record when it merges to `main`. Until then it is a draft on its branch, whatever its status line says: when it is wrong, fix it in place, and fix the contract and `CONTEXT.md` with it.
+
+A merged, accepted ADR is **immutable**. It records why a decision looked right *at the time, with what was known then* — not what the design is now. That is why the log is worth keeping: the wrong turns are the most instructive part of it. The "overlaying routes turns to spaghetti" rule was believed and acted on for a while before measurement disproved it; a tidied document would show only the correction.
 
 So: **never merge, rewrite or consolidate ADRs.** When a decision changes, write a new one and amend the old one's status line — that line is the only edit an accepted ADR ever receives. The current statement of a topic lives in its current contract (below), never in a rewritten ADR.
 

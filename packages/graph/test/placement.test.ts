@@ -1,8 +1,8 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { COLLAPSED_RESOURCE_SIZE, RESOURCE_SHAPES } from '@project/core';
+import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
 import type { ResourceId, ResourcePlacement, Map } from '@project/core';
-import { gridStrategy, Placement, positionedStrategy } from '../src/index';
+import { Placement, positionedStrategy } from '../src/index';
 import type { LayoutStrategyResource, LayoutStrategyGraph } from '../src/index';
 import { uuid } from './resource-files';
 
@@ -68,89 +68,51 @@ describe('Placement.fromMap', () => {
 
 describe('Placement.fromLayoutStrategyGraph', () => {
   it('reads back what a strategy placed', async () => {
-    const authored = at({
-      '00000000-0000-4000-8000-000000000002': [10, 20],
-      '00000000-0000-4000-8000-000000000003': [300, 20],
-      '00000000-0000-4000-8000-000000000005': [600, 20],
-    });
-    const laid = await positionedStrategy(authored)(graph);
+    const laid = await positionedStrategy(
+      at({
+        '00000000-0000-4000-8000-000000000002': [10, 20],
+        '00000000-0000-4000-8000-000000000003': [300, 20],
+        '00000000-0000-4000-8000-000000000005': [600, 20],
+      }),
+    )(graph);
 
-    expect(asObject(Placement.fromLayoutStrategyGraph(laid, authored))).toEqual({
+    expect(asObject(Placement.fromLayoutStrategyGraph(laid))).toEqual({
       [RESOURCE_A]: { x: 10, y: 20, open: false, shape: 'rectangle' },
       [RESOURCE_B]: { x: 300, y: 20, open: false, shape: 'rectangle' },
       [RESOURCE_C]: { x: 600, y: 20, open: false, shape: 'rectangle' },
     });
   });
 
-  // An arrangement moves positions and nothing else (ADR 0086, ADR 0117): each
-  // Resource keeps its Shape, its Open/Closed state and its Open Size.
-  it('moves every entry and keeps its Shape, Open state and Open Size', async () => {
+  it('carries no Open state across, which is why only a View may be converted', async () => {
     const authored = Placement.fromEntries([
       [
         RESOURCE_A,
-        { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 }, shape: 'diamond' },
+        { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 }, shape: 'rectangle' },
       ],
-      [
-        RESOURCE_B,
-        { x: 300, y: 0, open: false, openSize: { width: 400, height: 300 }, shape: 'pill' },
-      ],
-      [RESOURCE_C, { x: 600, y: 0, open: false, shape: 'hexagon' }],
+      [RESOURCE_B, { x: 300, y: 0, open: false, shape: 'rectangle' }],
     ]);
-    const laid = await gridStrategy({ columns: 1 })(graph);
+    const laid = await positionedStrategy(authored)({
+      resources: resourcesOf(RESOURCE_A, RESOURCE_B),
+      edges: [],
+    });
 
-    const arranged = Placement.fromLayoutStrategyGraph(laid, authored);
+    const converted = Placement.fromLayoutStrategyGraph(laid);
 
-    for (const resource of laid.resources) {
-      const before = authored.get(resource.id);
-      expect(arranged.get(resource.id)).toEqual({ ...before, x: resource.x, y: resource.y });
-    }
-    expect([...arranged.keys()].sort()).toEqual([...authored.keys()].sort());
-  });
-
-  it('keeps every Shape through an arrangement', async () => {
-    await fc.assert(
-      fc.asyncProperty(
-        fc.tuple(
-          fc.constantFrom(...RESOURCE_SHAPES),
-          fc.constantFrom(...RESOURCE_SHAPES),
-          fc.constantFrom(...RESOURCE_SHAPES),
-        ),
-        fc.integer({ min: 1, max: 3 }),
-        async (resourceShapes, columns) => {
-          const authored = Placement.fromEntries(
-            [RESOURCE_A, RESOURCE_B, RESOURCE_C].map((id, index) => [
-              id,
-              { x: index * 300, y: 0, open: false, shape: resourceShapes[index] ?? 'rectangle' },
-            ]),
-          );
-          const arranged = Placement.fromLayoutStrategyGraph(
-            await gridStrategy({ columns })(graph),
-            authored,
-          );
-          for (const [id, entry] of authored) {
-            expect(arranged.get(id)?.shape).toBe(entry.shape);
-          }
-        },
-      ),
-    );
-  });
-
-  it('gives a Resource the strategy placed outside the Map the rectangle, Closed', async () => {
-    const laid = await gridStrategy({ columns: 1 })(graph);
-    const arranged = Placement.fromLayoutStrategyGraph(laid, Placement.empty());
-    expect([...arranged.values()].every((entry) => !entry.open)).toBe(true);
-    expect([...arranged.values()].every((entry) => entry.shape === 'rectangle')).toBe(true);
+    // Nothing comes back Open: `fromLayoutStrategyGraph` authors from an
+    // empty Placement, where nothing is. A's remembered Open Size is dropped,
+    // and nothing in a laid-out graph can bring it back.
+    expect([...converted.values()].every((at) => !at.open)).toBe(true);
+    // B's coordinate is untouched, because A being Open does not move it at
+    // render time: the Edit that opened A did (ADR 0084).
+    expect(converted.get(RESOURCE_B)).toEqual({ x: 300, y: 0, open: false, shape: 'rectangle' });
   });
 
   it('omits a resource no strategy placed, rather than calling it the origin', () => {
     expect([
-      ...Placement.fromLayoutStrategyGraph(
-        {
-          resources: resourcesOf(RESOURCE_A, RESOURCE_B),
-          edges: [],
-        },
-        Placement.empty(),
-      ).keys(),
+      ...Placement.fromLayoutStrategyGraph({
+        resources: resourcesOf(RESOURCE_A, RESOURCE_B),
+        edges: [],
+      }).keys(),
     ]).toEqual([]);
   });
 });
@@ -865,9 +827,7 @@ describe('Placement properties', () => {
           resources: resourcesOf(...ids),
           edges: [],
         });
-        const replayed = await positionedStrategy(
-          Placement.fromLayoutStrategyGraph(laid, positions),
-        )({
+        const replayed = await positionedStrategy(Placement.fromLayoutStrategyGraph(laid))({
           resources: resourcesOf(...ids),
           edges: [],
         });
@@ -896,7 +856,7 @@ describe('Placement properties', () => {
           resources: resourcesOf(...ids),
           edges: [],
         });
-        const rendered = Placement.fromLayoutStrategyGraph(laid, authored);
+        const rendered = Placement.fromLayoutStrategyGraph(laid);
 
         expect([...Placement.next(authored, rendered, []).keys()].sort()).toEqual(
           [...authored.keys()].sort(),
