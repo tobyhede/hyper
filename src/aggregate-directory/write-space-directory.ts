@@ -1,5 +1,5 @@
-import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { relative } from 'node:path';
 import {
   SPACE_FILE_VERSION,
   type GraphEdge,
@@ -11,7 +11,8 @@ import {
 import { serializeResourceFile } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { compareOrdinal } from '../ordinal';
-import { isMissingFile } from './space-directory';
+import { discoverResourceFiles, isMissingFile } from './space-directory';
+import { writeInPlace } from './write-in-place';
 
 const exists = async (path: string): Promise<boolean> => {
   try {
@@ -151,19 +152,39 @@ const canonicalResource = (
   return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
 
-const removeMarkdownFiles = async (directory: string): Promise<void> => {
-  if (!(await exists(directory))) return;
-  const entries = await readdir(directory, { withFileTypes: true });
-  await Promise.all(
-    entries
-      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
-      .map((entry) => rm(join(directory, entry.name))),
-  );
+/**
+ * One Space's canonical files, by path relative to its Space directory:
+ * `space.json` and one `resources/<id>.md` per Resource.
+ */
+export const spaceDirectoryFiles = (stored: LoadedSpace): ReadonlyMap<string, string> => {
+  const files = new Map<string, string>([
+    ['space.json', `${JSON.stringify(canonicalSpaceFile(stored), null, 2)}\n`],
+  ]);
+  for (const resource of [...stored.snapshot.resources].sort((left, right) =>
+    compareOrdinal(left.id, right.id),
+  )) {
+    files.set(
+      `resources/${resource.id}.md`,
+      serializeResourceFile(canonicalResource(resource.id, resource.document)),
+    );
+  }
+  return files;
 };
 
 /**
- * Write one Space's canonical files into a directory, replacing whatever the
- * reader would have discovered there and leaving everything else alone.
+ * The files Import reads in a Space directory, by path relative to it, or none
+ * when the directory does not exist.
+ */
+export const scannedSpaceFiles = async (directory: string): Promise<readonly string[]> => {
+  if (!(await exists(directory))) return [];
+  const resources = await discoverResourceFiles(directory);
+  return ['space.json', ...resources.map((path) => relative(directory, path))];
+};
+
+/**
+ * Write one Space's canonical files into a directory, in place, replacing
+ * whatever the reader would have discovered there and leaving everything else
+ * alone.
  *
  * What it removes is exactly what `readSingleSpace` scans — `*.md` beside the
  * space file, `resources/*.md`, and `space.json` — so a Resource deleted since the
@@ -182,23 +203,8 @@ export const writeSpaceDirectory = async (
   stored: LoadedSpace,
   directory: string,
 ): Promise<void> => {
-  await mkdir(directory, { recursive: true });
-  await removeMarkdownFiles(directory);
-  await removeMarkdownFiles(join(directory, 'resources'));
-  await rm(join(directory, 'space.json'), { force: true });
-
-  const resourcesDirectory = join(directory, 'resources');
-  await mkdir(resourcesDirectory, { recursive: true });
-  await writeFile(
-    join(directory, 'space.json'),
-    `${JSON.stringify(canonicalSpaceFile(stored), null, 2)}\n`,
+  const files = new Map(
+    [...spaceDirectoryFiles(stored)].map(([path, text]) => [path, Buffer.from(text)] as const),
   );
-  for (const resource of [...stored.snapshot.resources].sort((left, right) =>
-    compareOrdinal(left.id, right.id),
-  )) {
-    await writeFile(
-      join(resourcesDirectory, `${resource.id}.md`),
-      serializeResourceFile(canonicalResource(resource.id, resource.document)),
-    );
-  }
+  await writeInPlace(directory, files, await scannedSpaceFiles(directory));
 };

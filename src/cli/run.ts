@@ -126,7 +126,7 @@ const runExport = async (
       case 'uninitialized':
         io.stderr('The repository is not initialized, so there is no aggregate to export\n');
         return 1;
-      case 'invalid-staged-aggregate':
+      case 'would-not-read-back':
         io.stderr(
           `Exported aggregate does not read back as a valid aggregate:\n${describeAggregateRefusal(result.errors, result.spaces).join('\n')}\n`,
         );

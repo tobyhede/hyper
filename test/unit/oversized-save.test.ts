@@ -10,7 +10,7 @@ import {
   type SpaceSession,
 } from '@project/persistence';
 import { createSpaceHttpApp, HttpSpaceBackend, MAX_COMMIT_BODY_BYTES } from '@project/http';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 /** A request that initializes no Space mints nothing, so any mint is a failure here. */
 const mintsNothing = (): UUID => {

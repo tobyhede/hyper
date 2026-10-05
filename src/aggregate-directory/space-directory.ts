@@ -44,7 +44,12 @@ const markdownFilesIn = async (directory: string): Promise<string[]> =>
 export const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
 
-const discoverResourceFiles = async (spaceDirectory: string): Promise<string[]> => {
+/**
+ * The Resource files Import reads in a Space directory: `*.md` beside
+ * `space.json` and `resources/*.md`, in ordinal order of their relative paths.
+ * Export removes exactly these when a Resource leaves, so the two cannot drift.
+ */
+export const discoverResourceFiles = async (spaceDirectory: string): Promise<string[]> => {
   const rootFiles = await markdownFilesIn(spaceDirectory);
   let nestedFiles: string[];
   try {
@@ -56,6 +61,97 @@ const discoverResourceFiles = async (spaceDirectory: string): Promise<string[]> 
 
   return [...rootFiles, ...nestedFiles].sort((left, right) =>
     compareOrdinal(relative(spaceDirectory, left), relative(spaceDirectory, right)),
+  );
+};
+
+/** A Space directory's files, by absolute path, as text. */
+export interface SpaceDirectoryFiles {
+  readonly spaceFile: string;
+  readonly spaceText: string;
+  readonly resources: readonly { readonly path: string; readonly text: string }[];
+}
+
+/** The space file's JSON value, and why it is not JSON when it is not. */
+interface SpaceJson {
+  readonly json: unknown;
+  readonly diagnostic?: string;
+}
+
+/**
+ * The space file parsed as JSON, or the diagnostic saying why it is not JSON.
+ * An unparseable file leaves `json` undefined, which `documentRefusal` answers
+ * `null` for.
+ */
+const parseSpaceJson = (spaceFile: string, spaceText: string | undefined): SpaceJson => {
+  if (spaceText === undefined) return { json: undefined };
+  try {
+    return { json: JSON.parse(spaceText) };
+  } catch (error) {
+    return { json: undefined, diagnostic: `${spaceFile}: ${String(error)}` };
+  }
+};
+
+/**
+ * Refuse a document this version cannot read, before anything else about it is
+ * answered. `documentRefusal`'s docblock is where the argument for one composed
+ * gate lives. It is asked before `importSpaceFileSchema`, which would otherwise
+ * answer first with a cascade of moved keys for a version it cannot read, and
+ * silence for a retired space-level `graphs`; and before a read failure, because
+ * a document refused outright was never going to load.
+ */
+const refuseDocument = (spaceFile: string, json: unknown): void => {
+  const refusal = documentRefusal(json);
+  if (refusal !== null) {
+    throw new AggregateDirectoryError('parsing', [`${spaceFile}: ${refusal.message}`]);
+  }
+};
+
+/**
+ * Parse one Space directory's files, already read, into the Space Import takes.
+ * The reader below and Export's in-memory check both parse through this, so a
+ * file Export would write is judged by exactly the rule Import reads it by.
+ */
+export const parseSingleSpace = ({
+  spaceFile,
+  spaceText,
+  resources: resourceFiles,
+}: SpaceDirectoryFiles): ImportSpace => {
+  const spaceJson = parseSpaceJson(spaceFile, spaceText);
+  refuseDocument(spaceFile, spaceJson.json);
+
+  const diagnostics: string[] = [];
+  let parsedSpaceFile: ImportSpaceFile | undefined;
+  if (spaceJson.diagnostic !== undefined) {
+    diagnostics.push(spaceJson.diagnostic);
+  } else {
+    const parsed = importSpaceFileSchema.safeParse(spaceJson.json);
+    if (parsed.success) {
+      parsedSpaceFile = parsed.data;
+    } else {
+      diagnostics.push(
+        ...parsed.error.issues.map(
+          (issue) => `${spaceFile}: ${issue.path.join('.') || '(space)'}: ${issue.message}`,
+        ),
+      );
+    }
+  }
+
+  const resources = resourceFiles.flatMap(({ path, text }) => {
+    const parsed = parseImportResourceFile({ path, text });
+    if (!parsed.ok) {
+      diagnostics.push(...parsed.errors.map((error) => error.message));
+      return [];
+    }
+    return [parsed.resource];
+  });
+
+  if (diagnostics.length > 0 || parsedSpaceFile === undefined) {
+    throw new AggregateDirectoryError('parsing', diagnostics);
+  }
+
+  const { id, ...document } = parsedSpaceFile;
+  return importSpaceSchema.parse(
+    id === undefined ? { document, resources } : { id, document, resources },
   );
 };
 
@@ -74,87 +170,23 @@ export const readSingleSpace = async (inputPath: string): Promise<ImportSpace> =
   const readResults = await Promise.allSettled(readPaths.map((path) => readFile(path, 'utf8')));
   const readDiagnostics: string[] = [];
   let spaceText: string | undefined;
-  const resourceTexts: string[] = [];
+  const resources: { path: string; text: string }[] = [];
   readResults.forEach((result, index) => {
+    const path = readPaths[index] ?? spaceFile;
     if (result.status === 'rejected') {
-      readDiagnostics.push(`${readPaths[index] ?? spaceFile}: ${String(result.reason)}`);
+      readDiagnostics.push(`${path}: ${String(result.reason)}`);
     } else if (index === 0) {
       spaceText = result.value;
     } else {
-      resourceTexts.push(result.value);
+      resources.push({ path, text: result.value });
     }
   });
 
-  // Read apart from the resources, and before the read failures are answered,
-  // because the refusal below is decided from this document alone. An
-  // unparseable space file leaves `spaceJson` undefined, which `documentRefusal`
-  // answers `null` for — so a bad JSON diagnostic still travels with the resource
-  // files' own, as it always did.
-  let spaceJson: unknown = undefined;
-  let spaceJsonDiagnostic: string | undefined;
-  if (spaceText !== undefined) {
-    try {
-      spaceJson = JSON.parse(spaceText);
-    } catch (error) {
-      spaceJsonDiagnostic = `${spaceFile}: ${String(error)}`;
-    }
-  }
-
-  // One answer, and nothing behind it — not the resources, and not even a file that
-  // could not be read. `documentRefusal`'s docblock is where the argument for
-  // one composed gate lives; two facts are only known at this call site.
-  //
-  // It is asked before `importSpaceFileSchema`, which runs ahead of domain
-  // intake, or that schema answers first: a cascade of moved keys for a version
-  // it cannot read, and silence for a retired space-level `graphs`.
-  //
-  // And it is asked before the read failures below, because a document refused
-  // outright was never going to load. Answering the unreadable resource first sends
-  // its author to fix a file permission and only then tells them the work was
-  // pointless. The mirror holds and is why this is not hoisted above the read
-  // itself: with no space file there is no document, so `documentRefusal`
-  // decides nothing and the read failure is the only available report.
-  const refusal = documentRefusal(spaceJson);
-  if (refusal !== null) {
-    throw new AggregateDirectoryError('parsing', [`${spaceFile}: ${refusal.message}`]);
-  }
-
+  // With no space file there is no document, so `documentRefusal` decides
+  // nothing and the read failure is the only available report.
   if (readDiagnostics.length > 0 || spaceText === undefined) {
+    refuseDocument(spaceFile, parseSpaceJson(spaceFile, spaceText).json);
     throw new AggregateDirectoryError('discovery', readDiagnostics);
   }
-
-  const diagnostics: string[] = [];
-  let parsedSpaceFile: ImportSpaceFile | undefined;
-  if (spaceJsonDiagnostic !== undefined) {
-    diagnostics.push(spaceJsonDiagnostic);
-  } else {
-    const parsed = importSpaceFileSchema.safeParse(spaceJson);
-    if (parsed.success) {
-      parsedSpaceFile = parsed.data;
-    } else {
-      diagnostics.push(
-        ...parsed.error.issues.map(
-          (issue) => `${spaceFile}: ${issue.path.join('.') || '(space)'}: ${issue.message}`,
-        ),
-      );
-    }
-  }
-
-  const resources = resourcePaths.flatMap((path, index) => {
-    const parsed = parseImportResourceFile({ path, text: resourceTexts[index] ?? '' });
-    if (!parsed.ok) {
-      diagnostics.push(...parsed.errors.map((error) => error.message));
-      return [];
-    }
-    return [parsed.resource];
-  });
-
-  if (diagnostics.length > 0 || parsedSpaceFile === undefined) {
-    throw new AggregateDirectoryError('parsing', diagnostics);
-  }
-
-  const { id, ...document } = parsedSpaceFile;
-  return importSpaceSchema.parse(
-    id === undefined ? { document, resources } : { id, document, resources },
-  );
+  return parseSingleSpace({ spaceFile, spaceText, resources });
 };

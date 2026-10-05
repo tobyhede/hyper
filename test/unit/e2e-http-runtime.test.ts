@@ -18,7 +18,10 @@ const FIXTURE_SPACES = [
 ] as const;
 /** The tracked fixture image, and the URL its SHA-256 gives it (ADR 0106). */
 const HARBOUR = readFileSync(
-  new URL('../../packages/app/fixture-images/harbour-400x300.png', import.meta.url),
+  new URL(
+    '../../packages/app/fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png',
+    import.meta.url,
+  ),
 );
 const HARBOUR_URL = '/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
 const startRuntime = async (options: E2eHttpRuntimeOptions) => {

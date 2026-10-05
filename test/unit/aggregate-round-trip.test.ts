@@ -7,7 +7,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { importAggregate } from '../../src/import/import-aggregate';
 import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { admitted, directoryTree, jpegBytes, pngBytes, showing } from '../support/stored-images';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -320,9 +321,10 @@ describe('exporting and importing one complete aggregate', () => {
   });
 
   /*
-   * The aggregate carries an Image Resource's URL and nothing else of its
-   * picture (ADR 0106): no bytes go to disk, and the URL, with the natural size
-   * the Resource recorded, comes back as it went out.
+   * An Image Resource's own document is its URL and recorded natural size, and
+   * both come back as they went out. Neither picture here has bytes to carry:
+   * one is external and the other names a stored image the repository does not
+   * hold, so each travels as its URL alone (ADR 0118).
    */
   it('round-trips an Image Resource by its URL', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
@@ -365,6 +367,7 @@ url: /images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU
 ---
 
 `);
+    await expect(readdir(destination)).resolves.not.toContain('images');
   });
 
   /*
@@ -415,6 +418,90 @@ kind: ur
 
     expect(await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8')).toBe(first);
     expect(await readFile(join(destination, AGGREGATE_FILE_NAME), 'utf8')).toBe(aggregateFile);
+  });
+});
+
+describe('stored image bytes', () => {
+  const PICTURE_ID = uuidSchema.parse('16161616-1616-4616-8616-161616161616');
+  const PHOTO_ID = uuidSchema.parse('17171717-1717-4717-8717-171717171717');
+
+  /** The complete aggregate, with Meta also holding one Image Resource per image. */
+  const picturing = async (
+    ...images: readonly { id: UUID; bytes: Uint8Array<ArrayBuffer> }[]
+  ): Promise<MemorySpaceRepository> => {
+    const [meta, ...targets] = completeAggregate();
+    if (meta === undefined) throw new Error('The aggregate names no Meta Space');
+    const stored = await Promise.all(images.map(({ bytes }) => admitted(bytes)));
+    const pictured: SpaceSnapshot = {
+      ...meta,
+      resources: [
+        ...meta.resources,
+        ...images.map(({ id }, index) => {
+          const image = stored[index];
+          if (image === undefined) throw new Error('An image was not admitted');
+          return { id, document: showing(image) };
+        }),
+      ],
+    };
+    const repository = repositoryHolding([pictured, ...targets]);
+    for (const image of stored) await repository.storeImage(image);
+    return repository;
+  };
+
+  it('carries each stored image the aggregate references, and Import stores it again', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const png = await admitted(pngBytes(1));
+    const jpeg = await admitted(jpegBytes(2));
+    const source = await picturing(
+      { id: PICTURE_ID, bytes: pngBytes(1) },
+      { id: PHOTO_ID, bytes: jpegBytes(2) },
+    );
+
+    await exportTo(source, destination);
+
+    expect((await readdir(join(destination, 'images'))).sort()).toEqual(
+      [`${png.id}.png`, `${jpeg.id}.jpg`].sort(),
+    );
+    expect(new Uint8Array(await readFile(join(destination, 'images', `${png.id}.png`)))).toEqual(
+      pngBytes(1),
+    );
+    const reimported = await importFrom(destination);
+    await expect(reimported.loadImage(png.id)).resolves.toEqual(png);
+    await expect(reimported.loadImage(jpeg.id)).resolves.toEqual(jpeg);
+    expect(await storedSnapshots(reimported)).toEqual(await storedSnapshots(source));
+  });
+
+  /*
+   * What an author commits is what Hyper reads back and writes again, so a run
+   * that changes nothing changes no byte of the directory, pictures included.
+   */
+  it('round-trips a directory with images byte-for-byte through Import then Export', async () => {
+    const root = await makeTemporaryDirectory();
+    const first = join(root, 'first');
+    const second = join(root, 'second');
+    await exportTo(
+      await picturing(
+        { id: PICTURE_ID, bytes: pngBytes(1) },
+        { id: PHOTO_ID, bytes: jpegBytes(2) },
+      ),
+      first,
+    );
+
+    await exportTo(await importFrom(first), second);
+
+    expect(await directoryTree(second)).toEqual(await directoryTree(first));
+  });
+
+  it('stores one file for two Resources showing the same picture', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'aggregate');
+    const png = await admitted(pngBytes(1));
+
+    await exportTo(
+      await picturing({ id: PICTURE_ID, bytes: pngBytes(1) }, { id: PHOTO_ID, bytes: pngBytes(1) }),
+      destination,
+    );
+
+    await expect(readdir(join(destination, 'images'))).resolves.toEqual([`${png.id}.png`]);
   });
 });
 
@@ -587,7 +674,7 @@ describe('re-exporting over an earlier export', () => {
 });
 
 describe('recording what was exported', () => {
-  it('records the revision of every Space, after the destination is replaced', async () => {
+  it('records the revision of every Space, after every file is written', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const source = new MemorySpaceRepository(
       completeAggregate().map((snapshot) => ({

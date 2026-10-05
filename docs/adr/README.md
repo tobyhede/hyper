@@ -54,6 +54,7 @@ under `superseded/`.
 | [0097](0097-a-multi-space-edit-is-judged-against-what-it-commits.md) | A multi-Space Edit is derived and judged with `decideCommit` against the stored Spaces plus its participants' working Spaces. |
 | [0099](0099-the-barrier-waits-only-for-commits-in-flight.md) | The coordination barrier pauses, then awaits only in-flight commits; one recovery rule covers both deletion cascades, reading stored and working state. |
 | [0106](0106-an-image-resource-owns-a-url-not-bytes.md) | An Image Resource owns a URL, not bytes. The host stores images at `/images/<sha256>`, named for what they are and outside the aggregate. The repo-state rule is deliberately waived for the picture. |
+| [0118](0118-an-aggregate-directory-carries-stored-image-bytes.md) | An Aggregate directory carries the bytes of every stored image the aggregate references in `images/<content-id>.<ext>`; Export rewrites `images/` whole and Import admits it before storing the aggregate, on every store (amends 0106). |
 | [0113](0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md) | Every capability is a Resource's, and a kind only adds actions; Reference is the terminal exception. An Ur Resource has no content and no Edit. A self-targeting Reference Resource was rejected. |
 | [0114](0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md) | First Open Size, resize floor, Map embedding and content area are decided from resolved content, so a Reference Resource takes its Target's; its kind withholds only content actions. |
 
@@ -95,7 +96,7 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0030](0030-postgres-is-the-live-write-model.md) | PostgreSQL is the live write model. Files are imported and exported. |
 | [0018](0018-a-new-space-is-a-single-centered-card.md) | A new Space is one centred Card. |
 | [0054](0054-the-unreleased-prototype-rolls-forward.md) | The prototype is unreleased, so a document format change rolls forward with its fixtures and adds no versioned reader. Relational schema changes still go through `migrations/app/`. |
-| [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. ADR 0106 excepts an Image Resource's picture. |
+| [0056](0056-the-repository-is-the-only-source-of-state.md) | The repository is the only source of state. Every artifact is derived. ADR 0106 excepts an Image Resource's picture; ADR 0118 narrows that to external URLs and stored images nothing references. |
 | [0077](0077-the-meta-space-starts-from-one-replaceable-default-aggregate.md) | The Meta Space starts from one deterministic, editable aggregate. The CLI hard reset that restores it is decided but not built (`.scratch/v1-release/issues/16`); today `hyper <path> --dangerous-truncate` (ADR 0094) replaces the aggregate from a directory. |
 | [0078](0078-the-server-side-repository-owns-meta-lifecycle.md) | The server-side repository owns Meta lifecycle; its browser seam does not expose lifecycle administration. |
 | [0094](0094-dangerous-truncate-replaces-whatever-is-stored.md) | `--dangerous-truncate` replaces whatever is stored, valid or not, still authorized by the Meta identity it read. |
@@ -103,6 +104,8 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0096](0096-the-aggregate-lifecycle-decision-stays-inside-each-repository.md) | Initialization and replacement decide their outcome inside each repository; there is no pure lifecycle decision beside `decideCommit`. |
 | [0088](0088-aggregate-names-the-meta-rooted-collection.md) | Aggregate names the complete Meta-rooted collection of Spaces. One Space plus its Things is a snapshot. |
 | [0098](0098-a-commit-outcome-is-named-once-on-both-sides-of-the-seam.md) | `CommitOutcome` is shared by both commit seams, its status codes are one table, and the identity rule is the store's alone. |
+| [0119](0119-export-writes-in-place-and-git-answers-for-a-partial-write.md) | Every Export writes the Aggregate directory in place: only the files Import reads, each changed one replaced by a per-file rename and the rest untouched; the directory is never moved, and git, not Hyper, answers for a write that fails part-way (refines 0030, 0117, 0118). |
+| [0117](0117-running-serves-an-aggregate-directory-as-the-durable-copy.md) | `pnpm start <dir>` runs an Aggregate directory: the directory is the durable copy, the memory store is discarded, and git answers for history, undo and concurrent writers. Edits are Exported after a quiet period and on stop; a crash before that write loses them. |
 
 ## HTTP
 

@@ -366,8 +366,8 @@ describe('readAggregate', () => {
   /*
    * Only the failures this reader models are collected into one refusal. A
    * Space that failed for a reason it does not — here the identity generator
-   * itself throwing, which is exactly how canonical export verifies a staged
-   * aggregate — has to reach the caller, even when a neighbour has an ordinary
+   * itself throwing, which is exactly how canonical export checks its files
+   * before writing them — has to reach the caller, even when a neighbour has an ordinary
    * parse diagnostic that sorts ahead of it.
    */
   it('raises an unmodelled fault ahead of the parse diagnostic beside it', async () => {

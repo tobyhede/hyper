@@ -1,26 +1,16 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { newUuid, type SpaceSnapshot } from '@project/core';
-import { identifySpace, readAggregate, readSingleSpace } from '../../src/aggregate-directory';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
 import {
-  admitImage,
-  IMAGE_COLLECTION_PATH,
-  imagePath,
-  type ImageStore,
-  type LoadedSpace,
-} from '@project/persistence';
+  identifySpace,
+  readAggregate,
+  readSingleSpace,
+  storedImageId,
+} from '../../src/aggregate-directory';
+import { importAggregateContents } from '../../src/import/import-aggregate';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { ImageId, LoadedSpace } from '@project/persistence';
 
 const fixtureDirectory = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));
-/**
- * The tracked image files the fixture's Image Resources show. They sit beside
- * the aggregate directory rather than in it, because an aggregate carries an
- * image's URL and never its bytes (ADR 0106).
- */
-const fixtureImageDirectory = fileURLToPath(
-  new URL('../../packages/app/fixture-images', import.meta.url),
-);
 
 const seededSpace = (
   initialized: Awaited<ReturnType<SpaceRepository['initializeAggregate']>>,
@@ -71,83 +61,58 @@ export const importSpaceDirectory = async (
 };
 
 /**
- * Store every tracked image file through the same admission and store the
- * storing route uses, and answer the `/images/<id>` URL each one produced. A
- * file admission refuses is a broken fixture, so it throws rather than being
- * skipped.
- *
- * Only visible regular files are image files: a dotfile or a subdirectory is
- * what a checkout or the operating system leaves behind (Finder's `.DS_Store`
- * is gitignored), not something the fixture tracks.
+ * Every stored image URL the Spaces name that the fixture's `images/` does not
+ * carry, read by the same rule Export uses to decide which images to carry.
  */
-const storeFixtureImages = async (
-  store: ImageStore,
-  directory: string,
-): Promise<ReadonlySet<string>> => {
-  const produced = new Set<string>();
-  const names = (await readdir(directory, { withFileTypes: true }))
-    .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
-    .map(({ name }) => name)
-    .sort();
-  for (const name of names) {
-    const admission = await admitImage(new Uint8Array(await readFile(join(directory, name))));
-    if (admission.kind === 'refused') {
-      throw new Error(`Fixture image ${join(directory, name)} was refused: ${admission.code}`);
-    }
-    await store.storeImage(admission.image);
-    produced.add(imagePath(admission.image.id));
-  }
-  return produced;
-};
-
-/** Every stored image URL the Spaces name that no tracked file produced. */
-const unproducedImageUrls = (
+const uncarriedImageUrls = (
   spaces: readonly SpaceSnapshot[],
-  produced: ReadonlySet<string>,
+  carried: ReadonlySet<ImageId>,
 ): readonly string[] =>
   spaces.flatMap(({ resources }) =>
-    resources.flatMap(({ document }) =>
-      document.kind === 'image' &&
-      document.url.startsWith(`${IMAGE_COLLECTION_PATH}/`) &&
-      !produced.has(document.url)
-        ? [document.url]
-        : [],
-    ),
+    resources.flatMap(({ document }) => {
+      if (document.kind !== 'image') return [];
+      const id = storedImageId(document.url);
+      return id === undefined || carried.has(id) ? [] : [document.url];
+    }),
   );
 
 /**
  * Import the tracked fixture as a complete Meta-rooted aggregate, through the
- * same `readAggregate` + `initializeAggregate` path public import uses.
+ * same `readAggregate` and import path public import uses, its `images/`
+ * included (ADR 0118).
  *
  * Returns the Meta Space so callers that open the fixture still receive the
  * Map fixture they address.
  *
- * The tracked image files are stored first, so every Image Resource the
- * fixture seeds loads from the host before anything is served; a fixture that
- * names an `/images/<id>` none of those files produces is refused before a
- * Space is stored, so the fixture and its files cannot drift apart (ADR 0054).
+ * Stricter than public import in one way: a fixture naming an `/images/<id>`
+ * its own `images/` does not carry is refused before anything is stored, so the
+ * fixture and its files cannot drift apart (ADR 0054). Public import draws such
+ * a picture as one that will not load.
  *
- * `directory` and `imageDirectory` default to the tracked pair; a test names a
- * copy of either to seed an altered fixture without touching tracked files.
+ * `directory` defaults to the tracked fixture; a test names a copy to seed an
+ * altered fixture without touching tracked files.
  */
 export const importFixture = async (
   repository: SpaceRepository,
-  {
-    directory = fixtureDirectory,
-    imageDirectory = fixtureImageDirectory,
-  }: { readonly directory?: string; readonly imageDirectory?: string } = {},
+  { directory = fixtureDirectory }: { readonly directory?: string } = {},
 ): Promise<LoadedSpace> => {
   const source = await readAggregate(directory, newUuid);
-  const produced = await storeFixtureImages(repository, imageDirectory);
-  const unproduced = unproducedImageUrls(source.spaces, produced);
-  if (unproduced.length > 0) {
+  const carried = new Set(source.images.map(({ id }) => id));
+  const uncarried = uncarriedImageUrls(source.spaces, carried);
+  if (uncarried.length > 0) {
     throw new Error(
-      `Fixture ${directory} names stored images no file in ${imageDirectory} produces: ${unproduced.join(', ')}`,
+      `Fixture ${directory} names stored images its images/ does not carry: ${uncarried.join(', ')}`,
     );
   }
-  const initialized = await repository.initializeAggregate({
-    metaSpaceId: source.metaSpaceId,
-    spaces: source.spaces,
-  });
-  return seededSpace(initialized, directory, source.metaSpaceId);
+  const imported = await importAggregateContents(source, repository, { truncate: false });
+  if (imported.kind !== 'imported') {
+    const because =
+      imported.kind === 'aggregate-refused'
+        ? imported.errors.map(({ kind }) => kind).join(', ')
+        : 'the repository was already initialized';
+    throw new Error(`Directory ${directory} did not seed: ${imported.kind} (${because})`);
+  }
+  const meta = imported.spaces.find(({ snapshot: { id } }) => id === source.metaSpaceId);
+  if (meta === undefined) throw new Error(`Directory ${directory} seeded no Meta Space`);
+  return meta;
 };

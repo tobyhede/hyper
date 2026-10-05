@@ -5,7 +5,7 @@ import {
   DatabaseTargetConfigurationError,
   type DatabaseTarget,
 } from '../../src/database/database-target';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 describe('database CLI entry', () => {
   it('opens and closes the selected target around one command', async () => {
