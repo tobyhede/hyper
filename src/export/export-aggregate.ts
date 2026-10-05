@@ -2,13 +2,17 @@ import { cp, mkdir, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate, type SpaceAggregateError } from '@project/graph';
-import type { LoadedAggregate } from '@project/persistence';
+import type { LoadedAggregate, StoredImage } from '@project/persistence';
 import {
   AGGREGATE_FILE_NAME,
   assertExportableDestination,
+  imageFileName,
+  IMAGES_DIRECTORY_NAME,
+  loadReferencedImages,
   pruneObsoleteSpaceDirectories,
   readAggregate,
   writeAggregateDirectory,
+  writeAggregateImages,
 } from '../aggregate-directory';
 import type { SpaceRepository } from '../persistence/space-repository';
 import {
@@ -112,6 +116,7 @@ const verifyStagedAggregate = async (
 
 const stageAggregate = async (
   aggregate: LoadedAggregate,
+  images: readonly StoredImage[],
   replacement: string,
 ): Promise<
   | { readonly ok: true }
@@ -125,15 +130,23 @@ const stageAggregate = async (
   const spaceIds = new Set(aggregate.spaces.map(({ snapshot }) => snapshot.id));
   await pruneObsoleteSpaceDirectories(replacement, spaceIds);
   await writeAggregateDirectory(aggregate, replacement);
+  await writeAggregateImages(images, replacement);
   return verifyStagedAggregate(replacement, aggregate.metaSpaceId);
 };
 
 const rejectSymbolicLinks = async (
   destination: string,
   aggregate: LoadedAggregate,
+  images: readonly StoredImage[],
 ): Promise<void> => {
   await rejectSymbolicLink(destination);
   await rejectSymbolicLink(join(destination, AGGREGATE_FILE_NAME));
+  await rejectSymbolicLink(join(destination, IMAGES_DIRECTORY_NAME));
+  await Promise.all(
+    images.map((image) =>
+      rejectSymbolicLink(join(destination, IMAGES_DIRECTORY_NAME, imageFileName(image))),
+    ),
+  );
   await Promise.all(
     aggregate.spaces.map(async ({ snapshot }) => {
       const spaceDirectory = join(destination, snapshot.id);
@@ -198,6 +211,12 @@ const markAggregateExported = async (
  * reader would discover is regenerated, obsolete Space directories go, and
  * everything else — root files this format ignores, and undiscovered contents
  * inside a Space directory that survives — is carried across untouched.
+ *
+ * The bytes of every stored image the aggregate shows are written to `images/`
+ * through the same staging, so a failure writing one leaves the destination as
+ * it was (ADR 0118). Images are read after the aggregate and outside its
+ * revision; an image's id is its content, so no commit can change one between
+ * the two reads.
  */
 export const exportAggregate = async (
   repository: SpaceRepository,
@@ -206,10 +225,14 @@ export const exportAggregate = async (
   const loaded = await repository.loadAggregate();
   if (loaded.kind === 'uninitialized') return { kind: 'uninitialized' };
   const aggregate = loaded.aggregate;
+  const images = await loadReferencedImages(
+    repository,
+    aggregate.spaces.map(({ snapshot }) => snapshot),
+  );
 
   const destination = resolve(destinationPath);
   await mkdir(resolve(destination, '..'), { recursive: true });
-  await rejectSymbolicLinks(destination, aggregate);
+  await rejectSymbolicLinks(destination, aggregate, images);
   await assertExportableDestination(destination);
 
   const stagingRoot = await createStagingRoot(destination);
@@ -220,7 +243,7 @@ export const exportAggregate = async (
     } else {
       await mkdir(replacement);
     }
-    const staged = await stageAggregate(aggregate, replacement);
+    const staged = await stageAggregate(aggregate, images, replacement);
     if (!staged.ok) {
       return {
         kind: 'invalid-staged-aggregate',

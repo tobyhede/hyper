@@ -9,10 +9,11 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import type { LoadedAggregate } from '@project/persistence';
+import type { LoadedAggregate, StoredImage } from '@project/persistence';
 import { compareOrdinal } from '../ordinal';
 import type { AggregateInput } from '../persistence/space-repository';
 import { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
+import { readAggregateImages } from './images';
 import { isMissingFile, readSingleSpace, AggregateDirectoryError } from './space-directory';
 import { writeSpaceDirectory } from './write-space-directory';
 
@@ -209,8 +210,19 @@ const identifyReadSpaces = (
 };
 
 /**
+ * What an Aggregate directory holds: the complete Meta-rooted input the
+ * persistence lifecycle takes, and the stored images its `images/` carries.
+ * The images are outside the aggregate (ADR 0106), so they travel beside it
+ * rather than inside the input either lifecycle door reads.
+ */
+export interface AggregateDirectoryContents extends AggregateInput {
+  readonly images: readonly StoredImage[];
+}
+
+/**
  * Read a canonical aggregate directory into the complete Meta-rooted input the
- * persistence lifecycle takes.
+ * persistence lifecycle takes, beside every image `images/` carries, each
+ * admitted by the rule storing an uploaded picture uses (ADR 0118).
  *
  * This reads and identifies; it validates nothing about how the Spaces relate.
  * Meta rooting, Space Resource targets, cross-Space Resource ownership and the rest
@@ -228,12 +240,15 @@ const identifyReadSpaces = (
 export const readAggregate = async (
   inputPath: string,
   newId: () => UUID,
-): Promise<AggregateInput> => {
+): Promise<AggregateDirectoryContents> => {
   const directory = resolve(inputPath);
   const metaSpaceId = await readAggregateFile(directory);
   const spaceDirectories = await discoverSpaceDirectories(directory);
 
-  const results = await Promise.allSettled(spaceDirectories.map(readSpaceDirectory));
+  const [results, images] = await Promise.all([
+    Promise.allSettled(spaceDirectories.map(readSpaceDirectory)),
+    readAggregateImages(directory),
+  ]);
   // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
   // `unknown` stops that `any` from propagating into `failures`.
   const readFailures: unknown[] = results.flatMap((result) =>
@@ -244,7 +259,7 @@ export const readAggregate = async (
   // fault it raises is weighed against the read failures rather than hidden
   // behind them.
   const identified = identifyReadSpaces(reads, newId);
-  const failures = [...readFailures, ...identified.failures];
+  const failures = [...readFailures, ...identified.failures, ...images.failures];
 
   if (failures.length > 0) {
     // A failure this reader does not model — a programming fault, a non-ENOENT
@@ -264,7 +279,7 @@ export const readAggregate = async (
     );
   }
 
-  return { metaSpaceId, spaces: identified.spaces };
+  return { metaSpaceId, spaces: identified.spaces, images: images.images };
 };
 
 const aggregateFile = (metaSpaceId: UUID): AggregateFile => ({

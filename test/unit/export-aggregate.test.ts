@@ -1,12 +1,13 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
-import type { LoadedSpace } from '@project/persistence';
+import type { LoadedSpace, StoredImage } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { captureError } from '../support/capture-error';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { admitted, pngBytes, showing } from '../support/stored-images';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
@@ -462,5 +463,144 @@ describe('canonical export', () => {
     ).resolves.toEqual({ kind: 'uninitialized' });
 
     await expect(readdir(root)).resolves.toEqual([]);
+  });
+});
+
+describe('stored image bytes', () => {
+  const PICTURE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000040');
+  const LINKED_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000041');
+
+  /** The stored Space, also holding these Image Resources. */
+  const withImages = (
+    ...documents: readonly { id: typeof PICTURE_ID; document: ReturnType<typeof showing> }[]
+  ): LoadedSpace => ({
+    ...storedSpace,
+    snapshot: {
+      ...storedSpace.snapshot,
+      resources: [...storedSpace.snapshot.resources, ...documents],
+    },
+  });
+
+  const holding = async (
+    space: LoadedSpace,
+    images: readonly StoredImage[],
+  ): Promise<MemorySpaceRepository> => {
+    const repository = new MemorySpaceRepository([space], SPACE_ID);
+    for (const image of images) await repository.storeImage(image);
+    return repository;
+  };
+
+  /*
+   * What Export removes from `images/` is exactly what Import scans there, so
+   * a picture no Resource shows any more leaves the directory rather than
+   * being imported again as a stored image nothing references.
+   */
+  it('rewrites images whole, so a picture no Resource shows leaves the directory', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const shown = await admitted(pngBytes(1));
+    const unshown = await admitted(pngBytes(2));
+    await exportTo(
+      await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown, unshown]),
+      destination,
+    );
+    expect(await readdir(join(destination, 'images'))).toEqual([`${shown.id}.png`]);
+
+    await exportTo(await holding(storedSpace, [shown, unshown]), destination);
+
+    expect(await readdir(destination)).not.toContain('images');
+  });
+
+  /*
+   * Neither picture has bytes the repository holds — one is somebody else's,
+   * the other was never stored here — so each is written as its URL and the
+   * Export still completes: one missing picture does not stop an edit reaching
+   * disk (ADR 0118).
+   */
+  it('exports an external URL and a stored URL whose bytes are missing as URLs only', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const missing = await admitted(pngBytes(3));
+    const repository = await holding(
+      withImages(
+        { id: PICTURE_ID, document: showing(missing) },
+        {
+          id: LINKED_ID,
+          document: { ...showing(missing), url: 'https://example.com/figure.png' },
+        },
+      ),
+      [],
+    );
+
+    await expect(exportAggregate(repository, destination)).resolves.toMatchObject({
+      kind: 'exported',
+    });
+
+    expect(await readdir(destination)).not.toContain('images');
+    await expect(
+      readFile(join(destination, SPACE_ID, 'resources', `${PICTURE_ID}.md`), 'utf8'),
+    ).resolves.toContain(`url: /images/${missing.id}`);
+  });
+
+  /*
+   * Import scans the visible regular files in `images/`, so those are what
+   * Export replaces; a dotfile or a directory there is the author's.
+   */
+  it('keeps what Import does not scan inside images/', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const shown = await admitted(pngBytes(1));
+    await mkdir(join(destination, 'images', 'drafts'), { recursive: true });
+    await writeFile(join(destination, 'images', '.gitkeep'), '');
+    await writeFile(join(destination, 'images', 'drafts', 'sketch.txt'), 'sketch\n');
+
+    await exportTo(
+      await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown]),
+      destination,
+    );
+
+    expect((await readdir(join(destination, 'images'))).sort()).toEqual(
+      ['.gitkeep', 'drafts', `${shown.id}.png`].sort(),
+    );
+    await expect(
+      readFile(join(destination, 'images', 'drafts', 'sketch.txt'), 'utf8'),
+    ).resolves.toBe('sketch\n');
+  });
+
+  it('refuses a destination whose images directory is a symbolic link', async () => {
+    const root = await makeTemporaryDirectory();
+    const destination = join(root, 'exported');
+    const elsewhere = join(root, 'elsewhere');
+    await mkdir(elsewhere);
+    await mkdir(destination);
+    await symlink(elsewhere, join(destination, 'images'));
+    const shown = await admitted(pngBytes(1));
+
+    const thrown = await captureError(async () =>
+      exportAggregate(
+        await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown]),
+        destination,
+      ),
+    );
+
+    expect(thrown?.message).toContain('symbolic link');
+    await expect(readdir(elsewhere)).resolves.toEqual([]);
+  });
+
+  it('refuses a destination whose image file is a symbolic link', async () => {
+    const root = await makeTemporaryDirectory();
+    const destination = join(root, 'exported');
+    const outside = join(root, 'outside.png');
+    await writeFile(outside, 'outside\n');
+    const shown = await admitted(pngBytes(1));
+    await mkdir(join(destination, 'images'), { recursive: true });
+    await symlink(outside, join(destination, 'images', `${shown.id}.png`));
+
+    const thrown = await captureError(async () =>
+      exportAggregate(
+        await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown]),
+        destination,
+      ),
+    );
+
+    expect(thrown?.message).toContain('symbolic link');
+    await expect(readFile(outside, 'utf8')).resolves.toBe('outside\n');
   });
 });

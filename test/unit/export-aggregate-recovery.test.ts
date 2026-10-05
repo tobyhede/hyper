@@ -3,13 +3,15 @@ import type * as FsPromises from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
-import type { LoadedSpace } from '@project/persistence';
+import { imagePath, type LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { admitted, pngBytes } from '../support/stored-images';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
+const PICTURE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 
 // SAFETY: `kind` starts `undefined` but is reassigned to 'backup'/'staging'
 // later (per test) — the cast states the mutable field's real type up front
@@ -17,6 +19,7 @@ const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const cleanupFailure = vi.hoisted(() => ({
   kind: undefined as 'backup' | 'staging' | undefined,
   replacementWrite: false,
+  imageWrite: false,
 }));
 
 /**
@@ -38,10 +41,10 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       // the aggregate file at the replacement root is already written by the time this
       // fires — which is the point: the failure lands part-way through staging,
       // where the destination has not been touched yet.
-      cleanupFailure.replacementWrite &&
       typeof path === 'string' &&
       path.includes('.hyper-export-') &&
-      path.endsWith(`/replacement/${SPACE_ID}/space.json`)
+      ((cleanupFailure.replacementWrite && path.endsWith(`/replacement/${SPACE_ID}/space.json`)) ||
+        (cleanupFailure.imageWrite && path.includes('/replacement/images/')))
         ? Promise.reject(
             Object.assign(new Error(`ENOSPC: no space left on device, write '${path}'`), {
               code: 'ENOSPC',
@@ -106,6 +109,7 @@ const previouslyExported = async (destination: string): Promise<void> => {
 afterEach(async () => {
   cleanupFailure.kind = undefined;
   cleanupFailure.replacementWrite = false;
+  cleanupFailure.imageWrite = false;
   for (const directory of temporaryDirectories) {
     await rm(directory, { recursive: true, force: true });
   }
@@ -161,6 +165,49 @@ describe('canonical export recovery cleanup', () => {
 
     await expect(readFile(join(destination, SPACE_ID, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
+    );
+    await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
+      exportedRevision: null,
+    });
+  });
+
+  /*
+   * Image bytes are staged with everything else, so a failure writing one
+   * leaves the destination exactly as the previous export left it — its
+   * pictures included — and records nothing.
+   */
+  it('leaves the previous destination whole when writing an image fails', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    await previouslyExported(destination);
+    await mkdir(join(destination, 'images'));
+    await writeFile(join(destination, 'images', 'previous.png'), 'previous image\n');
+    const image = await admitted(pngBytes(1));
+    const pictured: LoadedSpace = {
+      ...storedSpace,
+      snapshot: {
+        ...storedSpace.snapshot,
+        resources: [
+          ...storedSpace.snapshot.resources,
+          {
+            id: PICTURE_ID,
+            document: { title: 'Picture', kind: 'image', url: imagePath(image.id) },
+          },
+        ],
+      },
+    };
+    const repository = new MemorySpaceRepository([pictured], SPACE_ID);
+    await repository.storeImage(image);
+    cleanupFailure.imageWrite = true;
+
+    await expect(exportAggregate(repository, destination)).rejects.toMatchObject({
+      code: 'ENOSPC',
+    });
+
+    await expect(readFile(join(destination, SPACE_ID, 'space.json'), 'utf8')).resolves.toBe(
+      'previous space\n',
+    );
+    await expect(readFile(join(destination, 'images', 'previous.png'), 'utf8')).resolves.toBe(
+      'previous image\n',
     );
     await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
       exportedRevision: null,

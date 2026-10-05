@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema, type UUID } from '@project/core';
@@ -23,6 +23,7 @@ import type {
 import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 import { captureError } from '../support/capture-error';
+import { admitted, jpegBytes, pngBytes } from '../support/stored-images';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_META_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -41,7 +42,8 @@ const MAP_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
  * "the repository was never touched" is stated — an assertion about stored state
  * would pass just as well for an import that wrote and rolled back.
  */
-type SeamCall = 'loadAggregate' | 'loadMetaSpaceId' | 'initializeAggregate' | 'replaceAggregate';
+type SeamCall =
+  'loadAggregate' | 'loadMetaSpaceId' | 'initializeAggregate' | 'replaceAggregate' | 'storeImage';
 
 class RecordingRepository implements SpaceRepository {
   readonly calls: SeamCall[] = [];
@@ -68,6 +70,7 @@ class RecordingRepository implements SpaceRepository {
   }
 
   storeImage(image: StoredImage): Promise<'stored' | 'existing'> {
+    this.calls.push('storeImage');
     return this.#stored.storeImage(image);
   }
 
@@ -453,5 +456,125 @@ describe('importAggregate', () => {
       { kind: 'ordinary-space-unreferenced', spaceId: ORDINARY_SPACE_ID },
     ]);
     await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
+  });
+});
+
+describe('importing the images an Aggregate directory carries', () => {
+  /** A Meta-only aggregate whose one Resource shows `url`, plus these files in `images/`. */
+  const writePicturedAggregate = async (
+    url: string,
+    files: Readonly<Record<string, Uint8Array | string>>,
+  ): Promise<string> => {
+    const root = await writeAggregate(META_SPACE_ID, [
+      {
+        name: META_SPACE_ID,
+        spaceFile: JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Meta' }),
+        resources: { 'picture.md': `---\ntitle: Picture\nkind: image\nurl: ${url}\n---\n` },
+      },
+    ]);
+    await mkdir(join(root, 'images'));
+    for (const [name, bytes] of Object.entries(files)) {
+      await writeFile(join(root, 'images', name), bytes);
+    }
+    return root;
+  };
+
+  it('admits every image in images/ before the aggregate is stored', async () => {
+    const shown = await admitted(pngBytes(1));
+    const unshown = await admitted(jpegBytes(2));
+    const root = await writePicturedAggregate(`/images/${shown.id}`, {
+      [`${shown.id}.png`]: pngBytes(1),
+      [`${unshown.id}.jpg`]: jpegBytes(2),
+    });
+    const repository = new RecordingRepository();
+
+    await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
+
+    expect(repository.calls).toEqual(['storeImage', 'storeImage', 'initializeAggregate']);
+    await expect(repository.loadImage(shown.id)).resolves.toEqual(shown);
+    await expect(repository.loadImage(unshown.id)).resolves.toEqual(unshown);
+  });
+
+  it('admits the images before replacing the stored aggregate under truncate', async () => {
+    const image = await admitted(pngBytes(1));
+    const stored = new MemorySpaceRepository();
+    await importFrom(await writeMetaOnlyAggregate(OTHER_META_ID, 'Before'), stored);
+    const root = await writePicturedAggregate(`/images/${image.id}`, {
+      [`${image.id}.png`]: pngBytes(1),
+    });
+    const repository = new RecordingRepository(stored);
+
+    await expect(importFrom(root, repository, true)).resolves.toMatchObject({ kind: 'imported' });
+
+    expect(repository.calls).toEqual(['storeImage', 'loadMetaSpaceId', 'replaceAggregate']);
+    await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+  });
+
+  /*
+   * A stored image's URL whose bytes are not in the directory draws as a
+   * picture that will not load, which ADR 0106 already allows. So a directory
+   * an Export wrote while one picture's bytes were missing still Imports.
+   */
+  it('does not refuse a stored-image URL whose bytes the directory does not carry', async () => {
+    const absent = await admitted(pngBytes(9));
+    const root = await writePicturedAggregate(`/images/${absent.id}`, {});
+    const repository = new RecordingRepository();
+
+    await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
+    await expect(repository.loadImage(absent.id)).resolves.toBeUndefined();
+  });
+
+  it('ignores the dotfiles and directories inside images/', async () => {
+    const image = await admitted(pngBytes(1));
+    const root = await writePicturedAggregate(`/images/${image.id}`, {
+      '.DS_Store': 'Bud1 not an image',
+    });
+    await mkdir(join(root, 'images', 'drafts'));
+    await writeFile(join(root, 'images', 'drafts', 'notes.txt'), 'not an image');
+    const repository = new RecordingRepository();
+
+    await expect(importFrom(root, repository)).resolves.toMatchObject({ kind: 'imported' });
+    expect(repository.calls).toEqual(['initializeAggregate']);
+  });
+
+  it('refuses a file in images/ that is not an image the host stores, before storing anything', async () => {
+    const image = await admitted(pngBytes(1));
+    const root = await writePicturedAggregate(`/images/${image.id}`, {
+      [`${image.id}.png`]: pngBytes(1),
+      'notes.txt': 'not an image',
+    });
+    const repository = new RecordingRepository();
+
+    const error = await captureError(() => importFrom(root, repository));
+
+    expect(error).toBeInstanceOf(AggregateDirectoryError);
+    if (!(error instanceof AggregateDirectoryError)) return;
+    expect(error.kind).toBe('parsing');
+    expect(error.diagnostics).toEqual([expect.stringContaining(join(root, 'images', 'notes.txt'))]);
+    expect(error.diagnostics[0]).toContain('image-format-unsupported');
+    expect(repository.calls).toEqual([]);
+  });
+
+  /*
+   * A picture's file name is the id its URL names, so a renamed file would be
+   * stored under a URL no Resource shows while the one it does show stays
+   * missing. Import says so rather than guessing which the author meant.
+   */
+  it('refuses an image file not named for its content', async () => {
+    const image = await admitted(pngBytes(1));
+    const root = await writePicturedAggregate(`/images/${image.id}`, {
+      'harbour.png': pngBytes(1),
+    });
+    const repository = new RecordingRepository();
+
+    const error = await captureError(() => importFrom(root, repository));
+
+    expect(error).toBeInstanceOf(AggregateDirectoryError);
+    if (!(error instanceof AggregateDirectoryError)) return;
+    expect(error.diagnostics).toEqual([
+      expect.stringContaining(join(root, 'images', 'harbour.png')),
+    ]);
+    expect(error.diagnostics[0]).toContain(`${image.id}.png`);
+    expect(repository.calls).toEqual([]);
   });
 });
