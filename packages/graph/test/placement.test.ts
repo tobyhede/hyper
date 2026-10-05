@@ -469,7 +469,7 @@ describe('Placement.displace', () => {
       ],
       [
         RESOURCE_C,
-        { x: 400, y: 400, open: false, openSize: { width: 700, height: 500 }, shape: 'hexagon' },
+        { x: 400, y: 400, open: false, openSize: { width: 700, height: 500 }, shape: 'ellipse' },
       ],
     ]);
 
@@ -493,7 +493,7 @@ describe('Placement.displace', () => {
         y: 400,
         open: false,
         openSize: { width: 700, height: 500 },
-        shape: 'hexagon',
+        shape: 'ellipse',
       },
     });
   });

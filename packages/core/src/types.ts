@@ -55,7 +55,7 @@ export type GraphHeadShape = z.infer<typeof graphHeadShapeSchema>;
 export type ImageNaturalSize = z.infer<typeof imageNaturalSizeSchema>;
 export type MapPosition = z.infer<typeof mapPositionSchema>;
 export type ResourcePlacement = z.infer<typeof resourcePlacementSchema>;
-/** One of the five outlines an Ur Resource is drawn in on a Map, Open or Closed. */
+/** One of the four outlines an Ur Resource is drawn in on a Map, Open or Closed. */
 export type ResourceShape = z.infer<typeof resourceShapeSchema>;
 export type PositionedMap = z.infer<typeof positionedMapSchema>;
 

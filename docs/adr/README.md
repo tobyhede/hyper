@@ -58,7 +58,7 @@ under `superseded/`.
 | [0113](0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md) | Every capability is a Resource's, and a kind only adds actions; Reference is the terminal exception. An Ur Resource has no content and no Edit. A self-targeting Reference Resource was rejected. |
 | [0114](0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md) | First Open Size, resize floor, Map embedding and content area are decided from resolved content, so a Reference Resource takes its Target's; its kind withholds only content actions. |
 | [0120](0120-a-kind-is-a-behaviour-and-a-media-type-is-its-contents-format.md) | A kind is a behaviour and a media type is its content's format; `kind` never holds a media type. Content kinds are modules registered at composition, built in today with namespaced ids so runtime kinds stay possible. Ur, Reference and Space stay the domain's, and a Resource with no kind is an Ur Resource. |
-| [0121](0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md) | An Ur Resource's Shape (rectangle, pill, ellipse, diamond, hexagon) is stored on its Map entry, every other kind being the rectangle, optional with the rectangle as the application's default; it is drawn at the Resource's rect, Open and Closed alike. |
+| [0121](0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md) | An Ur Resource's Shape (rectangle, pill, ellipse, diamond) is stored on its Map entry, every other kind being the rectangle, optional with the rectangle as the application's default; it is drawn at the Resource's rect, Open and Closed alike. |
 
 ## Layout, View and Graph
 

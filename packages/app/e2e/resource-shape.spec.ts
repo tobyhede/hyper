@@ -104,7 +104,6 @@ const DRAWN_RESOURCE_SHAPES = [
   ['Pill', 'pill'],
   ['Ellipse', 'ellipse'],
   ['Diamond', 'diamond'],
-  ['Hexagon', 'hexagon'],
 ] as const;
 
 /** Choose a Shape from U's rail and wait for it to be drawn. */
@@ -172,9 +171,8 @@ test(
       'Pill',
       'Ellipse',
       'Diamond',
-      'Hexagon',
     ]);
-    await expect(resourceShapes.locator('svg[data-resource-shape]')).toHaveCount(5);
+    await expect(resourceShapes.locator('svg[data-resource-shape]')).toHaveCount(4);
     await expect(resourceShapes).not.toContainText('Shape');
     await expect(chosenResourceShape(resourceShapes)).toHaveText('Rectangle');
     await resourceShapes.getByRole('menuitemradio', { name: 'Diamond' }).click();
@@ -336,14 +334,14 @@ test(
     await expect
       .poll(() => drawnSize(ur))
       .toEqual([COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height]);
-    expect((await drawnOutline(face(ur))).shape).toBe('hexagon');
+    expect((await drawnOutline(face(ur))).shape).toBe('diamond');
     expect((await drawnOutline(face(ur))).touchesSideMidpoints).toBe(true);
 
     await page.reload();
     await selectCanvas(page, 'Collection 1');
     await expect(face(nodeByTitle(page, UR).first())).toHaveAttribute(
       'data-resource-shape',
-      'hexagon',
+      'diamond',
     );
   },
 );

@@ -8,7 +8,6 @@ export const RESOURCE_SHAPE_LABELS = {
   pill: 'Pill',
   ellipse: 'Ellipse',
   diamond: 'Diamond',
-  hexagon: 'Hexagon',
 } as const satisfies Record<ResourceShape, string>;
 
 const ICON_GRID = 24;

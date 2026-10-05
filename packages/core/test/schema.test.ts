@@ -510,8 +510,8 @@ describe('space file maps', () => {
         maps: [{ ...working, positions: { ...working.positions, [A]: entry } }],
       });
 
-    it('accepts each of the five Shapes, Closed and Open', () => {
-      expect(RESOURCE_SHAPES).toEqual(['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon']);
+    it('accepts each of the four Shapes, Closed and Open', () => {
+      expect(RESOURCE_SHAPES).toEqual(['rectangle', 'pill', 'ellipse', 'diamond']);
       for (const resourceShape of RESOURCE_SHAPES) {
         const closed = parseEntry({ x: 0, y: 0, open: false, shape: resourceShape });
         expect(closed.success, resourceShape).toBe(true);
@@ -547,8 +547,17 @@ describe('space file maps', () => {
       expect(DEFAULT_RESOURCE_SHAPE).toBe('rectangle');
     });
 
-    it('refuses a Shape outside the five', () => {
-      for (const resourceShape of ['triangle', 'cloud', 'Rectangle', 'square', '', 1, null]) {
+    it('refuses a Shape outside the four, the hexagon among them', () => {
+      for (const resourceShape of [
+        'hexagon',
+        'triangle',
+        'cloud',
+        'Rectangle',
+        'square',
+        '',
+        1,
+        null,
+      ]) {
         expect(
           parseEntry({ x: 0, y: 0, open: false, shape: resourceShape }).success,
           String(resourceShape),

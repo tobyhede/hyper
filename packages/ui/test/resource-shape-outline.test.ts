@@ -1,4 +1,4 @@
-import { COLLAPSED_RESOURCE_SIZE, DEFAULT_OPEN_SIZE, RESOURCE_SHAPES } from '@project/core';
+import { RESOURCE_SHAPES } from '@project/core';
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
@@ -193,30 +193,4 @@ describe('resourceShapeOutline', () => {
       }),
     );
   });
-
-  it.each([COLLAPSED_RESOURCE_SIZE, DEFAULT_OPEN_SIZE])(
-    'draws the hexagon at %o with its side vertices at the side midpoints and flat top and bottom',
-    (size) => {
-      const { width, height } = size;
-      const outline = resourceShapeOutline('hexagon', size);
-      expect(outline.kind).toBe('polygon');
-      const points = outline.kind === 'polygon' ? outline.points : [];
-      expect(points).toContainEqual({ x: 0, y: height / 2 });
-      expect(points).toContainEqual({ x: width, y: height / 2 });
-      expect(points.filter((point) => point.y === 0)).toHaveLength(2);
-      expect(points.filter((point) => point.y === height)).toHaveLength(2);
-    },
-  );
-
-  it.each([
-    [{ width: 260, height: 146 }, [65, 195]],
-    [{ width: 800, height: 100 }, [50, 750]],
-  ] as const)(
-    'insets the hexagon’s points at %o by a quarter of its width, capped at half its height',
-    (size, top) => {
-      const outline = resourceShapeOutline('hexagon', size);
-      const points = outline.kind === 'polygon' ? outline.points : [];
-      expect(points.filter((point) => point.y === 0).map((point) => point.x)).toEqual(top);
-    },
-  );
 });

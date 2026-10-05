@@ -285,11 +285,11 @@ describe('an Ur Resource’s decoration', () => {
         projectionNode(UR_ID, 'ur', open),
         context({ changeResourceShape }),
       );
-      patch.onResourceShapeChange?.('hexagon');
+      patch.onResourceShapeChange?.('ellipse');
     }
     expect(changeResourceShape.mock.calls).toEqual([
-      [UR_ID, 'hexagon'],
-      [UR_ID, 'hexagon'],
+      [UR_ID, 'ellipse'],
+      [UR_ID, 'ellipse'],
     ]);
 
     expect(

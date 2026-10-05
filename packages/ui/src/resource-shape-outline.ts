@@ -38,18 +38,9 @@ export type ResourceShapeOutline = (
 const ARC_INSET = 1 - Math.SQRT1_2;
 
 /**
- * How far the hexagon's inscribed rectangle stands in from the top and bottom,
- * as a fraction of the height; its inline inset is what keeps that rectangle's
- * corners inside the hexagon's slanted sides.
- */
-const HEXAGON_BLOCK_INSET = 0.15;
-
-/**
- * The outline each Shape is drawn in at a rect of `size`. The ellipse, diamond
- * and hexagon fill the rect proportionally; the pill's corners are rounded by
- * half its smaller side, so its ends stay half-circles; the hexagon's points
- * stand in a quarter of the width, capped at half the height so its slanted
- * sides never cross.
+ * The outline each Shape is drawn in at a rect of `size`. The ellipse and
+ * diamond fill the rect proportionally; the pill's corners are rounded by half
+ * its smaller side, so its ends stay half-circles.
  */
 export function resourceShapeOutline(
   resourceShape: ResourceShape,
@@ -81,23 +72,5 @@ export function resourceShapeOutline(
         ],
         inscribed: { inline: width / 4, block: height / 4 },
       };
-    case 'hexagon': {
-      const point = Math.min(width / 4, height / 2);
-      return {
-        kind: 'polygon',
-        points: [
-          { x: point, y: 0 },
-          { x: width - point, y: 0 },
-          { x: width, y: height / 2 },
-          { x: width - point, y: height },
-          { x: point, y: height },
-          { x: 0, y: height / 2 },
-        ],
-        inscribed: {
-          inline: point * (1 - 2 * HEXAGON_BLOCK_INSET),
-          block: height * HEXAGON_BLOCK_INSET,
-        },
-      };
-    }
   }
 }

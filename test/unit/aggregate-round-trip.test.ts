@@ -327,7 +327,7 @@ describe('exporting and importing one complete aggregate', () => {
     const [meta, ...targets] = completeAggregate();
     if (meta === undefined) throw new Error('The aggregate names no Meta Space');
     // Only an Ur Resource takes a Shape (ADR 0121): one Closed in a diamond,
-    // one Open in a hexagon at its remembered Open Size.
+    // one Open in an ellipse at its remembered Open Size.
     const withResourceShapes: SpaceSnapshot = {
       ...meta,
       document: {
@@ -344,7 +344,7 @@ describe('exporting and importing one complete aggregate', () => {
               y: 400,
               open: true,
               openSize: { width: 480, height: 270 },
-              shape: 'hexagon',
+              shape: 'ellipse',
             },
           },
         })),
@@ -359,7 +359,7 @@ describe('exporting and importing one complete aggregate', () => {
     await exportTo(repositoryHolding([withResourceShapes, ...targets]), destination);
     const written = await readFile(join(destination, META_SPACE_ID, 'space.json'), 'utf8');
     // Written last on the entry, after an Open Resource's remembered Open Size.
-    expect(written).toMatch(/"openSize": \{[^}]*\},\s*"shape": "hexagon"/);
+    expect(written).toMatch(/"openSize": \{[^}]*\},\s*"shape": "ellipse"/);
     const reimported = await importFrom(destination);
 
     const positions = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID)
@@ -370,7 +370,7 @@ describe('exporting and importing one complete aggregate', () => {
       y: 400,
       open: true,
       openSize: { width: 480, height: 270 },
-      shape: 'hexagon',
+      shape: 'ellipse',
     });
     expect(positions?.[FIRST_LINK_ID]).toEqual({ x: 340, y: 0, open: false, shape: 'rectangle' });
     // An entry with no Shape stored is written and read back without one.

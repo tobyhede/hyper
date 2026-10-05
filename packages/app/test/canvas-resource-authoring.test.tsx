@@ -309,8 +309,8 @@ describe('canvas Resource authoring', () => {
     expect(resourceShapeOf(spaceSession)).toBe('diamond');
 
     rerender({ ...props, open: true });
-    act(() => onlyNode(result.current.nodes).data.onResourceShapeChange?.('hexagon'));
-    expect(resourceShapeOf(spaceSession)).toBe('hexagon');
+    act(() => onlyNode(result.current.nodes).data.onResourceShapeChange?.('ellipse'));
+    expect(resourceShapeOf(spaceSession)).toBe('ellipse');
   });
 
   /**

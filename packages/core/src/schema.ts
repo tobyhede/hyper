@@ -374,7 +374,7 @@ const openSizeSchema = z.object({
  * Every member touches the midpoint of each side of the Resource's rect, where
  * Edges attach.
  */
-export const RESOURCE_SHAPES = ['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon'] as const;
+export const RESOURCE_SHAPES = ['rectangle', 'pill', 'ellipse', 'diamond'] as const;
 
 export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 

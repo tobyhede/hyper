@@ -1165,7 +1165,7 @@ export const spaceRepositoryContract = (
       await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
       await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(initial, 0n, null));
 
-      const changed = withResourceShapes('ellipse', 'hexagon', true);
+      const changed = withResourceShapes('ellipse', 'diamond', true);
       await expect(commitUpdate(repository, changed, 0n)).resolves.toMatchObject({
         kind: 'committed',
       });

@@ -664,7 +664,7 @@ describe('Change Shape', () => {
     authoring.complete(CANVAS, {
       kind: 'changed-resource-shape',
       resourceId: RESOURCE_A,
-      shape: 'hexagon',
+      shape: 'ellipse',
     });
     expect(
       authoring.complete(CANVAS, {

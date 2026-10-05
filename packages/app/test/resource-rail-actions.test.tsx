@@ -967,13 +967,13 @@ describe('a Resource’s commands on the canvas rail', () => {
     await selectResource('Gateway');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Shape: Diamond' }));
-    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Hexagon' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Ellipse' }));
     await waitFor(() =>
       expect(session.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape).toBe(
-        'hexagon',
+        'ellipse',
       ),
     );
-    expect(await screen.findByRole('button', { name: 'Shape: Hexagon' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Shape: Ellipse' })).toBeVisible();
     await settled(session);
   });
 

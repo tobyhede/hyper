@@ -2294,7 +2294,6 @@ describe('the Shape a Resource front is drawn in', () => {
     ['pill', 'rect'],
     ['ellipse', 'rect'],
     ['diamond', 'polygon'],
-    ['hexagon', 'polygon'],
   ] as const)('draws a %s in its own outline, Open and Closed', (resourceShape, element) => {
     for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
       const { unmount } = render(
@@ -2315,7 +2314,7 @@ describe('the Shape a Resource front is drawn in', () => {
    * bounding rect. Whether it shows is `canvas-resource.css`'s, keyed on the
    * state.
    */
-  it.each(['pill', 'ellipse', 'diamond', 'hexagon'] as const)(
+  it.each(['pill', 'ellipse', 'diamond'] as const)(
     'draws a %s ring and edge from one geometry, Open and Closed',
     (resourceShape) => {
       for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
@@ -2415,7 +2414,7 @@ describe('the Title a Shape draws', () => {
   const ladder = (resource: HTMLElement) =>
     [...resource.querySelectorAll('.canvas-resource__title-line')].map((line) => line.textContent);
 
-  it.each(['pill', 'ellipse', 'diamond', 'hexagon'] as const)(
+  it.each(['pill', 'ellipse', 'diamond'] as const)(
     'draws the short Title on one line in a %s, Open and Closed',
     (resourceShape) => {
       for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
@@ -2484,7 +2483,7 @@ describe('the Title a Shape draws', () => {
 
 /*
  * An Ur Resource's Shape is chosen from its rail (ADR 0121): one control whose
- * face is the Shape it is drawn in, opening the five Shapes as a radio list.
+ * face is the Shape it is drawn in, opening the four Shapes as a radio list.
  */
 describe('choosing an Ur Resource’s Shape from its rail', () => {
   const props = {
@@ -2505,12 +2504,12 @@ describe('choosing an Ur Resource’s Shape from its rail', () => {
         <CanvasResource
           {...props}
           front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
-          shape="hexagon"
+          shape="ellipse"
           display={display}
         />,
       );
-      const face = trigger('Shape: Hexagon');
-      expect(face.querySelector('svg[data-resource-shape="hexagon"]')).not.toBeNull();
+      const face = trigger('Shape: Ellipse');
+      expect(face.querySelector('svg[data-resource-shape="ellipse"]')).not.toBeNull();
       unmount();
     }
   });
@@ -2526,7 +2525,7 @@ describe('choosing an Ur Resource’s Shape from its rail', () => {
     expect(trigger('Shape: Rectangle')).toBeVisible();
   });
 
-  it('lists the five Shapes, each drawn and named, with the current one chosen and no caption', async () => {
+  it('lists the four Shapes, each drawn and named, with the current one chosen and no caption', async () => {
     render(
       <CanvasResource
         {...props}
@@ -2543,13 +2542,12 @@ describe('choosing an Ur Resource’s Shape from its rail', () => {
       'Pill',
       'Ellipse',
       'Diamond',
-      'Hexagon',
     ]);
     expect(
       items.map((item) =>
         item.querySelector('svg[data-resource-shape]')?.getAttribute('data-resource-shape'),
       ),
-    ).toEqual(['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon']);
+    ).toEqual(['rectangle', 'pill', 'ellipse', 'diamond']);
     expect(checked()).toEqual(['Diamond']);
     expect(list).not.toHaveTextContent(/^Shape/u);
   });

@@ -782,7 +782,6 @@ test(
       'Pill',
       'Ellipse',
       'Diamond',
-      'Hexagon',
     ]);
     for (const [index, resourceShape] of RESOURCE_SHAPES.entries()) {
       await expect(

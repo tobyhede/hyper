@@ -745,7 +745,7 @@ describe.each([
       expect(space.resources).toHaveLength(resources.length);
     });
 
-    it.each(['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon'] as const)(
+    it.each(['rectangle', 'pill', 'ellipse', 'diamond'] as const)(
       'loads an Ur Resource in the %s, Open or Closed',
       (resourceShape) => {
         const ur: Resource = { id: A, title: 'Node', kind: 'ur' };
@@ -777,7 +777,7 @@ describe.each([
     it.each(everyKind.filter(([kind]) => kind !== 'ur'))(
       'refuses a %s Resource in any Shape but the rectangle',
       (_kind, resources) => {
-        for (const resourceShape of ['pill', 'ellipse', 'diamond', 'hexagon'] as const) {
+        for (const resourceShape of ['pill', 'ellipse', 'diamond'] as const) {
           expect(refused(placedIn(resources, resourceShape))).toEqual([
             expect.objectContaining({ kind: 'shape-requires-ur-resource', ref: A }),
           ]);
