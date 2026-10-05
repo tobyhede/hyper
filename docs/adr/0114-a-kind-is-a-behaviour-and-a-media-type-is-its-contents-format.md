@@ -10,7 +10,7 @@ Resource kinds are modules. A content kind is one module registered once at comp
 
 **Reference and Space are not content kinds.** A Reference Resource's content is another Resource's (ADR 0070) and a Space Resource's content is another Space, whose lifetime it shares (ADR 0074); both take part in the aggregate's own validation. They remain the domain's, and every content kind, whatever is registered, can be a Reference Resource's Target.
 
-A stored Resource whose kind is not registered is refused at intake, because the repository is the only source of state and every registered kind is in it (ADR 0054, ADR 0056). This is the rule while every kind is built in. If runtime kinds are ever built, ADR 0113 already says what such a Resource is: every capability is a Resource's, so it is still titled, placed, connected, Opened and presented, and it can be drawn as its Title alone, as an Ur Resource is.
+A stored Resource whose kind is not registered is refused at intake, because the repository is the only source of state and every registered kind is in it (ADR 0054, ADR 0056).
 
 ## Prior art
 
