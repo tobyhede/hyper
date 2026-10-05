@@ -1,6 +1,7 @@
 # Running serves an Aggregate directory as the durable copy
 
 Status: accepted
+Refined by: 0119
 Related: 0018, 0030, 0056, 0078, 0109
 
 `pnpm start <dir>` **runs** an Aggregate directory. It Imports the directory into a fresh in-memory store, serves the application from that store, Exports back to the directory after every committed edit once edits have been quiet for about a second, Exports once more when the run is stopped, and discards the store. A directory that is missing or empty is established as the new Space (ADR 0018) and written at once; a directory holding only dot-entries, such as the `.git` a fresh `git init` leaves, is empty, and its dot-entries are kept. A directory that is not a valid Aggregate directory, including a single Space directory with no `hyper.json`, is refused with the intake's errors and nothing is served.

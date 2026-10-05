@@ -146,7 +146,7 @@ The bytes of every stored picture the aggregate's Image Resources show ([ADR 011
 - Importing admits every visible regular file in `images/` by the rule an upload uses: the format is read from the bytes, and a file is at most 10 MiB. A file that is not such an image, or is **not named for its own content**, refuses the whole directory.
 - A Resource whose `/images/<content-id>` has no file in `images/` is allowed. It draws as a picture that will not load.
 - An `https:` or `http:` URL stays a URL. Hyper does not download it, and nothing is written to `images/` for it.
-- Exporting rewrites `images/` whole: a picture no Resource shows any more is removed, and an `images/` left empty is removed. Dotfiles, subdirectories and links inside `images/` are left alone.
+- Exporting owns the image files in `images/`: a picture no Resource shows any more is removed, and an `images/` left empty is removed. Dotfiles, subdirectories and links inside `images/` are left alone.
 
 ## Which Ids may be left out
 
@@ -162,10 +162,20 @@ The next Export writes every minted Id into the files.
 
 ## What Exporting replaces, and what it keeps
 
-Exporting replaces exactly what Importing reads, and keeps everything else:
+Exporting writes the directory **in place** ([ADR 0119](adr/0119-export-writes-in-place-and-git-answers-for-a-partial-write.md)). It owns exactly what Importing reads, and never reads, copies or touches anything else:
 
-- **Replaced:** `hyper.json`; each Space directory's `space.json`, every `*.md` beside it and every `resources/*.md`; the image files in `images/`. A Space directory whose Space is gone is removed.
-- **Kept:** any other file or directory, at the root or inside a Space directory, such as notes in a `notes/` directory or a `.gitignore`.
+- **Owned:** `hyper.json`; each Space directory's `space.json`, every `*.md` beside it and every `resources/*.md`; the image files in `images/`.
+- **Kept:** any other file or directory, at the root or inside a Space directory, such as `.git`, a `README.md` at the root, notes in a `notes/` directory or a `.gitignore`.
+
+One write goes like this:
+
+1. Every file the aggregate serialises to is computed in memory and checked the way Importing would read it. If it would not read back, nothing is written.
+2. A file whose bytes are already on disk is left alone, so an unchanged file keeps its timestamp. Every other file is written to a dot-prefixed temporary file beside it and renamed over it, so no file is ever half-written.
+3. Each owned file the aggregate no longer has is removed: a removed Resource's file, a `*.md` beside `space.json`, a picture no Resource shows, the files of a Space that is gone. A directory that removal leaves empty is removed too, so a gone Space's directory disappears unless it holds files of yours.
+
+The directory itself, and each Space directory in it, is never renamed or recreated, so a shell or editor open inside one keeps working. A missing directory is created. Exporting refuses to write through a symbolic link.
+
+**There is no whole-write atomicity, backup or recovery copy.** A crash in the middle of a write can leave some files new and some old. Keep the directory under git: git restores it.
 
 **Markdown beside `space.json` is not kept.** A `README.md` or any other `*.md` in a Space directory or its `resources/` is read as a Resource file: it is either Imported as a Resource or, without valid frontmatter, refuses the directory. Either way the next Export removes it. Keep prose about a Space under a name or directory Hyper does not scan.
 

@@ -34,6 +34,7 @@ Work from the root of the Hyper clone. Each step ends on its completion criterio
    - Edits are written into the directory about a second after they stop editing, and again when they press Ctrl-C. A second Ctrl-C exits without waiting.
    - **Git is the undo.** To recover an edit, or after a `git pull` or a second run on the same directory, use git: Hyper's next write replaces what is on disk with what it holds. Pull, and edit files by hand, with Hyper stopped.
    - Killing Hyper outright within that second loses the edits not yet written; stopping it normally never does.
+   - Hyper writes only its own files, in place, and changes only the ones whose content changed. Anything else in the directory (`.git`, a README at the top, a `notes/` directory) is left alone. A crash in the middle of a write can leave some files new and some old; git restores them.
    - A `*.md` file beside `space.json` is read as a Resource and removed or rewritten by the next write, so notes belong in another directory.
    - Uploaded pictures are written to `images/` and committed with everything else.
    - Commit from the content directory: `git -C <dir> add -A && git -C <dir> commit`.

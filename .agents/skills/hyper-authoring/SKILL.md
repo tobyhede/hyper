@@ -9,7 +9,7 @@ An **Aggregate directory** is Hyper's on-disk form: `hyper.json` naming the Meta
 
 ## Steps
 
-1. **Stop the run.** If `pnpm start` is running on this directory, stop it (Ctrl-C, or SIGINT to the process group you started) and wait for it to exit. A running Hyper writes the whole directory from memory after every edit, so its next write replaces anything you change underneath it.
+1. **Stop the run.** If `pnpm start` is running on this directory, stop it (Ctrl-C, or SIGINT to the process group you started) and wait for it to exit. A running Hyper writes every file it owns from memory after every edit, so its next write replaces anything you change in those files underneath it.
    Done when nothing is serving the directory: `pgrep -fl "start-run.ts.*<dir>"` prints nothing.
 
 2. **Read what is there.** If the directory exists, read `hyper.json`, every Space's `space.json` and its Resource files, and check `git -C <dir> status` so your change starts from a clean or known state. A new directory needs a `hyper.json`, and a Meta Space directory with a `space.json`, before anything else.

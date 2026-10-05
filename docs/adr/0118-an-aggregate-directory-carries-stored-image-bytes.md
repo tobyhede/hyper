@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0106
+Refined by: 0119
 Related: 0054, 0056, 0078, 0117
 
 ADR 0106 kept a stored image outside the aggregate and had Export carry only an Image Resource's URL. So Export, a reset and Import restored a Space and not its uploaded pictures, and an Aggregate directory committed to git lost every picture an author had uploaded. Running (ADR 0117) makes the directory the only durable copy, so that loss would be a loss of authored work. The tracked fixture already needed a workaround for it: a separate directory of image files that the fixture importer stored first.
