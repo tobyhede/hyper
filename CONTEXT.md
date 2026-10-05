@@ -168,16 +168,20 @@ An application-supplied collection of the Space's Resources absent from the sele
 _Avoid_: Space-Resource palette, Resource panel, drawer, popover or Dock as the domain name.
 
 **Exporting**:
-Projecting the complete aggregate into the repository-friendly form an author can review, commit and share. The unit is every Space at once, rooted at the Meta Space, rather than one Space chosen from among them. Exporting is not what makes an edit durable; it records each Space outside Hyper at the revision it was read at.
+Projecting the complete aggregate into the repository-friendly form an author can review, commit and share. The unit is every Space at once, rooted at the Meta Space, rather than one Space chosen from among them. Outside Running, Exporting is not what makes an edit durable; it records each Space outside Hyper at the revision it was read at. While Running, it is the only thing that does.
 _Avoid_: saving, publishing, syncing; exporting a single Space.
 
 **Aggregate directory**:
-The on-disk form Exporting projects and Importing replaces: a directory holding `hyper.json` (naming the Meta Space) and one child directory per Space, each named for that Space's Id in lower case and holding `space.json` plus Resource markdown (`*.md` beside the space file and under `resources/`). Anything else in those directories is preserved across a round trip; what Exporting removes is exactly what Importing scans. Reading an Aggregate directory also identifies any omitted nested Ids before the persistence seam sees the Aggregate.
+The on-disk form Exporting projects and Importing replaces: a directory holding `hyper.json` (naming the Meta Space) and one child directory per Space, each named for that Space's Id in lower case and holding `space.json` plus Resource markdown (`*.md` beside the space file and under `resources/`), and an `images/` directory holding the bytes of every stored image the aggregate references, named by their content. Anything else in those directories is preserved across a round trip; what Exporting removes is exactly what Importing scans. Reading an Aggregate directory also identifies any omitted nested Ids before the persistence seam sees the Aggregate.
 _Avoid_: catalog, bundle, export root as a second name for the same artifact.
 
 **Importing**:
 Taking a complete aggregate from outside Hyper and making it the stored one. It either establishes the aggregate of a repository that has none, or replaces the stored one outright, whatever is stored and whether or not it is a valid aggregate (ADR 0094) — never both, and never partly. Importing does not merge, reconcile or add to what is stored, and it does not rewrite what it read.
 _Avoid_: loading, restoring, syncing; merging.
+
+**Running**:
+Serving an Aggregate directory as the working aggregate: Importing it into a fresh store, Exporting back to it after every committed edit and once more on stopping, and discarding the store when the run ends. While Running, the directory is the only durable copy, so Exporting is what makes an edit durable. The directory is expected to be under version control, which is what answers for history, undo and concurrent writers; the last write wins.
+_Avoid_: watching, syncing, live mode, session (that is the client's edit-coalescing seam).
 
 **Opening**:
 Bringing a single Resource's content up **on the Resource itself**, by growing it where it already sits. A Markdown Resource opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. A Reference Resource opens on its own Title and its immutable Target's content read-only, while the Target Resource must be opened explicitly to author that content. An Image Resource opens on its image. A Space Resource opens on the Map it selects. Opening is not presenting — the canvas it happens on is still what is being worked in — and Open Markdown content reads through the same renderer used while presenting.
