@@ -28,7 +28,8 @@ export type {
   CanvasResourceState,
 } from './CanvasResource';
 export { SpaceResourceSelectors } from './SpaceResourceSelectors';
-export { ResourceShapeMenu, resourceShapeName } from './ResourceShapeMenu';
+export { ResourceShapeMenu } from './ResourceShapeMenu';
+export { RESOURCE_SHAPE_LABELS, ResourceShapeIcon } from './ResourceShape';
 export type { ResourceShapeMenuProps } from './ResourceShapeMenu';
 export type {
   CanvasSpaceResourceChoice,
@@ -166,7 +167,6 @@ export {
   UrIcon,
   PlusIcon,
   RemoveFromMapIcon,
-  ResourceShapeIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,

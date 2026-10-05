@@ -1,24 +1,11 @@
 import { RESOURCE_SHAPES, type ResourceShape } from '@project/core';
 import { ChoiceMenu, ChoiceMenuTrigger } from './ChoiceMenu';
 import { ToolbarButton } from './components/toolbar';
-import { ResourceShapeIcon } from './icons';
-
-/** How each Shape is named wherever it is offered. */
-const RESOURCE_SHAPE_NAMES = {
-  rectangle: 'Rectangle',
-  pill: 'Pill',
-  ellipse: 'Ellipse',
-  diamond: 'Diamond',
-  hexagon: 'Hexagon',
-} as const satisfies Record<ResourceShape, string>;
-
-/** The name a Shape is offered by: `Diamond`. */
-export const resourceShapeName = (resourceShape: ResourceShape): string =>
-  RESOURCE_SHAPE_NAMES[resourceShape];
+import { RESOURCE_SHAPE_LABELS, ResourceShapeIcon } from './ResourceShape';
 
 const RESOURCE_SHAPE_CHOICES = RESOURCE_SHAPES.map((resourceShape) => ({
   id: resourceShape,
-  title: resourceShapeName(resourceShape),
+  title: RESOURCE_SHAPE_LABELS[resourceShape],
   icon: <ResourceShapeIcon shape={resourceShape} />,
 }));
 
@@ -59,7 +46,7 @@ export function ResourceShapeMenu({ shape: resourceShape, onChoose }: ResourceSh
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
           className="nokey nodrag nopan gap-1 px-1.5"
-          aria-label={`Shape: ${resourceShapeName(resourceShape)}`}
+          aria-label={`Shape: ${RESOURCE_SHAPE_LABELS[resourceShape]}`}
           icon={<ResourceShapeIcon shape={resourceShape} />}
         />
       }
