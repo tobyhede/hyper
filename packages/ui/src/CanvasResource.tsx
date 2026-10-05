@@ -54,7 +54,12 @@ import { ResourceImage } from './ResourceImage';
 import { ImageReplaceTarget } from './ImageReplaceTarget';
 import { UnresolvedContent } from './UnresolvedContent';
 import { atRest, drawnResourceShape, type FrontDisplay } from './resource-display';
-import { resourceShapeOutline, type OutlinePoint } from './resource-shape-outline';
+import {
+  resourceShapeOutline,
+  type OutlinePoint,
+  type OutlineSize,
+  type ResourceShapeOutline,
+} from './resource-shape-outline';
 
 /**
  * What a Resource front offers beyond its shared Title (ADR 0051): a kind-owned
@@ -151,6 +156,13 @@ interface CanvasResourceCommonProps {
    * is given the rectangle by its caller.
    */
   readonly shape: ResourceShape;
+  /**
+   * The rect the Resource is drawn at, in canvas units, which its Shape's
+   * outline and inscribed rectangle are answered for. A canvas adapter supplies
+   * the size it gives the Resource; absent, the front is drawn at the Closed
+   * Size.
+   */
+  readonly size?: OutlineSize;
   /**
    * Where the Resource's command toolbar is drawn, and when.
    *
@@ -426,14 +438,15 @@ export function CanvasResource(props: CanvasResourceProps) {
       onOpenChange !== undefined ||
       actionableEntityActions ||
       beginContentEdit !== undefined);
-  const { inscribed } = resourceShapeOutline(frontResourceShape);
+  const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
+  const outline = resourceShapeOutline(frontResourceShape, size);
   const style: CanvasResourceStyle = {
     '--canvas-resource-graph': graphColor,
     '--canvas-resource-drag-tilt': `${CANVAS_RESOURCE_DRAG_TILT_DEGREES}deg`,
-    // The Shape's inscribed rectangle, as a share of the Closed Size, which
-    // `canvas-resource.css` lays the Title and kind glyph out in.
-    '--canvas-resource-shape-inset-inline': `${(inscribed.inline / COLLAPSED_RESOURCE_SIZE.width) * 100}%`,
-    '--canvas-resource-shape-inset-block': `${(inscribed.block / COLLAPSED_RESOURCE_SIZE.height) * 100}%`,
+    // The Shape's inscribed rectangle, as a share of the rect it is drawn at,
+    // which `canvas-resource.css` lays the Title and kind glyph out in.
+    '--canvas-resource-shape-inset-inline': `${(outline.inscribed.inline / size.width) * 100}%`,
+    '--canvas-resource-shape-inset-block': `${(outline.inscribed.block / size.height) * 100}%`,
   };
   const markdownBodyProps: Mutable<
     Pick<MarkdownResourceBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
@@ -649,7 +662,7 @@ export function CanvasResource(props: CanvasResourceProps) {
           shared command surface. The Graph's colour is on this Resource — `--canvas-resource-graph` below draws the
           Title's own hover and caret treatment — and on the handles and
           Edges the adapter draws around it. */}
-      {drawsOutline && <ResourceShapeOutlineDrawing shape={frontResourceShape} />}
+      {drawsOutline && <ResourceShapeOutlineDrawing outline={outline} size={size} />}
       {rail}
       {props.renderToolbar?.(toolbar)}
       <CardContent ref={bodyControl} className="canvas-resource__body">
@@ -744,19 +757,24 @@ export function CanvasResource(props: CanvasResourceProps) {
  * A Closed Shape's paper and edge, drawn in place of the front's own border
  * and fill, which `canvas-resource.css` withdraws for it.
  *
- * Drawn at the Closed Size and stretched to the Resource's rect, so the outline
- * touches the midpoint of each of the rect's sides, where the adapter's handles
- * sit and Edges attach (ADR 0110, ADR 0117). The stroke keeps the border's
- * width at any rect because it does not scale with the drawing.
+ * Drawn in the units of the rect the Resource is drawn at, so the drawing is
+ * not stretched and the outline touches the midpoint of each of the rect's
+ * sides, where the adapter's handles sit and Edges attach (ADR 0110, ADR
+ * 0117). The stroke keeps the border's width at any zoom because it does not
+ * scale with the drawing.
  *
  * The geometry is drawn twice: first the selection ring, a wider stroke that
  * `canvas-resource.css` shows only while the Resource is selected or its Title
  * is being written, then the edge, whose fill covers the ring's inner half. So
  * the ring follows the outline.
  */
-function ResourceShapeOutlineDrawing({ shape: resourceShape }: { readonly shape: ResourceShape }) {
-  const outline = resourceShapeOutline(resourceShape);
-  const { width, height } = COLLAPSED_RESOURCE_SIZE;
+function ResourceShapeOutlineDrawing({
+  outline,
+  size: { width, height },
+}: {
+  readonly outline: ResourceShapeOutline;
+  readonly size: OutlineSize;
+}) {
   return (
     <svg
       className="canvas-resource__outline"

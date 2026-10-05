@@ -124,6 +124,8 @@ export function ResourceNode({
   selected,
   dragging,
   isConnectable,
+  width,
+  height,
 }: NodeProps<ResourceFlowNode>) {
   /**
    * Which handle role the live drag is looking for, or `null` when none is.
@@ -233,9 +235,15 @@ export function ResourceNode({
   const canvasResourceOptionalProps: Mutable<
     Pick<
       CanvasResourceProps,
-      'onBeginTitleEdit' | 'entityActions' | 'onBodyHeightChange' | 'contextNotice'
+      'onBeginTitleEdit' | 'entityActions' | 'onBodyHeightChange' | 'contextNotice' | 'size'
     >
   > = {};
+  // The rect React Flow draws this Resource at, which the projection declares
+  // from its Placement and republishes on every resize frame. Absent until the
+  // layout resolves, when the front is drawn at the Closed Size.
+  if (width !== undefined && height !== undefined) {
+    canvasResourceOptionalProps.size = { width, height };
+  }
   if (data.contextNotice !== undefined && data.contextNotice !== null) {
     canvasResourceOptionalProps.contextNotice = data.contextNotice;
   }

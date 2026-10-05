@@ -2425,6 +2425,35 @@ describe('the Shape a Resource front is drawn in', () => {
     },
   );
 
+  /*
+   * jsdom has no layout, so the drawing's own units are what show it is drawn
+   * at the Resource's rect rather than stretched from the Closed Size.
+   */
+  it('draws the outline in the units of the rect the Resource is drawn at', () => {
+    const { rerender } = render(
+      <CanvasResource {...props} shape="pill" display={CLOSED_DISPLAY} />,
+    );
+    const resource = screen.getByRole('article', { name: 'Decide' });
+    expect(outline(resource)?.getAttribute('viewBox')).toBe('0 0 260 146');
+    expect(
+      outline(resource)?.querySelector('.canvas-resource__outline-edge')?.getAttribute('rx'),
+    ).toBe('73');
+
+    rerender(
+      <CanvasResource
+        {...props}
+        shape="pill"
+        size={{ width: 400, height: 100 }}
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    expect(outline(resource)?.getAttribute('viewBox')).toBe('0 0 400 100');
+    const edge = outline(resource)?.querySelector('.canvas-resource__outline-edge');
+    expect(edge?.getAttribute('width')).toBe('400');
+    expect(edge?.getAttribute('height')).toBe('100');
+    expect(edge?.getAttribute('rx')).toBe('50');
+  });
+
   it('draws no outline for a Closed rectangle', () => {
     render(<CanvasResource {...props} shape="rectangle" display={CLOSED_DISPLAY} />);
     expect(outline(screen.getByRole('article', { name: 'Decide' }))).toBeNull();
