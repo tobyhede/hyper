@@ -64,7 +64,7 @@ const chainEdges = (ids: readonly UUID[]): GraphEdge[] => {
 };
 
 /** One Map owning one Graph over every generated Resource, at the given positions. */
-/** An Ur Resource's document, the one kind a Map may draw in any Shape (ADR 0120). */
+/** An Ur Resource's document, the one kind a Map may draw in any Shape (ADR 0121). */
 const urDocument = (title: string): ResourceDocument => ({ title, kind: 'ur' });
 
 const baseSnapshot = (
@@ -496,7 +496,7 @@ describe('SnapshotEdit.createInMap properties', () => {
           expect(outcome.kind).toBe('completed');
           if (outcome.kind !== 'completed') return;
           expect(loadSpaceSnapshot(outcome.snapshot).ok).toBe(true);
-          // No Shape is stored, so it draws as the rectangle (ADR 0120).
+          // No Shape is stored, so it draws as the rectangle (ADR 0121).
           expect(outcome.snapshot.document.maps?.[0]?.positions[newResourceId]).toEqual({
             x: anchor.x,
             y: anchor.y,
@@ -1022,7 +1022,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
   it('keeps every Shape through Open, any number of Resizes, a magnetic Close and Close', () => {
     // A Shape is drawn inside the fixed Closed Size and changes no rect, so the
     // Edits that move and grow Resources carry every entry's Shape through
-    // untouched — the subject's and each displaced neighbour's (ADR 0120).
+    // untouched — the subject's and each displaced neighbour's (ADR 0121).
     fc.assert(
       fc.property(
         entriesArb,
@@ -1255,7 +1255,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
           const exact = completed(
             SnapshotEdit.addToMap(snapshot, MAP_ID, subject, anchor, 'exact'),
           );
-          // Add to Map gives it the rectangle (ADR 0120).
+          // Add to Map gives it the rectangle (ADR 0121).
           expect(mapIn(exact, MAP_ID)?.positions[subject]).toEqual({
             x: anchor.x,
             y: anchor.y,

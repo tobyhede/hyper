@@ -284,7 +284,7 @@ describe('canvas Resource authoring', () => {
   });
 
   /**
-   * An Ur Resource's Shape is chosen on its rail (ADR 0120): one Edit on the
+   * An Ur Resource's Shape is chosen on its rail (ADR 0121): one Edit on the
    * Map, Open and Closed alike, offered only where a refusal can be reported.
    */
   it('changes an Ur Resource’s Shape on its Map, and offers no choice without command outcomes', () => {

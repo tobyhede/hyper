@@ -6,7 +6,7 @@ const RULE = 'no-shape-in-symbol-names';
 /** The domain compound `.oxlintrc.json` allows, as it configures the rule. */
 const HEAD_SHAPE = ['error', { allowedCompounds: ['head shape'] }] as const;
 
-/** The Resource Shape terms `.oxlintrc.json` allows beside it (ADR 0120). */
+/** The Resource Shape terms `.oxlintrc.json` allows beside it (ADR 0121). */
 const RESOURCE_SHAPE = [
   'error',
   { allowedCompounds: ['head shape', 'resource shape'], allowedNames: ['shape'] },
@@ -76,7 +76,7 @@ describe('no-shape-in-symbol-names', () => {
     );
   });
 
-  // ADR 0120 stores a Map entry's Shape as `shape`: the domain term is the
+  // ADR 0121 stores a Map entry's Shape as `shape`: the domain term is the
   // one word, so it is allowed as that field's name — wherever a property is
   // named — and nowhere else.
   it('allows a configured whole name where it names a property', () => {

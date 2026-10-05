@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0070, 0106
+Refined by: 0120
 Related: 0009, 0064, 0066, 0068, 0084, 0113
 
 What a Resource's content asks of the canvas is decided from its **resolved content**, not from its stored kind. That covers four things: the size it first Opens to, the floor below which an Open Resize stops before snapping to Close, whether it embeds a Map, and whether its Open front draws a content area above the Title. A Reference Resource resolves to its Target's content (ADR 0070, single-hop by ADR 0009), so it takes all four from its Target. A Reference Resource to a Space Resource first Opens at a Space Resource's Open Size, keeps a Space Resource's resize floor, reports its body height as the Map it embeds needs, and draws no content area. A Reference Resource to an Ur Resource draws no content area either. The one thing a Reference Resource's kind decides is the one ADR 0113 leaves to a kind: its **content actions**. It offers none, because what it shows is its Target's content, read-only.

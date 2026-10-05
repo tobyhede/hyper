@@ -601,7 +601,7 @@ describe('Change Shape', () => {
       resource.id === RESOURCE_A ? { id: RESOURCE_A, document } : resource,
     ),
   });
-  /** Only an Ur Resource takes a Shape (ADR 0120), so A is one here. */
+  /** Only an Ur Resource takes a Shape (ADR 0121), so A is one here. */
   const urSnapshot = withA({ title: 'A', kind: 'ur' });
   it('draws one Resource in another Shape on this Map, as one Edit that moves nothing else', () => {
     const { authoring, session } = open(urSnapshot);

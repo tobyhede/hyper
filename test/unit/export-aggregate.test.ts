@@ -83,7 +83,7 @@ const storedSpace: LoadedSpace = {
       ],
     },
     resources: [
-      // B and E are drawn in Shapes, which only an Ur Resource takes (ADR 0120).
+      // B and E are drawn in Shapes, which only an Ur Resource takes (ADR 0121).
       { id: RESOURCE_B, document: { title: 'B', kind: 'ur' } },
       { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
       { id: RESOURCE_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },

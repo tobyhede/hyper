@@ -39,7 +39,7 @@ test red rather than going unnoticed.
   identifier names a property — a non-computed object or destructuring key
   (not a shorthand destructuring key, which also binds a local), a member
   access's property, a type member or a JSX attribute — so the Map entry's
-  `shape` field (ADR 0120) can be written while a local or parameter named
+  `shape` field (ADR 0121) can be written while a local or parameter named
   `shape`, and `shapes`, `shapeOf` or `entryShape`, is still reported. Read in the same `before` hook. Pinned by
   `test/unit/anti-slop/no-shape-in-symbol-names.test.ts`.
 

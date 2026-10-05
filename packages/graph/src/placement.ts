@@ -72,7 +72,7 @@ const brand = (positions: ReadonlyMap<ResourceId, Readonly<ResourcePlacement>>):
 
 /**
  * A whole entry, or a bare point for a Resource joining the placement, which
- * joins Closed with no Shape stored, so it draws as the rectangle (ADR 0120).
+ * joins Closed with no Shape stored, so it draws as the rectangle (ADR 0121).
  */
 type PlacementPoint = ResourcePlacement | (MapPosition & { readonly open?: never });
 
@@ -230,7 +230,7 @@ function next(
  * Add Resource and Add to Map place a Resource where the author aimed it, which
  * is authorship rather than a report — no renderer has drawn that Resource yet,
  * so it cannot come through `next`. A bare point joins Closed with no Shape
- * stored (ADR 0120).
+ * stored (ADR 0121).
  */
 function place(placement: Placement, resourceId: ResourceId, at: PlacementPoint): Placement {
   const placed = new Map(placement);
@@ -371,7 +371,7 @@ function roomAxis(at: MapPosition, subject: MapPosition): 'x' | 'y' | null {
  * was when it Opened.
  *
  * Open/Closed state, the remembered Open Size and the Shape ride through
- * untouched; only `x` and `y` move (ADR 0066, ADR 0120). Answers the placement
+ * untouched; only `x` and `y` move (ADR 0066, ADR 0121). Answers the placement
  * it was given whenever no Resource actually moves — a subject the map does not
  * hold, a growth that is zero on both axes, and the case neither of those
  * catches: a nonzero growth with nothing clear of the subject, which `reclaim`

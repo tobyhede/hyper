@@ -79,7 +79,7 @@ export type ResourceNodeData = {
    */
   onEditResource?: (open: boolean) => 'completed' | 'retained';
   /**
-   * Draw this Ur Resource in another Shape on its Map (ADR 0120). Absent on
+   * Draw this Ur Resource in another Shape on its Map (ADR 0121). Absent on
    * every other kind, and wherever the Map may not be authored.
    */
   onResourceShapeChange?: (resourceShape: ResourceShape) => void;
@@ -199,7 +199,7 @@ export type ResourceNodeData = {
   display: ResourceDisplay;
   /**
    * The Shape the Map draws this Resource in, resolved — the rectangle where
-   * its entry stores none — and drawn Open and Closed alike (ADR 0120).
+   * its entry stores none — and drawn Open and Closed alike (ADR 0121).
    */
   shape: ResourceShape;
   active: boolean;

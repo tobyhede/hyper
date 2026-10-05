@@ -150,7 +150,7 @@ export interface EntityActionOption {
 
 /**
  * One of a closed set the entity has, chosen from a submenu of the menu — a
- * Resource's Shape on a Map (ADR 0120).
+ * Resource's Shape on a Map (ADR 0121).
  *
  * Drawn as a row naming the set, which opens the set as a
  * {@link ChoiceSubmenu}: a labelled radio list with the current member marked.

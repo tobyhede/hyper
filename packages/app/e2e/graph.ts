@@ -801,7 +801,7 @@ export async function resourceControls(page: Page, resource: Locator): Promise<L
 }
 
 /**
- * Open an Ur Resource's Shape choice from its rail (ADR 0120), selecting the
+ * Open an Ur Resource's Shape choice from its rail (ADR 0121), selecting the
  * Resource first when its toolbar is not drawn, and answer the list of Shapes.
  * The list is uncaptioned; the control's face names the current Shape.
  */

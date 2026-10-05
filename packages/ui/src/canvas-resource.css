@@ -451,7 +451,7 @@
   padding-top: 46px;
 }
 
-/* A Shape other than the rectangle (ADR 0120), drawn Open and Closed alike.
+/* A Shape other than the rectangle (ADR 0121), drawn Open and Closed alike.
    The Resource keeps its rect; the front's own paper and edge are withdrawn and
    `ResourceShapeOutlineDrawing` draws them as the Shape's outline at that rect,
    which touches the midpoint of each side, where Edges attach. `overflow` is released
@@ -488,7 +488,7 @@
   transition: fill var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
 }
 
-/* The selection ring follows the outline (ADR 0120): the edge's geometry
+/* The selection ring follows the outline (ADR 0121): the edge's geometry
    stroked wider beneath it, so it stands the ring width beyond the edge as the
    rectangle's shadow does. */
 .canvas-resource__outline-ring {

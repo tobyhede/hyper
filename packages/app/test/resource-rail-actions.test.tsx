@@ -927,7 +927,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * Only an Ur Resource takes a Shape (ADR 0120), chosen from its rail Open
+   * Only an Ur Resource takes a Shape (ADR 0121), chosen from its rail Open
    * and Closed alike: the control's face is the Shape it is drawn in.
    */
   it('offers an Open Ur Resource its Shape on the rail, the rectangle where its entry stores none', async () => {

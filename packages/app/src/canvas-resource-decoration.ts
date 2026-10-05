@@ -201,7 +201,7 @@ export function decorateSharedResourceNode(
     changeResourceShape !== undefined &&
     takesResourceShape(node.data.kind)
   ) {
-    // Open and Closed alike (ADR 0120); every other kind is the rectangle.
+    // Open and Closed alike (ADR 0121); every other kind is the rectangle.
     patch.onResourceShapeChange = (resourceShape) =>
       changeResourceShape(node.data.resourceId, resourceShape);
   }

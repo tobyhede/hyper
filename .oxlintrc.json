@@ -43,7 +43,7 @@
     // the drawn geometry itself rather than a structure standing in for an
     // owner, so the compound is allowed in every casing; "shape" alone or in any
     // other compound is still reported (`test/unit/anti-slop/no-shape-in-symbol-names.test.ts`).
-    // "Shape" is a domain term too (CONTEXT.md, ADR 0120): the outline an Ur
+    // "Shape" is a domain term too (CONTEXT.md, ADR 0121): the outline an Ur
     // Resource is drawn in on a Map, Open or Closed, stored in the Map entry's
     // `shape`. The whole
     // name is allowed only where it names a property (a key, a member access, a

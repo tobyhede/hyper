@@ -30,7 +30,7 @@ export interface ResourceShapeMenuProps {
 }
 
 /**
- * An Ur Resource's Shape, chosen from its rail (ADR 0120).
+ * An Ur Resource's Shape, chosen from its rail (ADR 0121).
  *
  * The shared `ChoiceMenu`: the radio list, the mark on the current Shape, the
  * keyboard and the dismissal are the primitive's. The trigger's face is the

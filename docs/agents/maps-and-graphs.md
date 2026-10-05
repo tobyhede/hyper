@@ -104,12 +104,12 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 
 ## 7. Shape
 
-- **R45. A Resource's Shape is authored on the Map.** It is one of a closed set: rectangle, pill, ellipse, diamond, hexagon. It is stored in the Map's entry beside position, Open/Closed state and Open Size, never on the Resource, so the same Resource may take different Shapes in different Maps. A Shape is the diagram's notation, and notation belongs to the diagram (A19). ([0120])
-- **R46. Only an Ur Resource takes a Shape.** A Shape is diagram notation, and an Ur Resource is the kind a diagram is drawn with; a Markdown, Image, Space or Reference Resource is always the rectangle. The Shape choice is offered on an Ur Resource alone, a Shape Edit on any other kind is refused (`shape-requires-ur-resource`), and intake refuses a Map entry giving any other kind a Shape but the rectangle with the same code. ([0120], [0113])
-- **R47. The Shape is optional, and the application's default is the rectangle.** An entry with no `shape` stored draws as the rectangle, as a Graph with no `headShape` draws the arrow; every reader resolves it through `resourceShape` in `@project/core`. Add Resource and Add to Map write no Shape. Choosing a Shape writes the one chosen, the rectangle included, and choosing the Shape a Resource already draws as is `unchanged`, so the rectangle is `unchanged` on an entry storing none. Every other Edit that rewrites an entry keeps what it stores. Remove from Map forgets it with the rest of the entry (A23). ([0120], [0105])
-- **R48. A Shape changes no rect.** It is drawn at the Resource's rect — the fixed Closed Size while Closed, its Open Size while Open — so Open, Close, Resize, displacement (R38–R44) and Edge attachment are unchanged. Ellipse, diamond and hexagon fill the rect proportionally, and a pill's ends stay half-circles at any size. Every Shape in the set touches the midpoint of each side of its rect at every size, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title and kind glyph lay out in the rectangle inscribed in the Shape, and a Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline. ([0120], [0110])
-- **R49. A Shape is drawn Open and Closed alike.** Opening and resizing an Ur Resource gives the same Shape at its Open Size, and Close returns it to that Shape at the Closed Size; a resize into the magnetic range Closes it as any Resource (R44). The resize control stays at the rect's bottom-right corner. The Shape choice is on the rail, Open and Closed, so the rail does not change between states. A presented Resource is drawn by the presented surface and is the rectangle. ([0120], [0064], [0066])
-- **R50. An embedded Map draws its Ur Resources' Shapes**, Open or Closed, because one surface draws every Map. ([0120], [0112])
+- **R45. A Resource's Shape is authored on the Map.** It is one of a closed set: rectangle, pill, ellipse, diamond, hexagon. It is stored in the Map's entry beside position, Open/Closed state and Open Size, never on the Resource, so the same Resource may take different Shapes in different Maps. A Shape is the diagram's notation, and notation belongs to the diagram (A19). ([0121])
+- **R46. Only an Ur Resource takes a Shape.** A Shape is diagram notation, and an Ur Resource is the kind a diagram is drawn with; a Markdown, Image, Space or Reference Resource is always the rectangle. The Shape choice is offered on an Ur Resource alone, a Shape Edit on any other kind is refused (`shape-requires-ur-resource`), and intake refuses a Map entry giving any other kind a Shape but the rectangle with the same code. ([0121], [0113])
+- **R47. The Shape is optional, and the application's default is the rectangle.** An entry with no `shape` stored draws as the rectangle, as a Graph with no `headShape` draws the arrow; every reader resolves it through `resourceShape` in `@project/core`. Add Resource and Add to Map write no Shape. Choosing a Shape writes the one chosen, the rectangle included, and choosing the Shape a Resource already draws as is `unchanged`, so the rectangle is `unchanged` on an entry storing none. Every other Edit that rewrites an entry keeps what it stores. Remove from Map forgets it with the rest of the entry (A23). ([0121], [0105])
+- **R48. A Shape changes no rect.** It is drawn at the Resource's rect — the fixed Closed Size while Closed, its Open Size while Open — so Open, Close, Resize, displacement (R38–R44) and Edge attachment are unchanged. Ellipse, diamond and hexagon fill the rect proportionally, and a pill's ends stay half-circles at any size. Every Shape in the set touches the midpoint of each side of its rect at every size, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title and kind glyph lay out in the rectangle inscribed in the Shape, and a Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline. ([0121], [0110])
+- **R49. A Shape is drawn Open and Closed alike.** Opening and resizing an Ur Resource gives the same Shape at its Open Size, and Close returns it to that Shape at the Closed Size; a resize into the magnetic range Closes it as any Resource (R44). The resize control stays at the rect's bottom-right corner. The Shape choice is on the rail, Open and Closed, so the rail does not change between states. A presented Resource is drawn by the presented surface and is the rectangle. ([0121], [0064], [0066])
+- **R50. An embedded Map draws its Ur Resources' Shapes**, Open or Closed, because one surface draws every Map. ([0121], [0112])
 
 ## Rejected alternatives
 
@@ -133,11 +133,11 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 | A16 | Bands against the Open rect | The set changes between Edits, and the round trip fails ([0093]) | Far-left Resources still move down |
 | A17 | A stored Closed Size | Optional gives two shapes for one fact; required repeats a constant ([0066]) | Resizable Closed Resources would be a format change |
 | A18 | Activation as an Edit, or as dirtying | It changes nothing authored ([0028]) | Not durable until the next Edit |
-| A19 | A Shape on the Resource | Notation is the diagram's; a presentation field on the Resource is the shared slot the model rules out ([0120]) | A Resource re-added to a Map starts as a rectangle |
-| A20 | A Shape fixed by kind | A kind adds only what its content supports ([0120], [0113]) | — |
-| A21 | A Shape that changes the Closed Size | Displacement, attachment and the fixed Closed Size would each depend on it ([0120]) | A circle is drawn as an ellipse |
-| A22 | An open set (free radius, arbitrary path) | Edges could no longer be guaranteed to meet the outline ([0120]) | Five Shapes only |
-| A23 | A required Shape, written on every entry | An optional field whose default the application chooses is the format's pattern, as `headShape` is ([0120], [0105]); requiring it would put notation only an Ur Resource uses on every entry of every kind | One resolver, `resourceShape`, reads an absent Shape as the rectangle |
+| A19 | A Shape on the Resource | Notation is the diagram's; a presentation field on the Resource is the shared slot the model rules out ([0121]) | A Resource re-added to a Map starts as a rectangle |
+| A20 | A Shape fixed by kind | A kind adds only what its content supports ([0121], [0113]) | — |
+| A21 | A Shape that changes the Closed Size | Displacement, attachment and the fixed Closed Size would each depend on it ([0121]) | A circle is drawn as an ellipse |
+| A22 | An open set (free radius, arbitrary path) | Edges could no longer be guaranteed to meet the outline ([0121]) | Five Shapes only |
+| A23 | A required Shape, written on every entry | An optional field whose default the application chooses is the format's pattern, as `headShape` is ([0121], [0105]); requiring it would put notation only an Ur Resource uses on every entry of every kind | One resolver, `resourceShape`, reads an absent Shape as the rectangle |
 
 ## Accepted, not built
 
@@ -189,10 +189,10 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R41 | §6 | [0084], [0093], CONTEXT.md "Placement" |
 | R42 | §6 | [0084], [0093] |
 | R44 | §6 | [0066], [0084] |
-| R45, R47, R49 | §7 | [0120] (R47 also [0105]; R49 also [0064], [0066]) |
-| R46 | §7 | [0120], [0113] |
-| R48 | §7 | [0120], [0110] |
-| R50 | §7 | [0120], [0112] |
+| R45, R47, R49 | §7 | [0121] (R47 also [0105]; R49 also [0064], [0066]) |
+| R46 | §7 | [0121], [0113] |
+| R48 | §7 | [0121], [0110] |
+| R50 | §7 | [0121], [0112] |
 | A1–A23 | Rejected alternatives | Cited in each row |
 | D12 | §6, Undo | [0086], [0084], [0048], [0074] |
 
@@ -229,4 +229,4 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0110]: ../adr/0110-an-edge-faces-across-the-larger-gap-between-two-resources.md
 [0105]: ../adr/0105-a-graphs-edges-share-one-head-shape.md
 [0113]: ../adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md
-[0120]: ../adr/0120-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md
+[0121]: ../adr/0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md

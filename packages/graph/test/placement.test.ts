@@ -267,7 +267,7 @@ describe('Placement.place', () => {
     );
   });
 
-  it('places a Resource at a bare point Closed, with no Shape stored (ADR 0120)', () => {
+  it('places a Resource at a bare point Closed, with no Shape stored (ADR 0121)', () => {
     expect(asObject(Placement.place(Placement.empty(), RESOURCE_B, { x: 640, y: 80 }))).toEqual({
       [RESOURCE_B]: { x: 640, y: 80, open: false },
     });
@@ -457,7 +457,7 @@ describe('Placement.displace', () => {
 
   it('carries Open/Closed state, the remembered Open Size and the Shape through untouched', () => {
     // Only `x` and `y` move. Open Size and Shape are stored on the Resource's own
-    // entry and survive everything that happens to its neighbours (ADR 0066, ADR 0120).
+    // entry and survive everything that happens to its neighbours (ADR 0066, ADR 0121).
     const authored = Placement.fromEntries([
       [
         RESOURCE_A,

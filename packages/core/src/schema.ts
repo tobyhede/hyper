@@ -370,7 +370,7 @@ const openSizeSchema = z.object({
 });
 
 /**
- * The outline an Ur Resource is drawn in on a Map (ADR 0120), Open or Closed.
+ * The outline an Ur Resource is drawn in on a Map (ADR 0121), Open or Closed.
  * Every member touches the midpoint of each side of the Resource's rect, where
  * Edges attach.
  */
@@ -380,7 +380,7 @@ export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 
 /**
  * Whether a Resource of this kind takes a Shape other than the rectangle (ADR
- * 0120). Only an Ur Resource does; every other kind is the rectangle.
+ * 0121). Only an Ur Resource does; every other kind is the rectangle.
  */
 export const takesResourceShape = (kind: z.infer<typeof resourceSchema>['kind']): boolean =>
   kind === 'ur';
@@ -389,7 +389,7 @@ export const takesResourceShape = (kind: z.infer<typeof resourceSchema>['kind'])
  * Where a Map puts a Resource and the Shape it draws it in, whatever its
  * Open/Closed state. Optional, as a Graph's `headShape` is: an entry with none
  * stored draws as the rectangle (`resourceShape`), and only an Ur Resource may
- * store another (ADR 0120).
+ * store another (ADR 0121).
  */
 const drawnPositionSchema = mapPositionSchema.extend({
   shape: resourceShapeSchema.optional(),

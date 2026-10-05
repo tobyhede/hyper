@@ -153,7 +153,7 @@ export type AuthoringCompletion =
     }
   /**
    * Change Shape: the outline one Resource is drawn in on the Map the Edit is
-   * written into (ADR 0120). Open or Closed alike; the Shape it already draws as
+   * written into (ADR 0121). Open or Closed alike; the Shape it already draws as
    * is `unchanged`.
    */
   | {

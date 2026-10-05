@@ -277,7 +277,7 @@ describe('an Ur Resource’s decoration', () => {
     expect(patch.onBeginBodyEditing).toBeUndefined();
   });
 
-  /** Only an Ur Resource takes a Shape (ADR 0120), Open and Closed alike. */
+  /** Only an Ur Resource takes a Shape (ADR 0121), Open and Closed alike. */
   it('offers the Shape choice where the Map may be authored, and on an Ur Resource alone', () => {
     const changeResourceShape = vi.fn();
     for (const open of [false, true]) {

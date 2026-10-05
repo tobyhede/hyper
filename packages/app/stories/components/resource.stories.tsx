@@ -160,7 +160,7 @@ Front.storyName = 'Front';
 const OPEN_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
 
 /**
- * Every Shape a Map may give an Ur Resource (ADR 0120), drawn Closed at the one
+ * Every Shape a Map may give an Ur Resource (ADR 0121), drawn Closed at the one
  * Closed Size and Open at a larger one: the rectangle is the front's own
  * border, and every other Shape is an outline touching the midpoint of each
  * side of the Resource's rect, with the kind glyph and the short Title — the
@@ -216,7 +216,7 @@ const DRAWN_RESOURCE_SHAPES = RESOURCE_SHAPES.filter(
 );
 
 /**
- * The selection ring on a Shape (ADR 0120), Open and Closed: it follows the
+ * The selection ring on a Shape (ADR 0121), Open and Closed: it follows the
  * outline rather than the bounding rect.
  */
 export const ResourceShapeTreatments: Story = () => (
@@ -255,7 +255,7 @@ export const ResourceShapeTreatments: Story = () => (
 );
 
 /**
- * An Ur Resource's Shape chosen from its rail (ADR 0120): the control's face is
+ * An Ur Resource's Shape chosen from its rail (ADR 0121): the control's face is
  * the Shape it is drawn in, and its list draws each Shape beside its name.
  */
 export const ResourceShapeChoice: Story = () => {

@@ -704,7 +704,7 @@ describe.each([
     });
   });
 
-  describe('Shapes (ADR 0120)', () => {
+  describe('Shapes (ADR 0121)', () => {
     const IMAGE: Resource = {
       id: A,
       title: 'Figure',

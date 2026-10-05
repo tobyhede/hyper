@@ -326,7 +326,7 @@ describe('exporting and importing one complete aggregate', () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const [meta, ...targets] = completeAggregate();
     if (meta === undefined) throw new Error('The aggregate names no Meta Space');
-    // Only an Ur Resource takes a Shape (ADR 0120): one Closed in a diamond,
+    // Only an Ur Resource takes a Shape (ADR 0121): one Closed in a diamond,
     // one Open in a hexagon at its remembered Open Size.
     const withResourceShapes: SpaceSnapshot = {
       ...meta,

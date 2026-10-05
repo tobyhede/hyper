@@ -97,7 +97,7 @@ export type CanvasResourceFront =
       /** An Ur Resource Opens through the shared Resource operation, and has nothing to edit. */
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /**
-       * Draw this Resource in another Shape on its Map (ADR 0120), chosen from
+       * Draw this Resource in another Shape on its Map (ADR 0121), chosen from
        * its rail Open and Closed alike. Absent where the Map may not be authored.
        */
       readonly onResourceShapeChange?: (resourceShape: ResourceShape) => void;
@@ -158,7 +158,7 @@ interface CanvasResourceCommonProps {
    */
   readonly display: FrontDisplay;
   /**
-   * The Shape the Map draws this Resource in (ADR 0120), whatever the display.
+   * The Shape the Map draws this Resource in (ADR 0121), whatever the display.
    * Absent, as on a front no Map places — a creation ghost, a specimen — the
    * front is drawn as the rectangle.
    */
@@ -775,7 +775,7 @@ export function CanvasResource(props: CanvasResourceProps) {
  * Drawn in the units of the rect the Resource is drawn at, so the drawing is
  * not stretched and the outline touches the midpoint of each of the rect's
  * sides, where the adapter's handles sit and Edges attach (ADR 0110, ADR
- * 0120). The stroke keeps the border's width however the drawing is scaled,
+ * 0121). The stroke keeps the border's width however the drawing is scaled,
  * because `canvas-resource.css` gives it `vector-effect: non-scaling-stroke`.
  *
  * The geometry is drawn twice: first the selection ring, a wider stroke that
