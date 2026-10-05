@@ -12,7 +12,7 @@ import { serializeResourceFile } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { compareOrdinal } from '../ordinal';
 import { discoverResourceFiles, isMissingFile } from './space-directory';
-import { rejectSymbolicLinks, writeInPlace } from './write-in-place';
+import { writeInPlace } from './write-in-place';
 
 const exists = async (path: string): Promise<boolean> => {
   try {
@@ -206,6 +206,5 @@ export const writeSpaceDirectory = async (
   const files = new Map(
     [...spaceDirectoryFiles(stored)].map(([path, text]) => [path, Buffer.from(text)] as const),
   );
-  await rejectSymbolicLinks(directory, files.keys());
   await writeInPlace(directory, files, await scannedSpaceFiles(directory));
 };

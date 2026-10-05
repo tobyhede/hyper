@@ -13,7 +13,7 @@ Every Export writes the Aggregate directory **in place**: Running's write-throug
   1. The complete set of files the aggregate serialises to is computed in memory, and checked the way Import reads it: parsed by Import's own parsers and judged by the ordinary aggregate intake. A set that would not read back is refused, and nothing is written.
   2. Each file whose bytes on disk already match is skipped. Every other file is written to a dot-prefixed temporary file beside it and renamed over it, so no file is ever seen half-written. This per-file rename is the only care the write takes.
   3. Each file Hyper owns that the aggregate no longer serialises to is removed: a removed Resource's file, a `*.md` beside `space.json`, a picture no Resource shows (ADR 0118), the files of a Space the aggregate no longer holds. Then each directory that removal left empty is removed.
-- **A symbolic link is still refused.** Export does not write through a link at `<dir>`, at any file it writes, or at any directory between them.
+- **A symbolic link is still refused.** Export does not write or remove through a link at `<dir>`, at any file it writes or removes, or at any directory between them, and it checks every one before it writes or removes anything. A temporary file is created fresh, never opened where something already stands.
 - **A crash part-way leaves a mix.** Some files are new and some old, and the directory may not import until it is restored. Git restores it. The revision each Space was exported at is still recorded only after every file is written.
 
 ## Why

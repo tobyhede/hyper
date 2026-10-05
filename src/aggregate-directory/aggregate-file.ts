@@ -26,7 +26,7 @@ import {
   parseSingleSpace,
   readSingleSpace,
 } from './space-directory';
-import { rejectSymbolicLinks, writeInPlace, type DirectoryFiles } from './write-in-place';
+import { writeInPlace, type DirectoryFiles } from './write-in-place';
 import { scannedSpaceFiles, spaceDirectoryFiles } from './write-space-directory';
 
 /** The name of the aggregate file at the root of a canonical aggregate directory. */
@@ -525,6 +525,5 @@ export const writeAggregateDirectory = async (
     (path) => !path.startsWith(`${IMAGES_DIRECTORY_NAME}/`),
   );
   const files = aggregateFiles(aggregate, []);
-  await rejectSymbolicLinks(directory, files.keys());
   await writeInPlace(directory, files, owned);
 };

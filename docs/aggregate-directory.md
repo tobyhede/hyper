@@ -173,7 +173,7 @@ One write goes like this:
 2. A file whose bytes are already on disk is left alone, so an unchanged file keeps its timestamp. Every other file is written to a dot-prefixed temporary file beside it and renamed over it, so no file is ever half-written.
 3. Each owned file the aggregate no longer has is removed: a removed Resource's file, a `*.md` beside `space.json`, a picture no Resource shows, the files of a Space that is gone. A directory that removal leaves empty is removed too, so a gone Space's directory disappears unless it holds files of yours.
 
-The directory itself, and each Space directory in it, is never renamed or recreated, so a shell or editor open inside one keeps working. A missing directory is created. Exporting refuses to write through a symbolic link.
+The directory itself, and each Space directory in it, is never renamed or recreated, so a shell or editor open inside one keeps working. A missing directory is created. Exporting refuses to write or remove anything through a symbolic link.
 
 **There is no whole-write atomicity, backup or recovery copy.** A crash in the middle of a write can leave some files new and some old. Keep the directory under git: git restores it.
 

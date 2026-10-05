@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, rename, rm, rmdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, rename, rm, rmdir, type FileHandle } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { compareOrdinal } from '../ordinal';
 import { isMissingFile } from './space-directory';
@@ -50,14 +50,39 @@ const holdsBytes = async (path: string, bytes: Uint8Array): Promise<boolean> => 
 };
 
 /**
- * Replace one file through a temporary file beside it, so a reader never sees
- * it half-written. The temporary name is dot-prefixed and ends in neither `.md`
+ * Create a temporary file beside `path` that did not exist before, exclusively,
+ * so whatever already sits at a temporary name (a file a failed write left, or
+ * a link to somewhere else) is never opened or written through. Each name taken
+ * moves on to the next. The names are dot-prefixed and end in neither `.md`
  * nor `.json`, so Import reads nothing a failed write leaves behind.
  */
+const createTemporaryFile = async (
+  path: string,
+): Promise<{ readonly temporary: string; readonly handle: FileHandle }> => {
+  for (let attempt = 0; ; attempt += 1) {
+    const suffix = attempt === 0 ? '' : `.${String(attempt)}`;
+    const temporary = join(dirname(path), `.${basename(path)}${suffix}.hyper-write`);
+    try {
+      return { temporary, handle: await open(temporary, 'wx') };
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error;
+    }
+  }
+};
+
+/**
+ * Replace one file through a temporary file beside it, so a reader never sees
+ * it half-written. On failure only the temporary file this call created is
+ * removed.
+ */
 const replaceFile = async (path: string, bytes: Uint8Array): Promise<void> => {
-  const temporary = join(dirname(path), `.${basename(path)}.hyper-write`);
+  const { temporary, handle } = await createTemporaryFile(path);
   try {
-    await writeFile(temporary, bytes);
+    try {
+      await handle.writeFile(bytes);
+    } finally {
+      await handle.close();
+    }
     await rename(temporary, path);
   } catch (error) {
     await rm(temporary, { force: true }).catch(() => undefined);
@@ -98,12 +123,19 @@ const removeEmptyDirectories = async (directory: string, from: string): Promise<
  * `owned` names the files the caller owns now. Each one `files` does not name
  * is removed, then every directory that removal leaves empty. Nothing outside
  * `files` and `owned` is read or touched.
+ *
+ * Before anything is written or removed, every path either names, and every
+ * directory between it and `directory`, is refused if it is a symbolic link:
+ * a scan reads through a linked directory, so a removal would otherwise delete
+ * files outside `directory`.
  */
 export const writeInPlace = async (
   directory: string,
   files: DirectoryFiles,
   owned: Iterable<string>,
 ): Promise<void> => {
+  const obsolete = [...owned].filter((path) => !files.has(path)).sort(compareOrdinal);
+  await rejectSymbolicLinks(directory, [...files.keys(), ...obsolete]);
   await mkdir(directory, { recursive: true });
   for (const path of [...files.keys()].sort(compareOrdinal)) {
     const bytes = files.get(path);
@@ -112,7 +144,6 @@ export const writeInPlace = async (
     await mkdir(dirname(target), { recursive: true });
     await replaceFile(target, bytes);
   }
-  const obsolete = [...owned].filter((path) => !files.has(path)).sort(compareOrdinal);
   for (const path of obsolete) {
     const target = join(directory, path);
     await rm(target, { force: true });

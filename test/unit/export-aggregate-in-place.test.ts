@@ -1,4 +1,14 @@
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
@@ -175,6 +185,67 @@ describe('Export writes in place', () => {
 
     expect(await directoryTree(destination)).toEqual(tree);
     await expect(readdir(destination)).resolves.not.toContain(orphan);
+  });
+
+  /*
+   * A Space directory the aggregate no longer holds is removed, but a link
+   * inside it leads outside the destination. Removing through it would delete
+   * the author's files elsewhere, so Export refuses before writing anything.
+   */
+  it('refuses to remove files through a linked resources directory', async () => {
+    const parent = await makeTemporaryDirectory();
+    const destination = join(parent, 'exported');
+    await exportTo(holding(storedSpace()), destination);
+    const removed = join(destination, 'c0000000-0000-4000-8000-0000000000bb');
+    await mkdir(removed);
+    await writeFile(join(removed, 'space.json'), '{}\n');
+    const outside = join(parent, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'kept.md'), "# Not Hyper's\n");
+    await symlink(outside, join(removed, 'resources'));
+    const tree = await directoryTree(destination);
+
+    await expect(exportAggregate(holding(storedSpace('B edited.\n')), destination)).rejects.toThrow(
+      /symbolic link/,
+    );
+
+    await expect(readFile(join(outside, 'kept.md'), 'utf8')).resolves.toBe("# Not Hyper's\n");
+    expect(await directoryTree(destination)).toEqual(tree);
+  });
+
+  it('refuses to remove pictures through a linked images directory', async () => {
+    const parent = await makeTemporaryDirectory();
+    const destination = join(parent, 'exported');
+    await exportTo(holding(storedSpace()), destination);
+    const outside = join(parent, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'picture.png'), "not hyper's\n");
+    await symlink(outside, join(destination, 'images'));
+
+    await expect(exportAggregate(holding(storedSpace()), destination)).rejects.toThrow(
+      /symbolic link/,
+    );
+
+    await expect(readFile(join(outside, 'picture.png'), 'utf8')).resolves.toBe("not hyper's\n");
+  });
+
+  /*
+   * The temporary file a replacement is written through must be new. A link
+   * already sitting at a temporary name is never written through.
+   */
+  it('never writes through a link left where a temporary file would go', async () => {
+    const parent = await makeTemporaryDirectory();
+    const destination = join(parent, 'exported');
+    await exportTo(holding(storedSpace()), destination);
+    const outside = join(parent, 'outside.txt');
+    await writeFile(outside, 'outside\n');
+    await symlink(outside, join(destination, '.hyper.json.hyper-write'));
+    await writeFile(join(destination, 'hyper.json'), '{}\n');
+
+    await exportTo(holding(storedSpace()), destination);
+
+    await expect(readFile(outside, 'utf8')).resolves.toBe('outside\n');
+    await expect(readFile(join(destination, 'hyper.json'), 'utf8')).resolves.toContain(SPACE_ID);
   });
 
   /*
