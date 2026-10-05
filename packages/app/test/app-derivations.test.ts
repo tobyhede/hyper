@@ -232,9 +232,11 @@ describe('resourceRailGroups', () => {
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
+  /** The one kind that takes a Shape (ADR 0117). */
+  const ur: Resource = { id: OUTSIDE, title: 'Gateway', kind: 'ur' };
 
   it('leads with Create Reference and ends with the commands that leave the Resource', () => {
-    expect(ids(resourceRailGroups(resource(PLACED_A), addresses, connect, everything))).toEqual([
+    expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
       ['resource-shape'],
@@ -244,7 +246,7 @@ describe('resourceRailGroups', () => {
   });
 
   it('offers the five Shapes with the current one chosen, and each choice chooses it', () => {
-    const choice = resourceRailGroups(resource(PLACED_A), addresses, connect, everything)
+    const choice = resourceRailGroups(ur, addresses, connect, everything)
       .flat()
       .find((entry) => entry.id === 'resource-shape');
     if (choice === undefined || !('options' in choice)) throw new Error('No Shape choice');
@@ -261,8 +263,16 @@ describe('resourceRailGroups', () => {
     expect(chosenResourceShapes).toEqual(RESOURCE_SHAPES);
   });
 
-  it('offers the Shape choice on a Space Resource beside its Connect group', () => {
-    const spaceResource: Resource = {
+  it.each<Resource>([
+    resource(PLACED_A),
+    {
+      id: OUTSIDE,
+      title: 'Figure',
+      kind: 'image',
+      url: 'https://example.com/figure.png',
+      naturalSize: { width: 400, height: 300 },
+    },
+    {
       id: OUTSIDE,
       title: 'Elsewhere',
       kind: 'space',
@@ -270,9 +280,14 @@ describe('resourceRailGroups', () => {
       map: MAP_ID,
       graph: GRAPH_ID,
       framing: undefined,
-    };
-    const groups = ids(resourceRailGroups(spaceResource, addresses, connect, everything));
-    expect(groups.slice(1, 3)).toEqual([['connect-resource'], ['resource-shape']]);
+    },
+    { id: OUTSIDE, title: 'A reference', kind: 'reference', target: PLACED_A },
+  ])('offers no Shape choice on a $kind Resource, which is always the rectangle', (subject) => {
+    expect(
+      resourceRailGroups(subject, addresses, connect, everything)
+        .flat()
+        .map(({ id }) => id),
+    ).not.toContain('resource-shape');
   });
 
   it('draws only Connect to Resource and the addresses while nothing else is available', () => {

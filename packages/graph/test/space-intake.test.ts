@@ -778,6 +778,76 @@ describe.each([
     });
   });
 
+  describe('Shapes (ADR 0117)', () => {
+    const IMAGE: Resource = {
+      id: A,
+      title: 'Figure',
+      kind: 'image',
+      url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+      naturalSize: { width: 640, height: 480 },
+    };
+    const everyKind: readonly (readonly [string, readonly Resource[]])[] = [
+      ['markdown', [markdown(A, 'A')]],
+      ['image', [IMAGE]],
+      ['space', [spaceResource(A, ABSENT)]],
+      ['reference', [referenceTo(A, B), markdown(B, 'B')]],
+      ['ur', [{ id: A, title: 'Node', kind: 'ur' }]],
+    ];
+    const placedIn = (resources: readonly Resource[], resourceShape: ResourcePlacement['shape']) =>
+      load({
+        resources,
+        maps: [
+          positionedMap(WORKING, { [A]: { x: 0, y: 0, open: false, shape: resourceShape } }, [
+            graph(MAIN, 'Main'),
+          ]),
+        ],
+      });
+
+    it.each(everyKind)('loads a %s Resource in the rectangle', (_kind, resources) => {
+      expect(loaded(placedIn(resources, 'rectangle')).resources).toHaveLength(resources.length);
+    });
+
+    it.each(['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon'] as const)(
+      'loads an Ur Resource in the %s, Open or Closed',
+      (resourceShape) => {
+        const ur: Resource = { id: A, title: 'Node', kind: 'ur' };
+        const space = loaded(
+          load({
+            resources: [ur, { id: B, title: 'Other', kind: 'ur' }],
+            maps: [
+              positionedMap(
+                WORKING,
+                {
+                  [A]: { x: 0, y: 0, open: false, shape: resourceShape },
+                  [B]: {
+                    x: 320,
+                    y: 0,
+                    open: true,
+                    openSize: { width: 400, height: 300 },
+                    shape: resourceShape,
+                  },
+                },
+                [graph(MAIN, 'Main')],
+              ),
+            ],
+          }),
+        );
+        expect(space.lookup.resource(A)).toEqual(ur);
+      },
+    );
+
+    it.each(everyKind.filter(([kind]) => kind !== 'ur'))(
+      'refuses a %s Resource in any Shape but the rectangle',
+      (_kind, resources) => {
+        for (const resourceShape of ['pill', 'ellipse', 'diamond', 'hexagon'] as const) {
+          expect(refused(placedIn(resources, resourceShape))).toEqual([
+            expect.objectContaining({ kind: 'shape-requires-ur-resource', ref: A }),
+          ]);
+        }
+      },
+    );
+  });
+
   describe('Space Resource reference cycles (ADR 0068)', () => {
     it('refuses a Space Resource that targets the Space containing it', () => {
       const errors = refused(load({ resources: [spaceResource(A, SPACE)], maps: [] }));

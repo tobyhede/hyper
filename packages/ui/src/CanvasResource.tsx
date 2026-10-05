@@ -752,7 +752,7 @@ export function CanvasResource(props: CanvasResourceProps) {
  * The geometry is drawn twice: first the selection ring, a wider stroke that
  * `canvas-resource.css` shows only while the Resource is selected or its Title
  * is being written, then the edge, whose fill covers the ring's inner half. So
- * the ring and a Reference Resource's dotted edge both follow the outline.
+ * the ring follows the outline.
  */
 function ResourceShapeOutlineDrawing({ shape: resourceShape }: { readonly shape: ResourceShape }) {
   const outline = resourceShapeOutline(resourceShape);

@@ -509,22 +509,6 @@
   filter: drop-shadow(var(--canvas-resource-shadow-dragging));
 }
 
-/* A Reference Resource's edge is dotted along the outline, and solid once it
-   leaves rest, as the rectangle's border is. */
-.canvas-resource[data-kind='reference'] .canvas-resource__outline-edge {
-  stroke-dasharray: 0 calc(2 * var(--canvas-resource-border-width));
-  stroke-linecap: round;
-}
-
-.canvas-resource[data-kind='reference']:is(
-    :hover,
-    :has(~ .rf-resource-node__authoring-handle:hover),
-    :not([data-state='rest'])
-  )
-  .canvas-resource__outline-edge {
-  stroke-dasharray: none;
-}
-
 /* The Title and kind glyph lay out in the rectangle inscribed in the Shape,
    whose insets `CanvasResource` publishes from the Shape's outline. The glyph
    keeps the inscribed rectangle's top-right corner and the Title fills the

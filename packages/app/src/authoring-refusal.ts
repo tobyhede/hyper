@@ -132,6 +132,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Resource is not in this Map.';
     case 'resource-not-open':
       return 'Open this Resource before resizing it.';
+    case 'shape-requires-ur-resource':
+      return 'Only an Ur Resource can be drawn in a Shape other than the rectangle.';
     case 'resource-has-references':
       return `Delete the Reference Resources of this Resource first: ${refusal.referenceTitles.join(', ')}.`;
     case 'graph-title-required':

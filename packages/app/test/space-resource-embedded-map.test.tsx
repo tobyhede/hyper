@@ -205,10 +205,11 @@ async function mount(value: SpaceSnapshot): Promise<SpaceSession> {
 /** {@link mount}, answering the Open Spaces it mounted as well. */
 async function mountOpenSpaces(
   value: SpaceSnapshot,
+  drawn: SpaceSnapshot = target,
 ): Promise<{ readonly session: SpaceSession; readonly spaces: OpenSpaces }> {
   const backend = new MemorySpaceBackend(
     META_ID,
-    [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+    [meta, value, drawn].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
   );
   const spaces = createOpenSpaces({
     images: unusedImageSources,
@@ -1959,6 +1960,36 @@ it('reports and dismisses a drawn Space Resource menu clipboard refusal', async 
   }
 });
 
+/** The drawn Space with Intake an Ur Resource, the one kind that takes a Shape (ADR 0117). */
+const targetWithUrIntake: SpaceSnapshot = {
+  ...target,
+  resources: target.resources.map((resource) =>
+    resource.id === DRAWN_A ? { id: DRAWN_A, document: { title: 'Intake', kind: 'ur' } } : resource,
+  ),
+};
+
+it('offers no Shape choice on a Markdown Resource inside a drawn Map', async () => {
+  await mountOpenSpaces(
+    home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    }),
+  );
+  await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+  beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+  fireEvent.click(
+    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', {
+      name: 'Actions for Resource Intake',
+    }),
+  );
+
+  expect(await screen.findByRole('menuitem', { name: 'Remove from Map' })).toBeVisible();
+  expect(screen.queryByRole('menuitem', { name: 'Shape' })).toBeNull();
+});
+
 it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing it there', async () => {
   const { spaces } = await mountOpenSpaces(
     home({
@@ -1968,6 +1999,7 @@ it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing i
       map: SELECTED_MAP_ID,
       graph: SELECTED_GRAPH_ID,
     }),
+    targetWithUrIntake,
   );
   await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
   beginPortalEdit(containingNode(SPACE_RESOURCE_ID));

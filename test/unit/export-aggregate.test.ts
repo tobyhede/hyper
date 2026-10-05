@@ -82,10 +82,11 @@ const storedSpace: LoadedSpace = {
       ],
     },
     resources: [
-      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+      // B and E are drawn in Shapes, which only an Ur Resource takes (ADR 0117).
+      { id: RESOURCE_B, document: { title: 'B', kind: 'ur' } },
       { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
       { id: RESOURCE_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
-      { id: RESOURCE_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
+      { id: RESOURCE_E, document: { title: 'E', kind: 'ur' } },
     ],
   },
   revision: 7n,
@@ -190,8 +191,8 @@ describe('canonical export', () => {
     snapshot: {
       resources: [
         { id: RESOURCE_A, document: { kind: 'markdown', body: 'A body.\n', title: 'A' } },
-        { id: RESOURCE_E, document: { body: 'E body.\n', title: 'E', kind: 'markdown' } },
-        { id: RESOURCE_B, document: { title: 'B', body: 'B body.\n', kind: 'markdown' } },
+        { id: RESOURCE_E, document: { title: 'E', kind: 'ur' } },
+        { id: RESOURCE_B, document: { kind: 'ur', title: 'B' } },
         { id: RESOURCE_F, document: { kind: 'markdown', title: 'F', body: 'F body.\n' } },
       ],
       id: SPACE_ID,

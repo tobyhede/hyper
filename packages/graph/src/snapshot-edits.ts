@@ -50,6 +50,8 @@ export type SnapshotEditRefusal =
   | { readonly code: 'reference-target-must-own-content'; readonly targetId: UUID }
   /** A Resize of a Resource that is not Open: there is no Open Size to change. */
   | { readonly code: 'resource-not-open' }
+  /** A Shape Edit on a Resource that is not an Ur Resource: every other kind is the rectangle. */
+  | { readonly code: 'shape-requires-ur-resource' }
   | {
       readonly code: 'resource-has-references';
       /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -450,7 +452,8 @@ function resize(
 }
 
 /**
- * Draw a Resource in another Shape in one Map (ADR 0117).
+ * Draw an Ur Resource in another Shape in one Map (ADR 0117). Every other
+ * kind is the rectangle, so a Shape Edit on one is refused whatever it asks for.
  *
  * The Shape is drawn inside the fixed Closed Size and changes no rect, so no
  * neighbour moves and the Resource's Open/Closed state and Open Size are kept.
@@ -466,6 +469,9 @@ function changeResourceShape(
   if ('code' in placed) return refused(placed);
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
+  if (resource === undefined) return refused({ code: 'resource-not-found' });
+  if (resource.document.kind !== 'ur') return refused({ code: 'shape-requires-ur-resource' });
   if (at.shape === resourceShape) return UNCHANGED;
   return withPlacement(
     snapshot,

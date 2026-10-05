@@ -59,7 +59,7 @@ Guards above are omitted below.
 | `opened-resource` | `resource-not-in-map` → (already Open ⇒ `unchanged`) → completed |
 | `closed-resource` | `resource-not-in-map` → (already Closed ⇒ `unchanged`) → completed |
 | `resized-resource` | `resource-not-in-map` → `resource-not-open` → (same size ⇒ `unchanged`) → completed |
-| `changed-resource-shape` | `resource-not-in-map` → (same Shape ⇒ `unchanged`) → completed |
+| `changed-resource-shape` | `resource-not-in-map` → `resource-not-found` → `shape-requires-ur-resource` → (same Shape ⇒ `unchanged`) → completed |
 | `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
@@ -128,10 +128,10 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 25 codes
+## The 26 codes
 
-1 contextual (`map-not-found`) plus 24 action-specific —
-none is produced anywhere else. 22 of those 24 are tabulated above;
+1 contextual (`map-not-found`) plus 25 action-specific —
+none is produced anywhere else. 23 of those 25 are tabulated above;
 `map-required` is declared and presented but currently raised nowhere, so it
 appears in no row, and `image-url-unsupported`, raised by the Image Resource
 Edits, has no row yet.

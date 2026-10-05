@@ -3,6 +3,8 @@ import { expect, test, type Locator, type Page } from './fixtures';
 import {
   authoringHandle,
   connectHandles,
+  createResource,
+  dragBy,
   nodeByTitle,
   openResource,
   positionOf,
@@ -15,15 +17,17 @@ import {
 import { drawnOutline, outlineTreatment } from './resource-shape-outline';
 
 /**
- * A Resource's Shape (ADR 0117): chosen from the Resource's Actions menu, drawn
- * by a Closed Resource inside its fixed Closed Size, and replaced by the
- * rectangle while the Resource is Open.
+ * An Ur Resource's Shape (ADR 0117): chosen from its Actions menu, drawn by a
+ * Closed Ur Resource inside its fixed Closed Size, and replaced by the
+ * rectangle while it is Open. Only an Ur Resource takes a Shape, so each test
+ * creates one; the fixture's Markdown Resources offer no Shape choice.
  */
 
 const LONG = '00000000-0000-4000-8000-000000000023';
-const RESOURCE_A = '00000000-0000-4000-8000-000000000002';
-/** The fixture's three-line Title `T`, placed directly below A. */
+/** The fixture's three-line Title `T`, on the row below A. */
 const RESOURCE_T = '00000000-0000-4000-8000-00000000000e';
+/** The Title every Ur Resource these tests create is given. */
+const UR = 'U';
 
 /** Half the 24-unit anchor: React Flow ends an Edge on the handle's outer rim. */
 const RADIUS = 12;
@@ -31,16 +35,42 @@ const RADIUS = 12;
 const face = (node: Locator): Locator => node.locator('.canvas-resource');
 
 /**
- * Open A's Actions menu and its Shape choice, answering the list of Shapes.
+ * On Collection 1, create an Ur Resource titled `U` and move it below the
+ * fixture's rows, clear of every other Resource, answering its node.
+ */
+async function createUr(page: Page): Promise<Locator> {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  await createResource(page, 'Ur Resource');
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill(UR);
+  await title.press('Enter');
+  await expect(title).toHaveCount(0);
+  const ur = nodeByTitle(page, UR).first();
+  await expect(face(ur)).toHaveAttribute('data-kind', 'ur');
+  await settled(page);
+  // A new Resource lands at the centre of the view, over the fixture's row.
+  await dragBy(page, ur, 0, 250);
+  await settled(page);
+  return ur;
+}
+
+/**
+ * Open U's Actions menu and its Shape choice, answering the list of Shapes.
  *
- * A Resource whose toolbar is already drawn is not pressed again: a press on a
- * selected Open Markdown Resource begins editing its body.
+ * A Resource whose toolbar is already drawn is not pressed again, so the same
+ * menu is reached Open and Closed.
  */
 async function resourceShapeChoice(page: Page): Promise<Locator> {
-  const a = nodeByTitle(page, 'A').first();
-  const toolbar = await resourceToolbar(page, a);
-  if ((await toolbar.count()) === 0) await resourceActions(page, 'A');
-  else await toolbar.getByRole('button', { name: 'Actions for Resource A' }).click({ delay: 120 });
+  const ur = nodeByTitle(page, UR).first();
+  const toolbar = await resourceToolbar(page, ur);
+  if ((await toolbar.count()) === 0) await resourceActions(page, UR);
+  else
+    await toolbar.getByRole('button', { name: `Actions for Resource ${UR}` }).click({ delay: 120 });
   await page.getByRole('menu').last().getByRole('menuitem', { name: 'Shape' }).click();
   const resourceShapes = page.getByRole('group', { name: 'Shape' });
   await expect(resourceShapes).toBeVisible();
@@ -80,14 +110,13 @@ async function edgeEnd(page: Page, edge: string): Promise<{ x: number; y: number
   return { x: Number(numbers[6]), y: Number(numbers[7]) };
 }
 
-test('a Diamond chosen from the Actions menu is drawn Closed, kept on reload, and a rectangle while Open', async ({
+test('a Diamond chosen from an Ur Resource’s Actions menu is drawn Closed, kept on reload, and a rectangle while Open', async ({
   page,
 }) => {
-  await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  const a = nodeByTitle(page, 'A').first();
-  await expect(a).toBeVisible();
-  await expect(face(a)).toHaveAttribute('data-resource-shape', 'rectangle');
+  const ur = await createUr(page);
+  await expect(face(ur)).toHaveAttribute('data-resource-shape', 'rectangle');
+  const status = page.getByTestId('persistence-status');
+  const before = Number(await status.getAttribute('data-revision'));
 
   const resourceShapes = await resourceShapeChoice(page);
   await expect(resourceShapes.getByRole('menuitemradio')).toHaveText([
@@ -100,23 +129,24 @@ test('a Diamond chosen from the Actions menu is drawn Closed, kept on reload, an
   await expect(chosenResourceShape(resourceShapes)).toHaveText('Rectangle');
   await resourceShapes.getByRole('menuitemradio', { name: 'Diamond' }).click();
 
-  await expect(face(a)).toHaveAttribute('data-resource-shape', 'diamond');
-  await expect.poll(() => outlineOffset(a)).toBeLessThan(0.5);
+  await expect(face(ur)).toHaveAttribute('data-resource-shape', 'diamond');
+  await expect.poll(() => outlineOffset(ur)).toBeLessThan(0.5);
   // The Shape changes no rect: the Resource keeps the fixed Closed Size.
   expect(
-    await face(a).evaluate((element) =>
+    await face(ur).evaluate((element) =>
       element instanceof HTMLElement ? [element.offsetWidth, element.offsetHeight] : [],
     ),
   ).toEqual([COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height]);
-  await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
+  // One Edit.
+  await expect(status).toHaveAttribute('data-revision', String(before + 1));
 
   await page.reload();
   await selectCanvas(page, 'Collection 1');
-  const reloaded = nodeByTitle(page, 'A').first();
+  const reloaded = nodeByTitle(page, UR).first();
   await expect(face(reloaded)).toHaveAttribute('data-resource-shape', 'diamond');
 
   // Offered Open as well as Closed, with the recorded Shape still chosen.
-  await openResource(reloaded, 'A');
+  await openResource(reloaded, UR);
   await expect(face(reloaded)).toHaveAttribute('data-open', 'true');
   await expect(face(reloaded)).toHaveAttribute('data-resource-shape', 'rectangle');
   await expect(reloaded.locator('.canvas-resource__outline')).toHaveCount(0);
@@ -128,48 +158,69 @@ test('a Diamond chosen from the Actions menu is drawn Closed, kept on reload, an
   await (
     await resourceControls(page, reloaded)
   )
-    .getByRole('button', { name: 'Close Resource A' })
+    .getByRole('button', { name: `Close Resource ${UR}` })
     .click();
   await expect(face(reloaded)).toHaveAttribute('data-open', 'false');
   await expect(face(reloaded)).toHaveAttribute('data-resource-shape', 'diamond');
 });
 
-test('an Edge drawn to a Closed diamond meets its outline', async ({ page }) => {
+test('a Markdown Resource offers no Shape choice', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
-  const a = nodeByTitle(page, 'A').first();
+  await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+  await settled(page);
+
+  const menu = await resourceActions(page, 'A');
+  await expect(menu.getByRole('menuitem', { name: 'Create Reference' })).toBeVisible();
+  await expect(menu.getByRole('menuitem', { name: 'Shape' })).toHaveCount(0);
+});
+
+test('an Edge drawn to a Closed diamond meets its outline', async ({ page }) => {
+  const ur = await createUr(page);
+  const urId = await ur.getAttribute('data-id');
+  if (urId === null) throw new Error('The Ur Resource has no id.');
   const t = page.locator(`.react-flow__node[data-id="${RESOURCE_T}"]`);
-  await expect(a).toBeVisible();
 
   const resourceShapes = await resourceShapeChoice(page);
   await resourceShapes.getByRole('menuitemradio', { name: 'Diamond' }).click();
-  await expect(face(a)).toHaveAttribute('data-resource-shape', 'diamond');
+  await expect(face(ur)).toHaveAttribute('data-resource-shape', 'diamond');
+  await page.keyboard.press('Escape');
   await settled(page);
 
-  // T sits directly below A, so the Edge it draws rises into A's bottom side.
+  // The canvas attaches the Edge to whichever of U's sides faces T, so it is
+  // asked to end at the vertex on any of them.
   const before = await page.locator('.react-flow__edge').count();
   await t.hover();
   await connectHandles(
     page,
     authoringHandle(t, 'source', 'top'),
-    authoringHandle(a, 'target', 'bottom'),
+    authoringHandle(ur, 'target', 'bottom'),
   );
   await expect(page.locator('.react-flow__edge')).toHaveCount(before + 1);
   await settled(page);
 
-  // The diamond's bottom vertex is the midpoint of A's bottom side, and the
-  // Edge ends on the handle centred there.
-  const at = await positionOf(a);
-  const end = await edgeEnd(page, `${LONG}::${RESOURCE_T}::${RESOURCE_A}`);
-  const vertex = {
-    x: at.x + COLLAPSED_RESOURCE_SIZE.width / 2,
-    y: at.y + COLLAPSED_RESOURCE_SIZE.height,
-  };
-  expect(Math.abs(end.x - vertex.x), 'the Edge meets the vertex on its axis').toBeLessThan(2);
-  expect(Math.abs(end.y - (vertex.y + RADIUS)), 'the Edge ends at the vertex').toBeLessThan(2);
-  await expect.poll(() => outlineOffset(a)).toBeLessThan(0.5);
+  // Each of the diamond's vertices is the midpoint of one of U's sides, and
+  // the Edge ends on the handle centred at one of them, its radius outside.
+  const at = await positionOf(ur);
+  const end = await edgeEnd(page, `${LONG}::${RESOURCE_T}::${urId}`);
+  const { width, height } = COLLAPSED_RESOURCE_SIZE;
+  const handleCentres = [
+    { x: at.x + width / 2, y: at.y - RADIUS },
+    { x: at.x + width + RADIUS, y: at.y + height / 2 },
+    { x: at.x + width / 2, y: at.y + height + RADIUS },
+    { x: at.x - RADIUS, y: at.y + height / 2 },
+  ];
+  expect(
+    Math.min(
+      ...handleCentres.map((centre) =>
+        Math.max(Math.abs(end.x - centre.x), Math.abs(end.y - centre.y)),
+      ),
+    ),
+    `the Edge ends at a vertex, not at ${end.x},${end.y}`,
+  ).toBeLessThan(2);
+  await expect.poll(() => outlineOffset(ur)).toBeLessThan(0.5);
   // The drawn diamond, not only its rect, reaches that midpoint.
-  expect((await drawnOutline(face(a))).touchesSideMidpoints, 'the outline holds the vertex').toBe(
+  expect((await drawnOutline(face(ur))).touchesSideMidpoints, 'the outline holds the vertex').toBe(
     true,
   );
 });
@@ -178,10 +229,7 @@ test(
   'each Shape chosen from the Actions menu is drawn Closed at the Closed Size, touching every side midpoint',
   { tag: '@parity:closed-resource-draws-its-shape' },
   async ({ page }) => {
-    await page.goto('/');
-    await selectCanvas(page, 'Collection 1');
-    const a = nodeByTitle(page, 'A').first();
-    await expect(a).toBeVisible();
+    const ur = await createUr(page);
 
     for (const [name, resourceShape] of [
       ['Pill', 'pill'],
@@ -191,91 +239,68 @@ test(
     ] as const) {
       const resourceShapes = await resourceShapeChoice(page);
       await resourceShapes.getByRole('menuitemradio', { name }).click();
-      await expect(face(a)).toHaveAttribute('data-resource-shape', resourceShape);
-      await expect.poll(() => outlineOffset(a)).toBeLessThan(0.5);
-      expect(await drawnOutline(face(a)), name).toEqual({
+      await expect(face(ur)).toHaveAttribute('data-resource-shape', resourceShape);
+      await expect.poll(() => outlineOffset(ur)).toBeLessThan(0.5);
+      expect(await drawnOutline(face(ur)), name).toEqual({
         shape: resourceShape,
         size: [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height],
         touchesSideMidpoints: true,
         fillsCorner: false,
         holdsTitleAndGlyph: true,
-        shortTitle: { text: 'A', oneLine: true, insideBody: true },
+        shortTitle: { text: UR, oneLine: true, insideBody: true },
       });
     }
 
     await page.reload();
     await selectCanvas(page, 'Collection 1');
-    await expect(face(nodeByTitle(page, 'A').first())).toHaveAttribute(
+    await expect(face(nodeByTitle(page, UR).first())).toHaveAttribute(
       'data-resource-shape',
       'hexagon',
     );
   },
 );
 
+/**
+ * The selection ring follows the outline. A Reference Resource made from an
+ * Ur Resource in a Shape is not an Ur Resource, so it is the rectangle and
+ * offers no Shape.
+ */
 test(
-  "a Closed Shape's selection ring and a Reference Resource's dotted edge follow its outline",
+  "a Closed Shape's selection ring follows its outline, and a Reference Resource made from it is the rectangle",
   { tag: '@parity:closed-resource-treatments-follow-its-shape' },
   async ({ page }) => {
-    await page.goto('/');
-    await selectCanvas(page, 'Collection 1');
-    const a = nodeByTitle(page, 'A').first();
-    await expect(a).toBeVisible();
+    const ur = await createUr(page);
 
     // Selected: the ring is the diamond's, not the rect's.
     await (await resourceShapeChoice(page)).getByRole('menuitemradio', { name: 'Diamond' }).click();
-    await expect(face(a)).toHaveAttribute('data-resource-shape', 'diamond');
-    await expect(face(a)).toHaveAttribute('data-state', 'selected');
+    await expect(face(ur)).toHaveAttribute('data-resource-shape', 'diamond');
+    await expect(face(ur)).toHaveAttribute('data-state', 'selected');
     await expect
-      .poll(() => outlineTreatment(face(a)))
+      .poll(() => outlineTreatment(face(ur)))
       .toEqual({
         ringShown: true,
         ringFollowsOutline: true,
         edge: 'solid',
         rectBorder: false,
       });
+    await page.keyboard.press('Escape');
 
-    // A Reference Resource made from A, named apart from it and drawn as a hexagon.
-    const menu = await resourceActions(page, 'A');
+    const menu = await resourceActions(page, UR);
     await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
     const title = page.getByRole('textbox', { name: 'Resource title' });
     await expect(title).toBeFocused();
-    await title.fill('A, again');
+    await title.fill('U, again');
     await title.press('Enter');
     await expect(title).toHaveCount(0);
     await settled(page);
-    const reference = nodeByTitle(page, 'A, again');
+    const reference = nodeByTitle(page, 'U, again');
     await expect(face(reference)).toHaveAttribute('data-kind', 'reference');
-    await (
-      await resourceActions(page, 'A, again')
-    )
-      .getByRole('menuitem', { name: 'Shape' })
-      .click();
-    await page
-      .getByRole('group', { name: 'Shape' })
-      .getByRole('menuitemradio', { name: 'Hexagon' })
-      .click();
-    await expect(face(reference)).toHaveAttribute('data-resource-shape', 'hexagon');
-    await expect
-      .poll(() => outlineTreatment(face(reference)))
-      .toEqual({
-        ringShown: true,
-        ringFollowsOutline: true,
-        edge: 'solid',
-        rectBorder: false,
-      });
-
-    // At rest, with the pointer away, its edge is dotted along the hexagon.
-    await page.keyboard.press('Escape');
-    await page.mouse.move(2, 2);
-    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
-    await expect(face(reference)).toHaveAttribute('data-state', 'rest');
-    await expect
-      .poll(() => outlineTreatment(face(reference)))
-      .toEqual({
-        ringShown: false,
-        ringFollowsOutline: false,
-        edge: 'dotted',
-        rectBorder: false,
-      });
+    await expect(face(reference)).toHaveAttribute('data-resource-shape', 'rectangle');
+    await expect(reference.locator('.canvas-resource__outline')).toHaveCount(0);
+    const referenceMenu = await resourceActions(page, 'U, again');
+    await expect(
+      referenceMenu.getByRole('menuitem', { name: 'Copy link to Target' }),
+    ).toBeVisible();
+    await expect(referenceMenu.getByRole('menuitem', { name: 'Shape' })).toHaveCount(0);
   },
 );

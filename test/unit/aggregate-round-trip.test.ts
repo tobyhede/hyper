@@ -24,6 +24,8 @@ const CONVERGING_LINK_ID = uuidSchema.parse('cccccccc-cccc-4ccc-8ccc-ccccccccccc
 const MARKDOWN_RESOURCE_ID = uuidSchema.parse('dddddddd-dddd-4ddd-8ddd-dddddddddddd');
 const TARGET_RESOURCE_ID = uuidSchema.parse('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
 const SECOND_RESOURCE_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-ffffffffffff');
+const CLOSED_UR_ID = uuidSchema.parse('12121212-1212-4121-8121-121212121212');
+const OPEN_UR_ID = uuidSchema.parse('13131313-1313-4131-8131-131313131313');
 
 const temporaryDirectories: string[] = [];
 
@@ -329,30 +331,32 @@ describe('exporting and importing one complete aggregate', () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const [meta, ...targets] = completeAggregate();
     if (meta === undefined) throw new Error('The aggregate names no Meta Space');
+    // Only an Ur Resource takes a Shape (ADR 0117): one Closed in a diamond,
+    // one Open in a hexagon at its remembered Open Size.
     const withResourceShapes: SpaceSnapshot = {
       ...meta,
       document: {
         ...meta.document,
         maps: meta.document.maps?.map((m) => ({
           ...m,
-          positions: Object.fromEntries(
-            Object.entries(m.positions).map(([id, at]) => [
-              id,
-              at === undefined
-                ? at
-                : {
-                    ...at,
-                    shape:
-                      id === FIRST_LINK_ID
-                        ? 'diamond'
-                        : id === SECOND_LINK_ID
-                          ? 'hexagon'
-                          : at.shape,
-                  },
-            ]),
-          ),
+          positions: {
+            ...m.positions,
+            [CLOSED_UR_ID]: { x: 0, y: 400, open: false, shape: 'diamond' },
+            [OPEN_UR_ID]: {
+              x: 340,
+              y: 400,
+              open: true,
+              openSize: { width: 480, height: 270 },
+              shape: 'hexagon',
+            },
+          },
         })),
       },
+      resources: [
+        ...meta.resources,
+        { id: CLOSED_UR_ID, document: { title: 'Decision', kind: 'ur' } },
+        { id: OPEN_UR_ID, document: { title: 'Step', kind: 'ur' } },
+      ],
     };
 
     await exportTo(repositoryHolding([withResourceShapes, ...targets]), destination);
@@ -363,8 +367,14 @@ describe('exporting and importing one complete aggregate', () => {
 
     const positions = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID)
       ?.document.maps?.[0]?.positions;
-    expect(positions?.[FIRST_LINK_ID]?.shape).toBe('diamond');
-    expect(positions?.[SECOND_LINK_ID]).toMatchObject({ open: true, shape: 'hexagon' });
+    expect(positions?.[CLOSED_UR_ID]).toEqual({ x: 0, y: 400, open: false, shape: 'diamond' });
+    expect(positions?.[OPEN_UR_ID]).toEqual({
+      x: 340,
+      y: 400,
+      open: true,
+      openSize: { width: 480, height: 270 },
+      shape: 'hexagon',
+    });
     expect(positions?.[MARKDOWN_RESOURCE_ID]?.shape).toBe('rectangle');
   });
 

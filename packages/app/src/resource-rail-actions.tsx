@@ -46,7 +46,7 @@ export interface ResourceShapeCommand {
 export interface ResourceRailCommands {
   /** Create Reference, or `null` while no Resource may be added. */
   readonly createReference: (() => EntityActionOutcome) | null;
-  /** The Shape choice, or `null` while the Map may not be authored. */
+  /** The Shape choice, or `null` while the Map may not be authored. Drawn on an Ur Resource only. */
   readonly resourceShape: ResourceShapeCommand | null;
   /** Remove from Map, or `null` while it is unavailable. */
   readonly removeFromMap: (() => void) | null;
@@ -70,9 +70,9 @@ export interface ResourceRailCommands {
  * sharing the trailing destructive group. A Space Resource's menu pairs Enter
  * with Open in New Tab ahead of its copy links.
  *
- * The Shape choice is the same whether the Resource is Open or Closed (ADR
- * 0117): an Open Resource draws the rectangle, and the Shape it records is
- * drawn again on Close.
+ * The Shape choice is an Ur Resource's alone, and the same whether it is Open
+ * or Closed (ADR 0117). Every other kind is the rectangle, so its menu offers
+ * no Shape whatever command it is given.
  */
 export function resourceRailGroups(
   resource: Resource,
@@ -82,7 +82,7 @@ export function resourceRailGroups(
 ): readonly EntityActionGroup[] {
   const { createReference, resourceShape, removeFromMap, deleteFromSpace, enter } = commands;
   const shaping: readonly EntityActionGroup[] =
-    resourceShape === null ? [] : [[resourceShapeChoice(resourceShape)]];
+    resourceShape === null || resource.kind !== 'ur' ? [] : [[resourceShapeChoice(resourceShape)]];
   const terminal = resource.kind === 'reference' ? REFERENCE_TERMINAL : null;
   const reference: readonly EntityActionGroup[] =
     createReference === null

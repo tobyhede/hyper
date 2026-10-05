@@ -576,7 +576,8 @@ const decodeSpaceError = (value: unknown): SpaceError => {
     case 'reference-targets-self':
     case 'reference-targets-reference':
     case 'reference-target-must-own-content':
-    case 'space-resource-reference-cycle': {
+    case 'space-resource-reference-cycle':
+    case 'shape-requires-ur-resource': {
       const error = exactRecord(value, ['kind', 'ref', 'message'], 'Space reference error');
       return {
         kind,

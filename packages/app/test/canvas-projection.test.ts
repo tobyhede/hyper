@@ -5,6 +5,7 @@ import {
   loadSpace,
   Placement,
   positionedStrategy,
+  serializeResourceFile,
   type Space,
 } from '@project/graph';
 import { OTHER_GRAPH_OPACITY } from '@project/react-flow-adapter';
@@ -51,7 +52,10 @@ const AT_REST: CanvasInteraction = {
   presenting: false,
 };
 
-function spaceWith(extra: Record<string, unknown> = {}): Space {
+function spaceWith(
+  extra: Record<string, unknown> = {},
+  resources: typeof RESOURCES = RESOURCES,
+): Space {
   const result = loadSpace(
     {
       version: 1,
@@ -61,7 +65,7 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
       maps: [mapOwning(EMPTY)],
       ...extra,
     },
-    RESOURCES,
+    resources,
   );
   if (!result.ok) throw new Error(result.errors.map((e) => e.message).join(', '));
   return result.space;
@@ -274,7 +278,16 @@ describe('canvasProjection', () => {
         },
       },
     };
-    const { nodes } = await projectThrough(spaceWith({ maps: [diamondMap] }), AT_REST, MAP);
+    // Only an Ur Resource takes a Shape (ADR 0117).
+    const urResources = [RESOURCE_A, RESOURCE_B].map((id) => ({
+      path: `resources/${id}.md`,
+      text: serializeResourceFile({ id, title: id, kind: 'ur' }),
+    }));
+    const { nodes } = await projectThrough(
+      spaceWith({ maps: [diamondMap] }, urResources),
+      AT_REST,
+      MAP,
+    );
 
     expect(nodes.map(({ id, data }) => [id, data.shape, data.display.shown])).toEqual([
       [RESOURCE_A, 'diamond', 'closed'],

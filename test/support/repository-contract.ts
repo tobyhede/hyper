@@ -1094,6 +1094,11 @@ export const spaceRepositoryContract = (
         const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
         return {
           ...base,
+          // Only an Ur Resource takes a Shape (ADR 0117).
+          resources: base.resources.map(({ id, document }) => ({
+            id,
+            document: { title: document.title, kind: 'ur' },
+          })),
           document: {
             ...base.document,
             maps: (base.document.maps ?? []).map((m) => ({
@@ -1130,6 +1135,11 @@ export const spaceRepositoryContract = (
         const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
         return {
           ...base,
+          // Only an Ur Resource takes a Shape (ADR 0117).
+          resources: base.resources.map(({ id, document }) => ({
+            id,
+            document: { title: document.title, kind: 'ur' },
+          })),
           document: {
             ...base.document,
             maps: (base.document.maps ?? []).map((m) => ({

@@ -315,7 +315,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * The dropdown and the context menu draw the identical list
    * (`EntityActionItems`), so this is the one place the order has to hold.
    */
-  it('groups Create Reference, Connect, Shape, both copy links, then Remove and Delete, in that order', async () => {
+  it('groups Create Reference, Connect, both copy links, then Remove and Delete, in that order', async () => {
     const session = mount();
 
     await selectResource('A');
@@ -325,7 +325,6 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Shape'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -349,7 +348,6 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Shape'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -801,7 +799,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * each. Rename is absent, which this exact-order assertion would catch as
    * an extra row if it were not.
    */
-  it('groups Create Reference, Connect, Shape, Open in New Tab, the copy links, then Remove and Delete on a Space Resource', async () => {
+  it('groups Create Reference, Connect, Open in New Tab, the copy links, then Remove and Delete on a Space Resource', async () => {
     const session = mount(undefined, undefined, withSpaceResource);
 
     await selectResource('A space');
@@ -811,7 +809,6 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Shape'],
       ['Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],
@@ -930,6 +927,44 @@ describe('a Resource’s commands on the canvas rail', () => {
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
+    await settled(session);
+  });
+
+  /**
+   * Only an Ur Resource takes a Shape (ADR 0117), so the choice is its alone,
+   * Open (`withUr`, above) and Closed alike.
+   */
+  it('offers a Closed Ur Resource the Shape choice', async () => {
+    const closed = spaceSnapshotSchema.parse({
+      ...withUr,
+      document: {
+        ...withUr.document,
+        maps: [
+          {
+            ...withUr.document.maps?.[0],
+            positions: {
+              ...withUr.document.maps?.[0]?.positions,
+              [UR_ID]: { x: 0, y: 400, open: false, shape: 'diamond' },
+            },
+          },
+        ],
+      },
+    });
+    const session = mount(undefined, undefined, closed);
+    await selectResource('Gateway');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Gateway' }));
+    expect(await screen.findByRole('menuitem', { name: /^Shape/ })).toBeVisible();
+    await settled(session);
+  });
+
+  it('offers an Image Resource no Shape choice', async () => {
+    const session = mount(undefined, undefined, withImage);
+    await selectResource('Harbour');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Harbour' }));
+    await screen.findByRole('menuitem', { name: 'Create Reference' });
+    expect(screen.queryByRole('menuitem', { name: /^Shape/ })).toBeNull();
     await settled(session);
   });
 

@@ -64,10 +64,14 @@ const chainEdges = (ids: readonly UUID[]): GraphEdge[] => {
 };
 
 /** One Map owning one Graph over every generated Resource, at the given positions. */
+/** An Ur Resource's document, the one kind a Map may draw in any Shape (ADR 0117). */
+const urDocument = (title: string): ResourceDocument => ({ title, kind: 'ur' });
+
 const baseSnapshot = (
   ids: readonly UUID[],
   positions: Record<UUID, ResourcePlacement>,
   edges: readonly GraphEdge[] = [],
+  documentOf: (title: string) => ResourceDocument = markdownDocument,
 ): SpaceSnapshot => ({
   id: SPACE_ID,
   document: {
@@ -84,7 +88,7 @@ const baseSnapshot = (
       },
     ],
   },
-  resources: ids.map((id, index) => ({ id, document: markdownDocument(`Resource ${index}`) })),
+  resources: ids.map((id, index) => ({ id, document: documentOf(`Resource ${index}`) })),
 });
 
 const closedPlacement = (ids: readonly UUID[], coords: readonly number[]): Placement =>
@@ -684,7 +688,7 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       const entry = entries[index];
       if (entry !== undefined) positions[resourceId] = placementOf(entry);
     });
-    return baseSnapshot(RESOURCE_IDS, positions);
+    return baseSnapshot(RESOURCE_IDS, positions, [], urDocument);
   };
 
   /** A completed outcome's snapshot, which intake must accept. */

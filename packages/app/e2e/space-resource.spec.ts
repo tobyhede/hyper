@@ -766,23 +766,62 @@ test(
 );
 
 /**
- * A drawn Map draws its Resources' Shapes and, while it may be authored,
- * offers the Shape choice (ADR 0117, ADR 0112). The choice writes the target
- * Space's Map, so the target draws it when entered; a Reference Resource to
- * the Space Resource draws the same Map read-only, with the Shape and no
- * commands.
+ * A drawn Map draws its Ur Resources' Shapes and, while it may be authored,
+ * offers the Shape choice on them alone (ADR 0117, ADR 0112). The choice
+ * writes the target Space's Map, so the target draws it when entered; a
+ * Reference Resource to the Space Resource draws the same Map read-only, with
+ * the Shape and no commands.
  */
 test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn wherever it is', async ({
   page,
 }) => {
   const parent = await openSpaceResourceOnItsMap(page);
+  // The target's first Resource is a Markdown Resource, which takes no Shape.
   await beginPortalEdit(page, parent);
-  const embedded = embeddedNodes(page);
+  const markdown = embeddedNodes(page);
+  await expect(markdown).toHaveCount(1);
+  await (
+    await resourceControls(page, markdown)
+  )
+    .getByRole('button', { name: 'Actions for Resource Resource 1' })
+    .click({ delay: 120 });
+  await expect(
+    page.getByRole('menu').last().getByRole('menuitem', { name: 'Remove from Map' }),
+  ).toBeVisible();
+  await expect(page.getByRole('menu').last().getByRole('menuitem', { name: 'Shape' })).toHaveCount(
+    0,
+  );
+  await page.keyboard.press('Escape');
+  await (
+    await resourceToolbar(page, parent)
+  )
+    .getByRole('button', { name: 'Done Resource Architecture' })
+    .click();
+  await settled(page);
+
+  // An Ur Resource made in the target Space, which the drawn Map then draws.
+  await enterThrough(page, parent, 'Space 1');
+  await createResource(page, 'Ur Resource');
+  const urTitle = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(urTitle).toBeFocused();
+  await urTitle.fill('Step');
+  await urTitle.press('Enter');
+  await expect(urTitle).toHaveCount(0);
+  await settled(page);
+  await page.goBack();
+  await expect(showingSpace(page)).not.toContainText('Space 1');
+  await expect(embeddedNodes(page)).toHaveCount(2);
+  await settled(page);
+
+  await beginPortalEdit(page, parent);
+  const embedded = embeddedNodes(page).filter({
+    has: page.getByRole('heading', { name: 'Step', exact: true }),
+  });
   await expect(embedded).toHaveCount(1);
   await (
     await resourceControls(page, embedded)
   )
-    .getByRole('button', { name: 'Actions for Resource Resource 1' })
+    .getByRole('button', { name: 'Actions for Resource Step' })
     .click({ delay: 120 });
   await page.getByRole('menu').last().getByRole('menuitem', { name: 'Shape' }).click();
   await page
@@ -822,7 +861,9 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
   await reference.press('Enter');
   const referenceId = await reference.getAttribute('data-id');
   if (referenceId === null) throw new Error('The Reference Resource has no id.');
-  const throughReference = page.locator(`.react-flow__node[data-id^="embedded:${referenceId}:"]`);
+  const throughReference = page
+    .locator(`.react-flow__node[data-id^="embedded:${referenceId}:"]`)
+    .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) });
   await expect(throughReference).toHaveCount(1);
   await expect(throughReference.locator('.canvas-resource')).toHaveAttribute(
     'data-resource-shape',
@@ -838,14 +879,14 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
   await expect(
     page
       .locator('.react-flow__node:visible')
-      .filter({ has: page.getByRole('heading', { name: 'Resource 1', exact: true }) })
+      .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) })
       .locator('.canvas-resource'),
   ).toHaveAttribute('data-resource-shape', 'diamond');
   await page.reload();
   await expect(
     page
       .locator('.react-flow__node:visible')
-      .filter({ has: page.getByRole('heading', { name: 'Resource 1', exact: true }) })
+      .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) })
       .locator('.canvas-resource'),
   ).toHaveAttribute('data-resource-shape', 'diamond');
 });

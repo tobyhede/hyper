@@ -32,6 +32,7 @@ import {
   SPACE_ID,
   derivationSpace,
   openDerivationSpace,
+  urDerivationSnapshot,
 } from './app-derivation-fixtures';
 import { mintingIds } from './minting';
 
@@ -501,7 +502,7 @@ describe('useSpaceAddresses', () => {
 
 describe('useResourceRailActions', () => {
   const railFor = (opened: OpenSpace, available: boolean) => {
-    const space = derivationSpace();
+    const space = derivationSpace(opened.session.getState().working);
     return renderHook(() =>
       useResourceRailActions(opened.app, {
         space,
@@ -540,19 +541,18 @@ describe('useResourceRailActions', () => {
     expect(ids(groups)).toEqual([
       ['create-reference'],
       ['connect-resource'],
-      ['resource-shape'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
-    const remove = groups[4]?.[0];
+    const remove = groups[3]?.[0];
     act(() => {
       if (remove !== undefined && 'onSelect' in remove) void remove.onSelect(null);
     });
     await waitFor(() => expect(placedIds(opened)).not.toContain(PLACED_A));
   });
 
-  it('offers the Shape the Map records, and choosing one changes it on that Map', async () => {
-    const opened = openDerivationSpace();
+  it('offers an Ur Resource the Shape the Map records, and choosing one changes it on that Map', async () => {
+    const opened = openDerivationSpace(undefined, undefined, urDerivationSnapshot);
     const choice = railFor(opened, true)
       .result.current(PLACED_A, connect)
       .flat()

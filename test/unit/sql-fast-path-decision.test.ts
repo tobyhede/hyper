@@ -59,6 +59,8 @@ const markdown = (id: UUID, title: string) => ({
   document: { title, kind: 'markdown' as const, body: `# ${title}` },
 });
 
+const ur = (id: UUID, title: string) => ({ id, document: { title, kind: 'ur' as const } });
+
 const spaceLink = (id: UUID, spaceId: UUID, mapId: UUID, graph: UUID) => ({
   id,
   document: { title: 'Link', kind: 'space' as const, spaceId, map: mapId, graph },
@@ -98,7 +100,8 @@ const target: SpaceSnapshot = {
       },
     ],
   },
-  resources: T_RESOURCES.map((id, index) => markdown(id, `Resource ${index}`)),
+  // Ur Resources, so a generated `reshape` may give any of them a Shape (ADR 0117).
+  resources: T_RESOURCES.map((id, index) => ur(id, `Resource ${index}`)),
 };
 
 const selector: SpaceSnapshot = {

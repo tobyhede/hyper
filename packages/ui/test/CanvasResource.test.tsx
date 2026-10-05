@@ -2395,10 +2395,10 @@ describe('the Shape a Resource front is drawn in', () => {
   });
 
   /*
-   * The selection ring and a Reference Resource's dotted edge follow the
-   * outline (ADR 0117): both are strokes of the outline's own geometry, so
-   * neither can be drawn as the bounding rect. Which of them shows, and how,
-   * is `canvas-resource.css`'s, keyed on the state and kind.
+   * The selection ring follows the outline (ADR 0117): ring and edge are
+   * strokes of the outline's own geometry, so the ring cannot be drawn as the
+   * bounding rect. Whether it shows is `canvas-resource.css`'s, keyed on the
+   * state.
    */
   it.each(['pill', 'ellipse', 'diamond', 'hexagon'] as const)(
     'draws a Closed %s ring and edge from one geometry',
@@ -2406,7 +2406,6 @@ describe('the Shape a Resource front is drawn in', () => {
       render(
         <CanvasResource
           {...props}
-          front={{ kind: 'reference' }}
           state="selected"
           shape={resourceShape}
           display={CLOSED_DISPLAY}

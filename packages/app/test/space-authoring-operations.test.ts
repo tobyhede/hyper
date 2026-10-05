@@ -607,8 +607,17 @@ describe('Open Resource geometry', () => {
 });
 
 describe('Change Shape', () => {
+  /** `positionedSnapshot` with Resource A as `document`, every other entry as it was. */
+  const withA = (document: SpaceSnapshot['resources'][number]['document']): SpaceSnapshot => ({
+    ...positionedSnapshot,
+    resources: positionedSnapshot.resources.map((resource) =>
+      resource.id === RESOURCE_A ? { id: RESOURCE_A, document } : resource,
+    ),
+  });
+  /** Only an Ur Resource takes a Shape (ADR 0117), so A is one here. */
+  const urSnapshot = withA({ title: 'A', kind: 'ur' });
   it('draws one Resource in another Shape on this Map, as one Edit that moves nothing else', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = open(urSnapshot);
     const before = session.getState().working;
 
     expect(
@@ -629,7 +638,7 @@ describe('Change Shape', () => {
   });
 
   it('is unchanged for the Shape the Resource already has', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = open(urSnapshot);
     const before = session.getState().working;
 
     expect(
@@ -643,7 +652,7 @@ describe('Change Shape', () => {
   });
 
   it('is undone by choosing the Shape it had, which restores the placement exactly', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = open(urSnapshot);
     const before = session.getState().working;
 
     authoring.complete(CANVAS, {
@@ -664,7 +673,7 @@ describe('Change Shape', () => {
   });
 
   it('is recorded while the Resource is Open, and kept through Resize and Close', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = open(urSnapshot);
     authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
 
     expect(
@@ -698,7 +707,7 @@ describe('Change Shape', () => {
   });
 
   it('keeps the Shape through a settled drag', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = open(urSnapshot);
     authoring.complete(CANVAS, {
       kind: 'changed-resource-shape',
       resourceId: RESOURCE_A,
@@ -719,7 +728,7 @@ describe('Change Shape', () => {
   });
 
   it('forgets the Shape with the rest of the entry, so Add to Map gives the rectangle again', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = open(urSnapshot);
     authoring.complete(CANVAS, {
       kind: 'changed-resource-shape',
       resourceId: RESOURCE_A,
@@ -742,7 +751,7 @@ describe('Change Shape', () => {
   });
 
   it('refuses a Resource the Map does not hold, changing nothing', () => {
-    const { authoring, session } = openPositioned();
+    const { authoring, session } = open(urSnapshot);
     const before = session.getState().working;
 
     expect(
@@ -757,11 +766,11 @@ describe('Change Shape', () => {
 
   it('changes the Shape on the one Map it names, and no other', () => {
     const twoMaps: SpaceSnapshot = {
-      ...positionedSnapshot,
+      ...urSnapshot,
       document: {
-        ...positionedSnapshot.document,
+        ...urSnapshot.document,
         maps: [
-          ...(positionedSnapshot.document.maps ?? []),
+          ...(urSnapshot.document.maps ?? []),
           {
             id: OTHER_MAP_ID,
             title: 'Map 2',
@@ -783,6 +792,67 @@ describe('Change Shape', () => {
     const after = session.getState().working;
     expect(mapOf(after, MAP_ID)?.positions[RESOURCE_A]?.shape).toBe('diamond');
     expect(mapOf(after, OTHER_MAP_ID)).toEqual(mapOf(twoMaps, OTHER_MAP_ID));
+  });
+
+  it.each([
+    ['Markdown', withA({ title: 'A', kind: 'markdown', body: 'A' })],
+    [
+      'Image',
+      withA({
+        title: 'A',
+        kind: 'image',
+        url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+        naturalSize: { width: 640, height: 480 },
+      }),
+    ],
+    [
+      'Space',
+      withA({
+        title: 'A',
+        kind: 'space',
+        spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000095'),
+        map: UNLOADED_MAP,
+        graph: UNLOADED_GRAPH,
+      }),
+    ],
+    ['Reference', withA({ title: 'A', kind: 'reference', target: RESOURCE_B })],
+  ])('refuses any Shape on a %s Resource, Open or Closed, changing nothing', (_kind, snapshot) => {
+    const { authoring, session } = open(snapshot);
+    const refusal = { kind: 'refused', refusal: { code: 'shape-requires-ur-resource' } };
+
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'changed-resource-shape',
+        resourceId: RESOURCE_A,
+        shape: 'diamond',
+      }),
+    ).toEqual(refusal);
+
+    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
+    const before = session.getState().working;
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'changed-resource-shape',
+        resourceId: RESOURCE_A,
+        shape: 'pill',
+      }),
+    ).toEqual(refusal);
+    expect(session.getState().working).toBe(before);
+  });
+
+  it('is unchanged for the Shape an Open Ur Resource already has', () => {
+    const { authoring, session } = open(urSnapshot);
+    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
+    const before = session.getState().working;
+
+    expect(
+      authoring.complete(CANVAS, {
+        kind: 'changed-resource-shape',
+        resourceId: RESOURCE_A,
+        shape: 'rectangle',
+      }),
+    ).toEqual({ kind: 'unchanged' });
+    expect(session.getState().working).toBe(before);
   });
 });
 

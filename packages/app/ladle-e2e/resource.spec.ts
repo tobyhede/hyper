@@ -686,7 +686,7 @@ test(
 );
 
 /**
- * Every Shape a Map may give a Resource, drawn Closed (ADR 0117): the one
+ * Every Shape a Map may give an Ur Resource, drawn Closed (ADR 0117): the one
  * Closed Size whatever the Shape, an outline reaching the midpoint of each side
  * where Edges attach, and the Title and kind glyph inside that outline. Every
  * Shape but the rectangle leaves the rect's corner unfilled and draws the short
@@ -694,7 +694,7 @@ test(
  * Title ladder.
  */
 test(
-  'a Closed Resource draws each Shape at the Closed Size, touching every side midpoint',
+  'a Closed Ur Resource draws each Shape at the Closed Size, touching every side midpoint',
   { tag: '@parity:closed-resource-draws-its-shape' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--resource-shapes&mode=preview');
@@ -707,7 +707,7 @@ test(
       ] as const) {
         const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
-        await expect(resource.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
+        await expect(resource.getByRole('img', { name: 'Ur Resource' })).toBeVisible();
         expect(await drawnOutline(resource), `${resourceShape} · ${suffix}`).toEqual({
           shape: resourceShape,
           size: [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height],
@@ -723,38 +723,20 @@ test(
 );
 
 /**
- * A selected Resource's ring and a Reference Resource's dotted edge on a
- * Closed Shape follow its outline (ADR 0117), not the rect it sits in.
+ * A selected Ur Resource's ring on a Closed Shape follows its outline
+ * (ADR 0117), not the rect it sits in.
  */
 test(
-  "a Closed Shape's selection ring and Reference edge follow its outline",
+  "a Closed Shape's selection ring follows its outline",
   { tag: '@parity:closed-resource-treatments-follow-its-shape' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--resource-shape-treatments&mode=preview');
 
     for (const resourceShape of RESOURCE_SHAPES.filter((each) => each !== 'rectangle')) {
-      const resource = (suffix: string) =>
-        specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
+      const resource = specimen(page, `${resourceShape} · selected`).getByRole('article');
 
-      await expect(resource('selected')).toHaveAttribute('data-resource-shape', resourceShape);
-      expect(await outlineTreatment(resource('selected')), `${resourceShape} · selected`).toEqual({
-        ringShown: true,
-        ringFollowsOutline: true,
-        edge: 'solid',
-        rectBorder: false,
-      });
-      expect(await outlineTreatment(resource('reference')), `${resourceShape} · reference`).toEqual(
-        {
-          ringShown: false,
-          ringFollowsOutline: false,
-          edge: 'dotted',
-          rectBorder: false,
-        },
-      );
-      expect(
-        await outlineTreatment(resource('reference selected')),
-        `${resourceShape} · reference selected`,
-      ).toEqual({
+      await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
+      expect(await outlineTreatment(resource), `${resourceShape} · selected`).toEqual({
         ringShown: true,
         ringFollowsOutline: true,
         edge: 'solid',
