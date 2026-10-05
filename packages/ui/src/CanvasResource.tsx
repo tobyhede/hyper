@@ -151,7 +151,7 @@ interface CanvasResourceCommonProps {
    */
   readonly display: FrontDisplay;
   /**
-   * The Shape the Map records for this Resource (ADR 0117), drawn whatever the
+   * The Shape the Map records for this Resource (ADR 0120), drawn whatever the
    * display. A front no Map places — a creation ghost, a specimen — is given the
    * rectangle by its caller.
    */
@@ -761,7 +761,7 @@ export function CanvasResource(props: CanvasResourceProps) {
  * Drawn in the units of the rect the Resource is drawn at, so the drawing is
  * not stretched and the outline touches the midpoint of each of the rect's
  * sides, where the adapter's handles sit and Edges attach (ADR 0110, ADR
- * 0117). The stroke keeps the border's width at any zoom because it does not
+ * 0120). The stroke keeps the border's width at any zoom because it does not
  * scale with the drawing.
  *
  * The geometry is drawn twice: first the selection ring, a wider stroke that

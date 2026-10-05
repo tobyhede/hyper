@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
@@ -13,6 +13,7 @@ import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { postgresTestDatabase } from '../support/postgres-database';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { runHyperScript } from '../support/hyper-command';
+import { admitted, pngBytes, showing } from '../support/stored-images';
 
 const IMPORTED_SPACE_ID = uuidSchema.parse('d1111111-1111-4111-8111-111111111111');
 const MALFORMED_SPACE_ID = uuidSchema.parse('d2222222-2222-4222-8222-222222222222');
@@ -24,6 +25,7 @@ const EXPORTED_RESOURCE_ID = uuidSchema.parse('d7777777-7777-4777-8777-777777777
 const TARGET_MAP_ID = uuidSchema.parse('d8888888-8888-4888-8888-888888888888');
 const TARGET_GRAPH_ID = uuidSchema.parse('d9999999-9999-4999-8999-999999999999');
 const LINK_RESOURCE_ID = uuidSchema.parse('dabababa-abab-4bab-8bab-abababababab');
+const PICTURE_ID = uuidSchema.parse('dcdcdcdc-dcdc-4cdc-8cdc-dcdcdcdcdcdc');
 
 const runHyperCommand = (args: readonly string[]) => runHyperScript('hyper', args);
 
@@ -94,13 +96,17 @@ describe('hyper CLI', () => {
     return directory;
   };
 
-  /** One Space of an aggregate, in the directory named for its own Id. */
+  /**
+   * One Space of an aggregate, in the directory named for its own Id, with a
+   * `resources/` directory for a test to write hand-authored Resources into.
+   */
   const writeSpaceDirectory = async (
     aggregate: string,
     snapshot: SpaceSnapshot,
   ): Promise<string> => {
     const directory = join(aggregate, snapshot.id);
     await writeLoadedSpaceDirectory({ snapshot, revision: 0n, exportedRevision: null }, directory);
+    await mkdir(join(directory, 'resources'), { recursive: true });
     return directory;
   };
 
@@ -379,6 +385,31 @@ describe('hyper CLI', () => {
         ],
       },
     });
+  });
+
+  /*
+   * The directory format is the same whichever store wrote it (ADR 0118): a
+   * picture an Aggregate directory carries is stored by Import and written
+   * back by Export.
+   */
+  it('stores the images an imported directory carries, and exports them again', async () => {
+    const image = await admitted(pngBytes(1));
+    const pictured: SpaceSnapshot = {
+      ...metaSpaceSnapshot,
+      resources: [...metaSpaceSnapshot.resources, { id: PICTURE_ID, document: showing(image) }],
+    };
+    const source = await makeAggregateDirectory(META_SPACE_ID, [targetSpaceSnapshot, pictured]);
+    await mkdir(join(source, 'images'));
+    await writeFile(join(source, 'images', `${image.id}.png`), pngBytes(1));
+
+    expect((await runHyperCommand([source])).status).toBe(0);
+    await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+
+    const destination = await temporaryDirectory('hyper-cli-images-');
+    expect((await runHyperCommand(['export', destination])).status).toBe(0);
+    expect(new Uint8Array(await readFile(join(destination, 'images', `${image.id}.png`)))).toEqual(
+      pngBytes(1),
+    );
   });
 
   it('reports a malformed resource path and stores no partial space', async () => {

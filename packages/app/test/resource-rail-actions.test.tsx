@@ -931,7 +931,7 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * Only an Ur Resource takes a Shape (ADR 0117), so the choice is its alone,
+   * Only an Ur Resource takes a Shape (ADR 0120), so the choice is its alone,
    * Open (`withUr`, above) and Closed alike.
    */
   it('offers a Closed Ur Resource the Shape choice', async () => {

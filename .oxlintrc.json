@@ -43,7 +43,7 @@
     // the drawn geometry itself rather than a structure standing in for an
     // owner, so the compound is allowed in every casing; "shape" alone or in any
     // other compound is still reported (`test/unit/anti-slop/no-shape-in-symbol-names.test.ts`).
-    // "Shape" is a domain term too (CONTEXT.md, ADR 0117): the outline a Closed
+    // "Shape" is a domain term too (CONTEXT.md, ADR 0120): the outline a Closed
     // Resource is drawn in on a Map, stored in the Map entry's `shape`. The whole
     // name is allowed only where it names a property (a key, a member access, a
     // type member or a JSX attribute), never as a local or a parameter, and the
@@ -170,24 +170,6 @@
       }
     },
     {
-      // Design debt flagged rather than fixed (research.md: no-module-mocking
-      // findings are design feedback, not free syntax fixes). This mocks
-      // `node:fs/promises` to fault-inject ENOSPC/EPERM on specific paths so
-      // export's cleanup-after-partial-failure paths are reachable at all —
-      // real disk-full/permission-denied conditions aren't practically
-      // triggerable in a test. Unlike the Base UI/React Flow boundary above,
-      // a real fix exists in principle: give `exportAggregate` an injected
-      // filesystem seam (ADR 0109's composition-time pattern) so this test
-      // could supply a faithful in-memory implementation that fails on
-      // command. That is a production-code change this bounded, zero-prod-risk
-      // phase deliberately does not make — left for whoever next touches
-      // `src/export/export-aggregate.ts`.
-      "files": ["test/unit/export-aggregate-recovery.test.ts"],
-      "rules": {
-        "anti-slop/no-module-mocking": "off"
-      }
-    },
-    {
       // `graphColorsByGraphId` builds its map at runtime, keyed by however many graphs
       // a Space holds — there is no static literal for `satisfies` to check and
       // no narrower key type escapes the rule's own unconditional `Record<...>`
@@ -308,8 +290,8 @@
       // (`typeof window/document/Element !== 'undefined'`, `vitest.setup.ts`'s
       // whole reason for existing) or to discriminate a closed union or
       // optional-function property a library's own types declare (React Flow's
-      // `nodeColor`, Node's `net.Server.address(): AddressInfo | string | null`
-      // and `fs.writeFile`'s `PathLike` parameter, Vite's optional
+      // `nodeColor`, Node's `net.Server.address(): AddressInfo | string | null`,
+      // Vite's optional
       // `configureServer`/`configurePreviewServer` plugin hooks, an ESLint
       // `unknown` config result shape-checked once, the untyped arguments of a
       // `console.error` call the unowned-update guard reads) — none of these are
@@ -320,8 +302,8 @@
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
         "test/unit/raw-http-request.test.ts",
         "test/unit/vite-hono-host.test.ts",
+        "test/integration/start-command.test.ts",
         "test/unit/vite-space-http-plugin.test.ts",
-        "test/unit/export-aggregate-recovery.test.ts",
         "test/support/refusing-postgres-server.ts",
         "test/support/unowned-react-updates.ts"
       ],
@@ -434,6 +416,7 @@
         "packages/persistence/src/session.ts",
         "src/cli/main.ts",
         "src/cli/run.ts",
+        "scripts/start-run.ts",
         "src/aggregate-directory/space-directory.ts"
       ],
       "rules": {

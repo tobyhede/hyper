@@ -71,7 +71,7 @@ export interface ResourceRailCommands {
  * with Open in New Tab ahead of its copy links.
  *
  * The Shape choice is an Ur Resource's alone, and the same whether it is Open
- * or Closed (ADR 0117). Every other kind is the rectangle, so its menu offers
+ * or Closed (ADR 0120). Every other kind is the rectangle, so its menu offers
  * no Shape whatever command it is given.
  */
 export function resourceRailGroups(

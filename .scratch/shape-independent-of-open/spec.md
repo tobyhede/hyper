@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 
-Refines `.scratch/resource-shape/` (ADR 0117, PR 338) in place. ADR 0117 is not on `main`, so it is corrected rather than superseded.
+Refines `.scratch/resource-shape/` (ADR 0120, PR 338) in place. ADR 0120 is not on `main`, so it is corrected rather than superseded.
 
 ## Problem Statement
 
@@ -41,7 +41,7 @@ A Shape is a property of an Ur Resource on a Map, drawn whatever its Open state.
 21. As a maintainer, I want the stored JSON of a Map entry unchanged, so that no fixture, seed or migration has to move for the schema change.
 22. As a maintainer, I want the Shape declared once beside position in the Map entry's schema, so that the Open/Closed union says only what Open/Closed means.
 23. As a maintainer, I want one function to answer a Shape's outline and inscribed rectangle for any size, so that Closed and Open draw from the same geometry.
-24. As a maintainer, I want CONTEXT.md, ADR 0117 and the Maps and Graphs contract to define a Shape without reference to Open, so that the docs and the code agree.
+24. As a maintainer, I want CONTEXT.md, ADR 0120 and the Maps and Graphs contract to define a Shape without reference to Open, so that the docs and the code agree.
 25. As a maintainer, I want the parity claims and stories for Shapes named and specimened for both Open and Closed, so that ADR 0052's evidence covers what is drawn.
 
 ## Implementation Decisions
@@ -54,7 +54,7 @@ A Shape is a property of an Ur Resource on a Map, drawn whatever its Open state.
 - **Drawing.** The front draws the Shape from `shape` alone. The rule that answered the rectangle for any display but Closed is removed, along with the redundant Closed check in the stylesheet. The outline drawing is sized to the Resource's current rect, so its strokes are not stretched, and the inscribed insets set on the front follow the current size. The short Title follows the Shape alone: a non-rectangle Shape shows it at every size. The resize control stays at the bounding rect's bottom-right corner.
 - **Presenting** is unchanged: a presented Resource is drawn by the presented surface, not on the Map.
 - **Reference outline treatment retired.** A Reference Resource is never an Ur Resource, so it is always the rectangle; the dotted-outline drawing for a Reference in a Shape is unreachable and is removed with its story rows and its part of the treatment parity claim.
-- **Docs, fixed in place.** ADR 0117 (title included, since it names "only a Closed Resource"), the Maps and Graphs contract R45–R50 (R46 becomes "only an Ur Resource takes a Shape", R48 states the Shape against the Resource's rect rather than the Closed Size, R49 is replaced by "a Shape is drawn Open and Closed alike"), and CONTEXT.md "Shape" ("the outline an Ur Resource is drawn in on a Map"). No new ADR: nothing on `main` changes, and ADR 0113's capability rule is unaffected because a Shape is now the Ur kind's, not a capability every Resource shares.
+- **Docs, fixed in place.** ADR 0120 (title included, since it names "only a Closed Resource"), the Maps and Graphs contract R45–R50 (R46 becomes "only an Ur Resource takes a Shape", R48 states the Shape against the Resource's rect rather than the Closed Size, R49 is replaced by "a Shape is drawn Open and Closed alike"), and CONTEXT.md "Shape" ("the outline an Ur Resource is drawn in on a Map"). No new ADR: nothing on `main` changes, and ADR 0113's capability rule is unaffected because a Shape is now the Ur kind's, not a capability every Resource shares.
 
 ## Testing Decisions
 

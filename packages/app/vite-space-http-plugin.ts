@@ -10,7 +10,7 @@ import type { Plugin } from 'vite';
 // of it here, which is what the two had already become.
 import type { ProductRequestResolver, ProductResponse } from '../http/src/index';
 
-interface FetchApplication extends ProductRequestResolver {
+export interface FetchApplication extends ProductRequestResolver {
   fetch(request: Request, env?: unknown): Response | Promise<Response>;
   /** Releases what the runtime opened; a runtime that opens nothing has none. */
   close?(): Promise<void>;
@@ -25,13 +25,26 @@ interface SpaceHttpRuntime {
   createApp(options?: unknown): Promise<FetchApplication> | FetchApplication;
 }
 
-export interface SpaceHttpPluginOptions {
+/** A runtime module the host loads by path, for the development and preview servers. */
+export interface SpaceHttpModuleOptions {
   developmentModule: string;
   previewModule: string;
   runtimeOptions?: unknown;
   /** System boundary injection used only by the plugin's Node-level tests. */
   loadPreviewModule?: (modulePath: string) => Promise<unknown>;
 }
+
+/**
+ * An application already composed in the process that starts Vite, for a
+ * launcher that must keep hold of what it serves — Running stops its
+ * application itself, flushing what it has not written, before it exits.
+ * A module Vite loads is a separate instance the launcher could not reach.
+ */
+export interface SpaceHttpApplicationOptions {
+  application: FetchApplication;
+}
+
+export type SpaceHttpPluginOptions = SpaceHttpModuleOptions | SpaceHttpApplicationOptions;
 
 // `previewModule` is a filesystem path, and `import()` takes a module specifier.
 // The two only coincide for tame POSIX paths: a `#` would start a URL fragment
@@ -98,27 +111,36 @@ const asRuntime = (loaded: unknown, modulePath: string): SpaceHttpRuntime => {
   return loaded as SpaceHttpRuntime;
 };
 
+/**
+ * The application a runtime module creates, checked at startup. The module
+ * probe in `asRuntime` sees `createApp`; this is the application it answers,
+ * and the two are different objects. A runtime that hands back a bare Hono app
+ * satisfies both the probe and this file's declared type, then fails on the
+ * first request off the API tree with `created.resolveProductRequest is not a
+ * function` — once per request, naming nothing that locates the runtime.
+ * Startup is the last place the module can still be named, so it is where the
+ * disagreement is reported.
+ */
+const loadApplication = async (
+  runtime: Promise<unknown>,
+  modulePath: string,
+  runtimeOptions: unknown,
+): Promise<FetchApplication> => {
+  const created = await asRuntime(await runtime, modulePath).createApp(runtimeOptions);
+  if (typeof created.resolveProductRequest !== 'function') {
+    throw new Error(`${modulePath}'s createApp returns no resolveProductRequest`);
+  }
+  return created;
+};
+
 const installMiddleware = (
   register: (
     middleware: (request: IncomingMessage, response: ServerResponse, next: Next) => void,
   ) => void,
-  runtime: Promise<unknown>,
-  modulePath: string,
-  runtimeOptions: unknown,
+  application: Promise<FetchApplication>,
   httpServer: ClosingServer | null,
 ): void => {
-  const host = runtime.then(async (loaded) => {
-    const created = await asRuntime(loaded, modulePath).createApp(runtimeOptions);
-    // The module probe above sees `createApp`; this is the application it
-    // answers, and the two are different objects. A runtime that hands back a
-    // bare Hono app satisfies both the probe and this file's declared type, then
-    // fails on the first request off the API tree with `created
-    // .resolveProductRequest is not a function` — once per request, naming
-    // nothing that locates the runtime. Startup is the last place the module can
-    // still be named, so it is where the disagreement is reported.
-    if (typeof created.resolveProductRequest !== 'function') {
-      throw new Error(`${modulePath}'s createApp returns no resolveProductRequest`);
-    }
+  const host = application.then((created) =>
     // `getRequestListener` replaces `globalThis.Request`/`Response` with its own
     // lightweight classes unless `overrideGlobalObjects: false` is passed, and
     // it defines them non-writable and non-configurable, so the swap is
@@ -127,11 +149,11 @@ const installMiddleware = (
     // `Request` constructor on an instance this adapter made. Disabling the
     // override answers 500 to every commit; `vite-hono-host.test.ts` pins both
     // the accepted and the oversized path against exactly that change.
-    return {
+    ({
       created,
       handle: getRequestListener((request, env) => created.fetch(request, env)),
-    };
-  });
+    }),
+  );
   // A runtime that fails to load rejects once, here, and nothing is waiting on
   // it until the first request arrives — Node calls that an unhandled rejection
   // and takes the server down with it. Marking it handled costs nothing: the
@@ -184,26 +206,46 @@ const installMiddleware = (
   });
 };
 
+/**
+ * The application a server hosts: the one the launcher composed in process, or
+ * the one the named runtime module creates.
+ */
+const hostedApplication = (
+  options: SpaceHttpPluginOptions,
+  loadModule: (modules: SpaceHttpModuleOptions) => Promise<FetchApplication>,
+): Promise<FetchApplication> =>
+  'application' in options ? Promise.resolve(options.application) : loadModule(options);
+
 /** Host the fixed server-side persistence runtime without importing it at config time. */
 export function spaceHttpPlugin(options: SpaceHttpPluginOptions): Plugin {
   return {
     name: 'space-http-persistence',
     configureServer(server) {
+      const application = hostedApplication(options, (modules) =>
+        loadApplication(
+          server.ssrLoadModule(modules.developmentModule),
+          modules.developmentModule,
+          modules.runtimeOptions,
+        ),
+      );
       installMiddleware(
         (middleware) => server.middlewares.use(middleware),
-        server.ssrLoadModule(options.developmentModule),
-        options.developmentModule,
-        options.runtimeOptions,
+        application,
         server.httpServer,
       );
     },
     configurePreviewServer(server) {
-      const load = options.loadPreviewModule ?? defaultPreviewLoader;
+      const application = hostedApplication(options, (modules) => {
+        const load = modules.loadPreviewModule ?? defaultPreviewLoader;
+        return loadApplication(
+          load(modules.previewModule),
+          modules.previewModule,
+          modules.runtimeOptions,
+        );
+      });
       installMiddleware(
         (middleware) => server.middlewares.use(middleware),
-        load(options.previewModule),
-        options.previewModule,
-        options.runtimeOptions,
+        application,
         server.httpServer,
       );
     },

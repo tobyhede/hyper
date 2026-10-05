@@ -232,7 +232,7 @@ describe('resourceRailGroups', () => {
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
-  /** The one kind that takes a Shape (ADR 0117). */
+  /** The one kind that takes a Shape (ADR 0120). */
   const ur: Resource = { id: OUTSIDE, title: 'Gateway', kind: 'ur' };
 
   it('leads with Create Reference and ends with the commands that leave the Resource', () => {

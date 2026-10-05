@@ -169,7 +169,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         });
         continue;
       }
-      // Only an Ur Resource takes a Shape (ADR 0117); every other kind is the
+      // Only an Ur Resource takes a Shape (ADR 0120); every other kind is the
       // rectangle. The kind is read from the Resource, because the entry does
       // not carry it.
       if (member.kind !== 'ur' && placement !== undefined && placement.shape !== 'rectangle') {

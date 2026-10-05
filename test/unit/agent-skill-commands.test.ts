@@ -56,11 +56,30 @@ const skillInstructionFiles = (directory: URL): readonly URL[] =>
         : [];
   });
 
+const namedRootScripts = (skill: string): readonly string[] =>
+  [...skill.matchAll(BACKTICKED_PNPM_COMMAND)]
+    .map((match) => match[1] ?? '')
+    .filter((command) => !PACKAGE_RUNNER_COMMANDS.has(command));
+
+const HYPER_SKILLS = ['hyper-getting-started', 'hyper-authoring'] as const;
+
+describe('commands in the Hyper getting-started and authoring skills', () => {
+  it.each(HYPER_SKILLS)('%s names only root scripts the repository can run', (name) => {
+    const skill = readFileSync(
+      new URL(`../../.agents/skills/${name}/SKILL.md`, import.meta.url),
+      'utf8',
+    );
+    const named = namedRootScripts(skill);
+    const availableScripts = new Set(Object.keys(rootPackage.scripts ?? {}));
+
+    expect(named).toContain('start');
+    expect(named.filter((script) => !availableScripts.has(script))).toEqual([]);
+  });
+});
+
 describe('commands in the mandatory shadcn-first UI workflow', () => {
   it('names only root scripts the repository can run', () => {
-    const namedScripts = [...shadcnFirstUi.matchAll(BACKTICKED_PNPM_COMMAND)]
-      .map((match) => match[1] ?? '')
-      .filter((command) => !PACKAGE_RUNNER_COMMANDS.has(command));
+    const namedScripts = namedRootScripts(shadcnFirstUi);
 
     const availableScripts = new Set(Object.keys(rootPackage.scripts ?? {}));
     const missingScripts = namedScripts.filter((script) => !availableScripts.has(script));

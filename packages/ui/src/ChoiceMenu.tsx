@@ -145,7 +145,7 @@ export interface ChoiceSubmenuProps<Id extends string> extends ChoiceListProps<I
 /**
  * The list a {@link ChoiceMenu} draws, as a submenu of the menu it sits in
  * rather than as a menu of its own — a Resource's Shape, chosen from its
- * Actions menu (ADR 0117). It takes no placement or focus props: a submenu
+ * Actions menu (ADR 0120). It takes no placement or focus props: a submenu
  * opens beside its row and closes with the menu it belongs to.
  */
 export function ChoiceSubmenu<Id extends string>({

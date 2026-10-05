@@ -1,8 +1,8 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
 import type { SpaceAggregateError } from '@project/graph';
-import type { LoadedSpace } from '@project/persistence';
+import type { LoadedSpace, StoredImage } from '@project/persistence';
 import type { AggregateInput, SpaceRepository } from '../persistence/space-repository';
-import { readAggregate } from '../aggregate-directory';
+import { readAggregate, type AggregateDirectoryContents } from '../aggregate-directory';
 
 /**
  * What became of a complete aggregate import.
@@ -40,6 +40,19 @@ export interface AggregateImportOptions {
   readonly truncate: boolean;
   readonly newId: () => UUID;
 }
+
+/**
+ * Store each image the directory carries, one at a time and in the order read.
+ * A stored image is outside the aggregate and is never deleted (ADR 0106), so
+ * an image stored by an import whose aggregate is then refused is one more
+ * picture nothing shows, like any upload whose Edit never landed.
+ */
+const storeImages = async (
+  repository: SpaceRepository,
+  images: readonly StoredImage[],
+): Promise<void> => {
+  for (const image of images) await repository.storeImage(image);
+};
 
 const initialize = async (
   repository: SpaceRepository,
@@ -104,8 +117,25 @@ export const importAggregate = async (
   path: string,
   repository: SpaceRepository,
   { truncate, newId }: AggregateImportOptions,
+): Promise<AggregateImportResult> =>
+  importAggregateContents(await readAggregate(path, newId), repository, { truncate });
+
+/**
+ * Import what `readAggregate` read, for a caller that has to look at the
+ * contents before anything is stored.
+ *
+ * The images are admitted first, so every stored image the aggregate shows is
+ * there to load the moment the aggregate is (ADR 0118). A stored-image URL the
+ * directory carries no bytes for is not refused: it draws as a picture that
+ * will not load, which ADR 0106 already allows.
+ */
+export const importAggregateContents = async (
+  contents: AggregateDirectoryContents,
+  repository: SpaceRepository,
+  { truncate }: Pick<AggregateImportOptions, 'truncate'>,
 ): Promise<AggregateImportResult> => {
-  const input = await readAggregate(path, newId);
+  const input: AggregateInput = { metaSpaceId: contents.metaSpaceId, spaces: contents.spaces };
+  await storeImages(repository, contents.images);
 
   if (!truncate) return initialize(repository, input);
 

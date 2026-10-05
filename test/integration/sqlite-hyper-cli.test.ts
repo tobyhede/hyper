@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
@@ -14,6 +14,7 @@ import { createSqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { runHyperScript } from '../support/hyper-command';
 import { migrateSqliteFile } from '../support/sqlite-harness';
+import { admitted, pngBytes, showing } from '../support/stored-images';
 
 const META_SPACE_ID = uuidSchema.parse('e1111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('e2222222-2222-4222-8222-222222222222');
@@ -22,6 +23,7 @@ const RESOURCE_ID = uuidSchema.parse('e4444444-4444-4444-8444-444444444444');
 const LINK_RESOURCE_ID = uuidSchema.parse('e5555555-5555-4555-8555-555555555555');
 const MAP_ID = uuidSchema.parse('e6666666-6666-4666-8666-666666666666');
 const GRAPH_ID = uuidSchema.parse('e7777777-7777-4777-8777-777777777777');
+const PICTURE_ID = uuidSchema.parse('e8888888-8888-4888-8888-888888888888');
 
 const targetSpace: SpaceSnapshot = {
   id: TARGET_SPACE_ID,
@@ -358,6 +360,34 @@ describe('hyper:sqlite CLI', () => {
         },
       });
     });
+  });
+
+  /*
+   * The directory format is the same whichever store wrote it (ADR 0118): a
+   * picture an Aggregate directory carries is stored by Import and written
+   * back by Export.
+   */
+  it('stores the images an imported directory carries, and exports them again', async () => {
+    const path = await migratedFile();
+    const image = await admitted(pngBytes(1));
+    const pictured: SpaceSnapshot = {
+      ...metaSpace,
+      resources: [...metaSpace.resources, { id: PICTURE_ID, document: showing(image) }],
+    };
+    const source = await aggregateDirectory(META_SPACE_ID, [targetSpace, pictured]);
+    await mkdir(join(source, 'images'));
+    await writeFile(join(source, 'images', `${image.id}.png`), pngBytes(1));
+
+    expect((await hyper(path, [source])).status).toBe(0);
+    await withRepository(path, async (repository) => {
+      await expect(repository.loadImage(image.id)).resolves.toEqual(image);
+    });
+
+    const destination = join(await temporaryDirectory('hyper-sqlite-cli-export-'), 'exported');
+    expect((await hyper(path, ['export', destination])).status).toBe(0);
+    expect(new Uint8Array(await readFile(join(destination, 'images', `${image.id}.png`)))).toEqual(
+      pngBytes(1),
+    );
   });
 
   it('refuses to run without SQLITE_PATH naming a file', async () => {

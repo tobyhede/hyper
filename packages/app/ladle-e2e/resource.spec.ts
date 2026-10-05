@@ -690,7 +690,7 @@ test(
 
 /**
  * Every Shape a Map may give an Ur Resource, drawn Open and Closed alike (ADR
- * 0117): an outline reaching the midpoint of each side of the Resource's rect,
+ * 0120): an outline reaching the midpoint of each side of the Resource's rect,
  * where Edges attach, at the one Closed Size and at a larger Open Size, and the
  * Title and kind glyph inside that outline. Every Shape but the rectangle
  * leaves the rect's corner unfilled and draws the short Title on one line,
@@ -732,7 +732,7 @@ test(
 );
 
 /**
- * A selected Ur Resource's ring on a Shape follows its outline (ADR 0117), not
+ * A selected Ur Resource's ring on a Shape follows its outline (ADR 0120), not
  * the rect it sits in, Open and Closed alike.
  */
 test(

@@ -370,7 +370,7 @@ const openSizeSchema = z.object({
 });
 
 /**
- * The outline an Ur Resource is drawn in on a Map (ADR 0117), Open or Closed.
+ * The outline an Ur Resource is drawn in on a Map (ADR 0120), Open or Closed.
  * Every member touches the midpoint of each side of the Resource's rect, where
  * Edges attach.
  */
@@ -388,7 +388,7 @@ export const ADDED_RESOURCE_SHAPE = 'rectangle' satisfies (typeof RESOURCE_SHAPE
 /**
  * Where a Map puts a Resource and the Shape it draws it in, whatever its
  * Open/Closed state. The Shape is required: nothing reads a missing one as a
- * rectangle (ADR 0117).
+ * rectangle (ADR 0120).
  */
 const shapedPositionSchema = mapPositionSchema.extend({
   shape: resourceShapeSchema,

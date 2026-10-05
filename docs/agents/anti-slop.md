@@ -52,7 +52,7 @@ The fixtures are excluded from lint, format and the root program on purpose. ESL
 
 ## Ownership
 
-- `no-shape-in-symbol-names`: name symbols for their domain role or owner; `shape` describes structure but assigns no responsibility. Two domain terms are allowed, both configured in `.oxlintrc.json`: **head shape** (ADR 0105) and a Resource's **Shape** (ADR 0117), the second written `resource shape` in a compound (`allowedCompounds`) and allowed alone only as the Map entry's whole field name `shape` (`allowedNames`) — where the identifier names a property (an object or destructuring key, a member access, a type member or a JSX attribute), never as a local or a parameter, which is written `resourceShape`. A new domain term joins those lists only if `CONTEXT.md` defines it and "shape" in it names drawn geometry.
+- `no-shape-in-symbol-names`: name symbols for their domain role or owner; `shape` describes structure but assigns no responsibility. Two domain terms are allowed, both configured in `.oxlintrc.json`: **head shape** (ADR 0105) and a Resource's **Shape** (ADR 0120), the second written `resource shape` in a compound (`allowedCompounds`) and allowed alone only as the Map entry's whole field name `shape` (`allowedNames`) — where the identifier names a property (an object or destructuring key, a member access, a type member or a JSX attribute), never as a local or a parameter, which is written `resourceShape`. A new domain term joins those lists only if `CONTEXT.md` defines it and "shape" in it names drawn geometry.
 - `no-object-parameters` also rejects ownerless `object` contracts; name what the function accepts.
 
 ## Seams and operations

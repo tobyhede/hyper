@@ -767,7 +767,7 @@ test(
 
 /**
  * A drawn Map draws its Ur Resources' Shapes, Open and Closed alike, and,
- * while it may be authored, offers the Shape choice on them alone (ADR 0117,
+ * while it may be authored, offers the Shape choice on them alone (ADR 0120,
  * ADR 0112). The choice writes the target Space's Map, so the target draws it
  * when entered; a Reference Resource to the Space Resource draws the same Map
  * read-only, with the Shape and no commands.

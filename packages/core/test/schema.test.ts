@@ -498,7 +498,7 @@ describe('space file maps', () => {
     });
   });
 
-  describe('a Shape on each entry (ADR 0117)', () => {
+  describe('a Shape on each entry (ADR 0120)', () => {
     const A = '00000000-0000-4000-8000-000000000002';
     /** An entry as a hand or a stale writer might put it on disk, Shape and all. */
     interface StoredEntry {

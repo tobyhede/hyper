@@ -1,22 +1,18 @@
-import { cp, mkdir, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { type SpaceSnapshot, type UUID } from '@project/core';
 import { loadSpaceAggregate, type SpaceAggregateError } from '@project/graph';
 import type { LoadedAggregate } from '@project/persistence';
 import {
-  AGGREGATE_FILE_NAME,
+  aggregateFiles,
   assertExportableDestination,
-  pruneObsoleteSpaceDirectories,
-  readAggregate,
-  writeAggregateDirectory,
+  loadReferencedImages,
+  readAggregateFiles,
+  rejectSymbolicLinks,
+  scannedAggregateFiles,
+  writeInPlace,
+  type DirectoryFiles,
 } from '../aggregate-directory';
 import type { SpaceRepository } from '../persistence/space-repository';
-import {
-  createStagingRoot,
-  exists,
-  rejectSymbolicLink,
-  replaceDestination,
-} from './replace-destination';
 
 /** One Space whose bytes landed but whose projected revision was not recorded. */
 export interface UnrecordedExport {
@@ -33,12 +29,12 @@ export type AggregateExportResult =
   | { kind: 'exported'; aggregate: LoadedAggregate; unrecorded: readonly UnrecordedExport[] }
   | { kind: 'uninitialized' }
   /**
-   * Staged bytes re-read as Spaces naming the expected Meta Space, but ordinary
-   * Aggregate intake refused them. The destination is untouched. The CLI renders
+   * The files read back as Spaces naming the expected Meta Space, but ordinary
+   * Aggregate intake refused them. Nothing was written. The CLI renders
    * `errors` through `describeAggregateRefusal`.
    */
   | {
-      kind: 'invalid-staged-aggregate';
+      kind: 'would-not-read-back';
       metaSpaceId: UUID;
       spaces: readonly SpaceSnapshot[];
       errors: readonly SpaceAggregateError[];
@@ -46,20 +42,20 @@ export type AggregateExportResult =
 
 /**
  * Nothing in a canonical export is minted, because the aggregate being written
- * is already fully identified. Verification re-reads what was staged through the
- * ordinary import reader, which takes a generator for the ids a hand-authored
- * directory may omit — so the one this passes exists to prove it is never
- * reached. If it is, the export wrote a file with an id missing from it.
+ * is already fully identified. The check reads the files through the ordinary
+ * import reader, which takes a generator for the ids a hand-authored directory
+ * may omit — so the one this passes exists to prove it is never reached. If it
+ * is, the export would write a file with an id missing from it.
  */
 const mintsNothing = (): UUID => {
   throw new Error('Canonical export wrote an entity with no id');
 };
 
 /**
- * Prove the staged directory reads back as the aggregate it was written from,
- * before anything replaces the destination.
+ * Prove the files read back as the aggregate they were serialised from, in
+ * memory, before any of them is written.
  *
- * Read through the ordinary Aggregate-directory reader and the ordinary
+ * Read through the ordinary Aggregate-directory parsers and the ordinary
  * aggregate intake, rather than through a check written for export: what this
  * needs to know is that import will accept these bytes, and the only honest way
  * to know that is to ask import.
@@ -72,13 +68,14 @@ const mintsNothing = (): UUID => {
  *
  * An intake refusal is returned rather than rendered: `loadAggregate` has
  * already validated, so a refusal here means the canonical bytes disagree with
- * the aggregate they were written from — a serialization defect. The CLI owns
+ * the aggregate they were serialised from — a serialization defect. The CLI owns
  * the operator sentences via `describeAggregateRefusal`, the same renderer
  * import uses. A Meta id mismatch remains a thrown Error: that is a bug in the
  * writer, not an Aggregate the operator can repair in the destination.
  */
-const verifyStagedAggregate = async (
-  directory: string,
+const checkReadsBack = async (
+  destination: string,
+  files: DirectoryFiles,
   metaSpaceId: UUID,
 ): Promise<
   | { readonly ok: true }
@@ -89,7 +86,7 @@ const verifyStagedAggregate = async (
       readonly errors: readonly SpaceAggregateError[];
     }
 > => {
-  const reread = await readAggregate(directory, mintsNothing);
+  const reread = await readAggregateFiles(destination, files, mintsNothing);
   if (reread.metaSpaceId !== metaSpaceId) {
     throw new Error(
       `Exported aggregate names Meta Space ${reread.metaSpaceId} rather than ${metaSpaceId}`,
@@ -110,44 +107,6 @@ const verifyStagedAggregate = async (
   return { ok: true };
 };
 
-const stageAggregate = async (
-  aggregate: LoadedAggregate,
-  replacement: string,
-): Promise<
-  | { readonly ok: true }
-  | {
-      readonly ok: false;
-      readonly metaSpaceId: UUID;
-      readonly spaces: readonly SpaceSnapshot[];
-      readonly errors: readonly SpaceAggregateError[];
-    }
-> => {
-  const spaceIds = new Set(aggregate.spaces.map(({ snapshot }) => snapshot.id));
-  await pruneObsoleteSpaceDirectories(replacement, spaceIds);
-  await writeAggregateDirectory(aggregate, replacement);
-  return verifyStagedAggregate(replacement, aggregate.metaSpaceId);
-};
-
-const rejectSymbolicLinks = async (
-  destination: string,
-  aggregate: LoadedAggregate,
-): Promise<void> => {
-  await rejectSymbolicLink(destination);
-  await rejectSymbolicLink(join(destination, AGGREGATE_FILE_NAME));
-  await Promise.all(
-    aggregate.spaces.map(async ({ snapshot }) => {
-      const spaceDirectory = join(destination, snapshot.id);
-      await rejectSymbolicLink(spaceDirectory);
-      await rejectSymbolicLink(join(spaceDirectory, 'resources'));
-      await Promise.all(
-        snapshot.resources.map(({ id }) =>
-          rejectSymbolicLink(join(spaceDirectory, 'resources', `${id}.md`)),
-        ),
-      );
-    }),
-  );
-};
-
 /**
  * Record the revision each Space was exported at, one call per Space, after the
  * bytes are already on disk.
@@ -157,11 +116,11 @@ const rejectSymbolicLinks = async (
  * neighbour. An unmarked Space reads as changed since its last export, which is
  * the conservative direction — it invites an export that was already done,
  * where the opposite would hide one that never happened. So this runs after
- * replacement and never before it: a revision recorded against bytes that did
- * not land is the one failure mode there is no recovering from.
+ * every file is written and never before: a revision recorded against bytes
+ * that did not land is the one failure mode there is no recovering from.
  *
- * **Answered, not thrown.** This runs after the destination has been replaced,
- * so by the time it can fail the export has already happened and no sentence
+ * **Answered, not thrown.** This runs after every file is written, so by the
+ * time it can fail the export has already happened and no sentence
  * may say otherwise. Throwing made the CLI print `Export failed` with exit 1
  * for the one outcome this ordering was chosen to make safe, which invites the
  * operator to re-run or discard a destination that is complete and valid. Each
@@ -188,16 +147,22 @@ const markAggregateExported = async (
 };
 
 /**
- * Write the complete stored aggregate to a canonical directory.
+ * Write the complete stored aggregate to a canonical directory, in place
+ * (ADR 0119).
  *
  * One `loadAggregate()` read is the whole of what gets exported, so every Space
  * in the directory comes from one consistent view rather than from a series of
- * reads a concurrent commit could fall between.
+ * reads a concurrent commit could fall between. The bytes of every stored image
+ * the aggregate shows are written to `images/` (ADR 0118); images are read after
+ * the aggregate and outside its revision, and an image's id is its content, so
+ * no commit can change one between the two reads.
  *
- * The destination is replaced whole, from a staging copy of itself: what the
- * reader would discover is regenerated, obsolete Space directories go, and
- * everything else — root files this format ignores, and undiscovered contents
- * inside a Space directory that survives — is carried across untouched.
+ * The files are checked to read back before any is written, and a refusal
+ * writes nothing. Then each file whose bytes differ is replaced, and each file
+ * Import would read that the aggregate no longer serialises to is removed. The
+ * destination and its Space directories are never renamed or recreated, and
+ * nothing Import does not read is touched. A failure part-way leaves some files
+ * written and some not; git, not Hyper, restores the directory.
  */
 export const exportAggregate = async (
   repository: SpaceRepository,
@@ -206,33 +171,26 @@ export const exportAggregate = async (
   const loaded = await repository.loadAggregate();
   if (loaded.kind === 'uninitialized') return { kind: 'uninitialized' };
   const aggregate = loaded.aggregate;
+  const images = await loadReferencedImages(
+    repository,
+    aggregate.spaces.map(({ snapshot }) => snapshot),
+  );
 
   const destination = resolve(destinationPath);
-  await mkdir(resolve(destination, '..'), { recursive: true });
-  await rejectSymbolicLinks(destination, aggregate);
+  const files = aggregateFiles(aggregate, images);
+  await rejectSymbolicLinks(destination, files.keys());
   await assertExportableDestination(destination);
 
-  const stagingRoot = await createStagingRoot(destination);
-  const replacement = join(stagingRoot, 'replacement');
-  try {
-    if (await exists(destination)) {
-      await cp(destination, replacement, { recursive: true });
-    } else {
-      await mkdir(replacement);
-    }
-    const staged = await stageAggregate(aggregate, replacement);
-    if (!staged.ok) {
-      return {
-        kind: 'invalid-staged-aggregate',
-        metaSpaceId: staged.metaSpaceId,
-        spaces: staged.spaces,
-        errors: staged.errors,
-      };
-    }
-    await replaceDestination(replacement, destination);
-    const unrecorded = await markAggregateExported(repository, aggregate);
-    return { kind: 'exported', aggregate, unrecorded };
-  } finally {
-    await rm(stagingRoot, { recursive: true, force: true }).catch(() => undefined);
+  const checked = await checkReadsBack(destination, files, aggregate.metaSpaceId);
+  if (!checked.ok) {
+    return {
+      kind: 'would-not-read-back',
+      metaSpaceId: checked.metaSpaceId,
+      spaces: checked.spaces,
+      errors: checked.errors,
+    };
   }
+  await writeInPlace(destination, files, await scannedAggregateFiles(destination));
+  const unrecorded = await markAggregateExported(repository, aggregate);
+  return { kind: 'exported', aggregate, unrecorded };
 };

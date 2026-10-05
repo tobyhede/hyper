@@ -1960,7 +1960,7 @@ it('reports and dismisses a drawn Space Resource menu clipboard refusal', async 
   }
 });
 
-/** The drawn Space with Intake an Ur Resource, the one kind that takes a Shape (ADR 0117). */
+/** The drawn Space with Intake an Ur Resource, the one kind that takes a Shape (ADR 0120). */
 const targetWithUrIntake: SpaceSnapshot = {
   ...target,
   resources: target.resources.map((resource) =>

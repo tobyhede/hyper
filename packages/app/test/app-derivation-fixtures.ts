@@ -67,7 +67,7 @@ export const derivationSpace = (snapshot: SpaceSnapshot = derivationSnapshot): S
 
 /**
  * `derivationSnapshot` with `PLACED_A` an Ur Resource, the one kind a Map may
- * draw in a Shape other than the rectangle (ADR 0117).
+ * draw in a Shape other than the rectangle (ADR 0120).
  */
 export const urDerivationSnapshot: SpaceSnapshot = {
   ...derivationSnapshot,

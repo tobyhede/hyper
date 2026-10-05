@@ -40,7 +40,9 @@ const FIGURE_URL = 'https://example.com/figure.png';
  * The tracked fixture's 400×300 picture, served in place of the external URL so
  * nothing reaches the network.
  */
-const HARBOUR = readFileSync(new URL('../fixture-images/harbour-400x300.png', import.meta.url));
+const HARBOUR = readFileSync(
+  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+);
 
 interface Pictures {
   /** The Image Resource's Title. */

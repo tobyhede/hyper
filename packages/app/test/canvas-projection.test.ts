@@ -278,7 +278,7 @@ describe('canvasProjection', () => {
         },
       },
     };
-    // Only an Ur Resource takes a Shape (ADR 0117).
+    // Only an Ur Resource takes a Shape (ADR 0120).
     const urResources = [RESOURCE_A, RESOURCE_B].map((id) => ({
       path: `resources/${id}.md`,
       text: serializeResourceFile({ id, title: id, kind: 'ur' }),

@@ -230,14 +230,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResourceShapes',
     claim:
-      'An Ur Resource draws the Shape its Map gives it — rectangle, pill, ellipse, diamond or hexagon — Open and Closed alike, at the one Closed Size and at any Open Size, its outline touching the midpoint of each side of its rect where Edges attach, with its Title and kind glyph inside the outline; every Shape but the rectangle draws the short Title, on one line and ellipsised where it is too wide (ADR 0117).',
+      'An Ur Resource draws the Shape its Map gives it — rectangle, pill, ellipse, diamond or hexagon — Open and Closed alike, at the one Closed Size and at any Open Size, its outline touching the midpoint of each side of its rect where Edges attach, with its Title and kind glyph inside the outline; every Shape but the rectangle draws the short Title, on one line and ellipsised where it is too wide (ADR 0120).',
   },
   {
     id: 'ur-resource-treatments-follow-its-shape',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResourceShapeTreatments',
     claim:
-      'An Ur Resource drawn in a Shape other than the rectangle rings its outline while selected, Open or Closed, rather than the bounding rect (ADR 0117).',
+      'An Ur Resource drawn in a Shape other than the rectangle rings its outline while selected, Open or Closed, rather than the bounding rect (ADR 0120).',
   },
   {
     id: 'image-resource-closed-front-draws-title-and-kind',

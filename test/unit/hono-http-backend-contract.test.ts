@@ -8,7 +8,7 @@ import {
 } from '@project/persistence';
 import { spaceBackendContract } from '@project/persistence/test-support';
 import { createSpaceHttpApp, HttpSpaceBackend } from '@project/http';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 import { RESOURCE_ID, SPACE_ID, oneResourceSnapshot as snapshot } from '../support/space-fixtures';
 
 /** A request that initializes no Space mints nothing, so any mint is a failure here. */

@@ -23,7 +23,7 @@ import { requireDefaultMap } from '#src/map-resolution';
 import { CanvasResourceNodeSpecimen, type DrawnMap } from '../support/ReactFlowCanvas';
 import { resourceIds, GRAPH_PALETTE } from '../support/fixture';
 import { authoredSpace, imageReferenceIds, imageReferenceSpace } from '../support/spaces';
-import harbour from '#fixture-images/harbour-400x300.png';
+import harbour from '#fixture-images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png';
 import '../support/inventory.css';
 
 export default { title: 'Components/Resource' };
@@ -159,7 +159,7 @@ Front.storyName = 'Front';
 const OPEN_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
 
 /**
- * Every Shape a Map may give an Ur Resource (ADR 0117), drawn Closed at the one
+ * Every Shape a Map may give an Ur Resource (ADR 0120), drawn Closed at the one
  * Closed Size and Open at a larger one: the rectangle is the front's own
  * border, and every other Shape is an outline touching the midpoint of each
  * side of the Resource's rect, with the kind glyph and the short Title — the
@@ -215,7 +215,7 @@ const DRAWN_RESOURCE_SHAPES = RESOURCE_SHAPES.filter(
 );
 
 /**
- * The selection ring on a Shape (ADR 0117), Open and Closed: it follows the
+ * The selection ring on a Shape (ADR 0120), Open and Closed: it follows the
  * outline rather than the bounding rect.
  */
 export const ResourceShapeTreatments: Story = () => (

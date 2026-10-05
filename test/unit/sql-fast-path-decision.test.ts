@@ -100,7 +100,7 @@ const target: SpaceSnapshot = {
       },
     ],
   },
-  // Ur Resources, so a generated `reshape` may give any of them a Shape (ADR 0117).
+  // Ur Resources, so a generated `reshape` may give any of them a Shape (ADR 0120).
   resources: T_RESOURCES.map((id, index) => ur(id, `Resource ${index}`)),
 };
 

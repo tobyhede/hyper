@@ -1,4 +1,4 @@
-import { readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import {
   AGGREGATE_FILE_VERSION,
@@ -9,12 +9,25 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import type { LoadedAggregate } from '@project/persistence';
+import type { LoadedAggregate, StoredImage } from '@project/persistence';
 import { compareOrdinal } from '../ordinal';
 import type { AggregateInput } from '../persistence/space-repository';
 import { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
-import { isMissingFile, readSingleSpace, AggregateDirectoryError } from './space-directory';
-import { writeSpaceDirectory } from './write-space-directory';
+import {
+  admitImageFile,
+  imageFileName,
+  IMAGES_DIRECTORY_NAME,
+  readAggregateImages,
+  scannedImageFileNames,
+} from './images';
+import {
+  AggregateDirectoryError,
+  isMissingFile,
+  parseSingleSpace,
+  readSingleSpace,
+} from './space-directory';
+import { writeInPlace, type DirectoryFiles } from './write-in-place';
+import { scannedSpaceFiles, spaceDirectoryFiles } from './write-space-directory';
 
 /** The name of the aggregate file at the root of a canonical aggregate directory. */
 export const AGGREGATE_FILE_NAME = 'hyper.json';
@@ -35,20 +48,13 @@ const isRegularFile = async (path: string): Promise<boolean> => {
  * message names the file: the likeliest way to arrive here is by pointing the
  * command at a single Space directory, which is not what public import takes, and "there is no hyper.json here" is the sentence that says so.
  */
-const readAggregateFile = async (directory: string): Promise<UUID> => {
-  const path = join(directory, AGGREGATE_FILE_NAME);
-  let text: string;
-  try {
-    text = await readFile(path, 'utf8');
-  } catch (error) {
-    if (isMissingFile(error)) {
-      throw new AggregateDirectoryError('discovery', [
-        `${path}: a canonical aggregate directory must contain ${AGGREGATE_FILE_NAME}`,
-      ]);
-    }
-    throw new AggregateDirectoryError('discovery', [`${path}: ${String(error)}`]);
-  }
+const missingAggregateFile = (path: string): AggregateDirectoryError =>
+  new AggregateDirectoryError('discovery', [
+    `${path}: a canonical aggregate directory must contain ${AGGREGATE_FILE_NAME}`,
+  ]);
 
+/** Parse `hyper.json`'s text into the Meta Space it names. */
+const parseAggregateFile = (path: string, text: string): UUID => {
   let json: unknown;
   try {
     json = JSON.parse(text);
@@ -65,6 +71,18 @@ const readAggregateFile = async (directory: string): Promise<UUID> => {
   return parsed.data.metaSpaceId;
 };
 
+const readAggregateFile = async (directory: string): Promise<UUID> => {
+  const path = join(directory, AGGREGATE_FILE_NAME);
+  let text: string;
+  try {
+    text = await readFile(path, 'utf8');
+  } catch (error) {
+    if (isMissingFile(error)) throw missingAggregateFile(path);
+    throw new AggregateDirectoryError('discovery', [`${path}: ${String(error)}`]);
+  }
+  return parseAggregateFile(path, text);
+};
+
 /**
  * The immediate children that are Space directories, in ordinal name order.
  *
@@ -79,8 +97,8 @@ const readAggregateFile = async (directory: string): Promise<UUID> => {
  * back, so it has to come from the bytes rather than from ICU.
  *
  * Private to this module: export reaches discovery only through
- * `assertExportableDestination` and `pruneObsoleteSpaceDirectories`, so a
- * second discovery rule cannot drift beside the write path.
+ * `assertExportableDestination` and `scannedAggregateFiles`, so a second
+ * discovery rule cannot drift beside the write path.
  */
 const discoverSpaceDirectories = async (directory: string): Promise<string[]> => {
   let entries;
@@ -150,22 +168,32 @@ interface SpaceDirectoryRead {
  * order — so which Space received which minted id depended on how fast its
  * files came back rather than on the sort that discovery applied.
  */
-const readSpaceDirectory = async (directory: string): Promise<SpaceDirectoryRead> => {
+const requireSpaceDirectoryId = (directory: string): UUID => {
   const id = spaceDirectoryId(basename(directory));
   if (id === undefined) {
     throw new AggregateDirectoryError('parsing', [
       `${directory}: a Space directory must be named for its Space UUID, in lower case`,
     ]);
   }
+  return id;
+};
 
-  const input = await readSingleSpace(directory);
+const agreeingSpaceDirectory = (
+  directory: string,
+  id: UUID,
+  input: ImportSpace,
+): SpaceDirectoryRead => {
   if (input.id !== undefined && input.id !== id) {
     throw new AggregateDirectoryError('parsing', [
       `${join(directory, 'space.json')}: declares Space ${input.id} inside directory ${id}`,
     ]);
   }
-
   return { directory, id, input };
+};
+
+const readSpaceDirectory = async (directory: string): Promise<SpaceDirectoryRead> => {
+  const id = requireSpaceDirectoryId(directory);
+  return agreeingSpaceDirectory(directory, id, await readSingleSpace(directory));
 };
 
 /** The Spaces minting completed, beside the failures it gathered on the way. */
@@ -185,7 +213,7 @@ interface IdentifiedSpaces {
  * Failures are gathered rather than thrown so they join the read failures in one
  * list, and are answered by the one policy below. A fault the reader does not
  * model reaches this phase as readily as the read phase — the identity generator
- * throwing is how canonical export verifies a staged aggregate — so it has to be
+ * throwing is how canonical export checks its files before writing them — so it has to be
  * sorted by what it is, not by which phase raised it.
  */
 const identifyReadSpaces = (
@@ -209,8 +237,19 @@ const identifyReadSpaces = (
 };
 
 /**
+ * What an Aggregate directory holds: the complete Meta-rooted input the
+ * persistence lifecycle takes, and the stored images its `images/` carries.
+ * The images are outside the aggregate (ADR 0106), so they travel beside it
+ * rather than inside the input either lifecycle door reads.
+ */
+export interface AggregateDirectoryContents extends AggregateInput {
+  readonly images: readonly StoredImage[];
+}
+
+/**
  * Read a canonical aggregate directory into the complete Meta-rooted input the
- * persistence lifecycle takes.
+ * persistence lifecycle takes, beside every image `images/` carries, each
+ * admitted by the rule storing an uploaded picture uses (ADR 0118).
  *
  * This reads and identifies; it validates nothing about how the Spaces relate.
  * Meta rooting, Space Resource targets, cross-Space Resource ownership and the rest
@@ -228,23 +267,40 @@ const identifyReadSpaces = (
 export const readAggregate = async (
   inputPath: string,
   newId: () => UUID,
-): Promise<AggregateInput> => {
+): Promise<AggregateDirectoryContents> => {
   const directory = resolve(inputPath);
   const metaSpaceId = await readAggregateFile(directory);
   const spaceDirectories = await discoverSpaceDirectories(directory);
 
-  const results = await Promise.allSettled(spaceDirectories.map(readSpaceDirectory));
+  const [results, images] = await Promise.all([
+    Promise.allSettled(spaceDirectories.map(readSpaceDirectory)),
+    readAggregateImages(directory),
+  ]);
   // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
   // `unknown` stops that `any` from propagating into `failures`.
   const readFailures: unknown[] = results.flatMap((result) =>
     result.status === 'rejected' ? [result.reason as unknown] : [],
   );
   const reads = results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+  return aggregateContents(metaSpaceId, reads, readFailures, images, newId);
+};
+
+/**
+ * Mint what the reads left out and answer every failure by one policy, for the
+ * directory reader and the in-memory one alike.
+ */
+const aggregateContents = (
+  metaSpaceId: UUID,
+  reads: readonly SpaceDirectoryRead[],
+  readFailures: readonly unknown[],
+  images: { readonly images: readonly StoredImage[]; readonly failures: readonly unknown[] },
+  newId: () => UUID,
+): AggregateDirectoryContents => {
   // Minting runs over whatever read cleanly even when a neighbour did not, so a
   // fault it raises is weighed against the read failures rather than hidden
   // behind them.
   const identified = identifyReadSpaces(reads, newId);
-  const failures = [...readFailures, ...identified.failures];
+  const failures = [...readFailures, ...identified.failures, ...images.failures];
 
   if (failures.length > 0) {
     // A failure this reader does not model — a programming fault, a non-ENOENT
@@ -264,13 +320,135 @@ export const readAggregate = async (
     );
   }
 
-  return { metaSpaceId, spaces: identified.spaces };
+  return { metaSpaceId, spaces: identified.spaces, images: images.images };
+};
+
+const textOf = (bytes: Uint8Array): string => Buffer.from(bytes).toString('utf8');
+
+/**
+ * The files of an Aggregate directory's own layout, by path relative to it,
+ * read the way `readAggregate` reads that directory once they are on disk:
+ * `hyper.json`; each top-level directory holding `space.json`, with the
+ * `*.md` beside it and `resources/*.md`; and the visible files in `images/`.
+ * Each is parsed and admitted by the same functions the directory reader uses,
+ * and failures are answered by the same policy, so Export can ask whether its
+ * files would read back before it writes any of them. `directory` only names
+ * the paths in diagnostics.
+ */
+export const readAggregateFiles = async (
+  directory: string,
+  files: DirectoryFiles,
+  newId: () => UUID,
+): Promise<AggregateDirectoryContents> => {
+  const aggregatePath = join(directory, AGGREGATE_FILE_NAME);
+  const aggregateBytes = files.get(AGGREGATE_FILE_NAME);
+  if (aggregateBytes === undefined) throw missingAggregateFile(aggregatePath);
+  const metaSpaceId = parseAggregateFile(aggregatePath, textOf(aggregateBytes));
+
+  const paths = [...files.keys()];
+  const spaceNames = paths
+    .flatMap((path) => {
+      const [name, file, ...rest] = path.split('/');
+      return file === 'space.json' && rest.length === 0 && name !== undefined ? [name] : [];
+    })
+    .sort(compareOrdinal);
+
+  const reads: SpaceDirectoryRead[] = [];
+  const readFailures: unknown[] = [];
+  for (const name of spaceNames) {
+    const spaceDirectory = join(directory, name);
+    try {
+      const id = requireSpaceDirectoryId(spaceDirectory);
+      const resources = paths
+        .flatMap((path) => {
+          const [owner, ...rest] = path.split('/');
+          const inside = rest.join('/');
+          const isResource =
+            owner === name &&
+            ((rest.length === 1 && inside.endsWith('.md')) ||
+              (rest.length === 2 && rest[0] === 'resources' && inside.endsWith('.md')));
+          return isResource ? [inside] : [];
+        })
+        .sort(compareOrdinal)
+        .map((inside) => ({
+          path: join(spaceDirectory, inside),
+          text: textOf(files.get(`${name}/${inside}`) ?? new Uint8Array()),
+        }));
+      const spaceText = textOf(files.get(`${name}/space.json`) ?? new Uint8Array());
+      const input = parseSingleSpace({
+        spaceFile: join(spaceDirectory, 'space.json'),
+        spaceText,
+        resources,
+      });
+      reads.push(agreeingSpaceDirectory(spaceDirectory, id, input));
+    } catch (error) {
+      readFailures.push(error);
+    }
+  }
+
+  const imageResults = await Promise.allSettled(
+    paths
+      .flatMap((path) => {
+        const [first, name, ...rest] = path.split('/');
+        return first === IMAGES_DIRECTORY_NAME &&
+          name !== undefined &&
+          !name.startsWith('.') &&
+          rest.length === 0
+          ? [name]
+          : [];
+      })
+      .sort(compareOrdinal)
+      .map((name) =>
+        admitImageFile(
+          join(directory, IMAGES_DIRECTORY_NAME, name),
+          name,
+          new Uint8Array(files.get(`${IMAGES_DIRECTORY_NAME}/${name}`) ?? new Uint8Array()),
+        ),
+      ),
+  );
+  const images = {
+    images: imageResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
+    // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
+    // `unknown` stops that `any` from propagating into `failures`.
+    failures: imageResults.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : [],
+    ),
+  };
+  return aggregateContents(metaSpaceId, reads, readFailures, images, newId);
 };
 
 const aggregateFile = (metaSpaceId: UUID): AggregateFile => ({
   version: AGGREGATE_FILE_VERSION,
   metaSpaceId,
 });
+
+/**
+ * Every file an aggregate and the stored images it shows serialise to, by path
+ * relative to the Aggregate directory: `hyper.json`, each Space's directory
+ * named for its id, and `images/<content-id>.<ext>` (ADR 0118).
+ */
+export const aggregateFiles = (
+  aggregate: LoadedAggregate,
+  images: readonly StoredImage[],
+): DirectoryFiles => {
+  const files = new Map<string, Uint8Array>([
+    [
+      AGGREGATE_FILE_NAME,
+      Buffer.from(`${JSON.stringify(aggregateFile(aggregate.metaSpaceId), null, 2)}\n`),
+    ],
+  ]);
+  for (const space of [...aggregate.spaces].sort((left, right) =>
+    compareOrdinal(left.snapshot.id, right.snapshot.id),
+  )) {
+    for (const [path, text] of spaceDirectoryFiles(space)) {
+      files.set(`${space.snapshot.id}/${path}`, Buffer.from(text));
+    }
+  }
+  for (const image of images) {
+    files.set(`${IMAGES_DIRECTORY_NAME}/${imageFileName(image)}`, image.bytes);
+  }
+  return files;
+};
 
 const directoryExists = async (path: string): Promise<boolean> => {
   try {
@@ -283,40 +461,35 @@ const directoryExists = async (path: string): Promise<boolean> => {
 };
 
 /**
- * Drop Space directories the Aggregate no longer holds.
- *
- * Write removes exactly what read scans: a child holding `space.json`. A Space
- * deleted since the last export has to leave with it — otherwise the next
- * import reads the deletion back as a Space that still exists. A UUID-named
- * directory without `space.json` is not a scan hit, so it stays.
- *
- * `spaceDirectoryId` is still what "a previous export wrote this" means for a
- * scanned directory, and the canonical lower-case spelling it insists on is
- * load-bearing here: removal is recursive, and `z.string().uuid()` alone would
- * accept an upper-cased name this exporter never writes — an author's own
- * directory, destroyed for looking like ours.
+ * Every file Import would read in `directory`, by path relative to it: what
+ * Export owns there, and so what it removes when the aggregate no longer
+ * serialises to it. `hyper.json`, each discovered Space directory's
+ * `space.json` and Resource files, and the visible files in `images/` — and
+ * nothing else, so a file Import does not read is never Export's to remove.
  */
-export const pruneObsoleteSpaceDirectories = async (
-  directory: string,
-  keep: ReadonlySet<UUID>,
-): Promise<void> => {
-  for (const child of await discoverSpaceDirectories(directory)) {
-    const id = spaceDirectoryId(basename(child));
-    if (id === undefined || keep.has(id)) continue;
-    await rm(child, { recursive: true, force: true });
-  }
+export const scannedAggregateFiles = async (directory: string): Promise<readonly string[]> => {
+  if (!(await directoryExists(directory))) return [];
+  const aggregate = (await isRegularFile(join(directory, AGGREGATE_FILE_NAME)))
+    ? [AGGREGATE_FILE_NAME]
+    : [];
+  const spaces = await Promise.all(
+    (await discoverSpaceDirectories(directory)).map(async (child) =>
+      (await scannedSpaceFiles(child)).map((path) => `${basename(child)}/${path}`),
+    ),
+  );
+  const images = (await scannedImageFileNames(directory)).map(
+    (name) => `${IMAGES_DIRECTORY_NAME}/${name}`,
+  );
+  return [...aggregate, ...spaces.flat(), ...images];
 };
 
 /**
  * Refuse a destination holding a Space directory import could not read back,
- * before anything is staged.
+ * before anything is written.
  *
- * Staging is a copy of the destination and verification re-reads the staged
- * copy, so a Space directory the author left here under a name that is not its
- * Space's id — an old flat-format Space, a hand-authored sample — fails every
- * export from then on. And the diagnostic would name a path inside a staging
- * root this function's caller deletes before the operator can read it, so the
- * path they are told to fix would not exist.
+ * Import refuses a Space directory the author left here under a name that is
+ * not its Space's id — an old flat-format Space, a hand-authored sample — so
+ * every export into it would write a directory that cannot be imported.
  *
  * Checked here rather than answered by having the reader skip a directory it
  * cannot name: that skip is the guard which stops a renamed Space directory
@@ -339,20 +512,18 @@ export const assertExportableDestination = async (destination: string): Promise<
 };
 
 /**
- * Write one Aggregate into a directory: `hyper.json` plus every Space directory.
- * Callers that stage first are expected to have pruned obsolete Space directories.
+ * Write one Aggregate into a directory, in place: `hyper.json` plus every
+ * Space directory, removing the Space directories and Resource files Import
+ * would read that the Aggregate no longer holds. Nothing is checked before
+ * writing; `exportAggregate` is the write that checks.
  */
 export const writeAggregateDirectory = async (
   aggregate: LoadedAggregate,
   directory: string,
 ): Promise<void> => {
-  await writeFile(
-    join(directory, AGGREGATE_FILE_NAME),
-    `${JSON.stringify(aggregateFile(aggregate.metaSpaceId), null, 2)}\n`,
+  const owned = (await scannedAggregateFiles(directory)).filter(
+    (path) => !path.startsWith(`${IMAGES_DIRECTORY_NAME}/`),
   );
-  for (const space of [...aggregate.spaces].sort((left, right) =>
-    compareOrdinal(left.snapshot.id, right.snapshot.id),
-  )) {
-    await writeSpaceDirectory(space, join(directory, space.snapshot.id));
-  }
+  const files = aggregateFiles(aggregate, []);
+  await writeInPlace(directory, files, owned);
 };

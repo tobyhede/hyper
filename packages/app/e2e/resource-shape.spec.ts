@@ -19,7 +19,7 @@ import {
 import { drawnOutline, outlineTreatment } from './resource-shape-outline';
 
 /**
- * An Ur Resource's Shape (ADR 0117): chosen from its Actions menu and drawn at
+ * An Ur Resource's Shape (ADR 0120): chosen from its Actions menu and drawn at
  * the Resource's rect Open and Closed alike — at the fixed Closed Size, and at
  * whatever Open Size it is resized to. Only an Ur Resource takes a Shape, so
  * each test creates one; the fixture's Markdown Resources offer no Shape

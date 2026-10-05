@@ -2409,7 +2409,7 @@ describe('the Shape a Resource front is drawn in', () => {
   });
 
   /*
-   * The selection ring follows the outline (ADR 0117): ring and edge are
+   * The selection ring follows the outline (ADR 0120): ring and edge are
    * strokes of the outline's own geometry, so the ring cannot be drawn as the
    * bounding rect. Whether it shows is `canvas-resource.css`'s, keyed on the
    * state.

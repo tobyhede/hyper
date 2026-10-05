@@ -9,7 +9,9 @@ import { seedPositionedMap } from './seed';
 
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
 const FIGURE_URL = 'https://example.com/figure.png';
-const HARBOUR = readFileSync(new URL('../fixture-images/harbour-400x300.png', import.meta.url));
+const HARBOUR = readFileSync(
+  new URL('../fixture/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs.png', import.meta.url),
+);
 
 /** Open a Space holding a Closed Image Resource on the Map `Pictures`, and a second Map `Elsewhere`. */
 async function openPicturesAndElsewhere(page: Page): Promise<void> {

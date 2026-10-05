@@ -1,12 +1,13 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { uuidSchema } from '@project/core';
-import type { LoadedSpace } from '@project/persistence';
+import type { LoadedSpace, StoredImage } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { captureError } from '../support/capture-error';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { admitted, pngBytes, showing } from '../support/stored-images';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
@@ -82,7 +83,7 @@ const storedSpace: LoadedSpace = {
       ],
     },
     resources: [
-      // B and E are drawn in Shapes, which only an Ur Resource takes (ADR 0117).
+      // B and E are drawn in Shapes, which only an Ur Resource takes (ADR 0120).
       { id: RESOURCE_B, document: { title: 'B', kind: 'ur' } },
       { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
       { id: RESOURCE_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
@@ -359,11 +360,8 @@ describe('canonical export', () => {
   });
 
   /*
-   * Staging is a copy of the destination, and verification re-reads the staged
-   * copy through the ordinary import reader — which refuses a Space directory
-   * whose name is not its Space's id. So a directory the author put there would
-   * fail every export from that moment on, and the path the diagnostic names
-   * lives inside a staging root deleted before the operator can read it.
+   * Import refuses a Space directory whose name is not its Space's id, so a
+   * directory the author put there would make every export unimportable.
    *
    * The destination is checked first, and by the path that is really there.
    */
@@ -379,8 +377,7 @@ describe('canonical export', () => {
     );
 
     expect(thrown?.message).toContain(drafts);
-    expect(thrown?.message).not.toContain('hyper-export-');
-    // Nothing was staged beside the destination and nothing was written into it.
+    // Nothing was written beside the destination or into it.
     await expect(readdir(root)).resolves.toEqual(['exported']);
     await expect(readdir(destination)).resolves.toEqual(['drafts']);
   });
@@ -430,12 +427,11 @@ describe('canonical export', () => {
    * a state the command reports rather than a failure it recovers from.
    *
    * The parent directory is what proves nothing was written, not the
-   * destination: the staging root is minted *beside* the destination, so an
-   * exporter that started work and then noticed would leave a sibling behind
-   * where a check on the destination alone would still pass.
+   * destination: an exporter that created the destination and then noticed
+   * would leave it behind.
    */
   /*
-   * Staged verification is the last safeguard standing between a serialization
+   * Checking that the files read back is the last safeguard standing between a serialization
    * defect and a destination that cannot be imported, and the only way it can
    * fail is one: `loadAggregate` has already validated, so a refusal here means
    * the canonical bytes say something the stored aggregate did not.
@@ -446,9 +442,9 @@ describe('canonical export', () => {
    * `src/cli/aggregate-refusal.ts` prevents.
    *
    * `loadAggregate` is stubbed because a valid repository cannot reach here; the
-   * refusal has to come from the staged bytes disagreeing with Meta rooting.
+   * refusal has to come from the serialised bytes disagreeing with Meta rooting.
    */
-  it('answers invalid-staged-aggregate when verifying the staged aggregate refuses', async () => {
+  it('answers would-not-read-back and writes nothing when the files would not read back', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const orphan = uuidSchema.parse('c0000000-0000-4000-8000-0000000000aa');
@@ -470,11 +466,11 @@ describe('canonical export', () => {
 
     const result = await exportAggregate(repository, destination);
     expect(result).toMatchObject({
-      kind: 'invalid-staged-aggregate',
+      kind: 'would-not-read-back',
       metaSpaceId: SPACE_ID,
       errors: [{ kind: 'ordinary-space-unreferenced', spaceId: orphan }],
     });
-    if (result.kind !== 'invalid-staged-aggregate') return;
+    if (result.kind !== 'would-not-read-back') return;
     expect(result.spaces.map((space) => space.id).sort()).toEqual([SPACE_ID, orphan].sort());
     await expect(readdir(destination).catch(() => [])).resolves.toEqual([]);
   });
@@ -487,5 +483,144 @@ describe('canonical export', () => {
     ).resolves.toEqual({ kind: 'uninitialized' });
 
     await expect(readdir(root)).resolves.toEqual([]);
+  });
+});
+
+describe('stored image bytes', () => {
+  const PICTURE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000040');
+  const LINKED_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000041');
+
+  /** The stored Space, also holding these Image Resources. */
+  const withImages = (
+    ...documents: readonly { id: typeof PICTURE_ID; document: ReturnType<typeof showing> }[]
+  ): LoadedSpace => ({
+    ...storedSpace,
+    snapshot: {
+      ...storedSpace.snapshot,
+      resources: [...storedSpace.snapshot.resources, ...documents],
+    },
+  });
+
+  const holding = async (
+    space: LoadedSpace,
+    images: readonly StoredImage[],
+  ): Promise<MemorySpaceRepository> => {
+    const repository = new MemorySpaceRepository([space], SPACE_ID);
+    for (const image of images) await repository.storeImage(image);
+    return repository;
+  };
+
+  /*
+   * What Export removes from `images/` is exactly what Import scans there, so
+   * a picture no Resource shows any more leaves the directory rather than
+   * being imported again as a stored image nothing references.
+   */
+  it('rewrites images whole, so a picture no Resource shows leaves the directory', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const shown = await admitted(pngBytes(1));
+    const unshown = await admitted(pngBytes(2));
+    await exportTo(
+      await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown, unshown]),
+      destination,
+    );
+    expect(await readdir(join(destination, 'images'))).toEqual([`${shown.id}.png`]);
+
+    await exportTo(await holding(storedSpace, [shown, unshown]), destination);
+
+    expect(await readdir(destination)).not.toContain('images');
+  });
+
+  /*
+   * Neither picture has bytes the repository holds — one is somebody else's,
+   * the other was never stored here — so each is written as its URL and the
+   * Export still completes: one missing picture does not stop an edit reaching
+   * disk (ADR 0118).
+   */
+  it('exports an external URL and a stored URL whose bytes are missing as URLs only', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const missing = await admitted(pngBytes(3));
+    const repository = await holding(
+      withImages(
+        { id: PICTURE_ID, document: showing(missing) },
+        {
+          id: LINKED_ID,
+          document: { ...showing(missing), url: 'https://example.com/figure.png' },
+        },
+      ),
+      [],
+    );
+
+    await expect(exportAggregate(repository, destination)).resolves.toMatchObject({
+      kind: 'exported',
+    });
+
+    expect(await readdir(destination)).not.toContain('images');
+    await expect(
+      readFile(join(destination, SPACE_ID, 'resources', `${PICTURE_ID}.md`), 'utf8'),
+    ).resolves.toContain(`url: /images/${missing.id}`);
+  });
+
+  /*
+   * Import scans the visible regular files in `images/`, so those are what
+   * Export replaces; a dotfile or a directory there is the author's.
+   */
+  it('keeps what Import does not scan inside images/', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const shown = await admitted(pngBytes(1));
+    await mkdir(join(destination, 'images', 'drafts'), { recursive: true });
+    await writeFile(join(destination, 'images', '.gitkeep'), '');
+    await writeFile(join(destination, 'images', 'drafts', 'sketch.txt'), 'sketch\n');
+
+    await exportTo(
+      await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown]),
+      destination,
+    );
+
+    expect((await readdir(join(destination, 'images'))).sort()).toEqual(
+      ['.gitkeep', 'drafts', `${shown.id}.png`].sort(),
+    );
+    await expect(
+      readFile(join(destination, 'images', 'drafts', 'sketch.txt'), 'utf8'),
+    ).resolves.toBe('sketch\n');
+  });
+
+  it('refuses a destination whose images directory is a symbolic link', async () => {
+    const root = await makeTemporaryDirectory();
+    const destination = join(root, 'exported');
+    const elsewhere = join(root, 'elsewhere');
+    await mkdir(elsewhere);
+    await mkdir(destination);
+    await symlink(elsewhere, join(destination, 'images'));
+    const shown = await admitted(pngBytes(1));
+
+    const thrown = await captureError(async () =>
+      exportAggregate(
+        await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown]),
+        destination,
+      ),
+    );
+
+    expect(thrown?.message).toContain('symbolic link');
+    await expect(readdir(elsewhere)).resolves.toEqual([]);
+  });
+
+  it('refuses a destination whose image file is a symbolic link', async () => {
+    const root = await makeTemporaryDirectory();
+    const destination = join(root, 'exported');
+    const outside = join(root, 'outside.png');
+    await writeFile(outside, 'outside\n');
+    const shown = await admitted(pngBytes(1));
+    await mkdir(join(destination, 'images'), { recursive: true });
+    await symlink(outside, join(destination, 'images', `${shown.id}.png`));
+
+    const thrown = await captureError(async () =>
+      exportAggregate(
+        await holding(withImages({ id: PICTURE_ID, document: showing(shown) }), [shown]),
+        destination,
+      ),
+    );
+
+    expect(thrown?.message).toContain('symbolic link');
+    await expect(readFile(outside, 'utf8')).resolves.toBe('outside\n');
   });
 });

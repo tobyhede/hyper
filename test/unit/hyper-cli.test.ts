@@ -8,7 +8,7 @@ import { runCliMain } from '../../src/cli/main';
 import { runHyper, type CliIo } from '../../src/cli/run';
 import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
 import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
-import { MemorySpaceRepository } from '../support/memory-space-repository';
+import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -173,7 +173,7 @@ describe('runHyper', () => {
     ).resolves.toBe('keep nested\n');
   });
 
-  it('records the exact revision only after the destination is replaced', async () => {
+  it('records the exact revision only after every file is written', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const revision = 9_007_199_254_740_993n;
     const repository = new MemorySpaceRepository([{ ...storedSpace, revision }], SPACE_ID);
@@ -192,7 +192,7 @@ describe('runHyper', () => {
     });
   });
 
-  it('leaves the previous destination recoverable and metadata unchanged when staging fails', async () => {
+  it('reports a write that fails part-way, records nothing, and leaves the files it did not reach', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const spaceDirectory = join(destination, SPACE_ID);
     await mkdir(spaceDirectory, { recursive: true });
@@ -217,7 +217,7 @@ describe('runHyper', () => {
     });
   });
 
-  it('renders a staged Aggregate intake refusal without importing from Export', async () => {
+  it('renders an Aggregate intake refusal of the files Export would write, and writes nothing', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const orphan = uuidSchema.parse('c0000000-0000-4000-8000-0000000000aa');
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);

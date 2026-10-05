@@ -23,7 +23,7 @@ export interface InscribedInsets {
 }
 
 /**
- * The outline a Shape is drawn in (ADR 0117), in the units of the rect it
+ * The outline a Shape is drawn in (ADR 0120), in the units of the rect it
  * fills: a rect whose corners are rounded by `rx` and `ry`, or a polygon. Every
  * outline touches the midpoint of each side of that rect at every size, where
  * the adapter's handles sit and Edges attach
