@@ -93,7 +93,9 @@ describe('the Open front chrome, where the commands float outside the Resource',
       ".canvas-resource[data-open='false'] > .canvas-resource__body",
       `.canvas-resource${RAIL_ACTIONS} .canvas-resource__content`,
       `.canvas-resource[data-open='false']${RAIL_ACTIONS} > .canvas-resource__body`,
-      ".canvas-resource[data-open='false']:not([data-resource-shape='rectangle']) > .canvas-resource__body",
+      // Only an Ur Resource takes a Shape, and it has no content area for the
+      // constant to measure, so its Shape's padding stands outside it.
+      ".canvas-resource:not([data-resource-shape='rectangle']) > .canvas-resource__body",
     ]);
   });
 

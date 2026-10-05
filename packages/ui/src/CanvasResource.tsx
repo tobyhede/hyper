@@ -53,7 +53,7 @@ import { InlineTitleEditor } from './InlineTitleEditor';
 import { ResourceImage } from './ResourceImage';
 import { ImageReplaceTarget } from './ImageReplaceTarget';
 import { UnresolvedContent } from './UnresolvedContent';
-import { atRest, drawnResourceShape, type FrontDisplay } from './resource-display';
+import { atRest, type FrontDisplay } from './resource-display';
 import {
   resourceShapeOutline,
   type OutlinePoint,
@@ -151,9 +151,9 @@ interface CanvasResourceCommonProps {
    */
   readonly display: FrontDisplay;
   /**
-   * The Shape the Map records for this Resource (ADR 0117), drawn while the
-   * display is Closed. A front no Map places — a creation ghost, a specimen —
-   * is given the rectangle by its caller.
+   * The Shape the Map records for this Resource (ADR 0117), drawn whatever the
+   * display. A front no Map places — a creation ghost, a specimen — is given the
+   * rectangle by its caller.
    */
   readonly shape: ResourceShape;
   /**
@@ -366,10 +366,9 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const display = readOnly ? atRest(props.display) : props.display;
   const open = display.shown !== 'closed';
-  const frontResourceShape = drawnResourceShape(display, props.shape);
   // Every Shape but the rectangle is drawn as an outline, and its inscribed
   // rectangle has room for the short Title and not the ladder.
-  const drawsOutline = frontResourceShape !== 'rectangle';
+  const drawsOutline = props.shape !== 'rectangle';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const openableFront = front.kind === 'preview' ? undefined : front;
@@ -439,7 +438,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       actionableEntityActions ||
       beginContentEdit !== undefined);
   const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
-  const outline = resourceShapeOutline(frontResourceShape, size);
+  const outline = resourceShapeOutline(props.shape, size);
   const style: CanvasResourceStyle = {
     '--canvas-resource-graph': graphColor,
     '--canvas-resource-drag-tilt': `${CANVAS_RESOURCE_DRAG_TILT_DEGREES}deg`,
@@ -524,8 +523,10 @@ export function CanvasResource(props: CanvasResourceProps) {
     };
   }, [onBodyHeightChange]);
 
-  // An Open Resource's front already says what it is, so its kind is not drawn.
-  const kindMark = open ? null : <ResourceRailKind kind={visualKind} />;
+  // An Open Resource's content already says what it is, so its kind is not
+  // drawn. A Resource drawn in a Shape has no content area and draws its kind
+  // Open and Closed alike.
+  const kindMark = open && !drawsOutline ? null : <ResourceRailKind kind={visualKind} />;
   const toolbar = showActions ? (
     // ADR 0073. One tab stop for the whole rail, arrows between its
     // controls: a canvas carries many Resources and a Resource's rail carries
@@ -651,7 +652,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       data-open={open}
       // The Shape the front is drawn in, which `canvas-resource.css` reads to
       // draw the outline below and inset the Title and glyph within it.
-      data-resource-shape={frontResourceShape}
+      data-resource-shape={props.shape}
       // A running edit is not a hover, so `canvas-resource.css` draws the active
       // face off this as well as `:hover` — a Resource being written in reads as
       // active without the pointer on it.
@@ -754,7 +755,7 @@ export function CanvasResource(props: CanvasResourceProps) {
 }
 
 /**
- * A Closed Shape's paper and edge, drawn in place of the front's own border
+ * A Shape's paper and edge, drawn in place of the front's own border
  * and fill, which `canvas-resource.css` withdraws for it.
  *
  * Drawn in the units of the rect the Resource is drawn at, so the drawing is
@@ -868,7 +869,7 @@ interface TitleHeadingProps extends TitleLadderProps {
  * It carries no `aria-label`. Its name is the Title Lines it draws, which is
  * the whole reason the control wraps it rather than the other way round.
  *
- * A Closed Shape other than the rectangle draws the short Title instead: the
+ * A Shape other than the rectangle draws the short Title instead: the
  * name on one line, with an ellipsis when more Title Lines follow. The ladder
  * stays in the heading for assistive technology, visually hidden, so the
  * heading is named by every Title Line whatever Shape the front is drawn in.

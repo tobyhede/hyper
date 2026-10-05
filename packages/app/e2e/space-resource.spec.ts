@@ -766,11 +766,11 @@ test(
 );
 
 /**
- * A drawn Map draws its Ur Resources' Shapes and, while it may be authored,
- * offers the Shape choice on them alone (ADR 0117, ADR 0112). The choice
- * writes the target Space's Map, so the target draws it when entered; a
- * Reference Resource to the Space Resource draws the same Map read-only, with
- * the Shape and no commands.
+ * A drawn Map draws its Ur Resources' Shapes, Open and Closed alike, and,
+ * while it may be authored, offers the Shape choice on them alone (ADR 0117,
+ * ADR 0112). The choice writes the target Space's Map, so the target draws it
+ * when entered; a Reference Resource to the Space Resource draws the same Map
+ * read-only, with the Shape and no commands.
  */
 test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn wherever it is', async ({
   page,
@@ -835,6 +835,18 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
   await expect(
     nodeByTitle(page, 'Architecture').locator('.canvas-resource').first(),
   ).toHaveAttribute('data-resource-shape', 'rectangle');
+  // Opened on the drawn Map, it is still drawn in its Shape.
+  await (
+    await resourceControls(page, embedded)
+  )
+    .getByRole('button', { name: 'Open Resource Step' })
+    .click();
+  await expect(embedded.locator('.canvas-resource')).toHaveAttribute('data-open', 'true');
+  await expect(embedded.locator('.canvas-resource')).toHaveAttribute(
+    'data-resource-shape',
+    'diamond',
+  );
+  await expect(embedded.locator('.canvas-resource__outline')).toHaveCount(1);
   await (
     await resourceToolbar(page, parent)
   )
@@ -865,6 +877,7 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
     .locator(`.react-flow__node[data-id^="embedded:${referenceId}:"]`)
     .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) });
   await expect(throughReference).toHaveCount(1);
+  await expect(throughReference.locator('.canvas-resource')).toHaveAttribute('data-open', 'true');
   await expect(throughReference.locator('.canvas-resource')).toHaveAttribute(
     'data-resource-shape',
     'diamond',
@@ -875,13 +888,13 @@ test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn 
   ).toHaveCount(0);
 
   await enterThrough(page, nodeByTitle(page, 'Architecture'), 'Space 1');
-  // Entered, the target Space draws the Shape on its own Map, and keeps it on reload.
-  await expect(
-    page
-      .locator('.react-flow__node:visible')
-      .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) })
-      .locator('.canvas-resource'),
-  ).toHaveAttribute('data-resource-shape', 'diamond');
+  // Entered, the target Space draws the Open Shape on its own Map, and keeps it on reload.
+  const entered = page
+    .locator('.react-flow__node:visible')
+    .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) })
+    .locator('.canvas-resource');
+  await expect(entered).toHaveAttribute('data-open', 'true');
+  await expect(entered).toHaveAttribute('data-resource-shape', 'diamond');
   await page.reload();
   await expect(
     page

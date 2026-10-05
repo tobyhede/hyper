@@ -107,9 +107,9 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R45. A Resource's Shape is authored on the Map.** It is one of a closed set: rectangle, pill, ellipse, diamond, hexagon. It is stored in the Map's entry beside position, Open/Closed state and Open Size, never on the Resource, so the same Resource may take different Shapes in different Maps. A Shape is the diagram's notation, and notation belongs to the diagram (A19). ([0117])
 - **R46. Only an Ur Resource takes a Shape.** A Shape is diagram notation, and an Ur Resource is the kind a diagram is drawn with; a Markdown, Image, Space or Reference Resource is always the rectangle. The Shape choice is offered on an Ur Resource alone, a Shape Edit on any other kind is refused (`shape-requires-ur-resource`), and intake refuses a Map entry giving any other kind a Shape but the rectangle with the same code. ([0117], [0113])
 - **R47. The Shape is required, and a Resource added to a Map is given the rectangle.** Add Resource and Add to Map write it; no rule reads a missing Shape as the rectangle (A23). Every other Edit that rewrites an entry keeps it. Remove from Map forgets it with the rest of the entry. Choosing the Shape a Resource already has is `unchanged`. ([0117])
-- **R48. A Shape changes no rect.** It is drawn inside the fixed Closed Size, so displacement (R38–R41) and Edge attachment are unchanged. Every Shape in the set touches the midpoint of each side of its bounding rect, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title and kind glyph lay out in the rectangle inscribed in the Shape, and a Closed Resource in a Shape other than the rectangle shows its short Title: its name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline. ([0117], [0110])
-- **R49. Only a Closed Resource draws its Shape.** An Open, editing or presented Resource is drawn as a rectangle whatever its Shape, and the Shape returns on Close. The Shape choice is offered while Open as well, so the menu does not change between states. ([0117], [0064])
-- **R50. An embedded Map draws its Resources' Shapes**, because one surface draws every Map. ([0117], [0112])
+- **R48. A Shape changes no rect.** It is drawn at the Resource's rect — the fixed Closed Size while Closed, its Open Size while Open — so Open, Close, Resize, displacement (R38–R44) and Edge attachment are unchanged. Ellipse, diamond and hexagon fill the rect proportionally, and a pill's ends stay half-circles at any size. Every Shape in the set touches the midpoint of each side of its rect at every size, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title and kind glyph lay out in the rectangle inscribed in the Shape, and a Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline. ([0117], [0110])
+- **R49. A Shape is drawn Open and Closed alike.** Opening and resizing an Ur Resource gives the same Shape at its Open Size, and Close returns it to that Shape at the Closed Size; a resize into the magnetic range Closes it as any Resource (R44). The resize control stays at the rect's bottom-right corner. The Shape choice is offered Open and Closed, so the menu does not change between states. A presented Resource is drawn by the presented surface and is the rectangle. ([0117], [0064], [0066])
+- **R50. An embedded Map draws its Ur Resources' Shapes**, Open or Closed, because one surface draws every Map. ([0117], [0112])
 
 ## Rejected alternatives
 
@@ -189,7 +189,7 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R41 | §6 | [0084], [0093], CONTEXT.md "Placement" |
 | R42 | §6 | [0084], [0093] |
 | R44 | §6 | [0066], [0084] |
-| R45, R47, R49 | §7 | [0117] (R49 also [0064]) |
+| R45, R47, R49 | §7 | [0117] (R49 also [0064], [0066]) |
 | R46 | §7 | [0117], [0113] |
 | R48 | §7 | [0117], [0110] |
 | R50 | §7 | [0117], [0112] |
@@ -230,4 +230,4 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0056]: ../adr/0056-the-repository-is-the-only-source-of-state.md
 [0110]: ../adr/0110-an-edge-faces-across-the-larger-gap-between-two-resources.md
 [0113]: ../adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md
-[0117]: ../adr/0117-a-shape-is-a-maps-and-only-a-closed-resource-draws-it.md
+[0117]: ../adr/0117-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md

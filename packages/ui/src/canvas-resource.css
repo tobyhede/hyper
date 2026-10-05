@@ -421,7 +421,7 @@
 /* The rail sits eight pixels inside the Resource's paper border and holds its kind
    glyph at the top-right corner; on the canvas the commands float outside the
    Resource (ADR 0102). The room above the content is the glyph's row: eight pixels,
-   the glyph, eight pixels. An Open Resource draws no glyph, so its Markdown sits as
+   the glyph, eight pixels. An Open rectangle draws no glyph, so its Markdown sits as
    far from the top as from the sides: 12px here and the rendered body's own 10px
    (`--markdown-resource-content-top`) make its 22px side inset. */
 .canvas-resource__rail {
@@ -451,10 +451,10 @@
   padding-top: 46px;
 }
 
-/* A Closed Shape other than the rectangle (ADR 0117). The Resource keeps its
-   fixed Closed Size and rect; the front's own paper and edge are withdrawn and
-   `ResourceShapeOutlineDrawing` draws them as the Shape's outline, which
-   touches the midpoint of each side, where Edges attach. `overflow` is released
+/* A Shape other than the rectangle (ADR 0117), drawn Open and Closed alike.
+   The Resource keeps its rect; the front's own paper and edge are withdrawn and
+   `ResourceShapeOutlineDrawing` draws them as the Shape's outline at that rect,
+   which touches the midpoint of each side, where Edges attach. `overflow` is released
    so the stroke at those points is not cut by the rect. The rectangle's box
    shadows are withdrawn too: the ring and drag shadow follow the outline. */
 .canvas-resource:not([data-resource-shape='rectangle']) {
@@ -523,8 +523,7 @@
   padding: 0;
 }
 
-.canvas-resource[data-open='false']:not([data-resource-shape='rectangle'])
-  > .canvas-resource__body {
+.canvas-resource:not([data-resource-shape='rectangle']) > .canvas-resource__body {
   position: absolute;
   inset: var(--canvas-resource-shape-inset-block) var(--canvas-resource-shape-inset-inline);
   align-items: center;
@@ -538,7 +537,7 @@
   margin-inline: auto;
 }
 
-/* A Closed Shape draws the short Title — the name, with an ellipsis when more
+/* A Shape other than the rectangle draws the short Title — the name, with an ellipsis when more
    Title Lines follow — on one line at the `title` role, ellipsised where it is
    wider than the inscribed rectangle. The heading and its control are held to
    the body's width so the line has a width to ellipsise at. */

@@ -455,8 +455,8 @@ function resize(
  * Draw an Ur Resource in another Shape in one Map (ADR 0117). Every other
  * kind is the rectangle, so a Shape Edit on one is refused whatever it asks for.
  *
- * The Shape is drawn inside the fixed Closed Size and changes no rect, so no
- * neighbour moves and the Resource's Open/Closed state and Open Size are kept.
+ * The Shape is drawn at the Resource's rect and changes none, so no neighbour
+ * moves and the Resource's Open/Closed state and Open Size are kept.
  * `unchanged` for the Shape it already has, including while it is Open.
  */
 function changeResourceShape(

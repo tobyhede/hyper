@@ -2,7 +2,6 @@ import {
   contentAction,
   type ContentVia,
   type ResourceContent,
-  type ResourceShape,
   type SpaceView,
 } from '@project/core';
 import type { ImageReplaceEditor } from './ImageReplaceTarget';
@@ -127,19 +126,4 @@ export function spaceViewOf(
     case 'replacing':
       return undefined;
   }
-}
-
-/**
- * The Shape a Resource front is drawn in (ADR 0117).
- *
- * Only a Closed Resource draws its Map's Shape: an Open, editing, replacing or
- * presented Resource is read rather than drawn as notation, and is drawn as
- * the rectangle whatever its Shape. The Shape stays recorded on the Map and is
- * drawn again on Close.
- */
-export function drawnResourceShape(
-  display: ResourceDisplay,
-  resourceShape: ResourceShape,
-): ResourceShape {
-  return display.shown === 'closed' ? resourceShape : 'rectangle';
 }

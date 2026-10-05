@@ -2362,22 +2362,31 @@ describe('the Shape a Resource front is drawn in', () => {
   };
   const outline = (resource: HTMLElement) => resource.querySelector('.canvas-resource__outline');
 
-  it('draws a Closed diamond as a diamond, and an Open one as the rectangle', () => {
+  const glyph = (resource: HTMLElement) => resource.querySelector('.resource-rail__kind');
+
+  it('draws a diamond, with its kind glyph, Open and Closed alike', () => {
     const { rerender } = render(
       <CanvasResource {...props} shape="diamond" display={CLOSED_DISPLAY} />,
     );
     const resource = screen.getByRole('article', { name: 'Decide' });
     expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
     expect(outline(resource)).not.toBeNull();
+    expect(glyph(resource)).not.toBeNull();
 
     rerender(
       <CanvasResource {...props} shape="diamond" display={opened({ kind: 'ur', via: 'self' })} />,
     );
-    expect(resource).toHaveAttribute('data-resource-shape', 'rectangle');
-    expect(outline(resource)).toBeNull();
-
-    rerender(<CanvasResource {...props} shape="diamond" display={CLOSED_DISPLAY} />);
+    expect(resource).toHaveAttribute('data-open', 'true');
     expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+    expect(outline(resource)).not.toBeNull();
+    expect(glyph(resource)).not.toBeNull();
+  });
+
+  it('draws no kind glyph on an Open rectangle, whose front says what it is', () => {
+    render(
+      <CanvasResource {...props} shape="rectangle" display={opened({ kind: 'ur', via: 'self' })} />,
+    );
+    expect(glyph(screen.getByRole('article', { name: 'Decide' }))).toBeNull();
   });
 
   it.each([
@@ -2385,13 +2394,18 @@ describe('the Shape a Resource front is drawn in', () => {
     ['ellipse', 'rect'],
     ['diamond', 'polygon'],
     ['hexagon', 'polygon'],
-  ] as const)('draws a Closed %s in its own outline', (resourceShape, element) => {
-    render(<CanvasResource {...props} shape={resourceShape} display={CLOSED_DISPLAY} />);
-    const resource = screen.getByRole('article', { name: 'Decide' });
-    expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
-    expect(outline(resource)?.querySelector('.canvas-resource__outline-edge')?.tagName).toBe(
-      element,
-    );
+  ] as const)('draws a %s in its own outline, Open and Closed', (resourceShape, element) => {
+    for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+      const { unmount } = render(
+        <CanvasResource {...props} shape={resourceShape} display={display} />,
+      );
+      const resource = screen.getByRole('article', { name: 'Decide' });
+      expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
+      expect(outline(resource)?.querySelector('.canvas-resource__outline-edge')?.tagName).toBe(
+        element,
+      );
+      unmount();
+    }
   });
 
   /*
@@ -2401,26 +2415,30 @@ describe('the Shape a Resource front is drawn in', () => {
    * state.
    */
   it.each(['pill', 'ellipse', 'diamond', 'hexagon'] as const)(
-    'draws a Closed %s ring and edge from one geometry',
+    'draws a %s ring and edge from one geometry, Open and Closed',
     (resourceShape) => {
-      render(
-        <CanvasResource
-          {...props}
-          state="selected"
-          shape={resourceShape}
-          display={CLOSED_DISPLAY}
-        />,
-      );
-      const drawn = outline(screen.getByRole('article', { name: 'Decide' }));
-      const ring = drawn?.querySelector('.canvas-resource__outline-ring');
-      const edge = drawn?.querySelector('.canvas-resource__outline-edge');
-      expect(ring).not.toBeNull();
-      expect(edge).not.toBeNull();
-      // The ring is drawn beneath the edge, whose fill covers its inner half.
-      expect(drawn?.firstElementChild).toBe(ring);
-      expect(ring?.tagName).toBe(edge?.tagName);
-      for (const attribute of ['points', 'width', 'height', 'rx', 'ry']) {
-        expect(ring?.getAttribute(attribute)).toBe(edge?.getAttribute(attribute) ?? null);
+      for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+        const { unmount } = render(
+          <CanvasResource
+            {...props}
+            state="selected"
+            shape={resourceShape}
+            size={{ width: 480, height: 300 }}
+            display={display}
+          />,
+        );
+        const drawn = outline(screen.getByRole('article', { name: 'Decide' }));
+        const ring = drawn?.querySelector('.canvas-resource__outline-ring');
+        const edge = drawn?.querySelector('.canvas-resource__outline-edge');
+        expect(ring).not.toBeNull();
+        expect(edge).not.toBeNull();
+        // The ring is drawn beneath the edge, whose fill covers its inner half.
+        expect(drawn?.firstElementChild).toBe(ring);
+        expect(ring?.tagName).toBe(edge?.tagName);
+        for (const attribute of ['points', 'width', 'height', 'rx', 'ry']) {
+          expect(ring?.getAttribute(attribute)).toBe(edge?.getAttribute(attribute) ?? null);
+        }
+        unmount();
       }
     },
   );
@@ -2454,9 +2472,12 @@ describe('the Shape a Resource front is drawn in', () => {
     expect(edge?.getAttribute('rx')).toBe('50');
   });
 
-  it('draws no outline for a Closed rectangle', () => {
-    render(<CanvasResource {...props} shape="rectangle" display={CLOSED_DISPLAY} />);
-    expect(outline(screen.getByRole('article', { name: 'Decide' }))).toBeNull();
+  it('draws no outline for a rectangle, Open or Closed', () => {
+    for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+      const { unmount } = render(<CanvasResource {...props} shape="rectangle" display={display} />);
+      expect(outline(screen.getByRole('article', { name: 'Decide' }))).toBeNull();
+      unmount();
+    }
   });
 
   it('keeps the diamond while the Closed Title is being written', () => {
@@ -2478,7 +2499,7 @@ describe('the Shape a Resource front is drawn in', () => {
   });
 });
 
-describe('the Title a Closed Shape draws', () => {
+describe('the Title a Shape draws', () => {
   const title = 'Decide\nwhich branch\nand when';
   const props = {
     front: { kind: 'ur' as const },
@@ -2494,11 +2515,16 @@ describe('the Title a Closed Shape draws', () => {
     [...resource.querySelectorAll('.canvas-resource__title-line')].map((line) => line.textContent);
 
   it.each(['pill', 'ellipse', 'diamond', 'hexagon'] as const)(
-    'draws the short Title on one line in a Closed %s',
+    'draws the short Title on one line in a %s, Open and Closed',
     (resourceShape) => {
-      render(<CanvasResource {...props} shape={resourceShape} display={CLOSED_DISPLAY} />);
-      const resource = screen.getByRole('article', { name: 'Decide' });
-      expect(drawnLines(resource)).toEqual(['Decide…']);
+      for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+        const { unmount } = render(
+          <CanvasResource {...props} shape={resourceShape} display={display} />,
+        );
+        const resource = screen.getByRole('article', { name: 'Decide' });
+        expect(drawnLines(resource)).toEqual(['Decide…']);
+        unmount();
+      }
     },
   );
 
@@ -2524,7 +2550,7 @@ describe('the Title a Closed Shape draws', () => {
     expect(headingName()).toBe(rectangleName);
   });
 
-  it('draws the whole ladder in a Closed rectangle and an Open Shape', () => {
+  it('draws the whole ladder in a rectangle, Open and Closed', () => {
     const { rerender } = render(
       <CanvasResource {...props} shape="rectangle" display={CLOSED_DISPLAY} />,
     );
@@ -2533,7 +2559,7 @@ describe('the Title a Closed Shape draws', () => {
     expect(ladder(resource)).toEqual(['Decide', 'which branch', 'and when']);
 
     rerender(
-      <CanvasResource {...props} shape="diamond" display={opened({ kind: 'ur', via: 'self' })} />,
+      <CanvasResource {...props} shape="rectangle" display={opened({ kind: 'ur', via: 'self' })} />,
     );
     expect(drawnLines(resource)).toEqual([]);
     expect(ladder(resource)).toEqual(['Decide', 'which branch', 'and when']);

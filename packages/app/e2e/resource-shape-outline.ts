@@ -1,8 +1,8 @@
 import type { Locator } from '@playwright/test';
 
 /**
- * What a Closed Resource's drawn outline covers, read in the browser from the
- * outline's own geometry rather than from the stylesheet.
+ * What a Resource's drawn outline covers, Open or Closed, read in the browser
+ * from the outline's own geometry rather than from the stylesheet.
  *
  * `touchesSideMidpoints` asks, for each side of the Resource's rect, whether a
  * point one unit in from that side's midpoint is inside the outline's fill — so
@@ -25,7 +25,7 @@ export interface DrawnOutline {
   readonly shortTitle: DrawnShortTitle | null;
 }
 
-/** The short Title a Closed Shape draws. */
+/** The short Title a Shape other than the rectangle draws. */
 export interface DrawnShortTitle {
   readonly text: string;
   readonly oneLine: boolean;
@@ -114,8 +114,8 @@ export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
   });
 
 /**
- * How a Closed Resource's selection ring and edge are drawn against its Shape,
- * read in the browser from the drawn strokes.
+ * How a Resource's selection ring and edge are drawn against its Shape, read in
+ * the browser from the drawn strokes.
  *
  * `ringFollowsOutline` asks whether the ring is drawn as a stroke of the
  * outline's own geometry, standing beyond the edge at the top side's midpoint,

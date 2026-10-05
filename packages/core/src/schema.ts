@@ -370,9 +370,9 @@ const openSizeSchema = z.object({
 });
 
 /**
- * The outline a Closed Resource is drawn in on a Map (ADR 0117). Closed, because
- * every member touches the midpoint of each side of the Closed rect, where Edges
- * attach.
+ * The outline an Ur Resource is drawn in on a Map (ADR 0117), Open or Closed.
+ * Every member touches the midpoint of each side of the Resource's rect, where
+ * Edges attach.
  */
 export const RESOURCE_SHAPES = ['rectangle', 'pill', 'ellipse', 'diamond', 'hexagon'] as const;
 
@@ -386,20 +386,26 @@ export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 export const ADDED_RESOURCE_SHAPE = 'rectangle' satisfies (typeof RESOURCE_SHAPES)[number];
 
 /**
- * What a Map stores for one Resource: its origin, Open/Closed state, remembered
- * Open Size and Shape. The Shape is required: nothing reads a missing one as a
+ * Where a Map puts a Resource and the Shape it draws it in, whatever its
+ * Open/Closed state. The Shape is required: nothing reads a missing one as a
  * rectangle (ADR 0117).
  */
+const shapedPositionSchema = mapPositionSchema.extend({
+  shape: resourceShapeSchema,
+});
+
+/**
+ * What a Map stores for one Resource: its origin and Shape, its Open/Closed
+ * state and its remembered Open Size.
+ */
 export const resourcePlacementSchema = z.discriminatedUnion('open', [
-  mapPositionSchema.extend({
+  shapedPositionSchema.extend({
     open: z.literal(true),
     openSize: openSizeSchema,
-    shape: resourceShapeSchema,
   }),
-  mapPositionSchema.extend({
+  shapedPositionSchema.extend({
     open: z.literal(false),
     openSize: openSizeSchema.optional(),
-    shape: resourceShapeSchema,
   }),
 ]);
 

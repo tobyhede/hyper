@@ -3,6 +3,9 @@ import { COLLAPSED_RESOURCE_SIZE, RESOURCE_SHAPES } from '@project/core';
 import { resourceToolbar, selectResource } from '../e2e/graph';
 import { drawnOutline, outlineTreatment } from '../e2e/resource-shape-outline';
 
+/** The Closed Size, as the drawn outline reports a rect. */
+const CLOSED = [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height] as const;
+
 const specimen = (page: Page, label: string): Locator =>
   page.locator('.inv-specimen', {
     has: page.locator('.inv-specimen__label', { hasText: new RegExp(`^${label}$`) }),
@@ -686,34 +689,40 @@ test(
 );
 
 /**
- * Every Shape a Map may give an Ur Resource, drawn Closed (ADR 0117): the one
- * Closed Size whatever the Shape, an outline reaching the midpoint of each side
- * where Edges attach, and the Title and kind glyph inside that outline. Every
- * Shape but the rectangle leaves the rect's corner unfilled and draws the short
- * Title on one line, ellipsised where it is too wide; the rectangle draws the
- * Title ladder.
+ * Every Shape a Map may give an Ur Resource, drawn Open and Closed alike (ADR
+ * 0117): an outline reaching the midpoint of each side of the Resource's rect,
+ * where Edges attach, at the one Closed Size and at a larger Open Size, and the
+ * Title and kind glyph inside that outline. Every Shape but the rectangle
+ * leaves the rect's corner unfilled and draws the short Title on one line,
+ * ellipsised where it is too wide; the rectangle draws the Title ladder.
  */
 test(
-  'a Closed Ur Resource draws each Shape at the Closed Size, touching every side midpoint',
-  { tag: '@parity:closed-resource-draws-its-shape' },
+  'an Ur Resource draws each Shape Closed and Open, touching every side midpoint',
+  { tag: '@parity:ur-resource-draws-its-shape' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--resource-shapes&mode=preview');
 
     for (const resourceShape of RESOURCE_SHAPES) {
-      for (const [suffix, text] of [
-        ['one line', 'Strategies'],
-        ['three lines', 'Strategies…'],
-        ['overlong', 'Why authored placement beats a layout engine…'],
+      for (const [suffix, text, size] of [
+        ['one line', 'Strategies', CLOSED],
+        ['three lines', 'Strategies…', CLOSED],
+        ['overlong', 'Why authored placement beats a layout engine…', CLOSED],
+        ['open', 'Strategies…', [440, 260]],
       ] as const) {
         const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
-        await expect(resource.getByRole('img', { name: 'Ur Resource' })).toBeVisible();
+        await expect(resource).toHaveAttribute('data-open', String(suffix === 'open'));
+        // An Open rectangle draws its Title alone, so it has no glyph to hold.
+        const titleAlone = resourceShape === 'rectangle' && suffix === 'open';
+        await expect(resource.getByRole('img', { name: 'Ur Resource' })).toHaveCount(
+          titleAlone ? 0 : 1,
+        );
         expect(await drawnOutline(resource), `${resourceShape} · ${suffix}`).toEqual({
           shape: resourceShape,
-          size: [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height],
+          size,
           touchesSideMidpoints: true,
           fillsCorner: resourceShape === 'rectangle',
-          holdsTitleAndGlyph: true,
+          holdsTitleAndGlyph: !titleAlone,
           shortTitle:
             resourceShape === 'rectangle' ? null : { text, oneLine: true, insideBody: true },
         });
@@ -723,25 +732,27 @@ test(
 );
 
 /**
- * A selected Ur Resource's ring on a Closed Shape follows its outline
- * (ADR 0117), not the rect it sits in.
+ * A selected Ur Resource's ring on a Shape follows its outline (ADR 0117), not
+ * the rect it sits in, Open and Closed alike.
  */
 test(
-  "a Closed Shape's selection ring follows its outline",
-  { tag: '@parity:closed-resource-treatments-follow-its-shape' },
+  "a Shape's selection ring follows its outline, Open and Closed",
+  { tag: '@parity:ur-resource-treatments-follow-its-shape' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--resource-shape-treatments&mode=preview');
 
     for (const resourceShape of RESOURCE_SHAPES.filter((each) => each !== 'rectangle')) {
-      const resource = specimen(page, `${resourceShape} · selected`).getByRole('article');
+      for (const label of [`${resourceShape} · selected`, `${resourceShape} · open, selected`]) {
+        const resource = specimen(page, label).getByRole('article');
 
-      await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
-      expect(await outlineTreatment(resource), `${resourceShape} · selected`).toEqual({
-        ringShown: true,
-        ringFollowsOutline: true,
-        edge: 'solid',
-        rectBorder: false,
-      });
+        await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
+        expect(await outlineTreatment(resource), label).toEqual({
+          ringShown: true,
+          ringFollowsOutline: true,
+          edge: 'solid',
+          rectBorder: false,
+        });
+      }
     }
   },
 );

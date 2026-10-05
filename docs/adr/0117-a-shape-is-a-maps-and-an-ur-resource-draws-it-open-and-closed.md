@@ -1,4 +1,4 @@
-# A Shape is a Map's, and only a Closed Resource draws it
+# A Shape is a Map's, and an Ur Resource draws it Open and Closed alike
 
 Status: accepted
 Refines: 0113
@@ -6,7 +6,7 @@ Related: 0064, 0066, 0084, 0093, 0110, 0112, 0114
 
 ADR 0113 gave the author the Ur Resource so they can diagram: draw named things and the Edges between them. A diagram also needs notation. A decision reads as a diamond and a start or end reads as a pill, so a Resource needs a way to be drawn in something other than the rectangle every front has now.
 
-A Resource on a Map has a **Shape**: the outline its Closed front is drawn in. The set is closed: **rectangle**, **pill**, **ellipse**, **diamond** and **hexagon**.
+A Resource on a Map has a **Shape**: the outline its front is drawn in, Open or Closed. The set is closed: **rectangle**, **pill**, **ellipse**, **diamond** and **hexagon**.
 
 **The Shape is the Map's.** It is stored in the Map's entry for the Resource, beside position, Open/Closed state and Open Size. It is not stored on the Resource. A Shape is notation, and notation belongs to the diagram. The same Resource can be a decision in one Map and a step in another. A Resource is a Title and a kind, and the kind owns everything else. A presentation field on the Resource would be the shared second slot the model rules out.
 
@@ -14,13 +14,13 @@ A Resource on a Map has a **Shape**: the outline its Closed front is drawn in. T
 
 **The Shape is required, and a Resource added to a Map is given the rectangle.** Add Resource and Add to Map write the rectangle, as a new Graph is given the arrow head shape. There is no rule that reads a missing Shape as a rectangle. The schema and fixtures roll forward in the same change (ADR 0054, ADR 0056). Remove from Map forgets the Shape along with the rest of the entry.
 
-**The Shape is drawn inside the fixed Closed Size and changes no rect.** Every Closed Resource keeps the same Closed Size. Displacement (ADR 0084, ADR 0093) and Edge attachment (ADR 0110) read the rect and are unchanged. That is why the set is closed. Every member touches the midpoint of each side of its bounding rect, where Edges attach, so an Edge meets the drawn outline. A triangle, parallelogram, cylinder or cloud would not, and is excluded. The kind glyph and Title sit in the rectangle inscribed in the Shape, and a Shape other than the rectangle shows the short Title: the name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline.
+**The Shape is drawn at the Resource's rect and changes no rect.** A Closed Resource is its Shape at the fixed Closed Size, and an Open one is its Shape at its Open Size. Open, Close, Resize, Open Size and displacement (ADR 0064, ADR 0066, ADR 0084, ADR 0093) and Edge attachment (ADR 0110) read the rect and are unchanged. Ellipse, diamond and hexagon fill the rect proportionally; a pill's ends stay half-circles at any size. That is why the set is closed. Every member touches the midpoint of each side of its bounding rect at every size, where Edges attach, so an Edge meets the drawn outline. A triangle, parallelogram, cylinder or cloud would not, and is excluded. The kind glyph and Title sit in the rectangle inscribed in the Shape, and a Shape other than the rectangle shows the short Title: the name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline.
 
-**Only a Closed Resource draws its Shape.** An Open Resource and a presented Resource are always rectangles. They are read, not diagrammed, and an Open Markdown body or image inside a diamond would lose its corners and its resize control. The Shape stays recorded while the Resource is Open and returns when it Closes.
+**A Shape is drawn Open and Closed alike.** Open/Closed is the Map's, and it has nothing to do with the Shape: an author who Opens a diamond to make it bigger gets a bigger diamond, and Close returns it to the diamond at the Closed Size. Only an Ur Resource takes a Shape, and an Ur Resource has no content, so nothing an Open Resource reads is ever drawn inside an outline. The resize control stays at the rect's bottom-right corner. A presented Resource is drawn by the presented surface, not on the Map, and is always the rectangle.
 
-**The author changes it through a Shape choice in the Resource's Actions menu**, drawn with `ChoiceMenu`. Each choice is one Edit. The choice is offered while the Resource is Open too, so the menu doesn't change between states.
+**The author changes it through a Shape choice in the Resource's Actions menu**, drawn with `ChoiceMenu`. Each choice is one Edit. The choice is offered Open and Closed, so the menu doesn't change between states.
 
-An embedded Map draws its Resources' Shapes, because one surface draws every Map (ADR 0112).
+An embedded Map draws its Ur Resources' Shapes, Open or Closed, because one surface draws every Map (ADR 0112).
 
 ## Considered options
 
@@ -28,10 +28,10 @@ An embedded Map draws its Resources' Shapes, because one surface draws every Map
 - **Every kind may take any Shape.** Rejected: a Markdown, Image, Space or Reference Resource in a Shape is notation nobody needs, and the choice would clutter every Resource's menu.
 - **A Shape fixed by kind.** Rejected: an Ur Resource is a decision in one diagram and a step in another, so its Shape is chosen per Map rather than given by its kind.
 - **A Shape changes the Closed Size**, for example a square for a circle. Rejected: displacement, Edge attachment and the fixed Closed Size would all have to depend on the Shape, for a difference an ellipse in the same rect already shows.
-- **Open Resources draw their Shape too.** Rejected: content needs the rectangle, and the resize control needs a corner.
+- **Only a Closed Resource draws its Shape.** Rejected: a diagram could not hold a large diamond, an ellipse sized to its label or a pill stretched across a lane, and Opening would change the notation. The reason first given for it — that content needs the rectangle — no longer applies once only the contentless Ur Resource takes a Shape.
 - **An open set**, such as a free corner radius or an arbitrary path. Rejected: Edges could no longer be guaranteed to meet the outline, and the set would stop being notation a reader can learn.
 - **A missing Shape reads as a rectangle.** Rejected: the repo is the only source of state, so the schema and fixtures move forward together instead of carrying a rule for reading a missing field.
 
 ## Consequences
 
-The Map entry schema, intake, export and import gain a required `shape` field. Every tracked fixture and seed writes `rectangle`. Add Resource and Add to Map write it. A new Edit changes one Resource's Shape on one Map. The Closed Resource front draws the outline, insets its Title and glyph, and has its selection ring follow the outline. A Closed Resource in a Shape other than the rectangle shows its short Title: its name on one line, with an ellipsis when more Title Lines follow. The Open, presented and editing fronts are unchanged.
+The Map entry schema, intake, export and import gain a required `shape` field. Every tracked fixture and seed writes `rectangle`. Add Resource and Add to Map write it. A new Edit changes one Resource's Shape on one Map. The Resource front draws the outline at its current rect, Open or Closed, insets its Title and glyph, and has its selection ring follow the outline. A Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow. The presented Resource is unchanged.
