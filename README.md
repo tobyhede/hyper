@@ -1,17 +1,71 @@
-# Graph-Native Technical Presentations
+# Hyper
 
-A local prototype that proves one idea:
+Hyper is for technical talks and designs whose ideas connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. [React Flow](https://reactflow.dev) draws every Graph at once, each in its own colour, at the positions you chose.
 
-> A technical deck can be authored as Markdown resources on a spatial graph, then presented as a curated Graph through that graph.
+**Presenting is the same canvas, closer in.** There is no second surface to build ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): Present moves the camera to the Graph's first Resource and shows its content. Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
 
-Content can be authored in version-controlled files and imported into the live persistence model. A space directory holds a space file naming the maps and the graphs each one owns, plus one Markdown file per resource. [React Flow](https://reactflow.dev) draws **every** Graph at once, each in its own colour, at the positions the map authored. A Resource exposes four Edge anchors, one on each side, and an Edge attaches to whichever of them faces the other Resource. Choosing a Graph in the toolbar emphasises it without hiding the others.
+Your work is a directory of plain files, an [Aggregate directory](docs/aggregate-directory.md), that you keep in its own git repository.
 
-**Presenting is the same canvas, closer in.** There is no deck and no second surface ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): pressing Present moves React Flow's camera to the Graph's first resource and draws that resource's content rendered. Arrow keys traverse the Graph's edges — Right follows the selected one, Left goes back along the path taken, Up and Down choose among a fork's branches without moving the camera ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
+## Quick start
 
-## Running it
+You need Node ≥ 26.8.1 and pnpm 9.
 
-Requirements: Node ≥ 26.8.1 and pnpm 9. Local PostgreSQL also requires Docker
-Engine or Docker Desktop with Compose v2.
+```sh
+git clone https://github.com/tobyhede/hyper.git
+cd hyper
+pnpm install
+pnpm start ~/talks/rust-async
+```
+
+`~/talks/rust-async` does not need to exist: Hyper creates a new Space there, prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
+
+1. Edit. Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go.
+2. Press **Present** to traverse the Graph: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the Map.
+3. Press Ctrl-C in the terminal. Hyper writes anything not yet on disk and exits.
+4. Commit your work in the directory's own repository:
+
+   ```sh
+   cd ~/talks/rust-async
+   git init        # the first time only
+   git add -A
+   git commit -m "First draft"
+   ```
+
+Run `pnpm start` from the Hyper clone every time, pointing at whichever directory you are working on. A relative path is relative to where you ran the command.
+
+## How Running works
+
+`pnpm start <dir>` **runs** an Aggregate directory ([ADR 0117](docs/adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)). Hyper reads the directory into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept.
+
+- **Your content lives in its own git repository**, at any path you like. Hyper does not need it to be inside the Hyper clone, and nothing of yours belongs there.
+- **Hyper writes the directory on every edit.** Once your edits have been quiet for about a second, Hyper writes the directory, so `git status` shows what you changed. Stopping Hyper writes anything still pending. Ctrl-C, closing the terminal (SIGHUP) and SIGTERM all stop it the same way; a second Ctrl-C exits at once without waiting.
+- **Git is your undo.** Hyper keeps no history of its own and does not lock the directory or watch it for changes. The last write wins. To undo an edit, check out the earlier file. If you `git pull` while Hyper is running, or run Hyper twice on one directory, Hyper's next write replaces what is on disk with what it holds, and you recover the other version with git. Pull and edit files with Hyper stopped.
+- **A crash before a write is the one way to lose an edit.** If Hyper is killed outright (`kill -9`, a power cut) within that quiet second, the edits not yet written are lost. Stopping it normally never loses one.
+- **A `*.md` file beside `space.json` is removed by the next write.** Hyper reads every Markdown file in a Space's directory and its `resources/` directory as a Resource, and rewrites them all. Keep your own notes elsewhere, for example in a `notes/` directory: other files and directories are left alone.
+- **Pictures are written to `images/`.** A picture you upload is written to the directory's `images/`, named by its content, so committing the directory commits the picture. A picture linked by `https:` URL stays a link.
+- **Starting.** A missing or empty directory becomes a new Space and is written at once. Dot-entries such as `.git` and `.DS_Store` do not count, so `git init` before the first start is fine. A directory that is not a valid Aggregate directory is refused, with its problems printed, and nothing is served; fix the files and start again. A run with no edits leaves the directory byte-for-byte as it was.
+- **Ports and the browser.** Hyper serves on port 4173, or the next free port if that one is taken. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running Hyper headless or from an agent:
+
+  ```sh
+  pnpm start ~/talks/rust-async --port 4200 --no-open
+  ```
+
+The file format, including what Hyper keeps and removes when it writes, is described in [`docs/aggregate-directory.md`](docs/aggregate-directory.md).
+
+## Using Hyper with agents
+
+This repository carries two agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`:
+
+- **`hyper-getting-started`**: sets a person up from a fresh clone: checks Node and pnpm, installs, chooses or creates the content directory as its own git repository, and starts a run.
+- **`hyper-authoring`**: writes or changes an Aggregate directory as files: Spaces, Resources, Maps, Graphs, Edges and pictures. It stops the run first, because Hyper's next write would replace edits made underneath it.
+
+## Developing Hyper
+
+Read [`AGENTS.md`](AGENTS.md) before changing code. It is written for coding agents and is the authority on commands, package boundaries, conventions and what "done" means here; this section is the human summary.
+
+### Development servers
+
+Requirements: Node ≥ 26.8.1 and pnpm 9. Local PostgreSQL also requires Docker Engine or Docker Desktop with Compose v2.
 
 ```sh
 pnpm install
@@ -20,16 +74,11 @@ pnpm dev:new         # fresh one-resource memory space at http://localhost:5174
 pnpm dev:fixture     # tracked test fixture in memory at http://localhost:5175
 ```
 
-Then:
+A completed edit is committed automatically through the persistence session; the persistence indicator reports `Saving changes` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart. Under `pnpm start` it is written to the directory being run.
 
-1. Pick a Graph in the toolbar. Every Graph stays drawn; the one you pick is emphasised.
-2. Hover a Markdown Resource and use its Edit control to author its Title and Markdown source. `Esc` cancels and closes it.
-3. Drag a resource to move it. A completed edit is committed automatically through the persistence session; the toolbar reports `Persisting…` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart.
-4. Hover or select a resource to reveal its four authoring handles. Drag to another resource to add an Edge to the active Graph. Dropping on empty canvas cancels unless Option (macOS) or Alt (elsewhere) is held; the modifier gesture previews and atomically creates a blank `Resource N`, its placement and the Edge.
-5. Press **Present** to traverse the Graph: `→` follows an edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the overview.
-6. Watch the address bar. The Space, a Map, a Resource, a Graph and each Active Resource reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)); the Sidebar and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
+The Space, a Map, a Resource, a Graph and each Active Resource reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)). The Command Dock and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
 
-A resource declares one handle on each of its four sides, source and target alike, and an edge attaches to the anchor facing the resource at its other end — chosen while the edge is drawn, so the attachment follows a drag ([ADR 0087](docs/adr/0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md)). Several Graphs through one pair of resources therefore draw between the same two points, told apart by colour.
+A Resource declares one handle on each of its four sides, source and target alike, and an Edge attaches to the anchor facing the Resource at its other end. It is chosen while the Edge is drawn, so the attachment follows a drag ([ADR 0087](docs/adr/0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md)). Several Graphs through one pair of Resources therefore draw between the same two points, told apart by colour.
 
 ### Verify
 
@@ -39,7 +88,7 @@ pnpm e2e            # Playwright flow (each test boots its own isolated server)
 pnpm e2e:fixture    # only scenarios backed by the tracked fixture
 ```
 
-Both commands create and dispose an isolated server per test automatically. They differ in what those servers hold: `pnpm e2e:fixture` runs only the tracked-fixture project, while `pnpm e2e` also runs `new-space`, whose servers start from an empty catalog so startup mints the one-resource new space. They need the Chromium browser once: `pnpm exec playwright install chromium`.
+Both Playwright commands create and dispose an isolated server per test automatically. They differ in what those servers hold: `pnpm e2e:fixture` runs only the tracked-fixture project, while `pnpm e2e` also runs `new-space`, whose servers start from an empty catalog so startup mints the one-resource new space. They need the Chromium browser once: `pnpm exec playwright install chromium`.
 
 ### Local PostgreSQL
 
@@ -96,32 +145,9 @@ Use a stable absolute path in a local directory the application owns. The host a
 
 The file uses SQLite's default rollback journal (`journal_mode=delete`) with `synchronous=FULL`; WAL is not enabled. To back it up, stop the host (or anything else writing the file) and copy the file, or use SQLite's own backup API (`sqlite3 hyper.db ".backup copy.db"`). Do not copy the file while a writer has it open: a copy taken mid-transaction need not be a consistent database.
 
-## The space format
+### Importing and Exporting a database
 
-A space is a **space directory**: a space file (`space.json`) plus one Markdown file per resource. Resources are not listed anywhere — a resource exists because its file does ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)), and they are discovered by scanning two locations **non-recursively**: `*.md` beside the space file, and `resources/*.md`. The bundled example lives in [`packages/app/example`](packages/app/example).
-
-"Manifest" is retired, as a word and as a type ([ADR 0010](docs/adr/0010-space-is-the-root-loaded-by-loadspace.md)): the top-level value is a **Space**, and it is minted only by `loadSpace`.
-
-### The aggregate directory
-
-One space directory is not what the `hyper` CLI imports or exports. The unit is the complete **aggregate** — every Space, rooted at the Meta Space — and on disk that is a directory holding a versioned `hyper.json` plus one child directory per Space, named for that Space's UUID:
-
-```
-my-aggregate/
-  hyper.json                                  { "version": 1, "metaSpaceId": "…0041" }
-  00000000-0000-4000-8000-000000000041/       the Meta Space
-    space.json
-    resources/00000000-0000-4000-8000-000000000027.md
-  00000000-0000-4000-8000-000000000060/       an ordinary Space
-    space.json
-    resources/…
-```
-
-`hyper.json` carries the one fact the directory cannot say for itself: **which Space is Meta**. No adapter infers that from ordering, cardinality or topology ([ADR 0078](docs/adr/0078-the-server-side-repository-owns-meta-lifecycle.md)), and a directory is exactly where such an inference would be tempting — the first child, the alphabetically-least name — so the aggregate file states it, and a directory without one is not an aggregate. There is deliberately no Space inventory beside it: a Space is in the aggregate because its directory is there, the same way a resource exists because its file does.
-
-Every Space Id is explicit, and the **directory name is where it is written**. A name that is not a UUID is refused rather than read around, because silently taking the id out of `space.json` instead would let a renamed directory pass as a fresh Space on the next round trip; where `space.json` also declares an `id`, the two must agree. The spelling has to be **canonical lower case**, not merely a parseable UUID: export writes lower case and nothing else, so an upper-cased name is a directory somebody renamed — import must not take a Space id from it, and obsolete-directory removal, which is recursive, must not mistake it for one a previous export wrote. Nested ids — resource, map, graph — may still be omitted by a hand-authored file and are minted on import, which is safe precisely because nothing already in the document can name a UUID the importer has just invented. A reference to an id nobody declared is left to dangle and refused by aggregate intake.
-
-Everything the reader does not look at survives a round trip: root files it ignores, and undiscovered contents inside a Space directory it keeps. What it does regenerate, it replaces — so a Resource deleted since the last export leaves no file behind, and a Space deleted since then loses its directory.
+The `hyper` CLI moves a complete [Aggregate directory](docs/aggregate-directory.md) in and out of a database. The unit is always the whole aggregate, every Space rooted at the Meta Space, never one Space chosen from among them.
 
 ```sh
 pnpm hyper export ./my-aggregate           # write the complete stored aggregate
@@ -133,6 +159,8 @@ Two doors and no mode parameter on either. Without the flag, an already-initiali
 
 The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to truncate, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
 
+Export records the revision it projected for each Space, and writes and Import admits the pictures in `images/` on every store ([ADR 0118](docs/adr/0118-an-aggregate-directory-carries-stored-image-bytes.md)).
+
 The same commands run against a SQLite file through `pnpm hyper:sqlite`, which requires `SQLITE_PATH` to name an already-migrated file (`pnpm db:migrate:sqlite`). The script, not an argument or the environment's contents, picks the database, so `pnpm hyper` stays PostgreSQL even when `.env` names both. Run it only against a file no host has open — stop `pnpm dev:sqlite` first, or point it at a different file. An exported directory is the only way to move an aggregate between the two databases:
 
 ```sh
@@ -140,145 +168,50 @@ pnpm hyper export ./my-aggregate                               # from PostgreSQL
 SQLITE_PATH=/absolute/path/hyper.db pnpm hyper:sqlite ./my-aggregate   # into an empty SQLite file
 ```
 
-### Durable URLs and HTTP resources
-
-Every addressable entity has a durable product URL built from its UUID. Product URLs encode UUIDs as unpadded 22-character base64url values; titles never participate in identity. A URL may name an entity canonically or add the Map and Graph context needed to reopen the same canvas or Active Resource while Presenting:
-
-| Product URL | Destination |
-| --- | --- |
-| `/spaces/:spaceId` | Space |
-| `/spaces/:spaceId/resources/:resourceId` | Resource, using the Space's current Map when it contains the Resource |
-| `/spaces/:spaceId/graphs/:graphId` | Graph in its owning Map |
-| `/spaces/:spaceId/maps/:mapId` | Authored Map |
-| `/spaces/:spaceId/maps/:mapId/resources/:resourceId` | Resource in an explicit Map |
-| `/spaces/:spaceId/maps/:mapId/graphs/:graphId` | Graph in an explicit Map |
-| `/spaces/:spaceId/maps/:mapId/graphs/:graphId/present/:resourceId` | Presenting at its Active Resource |
-
-These are navigation addresses, not persistence resources: resolving one never edits a Map, Active Graph or Resource. The browser and Node host share the same destination contract, so malformed addresses receive `400`, unresolved entities receive `404`, and direct requests return the same application destination that client-side navigation opens ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)).
-
-The JSON API deliberately stays smaller and keeps UUIDs in canonical spelling:
-
-| HTTP resource | Purpose |
-| --- | --- |
-| `GET /api/spaces` | List stored Spaces and revisions |
-| `GET /api/spaces/:uuid` | Load one Space snapshot and revision |
-| `PUT /api/spaces/:uuid` | Commit a complete Space snapshot against an expected revision |
-
-Resources, Maps and Graphs are parts of the Space aggregate, so they have product URLs but no independent persistence endpoints. API failures use RFC 9457 Problem Details (`application/problem+json`).
-
-### `space.json`
-
-```json
-{
-  "version": 1,
-  "id": "00000000-0000-4000-8000-000000000041",
-  "title": "Graph-Native Technical Presentations",
-  "maps": [
-    {
-      "id": "00000000-0000-4000-8000-000000000048",
-      "title": "Working",
-      "positions": {
-        "00000000-0000-4000-8000-000000000027": { "x": 0, "y": 0, "open": false },
-        "00000000-0000-4000-8000-000000000043": { "x": 340, "y": 0, "open": false }
-      },
-      "graphs": [
-        {
-          "id": "00000000-0000-4000-8000-000000000004",
-          "title": "Main walkthrough",
-          "color": "#1f77b4",
-          "edges": [
-            {
-              "from": "00000000-0000-4000-8000-000000000027",
-              "to": "00000000-0000-4000-8000-000000000043"
-            }
-          ]
-        }
-      ],
-      "activeGraph": "00000000-0000-4000-8000-000000000004"
-    }
-  ],
-  "defaultMap": "00000000-0000-4000-8000-000000000048"
-}
-```
-
-| Key | Meaning |
-| --- | --- |
-| `version` | `1` is the first-public shape. Version 2 was the disposable pre-release one, which carried a space-level `graphs` array beside maps that owned none; Hyper is unreleased, so it is rejected by name rather than migrated ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)). |
-| `id`, `title` | What names the space. Every explicit id is a UUID; a hand-authored import may omit the nested ones for the importer to mint. Inside an aggregate directory the space's own id is the directory's name, and a declared `id` must agree with it. The id is not the title and not the file name. |
-| `maps` | Optional authored resource-to-position maps ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)). A map's position keys **are** its resource membership: sparse relative to the space — it may omit resources, but may not name one the space lacks. Each map owns a non-empty ordered `graphs` collection and may name which of them opens **active** (`activeGraph`; absent means the first it owns) — [ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md). A new space starts with one map owning one empty graph; a stored or imported space may arrive with no maps, and its first working load initializes one ([ADR 0079](docs/adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md)). |
-| `maps[].graphs` | Named walkthroughs, each an `id`, `title`, optional `color`, and a set of `{ from, to }` **edges** between resources **of that map** ([ADR 0032](docs/adr/0032-routes-may-contain-cycles.md)). Forks, merges, disconnected components, cycles and self-edges are legal; an exact duplicate Edge within one Graph is not, and an endpoint naming a resource the owning map omits is a load error. A graph belongs to exactly one map, and there is no space-level collection beside them ([ADR 0040](docs/adr/0040-layouts-own-card-membership-and-routes.md)); its id is nonetheless unique across the whole space, because lookup, the graph's URL and its colour resolve it by that id alone ([ADR 0108](docs/adr/0108-graph-identity-is-unique-within-the-space.md)). The edge set may be empty. Graphs are a map's only connection structure ([ADR 0007](docs/adr/0007-routes-are-the-only-structure.md)), and the drawn edges are derived from them. Where an edge attaches is not: a resource's four anchors are graph-independent, and the side is chosen at render ([ADR 0087](docs/adr/0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md), [ADR 0110](docs/adr/0110-an-edge-faces-across-the-larger-gap-between-two-resources.md)). |
-| `defaultMap` | The declared Map UUID the Space opens in. |
-
-### Graphs as color-coded flows
-
-Each authored edge becomes a colored drawn edge. Every resource carries four Edge anchors, one on each side, and an edge attaches to whichever anchor faces the other resource — decided while the edge is drawn, from where the two resources are at that moment, so the attachment follows a drag (ADR 0087). `@project/graph` derives the edges (`buildGraphRenderEdges`) and assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy`, colors the projection and chooses each edge's two anchors. Switching graphs changes emphasis, not visibility or placement.
-
-### Markdown resources
-
-A resource is **one file**: frontmatter, then body ([ADR 0020](docs/adr/0020-a-card-is-a-markdown-file-with-frontmatter.md), refined by [ADR 0051](docs/adr/0051-card-kinds-own-everything-beyond-the-title.md)). Shared frontmatter carries `id`, `title` and `kind`; a Reference Resource adds its `target`, while everything after a Markdown Resource's fence is its content. A resource can be visited by any number of graphs — that reuse is the whole point. A resource carries the same four Edge anchors however many graphs run through it, so every graph joining one pair of resources draws between the same two points, told apart by colour ([ADR 0087](docs/adr/0087-an-edge-attaches-to-the-anchor-that-faces-its-neighbour.md)).
-
-A resource's identity is its frontmatter `id`, never its filename, so renaming the file is not a data migration. Since the title lives in the same file as the body, a body may open with a heading — it is just a heading, not a repeat of a title held somewhere else.
-
-The graph draws a closed Resource's **title**, not its body. Opening a Markdown Resource expands it in place and renders its Markdown content on the Resource ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md)); editing its source is a separate action. The same renderer shows the Active Resource while presenting, so content is not embedded in every closed node.
-
-A resource occupies exactly one position in the graph; there is no placement layer letting the same resource sit in two places. Showing the same content at a second position is the job of a **reference resource** ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
-
-Validation happens in two layers:
-
-- **Shape** — Zod schemas (`@project/core`) validate the space file and each resource file's frontmatter.
-- **References** — `@project/graph` checks that both ends of every Graph Edge resolve to a Resource, that no Graph contains an exact duplicate Edge, that a Map positions and shows only Resources the Space has, and flags duplicate ids. Unresolved references are surfaced as a banner in the app rather than crashing it.
-
-`@project/graph` also derives the Graph edges (`buildGraphRenderEdges`); `@project/react-flow-adapter` projects colored resource nodes and edges (`projectResourceNodes`, `projectGraphEdges`) and decides where each edge attaches (`edge-attachment.ts`).
-
-### Maps
-
-A **Map** is authored data: a named resource-to-position map stored with the space. A **LayoutStrategy** is behaviour: it takes the layout-strategy graph to arrange and asynchronously returns that same value with positions on its resources ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)):
-
-```ts
-type LayoutStrategy = (graph: LayoutStrategyGraph) => Promise<LayoutStrategyGraph>;
-```
-
-Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy that places resources on a grid, and nothing selects it today. `positionedStrategy` reads an authored Map, and it is what the canvas draws. An automatic arrangement returns as a destructive Edit over a Map rather than as a render path, which is what took elkjs out of the tree ([ADR 0086](docs/adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md)) — and with it the routed Edge geometry and per-Resource port offsets the contract used to carry, which a Map has nowhere to store and no strategy in the tree ever placed. Where an Edge attaches is the render layer's own question. Which resources a strategy arranges is the view's choice, not the strategy's.
-
-## Architecture
+### Architecture
 
 A pnpm workspace with strict TypeScript and enforced package boundaries:
 
 | Package | Responsibility |
 | --- | --- |
 | `@project/core` | Domain types + Zod schema. No framework code. |
-| `@project/graph` | Pure graph/Graph logic: intake and indexing, lookups, Graph navigation, referential validation, Graph→edges derivation, and the `LayoutStrategy` contract. Property-tested. |
+| `@project/graph` | Pure graph logic: intake and indexing, lookups, Graph navigation, referential validation, Graph→Edge derivation, and the `LayoutStrategy` contract. Property-tested. |
 | `@project/persistence` | Browser-safe backend and session contracts, optimistic revisions, commit coalescing, failure/conflict handling, and the memory adapter. |
+| `@project/http` | The browser-safe Fetch transport: the Hono `/api` route tree and its request and response policy. |
 | `@project/react-flow-adapter` | Owns React Flow projection and every React Flow specific. Projects the domain model, already laid out, into coloured React Flow Resource nodes and Edges. It implements no `LayoutStrategy` and applies none — `@project/app` does that. |
-| `@project/ui` | Reusable, framework-agnostic React: resource renderer, Graph selector, Graph legend, presentation controls, app shell. |
-| `@project/app` | Wiring: Navigation, Space Authoring and Edge Authoring, product-URL navigation over the browser History API (no router library), the Zustand-backed render adapter, the canvas and its cameras, the example presentation, and Vite. |
+| `@project/ui` | Reusable, framework-agnostic React: the Resource renderer, the Command Dock's surfaces, presentation controls, the app shell. |
+| `@project/app` | Wiring: Navigation, Space Authoring and Edge Authoring, product-URL navigation over the browser History API (no router library), the Zustand-backed render adapter, the canvas and its cameras, and Vite. |
 
 Design rules kept throughout: domain logic stays out of React components, React Flow specifics stay in the adapter, and app wiring stays in `@project/app`.
+
+**Graphs as colour-coded flows.** Each authored Edge becomes a coloured drawn Edge. Every Resource carries four Edge anchors, one on each side, and an Edge attaches to whichever anchor faces the other Resource — decided while the Edge is drawn, from where the two Resources are at that moment, so the attachment follows a drag (ADR 0087). `@project/graph` derives the Edges (`buildGraphRenderEdges`) and assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy`, colours the projection (`projectResourceNodes`, `projectGraphEdges`) and chooses each Edge's two anchors (`edge-attachment.ts`). Switching Graphs changes emphasis, not visibility or placement.
+
+**Maps and layout strategies.** A **Map** is authored data: a named Resource-to-position mapping stored with the Space. A **LayoutStrategy** is behaviour: it takes the layout-strategy graph to arrange and asynchronously returns that same value with positions on its Resources ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)):
+
+```ts
+type LayoutStrategy = (graph: LayoutStrategyGraph) => Promise<LayoutStrategyGraph>;
+```
+
+Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy that places Resources on a grid, and nothing selects it today. `positionedStrategy` reads an authored Map, and it is what the canvas draws. An automatic layout returns as a destructive Edit over a Map rather than as a render path ([ADR 0086](docs/adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md)). Where an Edge attaches is the render layer's own question. Which Resources a strategy arranges is the view's choice, not the strategy's.
+
+**Resources.** The graph draws a Closed Resource's **Title**, not its content. Opening a Resource grows it in place and shows its content ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md)); editing its source is a separate action. The same renderer shows the Active Resource while Presenting. A Resource occupies exactly one position in a Map; showing the same content at a second position is the job of a Reference Resource ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
+
+**The browser never touches files.** It lists, opens and commits Spaces over HTTP and nothing else. Reading and writing an Aggregate directory is server-side: the `hyper` CLI, and the run behind `pnpm start`.
 
 ### Tests
 
 - Schema validation and rejection cases (`@project/core`).
-- Unresolved resource/edge/Graph-step references and duplicate ids (`@project/graph`).
+- Unresolved Resource, Edge and Graph references and duplicate ids (`@project/graph`).
 - Graph navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
 - React Flow projection correctness (`@project/react-flow-adapter`).
-- Resource rendering smoke test (`@project/ui`).
-- Playwright flows: app loads, the graph is visible, a Graph is selected, resources open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a Graph, and a Graph is traversed under the camera.
+- Aggregate directory round trips, Export and Import, and a run of `pnpm start` that edits over HTTP and stops on SIGINT (`test/unit`, `test/integration`).
+- Playwright flows: app loads, the graph is visible, a Graph is selected, Resources open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a Graph, and a Graph is traversed under the camera.
 
-## Current limitations
+### Current limitations
 
-- **Resource authoring is intentionally narrow.** Markdown source and Titles are editable; a Reference Resource's Target is chosen once at creation and immutable thereafter. Visual editing, freehand drawing and whiteboard shapes are not built. Resource, placement and Edge edits commit through the HTTP persistence session: under `pnpm dev` they land in PostgreSQL and outlive the page, and under `pnpm dev:new` they survive a browser reload but not a server restart.
-- **The app never touches files.** The browser lists, opens and commits Spaces under `/api/spaces` and nothing else; file discovery and parsing are server-side CLI and import concerns. There is no write-back and no file picker. Canonical file export belongs to the `hyper` CLI ([ADR 0030](docs/adr/0030-postgres-is-the-live-write-model.md)), which regenerates a deterministic aggregate directory from the database and records the revision it projected for each Space.
-- **Overlay legibility.** The graph draws every Graph at once, at the positions the map authored. An edge runs backward whenever the author placed its target left of its source — which two graphs disagreeing about the order of resources they share will force on one of them — and nothing routes an edge around a resource: every edge is the bezier React Flow draws, so a backward one curls back on itself. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
-- **Resources are a fixed shape.** A resource draws its title, so every resource is the same size — declared once in `packages/app/src/resource.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the resource, not the reverse, which is why a measured DOM size never decides placement.
-- **Structural authoring is partial.** Dragging between spatial handles draws an Edge, and the first one mints and activates `Graph 1` ([ADR 0033](docs/adr/0033-route-authoring-uses-spatial-route-coloured-handles.md)). Option/Alt plus an empty drop atomically creates and connects a blank `Resource N`. There is no detached Resource creation, and deleting Resources, Edges or Graphs is deliberately disabled until those operations can complete through the same persisted-Edit lifecycle. Broader Graph management is also unbuilt.
-- **No speaker view, timer, transitions or deck export.** They went with the deck framework and return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
-- **The presented resource is scaled by the camera**, so its text is rasterised rather than laid out at its final size — a property of wanting a spatial camera at all.
-- The production bundle ships React Flow in a single chunk — fine for a prototype, not tuned for size. Remeasured after elkjs left: the entry chunk is ~1.2 MB (381 kB gzipped) beside ~106 kB of CSS, and `MarkdownSourceEditor` is split out as a further ~623 kB fetched on first edit. The ~2.1 MB recorded before was one chunk with elkjs in it.
-
-## Next likely improvements
-
-- Structural deletion for Edges, Resources and Graphs through the completed-Edit lifecycle.
-- Detached Resource creation, without requiring an Edge from an existing Resource.
-- Resource content and metadata editing, plus creation, naming, recolouring and reordering of additional Graphs.
-- Authored camera hints (zoom/pan/highlight several nodes) and move transitions in the space file.
-- A traversal-native speaker view: current and next Resource, notes, and elapsed time.
+- **No undo inside the application.** Under `pnpm start`, git is the undo.
+- **Overlay legibility.** The graph draws every Graph at once, at the positions the Map authored. An Edge runs backward whenever the author placed its target left of its source — which two Graphs disagreeing about the order of Resources they share will force on one of them — and nothing routes an Edge around a Resource: every Edge is the bezier React Flow draws, so a backward one curls back on itself. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
+- **Closed Resources are a fixed shape.** A Closed Resource draws its Title, so every Closed Resource is the same size — declared once in `packages/app/src/resource.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the Resource, not the reverse, which is why a measured DOM size never decides placement.
+- **No speaker view, timer, transitions or export to another presentation format.** They return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
+- **The presented Resource is scaled by the camera**, so its text is rasterised rather than laid out at its final size — a property of wanting a spatial camera at all.
+- The production bundle ships React Flow in a single chunk — fine for a prototype, not tuned for size. Remeasured after elkjs left: the entry chunk is ~1.2 MB (381 kB gzipped) beside ~106 kB of CSS, and `MarkdownSourceEditor` is split out as a further ~623 kB fetched on first edit.
