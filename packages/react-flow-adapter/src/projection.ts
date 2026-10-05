@@ -192,8 +192,8 @@ export type ResourceNodeData = {
    */
   display: ResourceDisplay;
   /**
-   * The Shape the Map records for this Resource (ADR 0117), carried whatever
-   * the display: the front draws it only while the display is Closed.
+   * The Shape the Map records for this Resource, carried whatever the display:
+   * the front draws it only while the display is Closed.
    */
   shape: ResourceShape;
   active: boolean;
@@ -250,7 +250,7 @@ export interface ProjectResourceNodesOptions {
   resourceIds?: readonly ResourceId[];
   /** Map-authored Open Resources whose Markdown body is drawn in place. */
   openResourceIds?: ReadonlySet<ResourceId>;
-  /** The Shape the Map records for each projected Resource (ADR 0117). */
+  /** The Shape the Map records for each projected Resource. */
   resourceShape: (resourceId: ResourceId) => ResourceShape;
 }
 

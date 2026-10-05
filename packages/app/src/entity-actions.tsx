@@ -30,6 +30,13 @@ import {
  */
 
 /**
+ * An entity's commands, ruled into groups: what {@link spaceEntityActions}
+ * answers. Every member runs on the press, so a surface that draws its own menu
+ * can spend one by id.
+ */
+export type EntityCommandGroup = readonly EntityAction[];
+
+/**
  * The two addresses, spelled once.
  *
  * Exported so a consumer spells each from here instead of from a second
@@ -42,13 +49,6 @@ import {
  * what stops another being invented.
  */
 export const COPY_LINK_ACTION_ID = 'copy-link';
-
-/**
- * An entity's commands, ruled into groups: what {@link spaceEntityActions}
- * answers. Every member runs on the press, so a surface that draws its own menu
- * can spend one by id.
- */
-export type EntityCommandGroup = readonly EntityAction[];
 export const COPY_RESOURCE_LINK_ACTION_ID = 'copy-resource-link';
 export const COPY_SPACE_LINK_ACTION_ID = 'copy-space-link';
 export const COPY_LINK_TO_TARGET_ACTION_ID = 'copy-link-to-target';

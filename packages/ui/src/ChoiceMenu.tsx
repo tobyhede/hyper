@@ -69,16 +69,13 @@ export interface ChoiceMenuProps<Id extends string> {
    * Omitted, Base UI's own restoration stands.
    */
   readonly restoresFocusOnClose?: () => boolean;
-  /**
-   * Drawn as a submenu of the menu this list sits in, hanging off a
-   * {@link ChoiceMenuSubmenuTrigger} row, rather than as a menu of its own. A
-   * Resource's Shape is chosen this way from its Actions menu (ADR 0117).
-   * `triggerId`, `side`, `align`, `sideOffset` and `restoresFocusOnClose` are
-   * a root menu's and are not read here: a submenu opens beside its row and
-   * closes with the menu it belongs to.
-   */
-  readonly nested?: boolean;
 }
+
+/** What a {@link ChoiceMenu} and a {@link ChoiceSubmenu} draw alike: the set and its commands. */
+type ChoiceListProps<Id extends string> = Pick<
+  ChoiceMenuProps<Id>,
+  'label' | 'choices' | 'chosen' | 'onChoose' | 'children'
+>;
 
 /**
  * One of a named set, chosen from a list — the Command Dock's Map and Graph
@@ -119,9 +116,62 @@ export function ChoiceMenu<Id extends string>({
   sideOffset = 6,
   className = 'w-72',
   restoresFocusOnClose,
-  nested = false,
 }: ChoiceMenuProps<Id>) {
-  const list = (
+  return (
+    <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
+      {trigger}
+      <DropdownMenuContent
+        align={align}
+        side={side}
+        sideOffset={sideOffset}
+        className={className}
+        finalFocus={restoresFocusOnClose}
+      >
+        <ChoiceList<Id> label={label} choices={choices} chosen={chosen} onChoose={onChoose}>
+          {children}
+        </ChoiceList>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export interface ChoiceSubmenuProps<Id extends string> extends ChoiceListProps<Id> {
+  /** The row this list hangs off, a {@link ChoiceMenuSubmenuTrigger}. */
+  readonly trigger: ReactNode;
+  /** The popup's own class, which is where its width is set. */
+  readonly className?: string;
+}
+
+/**
+ * The list a {@link ChoiceMenu} draws, as a submenu of the menu it sits in
+ * rather than as a menu of its own — a Resource's Shape, chosen from its
+ * Actions menu (ADR 0117). It takes no placement or focus props: a submenu
+ * opens beside its row and closes with the menu it belongs to.
+ */
+export function ChoiceSubmenu<Id extends string>({
+  trigger,
+  className = 'w-72',
+  ...list
+}: ChoiceSubmenuProps<Id>) {
+  return (
+    <DropdownMenuSub>
+      {trigger}
+      <DropdownMenuSubContent className={className}>
+        <ChoiceList<Id> {...list} />
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>
+  );
+}
+
+/** The labelled radio group of the set, and the caller's commands below a rule. */
+function ChoiceList<Id extends string>({
+  label,
+  choices,
+  chosen,
+  onChoose,
+  children,
+}: ChoiceListProps<Id>) {
+  return (
     <>
       <DropdownMenuRadioGroup<Id | null>
         value={chosen}
@@ -152,28 +202,6 @@ export function ChoiceMenu<Id extends string>({
         </>
       )}
     </>
-  );
-  if (nested) {
-    return (
-      <DropdownMenuSub open={open} onOpenChange={onOpenChange}>
-        {trigger}
-        <DropdownMenuSubContent className={className}>{list}</DropdownMenuSubContent>
-      </DropdownMenuSub>
-    );
-  }
-  return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange} triggerId={triggerId}>
-      {trigger}
-      <DropdownMenuContent
-        align={align}
-        side={side}
-        sideOffset={sideOffset}
-        className={className}
-        finalFocus={restoresFocusOnClose}
-      >
-        {list}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
@@ -224,7 +252,7 @@ export const ChoiceMenuTrigger = forwardRef<HTMLButtonElement, ChoiceMenuTrigger
 export type ChoiceMenuSubmenuTriggerProps = ComponentProps<typeof DropdownMenuSubTrigger>;
 
 /**
- * The row a nested {@link ChoiceMenu} hangs off: a menu row naming the set,
+ * The row a {@link ChoiceSubmenu} hangs off: a menu row naming the set,
  * trailed by the submenu chevron. It opens the list on hover, on a press, on
  * Enter, on Space and on ArrowRight, as Base UI's submenu trigger does.
  */

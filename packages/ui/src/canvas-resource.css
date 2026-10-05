@@ -455,7 +455,8 @@
    fixed Closed Size and rect; the front's own paper and edge are withdrawn and
    `ResourceShapeOutlineDrawing` draws them as the Shape's outline, which
    touches the midpoint of each side, where Edges attach. `overflow` is released
-   so the stroke at those points is not cut by the rect. */
+   so the stroke at those points is not cut by the rect. The rectangle's box
+   shadows are withdrawn too: the ring and drag shadow follow the outline. */
 .canvas-resource:not([data-resource-shape='rectangle']) {
   --canvas-resource-title-ladder-lines: 3;
 
@@ -463,6 +464,7 @@
   border: 0;
   border-radius: 0;
   background: none;
+  box-shadow: none;
 }
 
 .canvas-resource__outline {
@@ -488,17 +490,13 @@
 
 /* The selection ring follows the outline (ADR 0117): the edge's geometry
    stroked wider beneath it, so it stands the ring width beyond the edge as the
-   rectangle's shadow does. A Shape withdraws the rectangle's box shadows. */
+   rectangle's shadow does. */
 .canvas-resource__outline-ring {
   display: none;
   fill: none;
   stroke-width: calc(
     var(--canvas-resource-border-width) + 2 * var(--canvas-resource-selected-ring-width)
   );
-}
-
-.canvas-resource:not([data-resource-shape='rectangle']) {
-  box-shadow: none;
 }
 
 .canvas-resource:is([data-state='selected'], [data-state='editing'])

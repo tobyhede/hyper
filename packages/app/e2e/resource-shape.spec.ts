@@ -168,6 +168,10 @@ test('an Edge drawn to a Closed diamond meets its outline', async ({ page }) => 
   expect(Math.abs(end.x - vertex.x), 'the Edge meets the vertex on its axis').toBeLessThan(2);
   expect(Math.abs(end.y - (vertex.y + RADIUS)), 'the Edge ends at the vertex').toBeLessThan(2);
   await expect.poll(() => outlineOffset(a)).toBeLessThan(0.5);
+  // The drawn diamond, not only its rect, reaches that midpoint.
+  expect((await drawnOutline(face(a))).touchesSideMidpoints, 'the outline holds the vertex').toBe(
+    true,
+  );
 });
 
 test(

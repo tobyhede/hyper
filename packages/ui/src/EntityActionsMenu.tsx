@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
-import { ChoiceMenu, ChoiceMenuSubmenuTrigger } from './ChoiceMenu';
+import { ChoiceMenuSubmenuTrigger, ChoiceSubmenu } from './ChoiceMenu';
 import { EntityActionsIcon } from './icons';
 import { cn } from './lib/utils';
 
@@ -152,10 +152,11 @@ export interface EntityActionOption {
  * One of a closed set the entity has, chosen from a submenu of the menu — a
  * Resource's Shape on a Map (ADR 0117).
  *
- * Drawn as a row naming the set, which opens the set as a nested
- * {@link ChoiceMenu}: a labelled radio list with the current member marked.
- * Each member carries its own operation, so the list hands back nothing a
- * caller has to look up again. Choosing closes the whole menu.
+ * Drawn as a row naming the set, which opens the set as a
+ * {@link ChoiceSubmenu}: a labelled radio list with the current member marked.
+ * Each member carries its own operation, so a caller spends no id: the row
+ * resolves the chosen id back to its member itself. Choosing closes the whole
+ * menu.
  */
 export interface EntityActionChoice {
   /** Stable within one menu; what React keys the row on. */
@@ -366,16 +367,7 @@ function EntityActionItems({
                 className="items-start"
                 onClick={() => fire(action)}
               >
-                {/* `w-4` fixed rather than content-sized, so an item with no
-                  glyph still spends the column and the labels stay a column. */}
-                {iconColumn && (
-                  <span
-                    aria-hidden="true"
-                    className="flex h-5 w-4 shrink-0 items-center justify-center"
-                  >
-                    {action.icon}
-                  </span>
-                )}
+                {iconColumn && <MenuIconColumn>{action.icon}</MenuIconColumn>}
                 <span className="flex min-w-0 flex-col gap-0.5">
                   <span>{action.id === report?.id ? report.word : action.label}</span>
                   {action.description !== undefined && (
@@ -404,8 +396,7 @@ function EntityActionChoiceRow({
 }) {
   const chosen = choice.options.find((option) => option.chosen)?.id ?? null;
   return (
-    <ChoiceMenu<string>
-      nested
+    <ChoiceSubmenu<string>
       label={choice.label}
       choices={choice.options}
       chosen={chosen}
@@ -413,15 +404,26 @@ function EntityActionChoiceRow({
       className="w-40"
       trigger={
         <ChoiceMenuSubmenuTrigger>
-          {iconColumn && (
-            <span aria-hidden="true" className="flex h-5 w-4 shrink-0 items-center justify-center">
-              {choice.icon}
-            </span>
-          )}
+          {iconColumn && <MenuIconColumn>{choice.icon}</MenuIconColumn>}
           <span>{choice.label}</span>
         </ChoiceMenuSubmenuTrigger>
       }
     />
+  );
+}
+
+/**
+ * The menu's leading glyph column on one row.
+ *
+ * `w-4` fixed rather than content-sized, so a row with no glyph still spends
+ * the column and the labels stay a column. `h-5` is the `text-sm` line box, so
+ * the glyph centres on the label's first line whether or not a second follows.
+ */
+function MenuIconColumn({ children }: { readonly children: ReactNode }) {
+  return (
+    <span aria-hidden="true" className="flex h-5 w-4 shrink-0 items-center justify-center">
+      {children}
+    </span>
   );
 }
 

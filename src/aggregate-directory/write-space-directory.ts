@@ -5,10 +5,9 @@ import {
   type GraphEdge,
   type SpaceFile,
   type Resource,
-  type ResourcePlacement,
   type UUID,
 } from '@project/core';
-import { serializeResourceFile } from '@project/graph';
+import { Placement, serializeResourceFile } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { compareOrdinal } from '../ordinal';
 import { isMissingFile } from './space-directory';
@@ -21,34 +20,6 @@ const exists = async (path: string): Promise<boolean> => {
     if (isMissingFile(error)) return false;
     throw error;
   }
-};
-
-/**
- * One placement, rebuilt key by key — the remembered Open Size and the Shape
- * included, on both arms of the union, because a rect carried through would
- * export whatever order `jsonb` handed it back in. `Placement.point` establishes
- * that key order, width-then-height included, and this is the same order
- * written to disk.
- */
-const canonicalPlacement = (point: ResourcePlacement): ResourcePlacement => {
-  if (point.open) {
-    return {
-      x: point.x,
-      y: point.y,
-      open: true,
-      openSize: { width: point.openSize.width, height: point.openSize.height },
-      shape: point.shape,
-    };
-  }
-  return point.openSize === undefined
-    ? { x: point.x, y: point.y, open: false, shape: point.shape }
-    : {
-        x: point.x,
-        y: point.y,
-        open: false,
-        openSize: { width: point.openSize.width, height: point.openSize.height },
-        shape: point.shape,
-      };
 };
 
 /** Full literals, so the exported key order is fixed and an absent Title writes no key. */
@@ -99,18 +70,11 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
       id: m.id,
       title: m.title,
       kind: m.kind,
+      // `Placement.fromMap` rebuilds every entry key by key — Open Size and Shape
+      // included — so a stored `{"y":…,"x":…}` exports in the canonical order
+      // rather than the one `jsonb` handed back; the sort fixes the entries' order.
       positions: Object.fromEntries(
-        Object.entries(m.positions)
-          .sort(([left], [right]) => compareOrdinal(left, right))
-          // The point is rebuilt too, not passed through: a stored `{"y":…,"x":…}`
-          // would otherwise export in that order. An absent value cannot come off
-          // a parsed document — the optionality is the `Partial<Record>` the
-          // schema's key branding produces — and dropping it matches what
-          // `JSON.stringify` already did with one.
-          .flatMap<readonly [string, ResourcePlacement]>(([id, point]) => {
-            if (point === undefined) return [];
-            return [[id, canonicalPlacement(point)]];
-          }),
+        [...Placement.fromMap(m)].sort(([left], [right]) => compareOrdinal(left, right)),
       ),
       graphs: canonicalGraphs(m.graphs),
     };

@@ -355,8 +355,9 @@ export function CanvasResource(props: CanvasResourceProps) {
   const display = readOnly ? atRest(props.display) : props.display;
   const open = display.shown !== 'closed';
   const frontResourceShape = drawnResourceShape(display, props.shape);
-  // A Shape's inscribed rectangle has room for the name and not the ladder.
-  const drawsShortTitle = frontResourceShape !== 'rectangle';
+  // Every Shape but the rectangle is drawn as an outline, and its inscribed
+  // rectangle has room for the short Title and not the ladder.
+  const drawsOutline = frontResourceShape !== 'rectangle';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const openableFront = front.kind === 'preview' ? undefined : front;
@@ -648,9 +649,7 @@ export function CanvasResource(props: CanvasResourceProps) {
           shared command surface. The Graph's colour is on this Resource — `--canvas-resource-graph` below draws the
           Title's own hover and caret treatment — and on the handles and
           Edges the adapter draws around it. */}
-      {frontResourceShape !== 'rectangle' && (
-        <ResourceShapeOutlineDrawing shape={frontResourceShape} />
-      )}
+      {drawsOutline && <ResourceShapeOutlineDrawing shape={frontResourceShape} />}
       {rail}
       {props.renderToolbar?.(toolbar)}
       <CardContent ref={bodyControl} className="canvas-resource__body">
@@ -673,7 +672,7 @@ export function CanvasResource(props: CanvasResourceProps) {
             data-editable={onBeginTitleEdit !== undefined && visibleContentEdit === null}
           >
             {onBeginTitleEdit === undefined || visibleContentEdit !== null ? (
-              <TitleHeading title={title} short={drawsShortTitle} />
+              <TitleHeading title={title} short={drawsOutline} />
             ) : (
               // ADR 0065's one-activation control, wrapping the heading rather
               // than sitting inside it (ADR 0083).
@@ -702,7 +701,7 @@ export function CanvasResource(props: CanvasResourceProps) {
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                <TitleHeading title={title} short={drawsShortTitle} />
+                <TitleHeading title={title} short={drawsOutline} />
               </Button>
             )}
           </CardTitle>
@@ -766,32 +765,29 @@ function ResourceShapeOutlineDrawing({ shape: resourceShape }: { readonly shape:
       aria-hidden="true"
       focusable="false"
     >
-      {outline.kind === 'polygon' ? (
-        <>
-          <polygon className="canvas-resource__outline-ring" points={points(outline.points)} />
-          <polygon className="canvas-resource__outline-edge" points={points(outline.points)} />
-        </>
-      ) : (
-        <>
+      {OUTLINE_LAYERS.map(({ className }) =>
+        outline.kind === 'polygon' ? (
+          <polygon key={className} className={className} points={points(outline.points)} />
+        ) : (
           <rect
-            className="canvas-resource__outline-ring"
+            key={className}
+            className={className}
             width={width}
             height={height}
             rx={outline.rx}
             ry={outline.ry}
           />
-          <rect
-            className="canvas-resource__outline-edge"
-            width={width}
-            height={height}
-            rx={outline.rx}
-            ry={outline.ry}
-          />
-        </>
+        ),
       )}
     </svg>
   );
 }
+
+/** The outline's two layers, ring beneath edge, each drawn from the same geometry. */
+const OUTLINE_LAYERS = [
+  { className: 'canvas-resource__outline-ring' },
+  { className: 'canvas-resource__outline-edge' },
+] as const;
 
 /** An outline polygon's vertices, as its `points` attribute spells them. */
 const points = (vertices: readonly OutlinePoint[]): string =>

@@ -241,7 +241,7 @@ function next(
  * Add Resource and Add to Map place a Resource where the author aimed it, which
  * is authorship rather than a report — no renderer has drawn that Resource yet,
  * so it cannot come through `next`. A bare point joins Closed with the
- * rectangle, so this is the one place a new entry is built (ADR 0117).
+ * rectangle (ADR 0117).
  */
 function place(placement: Placement, resourceId: ResourceId, at: PlacementPoint): Placement {
   const placed = new Map(placement);

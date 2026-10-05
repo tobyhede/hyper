@@ -379,9 +379,9 @@ export const RESOURCE_SHAPES = ['rectangle', 'pill', 'ellipse', 'diamond', 'hexa
 export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 
 /**
- * The Shape a Resource is given when it is added to a Map — Add Resource, Add to
- * Map, and every seed and fixture that places one. It is written, never
- * inferred from an absent field.
+ * The Shape a Resource is given when an Edit adds it to a Map — Add Resource,
+ * Add to Map and a new Space's first Resource. It is written, never inferred
+ * from an absent field.
  */
 export const ADDED_RESOURCE_SHAPE = 'rectangle' satisfies (typeof RESOURCE_SHAPES)[number];
 

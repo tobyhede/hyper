@@ -182,20 +182,6 @@ export function resourceRailGroups(
   ];
 }
 
-/**
- * The Shape choice for a Resource the Map places, while the Map may be
- * authored; `null` otherwise.
- */
-const resourceShapeCommandOf = (
-  drawnMap: SpaceMap,
-  resourceId: ResourceId,
-  authorOnCanvas: boolean,
-  choose: (resourceShape: ResourceShape) => void,
-): ResourceShapeCommand | null => {
-  const at = drawnMap.positions[resourceId];
-  return authorOnCanvas && at !== undefined ? { current: at.shape, choose } : null;
-};
-
 /** The Shape choice: the five Shapes, the recorded one chosen, each one Edit. */
 const resourceShapeChoice = ({ current, choose }: ResourceShapeCommand): EntityActionChoice => ({
   id: 'resource-shape',
@@ -270,26 +256,28 @@ export function useResourceRailActions(
       // A node the projection is still drawing for a Resource the working Space
       // no longer has: no commands rather than commands that name nothing.
       if (resource === undefined) return [];
+      const placed = selectedMap.positions[resourceId];
       return resourceRailGroups(
         resource,
         entityActions({ kind: 'resource', resource, map: selectedMap }),
         connect,
         {
           createReference: addResource ? () => createReferenceFrom(resource) : null,
-          resourceShape: resourceShapeCommandOf(
-            selectedMap,
-            resourceId,
-            authorOnCanvas,
-            (resourceShape) => {
-              commandOutcomes.run('resource-shape', () =>
-                authoring.complete({
-                  kind: 'changed-resource-shape',
-                  resourceId,
-                  shape: resourceShape,
-                }),
-              );
-            },
-          ),
+          resourceShape:
+            authorOnCanvas && placed !== undefined
+              ? {
+                  current: placed.shape,
+                  choose: (resourceShape) => {
+                    commandOutcomes.run('resource-shape', () =>
+                      authoring.complete({
+                        kind: 'changed-resource-shape',
+                        resourceId,
+                        shape: resourceShape,
+                      }),
+                    );
+                  },
+                }
+              : null,
           removeFromMap:
             authorOnCanvas && !editingResourceBody
               ? () => {
