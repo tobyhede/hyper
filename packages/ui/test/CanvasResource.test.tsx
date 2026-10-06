@@ -2411,26 +2411,8 @@ describe('the Title a Shape draws', () => {
     title,
     graphColor: '#ffc53d',
   };
-  const drawnLines = (resource: HTMLElement) =>
-    [...resource.querySelectorAll('[aria-hidden="true"].canvas-resource__title-short')].map(
-      (line) => line.textContent,
-    );
   const ladder = (resource: HTMLElement) =>
     [...resource.querySelectorAll('.canvas-resource__title-line')].map((line) => line.textContent);
-
-  it.each(['pill', 'ellipse', 'diamond'] as const)(
-    'draws the short Title on one line in a %s, Open and Closed',
-    (resourceShape) => {
-      for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
-        const { unmount } = render(
-          <CanvasResource {...props} shape={resourceShape} display={display} />,
-        );
-        const resource = screen.getByRole('article', { name: 'Decide' });
-        expect(drawnLines(resource)).toEqual(['Decide…']);
-        unmount();
-      }
-    },
-  );
 
   it('keeps the heading named by every Title Line, as the rectangle does', () => {
     const { unmount } = render(
@@ -2454,20 +2436,19 @@ describe('the Title a Shape draws', () => {
     expect(headingName()).toBe(rectangleName);
   });
 
-  it('draws the whole ladder in a rectangle, Open and Closed', () => {
-    const { rerender } = render(
-      <CanvasResource {...props} shape="rectangle" display={CLOSED_DISPLAY} />,
-    );
-    const resource = screen.getByRole('article', { name: 'Decide' });
-    expect(drawnLines(resource)).toEqual([]);
-    expect(ladder(resource)).toEqual(['Decide', 'which branch', 'and when']);
-
-    rerender(
-      <CanvasResource {...props} shape="rectangle" display={opened({ kind: 'ur', via: 'self' })} />,
-    );
-    expect(drawnLines(resource)).toEqual([]);
-    expect(ladder(resource)).toEqual(['Decide', 'which branch', 'and when']);
-  });
+  it.each(['rectangle', 'pill', 'ellipse', 'diamond'] as const)(
+    'draws the whole ladder in a %s, Open and Closed',
+    (resourceShape) => {
+      for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+        const { unmount } = render(
+          <CanvasResource {...props} shape={resourceShape} display={display} />,
+        );
+        const resource = screen.getByRole('article', { name: 'Decide' });
+        expect(ladder(resource)).toEqual(['Decide', 'which branch', 'and when']);
+        unmount();
+      }
+    },
+  );
 
   it('writes the whole Title of a Closed Resource drawn in a diamond', () => {
     render(

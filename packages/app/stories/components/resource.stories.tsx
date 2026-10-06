@@ -73,7 +73,7 @@ const THREE_LINE_TITLE = 'Strategies\nno strategy is privileged\ngrid is one mem
 
 /**
  * More Title Lines than any front draws, each long enough to wrap: the Title
- * whose short Title is wider than any Shape's inscribed rectangle.
+ * wider than any Shape's inscribed rectangle.
  */
 const OVERLONG_TITLE =
   'Why authored placement beats a layout engine\nno strategy is privileged over any other\ngrid is one member of a growing set\nand a fourth line\nand a fifth';
@@ -163,16 +163,15 @@ const RESIZED_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
  * Every Shape a Map may give an Ur Resource (ADR 0121), drawn at the Closed
  * Size and at a larger size it is resized to: the rectangle is the front's own
  * border, and every other Shape is an outline touching the midpoint of each
- * side of the Resource's rect, with the short Title — the name on one line,
- * with an ellipsis when more Title Lines follow — centred in the rectangle
- * inscribed in it. The rectangle draws the Title ladder, centred in its rect. No
+ * side of the Resource's rect, with the Title ladder centred in the rectangle
+ * inscribed in it. The rectangle draws the ladder centred in its rect. No
  * Shape draws a kind glyph: the Shape says what the Resource is.
  */
 export const ResourceShapes: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource Shapes"
-      note="Each Shape a Map may give an Ur Resource, the one kind that takes a Shape, drawn at the Closed Size with a one-line Title above a three-line one and an overlong one, and resized larger below them. A Shape is drawn alike at any size. Every outline touches the midpoint of each side of the Resource's rect, where Edges attach, and the Title sits inside it with no kind glyph, the Shape saying what the Resource is: the rectangle draws the Title ladder, and every other Shape draws the short Title on one line, ellipsised where it is too wide."
+      note="Each Shape a Map may give an Ur Resource, the one kind that takes a Shape, drawn at the Closed Size with a one-line Title above a three-line one and an overlong one, and resized larger below them. A Shape is drawn alike at any size. Every outline touches the midpoint of each side of the Resource's rect, where Edges attach, and the Title sits inside it with no kind glyph, the Shape saying what the Resource is. Every Shape draws the Title ladder, clamped to the lines its inscribed rectangle holds at the Closed Size; resizing wider gives each line more room."
     >
       <div className="inv-row">
         {RESOURCE_SHAPES.map((resourceShape) => (

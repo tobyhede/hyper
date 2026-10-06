@@ -546,18 +546,9 @@
   text-align: center;
 }
 
-/* A Shape other than the rectangle draws the short Title — the name, with an ellipsis when more
-   Title Lines follow — on one line at the `title` role, ellipsised where it is
-   wider than the inscribed rectangle. The heading and its control are held to
-   the body's width so the line has a width to ellipsise at. */
+/* The heading and its control are held to the inscribed rectangle's width,
+   so the Title Lines wrap inside the Shape. */
 .canvas-resource:not([data-resource-shape='rectangle']) .canvas-resource__title {
   min-width: 0;
   max-width: 100%;
-}
-
-.canvas-resource__title-short {
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }

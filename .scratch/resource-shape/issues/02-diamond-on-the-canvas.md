@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: 01
 
-**Superseded in part (ADR 0121, ADR 0122):** the Title is no longer clamped or truncated as described here. A Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow (`docs/agents/maps-and-graphs.md` R48). The hexagon has been dropped from the set, and only an Ur Resource takes a Shape, Open or Closed.
+**Superseded in part (ADR 0121, ADR 0122):** the Title is no longer clamped or truncated as described here. Every Shape draws the Title Lines, clamped to the lines its inscribed rectangle holds at the Closed Size (`docs/agents/maps-and-graphs.md` R48). The hexagon has been dropped from the set, and only an Ur Resource takes a Shape, Open or Closed.
 
 **What to build:** a Shape choice in the Resource's Actions menu on its rail, drawn with `ChoiceMenu`, listing the five Shapes with the current one selected; each choice completes the Edit from 01. It is offered while Open as well as Closed. A Closed Resource whose Shape is `diamond` draws a diamond inside the fixed Closed Size; its Title Lines and kind glyph lay out in the inscribed rectangle and truncate as they do now. Handles stay at the side midpoints, which the diamond touches. An Open, editing or presented Resource draws as a rectangle whatever its Shape, and the diamond returns on Close. Every other Shape still draws as the rectangle until 03.
 

@@ -699,9 +699,8 @@ test(
  * 0121): an outline reaching the midpoint of each side of the Resource's rect,
  * where Edges attach, at the Closed Size and at a larger size, and the
  * Title inside that outline, with no kind glyph: the Shape says what it is.
- * Every Shape but the rectangle leaves the rect's corner unfilled and draws the
- * short Title on one line, ellipsised where it is too wide; the rectangle draws
- * the Title ladder.
+ * Every Shape but the rectangle leaves the rect's corner unfilled, and every
+ * Shape draws the Title ladder.
  */
 test(
   'an Ur Resource draws each Shape at the Closed Size and resized, touching every side midpoint',
@@ -710,11 +709,11 @@ test(
     await page.goto('/?story=components--resource--resource-shapes&mode=preview');
 
     for (const resourceShape of RESOURCE_SHAPES) {
-      for (const [suffix, text, size] of [
-        ['one line', 'Strategies', CLOSED],
-        ['three lines', 'Strategies…', CLOSED],
-        ['overlong', 'Why authored placement beats a layout engine…', CLOSED],
-        ['resized', 'Strategies…', [440, 260]],
+      for (const [suffix, size] of [
+        ['one line', CLOSED],
+        ['three lines', CLOSED],
+        ['overlong', CLOSED],
+        ['resized', [440, 260]],
       ] as const) {
         const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
@@ -727,8 +726,6 @@ test(
           fillsCorner: resourceShape === 'rectangle',
           holdsTitle: true,
           drawsKindGlyph: false,
-          shortTitle:
-            resourceShape === 'rectangle' ? null : { text, oneLine: true, insideBody: true },
         });
       }
     }

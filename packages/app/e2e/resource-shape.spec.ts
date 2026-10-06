@@ -293,7 +293,6 @@ test(
         fillsCorner: false,
         holdsTitle: true,
         drawsKindGlyph: false,
-        shortTitle: { text: UR, oneLine: true, insideBody: true },
       });
     }
 
@@ -312,7 +311,6 @@ test(
         fillsCorner: false,
         holdsTitle: true,
         drawsKindGlyph: false,
-        shortTitle: { text: UR, oneLine: true, insideBody: true },
       });
     }
 

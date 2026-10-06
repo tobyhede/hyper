@@ -10,10 +10,7 @@ import type { Locator } from '@playwright/test';
  * asks the same of the top-left corner, which only the rectangle fills.
  * `holdsTitle` asks whether every corner of the Title's box is inside the fill,
  * and `drawsKindGlyph` whether the front draws a kind glyph at all — an Ur
- * Resource draws none, its Shape saying what it is. `shortTitle` is the short Title a Shape other
- * than the rectangle draws in place of the Title ladder — its text, whether it
- * is drawn on one line and ellipsised where it is too wide, and whether it lies
- * inside the body's content box — and null where the front draws the ladder.
+ * Resource draws none, its Shape saying what it is.
  * The rectangle draws no outline: its outline is the Resource's own border, and
  * it answers from the rect itself.
  */
@@ -24,14 +21,6 @@ export interface DrawnOutline {
   readonly fillsCorner: boolean;
   readonly holdsTitle: boolean;
   readonly drawsKindGlyph: boolean;
-  readonly shortTitle: DrawnShortTitle | null;
-}
-
-/** The short Title a Shape other than the rectangle draws. */
-export interface DrawnShortTitle {
-  readonly text: string;
-  readonly oneLine: boolean;
-  readonly insideBody: boolean;
 }
 
 /** The outline a `.canvas-resource` element draws. */
@@ -80,29 +69,6 @@ export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
         ].every(Boolean);
       })();
 
-    const body = element.querySelector('.canvas-resource__body');
-    const line = element.querySelector('.canvas-resource__title-short');
-    const shortTitle =
-      body === null || line === null
-        ? null
-        : (() => {
-            const bodyBox = body.getBoundingClientRect();
-            const box = line.getBoundingClientRect();
-            const style = getComputedStyle(line);
-            return {
-              text: line.textContent,
-              oneLine:
-                style.whiteSpace === 'nowrap' &&
-                style.textOverflow === 'ellipsis' &&
-                box.height <= Number.parseFloat(style.lineHeight) + 0.5,
-              insideBody:
-                box.left >= bodyBox.left - 0.5 &&
-                box.right <= bodyBox.right + 0.5 &&
-                box.top >= bodyBox.top - 0.5 &&
-                box.bottom <= bodyBox.bottom + 0.5,
-            };
-          })();
-
     return {
       shape: resourceShape,
       size,
@@ -110,7 +76,6 @@ export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
       fillsCorner: inside(outer.left + 2, outer.top + 2),
       holdsTitle,
       drawsKindGlyph: element.querySelector('.resource-rail__kind') !== null,
-      shortTitle,
     };
   });
 

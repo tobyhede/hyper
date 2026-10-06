@@ -230,7 +230,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResourceShapes',
     claim:
-      'An Ur Resource draws the Shape its Map gives it — rectangle, pill, ellipse or diamond — at the Closed Size and at any size it is resized to, its outline touching the midpoint of each side of its rect where Edges attach, with its Title inside the outline and no kind glyph, its Shape saying what it is; every Shape but the rectangle draws the short Title, on one line and ellipsised where it is too wide (ADR 0121).',
+      'An Ur Resource draws the Shape its Map gives it — rectangle, pill, ellipse or diamond — at the Closed Size and at any size it is resized to, its outline touching the midpoint of each side of its rect where Edges attach, with its Title inside the outline and no kind glyph, its Shape saying what it is; every Shape draws the Title ladder (ADR 0121).',
   },
   {
     id: 'ur-resource-treatments-follow-its-shape',

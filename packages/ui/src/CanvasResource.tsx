@@ -12,7 +12,6 @@ import {
   DEFAULT_RESOURCE_SHAPE,
   contentAction,
   drawsContentArea,
-  shortTitle,
   titleLines,
   titleName,
   type ContentVia,
@@ -692,7 +691,7 @@ export function CanvasResource(props: CanvasResourceProps) {
             data-editable={onBeginTitleEdit !== undefined && visibleContentEdit === null}
           >
             {onBeginTitleEdit === undefined || visibleContentEdit !== null ? (
-              <TitleHeading title={title} short={drawsOutline} />
+              <TitleHeading title={title} />
             ) : (
               // ADR 0065's one-activation control, wrapping the heading rather
               // than sitting inside it (ADR 0083).
@@ -721,7 +720,7 @@ export function CanvasResource(props: CanvasResourceProps) {
                 onPointerDown={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
               >
-                <TitleHeading title={title} short={drawsOutline} />
+                <TitleHeading title={title} />
               </Button>
             )}
           </CardTitle>
@@ -858,11 +857,6 @@ function TitleLadder({ title }: TitleLadderProps) {
   );
 }
 
-interface TitleHeadingProps extends TitleLadderProps {
-  /** Whether the front draws the short Title in place of the ladder. */
-  readonly short: boolean;
-}
-
 /**
  * The Resource's Title Lines, as the one heading the Resource front draws.
  *
@@ -874,27 +868,11 @@ interface TitleHeadingProps extends TitleLadderProps {
  *
  * It carries no `aria-label`. Its name is the Title Lines it draws, which is
  * the whole reason the control wraps it rather than the other way round.
- *
- * A Shape other than the rectangle draws the short Title instead: the
- * name on one line, with an ellipsis when more Title Lines follow. The ladder
- * stays in the heading for assistive technology, visually hidden, so the
- * heading is named by every Title Line whatever Shape the front is drawn in.
  */
-function TitleHeading({ title, short }: TitleHeadingProps) {
+function TitleHeading({ title }: TitleLadderProps) {
   return (
     <span className="canvas-resource__title-heading" role="heading" aria-level={2}>
-      {short ? (
-        <>
-          <span className="sr-only">
-            <TitleLadder title={title} />
-          </span>
-          <span className="canvas-resource__title-short" aria-hidden="true">
-            {shortTitle(title)}
-          </span>
-        </>
-      ) : (
-        <TitleLadder title={title} />
-      )}
+      <TitleLadder title={title} />
     </span>
   );
 }

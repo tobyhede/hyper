@@ -3,7 +3,7 @@
 Status: resolved
 Blocked by: 02
 
-**Superseded in part (ADR 0121, ADR 0122):** the Title is no longer clamped or truncated as described here. A Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow (`docs/agents/maps-and-graphs.md` R48). The hexagon has been dropped from the set, and only an Ur Resource takes a Shape, Open or Closed.
+**Superseded in part (ADR 0121, ADR 0122):** the Title is no longer clamped or truncated as described here. Every Shape draws the Title Lines, clamped to the lines its inscribed rectangle holds at the Closed Size (`docs/agents/maps-and-graphs.md` R48). The hexagon has been dropped from the set, and only an Ur Resource takes a Shape, Open or Closed.
 
 **What to build:** the Closed front draws `pill`, `ellipse` and `hexagon` as 02 draws `diamond`: within the fixed Closed Size, Title Lines and glyph in each Shape's inscribed rectangle, handles at the side midpoints each Shape touches.
 
