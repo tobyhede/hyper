@@ -240,6 +240,25 @@ describe('decorateSharedResourceNode', () => {
     expect(previewResize).toHaveBeenCalledWith(REFERENCE_ID, RESOURCE_SIZE);
   });
 
+  it('offers resize on every kind, Open or Closed, where the Map may be authored', () => {
+    for (const [id, kind] of [
+      [RESOURCE_ID, 'markdown'],
+      [UR_ID, 'ur'],
+    ] as const) {
+      for (const open of [false, true]) {
+        const patch = decorateSharedResourceNode(projectionNode(id, kind, open), context());
+        expect(patch.resize?.minWidth).toBe(RESOURCE_SIZE.width);
+        expect(patch.resize?.minHeight).toBe(RESOURCE_SIZE.height);
+      }
+    }
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(RESOURCE_ID, 'markdown'),
+        context({ authorOnCanvas: false }),
+      ).resize,
+    ).toBeUndefined();
+  });
+
   it('attaches the title editor only to the Resource holding the caret', () => {
     const patch = decorateSharedResourceNode(
       projectionNode(RESOURCE_ID, 'reference'),

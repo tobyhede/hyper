@@ -377,45 +377,61 @@ Drag.meta = { iframed: true };
 /** A specimen that keeps its own size in state, so a real drag on the real
  *  production control actually grows the real node — the round trip
  *  `SpaceCanvas` makes through Space Authoring, condensed to local state. */
-function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boolean }) {
+function ResizableSpecimen({
+  open = false,
+  selected = true,
+  resourceShape,
+}: {
+  readonly open?: boolean;
+  readonly selected?: boolean;
+  readonly resourceShape?: ResourceShape;
+}) {
   const [size, setSize] = useState({ width: 480, height: 360 });
   return (
     <CanvasResourceNodeSpecimen
-      open
+      open={open}
       selected={selected}
       nodeSize={size}
       onResize={setSize}
       stageClassName="inv-resource-node-stage--large"
+      resourceShape={resourceShape}
     />
   );
 }
 
 /**
- * Every Open Resource exposes one bottom-right resize control, revealed by hover,
- * Selection or focus; a Closed Resource exposes none (ADR 0066). Both specimens
- * mount the real production `ResourceNode` through the real `nodeTypes`, so what
- * is proved here is the shared Resource control rather than a facsimile of it.
+ * A selected Resource, Open or Closed, exposes one bottom-right resize control,
+ * and an unselected one exposes none (ADR 0122). A selected Shape other than the
+ * rectangle draws a thin frame at its rect, so the control sits on its corner.
+ * Every specimen mounts the real production `ResourceNode` through the real
+ * `nodeTypes`, so what is proved here is the shared Resource control rather than
+ * a facsimile of it.
  */
 export const ResizeControl: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resize control"
-      note="Hover, select or focus the Open Resource to reveal its bottom-right control, then drag it. The Closed Resource beside it offers none."
+      note="A selected Resource, Open or Closed, offers its bottom-right control; drag it. An unselected Resource offers none, and a selected Shape frames its rect so the control sits on its corner."
     >
       <div className="inv-row">
-        <Specimen label="Open · resizable">
-          <section aria-label="Open Resource">
-            <ResizableOpenSpecimen />
-          </section>
-        </Specimen>
         <Specimen label="Open · Selected">
-          <section aria-label="Selected Resource">
-            <ResizableOpenSpecimen selected />
+          <section aria-label="Open Resource">
+            <ResizableSpecimen open />
           </section>
         </Specimen>
-        <Specimen label="Closed · no control">
+        <Specimen label="Closed · Selected">
           <section aria-label="Closed Resource">
-            <CanvasResourceNodeSpecimen />
+            <ResizableSpecimen />
+          </section>
+        </Specimen>
+        <Specimen label="Unselected · no control">
+          <section aria-label="Unselected Resource">
+            <ResizableSpecimen open selected={false} />
+          </section>
+        </Specimen>
+        <Specimen label="diamond · Selected">
+          <section aria-label="Selected Shape">
+            <ResizableSpecimen resourceShape="diamond" />
           </section>
         </Specimen>
       </div>

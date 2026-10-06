@@ -244,12 +244,13 @@ test(
 );
 
 test(
-  'every Open Resource exposes one bottom-right resize control, revealed by hover, Selection or focus; a Closed Resource exposes none',
-  { tag: '@parity:open-resource-offers-one-resize-control' },
+  'a selected Resource, Open or Closed, exposes one bottom-right resize control; an unselected Resource exposes none',
+  { tag: '@parity:selected-resource-offers-one-resize-control' },
   async ({ page }) => {
     await page.goto(resizeControlStory);
     const openRegion = page.getByRole('region', { name: 'Open Resource', exact: true });
     const closedRegion = page.getByRole('region', { name: 'Closed Resource', exact: true });
+    const unselectedRegion = page.getByRole('region', { name: 'Unselected Resource' });
     await expect(openRegion.getByRole('article', { name: 'Strategies' })).toBeVisible({
       timeout: 20_000,
     });
@@ -258,30 +259,14 @@ test(
     await expect(openControl).toHaveCount(1);
     await expect(openControl).toHaveClass(/\bbottom\b/);
     await expect(openControl).toHaveClass(/\bright\b/);
-    await expect(closedRegion.locator('.react-flow__resize-control')).toHaveCount(0);
+    await expect(closedRegion.locator('.react-flow__resize-control')).toHaveCount(1);
+    await expect(unselectedRegion.locator('.react-flow__resize-control')).toHaveCount(0);
 
-    // Three independent reveals, each asserted rather than assumed from the
-    // one that is easiest to drive (ADR 0066). Hover is pointer discovery;
-    // Selection holds the control for touch, which has no hover to give; and
-    // Resource focus offers the keyboard the same authoring affordance.
+    // Selection is the reveal: the control stays up with the pointer away.
     await page.mouse.move(0, 0);
-    await expect(openControl).toHaveCSS('opacity', '0');
-
-    await openRegion.getByRole('article', { name: 'Strategies' }).hover();
     await expect(openControl).toHaveCSS('opacity', '1');
-
-    const selectedRegion = page.getByRole('region', { name: 'Selected Resource' });
-    const selectedControl = selectedRegion.locator('.react-flow__resize-control');
-    await page.mouse.move(0, 0);
-    await expect(selectedControl).toHaveCSS('opacity', '1');
-
-    await page.mouse.move(0, 0);
-    await expect(openControl).toHaveCSS('opacity', '0');
-    await page.keyboard.press('Tab');
-    await openRegion.locator('.react-flow__node').focus();
-    await expect(openControl).toHaveCSS('opacity', '1');
-
-    await openRegion.getByRole('article', { name: 'Strategies' }).hover();
+    await expect(closedRegion.locator('.react-flow__resize-control')).toHaveCSS('opacity', '1');
+    await expect(openRegion.locator('.rf-resource-node__resize-frame')).toHaveCount(0);
 
     const node = openRegion.locator('.react-flow__node');
     const before = await node.boundingBox();
@@ -331,6 +316,30 @@ test(
     expect(after.height).toBeGreaterThan(before.height);
     expect(after.x).toBeCloseTo(before.x, 0);
     expect(after.y).toBeCloseTo(before.y, 0);
+  },
+);
+
+test(
+  'a selected Shape frames its rect, and its resize control sits on the frame’s bottom-right corner',
+  { tag: '@parity:selected-shape-frames-its-rect-for-resize' },
+  async ({ page }) => {
+    await page.goto(resizeControlStory);
+    const region = page.getByRole('region', { name: 'Selected Shape' });
+    const resource = region.getByRole('article', { name: 'Strategies' });
+    await expect(resource).toBeVisible({ timeout: 20_000 });
+    await expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+
+    const frame = region.locator('.rf-resource-node__resize-frame');
+    await expect(frame).toHaveCount(1);
+    await expect(frame).toHaveCSS('border-top-width', '1px');
+    const node = await region.locator('.react-flow__node').boundingBox();
+    const frameBox = await frame.boundingBox();
+    const mark = await region.locator('.rf-resource-node__resize-mark').boundingBox();
+    if (node === null || frameBox === null || mark === null)
+      throw new Error('The selected Shape draws no frame, mark or node.');
+    expect(frameBox).toEqual(node);
+    expect(mark.x + mark.width - (frameBox.x + frameBox.width)).toBe(5);
+    expect(mark.y + mark.height - (frameBox.y + frameBox.height)).toBe(5);
   },
 );
 

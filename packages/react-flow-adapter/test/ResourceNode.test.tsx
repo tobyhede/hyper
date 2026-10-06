@@ -218,6 +218,7 @@ interface Overrides {
   resize?: ResourceNodeData['resize'];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
+  resourceShape?: ResourceNodeData['shape'];
 }
 
 /** What the projection resolves for a fixture Resource of `kind`. */
@@ -276,10 +277,11 @@ function props({
   resize,
   readOnly = false,
   connectionAuthoringEnabled,
+  resourceShape = 'rectangle',
 }: Overrides = {}): NodeProps<ResourceFlowNode> {
   const resolved = content ?? ownContent(kind, source, url);
   const data: ResourceFlowNode['data'] = {
-    shape: 'rectangle',
+    shape: resourceShape,
     resourceId,
     title,
     kind,
@@ -1396,7 +1398,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     // One control, not React Flow's eight — a bottom-right-only control cannot
     // move the authored origin by construction, so there is nothing else to draw.
@@ -1417,7 +1419,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.blur(window);
@@ -1435,7 +1437,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.blur(window);
@@ -1460,7 +1462,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     // The press is the gesture: geometry is proposed only from a drag this Resource
     // started, so a move without it proves nothing about the live one.
@@ -1480,7 +1482,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.pointerUp(window);
@@ -1488,7 +1490,7 @@ describe('ResourceNode Open Resource front', () => {
     expect(onResizeEnd).toHaveBeenCalledOnce();
   });
 
-  it('offers no resize control on a Collapsed Resource', () => {
+  it('offers the resize control on a selected Resource, Open or Closed, and none on an unselected one', () => {
     const resize = {
       minWidth: 260,
       minHeight: 146,
@@ -1497,10 +1499,48 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ source: SOURCE, resize })} />);
+    const { rerender } = render(
+      <ResourceNode {...props({ selected: true, source: SOURCE, resize })} />,
+    );
+    expect(screen.getByTestId('resize-control')).toHaveClass('bottom', 'right');
 
-    // A Collapsed Resource has no box the author drew, so nothing to resize.
+    rerender(<ResourceNode {...props({ selectedForAuthoring: true, source: SOURCE, resize })} />);
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
+
+    rerender(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
     expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
+
+    rerender(<ResourceNode {...props({ source: SOURCE, resize })} />);
+    expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
+
+    rerender(
+      <ResourceNode {...props({ selected: true, readOnly: true, source: SOURCE, resize })} />,
+    );
+    expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
+  });
+
+  it('frames a selected Shape at its rect with the resize control, and leaves the rectangle unframed', () => {
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    const frame = () => document.querySelector('.rf-resource-node__resize-frame');
+    const { rerender } = render(
+      <ResourceNode {...props({ kind: 'ur', resourceShape: 'diamond', selected: true, resize })} />,
+    );
+    expect(frame()).not.toBeNull();
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
+
+    rerender(<ResourceNode {...props({ kind: 'ur', resourceShape: 'diamond', resize })} />);
+    expect(frame()).toBeNull();
+
+    rerender(<ResourceNode {...props({ kind: 'ur', selected: true, resize })} />);
+    expect(frame()).toBeNull();
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
   });
 
   it('offers no resize control on an Open Resource the composition gave no resize operation', () => {
@@ -1519,10 +1559,9 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ kind: 'reference', open: true, resize })} />);
+    render(<ResourceNode {...props({ kind: 'reference', open: true, selected: true, resize })} />);
 
-    // The resize gate reads Open and never the kind: ADR 0066 makes resize
-    // Resource behaviour, not kind behaviour.
+    // The resize gate never reads the kind: resize is Resource behaviour.
     expect(screen.getByTestId('resize-control')).toBeInTheDocument();
   });
 
@@ -1535,7 +1574,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     // The control owns the hit target's upper layer. The inert mark is its
     // preceding sibling so the later Resource face can occlude their overlap.

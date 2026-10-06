@@ -175,12 +175,10 @@ body {
 
    The control is the hit target and the mark is only what it draws, and the
    whole interactive box stays inside the Resource: `translate` is overridden rather
-   than left as React Flow's centring of the box on the corner it resizes from.
-   Centred, three quarters of the target lay over the pane while `opacity` kept
-   it invisible, and hover is no answer to a pointer that has none — a touch
-   beside an unselected Open Resource's bottom-right corner began a resize on a
-   control nothing had revealed. The inert mark keeps its corner anchor; its
-   visual adjustment is CSS-only and changes no layout or interaction geometry.
+   than left as React Flow's centring of the box on the corner it resizes from,
+   so no part of the target lies over the pane. The inert mark keeps its corner
+   anchor; its visual adjustment is CSS-only and changes no layout or interaction
+   geometry.
 
    Anchoring it inside is what makes `z-index` load-bearing. The control is
    rendered before the Resource so `canvas-resource.css` can reach the authoring handles
@@ -189,15 +187,8 @@ body {
    press landed on the Resource body instead. It takes the same layer the authoring
    handles take, for the same reason.
 
-   `pointer-events` is gated on reveal, as the authoring handles gate theirs.
-   Against the centred box that deadlocked the gesture outright — a pointer
-   arriving on the overhang hit the pane, the Resource stopped being hovered, and
-   the control the hover was revealing was withheld from under it, so
-   `onResizeStart` never fired. Inside the Resource the gate cannot do that: being
-   on the control is being on the Resource, so the hover the reveal reads is already
-   true. What the gate buys is the corner back — invisible and always grabbable,
-   it would otherwise swallow every press on the Resource's own bottom-right, the
-   caret included. */
+   `pointer-events` is gated on reveal, as the authoring handles gate theirs, so
+   a Resource being dragged does not swallow presses on its own bottom-right. */
 .rf-resource-node__inner .react-flow__resize-control.rf-resource-node__resize-control {
   z-index: 1;
   width: 48px;
@@ -234,41 +225,35 @@ body {
   transition: opacity 100ms ease;
 }
 
-/* Hover discovers the control, Selection keeps it stable for touch (no hover
-   state to reveal it), and keyboard-visible Resource focus offers the same authoring
-   affordance — three independent ways an Open Resource is "in play" (ADR 0122).
-   Pointer focus alone must not keep the control up after Open/Close and departure.
-   Hover and focus are read off `.react-flow__node`, the element React Flow
-   itself makes hoverable and focusable; Selected is read off `data-selected`,
-   which only `.rf-resource-node__inner` carries.
-
-   Every one of the three is gated on `data-dragging`, for the reason the anchors
-   below are: moving a Resource satisfies all three at once — the pointer stays on
-   the Resource it carries and React Flow Selects it — so a Resource being carried
-   would otherwise offer the corner that resizes it. Stating the condition on
-   each arm keeps it where the reveal is decided rather than in a second rule
-   racing this one on specificity, as `data-resizing` already is. */
-.react-flow__node:hover
-  .rf-resource-node__inner[data-dragging='false']
-  .react-flow__resize-control.rf-resource-node__resize-control,
+/* The control is mounted only on a selected Resource (`ResourceNode`), so
+   Selection is its one reveal (ADR 0122). It is gated on `data-dragging`
+   because moving a Resource Selects it, and a Resource being carried would
+   otherwise offer the corner that resizes it. */
 .rf-resource-node__inner[data-selected='true'][data-dragging='false']
-  .react-flow__resize-control.rf-resource-node__resize-control,
-.react-flow__node:is(:focus-visible, :has(:focus-visible))
-  .rf-resource-node__inner[data-dragging='false']
   .react-flow__resize-control.rf-resource-node__resize-control {
   opacity: 1;
   pointer-events: auto;
 }
 
-.react-flow__node:hover
-  .rf-resource-node__inner[data-dragging='false']
-  .rf-resource-node__resize-mark,
 .rf-resource-node__inner[data-selected='true'][data-dragging='false']
-  .rf-resource-node__resize-mark,
-.react-flow__node:is(:focus-visible, :has(:focus-visible))
-  .rf-resource-node__inner[data-dragging='false']
   .rf-resource-node__resize-mark {
   opacity: 1;
+}
+
+/* A selected Shape other than the rectangle draws its rect as a thin frame, so
+   the resize control sits on a drawn corner. It is the rect the Map authored,
+   not a second outline, and it takes no pointer. */
+.rf-resource-node__resize-frame {
+  --resize-frame-border-width: 1px;
+
+  position: absolute;
+  inset: 0;
+  border: var(--resize-frame-border-width) solid var(--canvas-resource-ink-color);
+  pointer-events: none;
+}
+
+.rf-resource-node__inner[data-dragging='true'] .rf-resource-node__resize-frame {
+  display: none;
 }
 
 .new-resource-preview {

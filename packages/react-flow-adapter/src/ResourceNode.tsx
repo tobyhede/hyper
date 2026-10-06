@@ -285,8 +285,8 @@ export function ResourceNode({
    * first arm, because the projection has already decided that a presented
    * Resource is presented whether or not it is Open.
    *
-   * `data.open` is the Map's authored geometry: the resize control and the
-   * node's `data-open` read it, and nothing drawn does.
+   * `data.open` is the Map's authored Open state: the node's `data-open`
+   * publishes it, and nothing drawn here reads it.
    */
   const resize = data.resize;
   const resizeOperation = useRef(resize);
@@ -451,11 +451,10 @@ export function ResourceNode({
       data-drag-tilted={data.dragTilted === true}
     >
       {/*
-        React Flow's own bottom-right resize control, revealed on an Open Resource
-        by hover, Selection or focus rather than drawn only once selected. An
-        Open Resource is whatever box the author drew — there is no ratio on it,
-        because the closed Resource is what keeps the silhouette that predicts
-        what an audience sees (ADR 0064).
+        React Flow's own bottom-right resize control, drawn on a selected
+        Resource, Open or Closed, of any kind (ADR 0122). A Shape other than the
+        rectangle draws a thin frame at its rect with it, so the control sits on
+        that frame's corner rather than beside an outline that does not reach it.
 
         Rendered *before* the Resource, which is not cosmetic: `canvas-resource.css`
         keeps the Resource's hover treatment alive while the pointer is on an
@@ -464,8 +463,11 @@ export function ResourceNode({
         those handles would be invisible to that rule; anything before the Resource
         is harmless to it.
       */}
-      {!data.readOnly && open && resize !== undefined && (
+      {!data.readOnly && visuallySelected && resize !== undefined && (
         <>
+          {data.shape !== 'rectangle' && (
+            <span className="rf-resource-node__resize-frame" aria-hidden="true" />
+          )}
           <span
             className="rf-resource-node__resize-mark"
             style={{

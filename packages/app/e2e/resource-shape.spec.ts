@@ -386,3 +386,58 @@ test(
       });
   },
 );
+
+test(
+  'a selected Shape frames its rect with the resize control on its corner, and resizing it Closed keeps it Closed',
+  { tag: '@parity:selected-shape-frames-its-rect-for-resize' },
+  async ({ page }) => {
+    const ur = await seedResizedUr(page);
+    const control = ur.locator('.react-flow__resize-control.handle.bottom.right');
+    const frame = ur.locator('.rf-resource-node__resize-frame');
+    // Unselected, the Resource offers no control and draws no frame.
+    await page.mouse.move(1, 1);
+    await expect(ur).not.toHaveClass(/\bselected\b/);
+    await expect(control).toHaveCount(0);
+    await expect(frame).toHaveCount(0);
+
+    await chooseResourceShape(page, ur, 'Diamond', 'diamond');
+    await expect(face(ur)).toHaveAttribute('data-state', 'selected');
+    await expect(frame).toHaveCount(1);
+    await expect(frame).toHaveCSS('border-top-width', '1px');
+    await expect(control).toHaveCount(1);
+    await expect(control).toHaveCSS('opacity', '1');
+
+    // The frame is the rect, and the control's mark sits on its bottom-right corner.
+    const nodeBox = await ur.boundingBox();
+    const frameBox = await frame.boundingBox();
+    const controlBox = await control.boundingBox();
+    if (nodeBox === null || frameBox === null || controlBox === null)
+      throw new Error('The selected Shape draws no frame or control.');
+    expect(frameBox.x).toBeCloseTo(nodeBox.x, 0);
+    expect(frameBox.y).toBeCloseTo(nodeBox.y, 0);
+    expect(frameBox.width).toBeCloseTo(nodeBox.width, 0);
+    expect(frameBox.height).toBeCloseTo(nodeBox.height, 0);
+    expect(controlBox.x + controlBox.width).toBeCloseTo(frameBox.x + frameBox.width, 0);
+    expect(controlBox.y + controlBox.height).toBeCloseTo(frameBox.y + frameBox.height, 0);
+
+    const status = page.getByTestId('persistence-status');
+    const before = Number(await status.getAttribute('data-revision'));
+    await page.mouse.move(
+      controlBox.x + controlBox.width / 2,
+      controlBox.y + controlBox.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      controlBox.x + controlBox.width / 2 + 120,
+      controlBox.y + controlBox.height / 2 + 80,
+      { steps: 6 },
+    );
+    await page.mouse.up();
+    await expect(status).toHaveAttribute('data-revision', String(before + 1));
+    await placementSettled(ur);
+    const [width, height] = await drawnSize(ur);
+    expect(width).toBeGreaterThan(RESIZED[0]);
+    expect(height).toBeGreaterThan(RESIZED[1]);
+    await expect(ur.locator('.rf-resource-node__inner')).toHaveAttribute('data-open', 'false');
+  },
+);

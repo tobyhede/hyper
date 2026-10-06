@@ -1090,8 +1090,8 @@ test(
 );
 
 test(
-  'an Open Resource offers one resize control, revealed on hover, that selects the Resource and clears a Selected Edge without a second Edit',
-  { tag: '@parity:open-resource-offers-one-resize-control' },
+  'a selected Open Resource offers one resize control, and an unselected one offers none',
+  { tag: '@parity:selected-resource-offers-one-resize-control' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
@@ -1119,34 +1119,22 @@ test(
     const edgePath = page.locator('.react-flow__edge-path').first();
     const beforeEdgePath = await edgePath.getAttribute('d');
 
-    // A Closed Resource offers no control at all.
-    await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
-
-    // Select an Edge first, which leaves the Resource unselected, so the gesture
-    // below is proven to move both — not merely to arrive with the Resource
-    // already Selected from an earlier click. `openResource` Selected it, to draw
-    // the toolbar its Open is on (ADR 0102), and Selection is also a reveal
-    // condition for the control.
+    // An unselected Resource offers no control, Open or Closed. Selecting an
+    // Edge leaves every Resource unselected.
     await selectAnEdge(page);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
+    await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
+    await expect(resource.locator('.react-flow__resize-control')).toHaveCount(0);
 
-    // The Open Resource offers exactly one, at its bottom-right corner, and it is
-    // not visible until hovered — the actual reveal mechanism. Keyboard focus on
-    // the Resource is *also* a reveal condition, so focus is moved off first to
-    // observe rest.
+    // Selected, the Open Resource offers exactly one, at its bottom-right
+    // corner, and it stays revealed with the pointer away.
+    await selectResource(resource);
+    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
     const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
     await expect(resource.locator('.react-flow__resize-control')).toHaveCount(1);
-    await page.evaluate(() => {
-      const focused = document.activeElement;
-      if (focused instanceof HTMLElement) focused.blur();
-    });
     await page.mouse.move(0, 0);
-    await expect(control).toHaveCSS('opacity', '0');
-    await resource.hover();
     await expect(control).toHaveCSS('opacity', '1');
-    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
-    await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
 
     const box = await boxOf(control, "Resource A's resize control");
     // A hit target a hand can find. React Flow's own two-class `.handle` rule
@@ -1212,8 +1200,8 @@ test(
 
     await page.mouse.up();
 
-    // One drag both Selected the Resource and cleared the Selected Edge — no
-    // separate click, and Selection was never a second Edit.
+    // The Resource stays Selected through the gesture, and Selection was never
+    // a second Edit.
     await expect(resource).toHaveClass(/selected/);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
     await expect(persistence).toHaveText('Persisted');

@@ -156,11 +156,18 @@ export const parityClaims: readonly ParityClaim[] = [
       'The production CanvasResource fills a React Flow node whose authored rect differs from the collapsed default.',
   },
   {
-    id: 'open-resource-offers-one-resize-control',
+    id: 'selected-resource-offers-one-resize-control',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResizeControl',
     claim:
-      'Every Open Resource exposes one bottom-right resize control revealed by hover, selection or focus, and a Closed Resource exposes none.',
+      'A selected Resource, Open or Closed, exposes one bottom-right resize control, and an unselected Resource exposes none.',
+  },
+  {
+    id: 'selected-shape-frames-its-rect-for-resize',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'ResizeControl',
+    claim:
+      'A selected Resource in a Shape other than the rectangle draws a thin frame at its rect, and its resize control sits on that frame’s bottom-right corner.',
   },
   {
     id: 'active-resource-resize-tracks-pointer-without-dimension-animation',

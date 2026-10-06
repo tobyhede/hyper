@@ -210,9 +210,10 @@ export function decorateSharedResourceNode(
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);
   }
-  if (resourceBelongsToWorkingSpace && node.data.open === true && context.authorOnCanvas) {
-    // The Closed Size is the one floor for every kind, Open or Closed; the
-    // control's own minimum keeps a proposal at or above it.
+  if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
+    // Every kind resizes, Open or Closed (ADR 0122); `ResourceNode` draws the
+    // control only while the Resource is selected. The Closed Size is the one
+    // floor, and the control's own minimum keeps a proposal at or above it.
     patch.resize = {
       minWidth: RESOURCE_SIZE.width,
       minHeight: RESOURCE_SIZE.height,
