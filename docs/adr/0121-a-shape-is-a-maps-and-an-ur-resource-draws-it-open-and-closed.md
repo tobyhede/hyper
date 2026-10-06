@@ -32,6 +32,7 @@ An embedded Map draws its Ur Resources' Shapes, Open or Closed, because one surf
 - **A Shape fixed by kind.** Rejected: an Ur Resource is a decision in one diagram and a step in another, so its Shape is chosen per Map rather than given by its kind.
 - **A Shape changes the Closed Size**, for example a square for a circle. Rejected: displacement, Edge attachment and the fixed Closed Size would all have to depend on the Shape, for a difference an ellipse in the same rect already shows.
 - **Only a Closed Resource draws its Shape.** Rejected: a diagram could not hold a large diamond, an ellipse sized to its label or a pill stretched across a lane, and Opening would change the notation. The reason first given for it — that content needs the rectangle — no longer applies once only the contentless Ur Resource takes a Shape.
+- **A hexagon in the set.** It meets the side-midpoint rule, and was dropped from the set during the build. No reason was recorded for dropping it.
 - **An open set**, such as a free corner radius or an arbitrary path. Rejected: Edges could no longer be guaranteed to meet the outline, and the set would stop being notation a reader can learn.
 - **The Shape is required on every entry, and Add writes the rectangle.** Rejected: a field is optional and the application chooses its default, as `headShape` is (ADR 0105). Requiring it would put notation only an Ur Resource uses on every entry of every kind, in every fixture, seed and hand-written file.
 
