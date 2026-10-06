@@ -1,29 +1,28 @@
-import { COLLAPSED_RESOURCE_SIZE } from '@project/core';
+import { COLLAPSED_RESOURCE_SIZE, encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {
   authoringHandle,
-  boxOf,
   connectHandles,
   createResource,
   dragBy,
   nodeByTitle,
-  openResource,
   positionOf,
   resourceActions,
   resourceControls,
   resourceShapeChoice,
   selectCanvas,
+  selectedCanvas,
   settled,
-  viewportTransform,
 } from './graph';
+import { seedPositionedMap } from './seed';
 import { drawnOutline, outlineTreatment } from './resource-shape-outline';
 
 /**
- * An Ur Resource's Shape (ADR 0121): chosen from its rail and drawn at
- * the Resource's rect Open and Closed alike — at the fixed Closed Size, and at
- * whatever Open Size it is resized to. Only an Ur Resource takes a Shape, so
- * each test creates one; the fixture's Markdown Resources offer no Shape
- * choice.
+ * An Ur Resource's Shape (ADR 0121): chosen from its rail and drawn at the
+ * Resource's rect — at the Closed Size, and at whatever size it is resized to.
+ * Only an Ur Resource takes a Shape, so each test creates or seeds one; the
+ * fixture's Markdown Resources offer no Shape choice. An Ur Resource has no
+ * content, so it is never Open.
  */
 
 const LONG = '00000000-0000-4000-8000-000000000023';
@@ -62,7 +61,7 @@ async function createUr(page: Page): Promise<Locator> {
   return ur;
 }
 
-/** Open U's Shape choice from its rail, Open or Closed alike. */
+/** Open U's Shape choice from its rail. */
 const resourceShapeChoiceOfUr = (page: Page): Promise<Locator> =>
   resourceShapeChoice(page, nodeByTitle(page, UR).first());
 
@@ -129,25 +128,31 @@ const placementSettled = (node: Locator): Promise<void> =>
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
   });
 
-/**
- * Drag an Open Resource's resize control by a canvas-unit delta, scaled through
- * the current zoom, and release it.
- */
-async function resizeBy(page: Page, node: Locator, dx: number, dy: number): Promise<void> {
-  const control = node.locator('.react-flow__resize-control.handle.bottom.right');
-  await node.hover();
-  const box = await boxOf(control, 'the resize control');
-  const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
-  const from = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move(from.x + dx * zoom, from.y + dy * zoom, { steps: 8 });
-  await page.mouse.up();
-  await placementSettled(node);
+/** An Ur Resource seeded at a size an author resized it to. */
+const RESIZED_UR = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
+const RESIZED = [440, 260] as const;
+
+/** Open a Space whose seeded Map holds one Ur Resource `U`, resized and Closed. */
+async function seedResizedUr(page: Page): Promise<Locator> {
+  const seeded = await seedPositionedMap(
+    page,
+    'Shapes',
+    () => ({
+      [RESIZED_UR]: { x: 0, y: 0, open: false, size: { width: RESIZED[0], height: RESIZED[1] } },
+    }),
+    [{ id: RESIZED_UR, document: { title: UR, kind: 'ur' } }],
+  );
+  await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
+  await expect(selectedCanvas(page)).toContainText('Shapes');
+  await settled(page);
+  const ur = nodeByTitle(page, UR).first();
+  await expect(face(ur)).toHaveAttribute('data-kind', 'ur');
+  await placementSettled(ur);
+  return ur;
 }
 
 test(
-  'a Diamond chosen from an Ur Resource’s rail is drawn Closed, kept on reload, and still a diamond while Open',
+  'a Diamond chosen from an Ur Resource’s rail is drawn, kept on reload, and the Resource offers no Open',
   { tag: '@parity:ur-resource-shape-chosen-from-its-rail' },
   async ({ page }) => {
     const ur = await createUr(page);
@@ -196,23 +201,16 @@ test(
     const reloaded = nodeByTitle(page, UR).first();
     await expect(face(reloaded)).toHaveAttribute('data-resource-shape', 'diamond');
 
-    // Offered Open as well as Closed, with the recorded Shape still chosen.
-    await openResource(reloaded, UR);
-    await expect(face(reloaded)).toHaveAttribute('data-open', 'true');
-    await expect(face(reloaded)).toHaveAttribute('data-resource-shape', 'diamond');
-    await expect(reloaded.locator('.canvas-resource__outline')).toHaveCount(1);
-    const openResourceShapes = await resourceShapeChoiceOfUr(page);
-    await expect(chosenResourceShape(openResourceShapes)).toHaveText('Diamond');
+    // The recorded Shape is still chosen, and an Ur Resource, having no content,
+    // offers no Open.
+    const reloadedResourceShapes = await resourceShapeChoiceOfUr(page);
+    await expect(chosenResourceShape(reloadedResourceShapes)).toHaveText('Diamond');
     await page.keyboard.press('Escape');
-    await page.keyboard.press('Escape');
-
-    await (
-      await resourceControls(page, reloaded)
-    )
-      .getByRole('button', { name: `Close Resource ${UR}` })
-      .click();
+    const reloadedControls = await resourceControls(page, reloaded);
+    await expect(reloadedControls.getByRole('button', { name: `Open Resource ${UR}` })).toHaveCount(
+      0,
+    );
     await expect(face(reloaded)).toHaveAttribute('data-open', 'false');
-    await expect(face(reloaded)).toHaveAttribute('data-resource-shape', 'diamond');
   },
 );
 
@@ -280,7 +278,7 @@ test('an Edge drawn to a Closed diamond meets its outline', async ({ page }) => 
 });
 
 test(
-  'each Shape is drawn Closed at the Closed Size and Open at the size it is resized to, touching every side midpoint',
+  'each Shape is drawn at the Closed Size and at the size it is resized to, touching every side midpoint',
   { tag: '@parity:ur-resource-draws-its-shape' },
   async ({ page }) => {
     const ur = await createUr(page);
@@ -299,24 +297,17 @@ test(
       });
     }
 
-    // Opened and resized, the Shape is drawn at the size the author dragged to.
+    // Resized, the Shape is drawn at the size the Map gives it.
     await page.keyboard.press('Escape');
-    await openResource(ur, UR);
-    await expect(face(ur)).toHaveAttribute('data-open', 'true');
-    await placementSettled(ur);
-    await resizeBy(page, ur, 180, 110);
-    const [openWidth, openHeight] = await drawnSize(ur);
-    expect(openWidth).toBeGreaterThan(COLLAPSED_RESOURCE_SIZE.width + 100);
-    expect(openHeight).toBeGreaterThan(COLLAPSED_RESOURCE_SIZE.height + 60);
-
+    const resized = await seedResizedUr(page);
+    expect(await drawnSize(resized)).toEqual(RESIZED);
     for (const [name, resourceShape] of DRAWN_RESOURCE_SHAPES) {
-      await chooseResourceShape(page, ur, name, resourceShape);
+      await chooseResourceShape(page, resized, name, resourceShape);
       await page.keyboard.press('Escape');
-      await expect(face(ur)).toHaveAttribute('data-open', 'true');
-      await expect.poll(() => outlineOffset(ur)).toBeLessThan(0.5);
-      expect(await drawnOutline(face(ur)), `${name} · open`).toEqual({
+      await expect.poll(() => outlineOffset(resized)).toBeLessThan(0.5);
+      expect(await drawnOutline(face(resized)), `${name} · resized`).toEqual({
         shape: resourceShape,
-        size: [openWidth, openHeight],
+        size: RESIZED,
         touchesSideMidpoints: true,
         fillsCorner: false,
         holdsTitle: true,
@@ -325,72 +316,20 @@ test(
       });
     }
 
-    // Close returns it to the same Shape at the Closed Size.
-    await (
-      await resourceControls(page, ur)
-    )
-      .getByRole('button', { name: `Close Resource ${UR}` })
-      .click();
-    await expect(face(ur)).toHaveAttribute('data-open', 'false');
-    await placementSettled(ur);
-    await expect
-      .poll(() => drawnSize(ur))
-      .toEqual([COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height]);
-    expect((await drawnOutline(face(ur))).shape).toBe('diamond');
-    expect((await drawnOutline(face(ur))).touchesSideMidpoints).toBe(true);
-
     await page.reload();
-    await selectCanvas(page, 'Collection 1');
-    await expect(face(nodeByTitle(page, UR).first())).toHaveAttribute(
-      'data-resource-shape',
-      'diamond',
-    );
+    const reloaded = nodeByTitle(page, UR).first();
+    await expect(face(reloaded)).toHaveAttribute('data-resource-shape', 'diamond');
+    await expect.poll(() => drawnSize(reloaded)).toEqual(RESIZED);
   },
 );
 
-test('an Open diamond resized back into the Closed Size Closes, still a diamond', async ({
-  page,
-}) => {
-  const ur = await createUr(page);
-  await chooseResourceShape(page, ur, 'Diamond', 'diamond');
-  await page.keyboard.press('Escape');
-  await openResource(ur, UR);
-  await expect(face(ur)).toHaveAttribute('data-open', 'true');
-  await placementSettled(ur);
-
-  const [openWidth, openHeight] = await drawnSize(ur);
-  const status = page.getByTestId('persistence-status');
-  await expect(status).toHaveText('Persisted');
-  const before = Number(await status.getAttribute('data-revision'));
-  // Within the magnetic range of the Closed Size on both axes.
-  await resizeBy(
-    page,
-    ur,
-    COLLAPSED_RESOURCE_SIZE.width + 10 - openWidth,
-    COLLAPSED_RESOURCE_SIZE.height + 10 - openHeight,
-  );
-
-  await expect(face(ur)).toHaveAttribute('data-open', 'false');
-  await expect(face(ur)).toHaveAttribute('data-resource-shape', 'diamond');
-  await expect(status).toHaveAttribute('data-revision', String(before + 1));
-  await expect
-    .poll(() => drawnSize(ur))
-    .toEqual([COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height]);
-  expect(await drawnOutline(face(ur))).toMatchObject({
-    shape: 'diamond',
-    touchesSideMidpoints: true,
-    holdsTitle: true,
-    drawsKindGlyph: false,
-  });
-});
-
 /**
- * The selection ring follows the outline, Open and Closed. A Reference Resource
+ * The selection ring follows the outline, at any size. A Reference Resource
  * made from an Ur Resource in a Shape is not an Ur Resource, so it is the
  * rectangle and offers no Shape.
  */
 test(
-  "a Shape's selection ring follows its outline Open and Closed, and a Reference Resource made from it is the rectangle",
+  "a Shape's selection ring follows its outline at any size, and a Reference Resource made from it is the rectangle",
   { tag: '@parity:ur-resource-treatments-follow-its-shape' },
   async ({ page }) => {
     const ur = await createUr(page);
@@ -413,20 +352,6 @@ test(
       });
     await page.keyboard.press('Escape');
 
-    // Open and selected, the ring is still the diamond's.
-    await openResource(ur, UR);
-    await expect(face(ur)).toHaveAttribute('data-open', 'true');
-    await expect(face(ur)).toHaveAttribute('data-state', 'selected');
-    await placementSettled(ur);
-    await expect
-      .poll(() => outlineTreatment(face(ur)))
-      .toEqual({
-        ringShown: true,
-        ringFollowsOutline: true,
-        edge: 'solid',
-        rectBorder: false,
-      });
-
     const menu = await resourceActions(page, UR);
     await menu.getByRole('menuitem', { name: 'Create Reference' }).click();
     const title = page.getByRole('textbox', { name: 'Resource title' });
@@ -446,5 +371,18 @@ test(
     await expect(
       (await resourceControls(page, reference)).getByRole('button', { name: /^Shape: / }),
     ).toHaveCount(0);
+
+    // Resized and selected, the ring is still the diamond's.
+    const resized = await seedResizedUr(page);
+    await chooseResourceShape(page, resized, 'Diamond', 'diamond');
+    await expect(face(resized)).toHaveAttribute('data-state', 'selected');
+    await expect
+      .poll(() => outlineTreatment(face(resized)))
+      .toEqual({
+        ringShown: true,
+        ringFollowsOutline: true,
+        edge: 'solid',
+        rectBorder: false,
+      });
   },
 );

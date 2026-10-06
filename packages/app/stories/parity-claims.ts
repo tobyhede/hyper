@@ -163,13 +163,6 @@ export const parityClaims: readonly ParityClaim[] = [
       'Every Open Resource exposes one bottom-right resize control revealed by hover, selection or focus, and a Closed Resource exposes none.',
   },
   {
-    id: 'resize-preview-snaps-to-closed-rect',
-    storyFile: 'components/resource.stories.tsx',
-    storyExport: 'ResizeControl',
-    claim:
-      'A resize proposal entering the complete Close range previews the exact Closed rect while the active gesture still owns an Open Resource.',
-  },
-  {
     id: 'active-resource-resize-tracks-pointer-without-dimension-animation',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResizeControl',
@@ -230,14 +223,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResourceShapes',
     claim:
-      'An Ur Resource draws the Shape its Map gives it — rectangle, pill, ellipse or diamond — Open and Closed alike, at the one Closed Size and at any Open Size, its outline touching the midpoint of each side of its rect where Edges attach, with its Title inside the outline and no kind glyph, its Shape saying what it is; every Shape but the rectangle draws the short Title, on one line and ellipsised where it is too wide (ADR 0121).',
+      'An Ur Resource draws the Shape its Map gives it — rectangle, pill, ellipse or diamond — at the Closed Size and at any size it is resized to, its outline touching the midpoint of each side of its rect where Edges attach, with its Title inside the outline and no kind glyph, its Shape saying what it is; every Shape but the rectangle draws the short Title, on one line and ellipsised where it is too wide (ADR 0121).',
   },
   {
     id: 'ur-resource-treatments-follow-its-shape',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResourceShapeTreatments',
     claim:
-      'An Ur Resource drawn in a Shape other than the rectangle rings its outline while selected, Open or Closed, rather than the bounding rect (ADR 0121).',
+      'An Ur Resource drawn in a Shape other than the rectangle rings its outline while selected, at any size, rather than the bounding rect (ADR 0121).',
   },
   {
     id: 'ur-resource-shape-chosen-from-its-rail',
@@ -258,7 +251,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImage',
     claim:
-      "An Open Image Resource is the Open Markdown front with its picture as the content: the picture fills the content area above the Title footer, contained and never enlarged past its natural size, named by the Resource, and its first Open holds a recorded picture at its own size plus the Open front's chrome (ADR 0106).",
+      'An Open Image Resource is the Open Markdown front with its picture as the content: the picture fills the content area above the Title footer, contained and never enlarged past its natural size, named by the Resource (ADR 0106).',
   },
   {
     id: 'open-image-resource-shows-failed-state',
@@ -289,11 +282,11 @@ export const parityClaims: readonly ParityClaim[] = [
       'A refused replacement — a data: URL, a dropped file that is not an image, or more than one dropped image — is said in the upload target in the application’s words, and the target stays up with the picture unchanged (ADR 0106).',
   },
   {
-    id: 'image-resource-replace-fits-the-minimum-open-size',
+    id: 'image-resource-replace-fits-the-closed-size',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
     claim:
-      'An Image Resource whose small picture first Opens at the minimum Open Size draws its upload target compactly: Upload, the URL field and a refusal all lie inside the content area, and a URL still replaces the picture there (ADR 0106).',
+      'An Image Resource at the Closed Size draws its upload target compactly: Upload, the URL field and a refusal all lie inside the content area, and a URL still replaces the picture there (ADR 0106).',
   },
   {
     id: 'image-resource-failed-state-offers-replace',
@@ -382,7 +375,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImageReference',
     claim:
-      "An Open Reference Resource whose Target is an Image Resource keeps its own Title and draws the Target's picture read-only through the same front, at the size its Target's recorded picture gives its first Open, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106).",
+      "An Open Reference Resource whose Target is an Image Resource keeps its own Title and draws the Target's picture read-only through the same front, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106).",
   },
   /*
    * **No claim covers a saving lifecycle.** The Command Dock mounts

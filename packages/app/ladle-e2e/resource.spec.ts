@@ -695,16 +695,16 @@ test(
 );
 
 /**
- * Every Shape a Map may give an Ur Resource, drawn Open and Closed alike (ADR
+ * Every Shape a Map may give an Ur Resource, drawn alike at any size (ADR
  * 0121): an outline reaching the midpoint of each side of the Resource's rect,
- * where Edges attach, at the one Closed Size and at a larger Open Size, and the
+ * where Edges attach, at the Closed Size and at a larger size, and the
  * Title inside that outline, with no kind glyph: the Shape says what it is.
  * Every Shape but the rectangle leaves the rect's corner unfilled and draws the
  * short Title on one line, ellipsised where it is too wide; the rectangle draws
  * the Title ladder.
  */
 test(
-  'an Ur Resource draws each Shape Closed and Open, touching every side midpoint',
+  'an Ur Resource draws each Shape at the Closed Size and resized, touching every side midpoint',
   { tag: '@parity:ur-resource-draws-its-shape' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--resource-shapes&mode=preview');
@@ -714,11 +714,11 @@ test(
         ['one line', 'Strategies', CLOSED],
         ['three lines', 'Strategies…', CLOSED],
         ['overlong', 'Why authored placement beats a layout engine…', CLOSED],
-        ['open', 'Strategies…', [440, 260]],
+        ['resized', 'Strategies…', [440, 260]],
       ] as const) {
         const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
-        await expect(resource).toHaveAttribute('data-open', String(suffix === 'open'));
+        await expect(resource).toHaveAttribute('data-open', 'false');
         await expect(resource.getByRole('img', { name: 'Ur Resource' })).toHaveCount(0);
         expect(await drawnOutline(resource), `${resourceShape} · ${suffix}`).toEqual({
           shape: resourceShape,
@@ -737,16 +737,16 @@ test(
 
 /**
  * A selected Ur Resource's ring on a Shape follows its outline (ADR 0121), not
- * the rect it sits in, Open and Closed alike.
+ * the rect it sits in, at any size.
  */
 test(
-  "a Shape's selection ring follows its outline, Open and Closed",
+  "a Shape's selection ring follows its outline, at the Closed Size and resized",
   { tag: '@parity:ur-resource-treatments-follow-its-shape' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--resource-shape-treatments&mode=preview');
 
     for (const resourceShape of RESOURCE_SHAPES.filter((each) => each !== 'rectangle')) {
-      for (const label of [`${resourceShape} · selected`, `${resourceShape} · open, selected`]) {
+      for (const label of [`${resourceShape} · selected`, `${resourceShape} · resized, selected`]) {
         const resource = specimen(page, label).getByRole('article');
 
         await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);

@@ -11,7 +11,6 @@ import {
   dock,
   dragBy,
   nodeByTitle,
-  openResource,
   presentControl,
   resourceControls,
   selectCanvas,
@@ -456,13 +455,13 @@ test(
 );
 
 /**
- * An Ur Resource, Open on the canvas and then presented (ADR 0113).
+ * An Ur Resource on the canvas and then presented (ADR 0113).
  *
- * It has no content, so opening it draws its Title and nothing else, and the
- * traversal stops on it to draw that Title as a title slide: the name alone,
+ * It has no content, so it offers no Open and draws its Title and nothing
+ * else, and the traversal stops on it to draw that Title as a title slide: the name alone,
  * centred in the frame `styles.css` addresses by `data-content-kind`.
  */
-test('an Ur Resource opens to its Title alone and presents as a centred title slide', async ({
+test('an Ur Resource offers no Open, draws its Title alone and presents as a centred title slide', async ({
   page,
 }) => {
   await page.goto('/');
@@ -500,18 +499,18 @@ test('an Ur Resource opens to its Title alone and presents as a centred title sl
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await settled(page);
 
-  await openResource(ur, 'Title slide');
   const controls = await resourceControls(page, ur);
-  await expect(controls.getByRole('button', { name: 'Close Resource Title slide' })).toBeVisible();
+  await expect(controls.getByRole('button', { name: /^Actions for Resource/ })).toBeVisible();
+  await expect(controls.getByRole('button', { name: 'Open Resource Title slide' })).toHaveCount(0);
   await settled(page);
-  // Open, and still only the Title: no content surface, and nothing to edit.
-  await expect(ur.locator('.canvas-resource')).toHaveAttribute('data-open', 'true');
+  // Only the Title: no content surface, and nothing to open or edit.
+  await expect(ur.locator('.canvas-resource')).toHaveAttribute('data-open', 'false');
   await expect(ur.locator('.canvas-resource__content')).toHaveCount(0);
   await expect(controls.getByRole('button', { name: 'Edit Resource Title slide' })).toHaveCount(0);
-  const face = await boxOf(ur.locator('.canvas-resource'), 'the Open Ur Resource');
+  const face = await boxOf(ur.locator('.canvas-resource'), 'the Ur Resource');
   const openTitle = await boxOf(
     ur.getByRole('heading', { name: 'Title slide', exact: true }),
-    'the Open Ur Resource Title',
+    'the Ur Resource Title',
   );
   expect(openTitle.y).toBeGreaterThanOrEqual(face.y);
   expect(openTitle.y + openTitle.height).toBeLessThanOrEqual(face.y + face.height);
@@ -538,7 +537,10 @@ test('an Ur Resource opens to its Title alone and presents as a centred title sl
     const { x, y, width, height } = range.getBoundingClientRect();
     return { x, y, width, height };
   });
-  const tolerance = 2;
+  // One percent of the frame: presenting fills the viewport with the Resource
+  // at whatever size it has, so a fixed screen tolerance would tighten as the
+  // presenting zoom grows.
+  const tolerance = Math.max(2, frame.height / 100);
   expect(Math.abs(name.x + name.width / 2 - (frame.x + frame.width / 2))).toBeLessThanOrEqual(
     tolerance,
   );

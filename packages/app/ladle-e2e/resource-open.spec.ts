@@ -335,53 +335,6 @@ test(
 );
 
 test(
-  'a resize proposal inside the complete Close range previews the exact Closed rect while the gesture remains active',
-  { tag: '@parity:resize-preview-snaps-to-closed-rect' },
-  async ({ page }) => {
-    await page.goto(resizeControlStory);
-    const openRegion = page.getByRole('region', { name: 'Open Resource', exact: true });
-    const node = openRegion.locator('.react-flow__node');
-    const control = openRegion.locator('.react-flow__resize-control');
-    await expect(openRegion.getByRole('article', { name: 'Strategies' })).toBeVisible({
-      timeout: 20_000,
-    });
-    await openRegion.getByRole('article', { name: 'Strategies' }).hover();
-
-    const before = await node.evaluate((element) => ({
-      width: Number.parseFloat(getComputedStyle(element).width),
-      height: Number.parseFloat(getComputedStyle(element).height),
-    }));
-    const zoom = await node.evaluate((element) => {
-      const viewport = element
-        .closest('.react-flow')
-        ?.querySelector<HTMLElement>('.react-flow__viewport');
-      return Number(/scale\(([\d.]+)\)/.exec(viewport?.style.transform ?? '')?.[1] ?? 1);
-    });
-    const box = await control.boundingBox();
-    if (box === null) throw new Error('The Open resize control has no box.');
-
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(
-      box.x + box.width / 2 + (280 - before.width) * zoom,
-      box.y + box.height / 2 + (166 - before.height) * zoom,
-      { steps: 6 },
-    );
-
-    await expect
-      .poll(async () =>
-        node.evaluate((element) => ({
-          width: Number.parseFloat(getComputedStyle(element).width),
-          height: Number.parseFloat(getComputedStyle(element).height),
-        })),
-      )
-      .toEqual({ width: 260, height: 146 });
-    await expect(node.locator('.rf-resource-node__inner')).toHaveAttribute('data-open', 'true');
-    await page.mouse.up();
-  },
-);
-
-test(
   'an active Resource resize does not animate its dimensions behind the pointer',
   { tag: '@parity:active-resource-resize-tracks-pointer-without-dimension-animation' },
   async ({ page }) => {
@@ -780,18 +733,16 @@ const openImageStory = '/?story=components--resource--open-image-resource&mode=p
 
 /**
  * An Open Image Resource is the Open Markdown front with its picture as the
- * content. Drawn at one canvas unit per pixel, the first-Open size —
- * the picture plus `OPEN_RESOURCE_CHROME` — leaves a content area the picture's
- * own size, which is the drawn half of the check `open-resource-chrome.test.ts`
- * makes against the stylesheet. In a Resource resized larger the picture keeps
- * its natural size rather than being enlarged.
+ * content. Drawn at one canvas unit per pixel in a Resource sized to hold it,
+ * the picture is drawn at its own size; in a Resource resized larger the
+ * picture keeps its natural size rather than being enlarged.
  */
 test(
   'an Open Image Resource draws its picture at its own size in the Markdown front',
   { tag: '@parity:open-image-resource-draws-its-image' },
   async ({ page }) => {
     await page.goto(openImageStory);
-    const first = page.getByRole('region', { name: 'First Open' });
+    const first = page.getByRole('region', { name: 'Sized to its picture' });
     const resource = first.getByRole('article', { name: 'Harbour' });
     const picture = resource.getByRole('img', { name: 'Harbour' });
     await expect(picture).toBeVisible();
@@ -850,7 +801,7 @@ const IMAGE_REFERENCE_MISSING_URL = 'https://missing.invalid/picture.png';
 /**
  * A Reference Resource to an Image Resource draws its Target's picture read-only
  * through the same front (ADR 0070, ADR 0106): its own Title in the footer, the
- * picture at its own size in a Resource at its first-Open size, Close and no
+ * picture at its own size in a Resource sized to hold it, Close and no
  * Replace, and no Replace in the failed-image state either. The story's Space
  * holds the Image Resource Targets, and this test serves Harbour's picture.
  */

@@ -651,7 +651,7 @@ test(
       throw new Error('Persisted Reference Resource A′ has no revision');
     }
     const beforeResizeRevision = Number(beforeResizeRevisionValue);
-    const openSize = await recap.evaluate((element) => ({
+    const beforeSize = await recap.evaluate((element) => ({
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
@@ -678,8 +678,8 @@ test(
       width: Number.parseFloat(getComputedStyle(element).width),
       height: Number.parseFloat(getComputedStyle(element).height),
     }));
-    expect(resizedSize.width).toBeGreaterThan(openSize.width);
-    expect(resizedSize.height).toBeGreaterThan(openSize.height);
+    expect(resizedSize.width).toBeGreaterThan(beforeSize.width);
+    expect(resizedSize.height).toBeGreaterThan(beforeSize.height);
 
     await controls.getByRole('button', { name: 'Close Resource A′' }).click();
     await expect(persistence).toHaveAttribute('data-revision', String(beforeResizeRevision + 2));

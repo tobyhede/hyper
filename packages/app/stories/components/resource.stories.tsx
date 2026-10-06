@@ -156,12 +156,12 @@ export const Front: Story = () => (
 );
 Front.storyName = 'Front';
 
-/** The size the Open specimens are drawn at, as an author resizes an Open Ur Resource to. */
-const OPEN_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
+/** The size the resized specimens are drawn at, as an author resizes an Ur Resource to. */
+const RESIZED_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
 
 /**
- * Every Shape a Map may give an Ur Resource (ADR 0121), drawn Closed at the one
- * Closed Size and Open at a larger one: the rectangle is the front's own
+ * Every Shape a Map may give an Ur Resource (ADR 0121), drawn at the Closed
+ * Size and at a larger size it is resized to: the rectangle is the front's own
  * border, and every other Shape is an outline touching the midpoint of each
  * side of the Resource's rect, with the short Title — the name on one line,
  * with an ellipsis when more Title Lines follow — centred in the rectangle
@@ -172,7 +172,7 @@ export const ResourceShapes: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource Shapes"
-      note="Each Shape a Map may give an Ur Resource, the one kind that takes a Shape, drawn Closed at the one Closed Size with a one-line Title above a three-line one and an overlong one, and Open at a larger size below them. A Shape is drawn Open and Closed alike. Every outline touches the midpoint of each side of the Resource's rect, where Edges attach, and the Title sits inside it with no kind glyph, the Shape saying what the Resource is: the rectangle draws the Title ladder, and every other Shape draws the short Title on one line, ellipsised where it is too wide."
+      note="Each Shape a Map may give an Ur Resource, the one kind that takes a Shape, drawn at the Closed Size with a one-line Title above a three-line one and an overlong one, and resized larger below them. A Shape is drawn alike at any size. Every outline touches the midpoint of each side of the Resource's rect, where Edges attach, and the Title sits inside it with no kind glyph, the Shape saying what the Resource is: the rectangle draws the Title ladder, and every other Shape draws the short Title on one line, ellipsised where it is too wide."
     >
       <div className="inv-row">
         {RESOURCE_SHAPES.map((resourceShape) => (
@@ -197,12 +197,12 @@ export const ResourceShapes: Story = () => (
       </div>
       <div className="inv-row">
         {RESOURCE_SHAPES.map((resourceShape) => (
-          <Specimen key={resourceShape} label={`${resourceShape} · open`}>
+          <Specimen key={resourceShape} label={`${resourceShape} · resized`}>
             <CanvasResourceSpecimen
               kind="ur"
               shape={resourceShape}
               title={THREE_LINE_TITLE}
-              openSize={OPEN_SPECIMEN_SIZE}
+              size={RESIZED_SPECIMEN_SIZE}
             />
           </Specimen>
         ))}
@@ -217,14 +217,14 @@ const DRAWN_RESOURCE_SHAPES = RESOURCE_SHAPES.filter(
 );
 
 /**
- * The selection ring on a Shape (ADR 0121), Open and Closed: it follows the
- * outline rather than the bounding rect.
+ * The selection ring on a Shape (ADR 0121), at the Closed Size and resized: it
+ * follows the outline rather than the bounding rect.
  */
 export const ResourceShapeTreatments: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource Shape treatments"
-      note="A selected Ur Resource's ring is a stroke of its Shape's own outline, Open or Closed, so it is not drawn as the rect the Shape sits in."
+      note="A selected Ur Resource's ring is a stroke of its Shape's own outline, at any size, so it is not drawn as the rect the Shape sits in."
     >
       <div className="inv-row">
         {DRAWN_RESOURCE_SHAPES.map((resourceShape) => (
@@ -240,13 +240,13 @@ export const ResourceShapeTreatments: Story = () => (
       </div>
       <div className="inv-row">
         {DRAWN_RESOURCE_SHAPES.map((resourceShape) => (
-          <Specimen key={resourceShape} label={`${resourceShape} · open, selected`}>
+          <Specimen key={resourceShape} label={`${resourceShape} · resized, selected`}>
             <CanvasResourceSpecimen
               kind="ur"
               shape={resourceShape}
               title={ONE_LINE_TITLE}
               state="selected"
-              openSize={OPEN_SPECIMEN_SIZE}
+              size={RESIZED_SPECIMEN_SIZE}
             />
           </Specimen>
         ))}

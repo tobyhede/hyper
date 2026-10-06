@@ -238,12 +238,12 @@ const expectWithin = async (part: Locator, content: Locator): Promise<void> => {
 };
 
 test(
-  'at the minimum Open Size the upload target keeps Upload, the URL field and a refusal inside the content area',
-  { tag: '@parity:image-resource-replace-fits-the-minimum-open-size' },
+  'at the Closed Size the upload target keeps Upload, the URL field and a refusal inside the content area',
+  { tag: '@parity:image-resource-replace-fits-the-closed-size' },
   async ({ page }) => {
     await open(page);
     const { resource, target } = await beginReplacing(page, 'Thumbnail');
-    // A 64×64 picture first Opens at the Closed size, which is the minimum Open Size.
+    // Opening changes no size: the Resource stays at the Closed Size, the smallest.
     const node = nodeByTitle(page, 'Thumbnail').first();
     await expect(node).toHaveCSS('width', '260px');
     await expect(node).toHaveCSS('height', '146px');
