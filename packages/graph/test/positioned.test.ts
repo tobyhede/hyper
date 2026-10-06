@@ -35,28 +35,34 @@ const at = (entries: Record<string, [number, number]>): Placement =>
   Placement.fromEntries(Object.entries(entries).map(([id, [x, y]]) => [uuid(id), { x, y }]));
 
 describe('positionedStrategy', () => {
-  it('draws an Open Resource at its authored rect and moves nobody for it', async () => {
+  it('draws every Resource at its authored size, Open or Closed, and moves nobody for it', async () => {
     const positions = Placement.fromEntries([
       [
         uuid('00000000-0000-4000-8000-000000000002'),
-        { x: 0, y: 0, open: true, openSize: { width: 360, height: 196 } },
+        { x: 0, y: 0, open: true, size: { width: 360, height: 196 } },
       ],
       [uuid('00000000-0000-4000-8000-000000000003'), { x: 300, y: 200, open: false }],
+      [
+        uuid('00000000-0000-4000-8000-000000000005'),
+        { x: 900, y: 0, open: false, size: { width: 400, height: 300 } },
+      ],
     ]);
     const laid = await positionedStrategy(positions)({
       resources: resourcesOf(
         uuid('00000000-0000-4000-8000-000000000002'),
         uuid('00000000-0000-4000-8000-000000000003'),
+        uuid('00000000-0000-4000-8000-000000000005'),
       ),
       edges: [],
     });
 
-    // The Open Resource's own rect is authored, so this reads it. Its neighbour is
-    // not moved here: displacement was applied by the Edit that opened the Resource
-    // and is already in the coordinates this reads (ADR 0084).
+    // A stored size is authored, so this reads it; an entry storing none keeps
+    // the size the caller declared. Nobody is moved here: displacement was applied by the
+    // Edit that resized a Resource and is already in these coordinates (ADR 0084).
     expect(laid.resources).toMatchObject([
       { x: 0, y: 0, width: 360, height: 196 },
-      { x: 300, y: 200 },
+      { x: 300, y: 200, ...SIZE },
+      { x: 900, y: 0, width: 400, height: 300 },
     ]);
   });
 

@@ -166,7 +166,8 @@ const imageUrlSchema = z.string().refine(isAcceptedImageUrl, {
 
 /**
  * The size of the picture in pixels, as measured when its URL was set
- * (ADR 0106). A first Open reads it; nothing else does.
+ * (ADR 0106). Recorded with the image; no size rule reads it, because a
+ * Resource's size is its Map entry's and the picture fits the rect it is given.
  */
 export const imageNaturalSizeSchema = z.object({
   width: z.number().positive().finite(),
@@ -364,7 +365,12 @@ export const mapPositionSchema = z.object({
   y: z.number().finite(),
 });
 
-const openSizeSchema = z.object({
+/**
+ * A Resource's size on a Map. No smaller than the Closed Size on either axis:
+ * that is the one floor for every kind, Open or Closed, and content adapts to
+ * the rect it is given.
+ */
+const resourceSizeSchema = z.object({
   width: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.width),
   height: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.height),
 });
@@ -386,29 +392,28 @@ export const takesResourceShape = (kind: z.infer<typeof resourceSchema>['kind'])
   kind === 'ur';
 
 /**
- * Where a Map puts a Resource and the Shape it draws it in, whatever its
- * Open/Closed state. Optional, as a Graph's `headShape` is: an entry with none
- * stored draws as the rectangle (`resourceShape`), and only an Ur Resource may
- * store another (ADR 0121).
+ * Whether a Resource of this kind may be Open. An Ur Resource has no content to
+ * show, so it is always Closed; every other kind may be either.
  */
-const drawnPositionSchema = mapPositionSchema.extend({
-  shape: resourceShapeSchema.optional(),
-});
+export const takesOpen = (kind: z.infer<typeof resourceSchema>['kind']): boolean => kind !== 'ur';
 
 /**
- * What a Map stores for one Resource: its origin and Shape, its Open/Closed
- * state and its remembered Open Size.
+ * What a Map stores for one Resource: its origin, and optionally whether it is
+ * Open, its size and its Shape. Each optional field has an application
+ * default, as a Graph's `headShape` does: an entry with no `open` is Closed
+ * (`resourceOpen`), one with no `size` is the Closed Size (`resourceSize`), and
+ * one with no `shape` is the rectangle (`resourceShape`). Size and Open/Closed
+ * are independent: Open changes what is drawn inside the rect, never the rect.
+ *
+ * **Strict**, as the Map is: a stripped key is a question answered silently.
  */
-export const resourcePlacementSchema = z.discriminatedUnion('open', [
-  drawnPositionSchema.extend({
-    open: z.literal(true),
-    openSize: openSizeSchema,
-  }),
-  drawnPositionSchema.extend({
-    open: z.literal(false),
-    openSize: openSizeSchema.optional(),
-  }),
-]);
+export const resourcePlacementSchema = mapPositionSchema
+  .extend({
+    open: z.boolean().optional(),
+    size: resourceSizeSchema.optional(),
+    shape: resourceShapeSchema.optional(),
+  })
+  .strict();
 
 /**
  * A Map the author wrote: a position for each Resource it holds, and the

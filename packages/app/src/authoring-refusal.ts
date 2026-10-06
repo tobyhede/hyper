@@ -130,8 +130,8 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Resource is already in this Map.';
     case 'resource-not-in-map':
       return 'This Resource is not in this Map.';
-    case 'resource-not-open':
-      return 'Open this Resource before resizing it.';
+    case 'open-requires-content':
+      return 'An Ur Resource has no content to open.';
     case 'shape-requires-ur-resource':
       return 'Only an Ur Resource can be drawn in a Shape other than the rectangle.';
     case 'resource-has-references':

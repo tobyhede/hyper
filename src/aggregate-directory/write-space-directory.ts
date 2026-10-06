@@ -71,8 +71,8 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
       id: m.id,
       title: m.title,
       kind: m.kind,
-      // `Placement.fromMap` rebuilds every entry key by key — Open Size and Shape
-      // included — so a stored `{"y":…,"x":…}` exports in the canonical order
+      // `Placement.fromMap` rebuilds every entry key by key — state, size and
+      // Shape included — so a stored `{"y":…,"x":…}` exports in the canonical order
       // rather than the one `jsonb` handed back; the sort fixes the entries' order.
       positions: Object.fromEntries(
         [...Placement.fromMap(m)].sort(([left], [right]) => compareOrdinal(left, right)),

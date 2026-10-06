@@ -1,5 +1,7 @@
 import {
+  resourceOpen,
   resourceShape,
+  resourceSize,
   type ResourceId,
   type ResourceShape,
   type Graph,
@@ -93,7 +95,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
   const resourceIds = mapResources(space, resolved.map).map((resource) => resource.id);
   const authored = Placement.fromMap(resolved.map);
   const openResourceIds = new Set(
-    [...authored].filter(([, at]) => at.open).map(([resourceId]) => resourceId),
+    [...authored].filter(([, at]) => resourceOpen(at)).map(([resourceId]) => resourceId),
   );
   // Every Resource drawn is one of `resourceIds`, the Map's own members, so
   // each has an entry; one with no Shape stored draws as the rectangle.
@@ -106,7 +108,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
   };
   const strategyGraph = buildLayoutStrategyGraph(resourceIds, edges, (resourceId) => {
     const at = authored.get(resourceId);
-    return at?.open === true ? at.openSize : RESOURCE_SIZE;
+    return at === undefined ? RESOURCE_SIZE : resourceSize(at);
   });
 
   return {

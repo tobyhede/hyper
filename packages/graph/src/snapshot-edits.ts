@@ -1,8 +1,9 @@
 import {
-  COLLAPSED_RESOURCE_SIZE,
   titleName,
-  firstOpenSize,
+  resourceOpen,
   resourceShape,
+  resourceSize,
+  takesOpen,
   takesResourceShape,
   type Graph,
   type Map,
@@ -14,20 +15,18 @@ import {
   type UUID,
 } from '@project/core';
 import { Placement } from './placement';
-import { resolveDocumentContent } from './content-resolution';
 
 /**
  * The Resource membership rules that turn a Space snapshot into the next one when
- * a Resource joins, grows, shrinks, changes Shape or leaves a Map — Add, Open,
- * Close, Resize, change Shape, Remove from Map, Delete from Space.
+ * a Resource joins, Opens, Closes, is resized, changes Shape or leaves a Map —
+ * Add, Open, Close, Resize, change Shape, Remove from Map, Delete from Space.
  *
  * `SnapshotEdit` operates on `SpaceSnapshot` — the one representation both
  * Space Authoring and the session registry already hold — rather than the
  * loaded `Space` (the registry would have to parse every snapshot to edit it)
  * or a bare `Placement` (a caller would keep assembling snapshots around it,
  * and every such assembly is a second copy of these rules free to diverge —
- * skipping {@link Placement.reclaim} on a delete, or not stepping off an
- * occupied point on a create).
+ * not stepping off an occupied point on a create, say).
  *
  * Every operation answers `completed(snapshot) | unchanged | refused(code)`,
  * never a throw for a domain rule (ADR 0057). This module declares its own
@@ -50,8 +49,8 @@ export type SnapshotEditRefusal =
   | { readonly code: 'reference-target-not-found'; readonly targetId: UUID }
   /** A Reference Resource created with a Target that is itself a Reference Resource. */
   | { readonly code: 'reference-target-must-own-content'; readonly targetId: UUID }
-  /** A Resize of a Resource that is not Open: there is no Open Size to change. */
-  | { readonly code: 'resource-not-open' }
+  /** An Open of a Resource with no content to show: an Ur Resource is always Closed. */
+  | { readonly code: 'open-requires-content' }
   /** A Shape Edit on a Resource that is not an Ur Resource: every other kind is the rectangle. */
   | { readonly code: 'shape-requires-ur-resource' }
   | {
@@ -151,7 +150,7 @@ function createInMap(
   return withPlacement(
     { ...snapshot, resources: [...snapshot.resources, { id: resourceId, document }] },
     mapId,
-    Placement.place(placement, resourceId, { x: at.x, y: at.y }),
+    Placement.place(placement, resourceId, { x: at.x, y: at.y, open: false }),
   );
 }
 
@@ -170,22 +169,9 @@ const withoutIncidentEdges = (graphs: readonly Graph[], resourceId: UUID): Graph
   }));
 
 /**
- * The placement with a Resource gone and the room it held given back.
- *
- * Leaving a Map is a Close the Resource does not come back from, so it
- * reclaims as a Close does (ADR 0084) — the room is written into the
- * neighbours' own coordinates, so a removal that only dropped the entry would
- * leave a hole nothing on the canvas explains and no Edit can give back. The
- * reclaim runs **before** the removal, because `Placement.reclaim` reads the
- * Resource's own entry.
- */
-const removedFrom = (placement: Placement, resourceId: UUID): Placement =>
-  Placement.remove(Placement.reclaim(placement, resourceId), resourceId);
-
-/**
  * Remove a Resource from a Space entirely: its own entry, its position and every
- * Edge incident to it in **every** Map, with the room it held given back
- * wherever it was Open (ADR 0084).
+ * Edge incident to it in **every** Map. No other Resource moves: removal changes
+ * no size, so it displaces nobody.
  *
  * Kind-agnostic — deleting a Space Resource this way is exactly this, and the
  * cross-Space cascade that follows (deleting a target Space nothing
@@ -224,7 +210,7 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
         ...snapshot.document,
         maps: maps.map((m) => ({
           ...m,
-          positions: Placement.toPositions(removedFrom(Placement.fromMap(m), resourceId)),
+          positions: Placement.toPositions(Placement.remove(Placement.fromMap(m), resourceId)),
           graphs: withoutIncidentEdges(m.graphs, resourceId),
         })),
       },
@@ -264,11 +250,8 @@ export function deletionReach(maps: readonly Map[], resourceId: UUID): DeletionR
   };
 }
 
-/** A width and a height together: an Open Size, or the room between two. */
+/** A width and a height together: a Resource's size. */
 type Extent = { readonly width: number; readonly height: number };
-
-/** An entry for a Resource that is Open, which is the only kind that holds room. */
-type OpenPlacement = Extract<ResourcePlacement, { readonly open: true }>;
 
 /** The named Map, and the placement it holds, or the refusal for a Map that is gone. */
 const placedIn = (
@@ -305,123 +288,54 @@ const refused = (refusal: SnapshotEditRefusal): SnapshotEditOutcome => ({
 
 const UNCHANGED: SnapshotEditOutcome = { kind: 'unchanged' };
 
-/**
- * The placement after a Resource's own entry changes and the room it holds
- * changes with it: one Edit, and the whole of displacement at the Edit
- * (ADR 0084).
- *
- * The entry is written first and the displacement runs over the result. The
- * coordinates are the same either way, because `displace` compares every
- * neighbour against the *subject's* `x`/`y` and neither step moves the subject.
- * But `displace` answers the placement unchanged for a subject the map does not
- * hold, and after `place` the subject is certainly held.
- */
-const withRoomFor = (
+/** The snapshot with one Resource's entry in one Map rewritten, and no other Resource moved. */
+const withEntry = (
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
   placement: Placement,
   resourceId: UUID,
   at: ResourcePlacement,
-  room: Extent,
-): Placement => Placement.displace(Placement.place(placement, resourceId, at), resourceId, room);
+): SnapshotEditOutcome =>
+  withPlacement(snapshot, mapId, Placement.place(placement, resourceId, at));
 
 /**
- * The placement after a Resource Closes: Closed on its own entry, and the room
- * it held given back by `Placement.reclaim`.
- *
- * Both ways a Resource closes end here — {@link close}, and a {@link resize} to
- * exactly the Closed Size (ADR 0066) — so the magnetic Close reclaims the
- * growth of the size the Resource was actually Open at rather than the zero
- * growth of the collapsed rect being proposed.
- *
- * The reclaim runs first and the Closed entry is written over the result,
- * because `Placement.reclaim` reads the Open Size off the entry it is given and
- * a Closed entry no longer holds any room. The remembered Open Size rides
- * through untouched (ADR 0066), which is what makes the next Open apply exactly
- * what this gives back.
- */
-const closedResource = (placement: Placement, resourceId: UUID, at: OpenPlacement): Placement =>
-  Placement.place(Placement.reclaim(placement, resourceId), resourceId, { ...at, open: false });
-
-/**
- * The room a Resource's neighbours gain when it goes from one Open Size to
- * another: the difference between the two growths, per axis (ADR 0084).
- *
- * Negative on an axis the Resource shrank on, which is the whole of a
- * shrinking Resize. It is **not** the involution the Open/Close pair is: a
- * negative room reverses a growth only for the Resources that growth was
- * applied to, and a Resource the author placed clear of the subject *after* the
- * Open was never one of them. Such a Resource can be carried back inside the
- * subject — subject Open at `x = 0`, a Resource dropped at `x = 260`, a shrink
- * of 200 — and growing back skips it as no longer clear, so it keeps the 200.
- * That is the memorylessness ADR 0084 chose for Close, which reclaims from
- * every Resource currently clear of the closing Resource; remembering which
- * Resources a growth actually pushed is the per-Resource history it rejected.
- */
-const roomBetween = (from: Extent, to: Extent): Extent => {
-  const before = Placement.growth(from);
-  const after = Placement.growth(to);
-  return { width: after.width - before.width, height: after.height - before.height };
-};
-
-/**
- * Open a Resource in one Map, moving the Resources clear of it by the room it
- * now takes (ADR 0084, ADR 0093).
- *
- * It Opens at the Open Size it remembers (ADR 0066), or at its content's
- * {@link firstOpenSize}. The room it
- * takes is that size's growth, so the Close that reverses this reads the same
- * number back off the entry. `unchanged` for a Resource already Open.
+ * Open a Resource in one Map. Only what is drawn inside its rect changes: its
+ * size and every position stay as they are. `unchanged` for a Resource already
+ * Open, and `open-requires-content` for an Ur Resource, which has no content to
+ * show.
  */
 function open(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
-  if (at.open) return UNCHANGED;
-  const documentOf = (id: UUID) =>
-    snapshot.resources.find((resource) => resource.id === id)?.document;
-  const openSize =
-    at.openSize ?? firstOpenSize(resolveDocumentContent(documentOf(resourceId), documentOf));
-  return withPlacement(
-    snapshot,
-    mapId,
-    withRoomFor(
-      placed.placement,
-      resourceId,
-      { ...at, open: true, openSize },
-      Placement.growth(openSize),
-    ),
-  );
+  const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
+  if (resource === undefined) return refused({ code: 'resource-not-found' });
+  if (!takesOpen(resource.document.kind)) return refused({ code: 'open-requires-content' });
+  if (resourceOpen(at)) return UNCHANGED;
+  return withEntry(snapshot, mapId, placed.placement, resourceId, { ...at, open: true });
 }
 
 /**
- * Close a Resource in one Map, giving back the room it held and keeping its
- * Open Size for the next Open (ADR 0066).
- *
- * Read as the Map stands, with no record of who this Resource's Open pushed:
- * everything currently clear of it moves back, the Resources the author dragged
- * there while it was open included (ADR 0084). `unchanged` for a Resource
- * already Closed.
+ * Close a Resource in one Map. Only what is drawn inside its rect changes: its
+ * size and every position stay as they are. `unchanged` for a Resource already
+ * Closed.
  */
 function close(snapshot: SpaceSnapshot, mapId: UUID, resourceId: UUID): SnapshotEditOutcome {
   const placed = placedIn(snapshot, mapId);
   if ('code' in placed) return refused(placed);
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
-  if (!at.open) return UNCHANGED;
-  return withPlacement(snapshot, mapId, closedResource(placed.placement, resourceId, at));
+  if (!resourceOpen(at)) return UNCHANGED;
+  return withEntry(snapshot, mapId, placed.placement, resourceId, { ...at, open: false });
 }
 
 /**
- * Resize an Open Resource in one Map, moving its neighbours by the difference
- * between the room it held and the room it now takes.
- *
- * A size of exactly `COLLAPSED_RESOURCE_SIZE` is a Close, and closes as
- * {@link close} does — reclaiming the growth of the size it was Open at, not
- * the proposal's. Which near misses count as that size is the application's
- * magnetic range (ADR 0066), decided before this is reached; only the exact
- * size arrives here as a Close. `unchanged` at the size it already has, and
- * `resource-not-open` for a Resource that is not Open, which has no Open
- * Size to change.
+ * Resize a Resource in one Map, Open or Closed, moving the Resources clear of it
+ * by the change from the size it had (ADR 0084, ADR 0093). The size is written
+ * even when it is the Closed Size, and Open/Closed is kept. `unchanged` at the
+ * size it already draws at. The floor is the schema's: no size below the
+ * Closed Size reaches here from a gesture, and intake refuses one.
  */
 function resize(
   snapshot: SpaceSnapshot,
@@ -433,24 +347,13 @@ function resize(
   if ('code' in placed) return refused(placed);
   const at = placed.placement.get(resourceId);
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
-  if (!at.open) return refused({ code: 'resource-not-open' });
-  if (
-    size.width === COLLAPSED_RESOURCE_SIZE.width &&
-    size.height === COLLAPSED_RESOURCE_SIZE.height
-  ) {
-    return withPlacement(snapshot, mapId, closedResource(placed.placement, resourceId, at));
-  }
-  if (at.openSize.width === size.width && at.openSize.height === size.height) return UNCHANGED;
-  return withPlacement(
-    snapshot,
-    mapId,
-    withRoomFor(
-      placed.placement,
-      resourceId,
-      { ...at, openSize: { width: size.width, height: size.height } },
-      roomBetween(at.openSize, size),
-    ),
-  );
+  const before = resourceSize(at);
+  if (before.width === size.width && before.height === size.height) return UNCHANGED;
+  const resized = Placement.place(placed.placement, resourceId, {
+    ...at,
+    size: { width: size.width, height: size.height },
+  });
+  return withPlacement(snapshot, mapId, Placement.displace(resized, resourceId, before, size));
 }
 
 /**
@@ -458,7 +361,7 @@ function resize(
  * kind is the rectangle, so a Shape Edit on one is refused whatever it asks for.
  *
  * The Shape is drawn at the Resource's rect and changes none, so no neighbour
- * moves and the Resource's Open/Closed state and Open Size are kept. The chosen
+ * moves and the Resource's Open/Closed state and size are kept. The chosen
  * Shape is written, the rectangle included; `unchanged` for the Shape the
  * Resource already draws as, so the rectangle is `unchanged` on an entry that
  * stores none.
@@ -512,13 +415,13 @@ function addToMap(
   return withPlacement(
     snapshot,
     mapId,
-    Placement.place(placed.placement, resourceId, { x: at.x, y: at.y }),
+    Placement.place(placed.placement, resourceId, { x: at.x, y: at.y, open: false }),
   );
 }
 
 /**
- * Remove a Resource from one Map: the room it held given back, its position
- * gone, and every Edge incident to it gone from **this Map's** Graphs.
+ * Remove a Resource from one Map: its position gone, and every Edge incident to
+ * it gone from **this Map's** Graphs. No other Resource moves.
  *
  * The Resource stays in the Space and in every other Map. Never blocked by a
  * Reference Resource targeting it: a Target that has left one Map is still a
@@ -542,7 +445,7 @@ function removeFromMap(
           m.id === mapId
             ? {
                 ...m,
-                positions: Placement.toPositions(removedFrom(placed.placement, resourceId)),
+                positions: Placement.toPositions(Placement.remove(placed.placement, resourceId)),
                 graphs: withoutIncidentEdges(m.graphs, resourceId),
               }
             : m,

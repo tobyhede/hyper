@@ -13,6 +13,7 @@ import {
   type GraphEdge,
   type GraphId,
   type MapPosition,
+  resourceSize,
 } from '@project/core';
 import { Placement } from '@project/graph';
 import {
@@ -20,7 +21,6 @@ import {
   type ResourceFlowNode,
   type RoutedEdgeData,
 } from '@project/react-flow-adapter';
-import { snapResourceSizeToClose } from './resource';
 import type { SurfaceAuthoring } from './space-authoring';
 
 /**
@@ -447,24 +447,21 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       beginResize: (resourceId) => {
         const placement = authoring.mapPlacement();
         const at = placement.get(resourceId);
-        if (at?.open !== true) return;
-        set({ resizeDraft: { resourceId, size: at.openSize, placement } });
+        if (at === undefined) return;
+        set({ resizeDraft: { resourceId, size: resourceSize(at), placement } });
       },
 
       previewResize: (resourceId, size) => {
         const draft = get().resizeDraft;
         if (draft?.resourceId !== resourceId) return;
         const at = draft.placement.get(resourceId);
-        if (at?.open !== true) return;
-        const proposedSize = snapResourceSizeToClose(size);
+        if (at === undefined) return;
+        const proposed = { width: size.width, height: size.height };
         set({
           resizeDraft: {
             resourceId,
-            size: proposedSize,
-            placement: Placement.place(draft.placement, resourceId, {
-              ...at,
-              openSize: proposedSize,
-            }),
+            size: proposed,
+            placement: Placement.place(draft.placement, resourceId, { ...at, size: proposed }),
           },
         });
       },

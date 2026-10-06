@@ -320,19 +320,12 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
   const text =
     content?.kind === 'markdown' ? content.source : content?.kind === 'image' ? content.url : '';
   const via: ContentVia = content?.via ?? 'self';
-  const width = content?.kind === 'image' ? content.naturalSize?.width : undefined;
-  const height = content?.kind === 'image' ? content.naturalSize?.height : undefined;
   return useMemo<AreaContent | null>(() => {
     switch (kind) {
       case 'markdown':
         return { kind, source: text, via };
       case 'image':
-        return {
-          kind,
-          url: text,
-          via,
-          naturalSize: width === undefined || height === undefined ? undefined : { width, height },
-        };
+        return { kind, url: text, via };
       case 'unresolved':
         return { kind, via: 'reference' };
       case 'space':
@@ -340,7 +333,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
       case undefined:
         return null;
     }
-  }, [kind, text, via, width, height]);
+  }, [kind, text, via]);
 }
 
 /**

@@ -138,7 +138,7 @@ const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): Spac
               x: 600,
               y: 20,
               open: true,
-              openSize: { width: 700, height: 500 },
+              size: { width: 700, height: 500 },
             },
           },
           graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -778,7 +778,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, size: { width: 700, height: 500 } },
           },
         })),
       },
@@ -931,7 +931,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, size: { width: 700, height: 500 } },
           },
         })),
       },
@@ -1001,7 +1001,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, size: { width: 700, height: 500 } },
           },
         })),
       },
@@ -1203,7 +1203,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, size: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1304,7 +1304,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, size: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1408,7 +1408,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, size: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1647,13 +1647,13 @@ describe('the Map an Open Space Resource draws', () => {
                 x: 600,
                 y: 20,
                 open: true,
-                openSize: { width: 700, height: 500 },
+                size: { width: 700, height: 500 },
               },
               [GONE_B_RESOURCE_ID]: {
                 x: 1400,
                 y: 20,
                 open: true,
-                openSize: { width: 700, height: 500 },
+                size: { width: 700, height: 500 },
               },
               [SPACE_RESOURCE_ID]: { x: 2200, y: 20, open: false },
             },

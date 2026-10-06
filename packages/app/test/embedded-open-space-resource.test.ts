@@ -86,7 +86,6 @@ const openSpaceResource = (
     readOnly: false,
     kind: geometry.kind ?? 'space',
     contentAction: geometry.kind === 'reference' ? 'none' : 'author-space-view',
-    openSizeFloor: { width: 292, height: 266 },
     embedsMap: geometry.kind !== 'markdown',
     open: geometry.open ?? true,
     active: false,

@@ -123,8 +123,6 @@ describe('projectResourceNodes', () => {
         });
         expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
           contentAction: 'none',
-          openSizeFloor:
-            kind === 'space' ? { width: 292, height: 266 } : { width: 260, height: 146 },
           embedsMap: kind === 'space',
         });
         if (!open)
@@ -350,7 +348,7 @@ describe('projectResourceNodes', () => {
     const imageNode = (options: Parameters<typeof projectResourceNodes>[1]) =>
       projectResourceNodes(withImage, options).find((node) => node.id === imageId)?.data;
 
-    const picture = { kind: 'image', url, naturalSize: undefined, via: 'self' };
+    const picture = { kind: 'image', url, via: 'self' };
     expect(imageNode({})).toMatchObject({ kind: 'image', display: { shown: 'closed' } });
     expect(imageNode({ openResourceIds: new Set([imageId]) })).toMatchObject({
       kind: 'image',
@@ -402,11 +400,11 @@ describe('projectResourceNodes display', () => {
     });
     expect(display(imageId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, naturalSize: undefined, via: 'self' },
+      content: { kind: 'image', url, via: 'self' },
     });
     expect(display(referenceId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, naturalSize: undefined, via: 'reference' },
+      content: { kind: 'image', url, via: 'reference' },
     });
   });
 
@@ -420,7 +418,7 @@ describe('projectResourceNodes display', () => {
       open: true,
       display: {
         shown: 'presented',
-        content: { kind: 'image', url, naturalSize: undefined, via: 'reference' },
+        content: { kind: 'image', url, via: 'reference' },
       },
     });
   });

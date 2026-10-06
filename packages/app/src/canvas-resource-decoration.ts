@@ -1,5 +1,6 @@
 import type { Continuation } from './continuation';
 import {
+  takesOpen,
   takesResourceShape,
   type GraphId,
   type ResourceDocument,
@@ -22,7 +23,7 @@ import type { OpenSpaces } from './open-spaces';
 import type { ResourceResize } from './render-adapter';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import type { SpaceResourceTargets } from './space-resource-targets';
-import { snapResourceSizeToClose, RESOURCE_SIZE } from './resource';
+import { RESOURCE_SIZE } from './resource';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
@@ -183,7 +184,8 @@ export function decorateSharedResourceNode(
       | 'entityActions'
     >
   > = {};
-  if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
+  if (resourceBelongsToWorkingSpace && context.authorOnCanvas && takesOpen(node.data.kind)) {
+    // An Ur Resource has no content to show, so it offers no Open or Close.
     patch.onEditResource = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
   } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {
@@ -209,10 +211,8 @@ export function decorateSharedResourceNode(
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);
   }
   if (resourceBelongsToWorkingSpace && node.data.open === true && context.authorOnCanvas) {
-    // Ordinary Open proposals stop at the content's floor, which keeps a drawn
-    // Map's footer clear. The gesture itself still reaches Closed Size so
-    // ADR 0066's magnet can Close it.
-    const floor = node.data.openSizeFloor;
+    // The Closed Size is the one floor for every kind, Open or Closed; the
+    // control's own minimum keeps a proposal at or above it.
     patch.resize = {
       minWidth: RESOURCE_SIZE.width,
       minHeight: RESOURCE_SIZE.height,
@@ -221,16 +221,10 @@ export function decorateSharedResourceNode(
         context.resourceResize.beginResize(node.data.resourceId);
       },
       onResize: (size) => {
-        const proposed = snapResourceSizeToClose(size);
-        context.resourceResize.previewResize(
-          node.data.resourceId,
-          proposed === RESOURCE_SIZE
-            ? proposed
-            : {
-                width: Math.max(floor.width, size.width),
-                height: Math.max(floor.height, size.height),
-              },
-        );
+        context.resourceResize.previewResize(node.data.resourceId, {
+          width: Math.max(RESOURCE_SIZE.width, size.width),
+          height: Math.max(RESOURCE_SIZE.height, size.height),
+        });
       },
       onResizeEnd: () => context.resourceResize.finishResize(node.data.resourceId),
       onResizeCancel: () => context.resourceResize.cancelResize(node.data.resourceId),

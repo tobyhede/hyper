@@ -29,7 +29,6 @@ describe('PresentedResource', () => {
         title={'Harbour\nAt dusk'}
         content={{
           kind: 'image',
-          naturalSize: undefined,
           url: 'https://example.com/h.png',
           via: 'self',
         }}
@@ -68,7 +67,6 @@ describe('PresentedResource', () => {
         title="Harbour, again"
         content={{
           kind: 'image',
-          naturalSize: undefined,
           url: 'https://example.com/h.png',
           via: 'reference',
         }}

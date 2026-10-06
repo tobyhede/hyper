@@ -1,6 +1,8 @@
 import {
   DEFAULT_RESOURCE_SHAPE,
+  resourceOpen,
   resourceShape,
+  takesOpen,
   takesResourceShape,
   uuidSchema,
   type Resource,
@@ -59,7 +61,9 @@ export type SpaceReferenceErrorKind =
   | 'reference-target-must-own-content'
   | 'space-resource-reference-cycle'
   /** A Map gives a Resource that is not an Ur Resource a Shape other than the rectangle. */
-  | 'shape-requires-ur-resource';
+  | 'shape-requires-ur-resource'
+  /** A Map stores an Ur Resource Open, which has no content to show. */
+  | 'open-requires-content';
 
 /**
  * One failed cross-reference. Named for the space whose references it is about,
@@ -187,6 +191,13 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
           kind: 'shape-requires-ur-resource',
           ref: resourceId,
           message: `Map "${subject.id}" draws ${member.kind} resource "${resourceId}" as a ${resourceShape(placement)}; only an Ur Resource takes a Shape other than the rectangle`,
+        });
+      }
+      if (!takesOpen(member.kind) && placement !== undefined && resourceOpen(placement)) {
+        errors.push({
+          kind: 'open-requires-content',
+          ref: resourceId,
+          message: `Map "${subject.id}" stores ${member.kind} resource "${resourceId}" Open; a Resource with no content is always Closed`,
         });
       }
     }

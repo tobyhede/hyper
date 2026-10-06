@@ -32,7 +32,7 @@ const EVERY_REFUSAL = {
   },
   'resource-already-in-map': { code: 'resource-already-in-map' },
   'resource-not-in-map': { code: 'resource-not-in-map' },
-  'resource-not-open': { code: 'resource-not-open' },
+  'open-requires-content': { code: 'open-requires-content' },
   'shape-requires-ur-resource': { code: 'shape-requires-ur-resource' },
   'resource-has-references': { code: 'resource-has-references', referenceTitles: ['Recap'] },
   'graph-title-required': { code: 'graph-title-required' },

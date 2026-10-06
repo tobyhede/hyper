@@ -40,7 +40,7 @@ const snapshot: SpaceSnapshot = {
         kind: 'positioned',
         positions: {
           [MARKDOWN]: { x: 0, y: 0, open: false },
-          [IMAGE]: { x: 400, y: 0, open: true, openSize: { width: 500, height: 420 } },
+          [IMAGE]: { x: 400, y: 0, open: true, size: { width: 500, height: 420 } },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: MARKDOWN, to: IMAGE }] }],
         activeGraph: GRAPH_ID,

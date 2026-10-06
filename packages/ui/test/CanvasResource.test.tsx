@@ -55,14 +55,11 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
 it('keeps a pending replacement mounted when its entity actions become unavailable', async () => {
   const waiting = Promise.withResolvers<string | null>();
   const front: CanvasResourceFront = { kind: 'image' };
-  const display = beginReplacing(
-    opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
-    {
-      accept: 'image/png',
-      onReplace: () => waiting.promise,
-      onEnd: () => undefined,
-    },
-  );
+  const display = beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+    accept: 'image/png',
+    onReplace: () => waiting.promise,
+    onEnd: () => undefined,
+  });
   const { rerender } = render(
     <CanvasResource
       state="selected"
@@ -248,7 +245,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="rest"
         title={'Figure\nFrom the north mole'}
@@ -273,7 +270,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="rest"
         title="Figure"
@@ -296,7 +293,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image', onOpenChange }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="selected"
         title="Figure"
@@ -344,14 +341,11 @@ describe('CanvasResource kind and interaction state', () => {
           onOpenChange: () => 'completed',
           onBeginEdit: () => undefined,
         }}
-        display={beginReplacing(
-          opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
-          {
-            accept: 'image/png',
-            onReplace: () => Promise.resolve(null),
-            onEnd,
-          },
-        )}
+        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+          accept: 'image/png',
+          onReplace: () => Promise.resolve(null),
+          onEnd,
+        })}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -379,14 +373,11 @@ describe('CanvasResource kind and interaction state', () => {
           kind: 'image',
           onOpenChange: () => 'completed',
         }}
-        display={beginReplacing(
-          opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
-          {
-            accept: 'image/png',
-            onReplace: () => new Promise(() => undefined),
-            onEnd,
-          },
-        )}
+        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+          accept: 'image/png',
+          onReplace: () => new Promise(() => undefined),
+          onEnd,
+        })}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -409,7 +400,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image', onBeginEdit }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="selected"
         title="Figure"
@@ -429,7 +420,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image', onBeginEdit: () => undefined }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="selected"
         title="Figure"
@@ -467,7 +458,6 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'reference', onOpenChange: () => 'completed' }}
         display={opened({
           kind: 'image',
-          naturalSize: undefined,
           url: FIGURE_URL,
           via: 'reference',
         })}
@@ -500,7 +490,6 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image', onBeginEdit: () => undefined }}
         display={opened({
           kind: 'image',
-          naturalSize: undefined,
           url: FIGURE_URL,
           via: 'reference',
         })}
@@ -2105,7 +2094,7 @@ describe('CanvasResource Close fade', () => {
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="rest"
         title="A"
@@ -2131,7 +2120,6 @@ describe('CanvasResource Close fade', () => {
         front={{ kind: 'reference' }}
         display={opened({
           kind: 'image',
-          naturalSize: undefined,
           url: FIGURE_URL,
           via: 'reference',
         })}

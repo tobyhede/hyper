@@ -7,10 +7,11 @@ import type { Placement } from './placement';
  * The only strategy that *reads* geometry rather than computing it — placement is authored content, not an artifact of an algorithm
  * (ADR 0014). It is the one strategy with a **Map** behind it: the Placement
  * it takes is that Map's, and `Placement.fromLayoutStrategyGraph` is this same
- * conversion run backwards. The Placement is read exactly as authored — an Open
- * Resource's neighbours were moved by the Edit that opened it (ADR 0084), so there
- * is no derived layer between those positions and the ones drawn, and this reads
- * an Open Resource's rect off its own entry alone. Like `gridStrategy` it consumes
+ * conversion run backwards. The Placement is read exactly as authored — a
+ * resized Resource's neighbours were moved by the Edit that resized it (ADR 0084),
+ * so there is no derived layer between those positions and the ones drawn. A
+ * stored size is read off the entry; an entry storing none keeps the size the
+ * caller declared, which is the Closed Size on the canvas. Like `gridStrategy` it consumes
  * only the resources: it never looks at the edges, and it answers positions and
  * nothing else, leaving the render layer to spread handles evenly and draw a
  * plain curve. The contract has nowhere to put anything else (ADR 0086), so if
@@ -37,8 +38,8 @@ export function positionedStrategy(positions: Placement): LayoutStrategy {
                 ...resource,
                 x: at.x,
                 y: at.y,
-                width: at.open ? at.openSize.width : resource.width,
-                height: at.open ? at.openSize.height : resource.height,
+                width: at.size?.width ?? resource.width,
+                height: at.size?.height ?? resource.height,
               },
             ];
       }),

@@ -159,7 +159,7 @@ type Op =
       readonly y: number;
     }
   | {
-      readonly kind: 'open';
+      readonly kind: 'resize';
       readonly map: number;
       readonly resource: number;
       readonly width: number;
@@ -231,7 +231,7 @@ const op: fc.Arbitrary<Op> = fc.oneof(
     y: coordinate,
   }),
   fc.record({
-    kind: fc.constant('open' as const),
+    kind: fc.constant('resize' as const),
     map: index,
     resource: index,
     width: fc.integer({ min: COLLAPSED_RESOURCE_SIZE.width, max: 2000 }),
@@ -335,19 +335,15 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
           };
         });
         break;
-      case 'open':
+      case 'resize':
       case 'close':
         withMap(current.map, (m) => {
           const resource = at(resourceIds, current.resource);
           const placed = resource === undefined ? undefined : m.positions[resource];
           if (resource === undefined || placed === undefined) return undefined;
           const next =
-            current.kind === 'open'
-              ? {
-                  ...placed,
-                  open: true as const,
-                  openSize: { width: current.width, height: current.height },
-                }
+            current.kind === 'resize'
+              ? { ...placed, size: { width: current.width, height: current.height } }
               : { ...placed, open: false as const };
           return { ...m, positions: { ...m.positions, [resource]: next } };
         });
@@ -551,7 +547,7 @@ describe('the SQL fast-path decision', () => {
   it('writes a Map-internal Edit to the Space other Spaces select into', () => {
     const next = applyOps(target, [
       { kind: 'move', map: 0, resource: 2, x: 40, y: 80 },
-      { kind: 'open', map: 0, resource: 0, width: 600, height: 400 },
+      { kind: 'resize', map: 0, resource: 0, width: 600, height: 400 },
       { kind: 'reshape', map: 0, resource: 1, shape: 'diamond' },
       { kind: 'add-edge', map: 0, graph: 1, from: 2, to: 3 },
       { kind: 'retitle-graph', map: 1, graph: 0, title: 'Renamed' },

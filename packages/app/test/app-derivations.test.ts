@@ -92,20 +92,12 @@ describe('referenceAnchor', () => {
     });
   });
 
-  it('adds the room an Open source holds', () => {
-    const openSize = { width: 600, height: 400 };
-    const growth = Placement.growth(openSize);
-    const anchor = referenceAnchor({ x: 0, y: 0, open: true, openSize }, centre);
-
-    expect(anchor.x).toBe(
-      Math.max(RESOURCE_WIDTH, growth.width + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO)),
-    );
-    expect(anchor.y).toBe(
-      Math.max(
-        RESOURCE_HEIGHT,
-        growth.height + Math.round(RESOURCE_HEIGHT * REFERENCE_OFFSET_RATIO),
-      ),
-    );
+  it('steps from a resized source’s bottom-right corner, Open or Closed', () => {
+    for (const open of [true, false]) {
+      expect(
+        referenceAnchor({ x: 0, y: 0, open, size: { width: 600, height: 400 } }, centre),
+      ).toEqual({ x: 600 - 260 + 195, y: 400 - 146 + 110 });
+    }
   });
 
   it('lands at the visible centre for a source the Map does not place', () => {

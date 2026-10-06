@@ -7,7 +7,6 @@ import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
   contentAction,
-  openSizeFloor,
   embedsMap,
   type Resource,
   type ResourceId,
@@ -55,7 +54,6 @@ export type ResourceNodeData = {
   kind: Resource['kind'];
   /** Resolved content facts remain available while the display is Closed. */
   contentAction: ReturnType<typeof contentAction>;
-  openSizeFloor: ReturnType<typeof openSizeFloor>;
   embedsMap: boolean;
   /** Reports rendered title geometry by placement, including embedded placements. */
   onBodyHeightChange?: (id: string, height: number | null) => void;
@@ -340,7 +338,6 @@ export function projectResourceNodes(
         readOnly: options.readOnly ?? false,
         kind: resource.kind,
         contentAction: contentAction(content),
-        openSizeFloor: openSizeFloor(content),
         embedsMap: embedsMap(content),
         active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),

@@ -824,7 +824,7 @@ describe('connecting from the Connect list', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+                  [RESOURCE_A]: { x: 10, y: 20, open: true, size: { width: 560, height: 420 } },
                 },
               }
             : m,

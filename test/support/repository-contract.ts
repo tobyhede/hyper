@@ -1130,7 +1130,7 @@ export const spaceRepositoryContract = (
       const withResourceShapes = (
         first: ResourceShape,
         second: ResourceShape,
-        secondOpen: boolean,
+        secondResized: boolean,
       ): SpaceSnapshot => {
         const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
         return {
@@ -1146,12 +1146,12 @@ export const spaceRepositoryContract = (
               ...m,
               positions: {
                 [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: first },
-                [SECOND_RESOURCE_ID]: secondOpen
+                [SECOND_RESOURCE_ID]: secondResized
                   ? {
                       x: 300,
                       y: 0,
-                      open: true,
-                      openSize: { width: 560, height: 420 },
+                      open: false,
+                      size: { width: 560, height: 420 },
                       shape: second,
                     }
                   : { x: 300, y: 0, open: false, shape: second },

@@ -12,7 +12,9 @@ import {
   resourceDocumentSchema,
   resourceFrontmatterSchema,
   resourceSchema,
+  resourceOpen,
   resourceShape,
+  resourceSize,
   spaceFileSchema,
   uuidSchema,
 } from '../src/index';
@@ -423,8 +425,8 @@ describe('space file maps', () => {
     interface Placement {
       x: number;
       y: number;
-      open: boolean;
-      openSize?: { width: number; height: number };
+      open?: boolean;
+      size?: { width: number; height: number };
     }
     const parsePlacement = (placement: Placement) =>
       spaceFileSchema.safeParse({
@@ -442,15 +444,13 @@ describe('space file maps', () => {
       expect(parsePlacement({ x: 0, y: value, open: false })).toBe(false);
     });
 
-    it.each([Infinity, NaN])('rejects an Open Size dimension of %s', (value) => {
+    it.each([Infinity, NaN])('rejects a size dimension of %s', (value) => {
+      expect(parsePlacement({ x: 0, y: 0, open: true, size: { width: value, height: 146 } })).toBe(
+        false,
+      );
+      expect(parsePlacement({ x: 0, y: 0, size: { width: 260, height: value } })).toBe(false);
       expect(
-        parsePlacement({ x: 0, y: 0, open: true, openSize: { width: value, height: 146 } }),
-      ).toBe(false);
-      expect(
-        parsePlacement({ x: 0, y: 0, open: true, openSize: { width: 260, height: value } }),
-      ).toBe(false);
-      expect(
-        parsePlacement({ x: 0, y: 0, open: false, openSize: { width: value, height: value } }),
+        parsePlacement({ x: 0, y: 0, open: false, size: { width: value, height: value } }),
       ).toBe(false);
     });
 
@@ -464,9 +464,9 @@ describe('space file maps', () => {
       expect(spaceFileSchema.safeParse(decoded).success).toBe(false);
     });
 
-    it('keeps negative coordinates and the minimum Open Size', () => {
+    it('keeps negative coordinates and the minimum size', () => {
       expect(
-        parsePlacement({ x: -1e6, y: -0.5, open: true, openSize: { width: 260, height: 146 } }),
+        parsePlacement({ x: -1e6, y: -0.5, open: true, size: { width: 260, height: 146 } }),
       ).toBe(true);
     });
 
@@ -482,7 +482,7 @@ describe('space file maps', () => {
                 x: -12.5,
                 y: 1e300,
                 open: true,
-                openSize: { width: 260, height: 146 },
+                size: { width: 260, height: 146 },
                 shape: 'diamond',
               },
             },
@@ -500,8 +500,8 @@ describe('space file maps', () => {
     interface StoredEntry {
       readonly x: number;
       readonly y: number;
-      readonly open: boolean;
-      readonly openSize?: { readonly width: number; readonly height: number };
+      readonly open?: boolean;
+      readonly size?: { readonly width: number; readonly height: number };
       readonly shape?: string | number | null;
     }
     const parseEntry = (entry: StoredEntry) =>
@@ -520,7 +520,7 @@ describe('space file maps', () => {
           x: 0,
           y: 0,
           open: true,
-          openSize: { width: 400, height: 300 },
+          size: { width: 400, height: 300 },
           shape: resourceShape,
         });
         expect(opened.data?.maps?.[0]?.positions).toMatchObject({ [A]: { shape: resourceShape } });
@@ -530,7 +530,7 @@ describe('space file maps', () => {
     it('accepts an entry with no Shape, Closed and Open, which draws as the rectangle', () => {
       for (const entry of [
         { x: 0, y: 0, open: false },
-        { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } },
+        { x: 0, y: 0, open: true, size: { width: 400, height: 300 } },
       ]) {
         const parsed = parseEntry(entry);
         expect(parsed.success).toBe(true);
@@ -566,34 +566,73 @@ describe('space file maps', () => {
     });
   });
 
-  it('requires an Open Resource to be at least the Closed Resource size', () => {
-    const positions = (width: number, height: number) => ({
-      '00000000-0000-4000-8000-000000000002': {
-        x: 0,
-        y: 0,
-        open: true,
-        openSize: { width, height },
-      },
+  describe('a size and an Open/Closed state on each entry', () => {
+    const A = '00000000-0000-4000-8000-000000000002';
+    /** An entry as a hand or a stale writer might put it on disk, the retired key included. */
+    interface StoredEntry {
+      readonly x: number;
+      readonly y: number;
+      readonly open?: boolean;
+      readonly size?: { readonly width: number; readonly height: number };
+      readonly openSize?: { readonly width: number; readonly height: number };
+    }
+    const parseEntry = (entry: StoredEntry) =>
+      spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        maps: [{ ...working, positions: { ...working.positions, [A]: entry } }],
+      });
+    const placedOf = (entry: StoredEntry) =>
+      parseEntry(entry).data?.maps?.[0]?.positions[uuidSchema.parse(A)];
+
+    it('reads an entry with neither as Closed at the Closed Size', () => {
+      const placed = placedOf({ x: 0, y: 0 });
+      expect(placed).toEqual({ x: 0, y: 0 });
+      expect(placed === undefined ? undefined : resourceSize(placed)).toEqual({
+        width: 260,
+        height: 146,
+      });
+      expect(placed === undefined ? undefined : resourceOpen(placed)).toBe(false);
     });
 
-    expect(
-      spaceFileSchema.safeParse({
-        ...validSpaceFile,
-        maps: [{ ...working, positions: positions(259, 146) }],
-      }).success,
-    ).toBe(false);
-    expect(
-      spaceFileSchema.safeParse({
-        ...validSpaceFile,
-        maps: [{ ...working, positions: positions(260, 145) }],
-      }).success,
-    ).toBe(false);
-    expect(
-      spaceFileSchema.safeParse({
-        ...validSpaceFile,
-        maps: [{ ...working, positions: positions(260, 146) }],
-      }).success,
-    ).toBe(true);
+    it('answers a stored size and state as the ones drawn, Open or Closed', () => {
+      expect(resourceSize({ size: { width: 400, height: 300 } })).toEqual({
+        width: 400,
+        height: 300,
+      });
+      expect(resourceOpen({ open: true })).toBe(true);
+      expect(resourceOpen({ open: false })).toBe(false);
+      for (const open of [true, false]) {
+        expect(placedOf({ x: 0, y: 0, open, size: { width: 400, height: 300 } })).toEqual({
+          x: 0,
+          y: 0,
+          open,
+          size: { width: 400, height: 300 },
+        });
+      }
+    });
+
+    it('refuses a size below the Closed Size on either axis, Open or Closed', () => {
+      for (const open of [true, false, undefined]) {
+        const at = (width: number, height: number) =>
+          parseEntry(
+            open === undefined
+              ? { x: 0, y: 0, size: { width, height } }
+              : { x: 0, y: 0, open, size: { width, height } },
+          ).success;
+        expect(at(259, 146)).toBe(false);
+        expect(at(260, 145)).toBe(false);
+        expect(at(260, 146)).toBe(true);
+      }
+    });
+
+    it('refuses the retired openSize, Open or Closed', () => {
+      expect(
+        parseEntry({ x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } }).success,
+      ).toBe(false);
+      expect(
+        parseEntry({ x: 0, y: 0, open: false, openSize: { width: 400, height: 300 } }).success,
+      ).toBe(false);
+    });
   });
 
   it('defaults a map with no kind to positioned, so one can be hand-written', () => {

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  DEFAULT_OPEN_SIZE,
   EDGE_TITLE_ONE_LINE,
   graphHeadShape,
   uuidSchema,
@@ -235,7 +234,7 @@ describe('Add Resource', () => {
           {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+              [RESOURCE_A]: { x: 10, y: 20, open: true, size: { width: 560, height: 420 } },
               [RESOURCE_B]: { x: 300, y: 40, open: false },
             },
           },
@@ -472,15 +471,27 @@ describe('Edit Resource', () => {
   });
 });
 
-describe('Open Resource geometry', () => {
-  it('restores a resized Open Size after Closing and Opening again', () => {
+describe('Resource size and Open', () => {
+  it('Opens and Closes changing nothing but open', () => {
     const { authoring, session } = openPositioned();
+    const positionsBefore = mapOf(session.getState().working, MAP_ID)?.positions;
 
     expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
-      {
-        kind: 'completed',
-      },
+      { kind: 'completed' },
     );
+    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
+      ...positionsBefore,
+      [RESOURCE_A]: { x: 10, y: 20, open: true },
+    });
+    expect(authoring.complete(CANVAS, { kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual(
+      { kind: 'completed' },
+    );
+    expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual(positionsBefore);
+  });
+
+  it('resizes a Closed Resource, which stays Closed, and Opening it keeps the size', () => {
+    const { authoring, session } = openPositioned();
+
     expect(
       authoring.complete(CANVAS, {
         kind: 'resized-resource',
@@ -488,46 +499,30 @@ describe('Open Resource geometry', () => {
         size: { width: 640, height: 480 },
       }),
     ).toEqual({ kind: 'completed' });
-    expect(authoring.complete(CANVAS, { kind: 'closed-resource', resourceId: RESOURCE_A })).toEqual(
-      {
-        kind: 'completed',
-      },
-    );
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
       open: false,
-      openSize: { width: 640, height: 480 },
+      size: { width: 640, height: 480 },
     });
 
-    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
-      {
-        kind: 'completed',
-      },
-    );
+    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
       open: true,
-      openSize: { width: 640, height: 480 },
+      size: { width: 640, height: 480 },
     });
   });
 
-  it('Closes at the exact Closed rect without replacing the remembered Open Size', () => {
+  it('stays Open when resized back to the Closed Size', () => {
     const { authoring, session } = openPositioned();
-
-    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
-      {
-        kind: 'completed',
-      },
-    );
-    expect(
-      authoring.complete(CANVAS, {
-        kind: 'resized-resource',
-        resourceId: RESOURCE_A,
-        size: { width: 640, height: 480 },
-      }),
-    ).toEqual({ kind: 'completed' });
+    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
+    authoring.complete(CANVAS, {
+      kind: 'resized-resource',
+      resourceId: RESOURCE_A,
+      size: { width: 640, height: 480 },
+    });
 
     expect(
       authoring.complete(CANVAS, {
@@ -539,22 +534,25 @@ describe('Open Resource geometry', () => {
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
-      open: false,
-      openSize: { width: 640, height: 480 },
+      open: true,
+      size: { width: 260, height: 146 },
     });
   });
 
-  it('refuses a stale resize completion for a Resource that is no longer Open', () => {
-    const { authoring, session } = openPositioned();
+  it('refuses to Open an Ur Resource, which has no content to show', () => {
+    const { authoring, session } = open({
+      ...positionedSnapshot,
+      resources: positionedSnapshot.resources.map((resource) =>
+        resource.id === RESOURCE_A
+          ? { id: RESOURCE_A, document: { title: 'A', kind: 'ur' } }
+          : resource,
+      ),
+    });
     const before = session.getState().working;
 
-    expect(
-      authoring.complete(CANVAS, {
-        kind: 'resized-resource',
-        resourceId: RESOURCE_A,
-        size: { width: 560, height: 420 },
-      }),
-    ).toEqual({ kind: 'refused', refusal: { code: 'resource-not-open' } });
+    expect(authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A })).toEqual(
+      { kind: 'refused', refusal: { code: 'open-requires-content' } },
+    );
     expect(session.getState().working).toBe(before);
   });
 
@@ -579,14 +577,13 @@ describe('Open Resource geometry', () => {
 
   it('is unchanged and moves nobody when the proposal is the size the Resource already has', () => {
     const { authoring, session } = openPositioned();
-    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
     const before = session.getState().working;
 
     expect(
       authoring.complete(CANVAS, {
         kind: 'resized-resource',
         resourceId: RESOURCE_A,
-        size: DEFAULT_OPEN_SIZE,
+        size: { width: 260, height: 146 },
       }),
     ).toEqual({ kind: 'unchanged' });
     expect(session.getState().working).toBe(before);
@@ -681,9 +678,13 @@ describe('Change Shape', () => {
     });
   });
 
-  it('is recorded while the Resource is Open, and kept through Resize and Close', () => {
+  it('is kept through Resize, and the size through a Shape', () => {
     const { authoring, session } = open(urSnapshot);
-    authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: RESOURCE_A });
+    authoring.complete(CANVAS, {
+      kind: 'resized-resource',
+      resourceId: RESOURCE_A,
+      size: { width: 640, height: 480 },
+    });
 
     expect(
       authoring.complete(CANVAS, {
@@ -692,25 +693,16 @@ describe('Change Shape', () => {
         shape: 'pill',
       }),
     ).toEqual({ kind: 'completed' });
-    expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
-      x: 10,
-      y: 20,
-      open: true,
-      openSize: DEFAULT_OPEN_SIZE,
-      shape: 'pill',
-    });
-
     authoring.complete(CANVAS, {
       kind: 'resized-resource',
       resourceId: RESOURCE_A,
-      size: { width: 640, height: 480 },
+      size: { width: 700, height: 500 },
     });
-    authoring.complete(CANVAS, { kind: 'closed-resource', resourceId: RESOURCE_A });
     expect(mapOf(session.getState().working, MAP_ID)?.positions[RESOURCE_A]).toEqual({
       x: 10,
       y: 20,
       open: false,
-      openSize: { width: 640, height: 480 },
+      size: { width: 700, height: 500 },
       shape: 'pill',
     });
   });
@@ -1318,10 +1310,10 @@ describe('Rename Space', () => {
 
   /**
    * The Map rides through a rename unchanged — `renamed-space` writes only
-   * `document.title` — so an Open Resource's remembered Open Size survives it too,
-   * with nothing narrower than the whole Map in the way to drop it.
+   * `document.title` — so every Open state and size survives it too, with
+   * nothing narrower than the whole Map in the way to drop it.
    */
-  it('leaves an Open Resource and its remembered Open Size exactly as they were', () => {
+  it('leaves an Open Resource and every size exactly as they were', () => {
     const opened: SpaceSnapshot = {
       ...positionedSnapshot,
       document: {
@@ -1330,8 +1322,8 @@ describe('Rename Space', () => {
           {
             ...positionedSnapshot.document.maps![0]!,
             positions: {
-              [RESOURCE_A]: { x: 10, y: 20, open: false, openSize: { width: 500, height: 300 } },
-              [RESOURCE_B]: { x: 300, y: 40, open: true, openSize: { width: 640, height: 360 } },
+              [RESOURCE_A]: { x: 10, y: 20, open: false, size: { width: 500, height: 300 } },
+              [RESOURCE_B]: { x: 300, y: 40, open: true, size: { width: 640, height: 360 } },
             },
           },
         ],

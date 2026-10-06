@@ -134,7 +134,7 @@ type TopologyPreservingDecision =
  * What another Space's Space Resource can select in this one: each Map id,
  * and each Graph id beside the id of the Map that owns it, in one sorted list
  * so two documents compare element by element. Titles, colours, positions,
- * Open state, Open Size, Edges, `activeGraph` and order are left out, because
+ * Open state, size, Edges, `activeGraph` and order are left out, because
  * no aggregate check reads them.
  */
 const selectableStructure = (document: SpaceSnapshot['document']): readonly string[] =>

@@ -11,6 +11,7 @@ import {
   type ResourcePlacement,
   type ResourceShape,
   COLLAPSED_RESOURCE_SIZE,
+  resourceSize,
   EDGE_TITLE_ONE_LINE,
   IMAGE_URL_UNSUPPORTED,
   isAcceptedImageUrl,
@@ -75,18 +76,9 @@ const ELIGIBLE = { kind: 'eligible' } as const;
  */
 const BESIDE_GAP = COLLAPSED_RESOURCE_SIZE.width / 2;
 
-/**
- * Right of the source, tops level: past its drawn rect so an Open source does
- * not cover it, and past the collapsed right edge so Closing the source
- * reclaims width only (ADR 0093).
- */
+/** Right of the source, tops level: past its drawn rect so the source does not cover it. */
 const besideSource = (at: ResourcePlacement): MapPosition => ({
-  x:
-    at.x +
-    (at.open
-      ? Math.max(COLLAPSED_RESOURCE_SIZE.width, at.openSize.width)
-      : COLLAPSED_RESOURCE_SIZE.width) +
-    BESIDE_GAP,
+  x: at.x + resourceSize(at).width + BESIDE_GAP,
   y: at.y,
 });
 
@@ -370,7 +362,7 @@ export type AuthoringRefusal =
   | { readonly code: 'reference-target-must-own-content'; readonly targetId: ResourceId }
   | { readonly code: 'resource-already-in-map' }
   | { readonly code: 'resource-not-in-map' }
-  | { readonly code: 'resource-not-open' }
+  | { readonly code: 'open-requires-content' }
   | { readonly code: 'shape-requires-ur-resource' }
   | {
       readonly code: 'resource-has-references';
@@ -1266,8 +1258,6 @@ export function createSpaceAuthoring({
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'resized-resource') {
-      // Only an exact Closed Size reaches here as a Close: the magnetic range
-      // that snaps a near miss to it is the canvas's (ADR 0066).
       const outcome = SnapshotEdit.resize(snapshot, mapId, completion.resourceId, completion.size);
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;

@@ -9,12 +9,7 @@ import {
   type RenderResult,
 } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import {
-  DEFAULT_OPEN_SIZE,
-  spaceSnapshotSchema,
-  uuidSchema,
-  type SpaceSnapshot,
-} from '@project/core';
+import { spaceSnapshotSchema, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
 import { MemorySpaceBackend, type SpaceSession } from '@project/persistence';
 import { mountSpace } from './space-mounting';
@@ -89,7 +84,7 @@ const snapshot = (
           kind: 'positioned',
           positions: {
             [RESOURCE_ID]: open
-              ? { x, y, open: true, openSize: DEFAULT_OPEN_SIZE }
+              ? { x, y, open: true, size: { width: 560, height: 420 } }
               : { x, y, open: false },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],

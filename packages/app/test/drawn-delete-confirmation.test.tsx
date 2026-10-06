@@ -74,7 +74,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
             x: 0,
             y: 0,
             open: true,
-            openSize: { width: 700, height: 500 },
+            size: { width: 700, height: 500 },
           },
         },
         graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],

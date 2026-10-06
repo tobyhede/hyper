@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { Story } from '@ladle/react';
 import {
-  OPEN_RESOURCE_CHROME,
   RESOURCE_SHAPES,
   uuidSchema,
   type Map,
@@ -17,7 +16,7 @@ import {
   type FrontDisplay,
 } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
-import { resourceSizeVars, snapResourceSizeToClose } from '#src/resource';
+import { resourceSizeVars } from '#src/resource';
 import { CanvasResourceSpecimen } from '../support/CanvasResourceSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { requireDefaultMap } from '#src/map-resolution';
@@ -385,7 +384,7 @@ function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boole
       open
       selected={selected}
       nodeSize={size}
-      onResize={(proposal) => setSize(snapResourceSizeToClose(proposal))}
+      onResize={setSize}
       stageClassName="inv-resource-node-stage--large"
     />
   );
@@ -597,10 +596,10 @@ OpenReference.meta = { iframed: true };
 
 /**
  * An Open Image Resource is the Open Markdown front with its picture as the
- * content. Three specimens at one canvas unit per pixel: a 400×300
- * picture at the size its first Open writes — the picture plus the front's
- * chrome — the same picture in a Resource resized larger, where it keeps its
- * natural size rather than being enlarged, and a URL that does not load.
+ * content. Three specimens at one canvas unit per pixel: a 400×300 picture in
+ * a Resource sized to hold it — the picture plus the front's chrome — the same
+ * picture in a Resource resized larger, where it keeps its natural size rather
+ * than being enlarged, and a URL that does not load.
  */
 export const OpenImage: Story = () => {
   const [open, setOpen] = useState(true);
@@ -608,26 +607,22 @@ export const OpenImage: Story = () => {
     setOpen(next);
     return 'completed' as const;
   };
-  const firstOpen = {
-    width: 400 + OPEN_RESOURCE_CHROME.width,
-    height: 300 + OPEN_RESOURCE_CHROME.height,
-  };
+  const sizedToPicture = { width: 408, height: 359 };
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
-      <section aria-label="First Open" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">400×300 at its first Open</p>
+      <section aria-label="Sized to its picture" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">400×300 in a Resource sized to hold it</p>
         <CanvasResourceNodeSpecimen
           title="Harbour"
           kind="image"
           content={{
             kind: 'image',
             url: harbour,
-            naturalSize: { width: 400, height: 300 },
             via: 'self',
           }}
           open={open}
           onOpenChange={changeOpen}
-          nodeSize={open ? firstOpen : closedFrame}
+          nodeSize={open ? sizedToPicture : closedFrame}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -640,7 +635,6 @@ export const OpenImage: Story = () => {
           content={{
             kind: 'image',
             url: harbour,
-            naturalSize: { width: 400, height: 300 },
             via: 'self',
           }}
           open
@@ -657,11 +651,10 @@ export const OpenImage: Story = () => {
           content={{
             kind: 'image',
             url: '/images/missing-picture.png',
-            naturalSize: undefined,
             via: 'self',
           }}
           open
-          nodeSize={firstOpen}
+          nodeSize={sizedToPicture}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -682,9 +675,8 @@ const imageReferenceMap: DrawnMap = {
  * picture read-only through the same front (ADR 0070, ADR 0106): its own
  * Title, Close, and no Replace, even where the picture does not load. Both
  * Resources are in a Space that holds their Image Resource Targets, so what
- * each draws is resolved from its Target rather than handed to it. Each is at
- * the size its first Open writes: the Target's recorded 400×300 picture plus
- * the front's chrome.
+ * each draws is resolved from its Target rather than handed to it. Each is
+ * sized to hold the Target's 400×300 picture plus the front's chrome.
  */
 export const OpenImageReference: Story = () => {
   const [open, setOpen] = useState(true);
@@ -692,10 +684,7 @@ export const OpenImageReference: Story = () => {
     setOpen(next);
     return 'completed' as const;
   };
-  const firstOpen = {
-    width: 400 + OPEN_RESOURCE_CHROME.width,
-    height: 300 + OPEN_RESOURCE_CHROME.height,
-  };
+  const sizedToPicture = { width: 408, height: 359 };
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
       <section aria-label="Image Target" className="flex flex-col gap-2">
@@ -705,7 +694,7 @@ export const OpenImageReference: Story = () => {
           resourceId={imageReferenceIds.harbourReference}
           open={open}
           onOpenChange={changeOpen}
-          nodeSize={open ? firstOpen : closedFrame}
+          nodeSize={open ? sizedToPicture : closedFrame}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -716,7 +705,7 @@ export const OpenImageReference: Story = () => {
           drawn={imageReferenceMap}
           resourceId={imageReferenceIds.missingReference}
           open
-          nodeSize={firstOpen}
+          nodeSize={sizedToPicture}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
         />

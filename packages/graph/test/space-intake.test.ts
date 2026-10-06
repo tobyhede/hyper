@@ -704,7 +704,7 @@ describe.each([
     });
   });
 
-  describe('Shapes (ADR 0121)', () => {
+  describe('Shapes (ADR 0121) and Open on each entry', () => {
     const IMAGE: Resource = {
       id: A,
       title: 'Figure',
@@ -746,7 +746,7 @@ describe.each([
     });
 
     it.each(['rectangle', 'pill', 'ellipse', 'diamond'] as const)(
-      'loads an Ur Resource in the %s, Open or Closed',
+      'loads an Ur Resource in the %s, at the Closed Size or resized',
       (resourceShape) => {
         const ur: Resource = { id: A, title: 'Node', kind: 'ur' };
         const space = loaded(
@@ -760,8 +760,7 @@ describe.each([
                   [B]: {
                     x: 320,
                     y: 0,
-                    open: true,
-                    openSize: { width: 400, height: 300 },
+                    size: { width: 400, height: 300 },
                     shape: resourceShape,
                   },
                 },
@@ -784,6 +783,38 @@ describe.each([
         }
       },
     );
+
+    const openIn = (resources: readonly Resource[], open: boolean) =>
+      load({
+        resources: [...resources],
+        maps: [positionedMap(WORKING, { [A]: { x: 0, y: 0, open } }, [graph(MAIN, 'Main')])],
+      });
+
+    it('loads an entry with neither open nor size stored', () => {
+      const space = loaded(
+        load({
+          resources: [{ id: A, title: 'Node', kind: 'ur' }],
+          maps: [positionedMap(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Main')])],
+        }),
+      );
+      expect(space.maps[0]?.positions[A]).toEqual({ x: 0, y: 0 });
+    });
+
+    it.each(everyKind.filter(([kind]) => kind !== 'ur'))(
+      'loads a %s Resource Open',
+      (_kind, resources) => {
+        expect(loaded(openIn(resources, true)).resources).toHaveLength(resources.length);
+      },
+    );
+
+    it('refuses an Ur Resource stored Open, which has no content to show', () => {
+      expect(refused(openIn([{ id: A, title: 'Node', kind: 'ur' }], true))).toEqual([
+        expect.objectContaining({ kind: 'open-requires-content', ref: A }),
+      ]);
+      expect(loaded(openIn([{ id: A, title: 'Node', kind: 'ur' }], false)).resources).toHaveLength(
+        1,
+      );
+    });
   });
 
   describe('Space Resource reference cycles (ADR 0068)', () => {

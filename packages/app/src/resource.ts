@@ -32,19 +32,6 @@ export const RESOURCE_HEIGHT = COLLAPSED_RESOURCE_SIZE.height;
 /** The size a layout strategy arranges resources at. */
 export const RESOURCE_SIZE = { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT } as const;
 
-/** Application-owned magnetic range for resizing an Open Resource to Close. */
-const RESOURCE_CLOSE_SNAP_DISTANCE = 24;
-
-/** Snap a complete near-Closed proposal to the one exact Closed rect. */
-export const snapResourceSizeToClose = (size: {
-  readonly width: number;
-  readonly height: number;
-}): { readonly width: number; readonly height: number } =>
-  Math.abs(size.width - RESOURCE_WIDTH) <= RESOURCE_CLOSE_SNAP_DISTANCE &&
-  Math.abs(size.height - RESOURCE_HEIGHT) <= RESOURCE_CLOSE_SNAP_DISTANCE
-    ? RESOURCE_SIZE
-    : size;
-
 /**
  * Handed to the graph container so the stylesheet draws resources at exactly the size
  * the strategy placed them at. If these drift, anchors land where the resource isn't.

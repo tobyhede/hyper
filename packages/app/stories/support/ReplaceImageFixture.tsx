@@ -36,12 +36,12 @@ export const REPLACE_MISSING_URL = 'https://missing.invalid/picture.png';
 /** The URL the catalogue's image store answers every chosen file with. */
 export const REPLACE_STORED_URL = '/images/LXEWQrcmsEQBYnyp-6wy9chTD7GQPMTbAiWHF5IaSIE';
 
-/** A small picture's URL: it first Opens at the minimum Open Size, the Closed size. */
+/** A small picture's URL, on a Resource at the Closed Size, the smallest any Resource is. */
 export const REPLACE_THUMBNAIL_URL = 'https://example.com/thumbnail.png';
 
 /**
- * Two Closed Image Resources, one of whose picture is small enough to first Open
- * at the Closed size, and an Open one whose picture will not load.
+ * Two Closed Image Resources at the Closed Size, one of whose pictures is small,
+ * and an Open, resized one whose picture will not load.
  */
 export const picturesSnapshot: SpaceSnapshot = {
   id: replaceId(0xf),
@@ -56,7 +56,7 @@ export const picturesSnapshot: SpaceSnapshot = {
         kind: 'positioned',
         positions: {
           [FIGURE]: { x: 0, y: 0, open: false },
-          [MISSING]: { x: 360, y: 0, open: true, openSize: { width: 460, height: 380 } },
+          [MISSING]: { x: 360, y: 0, open: true, size: { width: 460, height: 380 } },
           [THUMBNAIL]: { x: 900, y: 0, open: false },
         },
         graphs: [{ id: PICTURES_GRAPH, title: 'Main', edges: [] }],

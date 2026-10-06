@@ -236,12 +236,12 @@ describe('canvasProjection', () => {
     expect(sibling.edges.map((edge) => edge.data?.['graphId'])).toEqual([OTHER_GRAPH]);
   });
 
-  it('carries each authored Open rect through strategy input and node projection', async () => {
+  it('carries each authored size, Open or Closed, through strategy input and node projection', async () => {
     const authoredMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-        [RESOURCE_B]: { x: 700, y: 0, open: false },
+        [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: 560, height: 420 } },
+        [RESOURCE_B]: { x: 700, y: 0, open: false, size: { width: 400, height: 300 } },
       },
     };
     const space = spaceWith({ maps: [authoredMap] });
@@ -254,11 +254,20 @@ describe('canvasProjection', () => {
     const laidOut = await positionedStrategy(Placement.fromMap(resolved.map))(
       projection.strategyGraph,
     );
-    const node = projection.project(laidOut, AT_REST).nodes.find(({ id }) => id === RESOURCE_A);
-    expect(node).toMatchObject({ width: 560, height: 420, data: { open: true } });
+    const nodes = projection.project(laidOut, AT_REST).nodes;
+    expect(nodes.find(({ id }) => id === RESOURCE_A)).toMatchObject({
+      width: 560,
+      height: 420,
+      data: { open: true },
+    });
+    expect(nodes.find(({ id }) => id === RESOURCE_B)).toMatchObject({
+      width: 400,
+      height: 300,
+      data: { display: { shown: 'closed' } },
+    });
   });
 
-  it("carries each Resource's Shape from the Map it draws, Open or Closed", async () => {
+  it("carries each Resource's Shape from the Map it draws, at any size", async () => {
     const diamondMap = {
       ...mapOwning(DRAWN),
       positions: {
@@ -266,8 +275,8 @@ describe('canvasProjection', () => {
         [RESOURCE_B]: {
           x: 700,
           y: 0,
-          open: true,
-          openSize: { width: 560, height: 420 },
+          open: false,
+          size: { width: 560, height: 420 },
           shape: 'diamond',
         },
       },
@@ -283,9 +292,9 @@ describe('canvasProjection', () => {
       MAP,
     );
 
-    expect(nodes.map(({ id, data }) => [id, data.shape, data.display.shown])).toEqual([
-      [RESOURCE_A, 'diamond', 'closed'],
-      [RESOURCE_B, 'diamond', 'open'],
+    expect(nodes.map(({ id, data, width }) => [id, data.shape, width])).toEqual([
+      [RESOURCE_A, 'diamond', 260],
+      [RESOURCE_B, 'diamond', 560],
     ]);
   });
 
