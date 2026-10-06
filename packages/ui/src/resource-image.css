@@ -57,7 +57,7 @@
   color: var(--canvas-resource-title-color);
 }
 
-/* A room shorter than the full layout — the minimum Open Size's among them —
+/* A room shorter than the full layout — the Closed Size's among them —
    keeps the title and draws Upload and the URL field on one row, the refusal
    beneath them. */
 @container resource-image-replace (max-height: 18rem) {

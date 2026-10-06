@@ -555,7 +555,7 @@ describe('SnapshotEdit.createInMap properties', () => {
 });
 
 /**
- * Open, Close and Resize (ADR 0084, ADR 0093, ADR 0066), over one Map of five
+ * Open, Close and Resize (ADR 0084, ADR 0093, ADR 0122), over one Map of five
  * Resources.
  *
  * The transform `Placement.displace` is held to its round trip by

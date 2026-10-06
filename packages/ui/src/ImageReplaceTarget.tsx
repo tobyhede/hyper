@@ -47,8 +47,8 @@ export interface ImageReplaceTargetProps {
  * outline `Empty` with an Upload button at its centre and a URL field beneath
  * it (the registry's `empty-outline` and `empty-input-group` examples).
  *
- * A small picture first Opens at the minimum Open Size, whose content area is
- * far shorter than that layout, so in a short room the target draws compactly
+ * A Resource at the Closed Size has a content area far shorter than that
+ * layout, so in a short room the target draws compactly
  * — Upload and the URL field on one row and the refusal beneath them — and
  * scrolls within the room rather than being clipped by the Resource.
  */

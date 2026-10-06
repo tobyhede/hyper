@@ -131,7 +131,7 @@ export type ResourceNodeData = {
    * operation together because a resize gesture begun on an
    * unselected Resource has to select it before there is anything for `onResize`
    * to complete against — one control, one drag, and Selection is not a second
-   * Edit (ADR 0066).
+   * Edit (ADR 0122).
    */
   resize?: {
     readonly minWidth: number;

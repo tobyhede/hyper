@@ -34,7 +34,7 @@
 
   /* The ladder's ceiling, in lines of the `title` role. Placement is authored,
      so a Title is clamped to the room available and never accommodated (ADR
-     0014, ADR 0066, ADR 0083) — a Title with more lines than fit is clipped.
+     0014, ADR 0083) — a Title with more lines than fit is clipped.
 
      A number rather than the room the Resource happens to have, because the ladder
      has to draw the same whether the Resource is Open or Closed: room-relative

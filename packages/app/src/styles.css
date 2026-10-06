@@ -236,7 +236,7 @@ body {
 
 /* Hover discovers the control, Selection keeps it stable for touch (no hover
    state to reveal it), and keyboard-visible Resource focus offers the same authoring
-   affordance — three independent ways an Open Resource is "in play" (ADR 0066).
+   affordance — three independent ways an Open Resource is "in play" (ADR 0122).
    Pointer focus alone must not keep the control up after Open/Close and departure.
    Hover and focus are read off `.react-flow__node`, the element React Flow
    itself makes hoverable and focusable; Selected is read off `data-selected`,

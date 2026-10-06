@@ -584,7 +584,7 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
 }
 
 /**
- * Resize is Resource behaviour rather than kind behaviour (ADR 0066): a Resource owns
+ * Resize is Resource behaviour rather than kind behaviour (ADR 0122): a Resource owns
  * the surrounding rect and the resize interaction, while a kind owns only what
  * fills an Open front. That is content ownership and must not read back as a
  * second resize gate.
@@ -693,7 +693,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   /**
    * A gesture outlives the re-renders the resize itself causes.
    *
-   * Touch is what proves it, and ADR 0066 makes resizing pointer *and* touch.
+   * Touch is what proves it, and ADR 0122 keeps resizing pointer *and* touch.
    * `NodeResizeControl` lists its resize callbacks among an effect's
    * dependencies and tears the d3-drag binding down with
    * `selection.on('.drag', null)` whenever they change — which strips every

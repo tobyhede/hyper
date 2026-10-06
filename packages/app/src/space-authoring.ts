@@ -171,7 +171,7 @@ export type AuthoringCompletion =
   /**
    * Replace image: the Image Resource's URL and the natural size measured when
    * it was set, absent when the picture did not load (ADR 0106). Identity,
-   * Title, placement, Edges and a remembered Open Size are kept, and the URL it
+   * Title, placement, size and Edges are kept, and the URL it
    * already holds is `unchanged`.
    */
   | {
@@ -1397,7 +1397,7 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'settled-resource-movement') {
       // The moved Resources' drop points, merged over the Map's own positions
       // this Edit already started from — `Placement.next` is what keeps each
-      // Resource's Open/Closed state and Open Size while overwriting `x`/`y`.
+      // Resource's Open/Closed state, size and Shape while overwriting `x`/`y`.
       writePlacement(
         Placement.next(placement, Placement.fromEntries(completion.moved), [
           ...completion.moved.keys(),
