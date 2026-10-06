@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0113
+Refined by: 0122
 Related: 0064, 0066, 0084, 0093, 0105, 0110, 0112, 0114
 
 ADR 0113 gave the author the Ur Resource so they can diagram: draw named things and the Edges between them. A diagram also needs notation. A decision reads as a diamond and a start or end reads as a pill, so a Resource needs a way to be drawn in something other than the rectangle every front has now.

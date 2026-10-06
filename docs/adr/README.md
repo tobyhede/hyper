@@ -55,8 +55,8 @@ under `superseded/`.
 | [0099](0099-the-barrier-waits-only-for-commits-in-flight.md) | The coordination barrier pauses, then awaits only in-flight commits; one recovery rule covers both deletion cascades, reading stored and working state. |
 | [0106](0106-an-image-resource-owns-a-url-not-bytes.md) | An Image Resource owns a URL, not bytes. The host stores images at `/images/<sha256>`, named for what they are and outside the aggregate. The repo-state rule is deliberately waived for the picture. |
 | [0118](0118-an-aggregate-directory-carries-stored-image-bytes.md) | An Aggregate directory carries the bytes of every stored image the aggregate references in `images/<content-id>.<ext>`; Export rewrites `images/` whole and Import admits it before storing the aggregate, on every store (amends 0106). |
-| [0113](0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md) | Every capability is a Resource's, and a kind only adds actions; Reference is the terminal exception. An Ur Resource has no content and no Edit. A self-targeting Reference Resource was rejected. |
-| [0114](0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md) | First Open Size, resize floor, Map embedding and content area are decided from resolved content, so a Reference Resource takes its Target's; its kind withholds only content actions. |
+| [0113](0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md) | Every capability is a Resource's, and a kind only adds actions; Reference is the terminal exception. An Ur Resource has no content and no Edit; since 0122 it is never Open either. A self-targeting Reference Resource was rejected. |
+| [0114](0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md) | Map embedding and content area are decided from resolved content, so a Reference Resource takes its Target's; its kind withholds only content actions. 0122 retires the first Open Size and the per-content resize floor. |
 | [0120](0120-a-kind-is-a-behaviour-and-a-media-type-is-its-contents-format.md) | A kind is a behaviour and a media type is its content's format; `kind` never holds a media type. Content kinds are modules registered at composition, built in today with namespaced ids so runtime kinds stay possible. Ur, Reference and Space stay the domain's, and a Resource with no kind is an Ur Resource. |
 | [0121](0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md) | An Ur Resource's Shape (rectangle, pill, ellipse, diamond) is stored on its Map entry, every other kind being the rectangle, optional with the rectangle as the application's default; it is drawn at the Resource's rect, Open and Closed alike. |
 
@@ -143,14 +143,14 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0082](0082-the-space-command-surface-is-bound-by-what-it-owes-not-where-it-sits.md) | The Space command surface is bound by what it owes and takes no canvas space. Its shape is not an ADR question. |
 | [0048](0048-escape-and-commit-are-decided-by-the-surface-not-the-field.md) | The surface decides Escape and commit. The field does not. |
 | [0036](0036-a-card-selects-on-click-and-no-click-opens-it.md) | A Card selects on a click. No click opens it. |
-| [0064](0064-opening-a-card-expands-it-in-place.md) | To open a Card is a Layout-owned Edit that grows the Card in place. |
+| [0064](0064-opening-a-card-expands-it-in-place.md) | To open a Card is a Layout-owned Edit that draws its content in place; since 0122 it changes no size. |
 | [0065](0065-a-card-title-edits-on-one-activation.md) | A Card Title edits on one activation. |
 | [0089](0089-creating-a-thing-completes-on-activation.md) | Creating a Thing completes on activation. A Target comes from context, never from a pane. |
-| [0066](0066-open-size-survives-closing.md) | A Layout keeps the Open Size after a Close. |
 | [0073](0073-a-card-rail-is-a-toolbar.md) | A Card rail is one `role="toolbar"` with roving tabindex. |
 | [0102](0102-a-resources-commands-float-in-react-flows-node-toolbar.md) | A Resource's commands float in React Flow's `NodeToolbar`, drawn while the Resource is the one selected or an edit is running, at the Dock's size. |
-| [0084](0084-displacement-is-applied-by-the-edit-that-causes-it.md) | Opening and closing move their neighbours once, as an Edit. Nothing is derived at render. |
-| [0093](0093-a-thing-makes-room-on-one-axis-once-clear-of-the-collapsed-subject.md) | A Thing makes room on one axis, `x` first, once clear of the subject's collapsed rect. |
+| [0084](0084-displacement-is-applied-by-the-edit-that-causes-it.md) | The Edit that changes a size moves its neighbours once. Nothing is derived at render. Since 0122 only Resize does. |
+| [0093](0093-a-thing-makes-room-on-one-axis-once-clear-of-the-collapsed-subject.md) | A Thing makes room on one axis, `x` first, once clear of the subject's rect; 0122 measures that rect at the size before the Resize. |
+| [0122](0122-a-resources-size-is-independent-of-open.md) | A Resource's size is its Map entry's, optional with the Closed Size as default and as every kind's floor; only Resize changes it and only Resize displaces. Open changes what is drawn, never a rect, and an Ur Resource offers none. Supersedes 0066. |
 
 ## Toolchain
 

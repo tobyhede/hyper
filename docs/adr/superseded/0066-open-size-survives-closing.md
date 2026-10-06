@@ -1,6 +1,7 @@
 # Open Size survives Closing
 
-Status: accepted
+Status: superseded
+Superseded by: 0122
 Refines: 0064
 Refined by: 0084, 0085
 

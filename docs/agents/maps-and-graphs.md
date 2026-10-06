@@ -11,7 +11,7 @@ Your task does any of these:
 - adds, deletes, selects or defaults a Map, or touches `defaultMap`
 - adds, deletes, orders or activates a Graph, or touches `activeGraph`
 - adds a Resource to a Map, removes it from one, or deletes it from the Space, where Map membership or Edges are affected
-- changes Open, Close, Resize, Open Size, or how neighbours are displaced
+- changes Open, Close, Resize, a Resource's size, or how neighbours are displaced
 - adds, changes or draws a Resource's Shape on a Map
 - changes how a new Space is created, or how a stored or imported Space without a Map is first opened
 - changes the layout strategy contract, or adds or proposes Auto-arrange or a new automatic strategy
@@ -34,7 +34,7 @@ Neighbouring topics this contract does **not** cover keep their existing guides:
 
 ## Orientation
 
-A **Map** is an authored subset of a Space's Resources: which Resources it contains, where each sits, Open or Closed, each remembered Open Size, and the Graphs it owns. A **Graph** is directed Edges over one Map's Resources. The **Active Graph** is the one drawn emphasised, which new Edges join. A **layout strategy** is behaviour that arranges Resources. Definitions live in [CONTEXT.md][context].
+A **Map** is an authored subset of a Space's Resources: which Resources it contains, where each sits, its size, Open or Closed, and the Graphs it owns. A **Graph** is directed Edges over one Map's Resources. The **Active Graph** is the one drawn emphasised, which new Edges join. A **layout strategy** is behaviour that arranges Resources. Definitions live in [CONTEXT.md][context].
 
 Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Resource, Route as Graph, Cards View as Resources View, and Expanded as Open. Computed, Algorithmic and Space Views no longer exist.
 
@@ -83,33 +83,33 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 ## 5. Membership and removal
 
 - **R31. Membership and position are one authored fact.** A Map's membership is its position keys. An omitted Resource is absent and not drawn; omission never means the origin, and the canvas never invents a position. A position may not name a Resource the Space lacks. Positions are not stored on the Resource, and nothing sits between a Resource and its position. ([0040], [0004])
-- **R32. Placement belongs to the Map, not the Resource.** The same Resource may be absent from one Map and placed or sized differently in others. ([0040], [0064], [0066])
+- **R32. Placement belongs to the Map, not the Resource.** The same Resource may be absent from one Map and placed or sized differently in others. ([0040], [0064], [0122])
 - **R33. Add to Map adds an existing Resource with an initial position.** It arrives Closed with no Edges (code treatment, not an ADR rule). ([0040])
 - **R34. Remove from Map is one Edit.** It removes membership, position, and every incident Edge in that Map's Graphs. Emptied Graphs remain. The Resource stays in the Space and in other Maps. ([0040])
-- **R35. Removing or deleting an Open Resource Closes it in the same Edit, then removes it.** Close's reclaim gives back the room it held, by the memoryless rule (R41), before its position and Edges go. Removing a Closed Resource moves nothing. Removal itself never displaces; only Open, Close and Resize do. Leaving the gap instead was considered and declined: nothing could reclaim it later, because Close is memoryless and the Resource is gone. ([0084]; [CONTEXT.md][context] "Placement"; `snapshot-edits.property.test.ts`)
+- **R35. Removing or deleting a Resource moves no other Resource,** Open or Closed, at any size. Removal changes no size, and only a Resize displaces (R40). The room a resized Resource held stays where it was; the author moves into it or not. ([0122]; `snapshot-edits.property.test.ts`)
 - **R36. Deleting a Resource from the Space runs Remove from Map's cascade in every Map.** ([0040])
 
-## 6. Open, Close and displacement
+## 6. Size, Open and displacement
 
-- **R37. Open/Closed and Open Size are authored on the Map.** Open, Close and Resize are Edits and survive reload and export. ([0064], [0066])
-- **R38. Displacement is applied by the Edit that causes it.** Open moves the Resources it grows past, once, writing their positions into the Map. Close applies the negation, and Resize the difference. Between Edits a drawn position *is* the authored one: a drop lands where it was dropped, with no conversion and no `move` draft, and a resize preview shows only the resizing Resource. `Placement.drawn` and `authoredPoint` must not return. Render-derived displacement coupled every position to every Open size, jumped, and needed a non-total inverse that misplaced drops (A13). ([0084])
-- **R39. Growth is Open Size minus the fixed Closed Size, floored at zero per axis.** ([0084])
-- **R40. A Resource makes room on at most one axis, decided against the subject's *collapsed* rect.** At or past the collapsed right edge, it takes the width growth only. Otherwise, at or past the collapsed bottom edge, it takes the height growth only. Otherwise it does not move. One axis is enough to stay clear; `x` first keeps a Resource beside the subject from moving vertically; the constant collapsed rect makes Open and Close select the same set; touching counts as clear. Cost: a grid no longer scales uniformly, and a Resource below the subject but not clear on `x` moves down however far left it sits (A15, A16). ([0093])
-- **R41. Open and Close are memoryless.** Each reads the Map as it is now. Close reclaims from every Resource currently clear of the closing Resource, including ones moved there while it was Open, and from none if the closing Resource has been dragged past the neighbours its Open displaced. Never record which Resources an Open pushed (A14). ([0084], [0093], CONTEXT.md)
-- **R42. Open then Close restores every position,** because growth is nonnegative. The negative-growth asymmetry is stated, not clamped: a Resource dropped past the collapsed edge *inside* an Open subject was never pushed, so Close carries it inside the subject and a reopen skips it. ([0084], [0093])
-- **R43. One Open, Close or Resize Edit may move many Resources, as one unit.** ([0084])
-- **R44. Open Size survives Close.** The next Open returns to it. A first Open records a concrete default, which a Resource kind may choose. The Closed Size is fixed policy and never stored (A17). A resize ending within the application's magnetic range of the Closed Size on **both** axes completes as a Close and keeps the Open Size. A one-axis match is an ordinary Resize. ([0066], [0084])
+- **R37. Size and Open/Closed are authored on the Map, independently.** A Map entry is `{ x, y, open?, size?, shape? }`. Open, Close and Resize are Edits and survive reload and export. Both fields are optional with an application default, as `shape` is (R47): an entry with no `open` is Closed and one with no `size` is the Closed Size (260×146); every reader resolves them through `resourceOpen` and `resourceSize` in `@project/core`. Add Resource and Add to Map write no size. Coupling the two made a bigger Resource a two-step gesture that also changed what it drew and moved its neighbours (A17). ([0064], [0122])
+- **R38. Only Resize changes a size, and Open and Close change only `open`.** Opening or Closing changes what is drawn inside the Resource's rect — its Title, or its content — and never its size or any position. Edit on a Closed Resource still Opens it before placing the caret, changing no size. A Resize back to the Closed Size is an ordinary Resize and leaves an Open Resource Open; there is no magnetic Close (A26). ([0122], [0064])
+- **R39. Open is offered only by a kind with content to show** — Markdown, Image, Space and Reference. An Ur Resource has none (ADR 0113), so it offers no Open or Close — reversing ADR 0113's rejection of a kind that cannot be Opened, which rested on Open being how a size was authored — the Open Edit refuses it, and intake refuses an entry storing it Open, both as `open-requires-content` (A25). ([0122], [0113])
+- **R40. The Closed Size is the one floor for every kind, Open or Closed, and only a Resize displaces.** No kind has its own minimum and no kind chooses a first-Open size: content adapts to the rect it is given — a small Open document scrolls, a picture scales down, an embedded Map fits (A24). A Resize moves the Resources its growth passes, once, writing their positions into the Map. Between Edits a drawn position *is* the authored one: a drop lands where it was dropped, with no conversion and no `move` draft, and a resize preview shows only the resizing Resource. `Placement.drawn` and `authoredPoint` must not return. Render-derived displacement coupled every position to every size, jumped, and needed a non-total inverse that misplaced drops (A13). ([0122], [0084])
+- **R41. A Resource makes room on at most one axis, decided against the subject's rect before the Resize.** The change is the new size less the old one, per axis, negative for a shrink. At or past the old right edge, a Resource takes the width change only. Otherwise, at or past the old bottom edge, it takes the height change only. Otherwise it does not move. One axis is enough to stay clear; `x` first keeps a Resource beside the subject from moving vertically; touching counts as clear. Cost: a grid no longer scales uniformly, and a Resource below the subject but not clear on `x` moves down however far left it sits (A15, A16). ([0093], [0122])
+- **R42. A Resize is memoryless.** It reads the Map as it is now and never records which Resources it pushed (A14). A grow then the shrink back restores every position, because the grow carries each clear Resource clear of the grown rect, which the shrink measures from. The other order is stated, not clamped: a Resource overlapping the larger rect but clear of the smaller one is not moved by a shrink, and the grow back pushes it. ([0084], [0093], [0122])
+- **R43. One Resize Edit may move many Resources, as one unit.** ([0084])
+- **R44. The resize control is offered on the selected Resource, Open or Closed, any kind,** wherever its Map may be authored. It is one bottom-right control changing both dimensions from a fixed top-left origin; the drag is an Interaction draft producing one Edit on release, and there is no keyboard resize. A selected Resource drawn in a Shape other than the rectangle also draws a thin rectangular border around its rect, so the control sits on that border's corner; the rectangle's edge is its own border. Edge handles and attachment are untouched. **Not built**: the control is still offered only while a Resource is Open (see the end of this page). ([0122])
 
-**Undo is not built.** It is a planned future feature. Every Edit, including Open, Close, Resize and Auto-arrange, is derived, submitted and stored as one atomic unit, so a future undo will reverse an Edit as a whole: undoing an Open moves back every Resource it displaced, and undoing an Auto-arrange restores every position it rewrote. Until undo exists, an Edit is reversed only by another Edit. Where [0086] and [0084] call these Edits undoable, they describe the unit a future undo reverses; where [0048] and [0074] say there is no undo, they describe V1. (Resolved 2026-10-04 as D12 in the [inventory].)
+**Undo is not built.** It is a planned future feature. Every Edit, including Open, Close, Resize and Auto-arrange, is derived, submitted and stored as one atomic unit, so a future undo will reverse an Edit as a whole: undoing a Resize moves back every Resource it displaced, and undoing an Auto-arrange restores every position it rewrote. Until undo exists, an Edit is reversed only by another Edit. Where [0086] and [0084] call these Edits undoable, they describe the unit a future undo reverses; where [0048] and [0074] say there is no undo, they describe V1. (Resolved 2026-10-04 as D12 in the [inventory].)
 
 ## 7. Shape
 
-- **R45. A Resource's Shape is authored on the Map.** It is one of a closed set: rectangle, pill, ellipse, diamond. It is stored in the Map's entry beside position, Open/Closed state and Open Size, never on the Resource, so the same Resource may take different Shapes in different Maps. A Shape is the diagram's notation, and notation belongs to the diagram (A19). ([0121])
+- **R45. A Resource's Shape is authored on the Map.** It is one of a closed set: rectangle, pill, ellipse, diamond. It is stored in the Map's entry beside position, Open/Closed state and size, never on the Resource, so the same Resource may take different Shapes in different Maps. A Shape is the diagram's notation, and notation belongs to the diagram (A19). ([0121])
 - **R46. Only an Ur Resource takes a Shape.** A Shape is diagram notation, and an Ur Resource is the kind a diagram is drawn with; a Markdown, Image, Space or Reference Resource is always the rectangle. The Shape choice is offered on an Ur Resource alone, a Shape Edit on any other kind is refused (`shape-requires-ur-resource`), and intake refuses a Map entry giving any other kind a Shape but the rectangle with the same code. ([0121], [0113])
 - **R47. The Shape is optional, and the application's default is the rectangle.** An entry with no `shape` stored draws as the rectangle, as a Graph with no `headShape` draws the arrow; every reader resolves it through `resourceShape` in `@project/core`. Add Resource and Add to Map write no Shape. Choosing a Shape writes the one chosen, the rectangle included, and choosing the Shape a Resource already draws as is `unchanged`, so the rectangle is `unchanged` on an entry storing none. Every other Edit that rewrites an entry keeps what it stores. Remove from Map forgets it with the rest of the entry (A23). ([0121], [0105])
-- **R48. A Shape changes no rect.** It is drawn at the Resource's rect — the fixed Closed Size while Closed, its Open Size while Open — so Open, Close, Resize, displacement (R38–R44) and Edge attachment are unchanged. Ellipse and diamond fill the rect proportionally, and a pill's ends stay half-circles at any size. Every Shape in the set touches the midpoint of each side of its rect at every size, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title lays out centred in the rectangle inscribed in the Shape, with no kind glyph — an Ur Resource's Shape says what it is, so it draws none in any Shape, Open or Closed — and a Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline. ([0121], [0110])
-- **R49. A Shape is drawn Open and Closed alike.** Opening and resizing an Ur Resource gives the same Shape at its Open Size, and Close returns it to that Shape at the Closed Size; a resize into the magnetic range Closes it as any Resource (R44). The resize control stays at the rect's bottom-right corner. The Shape choice is on the rail, Open and Closed, so the rail does not change between states. A presented Resource is drawn by the presented surface and is the rectangle. ([0121], [0064], [0066])
-- **R50. An embedded Map draws its Ur Resources' Shapes**, Open or Closed, because one surface draws every Map. ([0121], [0112])
+- **R48. A Shape changes no rect.** It is drawn at the Resource's rect — its size — so Resize, displacement (R37–R44) and Edge attachment are unchanged. Ellipse and diamond fill the rect proportionally, and a pill's ends stay half-circles at any size. Every Shape in the set touches the midpoint of each side of its rect at every size, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title lays out centred in the rectangle inscribed in the Shape, with no kind glyph — an Ur Resource's Shape says what it is, so it draws none in any Shape, Open or Closed — and a Resource in a Shape other than the rectangle shows its short Title at every size: its name on one line, with an ellipsis when more Title Lines follow. The selection ring follows the outline. ([0121], [0110])
+- **R49. A Shape is drawn at every size.** Resizing an Ur Resource gives the same Shape at its new size; an Ur Resource is never Open (R39), so nothing it draws changes with Open. The resize control stays at the rect's bottom-right corner, on the border a selected Shape draws around its rect (R44). The Shape choice is on the rail at every size. A presented Resource is drawn by the presented surface and is the rectangle. ([0121], [0122])
+- **R50. An embedded Map draws its Ur Resources' Shapes**, at their sizes, because one surface draws every Map. ([0121], [0112])
 
 ## Rejected alternatives
 
@@ -128,22 +128,26 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 | A11 | Map-scoped Graph ids | Every lookup, render key and Graph URL would need the Map, to defend an unused ability ([0108]) | — |
 | A12 | An optimiser seeded to honour a drop point | Structural reshuffling ([0086], [0013]) | — |
 | A13 | Displacement derived at render | Size-coupled positions, jumps, a non-total inverse; a drag preview only moves the jump under the pointer ([0084]) | One Edit moves many positions |
-| A14 | Recording which Resources an Open pushed | Per-open state goes stale, and identical Maps would behave differently ([0084]) | Close reclaims from Resources moved into the room |
+| A14 | Recording which Resources a Resize pushed | Per-Resize state goes stale, and identical Maps would behave differently ([0084]) | A shrink then a grow is not an involution (R42) |
 | A15 | Independent per-axis thresholds (half-plane, or collapsed edges per axis) | Keeps the beside-but-lower jump ([0093]) | A grid's shape is not preserved |
-| A16 | Bands against the Open rect | The set changes between Edits, and the round trip fails ([0093]) | Far-left Resources still move down |
-| A17 | A stored Closed Size | Optional gives two shapes for one fact; required repeats a constant ([0066]) | Resizable Closed Resources would be a format change |
+| A16 | Bands against the Closed Size whatever the Resource's size | A Resource inside a resized subject's rect but past the Closed edge would be pushed by every grow ([0122]; first [0093], against the Open rect) | Far-left Resources still move down |
+| A17 | Open changing size: an Open Size beside the Closed Size, or a second stored Closed size | Opening moved neighbours and changed a size the author set, and a bigger Resource took two gestures; two sizes per entry is two facts for one rect ([0122]; superseded [0066]) | Opening an unresized Resource shows its content at the Closed Size |
 | A18 | Activation as an Edit, or as dirtying | It changes nothing authored ([0028]) | Not durable until the next Edit |
 | A19 | A Shape on the Resource | Notation is the diagram's; a presentation field on the Resource is the shared slot the model rules out ([0121]) | A Resource re-added to a Map starts as a rectangle |
 | A20 | A Shape fixed by kind | A kind adds only what its content supports ([0121], [0113]) | — |
 | A21 | A Shape that changes the Closed Size | Displacement, attachment and the fixed Closed Size would each depend on it ([0121]) | A circle is drawn as an ellipse |
 | A22 | An open set (free radius, arbitrary path) | Edges could no longer be guaranteed to meet the outline ([0121]) | Four Shapes only |
-| A23 | A required Shape, written on every entry | An optional field whose default the application chooses is the format's pattern, as `headShape` is ([0121], [0105]); requiring it would put notation only an Ur Resource uses on every entry of every kind | One resolver, `resourceShape`, reads an absent Shape as the rectangle |
+| A23 | A required Shape (or size), written on every entry | An optional field whose default the application chooses is the format's pattern, as `headShape` is ([0121], [0105]); requiring it would put notation only an Ur Resource uses on every entry of every kind | One resolver, `resourceShape`, reads an absent Shape as the rectangle |
+| A24 | A kind-specific floor or first-Open size (a Space Resource's room for its Map, an image's natural size, a Reference's Target geometry) | One floor is simpler to state and draw, and content can fit any rect ([0122]; refined [0106], [0114]) | A small Open Space Resource shows a small Map |
+| A25 | An Ur Resource that Opens to show its Title | With size independent of Open, Opening one changes nothing a reader sees ([0122]) | — |
+| A26 | The magnetic Close: a Resize ending at the Closed Size Closes | It made Close a side effect of a size, which is no longer Open's ([0122]; superseded [0066]) | Closing is always its own command |
 
 ## Accepted, not built
 
 Every rule above is built except these:
 
 - **Auto-arrange** (R6), with any returning automatic strategy (R7). Delivery: [`.scratch/auto-arrange/issues/01-auto-arrange-a-map.md`](../../.scratch/auto-arrange/issues/01-auto-arrange-a-map.md), which also holds the two open questions: whether the Edit records which strategy produced the positions, and whether it asks for confirmation before rewriting a whole Map while undo does not exist.
+- **The resize control on every selected Resource, and a selected Shape's border** (R44). Delivery: [`.scratch/size-independent-of-open/issues/02-resize-a-selected-resource.md`](../../.scratch/size-independent-of-open/issues/02-resize-a-selected-resource.md).
 - **Manual Graph reordering** (R25). Delivery: [`.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md`](../../.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md).
 
 Remove an entry here in the change that verifies its implementation.
@@ -180,20 +184,21 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R29 | §4 | [0028], [0041], [0079] |
 | R30 | §4 | CONTEXT.md "Graph"; [0015] |
 | R31 | §5 | [0040], [0004] |
-| R32 | §5 | [0040], [0064], [0066] |
+| R32 | §5 | [0040], [0064], [0122] |
 | R33, R34, R36 | §5 | [0040] |
-| R35 | §5 | [0084]; CONTEXT.md "Placement"; G1 |
-| R37 | §6 | [0064], [0066] |
-| R38, R39, R43 | §6 | [0084] |
-| R40 | §6 | [0093] |
-| R41 | §6 | [0084], [0093], CONTEXT.md "Placement" |
-| R42 | §6 | [0084], [0093] |
-| R44 | §6 | [0066], [0084] |
-| R45, R47, R49 | §7 | [0121] (R47 also [0105]; R49 also [0064], [0066]) |
+| R35 | §5 | [0122] |
+| R37, R38 | §6 | [0064], [0122] |
+| R39 | §6 | [0122], [0113] (reversing its rejected option) |
+| R40 | §6 | [0122], [0084] |
+| R41 | §6 | [0093], [0122] |
+| R42 | §6 | [0084], [0093], [0122] |
+| R43 | §6 | [0084] |
+| R44 | §6; Accepted, not built | [0122] |
+| R45, R47, R49 | §7 | [0121] (R47 also [0105]; R49 also [0122]) |
 | R46 | §7 | [0121], [0113] |
 | R48 | §7 | [0121], [0110] |
 | R50 | §7 | [0121], [0112] |
-| A1–A23 | Rejected alternatives | Cited in each row |
+| A1–A26 | Rejected alternatives | Cited in each row |
 | D12 | §6, Undo | [0086], [0084], [0048], [0074] |
 
 [context]: ../../CONTEXT.md
@@ -209,7 +214,7 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0041]: ../adr/0041-graph-is-the-first-public-name-for-route.md
 [0048]: ../adr/0048-escape-and-commit-are-decided-by-the-surface-not-the-field.md
 [0064]: ../adr/0064-opening-a-card-expands-it-in-place.md
-[0066]: ../adr/0066-open-size-survives-closing.md
+[0066]: ../adr/superseded/0066-open-size-survives-closing.md
 [0069]: ../adr/0069-entities-have-durable-web-addresses.md
 [0074]: ../adr/0074-space-card-references-own-the-target-space.md
 [0079]: ../adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md
@@ -230,3 +235,6 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0105]: ../adr/0105-a-graphs-edges-share-one-head-shape.md
 [0113]: ../adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md
 [0121]: ../adr/0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md
+[0122]: ../adr/0122-a-resources-size-is-independent-of-open.md
+[0106]: ../adr/0106-an-image-resource-owns-a-url-not-bytes.md
+[0114]: ../adr/0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md

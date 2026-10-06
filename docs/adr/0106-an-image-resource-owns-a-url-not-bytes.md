@@ -3,7 +3,7 @@
 Status: accepted
 Refines: 0056
 Related: 0051, 0054, 0070, 0101
-Refined by: 0107, 0114, 0118
+Refined by: 0107, 0114, 0118, 0122
 
 An **Image Resource** is a fourth Resource kind, `image`. Its content is an **image URL**. The Resource does not own the picture's bytes, and nothing about the Resource says where they are stored. The host also stores **images** of its own, each at a URL named for what it is, and an author who has a picture but no URL for it sends it there to get one. A stored image is not a variety of Image Resource, and the Resource carries no flag recording where its URL points.
 
