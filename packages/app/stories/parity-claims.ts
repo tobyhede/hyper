@@ -223,14 +223,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Front',
     claim:
-      'Every Resource front draws its kind glyph, its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
+      'Every Resource front draws its kind glyph — bar an Ur Resource, whose Shape says what it is — its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
   },
   {
     id: 'ur-resource-draws-its-shape',
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'ResourceShapes',
     claim:
-      'An Ur Resource draws the Shape its Map gives it — rectangle, pill, ellipse or diamond — Open and Closed alike, at the one Closed Size and at any Open Size, its outline touching the midpoint of each side of its rect where Edges attach, with its Title and kind glyph inside the outline; every Shape but the rectangle draws the short Title, on one line and ellipsised where it is too wide (ADR 0121).',
+      'An Ur Resource draws the Shape its Map gives it — rectangle, pill, ellipse or diamond — Open and Closed alike, at the one Closed Size and at any Open Size, its outline touching the midpoint of each side of its rect where Edges attach, with its Title inside the outline and no kind glyph, its Shape saying what it is; every Shape but the rectangle draws the short Title, on one line and ellipsised where it is too wide (ADR 0121).',
   },
   {
     id: 'ur-resource-treatments-follow-its-shape',

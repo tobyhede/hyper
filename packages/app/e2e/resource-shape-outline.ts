@@ -8,8 +8,9 @@ import type { Locator } from '@playwright/test';
  * point one unit in from that side's midpoint is inside the outline's fill — so
  * an outline that stood in from any side would answer false. `fillsCorner`
  * asks the same of the top-left corner, which only the rectangle fills.
- * `holdsTitleAndGlyph` asks whether every corner of the Title's box and the kind
- * glyph is inside the fill. `shortTitle` is the short Title a Shape other
+ * `holdsTitle` asks whether every corner of the Title's box is inside the fill,
+ * and `drawsKindGlyph` whether the front draws a kind glyph at all — an Ur
+ * Resource draws none, its Shape saying what it is. `shortTitle` is the short Title a Shape other
  * than the rectangle draws in place of the Title ladder — its text, whether it
  * is drawn on one line and ellipsised where it is too wide, and whether it lies
  * inside the body's content box — and null where the front draws the ladder.
@@ -21,7 +22,8 @@ export interface DrawnOutline {
   readonly size: readonly [number, number];
   readonly touchesSideMidpoints: boolean;
   readonly fillsCorner: boolean;
-  readonly holdsTitleAndGlyph: boolean;
+  readonly holdsTitle: boolean;
+  readonly drawsKindGlyph: boolean;
   readonly shortTitle: DrawnShortTitle | null;
 }
 
@@ -43,10 +45,7 @@ export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
     const outer = element.getBoundingClientRect();
     const svg = element.querySelector('.canvas-resource__outline');
     const drawing = svg?.querySelector('.canvas-resource__outline-edge');
-    const contents = [
-      element.querySelector('.canvas-resource__body'),
-      element.querySelector('.resource-rail__kind'),
-    ];
+    const title = element.querySelector('.canvas-resource__title');
 
     const inside: (x: number, y: number) => boolean =
       svg instanceof SVGSVGElement && drawing instanceof SVGGeometryElement
@@ -69,16 +68,17 @@ export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
       inside(outer.left + 1, midY),
     ].every(Boolean);
 
-    const holdsTitleAndGlyph = contents.every((content) => {
-      if (content === null) return false;
-      const box = content.getBoundingClientRect();
-      return [
-        inside(box.left + 1, box.top + 1),
-        inside(box.right - 1, box.top + 1),
-        inside(box.right - 1, box.bottom - 1),
-        inside(box.left + 1, box.bottom - 1),
-      ].every(Boolean);
-    });
+    const holdsTitle =
+      title !== null &&
+      (() => {
+        const box = title.getBoundingClientRect();
+        return [
+          inside(box.left + 1, box.top + 1),
+          inside(box.right - 1, box.top + 1),
+          inside(box.right - 1, box.bottom - 1),
+          inside(box.left + 1, box.bottom - 1),
+        ].every(Boolean);
+      })();
 
     const body = element.querySelector('.canvas-resource__body');
     const line = element.querySelector('.canvas-resource__title-short');
@@ -108,7 +108,8 @@ export const drawnOutline = (resource: Locator): Promise<DrawnOutline> =>
       size,
       touchesSideMidpoints,
       fillsCorner: inside(outer.left + 2, outer.top + 2),
-      holdsTitleAndGlyph,
+      holdsTitle,
+      drawsKindGlyph: element.querySelector('.resource-rail__kind') !== null,
       shortTitle,
     };
   });

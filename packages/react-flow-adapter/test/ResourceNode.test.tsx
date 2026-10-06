@@ -666,7 +666,7 @@ describe('ResourceNode Ur Resource', () => {
     );
 
     expect(screen.getByRole('article', { name: 'Gateway' })).toHaveAttribute('data-kind', 'ur');
-    expect(screen.getByRole('img', { name: 'Ur Resource' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Ur Resource' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
     screen.getByRole('button', { name: 'Open Resource Gateway' }).click();
     expect(onEditResource).toHaveBeenCalledWith(true);

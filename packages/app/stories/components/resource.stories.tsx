@@ -114,7 +114,8 @@ const FRONTS = [
  * Resource's Title, as one `.canvas-resource__title-line` per Title Line. Nothing
  * is drawn beneath the Title: a closed Resource's whole content is the Title its
  * author wrote. A closed front draws its kind glyph at its top-right corner,
- * whether or not it has a toolbar; an Open Resource draws none. No specimen is
+ * whether or not it has a toolbar; an Open Resource draws none, and nor does an
+ * Ur Resource, whose Shape says what it is. No specimen is
  * handed an authoring callback, so no toolbar is drawn (ADR 0102); `Hover` and
  * `Actions` are where the commands live.
  */
@@ -122,7 +123,7 @@ export const Front: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource front"
-      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A closed front draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none."
+      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A closed front draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
     >
       <div className="inv-row">
         {FRONTS.map((front) => (
@@ -163,15 +164,16 @@ const OPEN_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
  * Every Shape a Map may give an Ur Resource (ADR 0121), drawn Closed at the one
  * Closed Size and Open at a larger one: the rectangle is the front's own
  * border, and every other Shape is an outline touching the midpoint of each
- * side of the Resource's rect, with the kind glyph and the short Title — the
- * name on one line, with an ellipsis when more Title Lines follow — in the
- * rectangle inscribed in it. The rectangle draws the Title ladder.
+ * side of the Resource's rect, with the short Title — the name on one line,
+ * with an ellipsis when more Title Lines follow — centred in the rectangle
+ * inscribed in it. The rectangle draws the Title ladder, centred in its rect. No
+ * Shape draws a kind glyph: the Shape says what the Resource is.
  */
 export const ResourceShapes: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource Shapes"
-      note="Each Shape a Map may give an Ur Resource, the one kind that takes a Shape, drawn Closed at the one Closed Size with a one-line Title above a three-line one and an overlong one, and Open at a larger size below them. A Shape is drawn Open and Closed alike. Every outline touches the midpoint of each side of the Resource's rect, where Edges attach, and the kind glyph and Title sit inside it: the rectangle draws the Title ladder, and every other Shape draws the short Title on one line, ellipsised where it is too wide."
+      note="Each Shape a Map may give an Ur Resource, the one kind that takes a Shape, drawn Closed at the one Closed Size with a one-line Title above a three-line one and an overlong one, and Open at a larger size below them. A Shape is drawn Open and Closed alike. Every outline touches the midpoint of each side of the Resource's rect, where Edges attach, and the Title sits inside it with no kind glyph, the Shape saying what the Resource is: the rectangle draws the Title ladder, and every other Shape draws the short Title on one line, ellipsised where it is too wide."
     >
       <div className="inv-row">
         {RESOURCE_SHAPES.map((resourceShape) => (

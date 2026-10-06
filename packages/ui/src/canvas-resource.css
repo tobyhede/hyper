@@ -441,6 +441,20 @@
   padding-top: 30px;
 }
 
+/* An Ur Resource draws no kind glyph, its Shape saying what it is (ADR 0121), so
+   it keeps no glyph row: its Title is centred in its rect, Open and Closed, as a
+   presented Ur Resource's is in its frame. */
+.canvas-resource[data-kind='ur'] > .canvas-resource__body {
+  align-items: center;
+  justify-content: center;
+  padding-top: 8px;
+  text-align: center;
+}
+
+.canvas-resource[data-kind='ur'] .canvas-resource__title-control {
+  margin-inline: auto;
+}
+
 /* Where no adapter floats the toolbar it is drawn in the rail, and the room below
    it is the command strip's: its 38px, clear of its cast shadow. */
 .canvas-resource:has(> .canvas-resource__rail .canvas-resource__actions) .canvas-resource__content {
@@ -509,11 +523,10 @@
   filter: drop-shadow(var(--canvas-resource-shadow-dragging));
 }
 
-/* The Title and kind glyph lay out in the rectangle inscribed in the Shape,
-   whose insets `CanvasResource` publishes from the Shape's outline. The glyph
-   keeps the inscribed rectangle's top-right corner and the Title fills the
-   room below it. The field the Title is written in is capped at the lines that
-   room holds; the diamond's inscribed rectangle is the smallest. */
+/* The Title lays out in the rectangle inscribed in the Shape, whose insets
+   `CanvasResource` publishes from the Shape's outline, centred in it. The field
+   the Title is written in is capped at the lines that room holds; the diamond's
+   inscribed rectangle is the smallest. */
 .canvas-resource[data-resource-shape='diamond'] {
   --canvas-resource-title-ladder-lines: 2;
 }
@@ -528,13 +541,9 @@
   inset: var(--canvas-resource-shape-inset-block) var(--canvas-resource-shape-inset-inline);
   align-items: center;
   justify-content: center;
-  padding: 18px 0 0;
+  padding: 0;
   overflow: hidden;
   text-align: center;
-}
-
-.canvas-resource:not([data-resource-shape='rectangle']) .canvas-resource__title-control {
-  margin-inline: auto;
 }
 
 /* A Shape other than the rectangle draws the short Title — the name, with an ellipsis when more

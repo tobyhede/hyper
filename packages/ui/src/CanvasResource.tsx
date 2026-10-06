@@ -534,10 +534,9 @@ export function CanvasResource(props: CanvasResourceProps) {
     };
   }, [onBodyHeightChange]);
 
-  // An Open Resource's content already says what it is, so its kind is not
-  // drawn. A Resource drawn in a Shape other than the rectangle has no content
-  // area and draws its kind Open and Closed alike.
-  const kindMark = open && !drawsOutline ? null : <ResourceRailKind kind={visualKind} />;
+  // An Open Resource's content already says what it is, and an Ur Resource's
+  // Shape does (ADR 0121), so neither draws its kind.
+  const kindMark = open || visualKind === 'ur' ? null : <ResourceRailKind kind={visualKind} />;
   const toolbar = showActions ? (
     // ADR 0073. One tab stop for the whole rail, arrows between its
     // controls: a canvas carries many Resources and a Resource's rail carries

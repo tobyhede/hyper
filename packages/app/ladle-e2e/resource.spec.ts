@@ -53,7 +53,8 @@ const FRONTS = [
   { label: 'reference', kind: 'reference', glyph: 'Reference Resource', border: 'dotted' },
   { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid' },
   { label: 'image', kind: 'image', glyph: 'Image Resource', border: 'solid' },
-  { label: 'ur', kind: 'ur', glyph: 'Ur Resource', border: 'solid' },
+  // An Ur Resource's Shape says what it is, so it draws no kind glyph.
+  { label: 'ur', kind: 'ur', glyph: null, border: 'solid' },
   // The creation ghost is not a Resource and takes the Markdown treatment, which is
   // why it is checked against the Markdown kind and glyph rather than its own.
   { label: 'creation ghost', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
@@ -79,7 +80,8 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
  * states, kinds, hover, colours, opening, resizing — and an element drawn only
  * by a slice nobody reviews goes unnoticed. So the assertions below are deliberately exhaustive
  * over the Resource's own box: the border, one element per Title Line at the
- * role the domain gave it, its kind glyph, and **nothing beneath the Title** — no
+ * role the domain gave it, its kind glyph (none on an Ur Resource, whose Shape
+ * says what it is), and **nothing beneath the Title** — no
  * second line the application writes on the author's behalf, and no text on the
  * Resource that is not one of the Title Lines the author typed.
  */
@@ -98,7 +100,11 @@ test(
         await expect(resource).toHaveAttribute('data-kind', front.kind);
         await expect(resource).toHaveAttribute('data-state', 'rest');
         await expect(resource).toHaveAttribute('data-open', 'false');
-        await expect(resource.getByRole('img', { name: front.glyph })).toBeVisible();
+        if (front.glyph === null) {
+          await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
+        } else {
+          await expect(resource.getByRole('img', { name: front.glyph })).toBeVisible();
+        }
         await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
         await expect(resource).toHaveCSS('border-style', front.border);
 
@@ -692,9 +698,10 @@ test(
  * Every Shape a Map may give an Ur Resource, drawn Open and Closed alike (ADR
  * 0121): an outline reaching the midpoint of each side of the Resource's rect,
  * where Edges attach, at the one Closed Size and at a larger Open Size, and the
- * Title and kind glyph inside that outline. Every Shape but the rectangle
- * leaves the rect's corner unfilled and draws the short Title on one line,
- * ellipsised where it is too wide; the rectangle draws the Title ladder.
+ * Title inside that outline, with no kind glyph: the Shape says what it is.
+ * Every Shape but the rectangle leaves the rect's corner unfilled and draws the
+ * short Title on one line, ellipsised where it is too wide; the rectangle draws
+ * the Title ladder.
  */
 test(
   'an Ur Resource draws each Shape Closed and Open, touching every side midpoint',
@@ -712,17 +719,14 @@ test(
         const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
         await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
         await expect(resource).toHaveAttribute('data-open', String(suffix === 'open'));
-        // An Open rectangle draws its Title alone, so it has no glyph to hold.
-        const titleAlone = resourceShape === 'rectangle' && suffix === 'open';
-        await expect(resource.getByRole('img', { name: 'Ur Resource' })).toHaveCount(
-          titleAlone ? 0 : 1,
-        );
+        await expect(resource.getByRole('img', { name: 'Ur Resource' })).toHaveCount(0);
         expect(await drawnOutline(resource), `${resourceShape} · ${suffix}`).toEqual({
           shape: resourceShape,
           size,
           touchesSideMidpoints: true,
           fillsCorner: resourceShape === 'rectangle',
-          holdsTitleAndGlyph: !titleAlone,
+          holdsTitle: true,
+          drawsKindGlyph: false,
           shortTitle:
             resourceShape === 'rectangle' ? null : { text, oneLine: true, insideBody: true },
         });

@@ -293,7 +293,8 @@ test(
         size: [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height],
         touchesSideMidpoints: true,
         fillsCorner: false,
-        holdsTitleAndGlyph: true,
+        holdsTitle: true,
+        drawsKindGlyph: false,
         shortTitle: { text: UR, oneLine: true, insideBody: true },
       });
     }
@@ -318,7 +319,8 @@ test(
         size: [openWidth, openHeight],
         touchesSideMidpoints: true,
         fillsCorner: false,
-        holdsTitleAndGlyph: true,
+        holdsTitle: true,
+        drawsKindGlyph: false,
         shortTitle: { text: UR, oneLine: true, insideBody: true },
       });
     }
@@ -377,7 +379,8 @@ test('an Open diamond resized back into the Closed Size Closes, still a diamond'
   expect(await drawnOutline(face(ur))).toMatchObject({
     shape: 'diamond',
     touchesSideMidpoints: true,
-    holdsTitleAndGlyph: true,
+    holdsTitle: true,
+    drawsKindGlyph: false,
   });
 });
 

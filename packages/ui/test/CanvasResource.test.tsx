@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type ResourceContent } from '@project/core';
+import { RESOURCE_SHAPES, uuidSchema, type ResourceContent } from '@project/core';
 import {
   beginEditing,
   beginReplacing,
@@ -2161,7 +2161,7 @@ describe('CanvasResource Close fade', () => {
 describe('CanvasResource Ur front', () => {
   const UR_OPEN: FrontDisplay = opened({ kind: 'ur', via: 'self' });
 
-  it('presents a Closed Ur Resource by its Title and kind alone', () => {
+  it('presents a Closed Ur Resource by its Title alone, its Shape saying what it is', () => {
     render(
       <CanvasResource
         front={{ kind: 'ur' }}
@@ -2176,7 +2176,7 @@ describe('CanvasResource Ur front', () => {
     expect(resource).toHaveAttribute('data-kind', 'ur');
     expect(resource).toHaveAttribute('data-open', 'false');
     expect(screen.getByRole('heading', { name: 'Gateway' })).toBeVisible();
-    expect(screen.getByRole('img', { name: 'Ur Resource' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Ur Resource' })).toBeNull();
     expect(resource.querySelector('.canvas-resource__content')).toBeNull();
   });
 
@@ -2265,14 +2265,13 @@ describe('the Shape a Resource front is drawn in', () => {
 
   const glyph = (resource: HTMLElement) => resource.querySelector('.resource-rail__kind');
 
-  it('draws a diamond, with its kind glyph, Open and Closed alike', () => {
+  it('draws a diamond, Open and Closed alike', () => {
     const { rerender } = render(
       <CanvasResource {...props} shape="diamond" display={CLOSED_DISPLAY} />,
     );
     const resource = screen.getByRole('article', { name: 'Decide' });
     expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
     expect(outline(resource)).not.toBeNull();
-    expect(glyph(resource)).not.toBeNull();
 
     rerender(
       <CanvasResource {...props} shape="diamond" display={opened({ kind: 'ur', via: 'self' })} />,
@@ -2280,14 +2279,31 @@ describe('the Shape a Resource front is drawn in', () => {
     expect(resource).toHaveAttribute('data-open', 'true');
     expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
     expect(outline(resource)).not.toBeNull();
-    expect(glyph(resource)).not.toBeNull();
   });
 
-  it('draws no kind glyph on an Open rectangle, whose front says what it is', () => {
-    render(
-      <CanvasResource {...props} shape="rectangle" display={opened({ kind: 'ur', via: 'self' })} />,
-    );
-    expect(glyph(screen.getByRole('article', { name: 'Decide' }))).toBeNull();
+  /*
+   * An Ur Resource's Shape is what says what it is (ADR 0121), so it draws no
+   * kind glyph in any Shape, Open or Closed.
+   */
+  it.each(RESOURCE_SHAPES)(
+    'draws no kind glyph on an Ur Resource in a %s, Open or Closed',
+    (resourceShape) => {
+      for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+        const { unmount } = render(
+          <CanvasResource {...props} shape={resourceShape} display={display} />,
+        );
+        const resource = screen.getByRole('article', { name: 'Decide' });
+        expect(glyph(resource)).toBeNull();
+        expect(screen.queryByRole('img', { name: 'Ur Resource' })).toBeNull();
+        unmount();
+      }
+    },
+  );
+
+  it('still draws the kind glyph on a Closed Markdown Resource', () => {
+    render(<CanvasResource {...props} front={{ kind: 'markdown' }} display={CLOSED_DISPLAY} />);
+    expect(glyph(screen.getByRole('article', { name: 'Decide' }))).not.toBeNull();
+    expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
   });
 
   it.each([

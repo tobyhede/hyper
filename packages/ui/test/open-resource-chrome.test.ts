@@ -91,6 +91,9 @@ describe('the Open front chrome, where the commands float outside the Resource',
       '.canvas-resource__body',
       '.canvas-resource__content',
       ".canvas-resource[data-open='false'] > .canvas-resource__body",
+      // An Ur Resource keeps no glyph row, and has no content area for the
+      // constant to measure, so its padding stands outside it too.
+      ".canvas-resource[data-kind='ur'] > .canvas-resource__body",
       `.canvas-resource${RAIL_ACTIONS} .canvas-resource__content`,
       `.canvas-resource[data-open='false']${RAIL_ACTIONS} > .canvas-resource__body`,
       // Only an Ur Resource takes a Shape, and it has no content area for the
