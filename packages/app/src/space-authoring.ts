@@ -9,7 +9,9 @@ import {
   type MapId,
   type MapPosition,
   type ResourcePlacement,
+  type ResourceShape,
   COLLAPSED_RESOURCE_SIZE,
+  resourceSize,
   EDGE_TITLE_ONE_LINE,
   IMAGE_URL_UNSUPPORTED,
   isAcceptedImageUrl,
@@ -74,18 +76,9 @@ const ELIGIBLE = { kind: 'eligible' } as const;
  */
 const BESIDE_GAP = COLLAPSED_RESOURCE_SIZE.width / 2;
 
-/**
- * Right of the source, tops level: past its drawn rect so an Open source does
- * not cover it, and past the collapsed right edge so Closing the source
- * reclaims width only (ADR 0093).
- */
+/** Right of the source, tops level: past its drawn rect so the source does not cover it. */
 const besideSource = (at: ResourcePlacement): MapPosition => ({
-  x:
-    at.x +
-    (at.open
-      ? Math.max(COLLAPSED_RESOURCE_SIZE.width, at.openSize.width)
-      : COLLAPSED_RESOURCE_SIZE.width) +
-    BESIDE_GAP,
+  x: at.x + resourceSize(at).width + BESIDE_GAP,
   y: at.y,
 });
 
@@ -150,6 +143,16 @@ export type AuthoringCompletion =
       readonly resourceId: ResourceId;
       readonly size: { readonly width: number; readonly height: number };
     }
+  /**
+   * Change Shape: the outline one Resource is drawn in on the Map the Edit is
+   * written into (ADR 0121). Open or Closed alike; the Shape it already draws as
+   * is `unchanged`.
+   */
+  | {
+      readonly kind: 'changed-resource-shape';
+      readonly resourceId: ResourceId;
+      readonly shape: ResourceShape;
+    }
   | {
       readonly kind: 'connected-resources';
       readonly from: ResourceId;
@@ -168,7 +171,7 @@ export type AuthoringCompletion =
   /**
    * Replace image: the Image Resource's URL and the natural size measured when
    * it was set, absent when the picture did not load (ADR 0106). Identity,
-   * Title, placement, Edges and a remembered Open Size are kept, and the URL it
+   * Title, placement, size and Edges are kept, and the URL it
    * already holds is `unchanged`.
    */
   | {
@@ -307,6 +310,7 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'opened-resource' }
   | { readonly kind: 'closed-resource' }
   | { readonly kind: 'resized-resource' }
+  | { readonly kind: 'changed-resource-shape' }
   | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
   | { readonly kind: 'recolored-graph' }
@@ -358,7 +362,8 @@ export type AuthoringRefusal =
   | { readonly code: 'reference-target-must-own-content'; readonly targetId: ResourceId }
   | { readonly code: 'resource-already-in-map' }
   | { readonly code: 'resource-not-in-map' }
-  | { readonly code: 'resource-not-open' }
+  | { readonly code: 'open-requires-content' }
+  | { readonly code: 'shape-requires-ur-resource' }
   | {
       readonly code: 'resource-has-references';
       /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -1253,9 +1258,16 @@ export function createSpaceAuthoring({
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'resized-resource') {
-      // Only an exact Closed Size reaches here as a Close: the magnetic range
-      // that snaps a near miss to it is the canvas's (ADR 0066).
       const outcome = SnapshotEdit.resize(snapshot, mapId, completion.resourceId, completion.size);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
+    } else if (completion.kind === 'changed-resource-shape') {
+      const outcome = SnapshotEdit.changeResourceShape(
+        snapshot,
+        mapId,
+        completion.resourceId,
+        completion.shape,
+      );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'created-resource') {
@@ -1385,7 +1397,7 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'settled-resource-movement') {
       // The moved Resources' drop points, merged over the Map's own positions
       // this Edit already started from — `Placement.next` is what keeps each
-      // Resource's Open/Closed state and Open Size while overwriting `x`/`y`.
+      // Resource's Open/Closed state, size and Shape while overwriting `x`/`y`.
       writePlacement(
         Placement.next(placement, Placement.fromEntries(completion.moved), [
           ...completion.moved.keys(),

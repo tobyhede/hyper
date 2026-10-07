@@ -1,4 +1,14 @@
-import { uuidSchema, type Resource, type Map, type UUID } from '@project/core';
+import {
+  DEFAULT_RESOURCE_SHAPE,
+  resourceOpen,
+  resourceShape,
+  takesOpen,
+  takesResourceShape,
+  uuidSchema,
+  type Resource,
+  type Map,
+  type UUID,
+} from '@project/core';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
@@ -49,7 +59,11 @@ export type SpaceReferenceErrorKind =
   | 'reference-targets-self'
   | 'reference-targets-reference'
   | 'reference-target-must-own-content'
-  | 'space-resource-reference-cycle';
+  | 'space-resource-reference-cycle'
+  /** A Map gives a Resource that is not an Ur Resource a Shape other than the rectangle. */
+  | 'shape-requires-ur-resource'
+  /** A Map stores an Ur Resource Open, which has no content to show. */
+  | 'open-requires-content';
 
 /**
  * One failed cross-reference. Named for the space whose references it is about,
@@ -155,14 +169,35 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     // this the *only* fault reported for it: an edge into that resource is then a
     // consequence of this fault rather than a second one.
     const members = new Set<string>();
-    for (const key of Object.keys(subject.positions)) {
+    for (const [key, placement] of Object.entries(subject.positions)) {
       const resourceId = uuidSchema.parse(key);
       members.add(resourceId);
-      if (!resourceIds.has(resourceId)) {
+      const member = resourceById.get(resourceId);
+      if (member === undefined) {
         errors.push({
           kind: 'map-member-missing-resource',
           ref: resourceId,
           message: `Map "${subject.id}" holds a position for resource "${resourceId}", which the space does not hold`,
+        });
+        continue;
+      }
+      // The kind is read from the Resource, because the entry does not carry it.
+      if (
+        !takesResourceShape(member.kind) &&
+        placement !== undefined &&
+        resourceShape(placement) !== DEFAULT_RESOURCE_SHAPE
+      ) {
+        errors.push({
+          kind: 'shape-requires-ur-resource',
+          ref: resourceId,
+          message: `Map "${subject.id}" draws ${member.kind} resource "${resourceId}" as a ${resourceShape(placement)}; only an Ur Resource takes a Shape other than the rectangle`,
+        });
+      }
+      if (!takesOpen(member.kind) && placement !== undefined && resourceOpen(placement)) {
+        errors.push({
+          kind: 'open-requires-content',
+          ref: resourceId,
+          message: `Map "${subject.id}" stores ${member.kind} resource "${resourceId}" Open; a Resource with no content is always Closed`,
         });
       }
     }

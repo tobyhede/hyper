@@ -94,7 +94,7 @@ export function benchmarkScenario(
     x: 0,
     y: Math.ceil(scale / 10) * 180,
     open: true,
-    openSize: { width: 640, height: 360 },
+    size: { width: 640, height: 360 },
   };
   const metaPositions: Record<UUID, ResourcePlacement> = {};
   metaPositions[ordinaryId] = { x: 20, y: 20, open: false };
@@ -103,7 +103,7 @@ export function benchmarkScenario(
       x: 380 + index * 760,
       y: 20,
       open: true,
-      openSize: { width: 700, height: 620 },
+      size: { width: 700, height: 620 },
     };
   });
 

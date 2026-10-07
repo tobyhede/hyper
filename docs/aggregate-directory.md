@@ -62,7 +62,7 @@ A child directory without a `space.json` is not a Space and is left alone.
           "x": 340,
           "y": 0,
           "open": true,
-          "openSize": { "width": 480, "height": 320 }
+          "size": { "width": 480, "height": 320 }
         }
       },
       "graphs": [
@@ -97,7 +97,7 @@ Every object here is **strict**: a key the format does not declare is refused ra
 | `maps` | Optional. The Space's Maps, in order. A Space with none is given one the first time it is opened ([ADR 0079](adr/0079-v1-exposes-only-layouts-and-first-open-initializes-one.md)). Only the Meta Space can be written without Maps, because a Space Resource must name a Map of the ordinary Space it targets. |
 | `maps[].id`, `.title` | The Map's Id and name. Map Ids are unique within the Space. |
 | `maps[].kind` | `"positioned"`, the only kind. May be omitted. |
-| `maps[].positions` | Resource Id → placement. **The keys are the Map's membership**: a Map may leave Resources out, and may not name one the Space does not hold. A placement is `{ "x", "y", "open" }`; an Open Resource (`"open": true`) also needs `openSize` (`{ "width", "height" }`, no smaller than the Closed Size), and a Closed one may keep the `openSize` it last had. |
+| `maps[].positions` | Resource Id → placement. **The keys are the Map's membership**: a Map may leave Resources out, and may not name one the Space does not hold. A placement is `{ "x", "y" }`, with an optional `open`, `size` and `shape`. `open` is `true` or `false`; absent means Closed, and an Ur Resource may not be Open. `size` is `{ "width", "height" }`, no smaller than the Closed Size (260×146) on either axis; absent means the Closed Size, Open or Closed. `shape` is one of `rectangle`, `pill`, `ellipse` or `diamond`; absent means `rectangle`, and only an Ur Resource may take another. |
 | `maps[].graphs` | The Graphs this Map owns, in order, **at least one**. A Graph Id is unique across the whole Space, not just the Map ([ADR 0108](adr/0108-graph-identity-is-unique-within-the-space.md)). `color` is any CSS colour and `headShape` is one of `arrow`, `vee`, `dot`, `diamond`; both are optional. |
 | `maps[].graphs[].edges` | Directed `{ "from", "to" }` Edges between Resources **this Map places**. Forks, merges, cycles and self-edges are allowed; an exact duplicate in one Graph is not. An Edge may carry a one-line `title`, and `"titleHidden": true` beside it. The list may be empty. |
 | `maps[].activeGraph` | Which Graph is active when the Map opens. Absent means the first. |

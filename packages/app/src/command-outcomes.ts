@@ -131,6 +131,11 @@ const CHANNELS = {
     words: 'described',
     title: 'Resource not removed',
   },
+  'resource-shape': {
+    resetsOnMapChange: true,
+    words: 'described',
+    title: 'Shape not changed',
+  },
   // It names what died. A Space Resource's placement is optimistic (ADR
   // 0089), so the author may be typing into the Resource when the lifecycle
   // answers, and this title makes a Resource vanishing from under the caret
@@ -177,6 +182,7 @@ type ReportedChannel = Exclude<CommandChannel, DescribedChannel>;
 export const COMMAND_CHANNELS = [
   'resource-delete',
   'resource-remove',
+  'resource-shape',
   'map-create',
   'map-manage',
   'map-delete',
@@ -286,6 +292,7 @@ interface CommandSignatures {
     readonly options: [];
   };
   readonly 'resource-remove': { readonly result: AuthoringResult; readonly options: [] };
+  readonly 'resource-shape': { readonly result: AuthoringResult; readonly options: [] };
   readonly 'space-resource-create': {
     readonly result: SpaceResourceCreationResult;
     readonly options: [options?: CommandContinuation<Completed<SpaceResourceCreationResult>>];
@@ -406,6 +413,7 @@ const COMMANDS: CommandDefinitions = {
     broke: brokeOn('resource-delete'),
   },
   'resource-remove': authoringCommand('resource-remove'),
+  'resource-shape': authoringCommand('resource-shape'),
   'space-resource-create': {
     channel: 'space-resource-create',
     settle: (result, options) => {

@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  SPACE_RESOURCE_MIN_OPEN_SIZE,
-  uuidSchema,
-  type ResourceId,
-  type SpaceSnapshot,
-} from '@project/core';
+import { uuidSchema, type ResourceId, type SpaceSnapshot } from '@project/core';
 import { projectResourceNodes, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { loadSpaceSnapshot } from '@project/graph';
 import {
@@ -53,6 +48,7 @@ const projectionNode = (
   width: open ? 640 : RESOURCE_SIZE.width,
   height: open ? 480 : RESOURCE_SIZE.height,
   data: {
+    shape: 'rectangle',
     resourceId,
     title: 'A',
     readOnly,
@@ -207,7 +203,7 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.entityActions).toBeUndefined();
   });
 
-  it('uses a projected Reference’s Space resize floor while still reaching Close', () => {
+  it('floors a projected Reference to a Space Resource at the Closed Size, as every kind', () => {
     const loaded = loadSpaceSnapshot({
       id: SPACE_ID,
       document: { version: 1, title: 'Host', maps: [] },
@@ -239,9 +235,28 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.resize?.minWidth).toBe(RESOURCE_SIZE.width);
     expect(patch.resize?.minHeight).toBe(RESOURCE_SIZE.height);
     patch.resize?.onResize({ width: 280, height: 220 });
-    expect(previewResize).toHaveBeenCalledWith(REFERENCE_ID, SPACE_RESOURCE_MIN_OPEN_SIZE);
-    patch.resize?.onResize(RESOURCE_SIZE);
+    expect(previewResize).toHaveBeenCalledWith(REFERENCE_ID, { width: 280, height: 220 });
+    patch.resize?.onResize({ width: 100, height: 100 });
     expect(previewResize).toHaveBeenCalledWith(REFERENCE_ID, RESOURCE_SIZE);
+  });
+
+  it('offers resize on every kind, Open or Closed, where the Map may be authored', () => {
+    for (const [id, kind] of [
+      [RESOURCE_ID, 'markdown'],
+      [UR_ID, 'ur'],
+    ] as const) {
+      for (const open of [false, true]) {
+        const patch = decorateSharedResourceNode(projectionNode(id, kind, open), context());
+        expect(patch.resize?.minWidth).toBe(RESOURCE_SIZE.width);
+        expect(patch.resize?.minHeight).toBe(RESOURCE_SIZE.height);
+      }
+    }
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(RESOURCE_ID, 'markdown'),
+        context({ authorOnCanvas: false }),
+      ).resize,
+    ).toBeUndefined();
   });
 
   it('attaches the title editor only to the Resource holding the caret', () => {
@@ -264,16 +279,55 @@ describe('decorateSharedResourceNode', () => {
  * operation and no content edit from any decorator.
  */
 describe('an Ur Resource’s decoration', () => {
-  it('offers Open, title editing and entity actions, and no body editing', () => {
+  it('offers title editing and entity actions, and no Open, Close or body editing', () => {
     const patch = decorateSharedResourceNode(
-      projectionNode(UR_ID, 'ur', true),
+      projectionNode(UR_ID, 'ur'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onEditResource).toBeTypeOf('function');
+    expect(patch.onEditResource).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
-    expect(patch.resize).toBeDefined();
     expect(patch.onBeginBodyEditing).toBeUndefined();
+  });
+
+  /** Only an Ur Resource takes a Shape (ADR 0121), whatever its projected state. */
+  it('offers the Shape choice where the Map may be authored, and on an Ur Resource alone', () => {
+    const changeResourceShape = vi.fn();
+    for (const open of [false, true]) {
+      const patch = decorateSharedResourceNode(
+        projectionNode(UR_ID, 'ur', open),
+        context({ changeResourceShape }),
+      );
+      patch.onResourceShapeChange?.('ellipse');
+    }
+    expect(changeResourceShape.mock.calls).toEqual([
+      [UR_ID, 'ellipse'],
+      [UR_ID, 'ellipse'],
+    ]);
+
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(UR_ID, 'ur'),
+        context({ changeResourceShape, authorOnCanvas: false }),
+      ).onResourceShapeChange,
+    ).toBeUndefined();
+    expect(
+      decorateSharedResourceNode(
+        projectionNode(UR_ID, 'ur'),
+        context({ changeResourceShape, editableResourceIds: new Set() }),
+      ).onResourceShapeChange,
+    ).toBeUndefined();
+    expect(
+      decorateSharedResourceNode(projectionNode(UR_ID, 'ur'), context()).onResourceShapeChange,
+    ).toBeUndefined();
+    for (const kind of ['markdown', 'reference', 'space'] as const) {
+      expect(
+        decorateSharedResourceNode(
+          projectionNode(RESOURCE_ID, kind),
+          context({ changeResourceShape }),
+        ).onResourceShapeChange,
+      ).toBeUndefined();
+    }
   });
 
   it('is given no editor, replacer or rail, although its caret is live', () => {
@@ -343,7 +397,7 @@ describe('decorateImageResourceNode', () => {
         display: open
           ? {
               shown: 'open',
-              content: { kind: 'image', url: IMAGE_URL, naturalSize: undefined, via: 'self' },
+              content: { kind: 'image', url: IMAGE_URL, via: 'self' },
             }
           : node.data.display,
       },
@@ -357,7 +411,7 @@ describe('decorateImageResourceNode', () => {
   it('enters the replacing display on an Open Image Resource whose caret is live', () => {
     expect(decorateImageResourceNode(imageNode(true), replacing).display).toMatchObject({
       shown: 'replacing',
-      content: { kind: 'image', url: IMAGE_URL, naturalSize: undefined, via: 'self' },
+      content: { kind: 'image', url: IMAGE_URL, via: 'self' },
       replacer: { accept: 'image/png' },
     });
   });

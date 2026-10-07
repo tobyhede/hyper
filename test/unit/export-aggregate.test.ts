@@ -54,7 +54,7 @@ const storedSpace: LoadedSpace = {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [RESOURCE_B]: { x: 260, y: 0, open: false },
+            [RESOURCE_B]: { x: 260, y: 0, open: false, shape: 'diamond' },
             [RESOURCE_A]: { x: 0, y: 0, open: false },
           },
           graphs: [
@@ -73,7 +73,7 @@ const storedSpace: LoadedSpace = {
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [RESOURCE_E]: { x: 0, y: 200, open: false },
+            [RESOURCE_E]: { x: 0, y: 200, open: false, shape: 'pill' },
             [RESOURCE_F]: { x: 260, y: 200, open: false },
           },
           graphs: [
@@ -83,10 +83,11 @@ const storedSpace: LoadedSpace = {
       ],
     },
     resources: [
-      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+      // B and E are drawn in Shapes, which only an Ur Resource takes (ADR 0121).
+      { id: RESOURCE_B, document: { title: 'B', kind: 'ur' } },
       { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
       { id: RESOURCE_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
-      { id: RESOURCE_E, document: { title: 'E', kind: 'markdown', body: 'E body.\n' } },
+      { id: RESOURCE_E, document: { title: 'E', kind: 'ur' } },
     ],
   },
   revision: 7n,
@@ -140,7 +141,7 @@ describe('canonical export', () => {
           kind: 'positioned',
           positions: {
             [RESOURCE_A]: { x: 0, y: 0, open: false },
-            [RESOURCE_B]: { x: 260, y: 0, open: false },
+            [RESOURCE_B]: { x: 260, y: 0, open: false, shape: 'diamond' },
           },
           graphs: [
             {
@@ -158,7 +159,7 @@ describe('canonical export', () => {
           title: 'Echo',
           kind: 'positioned',
           positions: {
-            [RESOURCE_E]: { x: 0, y: 200, open: false },
+            [RESOURCE_E]: { x: 0, y: 200, open: false, shape: 'pill' },
             [RESOURCE_F]: { x: 260, y: 200, open: false },
           },
           graphs: [
@@ -191,8 +192,8 @@ describe('canonical export', () => {
     snapshot: {
       resources: [
         { id: RESOURCE_A, document: { kind: 'markdown', body: 'A body.\n', title: 'A' } },
-        { id: RESOURCE_E, document: { body: 'E body.\n', title: 'E', kind: 'markdown' } },
-        { id: RESOURCE_B, document: { title: 'B', body: 'B body.\n', kind: 'markdown' } },
+        { id: RESOURCE_E, document: { title: 'E', kind: 'ur' } },
+        { id: RESOURCE_B, document: { kind: 'ur', title: 'B' } },
         { id: RESOURCE_F, document: { kind: 'markdown', title: 'F', body: 'F body.\n' } },
       ],
       id: SPACE_ID,
@@ -214,15 +215,15 @@ describe('canonical export', () => {
             title: 'Spine',
             positions: {
               [RESOURCE_A]: { y: 0, x: 0, open: false },
-              [RESOURCE_B]: { y: 0, x: 260, open: false },
+              [RESOURCE_B]: { y: 0, shape: 'diamond', x: 260, open: false },
             },
             id: SPINE_MAP_ID,
           },
           {
             title: 'Echo',
             positions: {
-              [RESOURCE_F]: { y: 200, x: 260, open: false },
-              [RESOURCE_E]: { y: 200, x: 0, open: false },
+              [RESOURCE_F]: { open: false, y: 200, x: 260 },
+              [RESOURCE_E]: { shape: 'pill', y: 200, x: 0, open: false },
             },
             graphs: [
               { title: 'Echo', edges: [{ to: RESOURCE_F, from: RESOURCE_E }], id: ECHO_GRAPH_ID },
@@ -256,11 +257,10 @@ describe('canonical export', () => {
   });
 
   /**
-   * Both arms of the placement union carrying a remembered Open Size (ADR 0066)
-   * — an Open Resource, and a Closed one that kept its rect for the next Open — each
-   * stored *height first*, which is an order `jsonb` is free to hand back.
+   * A size on an Open Resource and on a Closed one, each stored *height
+   * first*, which is an order `jsonb` is free to hand back.
    */
-  const storedSpaceWithOpenSizes: LoadedSpace = {
+  const storedSpaceWithSizes: LoadedSpace = {
     snapshot: {
       id: SPACE_ID,
       document: {
@@ -272,8 +272,8 @@ describe('canonical export', () => {
             title: 'Spine',
             kind: 'positioned',
             positions: {
-              [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { height: 420, width: 560 } },
-              [RESOURCE_B]: { x: 260, y: 0, open: false, openSize: { height: 300, width: 400 } },
+              [RESOURCE_A]: { x: 0, y: 0, open: true, size: { height: 420, width: 560 } },
+              [RESOURCE_B]: { x: 260, y: 0, open: false, size: { height: 300, width: 400 } },
             },
             graphs: [
               { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },
@@ -291,25 +291,25 @@ describe('canonical export', () => {
   };
 
   /**
-   * The keys of every exported `openSize`, in the order the bytes hold them.
+   * The keys of every exported `size`, in the order the bytes hold them.
    * Read off the text rather than a parsed value: re-parsing through the schema
    * would impose the schema's own key order and hide the resource under test.
    */
-  const exportedOpenSizeKeys = (json: string): string[][] =>
-    [...json.matchAll(/"openSize": \{([^}]*)\}/g)].map((openSize) =>
-      [...(openSize[1] ?? '').matchAll(/"(\w+)":/g)].map((key) => key[1] ?? ''),
+  const exportedSizeKeys = (json: string): string[][] =>
+    [...json.matchAll(/"size": \{([^}]*)\}/g)].map((size) =>
+      [...(size[1] ?? '').matchAll(/"(\w+)":/g)].map((key) => key[1] ?? ''),
     );
 
-  it('writes every Open Size width before height, however it was stored', async () => {
+  it('writes every size width before height, however it was stored', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
-    const repository = new MemorySpaceRepository([storedSpaceWithOpenSizes], SPACE_ID);
+    const repository = new MemorySpaceRepository([storedSpaceWithSizes], SPACE_ID);
 
     await exportTo(repository, destination);
 
     const written = await readFile(spaceFileIn(destination), 'utf8');
-    // Positions export sorted by Resource id, so the Open Resource's rect is first and
-    // the Closed Resource's remembered rect second.
-    expect(exportedOpenSizeKeys(written)).toEqual([
+    // Positions export sorted by Resource id, so the Open Resource's size is first and
+    // the Closed Resource's second.
+    expect(exportedSizeKeys(written)).toEqual([
       ['width', 'height'],
       ['width', 'height'],
     ]);
@@ -323,8 +323,8 @@ describe('canonical export', () => {
           title: 'Spine',
           kind: 'positioned',
           positions: {
-            [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-            [RESOURCE_B]: { x: 260, y: 0, open: false, openSize: { width: 400, height: 300 } },
+            [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: 560, height: 420 } },
+            [RESOURCE_B]: { x: 260, y: 0, open: false, size: { width: 400, height: 300 } },
           },
           graphs: [
             { id: LONG_GRAPH_ID, title: 'Long', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] },

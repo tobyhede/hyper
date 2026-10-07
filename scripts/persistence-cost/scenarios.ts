@@ -1,6 +1,5 @@
 import {
-  COLLAPSED_RESOURCE_SIZE,
-  DEFAULT_OPEN_SIZE,
+  resourceSize,
   spaceSnapshotSchema,
   uuidSchema,
   type PositionedMap,
@@ -203,10 +202,10 @@ const withPositions = (
 };
 
 /**
- * Give the subject the Open Size `size` answers for its current size, moving
- * every other Resource by the growth on one axis (ADR 0084, ADR 0093): at or
- * past the subject's collapsed right edge takes the width, otherwise at or past
- * its collapsed bottom edge takes the height.
+ * Give the subject the size `size` answers for its current size, moving every
+ * other Resource by the change on one axis (ADR 0084, ADR 0093): at or past the
+ * subject's right edge before the Resize takes the width, otherwise at or past
+ * its bottom edge takes the height.
  */
 const sizeTo = (
   snapshot: SpaceSnapshot,
@@ -219,21 +218,21 @@ const sizeTo = (
   withPositions(snapshot, (positions) => {
     const placement = positions[subjectId];
     if (placement === undefined) throw new Error(`Resource ${subjectId} is not placed`);
-    const current = placement.open ? placement.openSize : COLLAPSED_RESOURCE_SIZE;
-    const openSize = size(current);
-    const growth = {
-      width: Math.max(0, openSize.width - current.width),
-      height: Math.max(0, openSize.height - current.height),
+    const current = resourceSize(placement);
+    const resized = size(current);
+    const change = {
+      width: resized.width - current.width,
+      height: resized.height - current.height,
     };
-    const right = placement.x + COLLAPSED_RESOURCE_SIZE.width;
-    const bottom = placement.y + COLLAPSED_RESOURCE_SIZE.height;
+    const right = placement.x + current.width;
+    const bottom = placement.y + current.height;
     const next: Record<UUID, ResourcePlacement> = {};
     for (const [resourceId, other] of Object.entries(positions)) {
       if (other === undefined) continue;
       const key = uuidSchema.parse(resourceId);
-      if (key === subjectId) next[key] = { ...other, open: true, openSize };
-      else if (other.x >= right) next[key] = { ...other, x: other.x + growth.width };
-      else if (other.y >= bottom) next[key] = { ...other, y: other.y + growth.height };
+      if (key === subjectId) next[key] = { ...other, size: resized };
+      else if (other.x >= right) next[key] = { ...other, x: other.x + change.width };
+      else if (other.y >= bottom) next[key] = { ...other, y: other.y + change.height };
       else next[key] = other;
     }
     return next;
@@ -241,9 +240,9 @@ const sizeTo = (
 
 /**
  * The next snapshot one small Edit produces — the same kind of document change
- * Space Authoring's completion makes, not its exact derivation. `open` and
- * `resize` displace the other Resources (`sizeTo`), so each rewrites many
- * placements while staying one Map change; `add-resource` is the one Edit here
+ * Space Authoring's completion makes, not its exact derivation. `resize`
+ * displaces the other Resources (`sizeTo`), so it rewrites many placements
+ * while staying one Map change; `add-resource` is the one Edit here
  * that changes the Space's Resource membership.
  */
 export const applyEdit = (
@@ -280,7 +279,12 @@ export const applyEdit = (
         return positions;
       });
     case 'open':
-      return sizeTo(snapshot, subject.id, () => DEFAULT_OPEN_SIZE);
+      return withPositions(snapshot, (positions) => {
+        const placement = positions[subject.id];
+        if (placement === undefined) throw new Error(`Resource ${subject.id} is not placed`);
+        positions[subject.id] = { ...placement, open: true };
+        return positions;
+      });
     case 'resize':
       return sizeTo(snapshot, subject.id, (current) => ({
         width: current.width + 40,

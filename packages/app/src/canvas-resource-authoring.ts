@@ -3,9 +3,11 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import {
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
+  takesOpen,
   uuidSchema,
   type ResourceDocument,
   type ResourceId,
+  type ResourceShape,
   type GraphId,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
@@ -91,7 +93,7 @@ const completeEditedSpaceResource = (
 export interface CanvasResourceAuthoringInput {
   readonly continuation?: Continuation | undefined;
   /** This canvas Space's outcomes; target rails resolve their target's composition. */
-  readonly commandOutcomes?: CommandOutcomes;
+  readonly commandOutcomes?: CommandOutcomes | undefined;
   /** This canvas Space's confirmation; target rails use the target's confirmation. */
   readonly deleteConfirmation?: DeleteConfirmation;
   readonly nodes: readonly ResourceFlowNode[];
@@ -264,13 +266,10 @@ export function useCanvasResourceAuthoring({
       const stored = spaceSession
         .getState()
         .working.resources.find((resource) => resource.id === resourceId.data);
-      if (stored === undefined) return 'retained';
-      // Every Resource kind Opens, and there is deliberately no kind guard
-      // here. Opening is one Map-owned operation (ADR 0064) and each kind
-      // differs only in what its front then draws: Markdown of its own, an
-      // immutable Target's read-only (ADR 0070), or the Map a Space Resource
-      // selects (ADR 0068). Do not guard on kind: that is a decision about
-      // *content* made by the code that authors placement.
+      // Every kind with content Opens, as one Map-owned operation (ADR 0064);
+      // an Ur Resource has none to show, so Enter or Space on one asks nothing.
+      // `takesOpen` is the domain's one answer, which intake and the Edit ask too.
+      if (stored === undefined || !takesOpen(stored.document.kind)) return 'retained';
       const result = authoring.complete({ kind: 'opened-resource', resourceId: resourceId.data });
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
@@ -314,6 +313,27 @@ export function useCanvasResourceAuthoring({
       return result.kind === 'completed' || result.kind === 'unchanged' ? 'completed' : 'retained';
     },
     [authoring, spaceSession],
+  );
+
+  /**
+   * One Edit per choice, its refusal reported as the Actions menu's commands
+   * are. Without command outcomes there is nowhere to say a refusal, so the
+   * choice is not offered.
+   */
+  const changeResourceShape = useMemo(
+    () =>
+      commandOutcomes === undefined
+        ? undefined
+        : (resourceId: ResourceId, resourceShape: ResourceShape): void => {
+            commandOutcomes.run('resource-shape', () =>
+              authoring.complete({
+                kind: 'changed-resource-shape',
+                resourceId,
+                shape: resourceShape,
+              }),
+            );
+          },
+    [authoring, commandOutcomes],
   );
 
   const replaceResourceImage = useMemo(() => {
@@ -470,6 +490,7 @@ export function useCanvasResourceAuthoring({
       completeResourceTitle,
       clearCaret,
       resourceEntityActions,
+      changeResourceShape,
     }),
     [
       availability.authorOnCanvas,
@@ -485,6 +506,7 @@ export function useCanvasResourceAuthoring({
       completeResourceTitle,
       clearCaret,
       resourceEntityActions,
+      changeResourceShape,
     ],
   );
   const markdownContext = useMemo(

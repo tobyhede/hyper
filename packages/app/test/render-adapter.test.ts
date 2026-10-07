@@ -611,7 +611,7 @@ describe('render adapter', () => {
   it('answers one resize capability across writes resize knows nothing about', () => {
     const spy = authoringSpy({
       mapPlacement: Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+        [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);
@@ -629,14 +629,14 @@ describe('render adapter', () => {
   });
 
   it('previews the resizing Resource and nobody else, and completes only its final size', () => {
-    // The draft layers the proposed Open Size over the authored Placement and
+    // The draft layers the proposed size over the authored Placement and
     // nothing more. B keeps its authored coordinate through the whole gesture
     // although A grows past it, because a Resource's neighbours do not move until
     // the Edit lands (ADR 0084) — there is no derived layer to preview.
     // This is why the render adapter holds no `move` draft: a dragged Resource
     // displaces nobody either.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 500, height: 360 } }],
       [RESOURCE_B, { x: 300, y: 200, open: false }],
     ]);
     const spy = authoringSpy({ mapPlacement: authored });
@@ -649,7 +649,7 @@ describe('render adapter', () => {
       resourceId: RESOURCE_A,
       size: { width: 620, height: 440 },
       placement: Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 620, height: 440 } }],
+        [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 620, height: 440 } }],
         [RESOURCE_B, { x: 300, y: 200, open: false }],
       ]),
     });
@@ -663,47 +663,27 @@ describe('render adapter', () => {
     expect(store.getState().resizeDraft).toBeNull();
   });
 
-  it('snaps both dimensions inside the Close range to the exact Closed rect', () => {
-    const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
-    ]);
+  it('previews and completes a resize of a Closed Resource, keeping it Closed', () => {
+    const authored = Placement.fromEntries([[RESOURCE_A, { x: 10, y: 20, open: false }]]);
     const spy = authoringSpy({ mapPlacement: authored });
     const store = createRenderAdapter(spy.authoring);
 
     store.getState().resourceResize.beginResize(RESOURCE_A);
+    expect(store.getState().resizeDraft?.size).toEqual({ width: 260, height: 146 });
     store.getState().resourceResize.previewResize(RESOURCE_A, { width: 280, height: 166 });
 
-    expect(store.getState().resizeDraft).toMatchObject({
-      resourceId: RESOURCE_A,
-      size: { width: 260, height: 146 },
-    });
     expect(store.getState().resizeDraft?.placement.get(RESOURCE_A)).toEqual({
       x: 10,
       y: 20,
-      open: true,
-      openSize: { width: 260, height: 146 },
+      open: false,
+      size: { width: 280, height: 166 },
     });
 
     store.getState().resourceResize.finishResize(RESOURCE_A);
 
     expect(spy.completions).toEqual([
-      { kind: 'resized-resource', resourceId: RESOURCE_A, size: { width: 260, height: 146 } },
+      { kind: 'resized-resource', resourceId: RESOURCE_A, size: { width: 280, height: 166 } },
     ]);
-  });
-
-  it('keeps an Open resize proposal when only one dimension reaches the Close range', () => {
-    const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
-    ]);
-    const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
-
-    store.getState().resourceResize.beginResize(RESOURCE_A);
-    store.getState().resourceResize.previewResize(RESOURCE_A, { width: 280, height: 240 });
-
-    expect(store.getState().resizeDraft).toMatchObject({
-      resourceId: RESOURCE_A,
-      size: { width: 280, height: 240 },
-    });
   });
 
   /**
@@ -717,7 +697,7 @@ describe('render adapter', () => {
    */
   it('leaves the published projection alone while the resize draft grows', () => {
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 500, height: 360 } }],
       [RESOURCE_B, { x: 300, y: 200, open: false }],
     ]);
     const store = createRenderAdapter(authoringSpy({ mapPlacement: authored }).authoring);
@@ -737,7 +717,7 @@ describe('render adapter', () => {
   it('discards the complete resize draft without an Edit when the gesture is cancelled', () => {
     const spy = authoringSpy({
       mapPlacement: Placement.fromEntries([
-        [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 500, height: 360 } }],
+        [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 500, height: 360 } }],
       ]),
     });
     const store = createRenderAdapter(spy.authoring);

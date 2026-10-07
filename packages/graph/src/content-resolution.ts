@@ -8,7 +8,7 @@ function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent 
     case 'markdown':
       return { kind: 'markdown', source: resource.body, via };
     case 'image':
-      return { kind: 'image', url: resource.url, naturalSize: resource.naturalSize, via };
+      return { kind: 'image', url: resource.url, via };
     case 'space':
       return {
         kind: 'space',

@@ -921,7 +921,7 @@ describe('Space session registry', () => {
   // The registry applies the same membership rules Space Authoring does,
   // through `SnapshotEdit`, and these three hold it to them.
   describe('Space Resource membership through SnapshotEdit', () => {
-    it("reclaims an Open Space Resource's room from every Resource it displaced, on delete", async () => {
+    it('moves no other Resource when it deletes an Open, resized Space Resource', async () => {
       const OPEN_SPACE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000020');
       const DISPLACED_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000021');
       const DELETE_TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000022');
@@ -943,16 +943,13 @@ describe('Space session registry', () => {
                 title: 'Map 1',
                 kind: 'positioned' as const,
                 positions: {
-                  // 400x300 Open against the 260x146 collapsed rect is a growth
-                  // of 140x154, already written into the neighbour's coordinates
-                  // by the Open Edit that placed it (ADR 0084) — on `x` alone, the
-                  // neighbour being clear of it there (ADR 0093), exactly the
-                  // fixture `Placement.reclaim`'s own unit test uses.
+                  // Removal changes no size, so it displaces nobody: the
+                  // neighbour stays where it is.
                   [OPEN_SPACE_RESOURCE_ID]: {
                     x: 0,
                     y: 0,
                     open: true as const,
-                    openSize: { width: 400, height: 300 },
+                    size: { width: 400, height: 300 },
                   },
                   [DISPLACED_RESOURCE_ID]: { x: 400, y: 0, open: false as const },
                 },
@@ -1014,7 +1011,7 @@ describe('Space session registry', () => {
       expect(result).toEqual({ kind: 'completed' });
       const stored = await backend.loadSpace(SPACE_ID);
       expect(stored?.snapshot.document.maps?.[0]?.positions).toEqual({
-        [DISPLACED_RESOURCE_ID]: { x: 260, y: 0, open: false },
+        [DISPLACED_RESOURCE_ID]: { x: 400, y: 0, open: false },
       });
     });
 

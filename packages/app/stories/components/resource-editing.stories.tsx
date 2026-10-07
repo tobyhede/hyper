@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useRef, useState } from 'react';
 import type { Story } from '@ladle/react';
 import { titleName } from '@project/core';
 import {
@@ -10,6 +10,7 @@ import {
   type FrontDisplay,
 } from '@project/ui';
 import { resourceSizeVars } from '#src/resource';
+import type { ResourceFrameStyle } from '../support/CanvasResourceSpecimen';
 
 export default { title: 'Components/Resource/Editing' };
 
@@ -114,11 +115,6 @@ export const Title: Story = () => (
     </section>
   </div>
 );
-
-type ResourceFrameStyle = CSSProperties & {
-  readonly '--resource-width': string;
-  readonly '--resource-height': string;
-};
 
 const openFrame: ResourceFrameStyle = {
   '--resource-width': '480px',

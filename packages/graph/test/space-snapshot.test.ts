@@ -75,7 +75,7 @@ describe('loadSpaceSnapshot', () => {
             ...firstMap,
             positions: {
               ...firstMap.positions,
-              [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: Infinity, height: 146 } },
+              [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: Infinity, height: 146 } },
             },
           },
         ],

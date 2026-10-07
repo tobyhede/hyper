@@ -1,13 +1,7 @@
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { readFileSync } from 'node:fs';
-import {
-  COLLAPSED_RESOURCE_SIZE,
-  encodeCompactUuid,
-  OPEN_RESOURCE_CHROME,
-  uuidSchema,
-  type UUID,
-} from '@project/core';
+import { COLLAPSED_RESOURCE_SIZE, encodeCompactUuid, uuidSchema, type UUID } from '@project/core';
 import { decodeLoadedSpace } from '@project/persistence';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {
@@ -49,8 +43,10 @@ interface Pictures {
   readonly title?: string;
   /** Give the seeded Graph an Edge from the Image Resource to itself, so presenting starts there. */
   readonly presentable?: boolean;
-  /** The picture's recorded natural size, which its first Open is sized by. */
+  /** The picture's recorded natural size. */
   readonly naturalSize?: { readonly width: number; readonly height: number };
+  /** The Image Resource's size on the Map; absent, it is the Closed Size. */
+  readonly size?: { readonly width: number; readonly height: number };
 }
 
 /**
@@ -60,7 +56,7 @@ interface Pictures {
  */
 async function openPictures(
   page: Page,
-  { title = 'Figure', presentable = false, naturalSize = HARBOUR_SIZE }: Pictures = {},
+  { title = 'Figure', presentable = false, naturalSize = HARBOUR_SIZE, size }: Pictures = {},
 ): Promise<UUID> {
   const seeded = await seedPositionedMap(
     page,
@@ -70,7 +66,8 @@ async function openPictures(
       if (markdown === undefined) throw new Error('The opened Space holds no Markdown Resource.');
       return {
         [markdown.id]: { x: 0, y: 0, open: false },
-        [IMAGE_ID]: { x: 400, y: 0, open: false },
+        [IMAGE_ID]:
+          size === undefined ? { x: 400, y: 0, open: false } : { x: 400, y: 0, open: false, size },
       };
     },
     [
@@ -171,20 +168,17 @@ test(
   },
 );
 
+/** A Resource sized to hold the 400×300 picture above a one-line Title. */
+const SIZED_TO_PICTURE = { width: 408, height: 359 } as const;
+
 /**
  * An Open Image Resource is the Open Markdown front with its picture as the
- * content. Its first Open is one Edit that writes the recorded natural size plus
- * the front's chrome, and the picture is then drawn at its own size, above the
- * Title footer and named by the Resource.
- *
- * The chrome is measured here as the application draws it, host theme
- * included: exactly `OPEN_RESOURCE_CHROME` across, and down within the one unit
- * the constant rounds the Title line up by — so the content area is at least the
- * picture and less than one unit taller, and the picture draws at exactly
- * 400×300.
+ * content. Opening changes no size, so at the Closed Size the picture is drawn
+ * contained and scaled down, never enlarged, above the Title footer and named by
+ * the Resource.
  */
 test(
-  'an Open Image Resource draws its picture at its own size in the Markdown front',
+  'an Open Image Resource draws its picture contained in the Markdown front, at the size it already had',
   { tag: '@parity:open-image-resource-draws-its-image' },
   async ({ page }) => {
     await serveFigure(page);
@@ -194,12 +188,7 @@ test(
 
     const resource = node.getByRole('article', { name: 'Figure' });
     await expect(resource).toHaveAttribute('data-open', 'true');
-    await expect
-      .poll(() => authoredSize(node))
-      .toEqual({
-        width: 400 + OPEN_RESOURCE_CHROME.width,
-        height: 300 + OPEN_RESOURCE_CHROME.height,
-      });
+    await expect.poll(() => authoredSize(node)).toEqual(COLLAPSED_RESOURCE_SIZE);
 
     const picture = resource.getByRole('img', { name: 'Figure' });
     await expect(picture).toHaveAttribute('src', FIGURE_URL);
@@ -208,39 +197,33 @@ test(
     await expect(resource.getByRole('heading', { name: 'Figure' })).toBeVisible();
 
     await settled(page);
-    const { authored, room, natural, bottom } = await pictureIn(node, picture);
+    const { room, natural, bottom } = await pictureIn(node, picture);
     expect(natural).toEqual(HARBOUR_SIZE);
-    const chrome = { width: authored.width - room.width, height: authored.height - room.height };
-    expect(chrome.width).toBeCloseTo(OPEN_RESOURCE_CHROME.width, 1);
-    expect(chrome.height).toBeLessThanOrEqual(OPEN_RESOURCE_CHROME.height + 0.05);
-    expect(chrome.height).toBeGreaterThan(OPEN_RESOURCE_CHROME.height - 1);
-    // The room holds the picture, so it is drawn at exactly its natural size.
-    expect(room.width).toBeCloseTo(natural.width, 1);
-    expect(room.height).toBeGreaterThanOrEqual(natural.height - 0.05);
+    // The room is smaller than the picture, which is scaled down to fit it.
+    expect(room.width).toBeLessThan(natural.width);
+    expect(room.height).toBeLessThan(natural.height);
     const titleBox = await boxOf(resource.locator('.canvas-resource__body'), 'the Title footer');
     expect(bottom).toBeLessThanOrEqual(titleBox.y + 1);
   },
 );
 
 /**
- * The first Open's size reads one Title line, and a longer Title takes its room
- * from the picture: the Open Size is the same, the Title footer is taller, and
- * the picture is scaled down to fit what is left rather than overflowing it.
+ * A longer Title takes its room from the picture: the Resource's size is the
+ * same, the Title footer is taller, and the picture is scaled down to fit what
+ * is left rather than overflowing it.
  */
-test('a longer Title takes its room from the picture, not from the Open Size', async ({ page }) => {
+test('a longer Title takes its room from the picture, not from the size', async ({ page }) => {
   await serveFigure(page);
-  await openPictures(page, { title: 'Figure\nThe harbour wall, looking east' });
+  await openPictures(page, {
+    title: 'Figure\nThe harbour wall, looking east',
+    size: SIZED_TO_PICTURE,
+  });
   const node = page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`);
   await openResource(node, 'Figure');
 
   const resource = node.getByRole('article', { name: 'Figure' });
   await expect(resource).toHaveAttribute('data-open', 'true');
-  await expect
-    .poll(() => authoredSize(node))
-    .toEqual({
-      width: 400 + OPEN_RESOURCE_CHROME.width,
-      height: 300 + OPEN_RESOURCE_CHROME.height,
-    });
+  await expect.poll(() => authoredSize(node)).toEqual(SIZED_TO_PICTURE);
   const picture = resource.getByRole('img', { name: 'Figure' });
   await expectPictureLoaded(picture, HARBOUR_SIZE.width);
 
@@ -272,8 +255,7 @@ test('presenting an Image Resource draws its picture', async ({ page }) => {
 
 /**
  * A picture that will not load is not a refusal (ADR 0106): the Space stays as it
- * was authored, the Open Size still follows the recorded natural size, and the
- * content area says the image did not load and names its URL.
+ * was authored, the Resource keeps the size it had, and the content area says the image did not load and names its URL.
  */
 test(
   'an Open Image Resource whose picture does not load names its URL and keeps its Title',
@@ -289,12 +271,7 @@ test(
     await expect(resource.getByText(FIGURE_URL)).toBeVisible();
     await expect(resource.getByRole('img', { name: 'Figure' })).toHaveCount(0);
     await expect(resource.getByRole('heading', { name: 'Figure' })).toBeVisible();
-    await expect
-      .poll(() => authoredSize(node))
-      .toEqual({
-        width: 400 + OPEN_RESOURCE_CHROME.width,
-        height: 300 + OPEN_RESOURCE_CHROME.height,
-      });
+    await expect.poll(() => authoredSize(node)).toEqual(COLLAPSED_RESOURCE_SIZE);
   },
 );
 
@@ -712,8 +689,8 @@ async function expectWithin(part: Locator, content: Locator): Promise<void> {
 }
 
 test(
-  'a 64×64 picture Opens at the minimum Open Size, where the upload target keeps its controls and refusal in view and still replaces',
-  { tag: '@parity:image-resource-replace-fits-the-minimum-open-size' },
+  'at the Closed Size the upload target keeps its controls and refusal in view and still replaces',
+  { tag: '@parity:image-resource-replace-fits-the-closed-size' },
   async ({ page }) => {
     await serveFigure(page);
     const spaceId = await openPictures(page, { naturalSize: { width: 64, height: 64 } });
@@ -724,10 +701,9 @@ test(
     await expect(target).toBeVisible();
     await settled(page);
     const { maps } = await storedFigure(page, spaceId);
-    expect(maps?.[0]?.positions[IMAGE_ID]).toMatchObject({
-      open: true,
-      openSize: COLLAPSED_RESOURCE_SIZE,
-    });
+    // Opening for Replace wrote `open` and no size: the Closed Size is the
+    // smallest any Resource is.
+    expect(maps?.[0]?.positions[IMAGE_ID]).toEqual({ x: 400, y: 0, open: true });
     const content = resource.locator('.canvas-resource__content');
     const upload = target.getByRole('button', { name: 'Upload' });
     const field = target.getByRole('textbox', { name: 'Image URL' });
@@ -819,7 +795,7 @@ test(
       url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
       naturalSize: FIRST_PICTURE.size,
     });
-    // Placement, Open Size and Edges are the Map's, and the Map is untouched.
+    // Placement, size and Edges are the Map's, and the Map is untouched.
     expect(after.maps).toEqual(before.maps);
     // V1 has no Undo; one commit over the revision holding the old URL is the
     // one Edit an Undo would reverse.
@@ -1561,8 +1537,7 @@ test('the tracked fixture draws its Open Image Resource with no network', async 
 /**
  * A Reference Resource targets an Image Resource (ADR 0070, ADR 0106). Created
  * from the Image Resource's own menu, it is named after it with the caret in
- * its Title; its first Open writes the size its Target's recorded picture
- * takes; it draws that picture read-only, with Close and no Replace, not on its
+ * its Title; Opening it changes no size; it draws that picture read-only, with Close and no Replace, not on its
  * rail and not in its failed-image state; and replacing the Target's image,
  * through the Target's own Replace, changes what it draws.
  */
@@ -1603,12 +1578,8 @@ test(
     const front = reference.getByRole('article', { name: 'Figure' });
     await expect(front).toHaveAttribute('data-open', 'true');
     await expect(front).toHaveAttribute('data-kind', 'reference');
-    await expect
-      .poll(() => authoredSize(reference))
-      .toEqual({
-        width: HARBOUR_SIZE.width + OPEN_RESOURCE_CHROME.width,
-        height: HARBOUR_SIZE.height + OPEN_RESOURCE_CHROME.height,
-      });
+    // Opening changes no size: the Reference Resource keeps the Closed Size.
+    await expect.poll(() => authoredSize(reference)).toEqual(COLLAPSED_RESOURCE_SIZE);
 
     // The Target's picture did not load: the Reference Resource names its URL
     // and offers no Replace, which is the Image Resource's own command.
@@ -1654,7 +1625,7 @@ test('replacing an image in an only-drawn Space holds Back and Forward and edits
         {
           ...targetMap,
           positions: {
-            [HARBOUR_ID]: { x: 0, y: 0, open: true, openSize: { width: 408, height: 359 } },
+            [HARBOUR_ID]: { x: 0, y: 0, open: true, size: { width: 408, height: 359 } },
           },
           graphs: targetMap.graphs.map((graph) => ({ ...graph, edges: [] })),
         },
@@ -1676,7 +1647,7 @@ test('replacing an image in an only-drawn Space holds Back and Forward and edits
   expect(committed.ok()).toBe(true);
   const drawingId = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
   const root = await seedPositionedMap(page, 'Embedded pictures', () => ({
-    [drawingId]: { x: 0, y: 0, open: true, openSize: { width: 900, height: 700 } },
+    [drawingId]: { x: 0, y: 0, open: true, size: { width: 900, height: 700 } },
   }));
   await page.goto(`/spaces/${encodeCompactUuid(root.snapshot.id)}`);
   await expect(selectedCanvas(page)).toHaveText('Embedded pictures');

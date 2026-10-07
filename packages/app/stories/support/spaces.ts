@@ -628,8 +628,7 @@ const dockReferenceTarget = (title: string): UUID => {
 
 /**
  * The picture every Image Resource here names. Nothing serves it: the fixture's
- * Image Resources are drawn Closed, and the recorded natural size is what a
- * first Open reads (ADR 0106).
+ * Image Resources are drawn Closed (ADR 0106).
  */
 const DOCK_IMAGE_URL = 'https://example.com/dock-figure.png';
 

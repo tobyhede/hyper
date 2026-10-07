@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import type { Story } from '@ladle/react';
-import { OPEN_RESOURCE_CHROME, uuidSchema, type Map, type Resource } from '@project/core';
+import {
+  RESOURCE_SHAPES,
+  uuidSchema,
+  type Map,
+  type Resource,
+  type ResourceShape,
+} from '@project/core';
 import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
   CanvasResource,
@@ -10,7 +16,7 @@ import {
   type FrontDisplay,
 } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
-import { resourceSizeVars, snapResourceSizeToClose } from '#src/resource';
+import { resourceSizeVars } from '#src/resource';
 import { CanvasResourceSpecimen } from '../support/CanvasResourceSpecimen';
 import { CatalogueSection, Specimen } from '../support/Catalogue';
 import { requireDefaultMap } from '#src/map-resolution';
@@ -66,6 +72,13 @@ const ONE_LINE_TITLE = 'Strategies';
 const THREE_LINE_TITLE = 'Strategies\nno strategy is privileged\ngrid is one member of a set';
 
 /**
+ * More Title Lines than any front draws, each long enough to wrap: the Title
+ * wider than any Shape's inscribed rectangle.
+ */
+const OVERLONG_TITLE =
+  'Why authored placement beats a layout engine\nno strategy is privileged over any other\ngrid is one member of a growing set\nand a fourth line\nand a fifth';
+
+/**
  * One Title Line, long enough that the box breaks it. A break the box chose is
  * not a rung: every visual line of this is still the `title` role.
  */
@@ -100,7 +113,8 @@ const FRONTS = [
  * Resource's Title, as one `.canvas-resource__title-line` per Title Line. Nothing
  * is drawn beneath the Title: a closed Resource's whole content is the Title its
  * author wrote. A closed front draws its kind glyph at its top-right corner,
- * whether or not it has a toolbar; an Open Resource draws none. No specimen is
+ * whether or not it has a toolbar; an Open Resource draws none, and nor does an
+ * Ur Resource, whose Shape says what it is. No specimen is
  * handed an authoring callback, so no toolbar is drawn (ADR 0102); `Hover` and
  * `Actions` are where the commands live.
  */
@@ -108,7 +122,7 @@ export const Front: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource front"
-      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A closed front draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none."
+      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A closed front draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
     >
       <div className="inv-row">
         {FRONTS.map((front) => (
@@ -141,6 +155,125 @@ export const Front: Story = () => (
   </div>
 );
 Front.storyName = 'Front';
+
+/** The size the resized specimens are drawn at, as an author resizes an Ur Resource to. */
+const RESIZED_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
+
+/**
+ * Every Shape a Map may give an Ur Resource (ADR 0121), drawn at the Closed
+ * Size and at a larger size it is resized to: the rectangle is the front's own
+ * border, and every other Shape is an outline touching the midpoint of each
+ * side of the Resource's rect, with the Title ladder centred in the rectangle
+ * inscribed in it. The rectangle draws the ladder centred in its rect. No
+ * Shape draws a kind glyph: the Shape says what the Resource is.
+ */
+export const ResourceShapes: Story = () => (
+  <div className="inv inv-sheet" style={resourceSizeVars}>
+    <CatalogueSection
+      title="Resource Shapes"
+      note="Each Shape a Map may give an Ur Resource, the one kind that takes a Shape, drawn at the Closed Size with a one-line Title above a three-line one and an overlong one, and resized larger below them. A Shape is drawn alike at any size. Every outline touches the midpoint of each side of the Resource's rect, where Edges attach, and the Title sits inside it with no kind glyph, the Shape saying what the Resource is. Every Shape draws the Title ladder, clamped to the lines its inscribed rectangle holds at the Closed Size; resizing wider gives each line more room."
+    >
+      <div className="inv-row">
+        {RESOURCE_SHAPES.map((resourceShape) => (
+          <Specimen key={resourceShape} label={`${resourceShape} · one line`}>
+            <CanvasResourceSpecimen kind="ur" shape={resourceShape} title={ONE_LINE_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {RESOURCE_SHAPES.map((resourceShape) => (
+          <Specimen key={resourceShape} label={`${resourceShape} · three lines`}>
+            <CanvasResourceSpecimen kind="ur" shape={resourceShape} title={THREE_LINE_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {RESOURCE_SHAPES.map((resourceShape) => (
+          <Specimen key={resourceShape} label={`${resourceShape} · overlong`}>
+            <CanvasResourceSpecimen kind="ur" shape={resourceShape} title={OVERLONG_TITLE} />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {RESOURCE_SHAPES.map((resourceShape) => (
+          <Specimen key={resourceShape} label={`${resourceShape} · resized`}>
+            <CanvasResourceSpecimen
+              kind="ur"
+              shape={resourceShape}
+              title={THREE_LINE_TITLE}
+              size={RESIZED_SPECIMEN_SIZE}
+            />
+          </Specimen>
+        ))}
+      </div>
+    </CatalogueSection>
+  </div>
+);
+
+/** Every Shape but the rectangle, whose treatments are the front's own border and shadow. */
+const DRAWN_RESOURCE_SHAPES = RESOURCE_SHAPES.filter(
+  (resourceShape) => resourceShape !== 'rectangle',
+);
+
+/**
+ * The selection ring on a Shape (ADR 0121), at the Closed Size and resized: it
+ * follows the outline rather than the bounding rect.
+ */
+export const ResourceShapeTreatments: Story = () => (
+  <div className="inv inv-sheet" style={resourceSizeVars}>
+    <CatalogueSection
+      title="Resource Shape treatments"
+      note="A selected Ur Resource's ring is a stroke of its Shape's own outline, at any size, so it is not drawn as the rect the Shape sits in."
+    >
+      <div className="inv-row">
+        {DRAWN_RESOURCE_SHAPES.map((resourceShape) => (
+          <Specimen key={resourceShape} label={`${resourceShape} · selected`}>
+            <CanvasResourceSpecimen
+              kind="ur"
+              shape={resourceShape}
+              title={ONE_LINE_TITLE}
+              state="selected"
+            />
+          </Specimen>
+        ))}
+      </div>
+      <div className="inv-row">
+        {DRAWN_RESOURCE_SHAPES.map((resourceShape) => (
+          <Specimen key={resourceShape} label={`${resourceShape} · resized, selected`}>
+            <CanvasResourceSpecimen
+              kind="ur"
+              shape={resourceShape}
+              title={ONE_LINE_TITLE}
+              state="selected"
+              size={RESIZED_SPECIMEN_SIZE}
+            />
+          </Specimen>
+        ))}
+      </div>
+    </CatalogueSection>
+  </div>
+);
+
+/**
+ * An Ur Resource's Shape chosen from its rail (ADR 0121): the control's face is
+ * the Shape it is drawn in, and its list draws each Shape beside its name.
+ */
+export const ResourceShapeChoice: Story = () => {
+  const [resourceShape, setResourceShape] = useState<ResourceShape>('rectangle');
+  return (
+    <div className="p-8" style={resourceSizeVars}>
+      <CanvasResource
+        front={{ kind: 'ur', onResourceShapeChange: setResourceShape }}
+        display={CLOSED_DISPLAY}
+        shape={resourceShape}
+        title="Decide"
+        state="selected"
+        graphColor="#ffc53d"
+      />
+    </div>
+  );
+};
+ResourceShapeChoice.meta = { iframed: true };
 
 export const Kinds: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
@@ -243,45 +376,61 @@ Drag.meta = { iframed: true };
 /** A specimen that keeps its own size in state, so a real drag on the real
  *  production control actually grows the real node — the round trip
  *  `SpaceCanvas` makes through Space Authoring, condensed to local state. */
-function ResizableOpenSpecimen({ selected = false }: { readonly selected?: boolean }) {
+function ResizableSpecimen({
+  open = false,
+  selected = true,
+  resourceShape,
+}: {
+  readonly open?: boolean;
+  readonly selected?: boolean;
+  readonly resourceShape?: ResourceShape;
+}) {
   const [size, setSize] = useState({ width: 480, height: 360 });
   return (
     <CanvasResourceNodeSpecimen
-      open
+      open={open}
       selected={selected}
       nodeSize={size}
-      onResize={(proposal) => setSize(snapResourceSizeToClose(proposal))}
+      onResize={setSize}
       stageClassName="inv-resource-node-stage--large"
+      resourceShape={resourceShape}
     />
   );
 }
 
 /**
- * Every Open Resource exposes one bottom-right resize control, revealed by hover,
- * Selection or focus; a Closed Resource exposes none (ADR 0066). Both specimens
- * mount the real production `ResourceNode` through the real `nodeTypes`, so what
- * is proved here is the shared Resource control rather than a facsimile of it.
+ * A selected Resource, Open or Closed, exposes one bottom-right resize control,
+ * and an unselected one exposes none (ADR 0122). A selected Shape other than the
+ * rectangle draws a thin frame at its rect, so the control sits on its corner.
+ * Every specimen mounts the real production `ResourceNode` through the real
+ * `nodeTypes`, so what is proved here is the shared Resource control rather than
+ * a facsimile of it.
  */
 export const ResizeControl: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resize control"
-      note="Hover, select or focus the Open Resource to reveal its bottom-right control, then drag it. The Closed Resource beside it offers none."
+      note="A selected Resource, Open or Closed, offers its bottom-right control; drag it. An unselected Resource offers none, and a selected Shape frames its rect so the control sits on its corner."
     >
       <div className="inv-row">
-        <Specimen label="Open · resizable">
-          <section aria-label="Open Resource">
-            <ResizableOpenSpecimen />
-          </section>
-        </Specimen>
         <Specimen label="Open · Selected">
-          <section aria-label="Selected Resource">
-            <ResizableOpenSpecimen selected />
+          <section aria-label="Open Resource">
+            <ResizableSpecimen open />
           </section>
         </Specimen>
-        <Specimen label="Closed · no control">
+        <Specimen label="Closed · Selected">
           <section aria-label="Closed Resource">
-            <CanvasResourceNodeSpecimen />
+            <ResizableSpecimen />
+          </section>
+        </Specimen>
+        <Specimen label="Unselected · no control">
+          <section aria-label="Unselected Resource">
+            <ResizableSpecimen open selected={false} />
+          </section>
+        </Specimen>
+        <Specimen label="diamond · Selected">
+          <section aria-label="Selected Shape">
+            <ResizableSpecimen resourceShape="diamond" />
           </section>
         </Specimen>
       </div>
@@ -462,10 +611,10 @@ OpenReference.meta = { iframed: true };
 
 /**
  * An Open Image Resource is the Open Markdown front with its picture as the
- * content. Three specimens at one canvas unit per pixel: a 400×300
- * picture at the size its first Open writes — the picture plus the front's
- * chrome — the same picture in a Resource resized larger, where it keeps its
- * natural size rather than being enlarged, and a URL that does not load.
+ * content. Three specimens at one canvas unit per pixel: a 400×300 picture in
+ * a Resource sized to hold it — the picture plus the front's chrome — the same
+ * picture in a Resource resized larger, where it keeps its natural size rather
+ * than being enlarged, and a URL that does not load.
  */
 export const OpenImage: Story = () => {
   const [open, setOpen] = useState(true);
@@ -473,26 +622,22 @@ export const OpenImage: Story = () => {
     setOpen(next);
     return 'completed' as const;
   };
-  const firstOpen = {
-    width: 400 + OPEN_RESOURCE_CHROME.width,
-    height: 300 + OPEN_RESOURCE_CHROME.height,
-  };
+  const sizedToPicture = { width: 408, height: 359 };
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
-      <section aria-label="First Open" className="flex flex-col gap-2">
-        <p className="text-xs text-muted-foreground">400×300 at its first Open</p>
+      <section aria-label="Sized to its picture" className="flex flex-col gap-2">
+        <p className="text-xs text-muted-foreground">400×300 in a Resource sized to hold it</p>
         <CanvasResourceNodeSpecimen
           title="Harbour"
           kind="image"
           content={{
             kind: 'image',
             url: harbour,
-            naturalSize: { width: 400, height: 300 },
             via: 'self',
           }}
           open={open}
           onOpenChange={changeOpen}
-          nodeSize={open ? firstOpen : closedFrame}
+          nodeSize={open ? sizedToPicture : closedFrame}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -505,7 +650,6 @@ export const OpenImage: Story = () => {
           content={{
             kind: 'image',
             url: harbour,
-            naturalSize: { width: 400, height: 300 },
             via: 'self',
           }}
           open
@@ -522,11 +666,10 @@ export const OpenImage: Story = () => {
           content={{
             kind: 'image',
             url: '/images/missing-picture.png',
-            naturalSize: undefined,
             via: 'self',
           }}
           open
-          nodeSize={firstOpen}
+          nodeSize={sizedToPicture}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -547,9 +690,8 @@ const imageReferenceMap: DrawnMap = {
  * picture read-only through the same front (ADR 0070, ADR 0106): its own
  * Title, Close, and no Replace, even where the picture does not load. Both
  * Resources are in a Space that holds their Image Resource Targets, so what
- * each draws is resolved from its Target rather than handed to it. Each is at
- * the size its first Open writes: the Target's recorded 400×300 picture plus
- * the front's chrome.
+ * each draws is resolved from its Target rather than handed to it. Each is
+ * sized to hold the Target's 400×300 picture plus the front's chrome.
  */
 export const OpenImageReference: Story = () => {
   const [open, setOpen] = useState(true);
@@ -557,10 +699,7 @@ export const OpenImageReference: Story = () => {
     setOpen(next);
     return 'completed' as const;
   };
-  const firstOpen = {
-    width: 400 + OPEN_RESOURCE_CHROME.width,
-    height: 300 + OPEN_RESOURCE_CHROME.height,
-  };
+  const sizedToPicture = { width: 408, height: 359 };
   return (
     <div className="flex flex-wrap items-start gap-8 p-8">
       <section aria-label="Image Target" className="flex flex-col gap-2">
@@ -570,7 +709,7 @@ export const OpenImageReference: Story = () => {
           resourceId={imageReferenceIds.harbourReference}
           open={open}
           onOpenChange={changeOpen}
-          nodeSize={open ? firstOpen : closedFrame}
+          nodeSize={open ? sizedToPicture : closedFrame}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
         />
@@ -581,7 +720,7 @@ export const OpenImageReference: Story = () => {
           drawn={imageReferenceMap}
           resourceId={imageReferenceIds.missingReference}
           open
-          nodeSize={firstOpen}
+          nodeSize={sizedToPicture}
           zoom={1}
           stageClassName="inv-resource-node-stage--large"
         />

@@ -1,5 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { COLLAPSED_RESOURCE_SIZE, RESOURCE_SHAPES } from '@project/core';
 import { resourceToolbar, selectResource } from '../e2e/graph';
+import { drawnOutline, outlineTreatment } from '../e2e/resource-shape-outline';
+
+/** The Closed Size, as the drawn outline reports a rect. */
+const CLOSED = [COLLAPSED_RESOURCE_SIZE.width, COLLAPSED_RESOURCE_SIZE.height] as const;
 
 const specimen = (page: Page, label: string): Locator =>
   page.locator('.inv-specimen', {
@@ -48,7 +53,8 @@ const FRONTS = [
   { label: 'reference', kind: 'reference', glyph: 'Reference Resource', border: 'dotted' },
   { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid' },
   { label: 'image', kind: 'image', glyph: 'Image Resource', border: 'solid' },
-  { label: 'ur', kind: 'ur', glyph: 'Ur Resource', border: 'solid' },
+  // An Ur Resource's Shape says what it is, so it draws no kind glyph.
+  { label: 'ur', kind: 'ur', glyph: null, border: 'solid' },
   // The creation ghost is not a Resource and takes the Markdown treatment, which is
   // why it is checked against the Markdown kind and glyph rather than its own.
   { label: 'creation ghost', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
@@ -74,7 +80,8 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
  * states, kinds, hover, colours, opening, resizing — and an element drawn only
  * by a slice nobody reviews goes unnoticed. So the assertions below are deliberately exhaustive
  * over the Resource's own box: the border, one element per Title Line at the
- * role the domain gave it, its kind glyph, and **nothing beneath the Title** — no
+ * role the domain gave it, its kind glyph (none on an Ur Resource, whose Shape
+ * says what it is), and **nothing beneath the Title** — no
  * second line the application writes on the author's behalf, and no text on the
  * Resource that is not one of the Title Lines the author typed.
  */
@@ -93,7 +100,11 @@ test(
         await expect(resource).toHaveAttribute('data-kind', front.kind);
         await expect(resource).toHaveAttribute('data-state', 'rest');
         await expect(resource).toHaveAttribute('data-open', 'false');
-        await expect(resource.getByRole('img', { name: front.glyph })).toBeVisible();
+        if (front.glyph === null) {
+          await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
+        } else {
+          await expect(resource.getByRole('img', { name: front.glyph })).toBeVisible();
+        }
         await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
         await expect(resource).toHaveCSS('border-style', front.border);
 
@@ -680,5 +691,119 @@ test(
     await expect(page.getByTestId('independent-open-report')).toHaveText(
       'Sent space 00000000-0000-4000-8000-000000000020 to a new tab.',
     );
+  },
+);
+
+/**
+ * Every Shape a Map may give an Ur Resource, drawn alike at any size (ADR
+ * 0121): an outline reaching the midpoint of each side of the Resource's rect,
+ * where Edges attach, at the Closed Size and at a larger size, and the
+ * Title inside that outline, with no kind glyph: the Shape says what it is.
+ * Every Shape but the rectangle leaves the rect's corner unfilled, and every
+ * Shape draws the Title ladder.
+ */
+test(
+  'an Ur Resource draws each Shape at the Closed Size and resized, touching every side midpoint',
+  { tag: '@parity:ur-resource-draws-its-shape' },
+  async ({ page }) => {
+    await page.goto('/?story=components--resource--resource-shapes&mode=preview');
+
+    for (const resourceShape of RESOURCE_SHAPES) {
+      for (const [suffix, size] of [
+        ['one line', CLOSED],
+        ['three lines', CLOSED],
+        ['overlong', CLOSED],
+        ['resized', [440, 260]],
+      ] as const) {
+        const resource = specimen(page, `${resourceShape} · ${suffix}`).getByRole('article');
+        await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
+        await expect(resource).toHaveAttribute('data-open', 'false');
+        await expect(resource.getByRole('img', { name: 'Ur Resource' })).toHaveCount(0);
+        expect(await drawnOutline(resource), `${resourceShape} · ${suffix}`).toEqual({
+          shape: resourceShape,
+          size,
+          touchesSideMidpoints: true,
+          fillsCorner: resourceShape === 'rectangle',
+          holdsTitle: true,
+          drawsKindGlyph: false,
+        });
+      }
+    }
+  },
+);
+
+/**
+ * A selected Ur Resource's ring on a Shape follows its outline (ADR 0121), not
+ * the rect it sits in, at any size.
+ */
+test(
+  "a Shape's selection ring follows its outline, at the Closed Size and resized",
+  { tag: '@parity:ur-resource-treatments-follow-its-shape' },
+  async ({ page }) => {
+    await page.goto('/?story=components--resource--resource-shape-treatments&mode=preview');
+
+    for (const resourceShape of RESOURCE_SHAPES.filter((each) => each !== 'rectangle')) {
+      for (const label of [`${resourceShape} · selected`, `${resourceShape} · resized, selected`]) {
+        const resource = specimen(page, label).getByRole('article');
+
+        await expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
+        expect(await outlineTreatment(resource), label).toEqual({
+          ringShown: true,
+          ringFollowsOutline: true,
+          edge: 'solid',
+          rectBorder: false,
+        });
+      }
+    }
+  },
+);
+
+/**
+ * An Ur Resource's Shape is chosen from its rail (ADR 0121): the control's face
+ * is the Shape it is drawn in, and the list draws each Shape beside its name,
+ * uncaptioned, with the current one chosen.
+ */
+test(
+  "an Ur Resource's Shape is chosen from its rail, drawn as the Shape it is",
+  { tag: '@parity:ur-resource-shape-chosen-from-its-rail' },
+  async ({ page }) => {
+    await page.goto('/?story=components--resource--resource-shape-choice&mode=preview');
+    const resource = page.getByRole('article', { name: 'Decide' });
+    await expect(resource).toHaveAttribute('data-resource-shape', 'rectangle');
+
+    const face = page.getByRole('button', { name: 'Shape: Rectangle' });
+    await expect(face.locator('svg[data-resource-shape]')).toHaveAttribute(
+      'data-resource-shape',
+      'rectangle',
+    );
+    await face.click();
+    const resourceShapes = page.getByRole('group', { name: 'Shape' });
+    await expect(resourceShapes.getByRole('menuitemradio')).toHaveText([
+      'Rectangle',
+      'Pill',
+      'Ellipse',
+      'Diamond',
+    ]);
+    for (const [index, resourceShape] of RESOURCE_SHAPES.entries()) {
+      await expect(
+        resourceShapes.getByRole('menuitemradio').nth(index).locator('svg[data-resource-shape]'),
+      ).toHaveAttribute('data-resource-shape', resourceShape);
+    }
+    await expect(resourceShapes).not.toContainText('Shape');
+    await expect(resourceShapes.getByRole('menuitemradio', { checked: true })).toHaveText(
+      'Rectangle',
+    );
+
+    await resourceShapes.getByRole('menuitemradio', { name: 'Diamond' }).click();
+    await expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+    await expect(page.getByRole('button', { name: 'Shape: Diamond' })).toBeVisible();
+    await expect(resourceShapes).toHaveCount(0);
+
+    // The keyboard reaches it too, as any menu button.
+    await page.getByRole('button', { name: 'Shape: Diamond' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(
+      page.getByRole('group', { name: 'Shape' }).getByRole('menuitemradio', { checked: true }),
+    ).toHaveText('Diamond');
   },
 );

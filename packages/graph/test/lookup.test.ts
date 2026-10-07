@@ -97,7 +97,6 @@ describe('resolveResourceContent', () => {
       {
         kind: 'image',
         url: 'https://example.com/harbour.png',
-        naturalSize: undefined,
         via: 'self',
       },
     ],
@@ -123,7 +122,6 @@ describe('resolveResourceContent', () => {
       {
         kind: 'image',
         url: 'https://example.com/harbour.png',
-        naturalSize: undefined,
         via: 'reference',
       },
     ],

@@ -195,7 +195,7 @@ describe('the rungs below the name', () => {
 describe('the ladder ceiling', () => {
   /**
    * Placement is authored, so the Title is clamped to the room available and
-   * the Resource is never resized to fit one (ADR 0014, ADR 0066, ADR 0083).
+   * the Resource is never resized to fit one (ADR 0014, ADR 0083).
    *
    * The ceiling is a count of `title`-role lines rather than the room the Resource
    * happens to have, so that the ladder draws the same Open and Closed. What

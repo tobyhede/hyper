@@ -32,8 +32,8 @@ test(
       await page.mouse.move(1, 1);
       await expect(resource).toHaveClass(/\bselected\b/);
       await expect(actions).toBeVisible();
-      if (operation === 'Open') await expect(resize).toHaveCount(1);
-      else await expect(resize).toHaveCount(0);
+      // Selected, the Resource offers its resize control Open or Closed.
+      await expect(resize).toHaveCount(1);
     }
 
     // The same toolbar from the keyboard: activation keeps focus on the command,
@@ -50,7 +50,7 @@ test(
     await expect(open).toBeFocused();
     await expect(resource).toHaveClass(/\bselected\b/);
     await expect(actions).toBeVisible();
-    await expect(resize).toHaveCount(0);
+    await expect(resize).toHaveCount(1);
   },
 );
 

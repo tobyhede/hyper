@@ -69,6 +69,7 @@ const resourceNode = (
   height: RESOURCE_SIZE.height,
   selected,
   data: {
+    shape: 'rectangle',
     resourceId: id,
     title,
     readOnly: false,
@@ -583,26 +584,32 @@ function dragResizeControlTo(clientX: number, clientY: number): void {
 }
 
 /**
- * Resize is Resource behaviour rather than kind behaviour (ADR 0066): a Resource owns
+ * Resize is Resource behaviour rather than kind behaviour (ADR 0122): a Resource owns
  * the surrounding rect and the resize interaction, while a kind owns only what
  * fills an Open front. That is content ownership and must not read back as a
  * second resize gate.
  */
 describe('resize belongs to Resource rather than to a Resource kind', () => {
-  it('offers a resize operation to an Open Resource whatever its kind', async () => {
+  it('offers a resize operation to a selected Resource whatever its kind', async () => {
     const reference = resourceNode('Reference Resource', RESOURCE_ID, false);
     reference.data.kind = 'reference';
     reference.data.open = true;
+    reference.data.selectedForAuthoring = true;
     reference.data.display = fixtureDisplay(true, 'reference');
     const { view } = await mountGraph([reference]);
 
     expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
   });
 
-  it('offers no resize operation to a Closed Resource', async () => {
-    const { view } = await mountGraph([resourceNode('A')]);
+  it('offers a resize operation to a selected Closed Resource, and none to an unselected one', async () => {
+    const closed = resourceNode('A');
+    closed.data.selectedForAuthoring = true;
+    const { view } = await mountGraph([closed]);
+    expect(view.container.querySelector('.react-flow__resize-control')).toBeInTheDocument();
+    view.unmount();
 
-    expect(view.container.querySelector('.react-flow__resize-control')).toBeNull();
+    const unselected = await mountGraph([resourceNode('A')]);
+    expect(unselected.view.container.querySelector('.react-flow__resize-control')).toBeNull();
   });
 
   /**
@@ -615,6 +622,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('routes one resize lifecycle from the control to the canvas capability', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
+    opened.data.selectedForAuthoring = true;
     opened.data.display = fixtureDisplay(true, 'markdown', '# A');
     const onSelectResource = vi.fn();
     const resourceResize: ResourceResize = {
@@ -651,6 +659,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('proposes no node change to React Flow while it resizes', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
+    opened.data.selectedForAuthoring = true;
     opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
@@ -673,6 +682,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('routes loss of an active resize to cancellation', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
+    opened.data.selectedForAuthoring = true;
     opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
@@ -692,7 +702,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   /**
    * A gesture outlives the re-renders the resize itself causes.
    *
-   * Touch is what proves it, and ADR 0066 makes resizing pointer *and* touch.
+   * Touch is what proves it, and ADR 0122 keeps resizing pointer *and* touch.
    * `NodeResizeControl` lists its resize callbacks among an effect's
    * dependencies and tears the d3-drag binding down with
    * `selection.on('.drag', null)` whenever they change — which strips every
@@ -708,6 +718,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
   it('keeps a touch gesture alive across the projection its own frames publish', async () => {
     const opened = resourceNode('A', RESOURCE_ID, false);
     opened.data.open = true;
+    opened.data.selectedForAuthoring = true;
     opened.data.display = fixtureDisplay(true, 'markdown');
     const resourceResize: ResourceResize = {
       beginResize: vi.fn(),
@@ -722,6 +733,7 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
 
     const republished = resourceNode('A', RESOURCE_ID, false);
     republished.data.open = true;
+    republished.data.selectedForAuthoring = true;
     republished.data.display = fixtureDisplay(true, 'markdown');
     setNodes([republished]);
 

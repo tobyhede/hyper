@@ -6,6 +6,12 @@ const RULE = 'no-shape-in-symbol-names';
 /** The domain compound `.oxlintrc.json` allows, as it configures the rule. */
 const HEAD_SHAPE = ['error', { allowedCompounds: ['head shape'] }] as const;
 
+/** The Resource Shape terms `.oxlintrc.json` allows beside it (ADR 0121). */
+const RESOURCE_SHAPE = [
+  'error',
+  { allowedCompounds: ['head shape', 'resource shape'], allowedNames: ['shape'] },
+] as const;
+
 describe('no-shape-in-symbol-names', () => {
   it('flags "shape" in a symbol name when nothing is allowed', () => {
     const diagnostics = lintFixture('const headShape = 1;\nexport { headShape };', {
@@ -68,5 +74,54 @@ describe('no-shape-in-symbol-names', () => {
     expect(diagnostics.every((diagnostic) => diagnostic.message.includes('"headShapeShape"'))).toBe(
       true,
     );
+  });
+
+  // ADR 0121 stores a Map entry's Shape as `shape`: the domain term is the
+  // one word, so it is allowed as that field's name — wherever a property is
+  // named — and nowhere else.
+  it('allows a configured whole name where it names a property', () => {
+    const diagnostics = lintFixture(
+      [
+        'type ResourceShape = "rectangle";',
+        'interface Entry { readonly shape: ResourceShape }',
+        'const RESOURCE_SHAPES: readonly ResourceShape[] = ["rectangle"];',
+        'const entry: Entry = { shape: RESOURCE_SHAPES[0] };',
+        'const { shape: resourceShape } = entry;',
+        'const drawn = entry.shape;',
+        'const props = <div shape={drawn} />;',
+        'export { entry, resourceShape, drawn, props };',
+      ].join('\n'),
+      { [RULE]: RESOURCE_SHAPE },
+      'tsx',
+    );
+    expect(diagnostics).toEqual([]);
+  });
+
+  it.each([
+    [
+      'a destructured local',
+      'const entry = { shape: 1 };\nconst { shape } = entry;\nexport { shape };',
+    ],
+    ['a declared local', 'const shape = 1;\nexport { shape };'],
+    ['a parameter', 'export const read = (shape: number) => shape + 1;'],
+  ])('flags a configured whole name bound as %s', (_, source) => {
+    const diagnostics = lintFixture(source, { [RULE]: RESOURCE_SHAPE });
+    const named = diagnostics.map((diagnostic) => /"([^"]+)"/.exec(diagnostic.message)?.[1]);
+    expect(named).toContain('shape');
+  });
+
+  it('still flags the word in any other name beside an allowed field', () => {
+    const diagnostics = lintFixture(
+      [
+        'const entry = { shape: "rectangle" };',
+        'const shapes = [entry.shape];',
+        'const shapeOf = () => entry.shape;',
+        'const entryShape = entry.shape;',
+        'export { shapes, shapeOf, entryShape };',
+      ].join('\n'),
+      { [RULE]: RESOURCE_SHAPE },
+    );
+    const named = diagnostics.map((diagnostic) => /"([^"]+)"/.exec(diagnostic.message)?.[1]);
+    expect(new Set(named)).toEqual(new Set(['shapes', 'shapeOf', 'entryShape']));
   });
 });

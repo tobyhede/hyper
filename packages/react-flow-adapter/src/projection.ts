@@ -5,11 +5,12 @@ import { CLOSED_DISPLAY } from '@project/ui';
 import type { CanvasSpaceResourceSelection, EntityActionGroup, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
+  DEFAULT_RESOURCE_SHAPE,
   contentAction,
-  openSizeFloor,
   embedsMap,
   type Resource,
   type ResourceId,
+  type ResourceShape,
   type GraphHeadShape,
   type GraphId,
 } from '@project/core';
@@ -53,7 +54,6 @@ export type ResourceNodeData = {
   kind: Resource['kind'];
   /** Resolved content facts remain available while the display is Closed. */
   contentAction: ReturnType<typeof contentAction>;
-  openSizeFloor: ReturnType<typeof openSizeFloor>;
   embedsMap: boolean;
   /** Reports rendered title geometry by placement, including embedded placements. */
   onBodyHeightChange?: (id: string, height: number | null) => void;
@@ -76,6 +76,11 @@ export type ResourceNodeData = {
    * `markdown` and `image`.
    */
   onEditResource?: (open: boolean) => 'completed' | 'retained';
+  /**
+   * Draw this Ur Resource in another Shape on its Map (ADR 0121). Absent on
+   * every other kind, and wherever the Map may not be authored.
+   */
+  onResourceShapeChange?: (resourceShape: ResourceShape) => void;
   onBeginTitleEditing?: () => void;
   /**
    * The inline title editor this Resource is currently showing, absent on one that
@@ -126,7 +131,7 @@ export type ResourceNodeData = {
    * operation together because a resize gesture begun on an
    * unselected Resource has to select it before there is anything for `onResize`
    * to complete against — one control, one drag, and Selection is not a second
-   * Edit (ADR 0066).
+   * Edit (ADR 0122).
    */
   resize?: {
     readonly minWidth: number;
@@ -190,6 +195,11 @@ export type ResourceNodeData = {
    * resize and displacement read it — and never chooses what is drawn.
    */
   display: ResourceDisplay;
+  /**
+   * The Shape the Map draws this Resource in, resolved — the rectangle where
+   * its entry stores none — and drawn Open and Closed alike (ADR 0121).
+   */
+  shape: ResourceShape;
   active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
@@ -244,6 +254,8 @@ export interface ProjectResourceNodesOptions {
   resourceIds?: readonly ResourceId[];
   /** Map-authored Open Resources whose Markdown body is drawn in place. */
   openResourceIds?: ReadonlySet<ResourceId>;
+  /** The Shape the Map draws each projected Resource in; absent, every one is the rectangle. */
+  resourceShape?: (resourceId: ResourceId) => ResourceShape;
 }
 
 /**
@@ -326,11 +338,11 @@ export function projectResourceNodes(
         readOnly: options.readOnly ?? false,
         kind: resource.kind,
         contentAction: contentAction(content),
-        openSizeFloor: openSizeFloor(content),
         embedsMap: embedsMap(content),
         active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         display,
+        shape: options.resourceShape?.(resource.id) ?? DEFAULT_RESOURCE_SHAPE,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
       },

@@ -1,7 +1,6 @@
 import type { NodeChange } from '@xyflow/react';
 import {
   contentAction,
-  openSizeFloor,
   embedsMap,
   uuidSchema,
   type Resource,
@@ -19,6 +18,7 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
     position: { x, y },
     className: 'rf-resource-node',
     data: {
+      shape: 'rectangle',
       resourceId: uuidSchema.parse(id),
       title,
       readOnly: false,
@@ -75,7 +75,6 @@ function fixtureContent(
       return {
         kind: 'image',
         url: 'https://example.com/picture.png',
-        naturalSize: undefined,
         via: 'self',
       };
     case 'ur':
@@ -86,14 +85,13 @@ function fixtureContent(
 /** The projection's answers for the content used by node fixtures. */
 export function fixtureFacts(
   kind: Resource['kind'],
-): Pick<ResourceFlowNode['data'], 'contentAction' | 'openSizeFloor' | 'embedsMap'> {
+): Pick<ResourceFlowNode['data'], 'contentAction' | 'embedsMap'> {
   const content = fixtureContent(kind, '', {
     spaceId: FIXTURE_TARGET_SPACE,
     map: FIXTURE_TARGET_MAP,
   });
   return {
     contentAction: contentAction(content),
-    openSizeFloor: openSizeFloor(content),
     embedsMap: embedsMap(content),
   };
 }

@@ -85,7 +85,7 @@ describe('Placement.fromLayoutStrategyGraph', () => {
 
   it('carries no Open state across, which is why only a View may be converted', async () => {
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
+      [RESOURCE_A, { x: 0, y: 0, open: true, size: { width: 560, height: 420 } }],
       [RESOURCE_B, { x: 300, y: 0, open: false }],
     ]);
     const laid = await positionedStrategy(authored)({
@@ -120,7 +120,7 @@ describe('Placement.next', () => {
     // so B's reported coordinate is already B's authored one and the report
     // round-trips as itself (ADR 0084).
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 360, height: 196 } }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 360, height: 196 } }],
       [RESOURCE_B, { x: 300, y: 200, open: false }],
     ]);
     const rendered = Placement.fromEntries([
@@ -131,14 +131,23 @@ describe('Placement.next', () => {
     expect(Placement.next(authored, rendered, [RESOURCE_A, RESOURCE_B])).toBe(authored);
   });
 
-  it('preserves an Open Resource rect when the renderer reports only its moved position', () => {
+  it('preserves a Resource state, size and Shape when the renderer reports only its moved position', () => {
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
+      [
+        RESOURCE_A,
+        { x: 10, y: 20, open: true, size: { width: 560, height: 420 }, shape: 'diamond' },
+      ],
     ]);
-    const rendered = Placement.fromEntries([[RESOURCE_A, { x: 90, y: 80, open: false }]]);
+    const rendered = Placement.fromEntries([[RESOURCE_A, { x: 90, y: 80 }]]);
 
     expect(asObject(Placement.next(authored, rendered, [RESOURCE_A]))).toEqual({
-      [RESOURCE_A]: { x: 90, y: 80, open: true, openSize: { width: 560, height: 420 } },
+      [RESOURCE_A]: {
+        x: 90,
+        y: 80,
+        open: true,
+        size: { width: 560, height: 420 },
+        shape: 'diamond',
+      },
     });
   });
 
@@ -146,12 +155,12 @@ describe('Placement.next', () => {
     // Admission reads the report as authorship too. A's Open rect decides
     // nothing about where B lands.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } }],
+      [RESOURCE_A, { x: 10, y: 20, open: true, size: { width: 560, height: 420 } }],
     ]);
     const rendered = Placement.fromEntries([[RESOURCE_B, { x: 500, y: 400, open: false }]]);
 
     expect(asObject(Placement.next(authored, rendered, [RESOURCE_B]))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: true, openSize: { width: 560, height: 420 } },
+      [RESOURCE_A]: { x: 10, y: 20, open: true, size: { width: 560, height: 420 } },
       [RESOURCE_B]: { x: 500, y: 400, open: false },
     });
   });
@@ -257,6 +266,20 @@ describe('Placement.place', () => {
       },
     );
   });
+
+  it('writes an entry as given, storing no state, size or Shape it was not given', () => {
+    expect(asObject(Placement.place(Placement.empty(), RESOURCE_B, { x: 640, y: 80 }))).toEqual({
+      [RESOURCE_B]: { x: 640, y: 80 },
+    });
+  });
+
+  it('keeps the Shape of a whole entry it is given', () => {
+    expect(
+      asObject(
+        Placement.place(Placement.empty(), RESOURCE_B, { x: 0, y: 0, open: false, shape: 'pill' }),
+      ),
+    ).toEqual({ [RESOURCE_B]: { x: 0, y: 0, open: false, shape: 'pill' } });
+  });
 });
 
 describe('Placement.remove', () => {
@@ -283,69 +306,58 @@ describe('Placement.remove', () => {
   });
 });
 
-describe('Placement.growth', () => {
-  it('answers the Open rect less the collapsed one, per axis', () => {
-    expect(Placement.growth({ width: 560, height: 420 })).toEqual({ width: 300, height: 274 });
-  });
-
-  it('is zero for a Resource Open at exactly the collapsed size', () => {
-    expect(Placement.growth(COLLAPSED_RESOURCE_SIZE)).toEqual({ width: 0, height: 0 });
-  });
-
-  it('floors a stored rect smaller than a collapsed Resource at zero on each axis', () => {
-    // Nothing authors one — the resizer's minimum is the collapsed size — but a
-    // stored Space is bytes. A negative growth would pull neighbours back over
-    // the Resource that caused it, past the subject, where the negating Close can no
-    // longer reach them. A rect smaller than a collapsed Resource is not a shrink of
-    // its neighbours, so it displaces nobody.
-    expect(Placement.growth({ width: 100, height: 100 })).toEqual({ width: 0, height: 0 });
-    expect(Placement.growth({ width: 100, height: 700 })).toEqual({ width: 0, height: 554 });
-  });
-
-  it('displaces nobody when the growth it computed is a floored one', () => {
-    const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 100, height: 100 } }],
-      [RESOURCE_B, { x: 400, y: 400, open: false }],
-    ]);
-
-    expect(
-      Placement.displace(authored, RESOURCE_A, Placement.growth({ width: 100, height: 100 })),
-    ).toBe(authored);
-  });
-});
-
 describe('Placement.displace', () => {
-  const growth = { width: 300, height: 274 };
+  const before = COLLAPSED_RESOURCE_SIZE;
+  const after = { width: 560, height: 420 };
 
-  it('moves the Resources clear of the collapsed subject and leaves the rest', () => {
-    // Clear means starting at or past the far edge of the subject's collapsed
-    // rect (ADR 0093): a Resource one unit short of that edge overlaps the subject
-    // and does not move, and one exactly on it does.
-    const { width, height } = COLLAPSED_RESOURCE_SIZE;
+  it('moves the Resources clear of the subject before the Resize and leaves the rest', () => {
+    // Clear means starting at or past the far edge of the subject's rect before
+    // the Resize (ADR 0093): a Resource one unit short of that edge overlaps the
+    // subject and does not move, and one exactly on it does.
+    const { width, height } = before;
     const authored = Placement.fromEntries([
       [RESOURCE_A, { x: 0, y: 0, open: false }],
       [RESOURCE_B, { x: width - 1, y: height - 1, open: false }],
       [RESOURCE_C, { x: width, y: 0, open: false }],
     ]);
 
-    expect(asObject(Placement.displace(authored, RESOURCE_A, growth))).toEqual({
+    expect(asObject(Placement.displace(authored, RESOURCE_A, before, after))).toEqual({
       [RESOURCE_A]: { x: 0, y: 0, open: false },
       [RESOURCE_B]: { x: width - 1, y: height - 1, open: false },
       [RESOURCE_C]: { x: width + 300, y: 0, open: false },
     });
   });
 
-  it('moves a Resource exactly on the collapsed bottom edge, and leaves one unit short of it', () => {
+  it('measures from the size the subject had, not from the Closed Size', () => {
+    // A subject already 500 wide: a Resource at x = 400 overlaps it and stays,
+    // one at x = 500 is clear and takes the 100 the subject grows by.
+    const authored = Placement.fromEntries([
+      [RESOURCE_A, { x: 0, y: 0, size: { width: 500, height: 146 } }],
+      [RESOURCE_B, { x: 400, y: 0, open: false }],
+      [RESOURCE_C, { x: 500, y: 0, open: false }],
+    ]);
+
+    const moved = Placement.displace(
+      authored,
+      RESOURCE_A,
+      { width: 500, height: 146 },
+      { width: 600, height: 146 },
+    );
+    expect(moved.get(RESOURCE_B)).toEqual({ x: 400, y: 0, open: false });
+    expect(moved.get(RESOURCE_C)).toEqual({ x: 600, y: 0, open: false });
+  });
+
+  it('moves a Resource exactly on the bottom edge, and leaves one unit short of it', () => {
     // The y-axis half of "at or past, not strictly past" (ADR 0093). x stays
     // inside the subject's column so roomAxis takes y rather than x first.
-    const { width, height } = COLLAPSED_RESOURCE_SIZE;
+    const { width, height } = before;
     const authored = Placement.fromEntries([
       [RESOURCE_A, { x: 0, y: 0, open: false }],
       [RESOURCE_B, { x: width - 1, y: height - 1, open: false }],
       [RESOURCE_C, { x: width - 1, y: height, open: false }],
     ]);
 
-    expect(asObject(Placement.displace(authored, RESOURCE_A, growth))).toEqual({
+    expect(asObject(Placement.displace(authored, RESOURCE_A, before, after))).toEqual({
       [RESOURCE_A]: { x: 0, y: 0, open: false },
       [RESOURCE_B]: { x: width - 1, y: height - 1, open: false },
       [RESOURCE_C]: { x: width - 1, y: height + 274, open: false },
@@ -354,16 +366,14 @@ describe('Placement.displace', () => {
 
   it('moves each Resource on one axis, x first', () => {
     // A Resource below the subject and inside its column moves down; one to its
-    // right moves right; one clear on both moves right and not down. A Resource
-    // beside the subject whose top is lower than the subject's is beside it, not
-    // below it, so it moves on one axis only (ADR 0093).
+    // right moves right; one clear on both moves right and not down (ADR 0093).
     const authored = Placement.fromEntries([
       [RESOURCE_A, { x: 100, y: 100, open: false }],
       [RESOURCE_B, { x: 100, y: 500, open: false }],
       [RESOURCE_C, { x: 500, y: 500, open: false }],
     ]);
 
-    expect(asObject(Placement.displace(authored, RESOURCE_A, growth))).toEqual({
+    expect(asObject(Placement.displace(authored, RESOURCE_A, before, after))).toEqual({
       [RESOURCE_A]: { x: 100, y: 100, open: false },
       [RESOURCE_B]: { x: 100, y: 774, open: false },
       [RESOURCE_C]: { x: 800, y: 500, open: false },
@@ -371,80 +381,86 @@ describe('Placement.displace', () => {
   });
 
   it('does not pull a Resource beside the subject up by the height it never took', () => {
-    // The reported jump: a Resource to the right of an Open subject, its top a
-    // little below the subject's, gives back only the width on Close.
+    // A shrink: a Resource to the right of the subject, its top a little below
+    // the subject's, gives back only the width.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false }],
+      [RESOURCE_A, { x: 0, y: 0, size: after }],
       [RESOURCE_B, { x: 931, y: 48, open: false }],
     ]);
 
-    expect(
-      Placement.displace(authored, RESOURCE_A, {
-        width: -growth.width,
-        height: -growth.height,
-      }).get(RESOURCE_B),
-    ).toEqual({ x: 631, y: 48, open: false });
+    expect(Placement.displace(authored, RESOURCE_A, after, before).get(RESOURCE_B)).toEqual({
+      x: 631,
+      y: 48,
+      open: false,
+    });
   });
 
-  it('never moves the subject, whatever the growth', () => {
-    // A Resource does not displace itself: the subject is never clear of its own
-    // collapsed rect on either axis.
+  it('never moves the subject, whatever the change', () => {
     const authored = Placement.fromEntries([[RESOURCE_A, { x: -50, y: -50, open: false }]]);
 
-    expect(Placement.displace(authored, RESOURCE_A, growth).get(RESOURCE_A)).toEqual({
+    expect(Placement.displace(authored, RESOURCE_A, before, after).get(RESOURCE_A)).toEqual({
       x: -50,
       y: -50,
       open: false,
     });
   });
 
-  it('reclaims the room again under the negated growth', () => {
-    // How Close is expressed: the same operation, the sign reversed.
+  it('restores every position on the shrink back', () => {
     const authored = Placement.fromEntries([
       [RESOURCE_A, { x: 0, y: 0, open: false }],
       [RESOURCE_B, { x: 400, y: 400, open: false }],
     ]);
-    const opened = Placement.displace(authored, RESOURCE_A, growth);
+    const grown = Placement.displace(authored, RESOURCE_A, before, after);
 
-    expect(opened.get(RESOURCE_B)).toEqual({ x: 700, y: 400, open: false });
-    expect(
-      asObject(
-        Placement.displace(opened, RESOURCE_A, { width: -growth.width, height: -growth.height }),
-      ),
-    ).toEqual(asObject(authored));
+    expect(grown.get(RESOURCE_B)).toEqual({ x: 700, y: 400, open: false });
+    expect(asObject(Placement.displace(grown, RESOURCE_A, after, before))).toEqual(
+      asObject(authored),
+    );
   });
 
-  it('is not an involution when the negative growth is applied first', () => {
-    // The counter-example the round-trip property's nonnegative bound names,
-    // made executable so the bound is a fact rather than prose. B on A's
-    // collapsed edge is carried inside it by a width of -2, and the negation that
-    // follows skips it because it is no longer clear of A. Unreachable in the product:
-    // Open floors its growth at zero and Close only negates one already applied.
+  it('is not an involution when the shrink comes first', () => {
+    // B overlaps A's larger rect but is clear of the smaller one, so the shrink
+    // skips it and the grow back pushes it. Stated, not repaired: remembering
+    // which Resources a Resize pushed is the history ADR 0084 rejected.
+    const wide = { width: 500, height: 146 };
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false }],
-      [RESOURCE_B, { x: COLLAPSED_RESOURCE_SIZE.width, y: 0, open: false }],
+      [RESOURCE_A, { x: 0, y: 0, size: wide }],
+      [RESOURCE_B, { x: 300, y: 0, open: false }],
     ]);
-    const shrunk = Placement.displace(authored, RESOURCE_A, { width: -2, height: 0 });
-    const restored = Placement.displace(shrunk, RESOURCE_A, { width: 2, height: 0 });
-    const inside = { x: COLLAPSED_RESOURCE_SIZE.width - 2, y: 0, open: false };
+    const shrunk = Placement.displace(authored, RESOURCE_A, wide, before);
+    const restored = Placement.displace(shrunk, RESOURCE_A, before, wide);
 
-    expect(shrunk.get(RESOURCE_B)).toEqual(inside);
-    expect(restored.get(RESOURCE_B)).toEqual(inside);
+    expect(shrunk.get(RESOURCE_B)).toEqual({ x: 300, y: 0, open: false });
+    expect(restored.get(RESOURCE_B)).toEqual({ x: 540, y: 0, open: false });
   });
 
-  it('carries Open/Closed state and the remembered Open Size through untouched', () => {
-    // Only `x` and `y` move. Open Size is stored on the Resource's own entry and
-    // survives everything that happens to its neighbours (ADR 0066).
+  it('carries Open/Closed state, size and Shape through untouched', () => {
+    // Only `x` and `y` move (ADR 0121).
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
-      [RESOURCE_B, { x: 400, y: 400, open: true, openSize: { width: 800, height: 600 } }],
-      [RESOURCE_C, { x: 400, y: 400, open: false, openSize: { width: 700, height: 500 } }],
+      [RESOURCE_A, { x: 0, y: 0, open: true, shape: 'diamond' }],
+      [
+        RESOURCE_B,
+        { x: 400, y: 400, open: true, size: { width: 800, height: 600 }, shape: 'pill' },
+      ],
+      [RESOURCE_C, { x: 400, y: 400, size: { width: 700, height: 500 }, shape: 'ellipse' }],
     ]);
 
-    expect(asObject(Placement.displace(authored, RESOURCE_A, growth))).toEqual({
-      [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-      [RESOURCE_B]: { x: 700, y: 400, open: true, openSize: { width: 800, height: 600 } },
-      [RESOURCE_C]: { x: 700, y: 400, open: false, openSize: { width: 700, height: 500 } },
+    expect(asObject(Placement.displace(authored, RESOURCE_A, before, after))).toEqual({
+      [RESOURCE_A]: { x: 0, y: 0, open: true, shape: 'diamond' },
+      [RESOURCE_B]: {
+        x: 700,
+        y: 400,
+        open: true,
+        size: { width: 800, height: 600 },
+        shape: 'pill',
+      },
+      [RESOURCE_C]: {
+        x: 700,
+        y: 400,
+        open: false,
+        size: { width: 700, height: 500 },
+        shape: 'ellipse',
+      },
     });
   });
 
@@ -453,16 +469,16 @@ describe('Placement.displace', () => {
     // that moved nothing must not re-arrange a settled graph.
     const authored = at({ '00000000-0000-4000-8000-000000000002': [10, 20] });
 
-    expect(Placement.displace(authored, RESOURCE_C, growth)).toBe(authored);
+    expect(Placement.displace(authored, RESOURCE_C, before, after)).toBe(authored);
   });
 
-  it('answers the placement it was given when the growth is zero on both axes', () => {
+  it('answers the placement it was given when the size does not change', () => {
     const authored = at({
       '00000000-0000-4000-8000-000000000002': [10, 20],
       '00000000-0000-4000-8000-000000000003': [300, 40],
     });
 
-    expect(Placement.displace(authored, RESOURCE_A, { width: 0, height: 0 })).toBe(authored);
+    expect(Placement.displace(authored, RESOURCE_A, after, after)).toBe(authored);
   });
 
   it('leaves the placement it was given alone', () => {
@@ -471,80 +487,12 @@ describe('Placement.displace', () => {
       '00000000-0000-4000-8000-000000000003': [400, 400],
     });
 
-    Placement.displace(authored, RESOURCE_A, growth);
+    Placement.displace(authored, RESOURCE_A, before, after);
 
     expect(asObject(authored)).toEqual({
       [RESOURCE_A]: { x: 0, y: 0, open: false },
       [RESOURCE_B]: { x: 400, y: 400, open: false },
     });
-  });
-});
-
-describe('Placement.reclaim', () => {
-  it("gives an Open Resource's room back to the Resources beyond it, entry untouched", () => {
-    // 400x300 Open against a 260x146 collapsed rect is a growth of 140x154,
-    // already written into RESOURCE_B's coordinates by the Open Edit — B is clear
-    // of A on `x`, so the Open took the width alone.
-    const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } }],
-      [RESOURCE_B, { x: 400, y: 0, open: false }],
-    ]);
-
-    expect(asObject(Placement.reclaim(authored, RESOURCE_A))).toEqual({
-      // Still Open, and still remembering the size: reclaiming is the
-      // displacement half alone, and the caller writes the entry it wants.
-      [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 400, height: 300 } },
-      [RESOURCE_B]: { x: 260, y: 0, open: false },
-    });
-  });
-
-  it('reclaims nothing for a Closed Resource that remembers an Open Size', () => {
-    // A remembered Open Size is not room the Resource holds — nothing was displaced
-    // for it — so there is nothing to give back (ADR 0066).
-    const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: false, openSize: { width: 400, height: 300 } }],
-      [RESOURCE_B, { x: 140, y: 154, open: false }],
-    ]);
-
-    expect(Placement.reclaim(authored, RESOURCE_A)).toBe(authored);
-  });
-
-  it('reclaims nothing for a Resource the placement does not hold', () => {
-    const authored = at({ [RESOURCE_A]: [0, 0] });
-    expect(Placement.reclaim(authored, RESOURCE_B)).toBe(authored);
-  });
-
-  it('undoes exactly the Open that applied the growth', () => {
-    const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 10, y: 20, open: false }],
-      [RESOURCE_B, { x: 400, y: 400, open: false }],
-    ]);
-    const openSize = { width: 560, height: 420 };
-    const opened = Placement.place(
-      Placement.displace(authored, RESOURCE_A, Placement.growth(openSize)),
-      RESOURCE_A,
-      { x: 10, y: 20, open: true, openSize },
-    );
-
-    expect(asObject(Placement.reclaim(opened, RESOURCE_A))).toEqual({
-      [RESOURCE_A]: { x: 10, y: 20, open: true, openSize },
-      [RESOURCE_B]: { x: 400, y: 400, open: false },
-    });
-  });
-
-  it('reclaims from where the subject is now, not from where it was Opened', () => {
-    // The moved-*subject* face of ADR 0084's memorylessness, and the mirror of
-    // the moved-neighbour one the ADR states: a reclaim reads the Map as it
-    // stands, so a subject dragged past its own displaced neighbours finds
-    // nobody beyond it and gives nothing back. Deliberate: do not record where a
-    // particular Open happened, which is the per-Resource history ADR 0084 forbids.
-    const openSize = { width: 560, height: 420 };
-    const opened = Placement.fromEntries([
-      [RESOURCE_A, { x: 5000, y: 5000, open: true, openSize }],
-      [RESOURCE_B, { x: 600, y: 474, open: false }],
-    ]);
-
-    expect(Placement.reclaim(opened, RESOURCE_A)).toBe(opened);
   });
 });
 
@@ -626,6 +574,18 @@ describe('Placement.equals', () => {
     ).toBe(false);
     expect(Placement.equals(base, Placement.empty())).toBe(false);
   });
+
+  it('notices a Resource drawn in another Shape', () => {
+    const withResourceShape = (resourceShape: ResourcePlacement['shape']) =>
+      Placement.fromEntries([[RESOURCE_A, { x: 10, y: 20, open: false, shape: resourceShape }]]);
+
+    expect(Placement.equals(withResourceShape('rectangle'), withResourceShape('rectangle'))).toBe(
+      true,
+    );
+    expect(Placement.equals(withResourceShape('rectangle'), withResourceShape('ellipse'))).toBe(
+      false,
+    );
+  });
 });
 
 describe('Placement.toPositions', () => {
@@ -650,62 +610,48 @@ const idsArb = fc
   .uniqueArray(fc.uuid(), { minLength: 1, maxLength: 8 })
   .map((ids): ResourceId[] => ids.map(uuid));
 const coordArb = fc.integer({ min: -1000, max: 1000 });
-const openSizeArb = fc.record({
+const sizeArb = fc.record({
   width: fc.integer({ min: 261, max: 900 }),
   height: fc.integer({ min: 147, max: 700 }),
 });
 
 describe('Placement properties', () => {
-  it('round-trips a Map through opening and closing, for any nonnegative growth', () => {
-    // The property Open and Close rest on (ADR 0084): closing reclaims exactly
-    // the room opening made, so a Map opened and immediately closed is the
-    // Map it started as — every Resource back on its own coordinate, not merely
-    // an equal map.
-    //
-    // The **nonnegative** bound is load-bearing and is not here to keep the
-    // generator tidy. `displace` is not an involution for a negative initial
-    // growth, and deliberately: the counter-example below is executable. It is
-    // unreachable in the product because Open always applies a growth floored at
-    // zero and Close always applies the negation of a growth already applied, so
-    // every Resource Close must reclaim from is still clear of the subject when it
-    // runs. State the bound; do not clamp the operation or make it remember
-    // which Resources a particular Open pushed.
+  it('restores every position through a Resize and the Resize back, for any grow', () => {
+    // A grow carries every Resource clear of the subject clear of the grown
+    // rect, which is the rect the shrink back measures from, so the pair
+    // restores the Map exactly. Grow first: the other order is not an
+    // involution, and that asymmetry is stated in `displace`, not clamped.
     fc.assert(
       fc.property(
         idsArb,
         fc.array(coordArb, { minLength: 16, maxLength: 16 }),
         fc.nat({ max: 8 }),
+        sizeArb,
         fc.record({ width: fc.nat({ max: 640 }), height: fc.nat({ max: 480 }) }),
-        fc.array(fc.option(openSizeArb, { nil: undefined }), { minLength: 8, maxLength: 8 }),
-        (ids, coords, subjectIndex, growth, openSizes) => {
+        fc.array(fc.option(sizeArb, { nil: undefined }), { minLength: 8, maxLength: 8 }),
+        (ids, coords, subjectIndex, before, grow, sizes) => {
           const placement = Placement.fromEntries(
             ids.map((id, index) => {
               const point = {
                 x: coords[index * 2] ?? 0,
                 y: coords[index * 2 + 1] ?? 0,
               };
-              // Open entries are in the generator because the round trip has to
-              // hold over a Map with Resources already Open in it — Open Size
-              // rides through untouched, and only the coordinates move.
-              const openSize = openSizes[index];
+              // Resized entries ride through untouched; only coordinates move.
+              const size = sizes[index];
               return [
                 id,
-                openSize === undefined
-                  ? { ...point, open: false as const }
-                  : { ...point, open: true as const, openSize },
+                size === undefined ? { ...point, open: false } : { ...point, open: true, size },
               ] as const;
             }),
           );
           const subject = ids[subjectIndex % ids.length];
           if (subject === undefined) return;
+          const after = { width: before.width + grow.width, height: before.height + grow.height };
 
-          const opened = Placement.displace(placement, subject, growth);
-          const closed = Placement.displace(opened, subject, {
-            width: -growth.width,
-            height: -growth.height,
-          });
+          const grown = Placement.displace(placement, subject, before, after);
+          const restored = Placement.displace(grown, subject, after, before);
 
-          expect(asObject(closed)).toEqual(asObject(placement));
+          expect(asObject(restored)).toEqual(asObject(placement));
         },
       ),
     );
@@ -792,12 +738,12 @@ describe('Placement properties', () => {
   });
 });
 
-describe('Placement.next over an Open Resource', () => {
-  it('authors a drop on top of an Open Resource exactly where it was released', () => {
+describe('Placement.next over a resized Resource', () => {
+  it('authors a drop on top of a resized Resource exactly where it was released', () => {
     // Every canvas coordinate is an authored one (ADR 0084), so a Resource
-    // dropped over an Open one lands on the drop point.
+    // dropped over a resized one lands on the drop point.
     const authored = Placement.fromEntries([
-      [RESOURCE_A, { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } }],
+      [RESOURCE_A, { x: 0, y: 0, open: true, size: { width: 560, height: 420 } }],
       [RESOURCE_B, { x: 1000, y: 1000, open: false }],
     ]);
     const rendered = Placement.fromEntries([[RESOURCE_B, { x: 50, y: 30, open: false }]]);

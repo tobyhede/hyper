@@ -8,7 +8,8 @@ import type {
   ResourcePlacement,
   UUID,
 } from '@project/core';
-import { Placement, type PlacementMode } from '@project/graph';
+import { resourceSize } from '@project/core';
+import type { PlacementMode } from '@project/graph';
 import type { ObserverErrorReporter } from '@project/persistence';
 import type { EntityActionOutcome } from '@project/ui';
 import {
@@ -33,8 +34,8 @@ import { nextSpaceTitle } from './titles';
 import { useVisibleCentre, type VisibleCentreReporting } from './visible-centre';
 
 /**
- * How far a new Reference Resource steps from the Resource it was created from, as a fraction of
- * its collapsed size on both axes, plus any room its Open Target holds.
+ * How far a new Reference Resource steps past the Resource it was created from:
+ * its Target's size less a quarter of the Closed Size on both axes.
  *
  * Overlap is authored rather than avoided — a free-position search is a placement
  * algorithm, and ADR 0086 keeps those behind an Edit — so this is deliberately
@@ -52,24 +53,19 @@ export const REFERENCE_OFFSET_RATIO = 0.75;
  * author is looking; a Resource this Map does not place has no offset to take,
  * so its Reference Resource lands at the visible centre like any other creation.
  *
- * **The offset leaves the Reference Resource clear of the Target after Close.**
- * An Open Target holds room that Close reclaims from every Resource clear of it
- * (ADR 0084). The growth is added to the collapsed offset and, when the Target
- * is Open, the anchor stays at or past the collapsed rect so Close reclaims the
- * width alone (ADR 0093). `resource-rail-actions.test.tsx` holds that the
- * Reference Resource stays separated after Close.
+ * **The offset is measured from the Target's bottom-right corner**, so a
+ * resized Target is overlapped by the same quarter-Resource corner as one at
+ * the Closed Size.
  */
 export function referenceAnchor(
   at: ResourcePlacement | undefined,
   centreAnchor: () => MapPosition,
 ): MapPosition {
   if (at === undefined) return centreAnchor();
-  const growth = at.open ? Placement.growth(at.openSize) : { width: 0, height: 0 };
-  const across = growth.width + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO);
-  const down = growth.height + Math.round(RESOURCE_HEIGHT * REFERENCE_OFFSET_RATIO);
+  const size = resourceSize(at);
   return {
-    x: at.x + (at.open ? Math.max(RESOURCE_WIDTH, across) : across),
-    y: at.y + (at.open ? Math.max(RESOURCE_HEIGHT, down) : down),
+    x: at.x + size.width - RESOURCE_WIDTH + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO),
+    y: at.y + size.height - RESOURCE_HEIGHT + Math.round(RESOURCE_HEIGHT * REFERENCE_OFFSET_RATIO),
   };
 }
 

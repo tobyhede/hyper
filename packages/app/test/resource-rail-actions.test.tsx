@@ -133,7 +133,7 @@ const withImage: SpaceSnapshot = spaceSnapshotSchema.parse({
   ],
 });
 
-/** The same Space with an Ur Resource in it, Open, for the commands a contentless Resource keeps. */
+/** The same Space with an Ur Resource in it, resized, for the commands a contentless Resource keeps. */
 const withUr: SpaceSnapshot = spaceSnapshotSchema.parse({
   ...snapshot,
   document: {
@@ -146,8 +146,8 @@ const withUr: SpaceSnapshot = spaceSnapshotSchema.parse({
           [UR_ID]: {
             x: 0,
             y: 400,
-            open: true,
-            openSize: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
+            open: false,
+            size: { width: RESOURCE_WIDTH * 2, height: RESOURCE_HEIGHT * 2 },
           },
         },
       },
@@ -509,7 +509,7 @@ describe('a Resource’s commands on the canvas rail', () => {
                 x: 0,
                 y: 0,
                 open: true,
-                openSize: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
+                size: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
               },
             },
           },
@@ -620,76 +620,49 @@ describe('a Resource’s commands on the canvas rail', () => {
     await settled(session);
   });
 
-  it.each([
-    {
-      label: '4-times-sized',
-      width: RESOURCE_WIDTH * 4,
-      height: RESOURCE_HEIGHT * 4,
-      closedX: Math.round(RESOURCE_WIDTH * 0.75),
-    },
-    {
-      label: '6-times-sized',
-      width: RESOURCE_WIDTH * 6,
-      height: RESOURCE_HEIGHT * 6,
-      closedX: Math.round(RESOURCE_WIDTH * 0.75),
-    },
-    {
-      label: '300×400',
-      width: 300,
-      height: 400,
-      // At or past the collapsed width at Close (ADR 0093), then Close reclaims
-      // the width growth `300 - RESOURCE_WIDTH`.
-      closedX: RESOURCE_WIDTH - (300 - RESOURCE_WIDTH),
-    },
-  ])(
-    'keeps a Reference Resource separated after closing its $label Target',
-    async ({ width, height, closedX }) => {
-      const opened = spaceSnapshotSchema.parse({
-        ...snapshot,
-        document: {
-          ...snapshot.document,
-          maps: [
-            {
-              ...snapshot.document.maps?.[0],
-              positions: {
-                ...snapshot.document.maps?.[0]?.positions,
-                [RESOURCE_ID]: {
-                  x: 0,
-                  y: 0,
-                  open: true,
-                  openSize: { width, height },
-                },
-              },
+  it('places a Reference Resource past a resized Target’s corner, and Closing the Target moves it nowhere', async () => {
+    const width = RESOURCE_WIDTH * 4;
+    const height = RESOURCE_HEIGHT * 4;
+    const opened = spaceSnapshotSchema.parse({
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        maps: [
+          {
+            ...snapshot.document.maps?.[0],
+            positions: {
+              ...snapshot.document.maps?.[0]?.positions,
+              [RESOURCE_ID]: { x: 0, y: 0, open: true, size: { width, height } },
             },
-          ],
-        },
-      });
-      const session = mount(undefined, undefined, opened);
-      await selectResource('A');
-      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
-      fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
-      const editor = await screen.findByRole('textbox', { name: 'Resource title' });
-      fireEvent.keyDown(editor, { key: 'Escape' });
-      const reference = session.getState().working.resources[2]!.id;
-      // The Target is selected so its own toolbar is drawn. The Reference Resource
-      // carries the Target's name, so the Target is selected by its id.
-      await selectResourceById(RESOURCE_ID);
-      fireEvent.click(await screen.findByRole('button', { name: 'Close Resource A' }));
-      await waitFor(() => {
-        const positions = session.getState().working.document.maps?.[0]?.positions;
-        expect(positions?.[RESOURCE_ID]?.open).toBe(false);
-        // Close reclaims the width `createReferenceFrom` added ahead of the
-        // collapsed step and nothing else: the Reference Resource is clear of the
-        // Target on `x`, so that is its one room axis (ADR 0093). It stays below
-        // the Closed Target by the height growth it keeps.
-        const heightGrowth = height - RESOURCE_HEIGHT;
-        expect(positions?.[reference]?.x).toBe(closedX);
-        expect(positions?.[reference]?.y).toBe(Math.round(RESOURCE_HEIGHT * 0.75) + heightGrowth);
-        expect(positions?.[reference]?.y).toBeGreaterThanOrEqual(RESOURCE_HEIGHT);
-      });
-      await settled(session);
-    },
-  );
+          },
+        ],
+      },
+    });
+    const session = mount(undefined, undefined, opened);
+    await selectResource('A');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Create Reference' }));
+    const editor = await screen.findByRole('textbox', { name: 'Resource title' });
+    fireEvent.keyDown(editor, { key: 'Escape' });
+    const reference = session.getState().working.resources[2]!.id;
+    const placed = {
+      x: width - RESOURCE_WIDTH + Math.round(RESOURCE_WIDTH * 0.75),
+      y: height - RESOURCE_HEIGHT + Math.round(RESOURCE_HEIGHT * 0.75),
+    };
+    expect(session.getState().working.document.maps?.[0]?.positions[reference]).toMatchObject(
+      placed,
+    );
+    // The Target is selected so its own toolbar is drawn. The Reference Resource
+    // carries the Target's name, so the Target is selected by its id.
+    await selectResourceById(RESOURCE_ID);
+    fireEvent.click(await screen.findByRole('button', { name: 'Close Resource A' }));
+    await waitFor(() => {
+      const positions = session.getState().working.document.maps?.[0]?.positions;
+      expect(positions?.[RESOURCE_ID]?.open).toBe(false);
+      expect(positions?.[reference]).toMatchObject(placed);
+    });
+    await settled(session);
+  });
 
   /**
    * **Present and unavailable on a Reference Resource, not absent.**
@@ -907,15 +880,19 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * An Ur Resource has no content, so its rail offers no Edit (ADR 0113); every
-   * other Resource command is its as it is every Resource's.
+   * An Ur Resource has no content, so its rail offers no Edit (ADR 0113) and no
+   * Open or Close; every other Resource command is its as it is every Resource's.
    */
-  it('offers an Ur Resource every Resource command and no Edit', async () => {
+  it('offers an Ur Resource every Resource command and no Edit, Open or Close', async () => {
     const session = mount(undefined, undefined, withUr);
     await selectResource('Gateway');
 
-    expect(await screen.findByRole('button', { name: 'Close Resource Gateway' })).toBeVisible();
+    expect(
+      await screen.findByRole('button', { name: 'Actions for Resource Gateway' }),
+    ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open Resource Gateway' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Close Resource Gateway' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Actions for Resource Gateway' }));
     expectMenuGroups(await screen.findByRole('menu'), [
       ['Create Reference'],
@@ -923,6 +900,67 @@ describe('a Resource’s commands on the canvas rail', () => {
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
+    await settled(session);
+  });
+
+  /**
+   * Only an Ur Resource takes a Shape (ADR 0121), chosen from its rail at any
+   * size: the control's face is the Shape it is drawn in.
+   */
+  it('offers a resized Ur Resource its Shape on the rail, the rectangle where its entry stores none', async () => {
+    expect(withUr.document.maps?.[0]?.positions[UR_ID]).not.toHaveProperty('shape');
+    const session = mount(undefined, undefined, withUr);
+    await selectResource('Gateway');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Shape: Rectangle' }));
+    const group = await screen.findByRole('group', { name: 'Shape' });
+    expect(
+      within(group)
+        .getAllByRole('menuitemradio')
+        .filter((item) => item.getAttribute('aria-checked') === 'true')
+        .map((item) => item.textContent),
+    ).toEqual(['Rectangle']);
+    await settled(session);
+  });
+
+  it('changes a Closed Ur Resource’s Shape from its rail in one Edit', async () => {
+    const closed = spaceSnapshotSchema.parse({
+      ...withUr,
+      document: {
+        ...withUr.document,
+        maps: [
+          {
+            ...withUr.document.maps?.[0],
+            positions: {
+              ...withUr.document.maps?.[0]?.positions,
+              [UR_ID]: { x: 0, y: 400, open: false, shape: 'diamond' },
+            },
+          },
+        ],
+      },
+    });
+    const session = mount(undefined, undefined, closed);
+    await selectResource('Gateway');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Shape: Diamond' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Ellipse' }));
+    await waitFor(() =>
+      expect(session.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape).toBe(
+        'ellipse',
+      ),
+    );
+    expect(await screen.findByRole('button', { name: 'Shape: Ellipse' })).toBeVisible();
+    await settled(session);
+  });
+
+  it('offers an Image Resource no Shape', async () => {
+    const session = mount(undefined, undefined, withImage);
+    await selectResource('Harbour');
+
+    expect(
+      await screen.findByRole('button', { name: 'Actions for Resource Harbour' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Shape/ })).toBeNull();
     await settled(session);
   });
 

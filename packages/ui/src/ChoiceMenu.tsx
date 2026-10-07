@@ -25,7 +25,13 @@ export type ChoiceMenuSide = 'top' | 'right' | 'bottom' | 'left';
 
 export interface ChoiceMenuProps<Id extends string> {
   /** What the set is, captioning the list: `Maps`, `Graphs in Collection 1`. */
-  readonly label: ReactNode;
+  readonly label: string;
+  /**
+   * Whether the list draws `label` as its caption. Uncaptioned, `label` still
+   * names the list to assistive technology — for a set whose trigger already
+   * says what it is, as an Ur Resource's Shape control does.
+   */
+  readonly captioned?: boolean;
   readonly choices: readonly ChoiceMenuChoice<Id>[];
   /** The chosen member, or `null` where the caller has chosen none. */
   readonly chosen: Id | null;
@@ -94,6 +100,7 @@ export interface ChoiceMenuProps<Id extends string> {
  */
 export function ChoiceMenu<Id extends string>({
   label,
+  captioned = true,
   choices,
   chosen,
   onChoose,
@@ -119,6 +126,7 @@ export function ChoiceMenu<Id extends string>({
         finalFocus={restoresFocusOnClose}
       >
         <DropdownMenuRadioGroup<Id | null>
+          aria-label={captioned ? undefined : label}
           value={chosen}
           onValueChange={(next) => {
             // Base UI spells an empty controlled selection `null`, and no
@@ -127,7 +135,7 @@ export function ChoiceMenu<Id extends string>({
             if (next !== null) onChoose(next);
           }}
         >
-          <DropdownMenuLabel>{label}</DropdownMenuLabel>
+          {captioned && <DropdownMenuLabel>{label}</DropdownMenuLabel>}
           {choices.map((choice) => (
             <DropdownMenuRadioItem<Id | null>
               key={choice.id}

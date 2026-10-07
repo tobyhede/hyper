@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type ResourceContent } from '@project/core';
+import { RESOURCE_SHAPES, uuidSchema, type ResourceContent } from '@project/core';
 import {
   beginEditing,
   beginReplacing,
@@ -47,7 +47,7 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
     />,
   );
   expect(resource).toHaveAttribute('data-content-area', 'true');
-  rerender(<CanvasResource {...props} display={CLOSED_DISPLAY} />);
+  rerender(<CanvasResource shape="rectangle" {...props} display={CLOSED_DISPLAY} />);
   expect(resource).toHaveAttribute('data-content-area', 'true');
   expect(resource).toHaveTextContent('Target body');
 });
@@ -55,14 +55,11 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
 it('keeps a pending replacement mounted when its entity actions become unavailable', async () => {
   const waiting = Promise.withResolvers<string | null>();
   const front: CanvasResourceFront = { kind: 'image' };
-  const display = beginReplacing(
-    opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
-    {
-      accept: 'image/png',
-      onReplace: () => waiting.promise,
-      onEnd: () => undefined,
-    },
-  );
+  const display = beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+    accept: 'image/png',
+    onReplace: () => waiting.promise,
+    onEnd: () => undefined,
+  });
   const { rerender } = render(
     <CanvasResource
       state="selected"
@@ -248,7 +245,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="rest"
         title={'Figure\nFrom the north mole'}
@@ -273,7 +270,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="rest"
         title="Figure"
@@ -296,7 +293,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image', onOpenChange }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="selected"
         title="Figure"
@@ -344,14 +341,11 @@ describe('CanvasResource kind and interaction state', () => {
           onOpenChange: () => 'completed',
           onBeginEdit: () => undefined,
         }}
-        display={beginReplacing(
-          opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
-          {
-            accept: 'image/png',
-            onReplace: () => Promise.resolve(null),
-            onEnd,
-          },
-        )}
+        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+          accept: 'image/png',
+          onReplace: () => Promise.resolve(null),
+          onEnd,
+        })}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -379,14 +373,11 @@ describe('CanvasResource kind and interaction state', () => {
           kind: 'image',
           onOpenChange: () => 'completed',
         }}
-        display={beginReplacing(
-          opened({ kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' }),
-          {
-            accept: 'image/png',
-            onReplace: () => new Promise(() => undefined),
-            onEnd,
-          },
-        )}
+        display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
+          accept: 'image/png',
+          onReplace: () => new Promise(() => undefined),
+          onEnd,
+        })}
         state="selected"
         title="Figure"
         graphColor="#ffc53d"
@@ -409,7 +400,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image', onBeginEdit }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="selected"
         title="Figure"
@@ -429,7 +420,7 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image', onBeginEdit: () => undefined }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="selected"
         title="Figure"
@@ -467,7 +458,6 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'reference', onOpenChange: () => 'completed' }}
         display={opened({
           kind: 'image',
-          naturalSize: undefined,
           url: FIGURE_URL,
           via: 'reference',
         })}
@@ -500,7 +490,6 @@ describe('CanvasResource kind and interaction state', () => {
         front={{ kind: 'image', onBeginEdit: () => undefined }}
         display={opened({
           kind: 'image',
-          naturalSize: undefined,
           url: FIGURE_URL,
           via: 'reference',
         })}
@@ -2105,7 +2094,7 @@ describe('CanvasResource Close fade', () => {
         front={{ kind: 'image' }}
         display={{
           shown: 'open',
-          content: { kind: 'image', naturalSize: undefined, url: FIGURE_URL, via: 'self' },
+          content: { kind: 'image', url: FIGURE_URL, via: 'self' },
         }}
         state="rest"
         title="A"
@@ -2131,7 +2120,6 @@ describe('CanvasResource Close fade', () => {
         front={{ kind: 'reference' }}
         display={opened({
           kind: 'image',
-          naturalSize: undefined,
           url: FIGURE_URL,
           via: 'reference',
         })}
@@ -2161,7 +2149,7 @@ describe('CanvasResource Close fade', () => {
 describe('CanvasResource Ur front', () => {
   const UR_OPEN: FrontDisplay = opened({ kind: 'ur', via: 'self' });
 
-  it('presents a Closed Ur Resource by its Title and kind alone', () => {
+  it('presents a Closed Ur Resource by its Title alone, its Shape saying what it is', () => {
     render(
       <CanvasResource
         front={{ kind: 'ur' }}
@@ -2176,7 +2164,7 @@ describe('CanvasResource Ur front', () => {
     expect(resource).toHaveAttribute('data-kind', 'ur');
     expect(resource).toHaveAttribute('data-open', 'false');
     expect(screen.getByRole('heading', { name: 'Gateway' })).toBeVisible();
-    expect(screen.getByRole('img', { name: 'Ur Resource' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Ur Resource' })).toBeNull();
     expect(resource.querySelector('.canvas-resource__content')).toBeNull();
   });
 
@@ -2251,5 +2239,338 @@ describe('CanvasResource Ur front', () => {
     expect(resource).toHaveTextContent(/^Gateway, again$/u);
     expect(screen.getByRole('button', { name: 'Close Resource Gateway, again' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway, again' })).toBeNull();
+  });
+});
+
+describe('the Shape a Resource front is drawn in', () => {
+  const props = {
+    front: { kind: 'ur' as const },
+    state: 'rest' as const,
+    title: 'Decide',
+    graphColor: '#ffc53d',
+  };
+  const outline = (resource: HTMLElement) => resource.querySelector('.canvas-resource__outline');
+
+  const glyph = (resource: HTMLElement) => resource.querySelector('.resource-rail__kind');
+
+  it('draws a diamond, Open and Closed alike', () => {
+    const { rerender } = render(
+      <CanvasResource {...props} shape="diamond" display={CLOSED_DISPLAY} />,
+    );
+    const resource = screen.getByRole('article', { name: 'Decide' });
+    expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+    expect(outline(resource)).not.toBeNull();
+
+    rerender(
+      <CanvasResource {...props} shape="diamond" display={opened({ kind: 'ur', via: 'self' })} />,
+    );
+    expect(resource).toHaveAttribute('data-open', 'true');
+    expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+    expect(outline(resource)).not.toBeNull();
+  });
+
+  /*
+   * An Ur Resource's Shape is what says what it is (ADR 0121), so it draws no
+   * kind glyph in any Shape, Open or Closed.
+   */
+  it.each(RESOURCE_SHAPES)(
+    'draws no kind glyph on an Ur Resource in a %s, Open or Closed',
+    (resourceShape) => {
+      for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+        const { unmount } = render(
+          <CanvasResource {...props} shape={resourceShape} display={display} />,
+        );
+        const resource = screen.getByRole('article', { name: 'Decide' });
+        expect(glyph(resource)).toBeNull();
+        expect(screen.queryByRole('img', { name: 'Ur Resource' })).toBeNull();
+        unmount();
+      }
+    },
+  );
+
+  it('still draws the kind glyph on a Closed Markdown Resource', () => {
+    render(<CanvasResource {...props} front={{ kind: 'markdown' }} display={CLOSED_DISPLAY} />);
+    expect(glyph(screen.getByRole('article', { name: 'Decide' }))).not.toBeNull();
+    expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
+  });
+
+  it.each([
+    ['pill', 'rect'],
+    ['ellipse', 'rect'],
+    ['diamond', 'polygon'],
+  ] as const)('draws a %s in its own outline, Open and Closed', (resourceShape, element) => {
+    for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+      const { unmount } = render(
+        <CanvasResource {...props} shape={resourceShape} display={display} />,
+      );
+      const resource = screen.getByRole('article', { name: 'Decide' });
+      expect(resource).toHaveAttribute('data-resource-shape', resourceShape);
+      expect(outline(resource)?.querySelector('.canvas-resource__outline-edge')?.tagName).toBe(
+        element,
+      );
+      unmount();
+    }
+  });
+
+  /*
+   * The selection ring follows the outline (ADR 0121): ring and edge are
+   * strokes of the outline's own geometry, so the ring cannot be drawn as the
+   * bounding rect. Whether it shows is `canvas-resource.css`'s, keyed on the
+   * state.
+   */
+  it.each(['pill', 'ellipse', 'diamond'] as const)(
+    'draws a %s ring and edge from one geometry, Open and Closed',
+    (resourceShape) => {
+      for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+        const { unmount } = render(
+          <CanvasResource
+            {...props}
+            state="selected"
+            shape={resourceShape}
+            size={{ width: 480, height: 300 }}
+            display={display}
+          />,
+        );
+        const drawn = outline(screen.getByRole('article', { name: 'Decide' }));
+        const ring = drawn?.querySelector('.canvas-resource__outline-ring');
+        const edge = drawn?.querySelector('.canvas-resource__outline-edge');
+        expect(ring).not.toBeNull();
+        expect(edge).not.toBeNull();
+        // The ring is drawn beneath the edge, whose fill covers its inner half.
+        expect(drawn?.firstElementChild).toBe(ring);
+        expect(ring?.tagName).toBe(edge?.tagName);
+        for (const attribute of ['points', 'width', 'height', 'rx', 'ry']) {
+          expect(ring?.getAttribute(attribute)).toBe(edge?.getAttribute(attribute) ?? null);
+        }
+        unmount();
+      }
+    },
+  );
+
+  /*
+   * jsdom has no layout, so the drawing's own units are what show it is drawn
+   * at the Resource's rect rather than stretched from the Closed Size.
+   */
+  it('draws the outline in the units of the rect the Resource is drawn at', () => {
+    const { rerender } = render(
+      <CanvasResource {...props} shape="pill" display={CLOSED_DISPLAY} />,
+    );
+    const resource = screen.getByRole('article', { name: 'Decide' });
+    expect(outline(resource)?.getAttribute('viewBox')).toBe('0 0 260 146');
+    expect(
+      outline(resource)?.querySelector('.canvas-resource__outline-edge')?.getAttribute('rx'),
+    ).toBe('73');
+
+    rerender(
+      <CanvasResource
+        {...props}
+        shape="pill"
+        size={{ width: 400, height: 100 }}
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    expect(outline(resource)?.getAttribute('viewBox')).toBe('0 0 400 100');
+    const edge = outline(resource)?.querySelector('.canvas-resource__outline-edge');
+    expect(edge?.getAttribute('width')).toBe('400');
+    expect(edge?.getAttribute('height')).toBe('100');
+    expect(edge?.getAttribute('rx')).toBe('50');
+  });
+
+  it('draws no outline for a rectangle, Open or Closed', () => {
+    for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+      const { unmount } = render(<CanvasResource {...props} shape="rectangle" display={display} />);
+      expect(outline(screen.getByRole('article', { name: 'Decide' }))).toBeNull();
+      unmount();
+    }
+  });
+
+  it('keeps the diamond while the Closed Title is being written', () => {
+    render(
+      <CanvasResource
+        {...props}
+        state="editing"
+        shape="diamond"
+        display={CLOSED_DISPLAY}
+        onCompleteTitleEdit={() => null}
+        onCancelTitleEdit={() => undefined}
+        onReturnFocus={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('article', { name: 'Decide' })).toHaveAttribute(
+      'data-resource-shape',
+      'diamond',
+    );
+  });
+});
+
+describe('the Title a Shape draws', () => {
+  const title = 'Decide\nwhich branch\nand when';
+  const props = {
+    front: { kind: 'ur' as const },
+    state: 'rest' as const,
+    title,
+    graphColor: '#ffc53d',
+  };
+  const ladder = (resource: HTMLElement) =>
+    [...resource.querySelectorAll('.canvas-resource__title-line')].map((line) => line.textContent);
+
+  it('keeps the heading named by every Title Line, as the rectangle does', () => {
+    const { unmount } = render(
+      <CanvasResource {...props} shape="rectangle" display={CLOSED_DISPLAY} />,
+    );
+    const headingName = (): string => {
+      let name = '';
+      screen.getByRole('heading', {
+        name: (computed) => {
+          name = computed;
+          return true;
+        },
+      });
+      return name;
+    };
+    const rectangleName = headingName();
+    unmount();
+
+    render(<CanvasResource {...props} shape="diamond" display={CLOSED_DISPLAY} />);
+    expect(screen.getByRole('article', { name: 'Decide' })).toBeInTheDocument();
+    expect(headingName()).toBe(rectangleName);
+  });
+
+  it.each(['rectangle', 'pill', 'ellipse', 'diamond'] as const)(
+    'draws the whole ladder in a %s, Open and Closed',
+    (resourceShape) => {
+      for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+        const { unmount } = render(
+          <CanvasResource {...props} shape={resourceShape} display={display} />,
+        );
+        const resource = screen.getByRole('article', { name: 'Decide' });
+        expect(ladder(resource)).toEqual(['Decide', 'which branch', 'and when']);
+        unmount();
+      }
+    },
+  );
+
+  it('writes the whole Title of a Closed Resource drawn in a diamond', () => {
+    render(
+      <CanvasResource
+        {...props}
+        state="editing"
+        shape="diamond"
+        display={CLOSED_DISPLAY}
+        onCompleteTitleEdit={() => null}
+        onCancelTitleEdit={() => undefined}
+        onReturnFocus={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('textbox', { name: 'Resource title' })).toHaveValue(title);
+  });
+});
+
+/*
+ * An Ur Resource's Shape is chosen from its rail (ADR 0121): one control whose
+ * face is the Shape it is drawn in, opening the four Shapes as a radio list.
+ */
+describe('choosing an Ur Resource’s Shape from its rail', () => {
+  const props = {
+    state: 'selected' as const,
+    title: 'Decide',
+    graphColor: '#ffc53d',
+  };
+  const trigger = (name: string) => screen.getByRole('button', { name });
+  const checked = () =>
+    screen
+      .getAllByRole('menuitemradio')
+      .filter((item) => item.getAttribute('aria-checked') === 'true')
+      .map((item) => item.textContent);
+
+  it('draws the current Shape on the rail, Open and Closed alike', () => {
+    for (const display of [CLOSED_DISPLAY, opened({ kind: 'ur', via: 'self' })]) {
+      const { unmount } = render(
+        <CanvasResource
+          {...props}
+          front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
+          shape="ellipse"
+          display={display}
+        />,
+      );
+      const face = trigger('Shape: Ellipse');
+      expect(face.querySelector('svg[data-resource-shape="ellipse"]')).not.toBeNull();
+      unmount();
+    }
+  });
+
+  it('names the rectangle for a front given no Shape', () => {
+    render(
+      <CanvasResource
+        {...props}
+        front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    expect(trigger('Shape: Rectangle')).toBeVisible();
+  });
+
+  it('lists the four Shapes, each drawn and named, with the current one chosen and no caption', async () => {
+    render(
+      <CanvasResource
+        {...props}
+        front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
+        shape="diamond"
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    fireEvent.click(trigger('Shape: Diamond'));
+    const list = await screen.findByRole('group', { name: 'Shape' });
+    const items = screen.getAllByRole('menuitemradio');
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Rectangle',
+      'Pill',
+      'Ellipse',
+      'Diamond',
+    ]);
+    expect(
+      items.map((item) =>
+        item.querySelector('svg[data-resource-shape]')?.getAttribute('data-resource-shape'),
+      ),
+    ).toEqual(['rectangle', 'pill', 'ellipse', 'diamond']);
+    expect(checked()).toEqual(['Diamond']);
+    expect(list).not.toHaveTextContent(/^Shape/u);
+  });
+
+  it('runs the chosen Shape', async () => {
+    const onResourceShapeChange = vi.fn();
+    render(
+      <CanvasResource
+        {...props}
+        front={{ kind: 'ur', onResourceShapeChange }}
+        shape="rectangle"
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    fireEvent.click(trigger('Shape: Rectangle'));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Pill' }));
+    expect(onResourceShapeChange).toHaveBeenCalledWith('pill');
+    expect(onResourceShapeChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no Shape where it cannot be changed, or is read-only', () => {
+    const { rerender } = render(
+      <CanvasResource
+        {...props}
+        front={{ kind: 'ur', onOpenChange: () => 'completed' }}
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
+
+    rerender(
+      <CanvasResource
+        {...props}
+        readOnly
+        front={{ kind: 'ur', onResourceShapeChange: () => undefined }}
+        display={CLOSED_DISPLAY}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /^Shape/u })).toBeNull();
   });
 });

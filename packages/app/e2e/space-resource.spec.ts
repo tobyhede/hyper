@@ -1,4 +1,10 @@
-import { confirmDeletion, resourceControls, resourceToolbar, selectResource } from './graph';
+import {
+  confirmDeletion,
+  resourceControls,
+  resourceShapeChoice,
+  resourceToolbar,
+  selectResource,
+} from './graph';
 import {
   beginPortalEdit,
   embeddedGraphEdgeCount,
@@ -29,6 +35,7 @@ import {
   nodeByTitle,
   selectCanvas,
   settled,
+  viewportTransform,
 } from './graph';
 
 /**
@@ -657,7 +664,48 @@ async function openSpaceResourceOnItsMap(page: Page): Promise<Locator> {
     (await resourceControls(page, resource)).getByTestId('space-resource-map'),
   ).toHaveText('Map 1');
   await settled(page);
+  // Opening changes no size, so the Map it draws gets room the way an author
+  // gives it: one Resize through the real control.
+  await resizeTo(page, resource, SPACE_RESOURCE_WORKING_SIZE);
+  await settled(page);
   return resource;
+}
+
+/** The size the tests below give an Open Space Resource, with room for its drawn Map. */
+const SPACE_RESOURCE_WORKING_SIZE = { width: 960, height: 720 } as const;
+
+/** Resize a selected Resource to a size, through its bottom-right control, and settle. */
+async function resizeTo(
+  page: Page,
+  resource: Locator,
+  size: { readonly width: number; readonly height: number },
+): Promise<void> {
+  await resource.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const current = await resource.evaluate((element) => ({
+    width: Number.parseFloat(getComputedStyle(element).width),
+    height: Number.parseFloat(getComputedStyle(element).height),
+  }));
+  const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
+  await resource.hover();
+  const control = await boxOf(
+    resource.locator('.react-flow__resize-control.handle.bottom.right'),
+    'the resize control',
+  );
+  const from = { x: control.x + control.width / 2, y: control.y + control.height / 2 };
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(
+    from.x + (size.width - current.width) * zoom,
+    from.y + (size.height - current.height) * zoom,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
+  await resource.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
 }
 
 /**
@@ -764,6 +812,132 @@ test(
     );
   },
 );
+
+/**
+ * A drawn Map draws its Ur Resources' Shapes and, while it may be authored, offers the Shape choice on their rails alone (ADR 0121,
+ * ADR 0112). The choice writes the target Space's Map, so the target draws it
+ * when entered; a Reference Resource to the Space Resource draws the same Map
+ * read-only, with the Shape and no commands.
+ */
+test('a Shape chosen inside an Open Space Resource is the target Map’s, drawn wherever it is', async ({
+  page,
+}) => {
+  const parent = await openSpaceResourceOnItsMap(page);
+  // The target's first Resource is a Markdown Resource, which takes no Shape.
+  await beginPortalEdit(page, parent);
+  const markdown = embeddedNodes(page);
+  await expect(markdown).toHaveCount(1);
+  await (
+    await resourceControls(page, markdown)
+  )
+    .getByRole('button', { name: 'Actions for Resource Resource 1' })
+    .click({ delay: 120 });
+  await expect(
+    page.getByRole('menu').last().getByRole('menuitem', { name: 'Remove from Map' }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(
+    (await resourceControls(page, markdown)).getByRole('button', { name: /^Shape: / }),
+  ).toHaveCount(0);
+  await (
+    await resourceToolbar(page, parent)
+  )
+    .getByRole('button', { name: 'Done Resource Architecture' })
+    .click();
+  await settled(page);
+
+  // An Ur Resource made in the target Space, which the drawn Map then draws.
+  await enterThrough(page, parent, 'Space 1');
+  await createResource(page, 'Ur Resource');
+  const urTitle = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(urTitle).toBeFocused();
+  await urTitle.fill('Step');
+  await urTitle.press('Enter');
+  await expect(urTitle).toHaveCount(0);
+  await settled(page);
+  await page.goBack();
+  await expect(showingSpace(page)).not.toContainText('Space 1');
+  await expect(embeddedNodes(page)).toHaveCount(2);
+  await settled(page);
+
+  await beginPortalEdit(page, parent);
+  const embedded = embeddedNodes(page).filter({
+    has: page.getByRole('heading', { name: 'Step', exact: true }),
+  });
+  await expect(embedded).toHaveCount(1);
+  await (
+    await resourceShapeChoice(page, embedded)
+  )
+    .getByRole('menuitemradio', { name: 'Diamond' })
+    .click();
+  await expect(embedded.locator('.canvas-resource')).toHaveAttribute(
+    'data-resource-shape',
+    'diamond',
+  );
+  await expect(
+    nodeByTitle(page, 'Architecture').locator('.canvas-resource').first(),
+  ).toHaveAttribute('data-resource-shape', 'rectangle');
+  // An Ur Resource has no content, so the drawn Map offers it no Open either.
+  await expect(
+    (await resourceControls(page, embedded)).getByRole('button', { name: 'Open Resource Step' }),
+  ).toHaveCount(0);
+  await expect(embedded.locator('.canvas-resource__outline')).toHaveCount(1);
+  await (
+    await resourceToolbar(page, parent)
+  )
+    .getByRole('button', { name: 'Done Resource Architecture' })
+    .click();
+  await settled(page);
+
+  // Through a Reference Resource the drawn Map is read-only: the Shape is
+  // drawn, and the Resource drawn there offers no commands.
+  await (
+    await resourceControls(page, parent)
+  )
+    .getByRole('button', { name: 'Actions for Resource Architecture' })
+    .click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Create Reference', exact: true }).click();
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  await title.fill('Architecture, again');
+  await title.press('Enter');
+  await expect(title).toHaveCount(0);
+  await settled(page);
+  const reference = nodeByTitle(page, 'Architecture, again');
+  await reference.focus();
+  await reference.press('Enter');
+  const referenceId = await reference.getAttribute('data-id');
+  if (referenceId === null) throw new Error('The Reference Resource has no id.');
+  const throughReference = page
+    .locator(`.react-flow__node[data-id^="embedded:${referenceId}:"]`)
+    .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) });
+  await expect(throughReference).toHaveCount(1);
+  await expect(throughReference.locator('.canvas-resource')).toHaveAttribute('data-open', 'false');
+  await expect(throughReference.locator('.canvas-resource')).toHaveAttribute(
+    'data-resource-shape',
+    'diamond',
+  );
+  await expect(throughReference).toHaveCSS('pointer-events', 'none');
+  await expect(
+    page.locator(`[data-resource-rail-for="${await throughReference.getAttribute('data-id')}"]`),
+  ).toHaveCount(0);
+
+  await enterThrough(page, nodeByTitle(page, 'Architecture'), 'Space 1');
+  // Entered, the target Space draws the Shape on its own Map, and keeps it on reload.
+  const entered = page
+    .locator('.react-flow__node:visible')
+    .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) })
+    .locator('.canvas-resource');
+  await expect(entered).toHaveAttribute('data-open', 'false');
+  await expect(entered).toHaveAttribute('data-resource-shape', 'diamond');
+  await page.reload();
+  await expect(
+    page
+      .locator('.react-flow__node:visible')
+      .filter({ has: page.getByRole('heading', { name: 'Step', exact: true }) })
+      .locator('.canvas-resource'),
+  ).toHaveAttribute('data-resource-shape', 'diamond');
+});
 
 /**
  * Handles author the Graph the Space Resource is showing
@@ -1142,7 +1316,9 @@ test(
   },
 );
 
-test('a Space Resource resizes to Close and remembers its Open Size', async ({ page }) => {
+test('a Space Resource keeps the size it is resized to through Close and reopening', async ({
+  page,
+}) => {
   const parent = await openSpaceResourceOnItsMap(page);
   await parent.evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -1150,25 +1326,27 @@ test('a Space Resource resizes to Close and remembers its Open Size', async ({ p
   // Move the resize corner clear of the fixed Graph overview overlay.
   await dragBy(page, parent, -400, -150);
   await selectResource(parent);
-  const open = await boxOf(parent, 'Open Space Resource');
-  const control = await boxOf(
-    parent.locator('.react-flow__resize-control.handle.bottom.right'),
-    'Space Resource resize control',
-  );
-  const zoom = open.width / 960;
-  await page.mouse.move(control.x + control.width / 2, control.y + control.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(
-    control.x + control.width / 2 - (960 - 260) * zoom,
-    control.y + control.height / 2 - (720 - 146) * zoom,
-    { steps: 20 },
-  );
-  await page.mouse.up();
+  const opened = await boxOf(parent, 'Open Space Resource');
+  await resizeTo(page, parent, { width: 760, height: 560 });
+  await expect
+    .poll(async () => (await boxOf(parent, 'resized Space Resource')).width)
+    .toBeLessThan(opened.width - 50);
+  const resized = await boxOf(parent, 'resized Space Resource');
+
+  await (
+    await resourceControls(page, parent)
+  )
+    .getByRole('button', { name: 'Close Resource Architecture' })
+    .click();
   await expect(
     (await resourceControls(page, parent)).getByRole('button', {
       name: 'Open Resource Architecture',
     }),
   ).toBeVisible();
+  await expect
+    .poll(async () => (await boxOf(parent, 'Closed Space Resource')).width)
+    .toBeCloseTo(resized.width, 0);
+
   await parent.focus();
   await parent.press('Enter');
   await expect(
@@ -1178,10 +1356,10 @@ test('a Space Resource resizes to Close and remembers its Open Size', async ({ p
   ).toBeVisible();
   await expect
     .poll(async () => (await boxOf(parent, 'reopened Space Resource')).width)
-    .toBeCloseTo(open.width, 0);
+    .toBeCloseTo(resized.width, 0);
   await expect
     .poll(async () => (await boxOf(parent, 'reopened Space Resource')).height)
-    .toBeCloseTo(open.height, 0);
+    .toBeCloseTo(resized.height, 0);
 });
 
 test(

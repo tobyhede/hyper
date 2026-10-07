@@ -56,15 +56,17 @@ Guards above are omitted below.
 | `edited-resource` | `resource-not-found` → `resource-kind-immutable` → `reference-target-immutable` → `space-resource-target-immutable` → `resource-title-required` → (identical to current ⇒ `unchanged`) → `reference-target-not-found` → `reference-target-must-own-content` → completed |
 | `created-resource` | none → completed |
 | `created-reference` | `reference-target-not-found` → `reference-target-must-own-content` → completed |
-| `opened-resource` | `resource-not-in-map` → (already Open ⇒ `unchanged`) → completed |
+| `opened-resource` | `resource-not-in-map` → `resource-not-found` → `open-requires-content` → (already Open ⇒ `unchanged`) → completed |
 | `closed-resource` | `resource-not-in-map` → (already Closed ⇒ `unchanged`) → completed |
-| `resized-resource` | `resource-not-in-map` → `resource-not-open` → (same size ⇒ `unchanged`) → completed |
+| `resized-resource` | `resource-not-in-map` → (same size as `resourceSize` resolves it ⇒ `unchanged`) → completed |
+| `changed-resource-shape` | `resource-not-in-map` → `resource-not-found` → `shape-requires-ur-resource` → (same Shape as `resourceShape` resolves it ⇒ `unchanged`) → completed |
 | `added-resource-to-map` | `resource-not-found` → `resource-already-in-map` → completed |
 | `removed-resource-from-map` | `resource-not-in-map` → completed |
 | `deleted-resource` | `resource-not-found` → `space-resource-deletion-unsupported` → `resource-has-references` → completed |
 
-`resource-not-open` is the code `resized-resource` raises for a Resource that is
-**Closed**. Every code string here is quoted exactly as `AuthoringRefusal['code']`
+`open-requires-content` is the code `opened-resource` raises for an Ur Resource,
+which has no content to show; intake raises the same code for a Map entry storing
+one Open. Every code string here is quoted exactly as `AuthoringRefusal['code']`
 declares it. A refusal code is a stable identity across the seam (ADR 0057), so
 renaming one is a change to the domain surface rather than a wording fix, made in
 source and quoted here afterwards.
@@ -127,10 +129,10 @@ Edit that holds no Map say it needed one.
 | --- | --- |
 | `settled-resource-movement` | none → completed |
 
-## The 25 codes
+## The 26 codes
 
-1 contextual (`map-not-found`) plus 24 action-specific —
-none is produced anywhere else. 22 of those 24 are tabulated above;
+1 contextual (`map-not-found`) plus 25 action-specific —
+none is produced anywhere else. 23 of those 25 are tabulated above;
 `map-required` is declared and presented but currently raised nowhere, so it
 appears in no row, and `image-url-unsupported`, raised by the Image Resource
 Edits, has no row yet.

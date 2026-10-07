@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildGraphRenderEdges, loadSpace, type Space } from '@project/graph';
-import type { SpaceFile } from '@project/core';
+import type { ResourceId, ResourceShape, SpaceFile } from '@project/core';
 import { Position } from '@xyflow/react';
 import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
 import {
@@ -123,8 +123,6 @@ describe('projectResourceNodes', () => {
         });
         expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
           contentAction: 'none',
-          openSizeFloor:
-            kind === 'space' ? { width: 292, height: 266 } : { width: 260, height: 146 },
           embedsMap: kind === 'space',
         });
         if (!open)
@@ -146,6 +144,24 @@ describe('projectResourceNodes', () => {
     expect(a.data.active).toBe(false);
     // ADR 0064: content is loaded when a resource is opened, not embedded per node.
     expect('markdown' in a.data).toBe(false);
+  });
+
+  it('carries the Shape the Map records for each Resource it projects', () => {
+    const a = uuid('00000000-0000-4000-8000-000000000002');
+    const resourceShape = (id: ResourceId): ResourceShape => (id === a ? 'diamond' : 'rectangle');
+    const nodes = projectResourceNodes(space, { resourceShape });
+    expect(nodes.find((n) => n.id === a)?.data.shape).toBe('diamond');
+    expect(nodes.filter((n) => n.id !== a).map((n) => n.data.shape)).not.toContain('diamond');
+    // The Shape travels whatever the display, Open included: the front decides
+    // what it draws from the two together.
+    const opened = projectResourceNodes(space, {
+      resourceShape,
+      openResourceIds: new Set([a]),
+    });
+    expect(opened.find((n) => n.id === a)?.data).toMatchObject({
+      shape: 'diamond',
+      display: { shown: 'open' },
+    });
   });
 
   it('uses the positions a map put on the resources', () => {
@@ -332,7 +348,7 @@ describe('projectResourceNodes', () => {
     const imageNode = (options: Parameters<typeof projectResourceNodes>[1]) =>
       projectResourceNodes(withImage, options).find((node) => node.id === imageId)?.data;
 
-    const picture = { kind: 'image', url, naturalSize: undefined, via: 'self' };
+    const picture = { kind: 'image', url, via: 'self' };
     expect(imageNode({})).toMatchObject({ kind: 'image', display: { shown: 'closed' } });
     expect(imageNode({ openResourceIds: new Set([imageId]) })).toMatchObject({
       kind: 'image',
@@ -384,11 +400,11 @@ describe('projectResourceNodes display', () => {
     });
     expect(display(imageId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, naturalSize: undefined, via: 'self' },
+      content: { kind: 'image', url, via: 'self' },
     });
     expect(display(referenceId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, naturalSize: undefined, via: 'reference' },
+      content: { kind: 'image', url, via: 'reference' },
     });
   });
 
@@ -402,7 +418,7 @@ describe('projectResourceNodes display', () => {
       open: true,
       display: {
         shown: 'presented',
-        content: { kind: 'image', url, naturalSize: undefined, via: 'reference' },
+        content: { kind: 'image', url, via: 'reference' },
       },
     });
   });

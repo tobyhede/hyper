@@ -1,10 +1,4 @@
-import {
-  COLLAPSED_RESOURCE_SIZE,
-  type ResourceId,
-  type ResourcePlacement,
-  type Map,
-  type MapPosition,
-} from '@project/core';
+import { type ResourceId, type ResourcePlacement, type Map, type MapPosition } from '@project/core';
 import type { LayoutStrategyGraph } from './layout';
 
 /** The brand's carrier. See `Placement` below for what the type means. */
@@ -70,26 +64,18 @@ export type Placement = ReadonlyMap<ResourceId, Readonly<ResourcePlacement>> & {
 const brand = (positions: ReadonlyMap<ResourceId, Readonly<ResourcePlacement>>): Placement =>
   positions as Placement;
 
-type PlacementPoint = ResourcePlacement | (MapPosition & { readonly open?: never });
-
-const point = (at: PlacementPoint): ResourcePlacement => {
-  if (at.open === undefined) return { x: at.x, y: at.y, open: false };
-  if (at.open) {
-    return {
-      x: at.x,
-      y: at.y,
-      open: true,
-      openSize: { width: at.openSize.width, height: at.openSize.height },
-    };
-  }
-  return at.openSize === undefined
-    ? { x: at.x, y: at.y, open: false }
-    : {
-        x: at.x,
-        y: at.y,
-        open: false,
-        openSize: { width: at.openSize.width, height: at.openSize.height },
-      };
+/**
+ * A copy of an entry, keeping exactly the optional fields it stores: an absent
+ * `open`, `size` or `shape` stays absent, so the application's default is read
+ * for it (`resourceOpen`, `resourceSize`, `resourceShape`) rather than written.
+ */
+const point = (at: ResourcePlacement): ResourcePlacement => {
+  let entry: ResourcePlacement = { x: at.x, y: at.y };
+  if (at.open !== undefined) entry = { ...entry, open: at.open };
+  if (at.size !== undefined)
+    entry = { ...entry, size: { width: at.size.width, height: at.size.height } };
+  if (at.shape !== undefined) entry = { ...entry, shape: at.shape };
+  return entry;
 };
 
 /** The placement a Map holds. */
@@ -129,15 +115,17 @@ function fromLayoutStrategyGraph(strategyGraph: LayoutStrategyGraph): Placement 
  *
  * Total by nature — a rendered resource always has coordinates — which is why this
  * is never installed directly over an authored placement. `next` decides what
- * any of it is allowed to author.
+ * any of it is allowed to author. A bare point joins Closed, at the Closed Size,
+ * with no Shape stored.
  */
-function fromEntries(entries: Iterable<readonly [ResourceId, PlacementPoint]>): Placement {
+function fromEntries(entries: Iterable<readonly [ResourceId, ResourcePlacement]>): Placement {
   const positions = new Map<ResourceId, ResourcePlacement>();
-  for (const [resourceId, at] of entries) positions.set(resourceId, point(at));
+  for (const [resourceId, at] of entries)
+    positions.set(resourceId, at.open === undefined ? point({ ...at, open: false }) : point(at));
   return brand(positions);
 }
 
-/** Value equality: the same resources, each at the same coordinates. */
+/** Value equality: the same resources, each with the same coordinates and the same stored state, size and Shape. */
 function equals(a: Placement | null, b: Placement | null): boolean {
   if (a === b) return true;
   if (a === null || b === null) return false;
@@ -147,8 +135,9 @@ function equals(a: Placement | null, b: Placement | null): boolean {
     if (other === undefined) return false;
     if (other.x !== at.x || other.y !== at.y) return false;
     if (other.open !== at.open) return false;
-    if (other.openSize?.width !== at.openSize?.width) return false;
-    if (other.openSize?.height !== at.openSize?.height) return false;
+    if (other.size?.width !== at.size?.width) return false;
+    if (other.size?.height !== at.size?.height) return false;
+    if (other.shape !== at.shape) return false;
   }
   return true;
 }
@@ -181,9 +170,9 @@ function equals(a: Placement | null, b: Placement | null): boolean {
  * there is no derivation to invert. A settled drag therefore authors the drop
  * point exactly, whatever is Open and wherever it sits.
  *
- * The resource's own Open/Closed state and Open Size survive the merge: a renderer
- * reports React Flow node positions and nothing else, so only `x` and `y` are
- * read out of it.
+ * The resource's own Open/Closed state, size and Shape survive the merge: a
+ * renderer reports React Flow node positions and nothing else, so only `x` and
+ * `y` are read out of it.
  *
  * Returns `authored` itself when nothing changes, so an unchanged placement
  * keeps its identity and a settled graph is not re-arranged by the projection
@@ -205,12 +194,7 @@ function next(
     if (at !== undefined) {
       merged.set(
         resourceId,
-        point({
-          ...at,
-          ...original,
-          x: at.x,
-          y: at.y,
-        }),
+        original === undefined ? at : point({ ...original, x: at.x, y: at.y }),
       );
     }
   }
@@ -222,11 +206,12 @@ function next(
 /**
  * The placement with one more resource authored at a named point.
  *
- * The atomic create-and-connect Edit places its new Resource where the author
- * dropped it, which is authorship rather than a report — no renderer has drawn
- * that Resource yet, so it cannot come through `next`.
+ * Add Resource and Add to Map place a Resource where the author aimed it, which
+ * is authorship rather than a report — no renderer has drawn that Resource yet,
+ * so it cannot come through `next`. The entry is written as given: a Resource
+ * joining a Map is given `open: false` and nothing else by its caller.
  */
-function place(placement: Placement, resourceId: ResourceId, at: PlacementPoint): Placement {
+function place(placement: Placement, resourceId: ResourceId, at: ResourcePlacement): Placement {
   const placed = new Map(placement);
   placed.set(resourceId, point(at));
   return brand(placed);
@@ -263,161 +248,83 @@ function toPositions(placement: Placement): Record<ResourceId, ResourcePlacement
  */
 const empty = (): Placement => brand(new Map());
 
-/**
- * A width and a height together: the shape an Open Size, the collapsed constant
- * and a growth all share. Local, because none of the three is a domain entity —
- * they are the two numbers displacement is arithmetic over.
- */
+/** A width and a height together: a Resource's size before and after a Resize. */
 type Extent = { readonly width: number; readonly height: number };
 
 /**
- * The growth an Open Resource displaces its neighbours by: its Open rect less the
- * collapsed one, floored at zero on each axis independently.
+ * The axis a Resource makes room on when a subject is resized, or `null` for
+ * none.
  *
- * The conversion sits beside `displace` because the floor is part of the rule
- * rather than a caller's precaution, and a rule with two owners has none. Open
- * passes this, Close passes its negation and Resize passes the difference
- * between two of them, so every growth that reaches `displace` in production has
- * come through here.
+ * A Resource is **clear** of the subject on an axis when it starts at or past
+ * the far edge of the subject's rect *before* the Resize on that axis. A
+ * Resource clear on `x` takes the width change and nothing else; failing that,
+ * a Resource clear on `y` takes the height change; a Resource clear on neither
+ * overlaps the subject and moves on neither (ADR 0093).
  *
- * The floor is not defensive arithmetic. Nothing authors a rect below
- * `COLLAPSED_RESOURCE_SIZE` — the resizer's minimum is exactly that, and
- * `resourcePlacementSchema` refuses a smaller one — but a stored Space is bytes, and
- * a negative growth would pull neighbours backwards over the Resource that caused
- * it, past the subject, where the negating Close can no longer find them. So the
- * floor is also what makes the Open/Close round trip below hold. A rect smaller
- * than a collapsed Resource displaces nobody, which is the honest reading of it: it
- * is not a shrink of its neighbours.
- */
-function growth(openSize: Extent): Extent {
-  return {
-    width: Math.max(0, openSize.width - COLLAPSED_RESOURCE_SIZE.width),
-    height: Math.max(0, openSize.height - COLLAPSED_RESOURCE_SIZE.height),
-  };
-}
-
-/**
- * The axis a Resource makes room on when a subject grows, or `null` for none.
- *
- * A Resource is **clear** of the subject on an axis when it starts at or past the
- * far edge of the subject's *collapsed* rect on that axis — past where the
- * subject ends before it grows (ADR 0093). A Resource clear on `x` takes the width
- * growth and nothing else; failing that, a Resource clear on `y` takes the height
- * growth; a Resource clear on neither already overlaps the collapsed subject and
- * moves on neither.
- *
- * **One axis, and `x` first.** A Resource clear on `x` is clear of the grown
+ * **One axis, and `x` first.** A Resource clear on `x` is clear of the resized
  * rect after taking the width alone, and a Resource clear on both is the same
  * case. Do not also move it on `y`: a Resource beside the subject and one unit
- * lower would take the whole height growth, and Close, read memorylessly, would
- * pull it up by a height the Open never pushed it down by.
+ * lower would take the whole height change.
  *
- * **The collapsed rect and not the Open one**, because the membership has to
- * be the same at every Edit in a sequence for Open and Close to be a pair. The
- * collapsed size is a constant, and a nonnegative growth only carries a clear
- * Resource further clear on the axis it moved on while leaving the other axis
- * untouched, so what Open selects Close selects again. A shrinking Resize moves
- * a Resource back by no more than the growth still held, which leaves it at least
- * at the collapsed edge, so it too stays in the set.
+ * **The rect before the Resize**, so a grow followed by the shrink back selects
+ * the same Resources: a grow carries every clear Resource clear of the grown
+ * rect, which is the rect the shrink measures from.
  */
-function roomAxis(at: MapPosition, subject: MapPosition): 'x' | 'y' | null {
-  if (at.x >= subject.x + COLLAPSED_RESOURCE_SIZE.width) return 'x';
-  if (at.y >= subject.y + COLLAPSED_RESOURCE_SIZE.height) return 'y';
+function roomAxis(at: MapPosition, subject: MapPosition, before: Extent): 'x' | 'y' | null {
+  if (at.x >= subject.x + before.width) return 'x';
+  if (at.y >= subject.y + before.height) return 'y';
   return null;
 }
 
 /**
- * The placement with every Resource clear of a subject moved by a growth.
+ * The placement with every Resource clear of a subject moved by the change in
+ * its size from `before` to `after`.
  *
- * This is the whole of displacement (ADR 0084, ADR 0093). Opening a Resource
- * applies its growth here as part of the Open Edit, and the coordinates it
- * writes are authored ones with the same standing as any other — the author
- * opened the Resource, and opening is a Map decision. Closing applies the
- * negation, and resizing the difference. Between those Edits nothing derives
- * anything: the Map's positions are what the canvas draws.
+ * This is the whole of displacement (ADR 0084, ADR 0093). Resizing a Resource
+ * applies it as part of the Resize Edit, and the coordinates it writes are
+ * authored ones with the same standing as any other. Between Edits nothing
+ * derives anything: the Map's positions are what the canvas draws. Open, Close,
+ * a Shape and removal change no size, so they displace nobody.
  *
  * Which Resources move, and on which one axis, is {@link roomAxis}. The subject is
- * never clear of itself, so it never moves.
+ * never clear of itself, so it never moves, and its own entry is not written
+ * here: the caller writes its new size.
  *
- * A negative growth is how Close is expressed and nothing here special-cases it,
- * because the round trip is what makes Open and Close a pair:
- * `displace(displace(p, c, g), c, negate(g))` is `p` for every **nonnegative**
- * `g`. The bound is load-bearing rather than a convenience. Applying a negative
- * growth *first* can carry a Resource back inside the subject's collapsed extent,
- * and the negation then skips it as no longer clear — subject at `x = 0`,
- * neighbour at `x = 260`, `growth.width = -2`. `growth` above floors Open's at
- * zero, so no Open reaches it — but Close and a shrinking Resize both apply a
- * negative growth, and the Resources they reach are whichever ones are clear of
- * the subject *now*, not the ones the Open pushed. A Resource the author dropped
- * inside an Open Resource's rect, past its collapsed edge, is clear of it and was
- * never displaced by it, so closing carries that Resource back over the subject
- * and the reopen leaves it there. The asymmetry is therefore stated rather than
- * repaired — clamping it, or remembering which Resources a particular Open pushed,
- * is the per-Resource history ADR 0084 rejected for making two identical Maps
- * behave differently.
+ * A shrink is a negative change and nothing here special-cases it. A grow then
+ * the shrink back restores every position, because the grow carries each clear
+ * Resource clear of the grown rect. The other order is not an involution: a
+ * Resource overlapping the larger rect but clear of the smaller one is not moved
+ * by the shrink and is pushed by the grow back. That asymmetry is stated rather
+ * than repaired — remembering which Resources a Resize pushed is the
+ * per-Resource history ADR 0084 rejected for making two identical Maps behave
+ * differently.
  *
- * The same memorylessness read from the subject's side: a subject the author
- * has dragged past the neighbours its own Open displaced finds nobody clear of
- * it and gives nothing back, so that room stays where it is and a further
- * Open/drag/Close cycle adds more. ADR 0084 states this face for a moved
- * *neighbour*; it is one rule, and the subject is not exempt from it, because
- * this compares against wherever the subject now sits rather than wherever it
- * was when it Opened.
- *
- * Open/Closed state and the remembered Open Size ride through untouched; only
- * `x` and `y` move (ADR 0066). Answers the placement it was given whenever no
- * Resource actually moves — a subject the map does not hold, a growth that is zero
- * on both axes, and the case neither of those catches: a nonzero growth with
- * nothing clear of the subject, which `reclaim` reaches for a subject the
- * author dragged past its own displaced neighbours. Like `remove`, so an Edit
- * that moves nothing keeps the placement's identity and a settled graph is not
- * laid out again.
+ * Answers the placement it was given whenever no Resource actually moves — a
+ * subject the map does not hold, a change of zero on both axes, or nothing
+ * clear of the subject — so an Edit that moves nothing keeps the placement's
+ * identity and a settled graph is not laid out again.
  */
-function displace(placement: Placement, subjectId: ResourceId, growth: Extent): Placement {
+function displace(
+  placement: Placement,
+  subjectId: ResourceId,
+  before: Extent,
+  after: Extent,
+): Placement {
   const subject = placement.get(subjectId);
   if (subject === undefined) return placement;
-  if (growth.width === 0 && growth.height === 0) return placement;
+  const room = { width: after.width - before.width, height: after.height - before.height };
+  if (room.width === 0 && room.height === 0) return placement;
 
   const displaced = new Map<ResourceId, ResourcePlacement>();
   let moved = false;
   for (const [resourceId, at] of placement) {
-    const axis = roomAxis(at, subject);
-    const x = axis === 'x' ? at.x + growth.width : at.x;
-    const y = axis === 'y' ? at.y + growth.height : at.y;
+    const axis = roomAxis(at, subject, before);
+    const x = axis === 'x' ? at.x + room.width : at.x;
+    const y = axis === 'y' ? at.y + room.height : at.y;
     if (x !== at.x || y !== at.y) moved = true;
     displaced.set(resourceId, point({ ...at, x, y }));
   }
   return moved ? brand(displaced) : placement;
-}
-
-/**
- * The placement with the room an Open Resource holds given back to every Resource
- * beyond it, the Resource's own entry left exactly as it was.
- *
- * The displacement half of every way an Open Resource stops holding its room, and
- * the one statement of it (ADR 0084). A Resource closes, leaves a Map, or is
- * deleted from the Space, and all three owe the same negation of the growth of
- * the size it is Open at — the size read off its own entry, not off whatever
- * rect the gesture is proposing. That is why this is a member here beside
- * `growth` and `displace` rather than a line each caller writes: a caller that
- * misses it strands the Resource's room permanently — a Resource deleted from a
- * Map the Edit is not drawing is the easy one to miss — and a rule with three
- * owners has none.
- *
- * Answers the placement it was given for a Resource that is Closed or not a member,
- * neither of which holds any room. A Closed Resource's remembered Open Size is not
- * room it holds — nothing was displaced for it — so it is deliberately not read
- * here (ADR 0066).
- *
- * Separate from `remove` rather than folded into it, because removing a key is
- * also how a placement is reconciled against a Map that has already
- * reclaimed, and reclaiming there would give the room back twice.
- */
-function reclaim(placement: Placement, resourceId: ResourceId): Placement {
-  const at = placement.get(resourceId);
-  if (at?.open !== true) return placement;
-  const held = growth(at.openSize);
-  return displace(placement, resourceId, { width: -held.width, height: -held.height });
 }
 
 export const Placement = {
@@ -426,9 +333,7 @@ export const Placement = {
   fromLayoutStrategyGraph,
   fromEntries,
   equals,
-  growth,
   displace,
-  reclaim,
   next,
   place,
   remove,

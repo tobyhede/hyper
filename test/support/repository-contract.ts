@@ -2,6 +2,7 @@ import {
   uuidSchema,
   type GraphEdge,
   type GraphHeadShape,
+  type ResourceShape,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -1093,6 +1094,11 @@ export const spaceRepositoryContract = (
         const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
         return {
           ...base,
+          // Only an Ur Resource takes a Shape (ADR 0121).
+          resources: base.resources.map(({ id, document }) => ({
+            id,
+            document: { title: document.title, kind: 'ur' },
+          })),
           document: {
             ...base.document,
             maps: (base.document.maps ?? []).map((m) => ({
@@ -1115,6 +1121,58 @@ export const spaceRepositoryContract = (
       await expect(repository.loadAggregate()).resolves.toEqual({
         kind: 'loaded',
         aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(diamond, 1n, null)] },
+      });
+    });
+  });
+
+  it(`${name} keeps every Resource's Shape through initialization, commit and load`, async () => {
+    await withHarness(async (repository) => {
+      const withResourceShapes = (
+        first: ResourceShape,
+        second: ResourceShape,
+        secondResized: boolean,
+      ): SpaceSnapshot => {
+        const base = graphedSpace(SPACE_ID, 'Shaped', [RESOURCE_ID, SECOND_RESOURCE_ID]);
+        return {
+          ...base,
+          // Only an Ur Resource takes a Shape (ADR 0121).
+          resources: base.resources.map(({ id, document }) => ({
+            id,
+            document: { title: document.title, kind: 'ur' },
+          })),
+          document: {
+            ...base.document,
+            maps: (base.document.maps ?? []).map((m) => ({
+              ...m,
+              positions: {
+                [RESOURCE_ID]: { x: 0, y: 0, open: false, shape: first },
+                [SECOND_RESOURCE_ID]: secondResized
+                  ? {
+                      x: 300,
+                      y: 0,
+                      open: false,
+                      size: { width: 560, height: 420 },
+                      shape: second,
+                    }
+                  : { x: 300, y: 0, open: false, shape: second },
+              },
+            })),
+          },
+        };
+      };
+      const initial = withResourceShapes('diamond', 'pill', false);
+
+      await repository.initializeAggregate({ metaSpaceId: SPACE_ID, spaces: [initial] });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(initial, 0n, null));
+
+      const changed = withResourceShapes('ellipse', 'diamond', true);
+      await expect(commitUpdate(repository, changed, 0n)).resolves.toMatchObject({
+        kind: 'committed',
+      });
+      await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(stored(changed, 1n, null));
+      await expect(repository.loadAggregate()).resolves.toEqual({
+        kind: 'loaded',
+        aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(changed, 1n, null)] },
       });
     });
   });

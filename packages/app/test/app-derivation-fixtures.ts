@@ -32,7 +32,7 @@ export const derivationSnapshot: SpaceSnapshot = {
         kind: 'positioned',
         positions: {
           [PLACED_A]: { x: 10, y: 20, open: false },
-          [PLACED_B]: { x: 400, y: 20, open: true, openSize: { width: 600, height: 400 } },
+          [PLACED_B]: { x: 400, y: 20, open: true, size: { width: 600, height: 400 } },
         },
         graphs: [{ id: GRAPH_ID, title: 'Main', edges: [{ from: PLACED_A, to: PLACED_B }] }],
       },

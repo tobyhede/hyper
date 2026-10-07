@@ -5,6 +5,7 @@ import {
   loadSpace,
   Placement,
   positionedStrategy,
+  serializeResourceFile,
   type Space,
 } from '@project/graph';
 import { OTHER_GRAPH_OPACITY } from '@project/react-flow-adapter';
@@ -51,7 +52,10 @@ const AT_REST: CanvasInteraction = {
   presenting: false,
 };
 
-function spaceWith(extra: Record<string, unknown> = {}): Space {
+function spaceWith(
+  extra: Record<string, unknown> = {},
+  resources: typeof RESOURCES = RESOURCES,
+): Space {
   const result = loadSpace(
     {
       version: 1,
@@ -61,7 +65,7 @@ function spaceWith(extra: Record<string, unknown> = {}): Space {
       maps: [mapOwning(EMPTY)],
       ...extra,
     },
-    RESOURCES,
+    resources,
   );
   if (!result.ok) throw new Error(result.errors.map((e) => e.message).join(', '));
   return result.space;
@@ -232,12 +236,12 @@ describe('canvasProjection', () => {
     expect(sibling.edges.map((edge) => edge.data?.['graphId'])).toEqual([OTHER_GRAPH]);
   });
 
-  it('carries each authored Open rect through strategy input and node projection', async () => {
+  it('carries each authored size, Open or Closed, through strategy input and node projection', async () => {
     const authoredMap = {
       ...mapOwning(DRAWN),
       positions: {
-        [RESOURCE_A]: { x: 0, y: 0, open: true, openSize: { width: 560, height: 420 } },
-        [RESOURCE_B]: { x: 700, y: 0, open: false },
+        [RESOURCE_A]: { x: 0, y: 0, open: true, size: { width: 560, height: 420 } },
+        [RESOURCE_B]: { x: 700, y: 0, open: false, size: { width: 400, height: 300 } },
       },
     };
     const space = spaceWith({ maps: [authoredMap] });
@@ -250,7 +254,63 @@ describe('canvasProjection', () => {
     const laidOut = await positionedStrategy(Placement.fromMap(resolved.map))(
       projection.strategyGraph,
     );
-    const node = projection.project(laidOut, AT_REST).nodes.find(({ id }) => id === RESOURCE_A);
-    expect(node).toMatchObject({ width: 560, height: 420, data: { open: true } });
+    const nodes = projection.project(laidOut, AT_REST).nodes;
+    expect(nodes.find(({ id }) => id === RESOURCE_A)).toMatchObject({
+      width: 560,
+      height: 420,
+      data: { open: true },
+    });
+    expect(nodes.find(({ id }) => id === RESOURCE_B)).toMatchObject({
+      width: 400,
+      height: 300,
+      data: { display: { shown: 'closed' } },
+    });
+  });
+
+  it("carries each Resource's Shape from the Map it draws, at any size", async () => {
+    const diamondMap = {
+      ...mapOwning(DRAWN),
+      positions: {
+        [RESOURCE_A]: { x: 0, y: 0, open: false, shape: 'diamond' },
+        [RESOURCE_B]: {
+          x: 700,
+          y: 0,
+          open: false,
+          size: { width: 560, height: 420 },
+          shape: 'diamond',
+        },
+      },
+    };
+    // Only an Ur Resource takes a Shape (ADR 0121).
+    const urResources = [RESOURCE_A, RESOURCE_B].map((id) => ({
+      path: `resources/${id}.md`,
+      text: serializeResourceFile({ id, title: id, kind: 'ur' }),
+    }));
+    const { nodes } = await projectThrough(
+      spaceWith({ maps: [diamondMap] }, urResources),
+      AT_REST,
+      MAP,
+    );
+
+    expect(nodes.map(({ id, data, width }) => [id, data.shape, width])).toEqual([
+      [RESOURCE_A, 'diamond', 260],
+      [RESOURCE_B, 'diamond', 560],
+    ]);
+  });
+
+  it('draws an entry with no Shape stored, and one storing the rectangle, as the rectangle', async () => {
+    const rectangleMap = {
+      ...mapOwning(DRAWN),
+      positions: {
+        [RESOURCE_A]: { x: 0, y: 0, open: false },
+        [RESOURCE_B]: { x: 700, y: 0, open: false, shape: 'rectangle' },
+      },
+    };
+    const { nodes } = await projectThrough(spaceWith({ maps: [rectangleMap] }), AT_REST, MAP);
+
+    expect(nodes.map(({ id, data }) => [id, data.shape])).toEqual([
+      [RESOURCE_A, 'rectangle'],
+      [RESOURCE_B, 'rectangle'],
+    ]);
   });
 });

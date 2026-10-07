@@ -28,7 +28,7 @@ const REVIEW_ID = id('000000000017');
  *
  * Two Resources and the one Graph joining them, at the rects its own Map
  * authored — which is what the embedding draws, translated into the Space
- * Resource's rect and nothing else. Both fit inside the Resource's Open Size with the
+ * Resource's rect and nothing else. Both fit inside the Resource's size with the
  * `SPACE_RESOURCE_EMBED_INSET` reserved, so what is on screen is the whole Map
  * rather than the part that happened to fit.
  *
@@ -89,10 +89,9 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
 
 /**
  * The containing Space: one ordinary Markdown Resource, and one Space Resource its
- * Map has already Opened at a size with room for the target's Map.
+ * Map has already Opened and sized with room for the target's Map.
  *
- * The Open state and the Open Size are the Map's own authoring (ADR 0064,
- * ADR 0066), so the story states them where the application stores them rather
+ * The Open state and the size are the Map's own authoring (ADR 0064), so the story states them where the application stores them rather
  * than driving the gesture — Opening is proved by `Components/Resource` and by the
  * application's own Space Resource coverage, and what this story is about begins
  * once a Resource is Open. The selection is stored on the Resource, which is the
@@ -115,7 +114,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
             x: 340,
             y: 0,
             open: true,
-            openSize: { width: 640, height: 420 },
+            size: { width: 640, height: 420 },
           },
         },
         graphs: [
@@ -273,13 +272,13 @@ const pairHome: SpaceSnapshot = spaceSnapshotSchema.parse({
             x: 0,
             y: 0,
             open: true,
-            openSize: { width: 460, height: 320 },
+            size: { width: 460, height: 320 },
           },
           [PAIR_DETAIL_RESOURCE_ID]: {
             x: 500,
             y: 0,
             open: true,
-            openSize: { width: 460, height: 320 },
+            size: { width: 460, height: 320 },
           },
         },
         graphs: [{ id: PAIR_HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],

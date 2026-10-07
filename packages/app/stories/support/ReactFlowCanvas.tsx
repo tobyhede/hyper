@@ -9,7 +9,7 @@ import {
   type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
-import type { ResourceContent, ResourceId, GraphId, MapId } from '@project/core';
+import type { ResourceContent, ResourceId, ResourceShape, GraphId, MapId } from '@project/core';
 import {
   Placement,
   positionedStrategy,
@@ -414,6 +414,11 @@ interface CanvasResourceNodeSpecimenBaseProps {
    */
   readonly content?: ResourceContent;
   readonly readOnly?: boolean;
+  /**
+   * The Shape the fixture Resource is drawn in, as an Ur Resource — the one
+   * kind that takes a Shape. Absent, it keeps its own kind and the rectangle.
+   */
+  readonly resourceShape?: ResourceShape | undefined;
   /** Whether the specimen can be moved by a pointer; see {@link StoryCanvasProps.draggable}. */
   readonly draggable?: boolean;
   /**
@@ -457,6 +462,7 @@ export function CanvasResourceNodeSpecimen({
   kind,
   content,
   readOnly = false,
+  resourceShape,
   draggable = false,
   drawn = INVENTORY_MAP,
 }: CanvasResourceNodeSpecimenProps) {
@@ -493,6 +499,10 @@ export function CanvasResourceNodeSpecimen({
   if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
   if (kind === 'image') data.kind = kind;
+  if (resourceShape !== undefined) {
+    data.kind = 'ur';
+    data.shape = resourceShape;
+  }
   if (open === true) {
     data.display = {
       shown: 'open',
@@ -505,19 +515,17 @@ export function CanvasResourceNodeSpecimen({
     data.titleEditor = { onComplete: () => null, onCancel: () => undefined };
   }
   if (graphColor !== undefined) data.activeGraphColor = graphColor;
-  // Set exactly the way `SpaceCanvas` sets it: resize is Resource behaviour, not
-  // kind behaviour, so its presence follows Open state alone.
-  if (open === true) {
-    if (onResize !== undefined) {
-      data.resize = {
-        minWidth: RESOURCE_SIZE.width,
-        minHeight: RESOURCE_SIZE.height,
-        onResizeStart: () => undefined,
-        onResize,
-        onResizeEnd: () => undefined,
-        onResizeCancel: () => undefined,
-      };
-    }
+  // Set as the decoration sets it: every kind resizes, Open or Closed, and
+  // `ResourceNode` draws the control only while the Resource is selected.
+  if (onResize !== undefined) {
+    data.resize = {
+      minWidth: RESOURCE_SIZE.width,
+      minHeight: RESOURCE_SIZE.height,
+      onResizeStart: () => undefined,
+      onResize,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
   }
 
   const nodePosition = zoom === undefined ? source.position : { x: 40, y: 40 };

@@ -36,11 +36,40 @@ function compoundAt(
   });
 }
 
+/**
+ * Whether an identifier is written where it names a property rather than a
+ * binding: an object literal's or a destructuring pattern's key, a member
+ * access's property, a type or interface member, or a JSX attribute. A
+ * shorthand destructuring key also binds a local of the same name, so it is
+ * not one.
+ */
+function namesProperty(node: ESTree.Node): boolean {
+  const { parent } = node;
+  switch (parent?.type) {
+    case "Property":
+      return (
+        parent.key === node &&
+        !parent.computed &&
+        !(parent.shorthand && parent.parent.type === "ObjectPattern")
+      );
+    case "MemberExpression":
+      return parent.property === node && !parent.computed;
+    case "TSPropertySignature":
+      return parent.key === node && !parent.computed;
+    case "JSXAttribute":
+      return parent.name === node;
+    default:
+      return false;
+  }
+}
+
 function containsForbiddenSymbolName(
   name: string,
   allowedCompounds: readonly (readonly string[])[],
+  allowedName: boolean,
 ): boolean {
   if (!name.toLowerCase().includes(FORBIDDEN_SYMBOL_NAME)) return false;
+  if (allowedName) return false;
   const words = wordsOf(name);
   const allowed = new Set<number>();
   words.forEach((_, start) => {
@@ -69,6 +98,17 @@ function allowedCompoundsOption(option: unknown): readonly (readonly string[])[]
   });
 }
 
+/** The configured whole names, each matched exactly and only where it names a property. */
+function allowedNamesOption(option: unknown): ReadonlySet<string> {
+  if (typeof option !== "object" || option === null || !("allowedNames" in option)) {
+    return new Set();
+  }
+  const { allowedNames } = option;
+  if (!Array.isArray(allowedNames)) return new Set();
+  const entries: readonly unknown[] = allowedNames;
+  return new Set(entries.filter((entry): entry is string => typeof entry === "string"));
+}
+
 /** Ban the case-insensitive substring "shape" in every JavaScript and TypeScript symbol name. */
 export const noForbiddenTermInSymbolNamesRule = defineRule({
   meta: {
@@ -86,17 +126,20 @@ export const noForbiddenTermInSymbolNamesRule = defineRule({
         type: "object",
         properties: {
           allowedCompounds: { type: "array", items: { type: "string" } },
+          allowedNames: { type: "array", items: { type: "string" } },
         },
         additionalProperties: false,
       },
     ],
-    defaultOptions: [{ allowedCompounds: [] }],
+    defaultOptions: [{ allowedCompounds: [], allowedNames: [] }],
   },
   createOnce(context) {
     let allowedCompounds: readonly (readonly string[])[] = [];
+    let allowedNames: ReadonlySet<string> = new Set();
 
     const reportForbiddenSymbolName = (node: ESTree.Node & { name: string }) => {
-      if (!containsForbiddenSymbolName(node.name, allowedCompounds)) return;
+      const allowedName = allowedNames.has(node.name) && namesProperty(node);
+      if (!containsForbiddenSymbolName(node.name, allowedCompounds, allowedName)) return;
       context.report({
         node,
         messageId: "forbiddenSymbolName",
@@ -107,6 +150,7 @@ export const noForbiddenTermInSymbolNamesRule = defineRule({
     return {
       before() {
         allowedCompounds = allowedCompoundsOption(context.options?.[0]);
+        allowedNames = allowedNamesOption(context.options?.[0]);
       },
       Identifier: reportForbiddenSymbolName,
       PrivateIdentifier: reportForbiddenSymbolName,

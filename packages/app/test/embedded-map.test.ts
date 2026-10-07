@@ -49,7 +49,7 @@ async function projection(open = false) {
               [A]: { x: 0, y: 0, open: false },
               [B]: { x: 400, y: 0, open: false },
               [REFERENCE]: open
-                ? { x: 0, y: 300, open: true, openSize: { width: 560, height: 420 } }
+                ? { x: 0, y: 300, open: true, size: { width: 560, height: 420 } }
                 : { x: 0, y: 300, open: false },
             },
             graphs: [{ id: GRAPH, title: 'Graph', edges: [{ from: A, to: B }] }],

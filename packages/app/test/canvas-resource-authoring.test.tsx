@@ -1,11 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  SPACE_RESOURCE_MIN_OPEN_SIZE,
-  spaceSnapshotSchema,
-  uuidSchema,
-  type ResourceId,
-} from '@project/core';
+import { spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import { RESOURCE_SIZE } from '../src/resource';
@@ -108,6 +103,7 @@ const node = (
   width: open ? 640 : RESOURCE_SIZE.width,
   height: open ? 480 : RESOURCE_SIZE.height,
   data: {
+    shape: 'rectangle',
     resourceId,
     title: 'A',
     readOnly: false,
@@ -133,10 +129,11 @@ interface HookProps {
 const mountAuthoring = (
   onBodyEditingChange?: (editing: boolean) => void,
   projectedKind: 'markdown' | 'reference' | 'space' | 'ur' = 'markdown',
+  reportsOutcomes = false,
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter, imageReplacement } = composeApp({
+  const { authoring, adapter, imageReplacement, commandOutcomes } = composeApp({
     images: unusedImageSources,
     spaceSession,
   });
@@ -174,12 +171,13 @@ const mountAuthoring = (
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
         onBodyEditingChange,
+        commandOutcomes: reportsOutcomes ? commandOutcomes : undefined,
       }),
     {
       initialProps,
     },
   );
-  return { ...hook, spaceSession, authoring, adapter };
+  return { ...hook, spaceSession, authoring, adapter, commandOutcomes };
 };
 
 const onlyNode = (nodes: readonly ResourceFlowNode[]): ResourceFlowNode => {
@@ -253,31 +251,53 @@ describe('canvas Resource authoring', () => {
    * operation and keeps Close and its Title, and nothing hands it a caret or an
    * editor.
    */
-  it('authors Open for an Ur Resource and offers it no content edit', () => {
+  it('offers an Ur Resource no Open, Close or content edit, and Opens nothing for it', () => {
     const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur');
-    const props = (open: boolean) => ({
-      open,
+    rerender({
+      open: false,
       enabled: true,
       presenting: false,
       nameOnCreation: null,
       resourceId: UR_ID,
     });
-    rerender(props(false));
-    expect(onlyNode(result.current.nodes).data.onBeginBodyEditing).toBeUndefined();
-
-    act(() => expect(result.current.openResource(UR_ID)).toBe('completed'));
-    expect(spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.open).toBe(true);
-
-    rerender(props(true));
     const ur = onlyNode(result.current.nodes);
-    expect(ur.data.onEditResource).toBeDefined();
+    expect(ur.data.onEditResource).toBeUndefined();
     expect(ur.data.onBeginTitleEditing).toBeDefined();
-    expect(ur.data.resize).toBeDefined();
     expect(ur.data.onBeginBodyEditing).toBeUndefined();
-    expect(ur.data.display).toEqual({ shown: 'open', content: { kind: 'ur', via: 'self' } });
+    const before = spaceSession.getState().working;
 
-    act(() => expect(ur.data.onEditResource?.(false)).toBe('completed'));
-    expect(spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.open).toBe(false);
+    act(() => expect(result.current.openResource(UR_ID)).toBe('retained'));
+    expect(spaceSession.getState().working).toBe(before);
+  });
+
+  /**
+   * An Ur Resource's Shape is chosen on its rail (ADR 0121): one Edit on the
+   * Map, offered only where a refusal can be reported.
+   */
+  it('changes an Ur Resource’s Shape on its Map, and offers no choice without command outcomes', () => {
+    const resourceShapeOf = (spaceSession: ReturnType<typeof mountAuthoring>['spaceSession']) =>
+      spaceSession.getState().working.document.maps?.[0]?.positions[UR_ID]?.shape;
+    const props = {
+      open: false,
+      enabled: true,
+      presenting: false,
+      nameOnCreation: null,
+      resourceId: UR_ID,
+    };
+
+    const silent = mountAuthoring(undefined, 'ur');
+    silent.rerender(props);
+    expect(onlyNode(silent.result.current.nodes).data.onResourceShapeChange).toBeUndefined();
+    silent.unmount();
+
+    const { result, rerender, spaceSession } = mountAuthoring(undefined, 'ur', true);
+    rerender(props);
+    act(() => onlyNode(result.current.nodes).data.onResourceShapeChange?.('diamond'));
+    expect(resourceShapeOf(spaceSession)).toBe('diamond');
+
+    rerender({ ...props, open: true });
+    act(() => onlyNode(result.current.nodes).data.onResourceShapeChange?.('ellipse'));
+    expect(resourceShapeOf(spaceSession)).toBe('ellipse');
   });
 
   /**
@@ -406,16 +426,10 @@ describe('canvas Resource authoring', () => {
   });
 
   /**
-   * An Open Space Resource's floor is its own, and taller than every other Resource's.
-   *
-   * ADR 0068's embedded Map is painted over the Resource, so the Resource's own
-   * passengers hold a fixed footer under a fixed rail and `.canvas-resource` hides
-   * what will not fit. At the collapsed floor every other Resource resizes to, a
-   * Space Resource's Graph selector is simply cut off — so the capability carries
-   * `SPACE_RESOURCE_MIN_OPEN_SIZE`, which is the inset plus the smallest Resource the
-   * embedded Map could hold.
+   * The Closed Size is the one floor for every kind, a Space Resource's
+   * embedded Map included: its content fits the rect it is given.
    */
-  it('allows a Space Resource resize to reach Close while flooring an ordinary Open proposal above its footer', () => {
+  it('floors a Space Resource resize at the Closed Size and keeps it Open there', () => {
     const { result, rerender, authoring, adapter, spaceSession } = mountAuthoring(
       undefined,
       'space',
@@ -438,19 +452,19 @@ describe('canvas Resource authoring', () => {
       space.data.resize?.onResizeStart();
       space.data.resize?.onResize({ width: 280, height: 220 });
     });
-    expect(adapter.getState().resizeDraft?.size).toEqual(SPACE_RESOURCE_MIN_OPEN_SIZE);
-    const remembered =
-      spaceSession.getState().working.document.maps?.[0]?.positions[SPACE_RESOURCE_ID];
+    expect(adapter.getState().resizeDraft?.size).toEqual({ width: 280, height: 220 });
+    act(() => space.data.resize?.onResizeEnd());
+    expect(
+      spaceSession.getState().working.document.maps?.[0]?.positions[SPACE_RESOURCE_ID],
+    ).toMatchObject({ open: true, size: { width: 280, height: 220 } });
     act(() => {
-      space.data.resize?.onResize(RESOURCE_SIZE);
+      space.data.resize?.onResizeStart();
+      space.data.resize?.onResize({ width: 100, height: 100 });
       space.data.resize?.onResizeEnd();
     });
     expect(
       spaceSession.getState().working.document.maps?.[0]?.positions[SPACE_RESOURCE_ID],
-    ).toEqual({
-      ...remembered,
-      open: false,
-    });
+    ).toMatchObject({ open: true, size: RESOURCE_SIZE });
   });
 
   it.each(['markdown', 'reference'] as const)(
@@ -806,7 +820,7 @@ describe('canvas Resource authoring, replacing an image', () => {
           title: 'Map',
           kind: 'positioned',
           positions: {
-            [IMAGE_ID]: { x: 0, y: 0, open: true, openSize: { width: 640, height: 480 } },
+            [IMAGE_ID]: { x: 0, y: 0, open: true, size: { width: 640, height: 480 } },
           },
           graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
         },
@@ -822,6 +836,7 @@ describe('canvas Resource authoring, replacing an image', () => {
     width: 640,
     height: 480,
     data: {
+      shape: 'rectangle',
       resourceId: IMAGE_ID,
       title: 'Figure',
       readOnly: false,
@@ -832,7 +847,7 @@ describe('canvas Resource authoring, replacing an image', () => {
       selectedForAuthoring: false,
       display: {
         shown: 'open',
-        content: { kind: 'image', url: OLD_URL, naturalSize: undefined, via: 'self' },
+        content: { kind: 'image', url: OLD_URL, via: 'self' },
       },
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',

@@ -1,8 +1,10 @@
 import fc from 'fast-check';
 import {
   COLLAPSED_RESOURCE_SIZE,
+  RESOURCE_SHAPES,
   uuidSchema,
   type PositionedMap,
+  type ResourceShape,
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
@@ -52,6 +54,8 @@ const markdown = (id: UUID, title: string) => ({
   document: { title, kind: 'markdown' as const, body: `# ${title}` },
 });
 
+const ur = (id: UUID, title: string) => ({ id, document: { title, kind: 'ur' as const } });
+
 const spaceLink = (id: UUID, spaceId: UUID, mapId: UUID, graph: UUID) => ({
   id,
   document: { title: 'Link', kind: 'space' as const, spaceId, map: mapId, graph },
@@ -91,7 +95,8 @@ const target: SpaceSnapshot = {
       },
     ],
   },
-  resources: T_RESOURCES.map((id, index) => markdown(id, `Resource ${index}`)),
+  // Ur Resources, so a generated `reshape` may give any of them a Shape (ADR 0121).
+  resources: T_RESOURCES.map((id, index) => ur(id, `Resource ${index}`)),
 };
 
 const selector: SpaceSnapshot = {
@@ -140,7 +145,7 @@ const SNAPSHOTS = [meta, target, selector] as const;
 type Maps = readonly PositionedMap[];
 
 /**
- * One generated change to a Space's Maps. The first thirteen change only what
+ * One generated change to a Space's Maps. The first fourteen change only what
  * lies inside a Map; the rest change a Map id, a Graph id, which Map owns a
  * Graph, or `defaultMap`, unless they have nothing to act on or a later op
  * undoes them.
@@ -154,13 +159,19 @@ type Op =
       readonly y: number;
     }
   | {
-      readonly kind: 'open';
+      readonly kind: 'resize';
       readonly map: number;
       readonly resource: number;
       readonly width: number;
       readonly height: number;
     }
   | { readonly kind: 'close'; readonly map: number; readonly resource: number }
+  | {
+      readonly kind: 'reshape';
+      readonly map: number;
+      readonly resource: number;
+      readonly shape: ResourceShape;
+    }
   | {
       readonly kind: 'place';
       readonly map: number;
@@ -220,13 +231,19 @@ const op: fc.Arbitrary<Op> = fc.oneof(
     y: coordinate,
   }),
   fc.record({
-    kind: fc.constant('open' as const),
+    kind: fc.constant('resize' as const),
     map: index,
     resource: index,
     width: fc.integer({ min: COLLAPSED_RESOURCE_SIZE.width, max: 2000 }),
     height: fc.integer({ min: COLLAPSED_RESOURCE_SIZE.height, max: 2000 }),
   }),
   fc.record({ kind: fc.constant('close' as const), map: index, resource: index }),
+  fc.record({
+    kind: fc.constant('reshape' as const),
+    map: index,
+    resource: index,
+    shape: fc.constantFrom(...RESOURCE_SHAPES),
+  }),
   fc.record({
     kind: fc.constant('place' as const),
     map: index,
@@ -318,22 +335,28 @@ const applyOps = (snapshot: SpaceSnapshot, ops: readonly Op[]): SpaceSnapshot =>
           };
         });
         break;
-      case 'open':
+      case 'resize':
       case 'close':
         withMap(current.map, (m) => {
           const resource = at(resourceIds, current.resource);
           const placed = resource === undefined ? undefined : m.positions[resource];
           if (resource === undefined || placed === undefined) return undefined;
           const next =
-            current.kind === 'open'
-              ? {
-                  x: placed.x,
-                  y: placed.y,
-                  open: true as const,
-                  openSize: { width: current.width, height: current.height },
-                }
+            current.kind === 'resize'
+              ? { ...placed, size: { width: current.width, height: current.height } }
               : { ...placed, open: false as const };
           return { ...m, positions: { ...m.positions, [resource]: next } };
+        });
+        break;
+      case 'reshape':
+        withMap(current.map, (m) => {
+          const resource = at(resourceIds, current.resource);
+          const placed = resource === undefined ? undefined : m.positions[resource];
+          if (resource === undefined || placed === undefined) return undefined;
+          return {
+            ...m,
+            positions: { ...m.positions, [resource]: { ...placed, shape: current.shape } },
+          };
         });
         break;
       case 'unplace':
@@ -524,7 +547,8 @@ describe('the SQL fast-path decision', () => {
   it('writes a Map-internal Edit to the Space other Spaces select into', () => {
     const next = applyOps(target, [
       { kind: 'move', map: 0, resource: 2, x: 40, y: 80 },
-      { kind: 'open', map: 0, resource: 0, width: 600, height: 400 },
+      { kind: 'resize', map: 0, resource: 0, width: 600, height: 400 },
+      { kind: 'reshape', map: 0, resource: 1, shape: 'diamond' },
       { kind: 'add-edge', map: 0, graph: 1, from: 2, to: 3 },
       { kind: 'retitle-graph', map: 1, graph: 0, title: 'Renamed' },
       { kind: 'activate-graph', map: 0, graph: 1 },

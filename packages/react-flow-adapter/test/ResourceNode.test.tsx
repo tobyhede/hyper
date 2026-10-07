@@ -1,4 +1,4 @@
-import { contentAction, openSizeFloor, embedsMap } from '@project/core';
+import { contentAction, embedsMap } from '@project/core';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type * as ReactFlowReact from '@xyflow/react';
@@ -218,6 +218,7 @@ interface Overrides {
   resize?: ResourceNodeData['resize'];
   readOnly?: boolean;
   connectionAuthoringEnabled?: boolean;
+  resourceShape?: ResourceNodeData['shape'];
 }
 
 /** What the projection resolves for a fixture Resource of `kind`. */
@@ -226,7 +227,7 @@ function ownContent(kind: ResourceNodeData['kind'], source: string, url: string)
     case 'markdown':
       return { kind: 'markdown', source, via: 'self' };
     case 'image':
-      return { kind: 'image', url, naturalSize: undefined, via: 'self' };
+      return { kind: 'image', url, via: 'self' };
     case 'reference':
       return { kind: 'markdown', source, via: 'reference' };
     case 'space':
@@ -276,14 +277,15 @@ function props({
   resize,
   readOnly = false,
   connectionAuthoringEnabled,
+  resourceShape = 'rectangle',
 }: Overrides = {}): NodeProps<ResourceFlowNode> {
   const resolved = content ?? ownContent(kind, source, url);
   const data: ResourceFlowNode['data'] = {
+    shape: resourceShape,
     resourceId,
     title,
     kind,
     contentAction: contentAction(resolved),
-    openSizeFloor: openSizeFloor(resolved),
     embedsMap: embedsMap(resolved),
     active: false,
     selectedForAuthoring,
@@ -413,6 +415,16 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(onEditResource).toHaveBeenCalledWith(true);
   });
 
+  it("passes an Ur Resource's Shape choice through its own front", () => {
+    const onResourceShapeChange = vi.fn();
+    const node = props({ kind: 'ur', title: 'Gateway', selected: true });
+    render(
+      <ResourceNode {...node} data={{ ...node.data, shape: 'diamond', onResourceShapeChange }} />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Shape: Diamond' })).toBeVisible();
+  });
+
   it('draws a Markdown Resource kind glyph like any other kind', () => {
     render(
       <ResourceNode {...props({ kind: 'markdown', selected: true, onEditResource: vi.fn() })} />,
@@ -516,7 +528,7 @@ describe('ResourceNode draws what the display shows', () => {
           title: 'Harbour, again',
           open: true,
           selected: true,
-          content: { kind: 'image', url: FIGURE, naturalSize: undefined, via: 'reference' },
+          content: { kind: 'image', url: FIGURE, via: 'reference' },
           onEditResource: vi.fn(),
         })}
       />,
@@ -544,6 +556,19 @@ describe('ResourceNode draws what the display shows', () => {
     );
 
     expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
+  });
+
+  it("draws an Ur Resource's Shape Open and Closed alike", () => {
+    for (const open of [false, true]) {
+      const node = props({ kind: 'ur', title: 'Gateway', open });
+      const { unmount } = render(
+        <ResourceNode {...node} data={{ ...node.data, shape: 'diamond' }} />,
+      );
+      const resource = screen.getByRole('article', { name: 'Gateway' });
+      expect(resource).toHaveAttribute('data-open', String(open));
+      expect(resource).toHaveAttribute('data-resource-shape', 'diamond');
+      unmount();
+    }
   });
 
   /**
@@ -580,7 +605,7 @@ describe('ResourceNode draws what the display shows', () => {
           kind: 'reference',
           title: 'Harbour, again',
           presented: true,
-          content: { kind: 'image', url: FIGURE, naturalSize: undefined, via: 'reference' },
+          content: { kind: 'image', url: FIGURE, via: 'reference' },
         })}
       />,
     );
@@ -642,7 +667,7 @@ describe('ResourceNode Ur Resource', () => {
     );
 
     expect(screen.getByRole('article', { name: 'Gateway' })).toHaveAttribute('data-kind', 'ur');
-    expect(screen.getByRole('img', { name: 'Ur Resource' })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Ur Resource' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
     screen.getByRole('button', { name: 'Open Resource Gateway' }).click();
     expect(onEditResource).toHaveBeenCalledWith(true);
@@ -1373,7 +1398,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     // One control, not React Flow's eight — a bottom-right-only control cannot
     // move the authored origin by construction, so there is nothing else to draw.
@@ -1394,7 +1419,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.blur(window);
@@ -1412,7 +1437,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.blur(window);
@@ -1437,7 +1462,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     // The press is the gesture: geometry is proposed only from a drag this Resource
     // started, so a move without it proves nothing about the live one.
@@ -1457,7 +1482,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     fireEvent.mouseDown(screen.getByTestId('resize-control'));
     fireEvent.pointerUp(window);
@@ -1465,7 +1490,7 @@ describe('ResourceNode Open Resource front', () => {
     expect(onResizeEnd).toHaveBeenCalledOnce();
   });
 
-  it('offers no resize control on a Collapsed Resource', () => {
+  it('offers the resize control on a selected Resource, Open or Closed, and none on an unselected one', () => {
     const resize = {
       minWidth: 260,
       minHeight: 146,
@@ -1474,10 +1499,48 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ source: SOURCE, resize })} />);
+    const { rerender } = render(
+      <ResourceNode {...props({ selected: true, source: SOURCE, resize })} />,
+    );
+    expect(screen.getByTestId('resize-control')).toHaveClass('bottom', 'right');
 
-    // A Collapsed Resource has no box the author drew, so nothing to resize.
+    rerender(<ResourceNode {...props({ selectedForAuthoring: true, source: SOURCE, resize })} />);
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
+
+    rerender(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
     expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
+
+    rerender(<ResourceNode {...props({ source: SOURCE, resize })} />);
+    expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
+
+    rerender(
+      <ResourceNode {...props({ selected: true, readOnly: true, source: SOURCE, resize })} />,
+    );
+    expect(screen.queryByTestId('resize-control')).not.toBeInTheDocument();
+  });
+
+  it('frames a selected Shape at its rect with the resize control, and leaves the rectangle unframed', () => {
+    const resize = {
+      minWidth: 260,
+      minHeight: 146,
+      onResizeStart: () => undefined,
+      onResize: () => undefined,
+      onResizeEnd: () => undefined,
+      onResizeCancel: () => undefined,
+    };
+    const frame = () => document.querySelector('.rf-resource-node__resize-frame');
+    const { rerender } = render(
+      <ResourceNode {...props({ kind: 'ur', resourceShape: 'diamond', selected: true, resize })} />,
+    );
+    expect(frame()).not.toBeNull();
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
+
+    rerender(<ResourceNode {...props({ kind: 'ur', resourceShape: 'diamond', resize })} />);
+    expect(frame()).toBeNull();
+
+    rerender(<ResourceNode {...props({ kind: 'ur', selected: true, resize })} />);
+    expect(frame()).toBeNull();
+    expect(screen.getByTestId('resize-control')).toBeInTheDocument();
   });
 
   it('offers no resize control on an Open Resource the composition gave no resize operation', () => {
@@ -1496,10 +1559,9 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ kind: 'reference', open: true, resize })} />);
+    render(<ResourceNode {...props({ kind: 'reference', open: true, selected: true, resize })} />);
 
-    // The resize gate reads Open and never the kind: ADR 0066 makes resize
-    // Resource behaviour, not kind behaviour.
+    // The resize gate never reads the kind: resize is Resource behaviour.
     expect(screen.getByTestId('resize-control')).toBeInTheDocument();
   });
 
@@ -1512,7 +1574,7 @@ describe('ResourceNode Open Resource front', () => {
       onResizeEnd: () => undefined,
       onResizeCancel: () => undefined,
     };
-    render(<ResourceNode {...props({ open: true, source: SOURCE, resize })} />);
+    render(<ResourceNode {...props({ open: true, selected: true, source: SOURCE, resize })} />);
 
     // The control owns the hit target's upper layer. The inert mark is its
     // preceding sibling so the later Resource face can occlude their overlap.

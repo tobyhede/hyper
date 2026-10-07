@@ -80,12 +80,12 @@ const openSpaceResource = (
   width: geometry.width ?? 700,
   height: geometry.height ?? 500,
   data: {
+    shape: 'rectangle',
     resourceId,
     title: 'Elsewhere',
     readOnly: false,
     kind: geometry.kind ?? 'space',
     contentAction: geometry.kind === 'reference' ? 'none' : 'author-space-view',
-    openSizeFloor: { width: 292, height: 266 },
     embedsMap: geometry.kind !== 'markdown',
     open: geometry.open ?? true,
     active: false,
@@ -338,6 +338,7 @@ describe('embedded open Space Resource discovery', () => {
       width: innerSize.width,
       height: innerSize.height,
       data: {
+        shape: 'rectangle',
         resourceId: CHILD_RESOURCE,
         title: 'Note',
         readOnly: false,
@@ -423,6 +424,7 @@ describe('embedded open Space Resource discovery', () => {
       type: 'resource',
       position: { x: 0, y: 0 },
       data: {
+        shape: 'rectangle',
         resourceId: CHILD_RESOURCE,
         title: 'Note',
         readOnly: false,

@@ -138,7 +138,7 @@ const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): Spac
               x: 600,
               y: 20,
               open: true,
-              openSize: { width: 700, height: 500 },
+              size: { width: 700, height: 500 },
             },
           },
           graphs: [{ id: HOME_GRAPH_ID, title: 'Graph 1', edges: [] }],
@@ -204,10 +204,11 @@ async function mount(value: SpaceSnapshot): Promise<SpaceSession> {
 /** {@link mount}, answering the Open Spaces it mounted as well. */
 async function mountOpenSpaces(
   value: SpaceSnapshot,
+  drawn: SpaceSnapshot = target,
 ): Promise<{ readonly session: SpaceSession; readonly spaces: OpenSpaces }> {
   const backend = new MemorySpaceBackend(
     META_ID,
-    [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
+    [meta, value, drawn].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
   );
   const spaces = createOpenSpaces({
     images: unusedImageSources,
@@ -777,7 +778,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, size: { width: 700, height: 500 } },
           },
         })),
       },
@@ -930,7 +931,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, size: { width: 700, height: 500 } },
           },
         })),
       },
@@ -1000,7 +1001,7 @@ describe('the Map an Open Space Resource draws', () => {
           ...m,
           positions: {
             ...m.positions,
-            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, openSize: { width: 700, height: 500 } },
+            [HOME_RESOURCE_ID]: { x: 10, y: 20, open: true, size: { width: 700, height: 500 } },
           },
         })),
       },
@@ -1202,7 +1203,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, size: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1303,7 +1304,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, size: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1407,7 +1408,7 @@ describe('the Map an Open Space Resource draws', () => {
                 ...m,
                 positions: {
                   ...m.positions,
-                  [DRAWN_B]: { x: 264, y: 0, open: true, openSize: { width: 700, height: 500 } },
+                  [DRAWN_B]: { x: 264, y: 0, open: true, size: { width: 700, height: 500 } },
                 },
               },
         ),
@@ -1646,13 +1647,13 @@ describe('the Map an Open Space Resource draws', () => {
                 x: 600,
                 y: 20,
                 open: true,
-                openSize: { width: 700, height: 500 },
+                size: { width: 700, height: 500 },
               },
               [GONE_B_RESOURCE_ID]: {
                 x: 1400,
                 y: 20,
                 open: true,
-                openSize: { width: 700, height: 500 },
+                size: { width: 700, height: 500 },
               },
               [SPACE_RESOURCE_ID]: { x: 2200, y: 20, open: false },
             },
@@ -1918,4 +1919,72 @@ it('reports and dismisses a drawn Space Resource menu clipboard refusal', async 
     if (previousClipboard === undefined) Reflect.deleteProperty(navigator, 'clipboard');
     else Object.defineProperty(navigator, 'clipboard', previousClipboard);
   }
+});
+
+/** The drawn Space with Intake an Ur Resource, the one kind that takes a Shape (ADR 0121). */
+const targetWithUrIntake: SpaceSnapshot = {
+  ...target,
+  resources: target.resources.map((resource) =>
+    resource.id === DRAWN_A ? { id: DRAWN_A, document: { title: 'Intake', kind: 'ur' } } : resource,
+  ),
+};
+
+it('offers no Shape choice on a Markdown Resource inside a drawn Map', async () => {
+  await mountOpenSpaces(
+    home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    }),
+  );
+  await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+  beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+  const controls = controlsOf(embeddedNode(DRAWN_A));
+  expect(
+    within(controls).getByRole('button', { name: 'Actions for Resource Intake' }),
+  ).toBeVisible();
+  expect(within(controls).queryByRole('button', { name: /^Shape/ })).toBeNull();
+});
+
+it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing it there', async () => {
+  const { spaces } = await mountOpenSpaces(
+    home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    }),
+    targetWithUrIntake,
+  );
+  await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+  beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+  fireEvent.click(
+    within(controlsOf(embeddedNode(DRAWN_A))).getByRole('button', { name: 'Shape: Rectangle' }),
+  );
+  fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Diamond' }));
+
+  await waitFor(() =>
+    expect(
+      spaces
+        .entry(TARGET_ID)
+        ?.session.getState()
+        .working.document.maps?.find((candidate) => candidate.id === SELECTED_MAP_ID)?.positions[
+        DRAWN_A
+      ]?.shape,
+    ).toBe('diamond'),
+  );
+  expect(
+    Object.values(
+      spaces.entry(HOME_ID)?.session.getState().working.document.maps?.[0]?.positions ?? {},
+    ).map((entry) => entry?.shape),
+  ).toEqual([undefined, undefined]);
+  await waitFor(() =>
+    expect(embeddedNode(DRAWN_A).querySelector('.canvas-resource')).toHaveAttribute(
+      'data-resource-shape',
+      'diamond',
+    ),
+  );
 });

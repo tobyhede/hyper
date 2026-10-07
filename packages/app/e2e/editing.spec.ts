@@ -1,6 +1,5 @@
 import {
   COLLAPSED_RESOURCE_SIZE,
-  DEFAULT_OPEN_SIZE,
   encodeCompactUuid,
   uuidSchema,
   type ResourcePlacement,
@@ -498,7 +497,7 @@ test('the opened Resource draws Markdown and its editor on the same paper surfac
   );
 });
 
-test('opened Markdown editing persists source while Opening displaces and restores Resources', async ({
+test('opened Markdown editing persists source while Opening and Closing move no Resource', async ({
   page,
 }) => {
   await page.goto('/');
@@ -511,13 +510,9 @@ test('opened Markdown editing persists source while Opening displaces and restor
 
   await openResource(resource, 'A');
   const opened = await allPositions(page);
-  expect(opened[openedId ?? '']).toEqual(before[openedId ?? '']);
-  expect(
-    Object.entries(before).some(
-      ([id, position]) =>
-        id !== openedId && JSON.stringify(opened[id]) !== JSON.stringify(position),
-    ),
-  ).toBe(true);
+  // Opening changes what the Resource draws and no rect: nothing moves.
+  expect(opened).toEqual(before);
+  expect(openedId).not.toBeNull();
   await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
   await page.getByRole('textbox', { name: 'Markdown source of A' }).fill('# Edited\n\nNew source');
   await (await controls(resource)).getByRole('button', { name: 'Save Resource A' }).click();
@@ -650,15 +645,15 @@ test(
 /* -------------------------------------------------------------------------- */
 
 /**
- * The room an Open Resource makes for itself: its Open rect less the Closed one.
+ * A resized Resource's size, and the room it holds beyond the Closed Size.
  *
- * Arithmetic over the domain's own two constants rather than the numbers they
- * currently are, so a change to either size moves these tests with it instead of
- * leaving them asserting a stale offset.
+ * Arithmetic over the domain's Closed Size rather than the number it currently
+ * is, so a change to it moves these tests with it.
  */
-const OPEN_GROWTH = {
-  width: DEFAULT_OPEN_SIZE.width - COLLAPSED_RESOURCE_SIZE.width,
-  height: DEFAULT_OPEN_SIZE.height - COLLAPSED_RESOURCE_SIZE.height,
+const RESIZED = { width: 560, height: 420 } as const;
+const RESIZED_GROWTH = {
+  width: RESIZED.width - COLLAPSED_RESOURCE_SIZE.width,
+  height: RESIZED.height - COLLAPSED_RESOURCE_SIZE.height,
 } as const;
 
 /**
@@ -780,17 +775,16 @@ test('dragging an Open Resource across a neighbour moves nothing but the dragged
 });
 
 /**
- * A drop inside an Open Resource's growth band settles exactly where the author
+ * A drop inside a resized Resource's rect settles exactly where the author
  * released it, because a canvas coordinate is an authored one (ADR 0084).
  *
- * The band is one growth-step wide beginning at the Open Resource's origin, so
- * this drops half a step into it on both axes.
+ * This drops half the resized Resource's growth past its origin on both axes.
  */
-test('a closed Resource released inside an Open Resource lands at the drop point', async ({
+test('a closed Resource released inside a resized Open Resource lands at the drop point', async ({
   page,
 }) => {
   await seedGeometry(page, 'Drop Geometry', {
-    [SUBJECT.id]: { x: 150, y: 150, open: false },
+    [SUBJECT.id]: { x: 150, y: 150, open: false, size: RESIZED },
     [NEIGHBOUR.id]: { x: 0, y: 0, open: false },
   });
   const subject = seededNode(page, SUBJECT);
@@ -809,9 +803,9 @@ test('a closed Resource released inside an Open Resource lands at the drop point
   expect(open).toEqual({ x: 150, y: 150 });
   expect(from).toEqual({ x: 0, y: 0 });
 
-  // Inside the Open Resource's drawn box, and inside the band: half a growth-step
-  // beyond its origin on each axis.
-  const dropAt = { x: open.x + OPEN_GROWTH.width / 2, y: open.y + OPEN_GROWTH.height / 2 };
+  // Inside the Open Resource's drawn box: half its growth beyond its origin on
+  // each axis.
+  const dropAt = { x: open.x + RESIZED_GROWTH.width / 2, y: open.y + RESIZED_GROWTH.height / 2 };
   const openBox = await boxOf(subject, 'the Open Resource');
   await dragBy(page, mover, dropAt.x - from.x, dropAt.y - from.y);
   await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
@@ -826,7 +820,7 @@ test('a closed Resource released inside an Open Resource lands at the drop point
 
   const landed = await allPositions(page);
   expect(at(landed, NEIGHBOUR).x - from.x, 'the drag never started').toBeGreaterThan(
-    OPEN_GROWTH.width / 4,
+    RESIZED_GROWTH.width / 4,
   );
   // Where it was released, not the Open Resource's origin.
   expect(at(landed, NEIGHBOUR).x).toBeCloseTo(dropAt.x, -1);
@@ -835,72 +829,102 @@ test('a closed Resource released inside an Open Resource lands at the drop point
 });
 
 /**
- * Once, and then not again (ADR 0084).
+ * Open and Close change what a Resource draws and no rect, so they move
+ * nobody and keep the Resource's size; a Resize is what displaces, once, and
+ * dragging never displaces again (ADR 0084).
  *
- * Opening writes the room it takes into the Map, so the neighbour clear of the
- * subject on both axes moves by the width growth alone — its one room axis is
- * `x` (ADR 0093) — and the Resource behind it on both axes does not move at all. From then on those are authored positions like any
- * other: dragging the Open Resource past the neighbour is not a second Open, and the
- * room stays where the Open Edit put it.
+ * The neighbour is clear of the subject on both axes, so a Resize moves it by
+ * the width change alone — its one room axis is `x` (ADR 0093) — and the
+ * Resource behind the subject on both axes does not move at all.
  */
-test('opening a Resource displaces its neighbours once, and dragging it never displaces them again', async ({
+test('Open and Close move nobody and keep the size, a Resize displaces once, and dragging never does', async ({
   page,
 }) => {
   await seedGeometry(page, 'Open Geometry', {
-    [SUBJECT.id]: { x: 0, y: 0, open: false },
-    [NEIGHBOUR.id]: { x: 300, y: 250, open: false },
-    [BEHIND.id]: { x: -200, y: -150, open: false },
+    [SUBJECT.id]: { x: 0, y: 0, open: false, size: RESIZED },
+    [NEIGHBOUR.id]: { x: 600, y: 450, open: false },
+    [BEHIND.id]: { x: -400, y: -300, open: false },
   });
   const subject = seededNode(page, SUBJECT);
+  const rect = async () =>
+    subject.evaluate((element) => ({
+      width: Number.parseFloat(getComputedStyle(element).width),
+      height: Number.parseFloat(getComputedStyle(element).height),
+    }));
   const closed = await allPositions(page);
+  expect(await rect()).toEqual(RESIZED);
 
   await openResource(subject, SUBJECT.title);
   await expect(
     (await controls(subject)).getByRole('button', { name: `Close Resource ${SUBJECT.title}` }),
   ).toBeVisible();
   await settled(page);
+  expect(await allPositions(page), 'Opening moved a Resource').toEqual(closed);
+  expect(await rect(), 'Opening changed the size').toEqual(RESIZED);
 
-  const opened = await allPositions(page);
-  expect(at(opened, SUBJECT), 'the opening Resource moved').toEqual(at(closed, SUBJECT));
-  expect(at(opened, NEIGHBOUR)).toEqual({
-    x: at(closed, NEIGHBOUR).x + OPEN_GROWTH.width,
-    y: at(closed, NEIGHBOUR).y,
+  // Resize through the real control: the neighbour takes the width change.
+  const persistence = page.getByTestId('persistence-status');
+  await expect(persistence).toHaveText('Persisted');
+  const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
+  await subject.hover();
+  const control = subject.locator('.react-flow__resize-control.handle.bottom.right');
+  const box = await boxOf(control, 'the subject resize control');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 100 * zoom, box.y + box.height / 2 + 60 * zoom, {
+    steps: 6,
   });
+  await page.mouse.up();
+  await expect(persistence).toHaveText('Persisted');
+  await subject.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  const grown = await rect();
+  expect(grown.width).toBeGreaterThan(RESIZED.width);
+  expect(grown.height).toBeGreaterThan(RESIZED.height);
+  await settled(page);
+
+  const resized = await allPositions(page);
+  expect(at(resized, SUBJECT), 'the resizing Resource moved').toEqual(at(closed, SUBJECT));
+  expect(at(resized, NEIGHBOUR).x).toBeCloseTo(
+    at(closed, NEIGHBOUR).x + grown.width - RESIZED.width,
+    0,
+  );
+  expect(at(resized, NEIGHBOUR).y).toBe(at(closed, NEIGHBOUR).y);
   // Strictly before the subject on both axes, so it takes no room at all.
-  expect(at(opened, BEHIND)).toEqual(at(closed, BEHIND));
+  expect(at(resized, BEHIND)).toEqual(at(closed, BEHIND));
+
+  // Close moves nobody and keeps the size.
+  await (
+    await controls(subject)
+  )
+    .getByRole('button', { name: `Close Resource ${SUBJECT.title}` })
+    .click();
+  await expect(subject.locator('.rf-resource-node__inner')).toHaveAttribute('data-open', 'false');
+  await settled(page);
+  expect(await allPositions(page), 'Closing moved a Resource').toEqual(resized);
+  expect(await rect(), 'Closing changed the size').toEqual(grown);
 
   const roomKept = async (): Promise<void> => {
     const midGesture = await allPositions(page);
     expect(at(midGesture, NEIGHBOUR), 'the neighbour moved mid-drag').toEqual(
-      at(opened, NEIGHBOUR),
+      at(resized, NEIGHBOUR),
     );
     expect(at(midGesture, BEHIND), 'the Resource behind moved mid-drag').toEqual(
-      at(opened, BEHIND),
+      at(resized, BEHIND),
     );
   };
 
-  // Past the neighbour's *authored* origin on both axes, which is the crossing
-  // the derived rule reversed at.
-  await dragBy(page, subject, 340, 280, roomKept);
+  // Past the neighbour's origin on both axes: a drag displaces nobody.
+  await dragBy(page, subject, 700, 520, roomKept);
 
   const dragged = await allPositions(page);
   expect(at(dragged, SUBJECT).x, 'the drag never started').toBeCloseTo(
-    at(opened, SUBJECT).x + 340,
+    at(resized, SUBJECT).x + 700,
     -1,
   );
-  expect(at(dragged, SUBJECT).y, 'the drag never started').toBeCloseTo(
-    at(opened, SUBJECT).y + 280,
-    -1,
-  );
-  expect(at(dragged, NEIGHBOUR), 'the neighbour moved at release').toEqual(at(opened, NEIGHBOUR));
-  expect(at(dragged, BEHIND), 'the Resource behind moved at release').toEqual(at(opened, BEHIND));
-
-  await dragBy(page, subject, -340, -280, roomKept);
-
-  const returned = await allPositions(page);
-  expect(at(returned, SUBJECT).x).toBeCloseTo(at(opened, SUBJECT).x, -1);
-  expect(at(returned, NEIGHBOUR)).toEqual(at(opened, NEIGHBOUR));
-  expect(at(returned, BEHIND)).toEqual(at(opened, BEHIND));
+  expect(at(dragged, NEIGHBOUR), 'the neighbour moved at release').toEqual(at(resized, NEIGHBOUR));
+  expect(at(dragged, BEHIND), 'the Resource behind moved at release').toEqual(at(resized, BEHIND));
 });
 
 test(
@@ -1046,7 +1070,12 @@ test(
     )
       .getByRole('button', { name: 'Close Resource A', exact: true })
       .click();
-    await expect(persisted).toHaveCSS('width', '260px');
+    // Closing changes what is drawn, never the size.
+    await expect(persisted.locator('.rf-resource-node__inner')).toHaveAttribute(
+      'data-open',
+      'false',
+    );
+    await expect(persisted).toHaveCSS('width', `${resized.width}px`);
     await expectResourceFillsNode(persisted);
     await (
       await controls(persisted)
@@ -1061,8 +1090,8 @@ test(
 );
 
 test(
-  'an Open Resource offers one resize control, revealed on hover, that selects the Resource and clears a Selected Edge without a second Edit',
-  { tag: '@parity:open-resource-offers-one-resize-control' },
+  'a selected Open Resource offers one resize control, and an unselected one offers none',
+  { tag: '@parity:selected-resource-offers-one-resize-control' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');
@@ -1090,34 +1119,22 @@ test(
     const edgePath = page.locator('.react-flow__edge-path').first();
     const beforeEdgePath = await edgePath.getAttribute('d');
 
-    // A Closed Resource offers no control at all.
-    await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
-
-    // Select an Edge first, which leaves the Resource unselected, so the gesture
-    // below is proven to move both — not merely to arrive with the Resource
-    // already Selected from an earlier click. `openResource` Selected it, to draw
-    // the toolbar its Open is on (ADR 0102), and Selection is also a reveal
-    // condition for the control.
+    // An unselected Resource offers no control, Open or Closed. Selecting an
+    // Edge leaves every Resource unselected.
     await selectAnEdge(page);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
     await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
+    await expect(closed.locator('.react-flow__resize-control')).toHaveCount(0);
+    await expect(resource.locator('.react-flow__resize-control')).toHaveCount(0);
 
-    // The Open Resource offers exactly one, at its bottom-right corner, and it is
-    // not visible until hovered — the actual reveal mechanism. Keyboard focus on
-    // the Resource is *also* a reveal condition, so focus is moved off first to
-    // observe rest.
+    // Selected, the Open Resource offers exactly one, at its bottom-right
+    // corner, and it stays revealed with the pointer away.
+    await selectResource(resource);
+    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
     const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
     await expect(resource.locator('.react-flow__resize-control')).toHaveCount(1);
-    await page.evaluate(() => {
-      const focused = document.activeElement;
-      if (focused instanceof HTMLElement) focused.blur();
-    });
     await page.mouse.move(0, 0);
-    await expect(control).toHaveCSS('opacity', '0');
-    await resource.hover();
     await expect(control).toHaveCSS('opacity', '1');
-    await expect(page.locator('.react-flow__edge.selected')).toHaveCount(1);
-    await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
 
     const box = await boxOf(control, "Resource A's resize control");
     // A hit target a hand can find. React Flow's own two-class `.handle` rule
@@ -1183,8 +1200,8 @@ test(
 
     await page.mouse.up();
 
-    // One drag both Selected the Resource and cleared the Selected Edge — no
-    // separate click, and Selection was never a second Edit.
+    // The Resource stays Selected through the gesture, and Selection was never
+    // a second Edit.
     await expect(resource).toHaveClass(/selected/);
     await expect(page.locator('.react-flow__edge.selected')).toHaveCount(0);
     await expect(persistence).toHaveText('Persisted');
@@ -1497,88 +1514,6 @@ test.describe('resizing by touch', () => {
 });
 
 test(
-  'resizing into the complete Close range previews Closed geometry, completes one Close Edit and preserves Open Size through reload',
-  { tag: '@parity:resize-preview-snaps-to-closed-rect' },
-  async ({ page }) => {
-    await page.goto('/');
-    await selectCanvas(page, 'Collection 1');
-    const resource = nodeByTitle(page, 'A').first();
-    await expect(resource).toBeVisible();
-    await openResource(resource, 'A');
-    const persistence = page.getByTestId('persistence-status');
-    await expect(persistence).toHaveText('Persisted');
-    await resource.evaluate(async (element) => {
-      await Promise.all(element.getAnimations().map((animation) => animation.finished));
-    });
-
-    const size = async (subject: Locator) =>
-      subject.evaluate((element) => ({
-        width: Number.parseFloat(getComputedStyle(element).width),
-        height: Number.parseFloat(getComputedStyle(element).height),
-      }));
-    const initialSize = await size(resource);
-    const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
-    await resource.hover();
-    const growBox = await boxOf(control, "Resource A's resize control before growing");
-    await page.mouse.move(growBox.x + growBox.width / 2, growBox.y + growBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(
-      growBox.x + growBox.width / 2 + 100,
-      growBox.y + growBox.height / 2 + 60,
-      { steps: 6 },
-    );
-    await page.mouse.up();
-    await expect(persistence).toHaveText('Persisted');
-    await resource.evaluate(async (element) => {
-      await Promise.all(element.getAnimations().map((animation) => animation.finished));
-    });
-    const rememberedSize = await size(resource);
-    expect(rememberedSize.width).toBeGreaterThan(initialSize.width);
-    expect(rememberedSize.height).toBeGreaterThan(initialSize.height);
-
-    const beforeCloseRevision = await persistence.getAttribute('data-revision');
-    const zoom = Number(/scale\(([\d.]+)\)/.exec(await viewportTransform(page))?.[1] ?? 1);
-    const closeBox = await boxOf(control, "Resource A's resize control before Closing");
-    await page.mouse.move(closeBox.x + closeBox.width / 2, closeBox.y + closeBox.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(
-      closeBox.x + closeBox.width / 2 + (280 - rememberedSize.width) * zoom,
-      closeBox.y + closeBox.height / 2 + (166 - rememberedSize.height) * zoom,
-      { steps: 8 },
-    );
-
-    await expect.poll(async () => size(resource)).toEqual({ width: 260, height: 146 });
-    await expect(resource.locator('.rf-resource-node__inner')).toHaveAttribute('data-open', 'true');
-    await expect(persistence).toHaveAttribute('data-revision', beforeCloseRevision ?? '');
-
-    await page.mouse.up();
-
-    await expect(resource.locator('.rf-resource-node__inner')).toHaveAttribute(
-      'data-open',
-      'false',
-    );
-    await expect(resource.locator('.react-flow__resize-control')).toHaveCount(0);
-    await expect(persistence).toHaveText('Persisted');
-    await expect(persistence).toHaveAttribute(
-      'data-revision',
-      String(Number(beforeCloseRevision) + 1),
-    );
-
-    await page.reload();
-    await selectCanvas(page, 'Collection 1');
-    const persisted = nodeByTitle(page, 'A').first();
-    await expect(
-      (await controls(persisted)).getByRole('button', { name: 'Open Resource A' }),
-    ).toBeVisible();
-    await openResource(persisted, 'A');
-    await persisted.evaluate(async (element) => {
-      await Promise.all(element.getAnimations().map((animation) => animation.finished));
-    });
-    expect(await size(persisted)).toEqual(rememberedSize);
-  },
-);
-
-test(
   'an active Resource resize does not animate its dimensions behind the pointer',
   { tag: '@parity:active-resource-resize-tracks-pointer-without-dimension-animation' },
   async ({ page }) => {
@@ -1619,16 +1554,25 @@ test(
   },
 );
 
-test('opening animates the Resource wrapper and displaced neighbours from one duration token', async ({
+test('a completed Resize animates the neighbours it displaces from the one duration token', async ({
   page,
 }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
+  const resource = nodeByTitle(page, 'A').first();
+  await openResource(resource, 'A');
+  await expect(page.getByTestId('persistence-status')).toHaveText('Persisted');
   await page.addStyleTag({
     content: '.graph-area { --resource-placement-duration: 10s !important; }',
   });
-  const resource = nodeByTitle(page, 'A').first();
-  await openResource(resource, 'A');
+
+  await resource.hover();
+  const control = resource.locator('.react-flow__resize-control.handle.bottom.right');
+  const box = await boxOf(control, "Resource A's resize control");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 160, box.y + box.height / 2 + 100, { steps: 6 });
+  await page.mouse.up();
 
   const animatedProperties = async () =>
     page.locator('.react-flow__node').evaluateAll((nodes) =>
@@ -1642,17 +1586,14 @@ test('opening animates the Resource wrapper and displaced neighbours from one du
         }),
       })),
     );
-  const openedId = await resource.getAttribute('data-id');
+  const resizedId = await resource.getAttribute('data-id');
   await expect
-    .poll(async () => (await animatedProperties()).some(({ properties }) => properties.length > 0))
+    .poll(async () =>
+      (await animatedProperties()).some(
+        ({ id, properties }) => id !== resizedId && properties.includes('transform'),
+      ),
+    )
     .toBe(true);
-  const animations = await animatedProperties();
-  expect(animations.find(({ id }) => id === openedId)?.properties).toEqual(
-    expect.arrayContaining(['width', 'height']),
-  );
-  expect(
-    animations.some(({ id, properties }) => id !== openedId && properties.includes('transform')),
-  ).toBe(true);
 });
 
 /**

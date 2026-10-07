@@ -101,11 +101,12 @@ export const titleName = (title: string): string => {
 };
 
 /**
- * The Title on one line: its name, with an ellipsis when lines follow it.
+ * The short Title: the Title on one line, its name with an ellipsis when lines
+ * follow it.
  *
- * For a surface that refers to a Resource in running text, such as a question
- * about it, where dropping the later lines silently would present a part of
- * the Title as the whole of it.
+ * The one way a Title is shortened. Any surface that cannot draw every Title
+ * Line uses it, because dropping the later lines silently would present a part
+ * of the Title as the whole of it.
  */
 export const shortTitle = (title: string): string => {
   const name = titleName(title);

@@ -1,5 +1,13 @@
 import type { Continuation } from './continuation';
-import { type GraphId, type ResourceDocument, type ResourceId, type UUID } from '@project/core';
+import {
+  takesOpen,
+  takesResourceShape,
+  type GraphId,
+  type ResourceDocument,
+  type ResourceId,
+  type ResourceShape,
+  type UUID,
+} from '@project/core';
 import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
 import {
   beginEditing,
@@ -15,7 +23,7 @@ import type { OpenSpaces } from './open-spaces';
 import type { ResourceResize } from './render-adapter';
 import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import type { SpaceResourceTargets } from './space-resource-targets';
-import { snapResourceSizeToClose, RESOURCE_SIZE } from './resource';
+import { RESOURCE_SIZE } from './resource';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
@@ -23,6 +31,7 @@ export type CanvasResourceDataPatch = Partial<
   Pick<
     ResourceNodeData,
     | 'onEditResource'
+    | 'onResourceShapeChange'
     | 'onBeginTitleEditing'
     | 'resize'
     | 'titleEditor'
@@ -66,6 +75,12 @@ export interface CanvasResourceDecorationContext {
   readonly imageAccept: string;
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
+  /**
+   * Draw an Ur Resource in another Shape on this Map, reporting a refusal.
+   * Absent where this canvas has no command outcomes to report one through.
+   */
+  readonly changeResourceShape?:
+    ((resourceId: ResourceId, resourceShape: ResourceShape) => void) | undefined;
   readonly continuation?: Continuation | undefined;
   readonly containingSpaceId: UUID;
   readonly spaceDocuments: ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: 'space' }>>;
@@ -108,6 +123,7 @@ type SharedResourceDecorationContext = Pick<
   | 'completeResourceTitle'
   | 'clearCaret'
   | 'resourceEntityActions'
+  | 'changeResourceShape'
 >;
 
 type MarkdownResourceDecorationContext = Pick<
@@ -160,10 +176,16 @@ export function decorateSharedResourceNode(
   const patch: Mutable<
     Pick<
       ResourceNodeData,
-      'onEditResource' | 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'
+      | 'onEditResource'
+      | 'onResourceShapeChange'
+      | 'onBeginTitleEditing'
+      | 'resize'
+      | 'titleEditor'
+      | 'entityActions'
     >
   > = {};
-  if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
+  if (resourceBelongsToWorkingSpace && context.authorOnCanvas && takesOpen(node.data.kind)) {
+    // An Ur Resource has no content to show, so it offers no Open or Close.
     patch.onEditResource = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
   } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {
@@ -174,14 +196,24 @@ export function decorateSharedResourceNode(
     // also retains rather than running an Open or Close Edit.
     patch.onEditResource = () => 'retained';
   }
+  const changeResourceShape = context.changeResourceShape;
+  if (
+    resourceBelongsToWorkingSpace &&
+    context.authorOnCanvas &&
+    changeResourceShape !== undefined &&
+    takesResourceShape(node.data.kind)
+  ) {
+    // Open and Closed alike (ADR 0121); every other kind is the rectangle.
+    patch.onResourceShapeChange = (resourceShape) =>
+      changeResourceShape(node.data.resourceId, resourceShape);
+  }
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);
   }
-  if (resourceBelongsToWorkingSpace && node.data.open === true && context.authorOnCanvas) {
-    // Ordinary Open proposals stop at the content's floor, which keeps a drawn
-    // Map's footer clear. The gesture itself still reaches Closed Size so
-    // ADR 0066's magnet can Close it.
-    const floor = node.data.openSizeFloor;
+  if (resourceBelongsToWorkingSpace && context.authorOnCanvas) {
+    // Every kind resizes, Open or Closed (ADR 0122); `ResourceNode` draws the
+    // control only while the Resource is selected. The Closed Size is the one
+    // floor, and the control's own minimum keeps a proposal at or above it.
     patch.resize = {
       minWidth: RESOURCE_SIZE.width,
       minHeight: RESOURCE_SIZE.height,
@@ -190,16 +222,10 @@ export function decorateSharedResourceNode(
         context.resourceResize.beginResize(node.data.resourceId);
       },
       onResize: (size) => {
-        const proposed = snapResourceSizeToClose(size);
-        context.resourceResize.previewResize(
-          node.data.resourceId,
-          proposed === RESOURCE_SIZE
-            ? proposed
-            : {
-                width: Math.max(floor.width, size.width),
-                height: Math.max(floor.height, size.height),
-              },
-        );
+        context.resourceResize.previewResize(node.data.resourceId, {
+          width: Math.max(RESOURCE_SIZE.width, size.width),
+          height: Math.max(RESOURCE_SIZE.height, size.height),
+        });
       },
       onResizeEnd: () => context.resourceResize.finishResize(node.data.resourceId),
       onResizeCancel: () => context.resourceResize.cancelResize(node.data.resourceId),

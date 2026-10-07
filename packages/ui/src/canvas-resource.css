@@ -34,7 +34,7 @@
 
   /* The ladder's ceiling, in lines of the `title` role. Placement is authored,
      so a Title is clamped to the room available and never accommodated (ADR
-     0014, ADR 0066, ADR 0083) — a Title with more lines than fit is clipped.
+     0014, ADR 0083) — a Title with more lines than fit is clipped.
 
      A number rather than the room the Resource happens to have, because the ladder
      has to draw the same whether the Resource is Open or Closed: room-relative
@@ -101,7 +101,9 @@
   :not([data-state='rest']),
   [data-content-editing='true']
 ) {
-  background: var(--canvas-resource-active-face);
+  /* The face rather than the background, so a Shape drawn in place of the
+     Resource's own paper takes the same active face. */
+  --canvas-resource-face: var(--canvas-resource-active-face);
 }
 
 .canvas-resource[data-kind='reference']:is(
@@ -419,7 +421,7 @@
 /* The rail sits eight pixels inside the Resource's paper border and holds its kind
    glyph at the top-right corner; on the canvas the commands float outside the
    Resource (ADR 0102). The room above the content is the glyph's row: eight pixels,
-   the glyph, eight pixels. An Open Resource draws no glyph, so its Markdown sits as
+   the glyph, eight pixels. An Open rectangle draws no glyph, so its Markdown sits as
    far from the top as from the sides: 12px here and the rendered body's own 10px
    (`--markdown-resource-content-top`) make its 22px side inset. */
 .canvas-resource__rail {
@@ -439,6 +441,20 @@
   padding-top: 30px;
 }
 
+/* An Ur Resource draws no kind glyph, its Shape saying what it is (ADR 0121), so
+   it keeps no glyph row: its Title is centred in its rect, Open and Closed, as a
+   presented Ur Resource's is in its frame. */
+.canvas-resource[data-kind='ur'] > .canvas-resource__body {
+  align-items: center;
+  justify-content: center;
+  padding-top: 8px;
+  text-align: center;
+}
+
+.canvas-resource[data-kind='ur'] .canvas-resource__title-control {
+  margin-inline: auto;
+}
+
 /* Where no adapter floats the toolbar it is drawn in the rail, and the room below
    it is the command strip's: its 38px, clear of its cast shadow. */
 .canvas-resource:has(> .canvas-resource__rail .canvas-resource__actions) .canvas-resource__content {
@@ -447,4 +463,92 @@
 .canvas-resource[data-open='false']:has(> .canvas-resource__rail .canvas-resource__actions)
   > .canvas-resource__body {
   padding-top: 46px;
+}
+
+/* A Shape other than the rectangle (ADR 0121), drawn Open and Closed alike.
+   The Resource keeps its rect; the front's own paper and edge are withdrawn and
+   `ResourceShapeOutlineDrawing` draws them as the Shape's outline at that rect,
+   which touches the midpoint of each side, where Edges attach. `overflow` is released
+   so the stroke at those points is not cut by the rect. The rectangle's box
+   shadows are withdrawn too: the ring and drag shadow follow the outline. */
+.canvas-resource:not([data-resource-shape='rectangle']) {
+  --canvas-resource-title-ladder-lines: 3;
+
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.canvas-resource__outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.canvas-resource__outline > * {
+  stroke: var(--canvas-resource-ink);
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.canvas-resource__outline-edge {
+  fill: var(--canvas-resource-face);
+  stroke-width: var(--canvas-resource-border-width);
+  transition: fill var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
+}
+
+/* The selection ring follows the outline (ADR 0121): the edge's geometry
+   stroked wider beneath it, so it stands the ring width beyond the edge as the
+   rectangle's shadow does. */
+.canvas-resource__outline-ring {
+  display: none;
+  fill: none;
+  stroke-width: calc(
+    var(--canvas-resource-border-width) + 2 * var(--canvas-resource-selected-ring-width)
+  );
+}
+
+.canvas-resource:is([data-state='selected'], [data-state='editing'])
+  .canvas-resource__outline-ring {
+  display: inline;
+}
+
+/* The lean's offset shadow, cast by the drawn outline rather than the rect. */
+.canvas-resource[data-state='dragging'] .canvas-resource__outline {
+  filter: drop-shadow(var(--canvas-resource-shadow-dragging));
+}
+
+/* The Title lays out in the rectangle inscribed in the Shape, whose insets
+   `CanvasResource` publishes from the Shape's outline, centred in it. The field
+   the Title is written in is capped at the lines that room holds; the diamond's
+   inscribed rectangle is the smallest. */
+.canvas-resource[data-resource-shape='diamond'] {
+  --canvas-resource-title-ladder-lines: 2;
+}
+
+.canvas-resource:not([data-resource-shape='rectangle']) > .canvas-resource__rail {
+  inset: var(--canvas-resource-shape-inset-block) var(--canvas-resource-shape-inset-inline) auto;
+  padding: 0;
+}
+
+.canvas-resource:not([data-resource-shape='rectangle']) > .canvas-resource__body {
+  position: absolute;
+  inset: var(--canvas-resource-shape-inset-block) var(--canvas-resource-shape-inset-inline);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  text-align: center;
+}
+
+/* The heading and its control are held to the inscribed rectangle's width,
+   so the Title Lines wrap inside the Shape. */
+.canvas-resource:not([data-resource-shape='rectangle']) .canvas-resource__title {
+  min-width: 0;
+  max-width: 100%;
 }

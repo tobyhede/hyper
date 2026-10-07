@@ -149,6 +149,7 @@ async function refuseOnEveryChannel(outcomes: ReturnType<typeof open>['outcomes'
   outcomes.run('graph-delete', () => refusedGraphDelete);
   outcomes.run('resource-delete', () => refusedAuthoring);
   outcomes.run('resource-remove', () => refusedAuthoring);
+  outcomes.run('resource-shape', () => refusedAuthoring);
   outcomes.run('reference-create', () => refusedAuthoring);
   await outcomes.run('space-resource-create', () => Promise.resolve(refusedCreation));
   await outcomes.run(
@@ -169,6 +170,17 @@ describe('titles and sentences', () => {
       message: MAP_GONE,
     });
     expect(notice(outcomes, 'resource-delete')).toBeNull();
+  });
+
+  it('publishes a refused Shape choice under its own title', () => {
+    const { outcomes } = open();
+
+    outcomes.run('resource-shape', () => refusedAuthoring);
+
+    expect(notice(outcomes, 'resource-shape')).toEqual({
+      title: 'Shape not changed',
+      message: MAP_GONE,
+    });
   });
 
   it('publishes both deletion refusals under "Resource not deleted"', async () => {
@@ -330,7 +342,7 @@ describe('the Map-change reset', () => {
   it('clears exactly the channels a Map change resets', async () => {
     const { outcomes, navigation } = open();
     await refuseOnEveryChannel(outcomes);
-    expect(outcomes.getState().notices.size).toBe(11);
+    expect(outcomes.getState().notices.size).toBe(12);
 
     navigation.selectMap(MAP_B);
 

@@ -92,20 +92,12 @@ describe('referenceAnchor', () => {
     });
   });
 
-  it('adds the room an Open source holds', () => {
-    const openSize = { width: 600, height: 400 };
-    const growth = Placement.growth(openSize);
-    const anchor = referenceAnchor({ x: 0, y: 0, open: true, openSize }, centre);
-
-    expect(anchor.x).toBe(
-      Math.max(RESOURCE_WIDTH, growth.width + Math.round(RESOURCE_WIDTH * REFERENCE_OFFSET_RATIO)),
-    );
-    expect(anchor.y).toBe(
-      Math.max(
-        RESOURCE_HEIGHT,
-        growth.height + Math.round(RESOURCE_HEIGHT * REFERENCE_OFFSET_RATIO),
-      ),
-    );
+  it('steps from a resized source’s bottom-right corner, Open or Closed', () => {
+    for (const open of [true, false]) {
+      expect(
+        referenceAnchor({ x: 0, y: 0, open, size: { width: 600, height: 400 } }, centre),
+      ).toEqual({ x: 600 - 260 + 195, y: 400 - 146 + 110 });
+    }
   });
 
   it('lands at the visible centre for a source the Map does not place', () => {
@@ -222,14 +214,44 @@ describe('resourceRailGroups', () => {
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
+  /** The one kind that takes a Shape, which its rail offers rather than this menu (ADR 0121). */
+  const ur: Resource = { id: OUTSIDE, title: 'Gateway', kind: 'ur' };
 
   it('leads with Create Reference and ends with the commands that leave the Resource', () => {
-    expect(ids(resourceRailGroups(resource(PLACED_A), addresses, connect, everything))).toEqual([
+    expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
+  });
+
+  it.each<Resource>([
+    ur,
+    resource(PLACED_A),
+    {
+      id: OUTSIDE,
+      title: 'Figure',
+      kind: 'image',
+      url: 'https://example.com/figure.png',
+      naturalSize: { width: 400, height: 300 },
+    },
+    {
+      id: OUTSIDE,
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: SPACE_ID,
+      map: MAP_ID,
+      graph: GRAPH_ID,
+      framing: undefined,
+    },
+    { id: OUTSIDE, title: 'A reference', kind: 'reference', target: PLACED_A },
+  ])('offers no Shape choice in the menu of a $kind Resource', (subject) => {
+    expect(
+      resourceRailGroups(subject, addresses, connect, everything)
+        .flat()
+        .map(({ id }) => id),
+    ).not.toContain('resource-shape');
   });
 
   it('draws only Connect to Resource and the addresses while nothing else is available', () => {
@@ -253,8 +275,11 @@ describe('resourceRailGroups', () => {
       target: PLACED_A,
     };
     const row = resourceRailGroups(reference, addresses, connect, everything)[0]?.[0];
-    expect(row).toMatchObject({ id: 'create-reference', disabled: true });
-    expect(row?.description).toBe(REFERENCE_TERMINAL);
+    expect(row).toMatchObject({
+      id: 'create-reference',
+      disabled: true,
+      description: REFERENCE_TERMINAL,
+    });
   });
 });
 
