@@ -2,7 +2,7 @@
 
 Hyper is for technical talks and designs whose ideas connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. [React Flow](https://reactflow.dev) draws every Graph at once, each in its own colour, at the positions you chose.
 
-**Presenting is the same canvas, closer in.** There is no second surface to build ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): Present moves the camera to the Graph's first Resource and shows its content. Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
+**Presenting is the same canvas, closer in.** There is no second surface to build ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): Present moves the camera to the Graph's first Resource and shows its content. Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork ([ADR 0027](docs/adr/superseded/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
 
 Your work is a directory of plain files, an [Aggregate directory](docs/aggregate-directory.md), that you keep in its own git repository.
 

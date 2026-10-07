@@ -1,6 +1,7 @@
 # The presenting move is one fitView call
 
-Status: accepted
+Status: superseded
+Superseded by: 0123
 Refines: 0027, 0043
 
 Moving the camera onto the presented Card is a single `fitView({ nodes: [{ id }], padding, duration })`. There is no two-phase move, no pan-then-close-in, and no camera arithmetic in this repository.
