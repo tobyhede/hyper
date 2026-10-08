@@ -1045,7 +1045,7 @@ test('a connection between Resources of two different drawings is refused with w
   expect(response.ok()).toBe(true);
   const loaded = decodeLoadedSpace(await response.json());
   const maps = loaded.snapshot.document.maps ?? [];
-  const drawnMap = maps.find((map) => map.id === DEEP_DIVE_MAP_ID);
+  const drawnMap = maps.find((candidate) => candidate.id === DEEP_DIVE_MAP_ID);
   if (drawnMap?.graphs.some((graph) => graph.id === DEEP_DIVE_GRAPH_ID) !== true) {
     throw new Error('Deep dive must have the Map and Graph its Space Resource selects');
   }
@@ -1059,17 +1059,17 @@ test('a connection between Resources of two different drawings is refused with w
             ...loaded.snapshot,
             document: {
               ...loaded.snapshot.document,
-              maps: maps.map((map) =>
-                map.id === DEEP_DIVE_MAP_ID
+              maps: maps.map((candidate) =>
+                candidate.id === DEEP_DIVE_MAP_ID
                   ? {
-                      ...map,
+                      ...candidate,
                       positions: {
                         [DEEP_DIVE_FIRST_ID]: { x: 0, y: 0, open: false },
                         [DEEP_DIVE_SECOND_ID]: { x: 300, y: 0, open: false },
                       },
-                      graphs: map.graphs.map((graph) => ({ ...graph, edges: [] })),
+                      graphs: candidate.graphs.map((graph) => ({ ...graph, edges: [] })),
                     }
-                  : map,
+                  : candidate,
               ),
             },
           },
