@@ -106,7 +106,7 @@ test(
     await page.getByRole('article', { name: 'Resource 2' }).click({ button: 'right' });
 
     const menu = page.getByRole('menu');
-    // No Rename: a Resource's title is renamed in place on its Front, so the menu
+    // No Rename: a Resource's title is renamed in place on the drawn Resource, so the menu
     // production would supply here holds its two addresses and nothing else.
     await expect(menu.getByRole('menuitem', { name: 'Rename' })).toHaveCount(0);
     await expect(

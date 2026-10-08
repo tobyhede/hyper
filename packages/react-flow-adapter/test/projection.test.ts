@@ -151,7 +151,7 @@ describe('projectResourceNodes', () => {
     const nodes = projectResourceNodes(space, { resourceShape });
     expect(nodes.find((n) => n.id === a)?.data.shape).toBe('diamond');
     expect(nodes.filter((n) => n.id !== a).map((n) => n.data.shape)).not.toContain('diamond');
-    // The Shape travels whatever the display, Open included: the front decides
+    // The Shape travels whatever the display, Open included: `CanvasResource` decides
     // what it draws from the two together.
     const opened = projectResourceNodes(space, {
       resourceShape,

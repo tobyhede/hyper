@@ -232,8 +232,8 @@ export async function exerciseSpaceResourceEntityMenu(
     await trigger.focus();
     await trigger.press('Enter');
   };
-  // The Title edits on the Resource front, not from the menu: the menu carries no Rename
-  // row, so the rename that seeds the rest of this test presses the front's own
+  // The Title edits on the drawn Resource, not from the menu: the menu carries no Rename
+  // row, so the rename that seeds the rest of this test presses the Resource's own
   // control instead.
   const title = page.getByRole('textbox', { name: 'Resource title', exact: true });
   await resourceNode.getByRole('button', { name: /^Edit Title / }).click();

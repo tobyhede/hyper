@@ -12,7 +12,7 @@ const specimen = (page: Page, label: string): Locator =>
   });
 
 test(
-  'rest, selected and dragging draw visually distinct treatments, for both fronts',
+  'rest, selected and dragging draw visually distinct treatments, for both kinds',
   { tag: '@parity:canvas-resource-shows-rest-selected-and-dragging-states' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--states&mode=preview');
@@ -43,12 +43,12 @@ test(
 );
 
 /**
- * What every front draws, kind by kind, and what none of them draws.
+ * What every Closed Resource draws, kind by kind, and what none of them draws.
  *
- * The table is the point: one loop over every front the component declares, so
+ * The table is the point: one loop over every kind the component declares, so
  * a new kind cannot be added with its own story slice and reviewed on its own.
  */
-const FRONTS = [
+const CLOSED_KINDS = [
   { label: 'markdown', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
   { label: 'reference', kind: 'reference', glyph: 'Reference Resource', border: 'dotted' },
   { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid' },
@@ -74,7 +74,7 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
   );
 
 /**
- * The whole of what a Resource front draws, and the whole of what it does not.
+ * The whole of what a Closed Resource draws, and the whole of what it does not.
  *
  * This is the one place that states it. Every other Resource story is a slice —
  * states, kinds, hover, colours, opening, resizing — and an element drawn only
@@ -86,27 +86,27 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
  * Resource that is not one of the Title Lines the author typed.
  */
 test(
-  'every Resource front draws its kind, its border and its Title Lines, and nothing beneath them',
-  { tag: '@parity:canvas-resource-front-draws-only-its-title-lines' },
+  'every Closed Resource draws its kind, its border and its Title Lines, and nothing beneath them',
+  { tag: '@parity:closed-resource-draws-only-its-title-lines' },
   async ({ page }) => {
-    await page.goto('/?story=components--resource--front&mode=preview');
+    await page.goto('/?story=components--resource--closed&mode=preview');
 
-    for (const front of FRONTS) {
+    for (const entry of CLOSED_KINDS) {
       for (const [suffix, expected] of [
         ['one line', ONE_LINE],
         ['three lines', THREE_LINES],
       ] as const) {
-        const resource = specimen(page, `${front.label} · ${suffix}`).getByRole('article');
-        await expect(resource).toHaveAttribute('data-kind', front.kind);
+        const resource = specimen(page, `${entry.label} · ${suffix}`).getByRole('article');
+        await expect(resource).toHaveAttribute('data-kind', entry.kind);
         await expect(resource).toHaveAttribute('data-state', 'rest');
         await expect(resource).toHaveAttribute('data-open', 'false');
-        if (front.glyph === null) {
+        if (entry.glyph === null) {
           await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
         } else {
-          await expect(resource.getByRole('img', { name: front.glyph })).toBeVisible();
+          await expect(resource.getByRole('img', { name: entry.glyph })).toBeVisible();
         }
         await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
-        await expect(resource).toHaveCSS('border-style', front.border);
+        await expect(resource).toHaveCSS('border-style', entry.border);
 
         // One block element per Title Line, carrying the role `titleLines` gave
         // it — and exactly as many as the author typed.
@@ -146,14 +146,14 @@ test(
 
 /**
  * A Closed Image Resource looks like any Resource (ADR 0106): its Title and its
- * kind glyph at the one Closed size, and no picture — the Closed front draws no
+ * kind glyph at the one Closed size, and no picture — a Closed Resource draws no
  * thumbnail, so no `img` element is mounted on it at all.
  */
 test(
   'a Closed Image Resource draws its Title and kind at the Closed size, and no picture',
-  { tag: '@parity:image-resource-closed-front-draws-title-and-kind' },
+  { tag: '@parity:closed-image-resource-draws-title-and-kind' },
   async ({ page }) => {
-    await page.goto('/?story=components--resource--front&mode=preview');
+    await page.goto('/?story=components--resource--closed&mode=preview');
 
     const image = specimen(page, 'image · one line').getByRole('article');
     await expect(image).toHaveAttribute('data-kind', 'image');
@@ -174,13 +174,13 @@ test(
  * drawn side by side: a break the **author** typed starts a rung and a break the
  * **box** chose does not.
  */
-// Untagged: the parity claim `canvas-resource-front-draws-only-its-title-lines`
+// Untagged: the parity claim `closed-resource-draws-only-its-title-lines`
 // above already owns this story's evidence, and one claim takes exactly one
 // Ladle test. This is the same story's second reading and needs no second claim.
 test('a wrapped single-line Title stays one rung while an authored three-line Title draws three', async ({
   page,
 }) => {
-  await page.goto('/?story=components--resource--front&mode=preview');
+  await page.goto('/?story=components--resource--closed&mode=preview');
 
   const wrapped = specimen(page, 'one Title Line, wrapped')
     .getByRole('article')
@@ -208,7 +208,7 @@ test('a wrapped single-line Title stays one rung while an authored three-line Ti
 });
 
 test(
-  "a Reference Resource front's dotted border and a long Markdown title's three-line clamp are the kind's own presentation",
+  "a Reference Resource's dotted border and a long Markdown title's three-line clamp are the kind's own presentation",
   { tag: '@parity:canvas-resource-shows-kind-treatment' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--kinds&mode=preview');
@@ -512,7 +512,7 @@ test(
     // arrangements apart: `Edit Title <name>` and the heading's own name are
     // then the same string, and an implementation that drew the name and
     // dropped every line after it reads as correct — which is exactly the
-    // regression ADR 0083's sentence about the Resource front's own heading exists
+    // regression ADR 0083's sentence about the drawn Resource's own heading exists
     // to prevent. The separator is one space per line because each Title Line
     // is its own block box, which is the name computation's rule and not this
     // test's.

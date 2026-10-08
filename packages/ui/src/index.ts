@@ -25,7 +25,7 @@ export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
 export type {
   CanvasResourceBodyEditor,
-  CanvasResourceFront,
+  KindOperations,
   CanvasResourceProps,
   CanvasResourceState,
 } from './CanvasResource';

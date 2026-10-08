@@ -3,7 +3,7 @@
  *
  * A Title is one or more **Title Lines**, stored as one string on the Resource
  * document, with the newlines inside it load-bearing. The first
- * line is the Resource's **name**; the lines after it qualify it on the Resource front.
+ * line is the Resource's **name**; the lines after it qualify it on the drawn Resource.
  *
  * The structure therefore lives in a `string` and nothing in the type says so,
  * which is exactly why the reading of one is a named domain operation here
@@ -90,7 +90,7 @@ export const titleLines = (title: string): readonly TitleLine[] =>
  * The Resource's name: the first line of its Title.
  *
  * Nearly every consumer wants this one and no other — every surface that lists
- * or refers to a Resource shows the name, and only the Resource front draws the ladder
+ * or refers to a Resource shows the name, and only the drawn Resource draws the ladder
  * (ADR 0083). It exists so that nobody writes `titleLines(title)[0].text`, an
  * expression that is both a positional convention restated and, under
  * `noUncheckedIndexedAccess`, a possibly-undefined value at every call site.

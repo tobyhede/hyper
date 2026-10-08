@@ -56,7 +56,7 @@ const GROUP_LAYOUT = 'inline-flex items-center gap-px';
  * **Shared** commands belong to every Resource whatever it is: Open and Close are
  * Resource-level under ADR 0064, and a Space Resource is as closable as a Markdown one.
  * **Kind** commands belong to one kind of Resource and mean nothing on another:
- * Edit, Save and Cancel are the Markdown front's, and choosing a Map or
+ * Edit, Save and Cancel are an Open Markdown Resource's, and choosing a Map or
  * entering a Space would be a Space Resource's.
  *
  * The two are drawn the same — same box, same glyph vocabulary, one rail and

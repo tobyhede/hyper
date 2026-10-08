@@ -59,7 +59,7 @@ const onResource = (
   props: Partial<Pick<Parameters<typeof MarkdownResourceBody>[0], 'editor'>> = {},
 ) => (
   <CanvasResource
-    front={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+    kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
     display={props.editor === undefined ? STRATEGIES : beginEditing(STRATEGIES, props.editor, true)}
     state="rest"
     title="Strategies"
@@ -71,7 +71,7 @@ function EditingResource() {
   const [editing, setEditing] = useState(true);
   return (
     <CanvasResource
-      front={{ kind: 'markdown', onBeginEdit: () => setEditing(true) }}
+      kindOperations={{ kind: 'markdown', onBeginEdit: () => setEditing(true) }}
       display={
         editing
           ? beginEditing(STRATEGIES, { onComplete: vi.fn(), onEnd: () => setEditing(false) }, true)

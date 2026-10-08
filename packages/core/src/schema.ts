@@ -42,7 +42,7 @@ export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
  * what every list, search and accessible label shows.
  *
  * Resources only. Space, Map and Graph titles keep their plain single-line
- * field: they are labels in lists with no front to draw a ladder on, and giving
+ * field: they are labels in lists with no drawn Resource to put a ladder on, and giving
  * all four the capability because they share a field type would be the model
  * following the implementation (ADR 0083).
  *

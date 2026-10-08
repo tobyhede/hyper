@@ -223,7 +223,7 @@ it('presents a fully cyclic Graph, which has no entry Resource', () => {
  * `moves()` is what the presenting chrome draws a row from and what a move's
  * accessible name is composed of, so a Title's later lines reaching it would
  * arrive on screen as a run-together label rather than as an error. The ladder
- * is the Resource front's and does not travel.
+ * is the drawn Resource's and does not travel.
  */
 it('names a move by the Resource’s name, not by its whole Title', () => {
   const resourceA = uuid('00000000-0000-4000-8000-000000000002');

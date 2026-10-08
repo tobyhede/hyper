@@ -14,10 +14,10 @@ export type OwnContent<K extends 'markdown' | 'image'> = Extract<
 > & { readonly via: 'self' };
 
 /**
- * What a Resource front shows now. A Closed Resource carries no content (ADR
+ * What a drawn Resource shows now. A Closed Resource carries no content (ADR
  * 0006, as narrowed by ADR 0064); an Open one carries its resolved content, its
  * own or its Target's. Presenting draws on the Stage through
- * `PresentedResource`, never through a front (ADR 0123).
+ * `PresentedResource`, never through `CanvasResource` (ADR 0123).
  *
  * `editing` and `replacing` are made only by `beginEditing` and
  * `beginReplacing`, and carry only the Resource's own content, so a Target's

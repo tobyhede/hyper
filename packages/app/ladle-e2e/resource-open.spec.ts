@@ -741,13 +741,13 @@ test(
 const openImageStory = '/?story=components--resource--open-image-resource&mode=preview';
 
 /**
- * An Open Image Resource is the Open Markdown front with its picture as the
+ * An Open Image Resource is drawn as an Open Markdown Resource with its picture as the
  * content. Drawn at one canvas unit per pixel in a Resource sized to hold it,
  * the picture is drawn at its own size; in a Resource resized larger the
  * picture keeps its natural size rather than being enlarged.
  */
 test(
-  'an Open Image Resource draws its picture at its own size in the Markdown front',
+  'an Open Image Resource draws its picture at its own size where Markdown content is drawn',
   { tag: '@parity:open-image-resource-draws-its-image' },
   async ({ page }) => {
     await page.goto(openImageStory);
@@ -777,7 +777,7 @@ test(
     });
     expect(drawn).toEqual({ fit: 'scale-down', scale: 1, roomy: true });
 
-    // Close and Title editing are the Markdown front's, and there is no content Edit.
+    // Close and Title editing are an Open Markdown Resource's, and there is no content Edit.
     const node = first.locator('.react-flow__node');
     await selectResource(node);
     const toolbar = await resourceToolbar(page, node);
@@ -809,7 +809,7 @@ const IMAGE_REFERENCE_MISSING_URL = 'https://missing.invalid/picture.png';
 
 /**
  * A Reference Resource to an Image Resource draws its Target's picture read-only
- * through the same front (ADR 0070, ADR 0106): its own Title in the footer, the
+ * as its own content would be (ADR 0070, ADR 0106): its own Title in the footer, the
  * picture at its own size in a Resource sized to hold it, Close and no
  * Replace, and no Replace in the failed-image state either. The story's Space
  * holds the Image Resource Targets, and this test serves Harbour's picture.

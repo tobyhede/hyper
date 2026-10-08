@@ -2,7 +2,7 @@ import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import { CLOSED_DISPLAY } from '@project/ui';
-import type { CanvasSpaceResourceSelection, EntityActionGroup, ResourceDisplay } from '@project/ui';
+import type { EntityActionGroup, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
@@ -47,7 +47,7 @@ export type ResourceTitleEditor = {
  *  React Flow's `Record<string, unknown>` data constraint. */
 export type ResourceNodeData = {
   /**
-   * The Resource's own kind, drawn as a persistent glyph on the Front. A
+   * The Resource's own kind, drawn as a persistent glyph on the Resource. A
    * Reference Resource is `reference` whatever its Target is; what it draws is
    * its `display`.
    */
@@ -104,7 +104,7 @@ export type ResourceNodeData = {
    * follows from it rather than the other way round. The adapter cannot read it
    * off the geometry — a Resource is not Open just because it is large.
    *
-   * An Open Reference Resource draws its immutable Target's content through the same front.
+   * An Open Reference Resource draws its immutable Target's content as its own would be drawn.
    */
   open?: boolean;
   /**
@@ -152,16 +152,6 @@ export type ResourceNodeData = {
    * already applies to the value it is handed.
    */
   entityActions?: readonly EntityActionGroup[];
-  /**
-   * For a space resource, what the Space it references offers its selections to be
-   * chosen from.
-   *
-   * Not derived here, and it could not be: it describes a *second* Space, which
-   * this projection has no reader for and no business loading. The composition
-   * that read the target supplies it, exactly as it supplies every other
-   * operation on this node (ADR 0068, ADR 0074).
-   */
-  spaceSelection?: CanvasSpaceResourceSelection;
   /**
    * Map and Graph clusters for an Open Space Resource, assembled by the
    * application and inserted at the head of the Resource rail.

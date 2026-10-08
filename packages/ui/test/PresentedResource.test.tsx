@@ -43,7 +43,7 @@ describe('PresentedResource', () => {
   });
 
   /**
-   * The Title ladder is the Resource front's and nothing else's (ADR 0083). A
+   * The Title ladder is the drawn Resource's and nothing else's (ADR 0083). A
    * presented Resource is a different surface with a different frame around it, so
    * it draws the Resource's **name** — and a heading is a single line of text
    * whatever the string handed to it contains, so a Title reaching one whole

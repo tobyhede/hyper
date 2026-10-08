@@ -390,7 +390,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.getByRole('img', { name: 'Reference Resource' })).toBeVisible();
   });
 
-  it('passes the Reference Resource metadata Open operation through its own front', () => {
+  it('passes the Reference Resource metadata Open operation through its own kind operations', () => {
     const onEditResource = vi.fn();
     render(
       <ResourceNode
@@ -407,7 +407,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(onEditResource).toHaveBeenCalledWith(true);
   });
 
-  it("passes an Ur Resource's Shape choice through its own front", () => {
+  it("passes an Ur Resource's Shape choice through its own kind operations", () => {
     const onResourceShapeChange = vi.fn();
     const node = props({ kind: 'ur', title: 'Gateway', selected: true });
     render(
@@ -488,7 +488,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.queryByTestId('resource-image-failed')).toBeNull();
   });
 
-  it('renders a Space Resource through an explicit non-Markdown front', () => {
+  it('renders a Space Resource through explicit non-Markdown kind operations', () => {
     const onEditResource = vi.fn();
     const onBeginBodyEditing = vi.fn();
     render(
@@ -536,7 +536,7 @@ describe('ResourceNode draws what the display shows', () => {
     expect(screen.queryByRole('button', { name: 'Replace image' })).toBeNull();
   });
 
-  it('draws an unresolved Target as a notice on the Open front', () => {
+  it('draws an unresolved Target as a notice on the Open Resource', () => {
     render(
       <ResourceNode
         {...props({
@@ -578,7 +578,7 @@ describe('ResourceNode Ur Resource', () => {
     onResizeCancel: () => undefined,
   };
 
-  it('opens through the shared front and offers no Edit, even when one is supplied', () => {
+  it('opens through the shared operation and offers no Edit, even when one is supplied', () => {
     const onEditResource = vi.fn();
     render(
       <ResourceNode
@@ -828,7 +828,7 @@ describe('ResourceNode title authoring', () => {
     expect(screen.getByRole('heading', { name: 'A' })).toBeVisible();
   });
 
-  it('draws no shared Description slot on the Resource front', () => {
+  it('draws no shared Description slot on the drawn Resource', () => {
     render(<ResourceNode {...props()} />);
 
     expect(screen.queryByTestId('resource-description')).not.toBeInTheDocument();
@@ -1229,7 +1229,7 @@ test('renders every authoring handle as a sibling following the Resource', () =>
   }
 });
 
-describe('ResourceNode Open Resource front', () => {
+describe('ResourceNode Open Resource', () => {
   const SOURCE = '# Strategies\n\nNo strategy is privileged.';
 
   it("draws the Resource's rendered Markdown on the Resource, and says the Resource is Open", () => {

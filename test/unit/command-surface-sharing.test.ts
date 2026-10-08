@@ -170,19 +170,18 @@ describe('choosing a Map or a Graph', () => {
   });
 
   /**
-   * And an Open Space Resource's two choices are themselves **one** control,
-   * mounted by both surfaces that draw them, rather than a control copied
-   * twice: `@project/ui`'s `SpaceResourceSelectors` is the sole place a Map or
-   * Graph choice is turned into a `ChoiceMenu`, an embedded canvas Resource's own
-   * rail (`CanvasResource`) and the application's Space Resource rail
-   * (`buildSpaceResourceRail`) each mount it rather than restating it.
+   * And an Open Space Resource's two choices are themselves **one** control:
+   * `@project/ui`'s `SpaceResourceSelectors` is the sole place a Map or Graph
+   * choice is turned into a `ChoiceMenu`. The application's Space Resource rail
+   * (`buildSpaceResourceRail`) mounts it, and `CanvasResource` draws that rail
+   * as it is handed, restating neither.
    */
   it('is owned once by @project/ui, not copied onto the canvas Resource or the app rail', () => {
     expect(spaceResourceRail).toContain("from '@project/ui'");
+    expect(spaceResourceRail).toContain('<SpaceResourceSelectors');
     expect(spaceResourceRail).not.toContain('<ChoiceMenu');
     expect(spaceResourceRail).not.toMatch(/function SpaceResourceSelector/u);
 
-    expect(canvasResource).toContain("from './SpaceResourceSelectors'");
     expect(canvasResource).not.toContain('<ChoiceMenu');
     expect(canvasResource).not.toMatch(/function SpaceResourceSelector/u);
   });

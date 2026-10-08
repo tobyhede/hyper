@@ -2369,7 +2369,7 @@ test(
 
     // **The Space's own name, from inside the Space, as one Edit on its session.**
     // It writes `document.title` and nothing else: no Space Resource pointing here
-    // moves with it, and ADR 0083 keeps this name off any Resource's front, so the
+    // moves with it, and ADR 0083 keeps this name off any drawn Resource, so the
     // reload below is reading the stored document rather than a Resource that
     // happened to agree with it.
     await beginRename(page, spaceName(page));
@@ -3469,7 +3469,7 @@ test('Add Resource names the new Resource in place in the selected Map', async (
  * cancel: one row, one press, and the Reference Resource exists. The Title is the Target's,
  * copied once, with the caret in it — which is the only resource on the canvas that
  * says what the Reference Resource points at, ADR 0083 keeping the Target's name off the
- * Resource front.
+ * drawn Resource.
  */
 test('Create Reference on a Resource makes a Reference Resource of it and names it after its Target', async ({
   page,

@@ -115,7 +115,7 @@ export function resourceRailGroups(
         ]),
   ];
   if (resource.kind === 'space') {
-    // The Title edits in place on the Resource front; this menu authors neither
+    // The Title edits in place on the drawn Resource; this menu authors neither
     // the Resource's name nor the target Space's.
     const links = addresses.flat();
     const entering: EntityActionGroup =

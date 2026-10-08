@@ -240,7 +240,7 @@ export type AuthoringCompletion =
    * It writes `document.title` and nothing else. No Space Resource pointing at this
    * Space changes with it — a Space's name and the Title of a Resource that
    * references it are two stored values that agree only at creation, and ADR
-   * 0083 keeps the target's name off the Resource's front, so nothing in another
+   * 0083 keeps the target's name off the drawn Resource, so nothing in another
    * Space draws what this writes.
    *
    * Derived beside `created-map`, ahead of the general per-Map path below:

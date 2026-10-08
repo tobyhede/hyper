@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
  * source, in the idiom `codemirror-encapsulation.test.ts` uses for an
  * encapsulation a type cannot express.
  *
- * Two rules, and they are the same rule twice: **only the Resource front reads a
+ * Two rules, and they are the same rule twice: **only the drawn Resource reads a
  * Title's later lines.** Everywhere else shows the name, which is `titleName`,
  * and `titleName` is deliberately unrestricted — it is the answer, not the
  * constraint being contained.
@@ -30,10 +30,10 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 /**
  * Where a Title's later lines may be read.
  *
- * Two files, and nothing wider. The Resource front draws the ladder and is the only
+ * Two files, and nothing wider. The drawn Resource draws the ladder and is the only
  * surface that does (ADR 0083); `@project/core`'s own module is where the rule
  * lives and is what every other reader goes through. The render adapter mounts
- * that front on the canvas but needs no permission: it hands `CanvasResource` a
+ * that Resource on the canvas but needs no permission: it hands `CanvasResource` a
  * Title and reads no line of one. Every entry here is asserted below to still
  * be reading a Title's lines, which is what a tree could not be held to file by file.
  */
@@ -100,7 +100,7 @@ const reaching = (files: readonly string[], pattern: RegExp): readonly string[] 
 
 const isLadderReader = (file: string): boolean => LADDER_READERS.includes(file);
 
-describe('only the Resource front reads a Title’s later lines', () => {
+describe('only the drawn Resource reads a Title’s later lines', () => {
   const sources = packageSources();
 
   it('reads every package’s own source tree', () => {
@@ -172,10 +172,10 @@ describe('only the Resource front reads a Title’s later lines', () => {
   });
 
   /**
-   * And the Resource front is still the subject being permitted. A permission granted
+   * And the drawn Resource is still the subject being permitted. A permission granted
    * to a file that stopped drawing the ladder is a hole with a name on it.
    */
-  it('keeps the Resource front drawing the ladder', () => {
+  it('keeps the drawn Resource drawing the ladder', () => {
     expect(
       LADDER_CALL.test(readFileSync(join(repoRoot, 'packages/ui/src/CanvasResource.tsx'), 'utf8')),
     ).toBe(true);

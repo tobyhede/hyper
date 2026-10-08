@@ -107,10 +107,10 @@ export interface CanvasSpaceResourceSelection {
 
 /**
  * What {@link SpaceResourceSelectors} needs to draw Map and Graph on a Space
- * Resource rail, minus portal Read/Edit which stays on the Resource front.
+ * Resource rail, minus portal Read/Edit which stays on the drawn Resource.
  *
- * The one shape both an embedded canvas Resource (`CanvasResource`'s own rail) and
- * the application's Space Resource rail render — the Dock's identical-looking
+ * The shape the application's Space Resource rail renders
+ * (`build-space-resource-rail.tsx`) — the Dock's identical-looking
  * clusters are a different operation over the same primitive and are not
  * built from this type (`docs/agents/ui.md`, `command-surface-sharing.test.ts`).
  */

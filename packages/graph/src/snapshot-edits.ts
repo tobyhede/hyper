@@ -83,7 +83,7 @@ export type SnapshotEditOutcome =
  * on top of each other.
  *
  * A visible stack rather than collision avoidance: existing Resources never move,
- * and partial overlap of the Front is deliberate. Only an *exact* anchor
+ * and partial overlap of Resources is deliberate. Only an *exact* anchor
  * collision steps, which is what a repeated centre-add produces and a pointer
  * drop essentially never does.
  */

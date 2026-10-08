@@ -6,7 +6,7 @@ import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
  *
  * Persistent, not a hover affordance: a Resource's kind is a fact about it, and a
  * Reference Resource that only announces itself under the pointer is one an author has to
- * hunt for. It is the same glyph wherever a Resource appears — on its Front, and in
+ * hunt for. It is the same glyph wherever a Resource appears — on the drawn Resource, and in
  * the Resources list — so recognising one teaches the other.
  *
  * Adding a Resource kind is a compile-time obligation here: both records are keyed
@@ -67,7 +67,7 @@ export interface ResourceKindIconProps {
    * the pointer gets and `Create Reference` hovers as `Reference Resource`.
    *
    * It is deliberately not the default. Everywhere else the glyph carries the
-   * kind *on its own* — on a Resource's own Front, on a list row — and there the name is the whole point of the element.
+   * kind *on its own* — on the drawn Resource, on a list row — and there the name is the whole point of the element.
    */
   readonly decorative?: boolean | undefined;
 }

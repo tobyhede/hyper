@@ -454,7 +454,7 @@ describe('the body height an embedding is clipped by', () => {
   it('is known on the first request after a Space Resource Opens, having been reported while Closed', () => {
     const closed = openSpaceResource(HOST, { spaceId: TARGET, map: MAP }, { open: false });
     expect(reportsBodyHeight(closed)).toBe(true);
-    // What the Closed front's body reports before the Open commit.
+    // What the Closed Resource's body reports before the Open commit.
     const bodyHeights = new Map([[HOST, 40]]);
     const opened = openSpaceResource(HOST, { spaceId: TARGET, map: MAP });
     const [first] = discoverEmbeddedOpenSpaceResources({

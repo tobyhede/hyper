@@ -9,7 +9,7 @@ import type { Locator } from '@playwright/test';
  * an outline that stood in from any side would answer false. `fillsCorner`
  * asks the same of the top-left corner, which only the rectangle fills.
  * `holdsTitle` asks whether every corner of the Title's box is inside the fill,
- * and `drawsKindGlyph` whether the front draws a kind glyph at all — an Ur
+ * and `drawsKindGlyph` whether the Resource draws a kind glyph at all — an Ur
  * Resource draws none, its Shape saying what it is.
  * The rectangle draws no outline: its outline is the Resource's own border, and
  * it answers from the rect itself.

@@ -26,10 +26,6 @@ import {
   ResourceRailSharedActions,
 } from './ResourceRailActions';
 import { ResourceContentEditProvider, type ResourceContentEdit } from './resource-content-edit';
-import {
-  SpaceResourceSelectors,
-  type CanvasSpaceResourceSelection,
-} from './SpaceResourceSelectors';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ResourceRail, ResourceRailKind } from './ResourceRail';
 import { ResourceShapeMenu } from './ResourceShapeMenu';
@@ -63,11 +59,11 @@ import {
 } from './resource-shape-outline';
 
 /**
- * What a Resource front offers beyond its shared Title (ADR 0051): a kind-owned
+ * What a Resource's kind offers beyond its shared Title (ADR 0051): a kind-owned
  * choice of operations, not a kind tag plus an optional field every other kind
  * ignores. What it draws, and whether it is Open, is the display's.
  */
-export type CanvasResourceFront =
+export type KindOperations =
   | {
       /** A creation ghost: Markdown treatment without authored content or open state. */
       readonly kind: 'preview';
@@ -106,12 +102,6 @@ export type CanvasResourceFront =
       /** A Space Resource Opens through the shared Resource operation. */
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /**
-       * What an Open Space Resource offers to author: the target's Maps, the
-       * Graphs of the selected one, and this Resource's own selections. Absent while
-       * the target Space has not been read yet.
-       */
-      readonly selection?: CanvasSpaceResourceSelection;
-      /**
        * Map and Graph clusters, assembled by the application and inserted
        * at the head of this Resource's rail. Absent while the Resource is closed, the
        * surface is read-only, or the target Space has not been read yet.
@@ -148,24 +138,24 @@ export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
 export type CanvasResourceState = 'rest' | 'selected' | 'dragging' | 'editing';
 
 interface CanvasResourceCommonProps {
-  readonly front: CanvasResourceFront;
+  readonly kindOperations: KindOperations;
   /**
    * Whether this Resource is Open, the content it draws when it is, and the
-   * body editor or image replacer while one runs. The front reads Open from
+   * body editor or image replacer while one runs. `CanvasResource` reads Open from
    * this alone; the Map's authored Open state reaches it only through the
    * display the projection made from it.
    */
   readonly display: ResourceDisplay;
   /**
    * The Shape the Map draws this Resource in (ADR 0121), whatever the display.
-   * Absent, as on a front no Map places — a creation ghost, a specimen — the
-   * front is drawn as the rectangle.
+   * Absent, as on a Resource no Map places — a creation ghost, a specimen — the
+   * Resource is drawn as the rectangle.
    */
   readonly shape?: ResourceShape;
   /**
    * The rect the Resource is drawn at, in canvas units, which its Shape's
    * outline and inscribed rectangle are answered for. A canvas adapter supplies
-   * the size it gives the Resource; absent, the front is drawn at the Closed
+   * the size it gives the Resource; absent, the Resource is drawn at the Closed
    * Size.
    */
   readonly size?: OutlineSize;
@@ -178,7 +168,7 @@ interface CanvasResourceCommonProps {
    */
   readonly renderToolbar?: (toolbar: ReactNode) => ReactNode;
   /**
-   * Hand focus back to the Resource the adapter renders this front inside. Where an
+   * Hand focus back to the Resource the adapter renders this component inside. Where an
    * edit ends on a Resource whose toolbar is no longer drawn, there is no Edit
    * control to return to, so focus returns to the Resource instead.
    */
@@ -226,7 +216,7 @@ export type CanvasResourceProps = CanvasResourceCommonProps &
         /** Submit the draft; answers a refusal reason, or `null` when accepted. */
         readonly onCompleteTitleEdit: (title: string) => string | null;
         readonly onCancelTitleEdit: () => void;
-        /** Hand focus back to the Resource the adapter renders this front inside. */
+        /** Hand focus back to the Resource the adapter renders this component inside. */
         readonly onReturnFocus: () => void;
       }
   );
@@ -336,28 +326,28 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
 }
 
 /**
- * The one visual Resource front shared by the production canvas and its stories.
+ * The one drawn Resource shared by the production canvas and its stories.
  *
- * The deep production module for Markdown and Reference Resource fronts, title
- * editing, refusal display and interaction-state visual treatment. React Flow
- * geometry, connection state, selection/drag translation and containment stay
+ * The deep production module for every Resource kind: title editing, refusal
+ * display and interaction-state visual treatment. React Flow geometry,
+ * connection state, selection/drag translation and containment stay
  * with the adapter that renders this component (`@project/react-flow-adapter`
  * `ResourceNode`) — nothing here imports React Flow or reaches into its DOM. Its
  * own visual treatment lives in `canvas-resource.css`, colocated with this module.
  */
 export function CanvasResource(props: CanvasResourceProps) {
-  const { front, title, graphColor, entityActions, state, readOnly = false } = props;
+  const { kindOperations, title, graphColor, entityActions, state, readOnly = false } = props;
   /**
    * What this Resource is called wherever it is *named* rather than drawn.
    *
    * The Title's first line (ADR 0083). The visible heading below still draws
-   * the whole ladder — that is what the Resource front is for — but every
+   * the whole ladder — that is what the drawn Resource is for — but every
    * accessible name here is one line, because a screen reader announcing three
    * lines as one control's name reads as a control with a paragraph for a name.
    * A reader who wants the rest reads the heading.
    */
   const name = titleName(title);
-  const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
+  const visualKind = kindOperations.kind === 'preview' ? 'markdown' : kindOperations.kind;
   /*
    * Read-only is decided here, once: a read-only Resource draws its content at
    * rest, and every authoring affordance below reads one of these operations,
@@ -371,19 +361,21 @@ export function CanvasResource(props: CanvasResourceProps) {
   const drawsOutline = drawnResourceShape !== 'rectangle';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
-  const openableFront = front.kind === 'preview' ? undefined : front;
-  const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
-  const contentFront =
-    !readOnly && 'onBeginEdit' in front && (content === null || contentAction(content) !== 'none')
-      ? front
+  const openableOperations = kindOperations.kind === 'preview' ? undefined : kindOperations;
+  const onOpenChange = readOnly ? undefined : openableOperations?.onOpenChange;
+  const contentOperations =
+    !readOnly &&
+    'onBeginEdit' in kindOperations &&
+    (content === null || contentAction(content) !== 'none')
+      ? kindOperations
       : undefined;
-  const onBeginContentEdit = contentFront?.onBeginEdit;
-  const spaceFront =
+  const onBeginContentEdit = contentOperations?.onBeginEdit;
+  const spaceOperations =
     !readOnly &&
     content !== null &&
     contentAction(content) === 'author-space-view' &&
-    front.kind === 'space'
-      ? front
+    kindOperations.kind === 'space'
+      ? kindOperations
       : undefined;
   const areaContent = useAreaContent(content);
   const bodyControl = useRef<HTMLDivElement>(null);
@@ -406,7 +398,7 @@ export function CanvasResource(props: CanvasResourceProps) {
   const contentAuthoring =
     contentPresence.mounted && !contentLeaving && contentAction(contentPresence.value) !== 'none';
   /**
-   * The edit running inside the Markdown front this Resource owns.
+   * The edit running inside the Markdown content this Resource owns.
    *
    * State rather than a second prop because the draft and caret live inside
    * the body. The display's editor supplies domain completion; the body publishes
@@ -422,18 +414,15 @@ export function CanvasResource(props: CanvasResourceProps) {
   const actionableEntityActions =
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const onResourceShapeChange =
-    !readOnly && front.kind === 'ur' ? front.onResourceShapeChange : undefined;
-  const [selectorNotice, setContextNotice] = useState<string | null>(null);
-  const contextNotice = props.contextNotice ?? selectorNotice;
-  const spaceSelection = spaceFront?.selection;
-  const spaceRail = spaceFront?.spaceRail;
-  const portal = spaceFront?.portal;
+    !readOnly && kindOperations.kind === 'ur' ? kindOperations.onResourceShapeChange : undefined;
+  const contextNotice = props.contextNotice ?? null;
+  const spaceRail = spaceOperations?.spaceRail;
+  const portal = spaceOperations?.portal;
   const portalEditing = portal?.editing === true;
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (spaceSelection !== undefined ||
-      spaceRail !== undefined ||
+    (spaceRail !== undefined ||
       portal !== undefined ||
       visibleContentEdit !== null ||
       onOpenChange !== undefined ||
@@ -540,7 +529,7 @@ export function CanvasResource(props: CanvasResourceProps) {
     // has, and what each one runs.
     //
     // The two groups are the answer to "whose command is this?". Editing
-    // this Resource's Markdown is the Markdown front's business and means
+    // this Resource's Markdown is an Open Markdown Resource's business and means
     // nothing on another kind; opening and closing is every Resource's.
     //
     // The entity actions lead, then a Space Resource's choices, the content-edit
@@ -558,9 +547,6 @@ export function CanvasResource(props: CanvasResourceProps) {
           render={<ResourceRailAction />}
         />
       )}
-      {spaceSelection !== undefined && (
-        <SpaceResourceSelectors {...spaceSelection} onReport={setContextNotice} />
-      )}
       {spaceRail}
       <ResourceRailKindActions kind={visualKind}>
         {onResourceShapeChange !== undefined && (
@@ -572,11 +558,13 @@ export function CanvasResource(props: CanvasResourceProps) {
           <ResourceRailAction
             ref={editControl}
             aria-label={
-              front.kind === 'image' ? `Replace image of Resource ${name}` : `Edit Resource ${name}`
+              kindOperations.kind === 'image'
+                ? `Replace image of Resource ${name}`
+                : `Edit Resource ${name}`
             }
             onClick={beginContentEdit}
           >
-            {front.kind === 'image' ? (
+            {kindOperations.kind === 'image' ? (
               <ReplaceImageIcon data-icon="inline-start" />
             ) : (
               <EditIcon data-icon="inline-start" />
@@ -655,7 +643,7 @@ export function CanvasResource(props: CanvasResourceProps) {
       // layout remains invariant; no wall-clock presentation state is allowed
       // to become a second Open fact and move the Title mid-close.
       data-open={open}
-      // The Shape the front is drawn in, which `canvas-resource.css` reads to
+      // The Shape the Resource is drawn in, which `canvas-resource.css` reads to
       // draw the outline below and inset the Title and glyph within it.
       data-resource-shape={drawnResourceShape}
       // A running edit is not a hover, so `canvas-resource.css` draws the active
@@ -677,8 +665,8 @@ export function CanvasResource(props: CanvasResourceProps) {
             title={title}
             label="Resource title"
             variant="resource"
-            // A Resource's Title is Title Lines (ADR 0083), and the Resource front is
-            // the one surface that draws them, so the Resource front is where the
+            // A Resource's Title is Title Lines (ADR 0083), and the drawn Resource is
+            // the one surface that draws them, so the drawn Resource is where the
             // capability is asked for.
             multiline
             onComplete={props.onCompleteTitleEdit}
@@ -728,7 +716,7 @@ export function CanvasResource(props: CanvasResourceProps) {
         {/* Withheld while the Resource is read-only for the same reason every other
             authoring affordance is — a read-only surface draws what the Resource
             shows, not what could be changed about it. */}
-        {spaceFront !== undefined && spaceSelection === undefined && spaceRail === undefined && (
+        {spaceOperations !== undefined && spaceRail === undefined && (
           <p className="canvas-resource__space-note">Reading the referenced Space…</p>
         )}
         {contextNotice !== null && (
@@ -760,7 +748,7 @@ export function CanvasResource(props: CanvasResourceProps) {
 }
 
 /**
- * A Shape's paper and edge, drawn in place of the front's own border
+ * A Shape's paper and edge, drawn in place of the Resource's own border
  * and fill, which `canvas-resource.css` withdraws for it.
  *
  * Drawn in the units of the rect the Resource is drawn at, so the drawing is
@@ -824,7 +812,7 @@ interface TitleLadderProps {
 /**
  * A Resource's Title drawn as its Title Lines (ADR 0083).
  *
- * The Resource front is the only surface that draws the ladder — everywhere else
+ * The drawn Resource is the only surface that draws the ladder — everywhere else
  * shows the name, which is the first line — and it draws it identically whether
  * the Resource is Open or Closed and whatever kind the Resource is. A Title that
  * changed shape on Opening would teach an author that Opening edits it.
@@ -858,7 +846,7 @@ function TitleLadder({ title }: TitleLadderProps) {
 }
 
 /**
- * The Resource's Title Lines, as the one heading the Resource front draws.
+ * The Resource's Title Lines, as the one heading the drawn Resource draws.
  *
  * A `span` and not a `div` or an `h2`: a `button`'s content model is phrasing
  * content, and this element sits inside ADR 0065's activation control whenever

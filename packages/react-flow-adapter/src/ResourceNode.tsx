@@ -11,7 +11,7 @@ import {
   type OnResizeStart,
   type ShouldResize,
 } from '@xyflow/react';
-import { CanvasResource, type CanvasResourceFront, type CanvasResourceProps } from '@project/ui';
+import { CanvasResource, type KindOperations, type CanvasResourceProps } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { useConnectionEndEligible } from './connection-end-eligibility';
@@ -19,10 +19,10 @@ import { useConnectionTargetProximity } from './connection-target-proximity';
 import { offersConnectionEnd } from './connection-target-reveal';
 
 /**
- * React Flow custom node: a Resource front with one Edge anchor on each of its four
+ * React Flow custom node: a drawn Resource with one Edge anchor on each of its four
  * sides. An Open Resource draws its content inside the same node (ADR 0064).
  *
- * The Resource front itself — Markdown and Reference Resource treatment, title editing, refusal
+ * The drawn Resource itself — Markdown and Reference Resource treatment, title editing, refusal
  * display, Open/Edit controls and interaction-state visuals — is the
  * production `@project/ui` `CanvasResource`. This module owns everything React
  * Flow: handles and their declared geometry, connection state, translating
@@ -38,62 +38,62 @@ const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position
  *  spread — the props themselves stay readonly to every other caller. The keys
  *  are already optional; this changes nothing but their mutability. */
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
-type MarkdownFront = Mutable<Extract<CanvasResourceFront, { kind: 'markdown' }>>;
-type ReferenceFront = Mutable<Extract<CanvasResourceFront, { kind: 'reference' }>>;
-type SpaceFront = Mutable<Extract<CanvasResourceFront, { kind: 'space' }>>;
-type ImageFront = Mutable<Extract<CanvasResourceFront, { kind: 'image' }>>;
-type UrFront = Mutable<Extract<CanvasResourceFront, { kind: 'ur' }>>;
+type MarkdownOperations = Mutable<Extract<KindOperations, { kind: 'markdown' }>>;
+type ReferenceOperations = Mutable<Extract<KindOperations, { kind: 'reference' }>>;
+type SpaceOperations = Mutable<Extract<KindOperations, { kind: 'space' }>>;
+type ImageOperations = Mutable<Extract<KindOperations, { kind: 'image' }>>;
+type UrOperations = Mutable<Extract<KindOperations, { kind: 'ur' }>>;
 
-type MutableFront = MarkdownFront | ImageFront | UrFront | ReferenceFront | SpaceFront;
+type MutableKindOperations =
+  MarkdownOperations | ImageOperations | UrOperations | ReferenceOperations | SpaceOperations;
 
 /**
- * The operations each kind's front offers. What it draws is the display's, not
- * the front's. Every kind opens and closes, so Open/Close is set once here; the
+ * The operations each kind offers. What it draws is the display's, not
+ * the operations'. Every kind opens and closes, so Open/Close is set once here; the
  * rest is by the Resource's own kind.
  */
-function frontOf(data: ResourceFlowNode['data']): CanvasResourceFront {
-  const front = kindFrontOf(data);
-  if (data.onEditResource !== undefined) front.onOpenChange = data.onEditResource;
-  return front;
+function kindOperationsOf(data: ResourceFlowNode['data']): KindOperations {
+  const kindOperations = operationsOfKind(data);
+  if (data.onEditResource !== undefined) kindOperations.onOpenChange = data.onEditResource;
+  return kindOperations;
 }
 
-function kindFrontOf(data: ResourceFlowNode['data']): MutableFront {
+function operationsOfKind(data: ResourceFlowNode['data']): MutableKindOperations {
   switch (data.kind) {
     case 'markdown': {
-      const front: MarkdownFront = { kind: 'markdown' };
+      const kindOperations: MarkdownOperations = { kind: 'markdown' };
       if (data.contentAction === 'edit-markdown' && data.onBeginBodyEditing !== undefined) {
-        front.onBeginEdit = data.onBeginBodyEditing;
+        kindOperations.onBeginEdit = data.onBeginBodyEditing;
       }
-      return front;
+      return kindOperations;
     }
     case 'image': {
       // Closed, an Image Resource draws its Title and kind and no thumbnail; Open,
       // its picture is the content, and replacing it takes the place a body edit
       // takes on a Markdown Resource.
-      const front: ImageFront = { kind: 'image' };
+      const kindOperations: ImageOperations = { kind: 'image' };
       if (data.contentAction === 'replace-image' && data.onBeginBodyEditing !== undefined) {
-        front.onBeginEdit = data.onBeginBodyEditing;
+        kindOperations.onBeginEdit = data.onBeginBodyEditing;
       }
-      return front;
+      return kindOperations;
     }
     case 'ur': {
       // An Ur Resource has no content, so it offers no edit; it takes a Shape.
-      const front: UrFront = { kind: 'ur' };
+      const kindOperations: UrOperations = { kind: 'ur' };
       if (data.onResourceShapeChange !== undefined)
-        front.onResourceShapeChange = data.onResourceShapeChange;
-      return front;
+        kindOperations.onResourceShapeChange = data.onResourceShapeChange;
+      return kindOperations;
     }
     case 'reference':
       return { kind: 'reference' };
     case 'space': {
-      // A Space Resource's own front carries nothing it authors of the target: its
+      // A Space Resource's own operations carry nothing it authors of the target: its
       // Title is the Resource's, its content is the target Space's, and the
       // composition hands down the rail fragment plus Enter.
-      const front: SpaceFront = { kind: 'space' };
-      if (data.spaceSelection !== undefined) front.selection = data.spaceSelection;
-      if (data.spaceRail !== undefined) front.spaceRail = data.spaceRail;
-      if (data.portal !== undefined) front.portal = data.portal;
-      return front;
+      const kindOperations: SpaceOperations = { kind: 'space' };
+      if (data.spaceRail !== undefined) kindOperations.spaceRail = data.spaceRail;
+      if (data.portal !== undefined) kindOperations.portal = data.portal;
+      return kindOperations;
     }
   }
 }
@@ -165,7 +165,7 @@ export function ResourceNode({
     [id, reportBodyHeight],
   );
 
-  const front = frontOf(data);
+  const kindOperations = kindOperationsOf(data);
   const display = data.display;
 
   /**
@@ -240,7 +240,7 @@ export function ResourceNode({
   // The rect React Flow draws this Resource at, which the projection declares
   // from the Resource's Placement (`canvas-projection.test.ts`, "carries each
   // authored Open rect through strategy input and node projection"). Where React
-  // Flow gives none, the front is drawn at the Closed Size.
+  // Flow gives none, the Resource is drawn at the Closed Size.
   if (width !== undefined && height !== undefined) {
     canvasResourceOptionalProps.size = { width, height };
   }
@@ -482,7 +482,7 @@ export function ResourceNode({
       {titleEditor !== undefined ? (
         <CanvasResource
           readOnly={data.readOnly}
-          front={front}
+          kindOperations={kindOperations}
           display={display}
           shape={data.shape}
           renderToolbar={renderToolbar}
@@ -497,7 +497,7 @@ export function ResourceNode({
       ) : (
         <CanvasResource
           readOnly={data.readOnly}
-          front={front}
+          kindOperations={kindOperations}
           display={display}
           shape={data.shape}
           renderToolbar={renderToolbar}

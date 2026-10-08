@@ -145,7 +145,7 @@ async function pictureIn(node: Locator, picture: Locator) {
  */
 test(
   'a Closed Image Resource draws its Title and kind at the Closed size, and no picture',
-  { tag: '@parity:image-resource-closed-front-draws-title-and-kind' },
+  { tag: '@parity:closed-image-resource-draws-title-and-kind' },
   async ({ page }) => {
     const pictureRequests: string[] = [];
     page.on('request', (request) => {
@@ -177,13 +177,13 @@ test(
 const SIZED_TO_PICTURE = { width: 408, height: 359 } as const;
 
 /**
- * An Open Image Resource is the Open Markdown front with its picture as the
+ * An Open Image Resource is drawn as an Open Markdown Resource with its picture as the
  * content. Opening changes no size, so at the Closed Size the picture is drawn
  * contained and scaled down, never enlarged, above the Title footer and named by
  * the Resource.
  */
 test(
-  'an Open Image Resource draws its picture contained in the Markdown front, at the size it already had',
+  'an Open Image Resource draws its picture contained where Markdown content is drawn, at the size it already had',
   { tag: '@parity:open-image-resource-draws-its-image' },
   async ({ page }) => {
     await serveFigure(page);
@@ -1614,17 +1614,17 @@ test(
 
     const reference = page.locator(`.react-flow__node[data-id="${referenceId}"]`);
     await openResource(reference, 'Figure');
-    const front = reference.getByRole('article', { name: 'Figure' });
-    await expect(front).toHaveAttribute('data-open', 'true');
-    await expect(front).toHaveAttribute('data-kind', 'reference');
+    const article = reference.getByRole('article', { name: 'Figure' });
+    await expect(article).toHaveAttribute('data-open', 'true');
+    await expect(article).toHaveAttribute('data-kind', 'reference');
     // Opening changes no size: the Reference Resource keeps the Closed Size.
     await expect.poll(() => authoredSize(reference)).toEqual(COLLAPSED_RESOURCE_SIZE);
 
     // The Target's picture did not load: the Reference Resource names its URL
     // and offers no Replace, which is the Image Resource's own command.
-    await expect(front.getByText('Image did not load')).toBeVisible();
-    await expect(front.getByText(FIGURE_URL)).toBeVisible();
-    await expect(front.getByRole('button', { name: /Replace/ })).toHaveCount(0);
+    await expect(article.getByText('Image did not load')).toBeVisible();
+    await expect(article.getByText(FIGURE_URL)).toBeVisible();
+    await expect(article.getByRole('button', { name: /Replace/ })).toHaveCount(0);
     const controls = await resourceControls(page, reference);
     await expect(controls.getByRole('button', { name: 'Close Resource Figure' })).toBeVisible();
     await expect(controls.getByRole('button', { name: /^Replace image of Resource/ })).toHaveCount(
@@ -1638,10 +1638,10 @@ test(
     await field.fill(NEW_URL);
     await field.press('Enter');
     await expect(target).toHaveCount(0);
-    const picture = front.getByRole('img', { name: 'Figure' });
+    const picture = article.getByRole('img', { name: 'Figure' });
     await expect(picture).toHaveAttribute('src', NEW_URL);
     await expectPictureLoaded(picture, HARBOUR_SIZE.width);
-    await expect(front.getByText('Image did not load')).toHaveCount(0);
+    await expect(article.getByText('Image did not load')).toHaveCount(0);
     await settled(page);
     expect((await storedFigure(page, spaceId)).figure).toMatchObject({ url: NEW_URL });
   },

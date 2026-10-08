@@ -252,7 +252,7 @@ const kindsArb = fc.array(
 describe('what each node shows', () => {
   /**
    * A Resource's own content is of its own kind: the display and the kind the
-   * front is chosen by are made from one Resource, so they cannot disagree for
+   * drawing is chosen by are made from one Resource, so they cannot disagree for
    * content that is the Resource's own.
    */
   it('draws content of the node’s own kind whenever the content is its own', () => {
