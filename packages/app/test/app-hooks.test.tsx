@@ -660,6 +660,7 @@ describe('useDockChrome', () => {
         projection: view.projection,
         activeGraphId,
         presenting: false,
+        present: opened.app.navigation.present,
         active: false,
         persistence: { kind: 'settled' },
         replacementEpoch: 0,

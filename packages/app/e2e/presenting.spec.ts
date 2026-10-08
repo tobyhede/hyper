@@ -135,11 +135,19 @@ test(
     await present(page);
     await expectFrameFillsTheRoom(page);
 
-    await page.setViewportSize({ width: 900, height: 900 });
-    await expectFrameFillsTheRoom(page);
-
-    await page.setViewportSize({ width: 1600, height: 500 });
-    await expectFrameFillsTheRoom(page);
+    // Present takes the window fullscreen, and a fullscreen window cannot be
+    // resized, so each other size is presented afresh.
+    for (const size of [
+      { width: 900, height: 900 },
+      { width: 1600, height: 500 },
+    ]) {
+      await page.getByTestId('exit-presenting').click();
+      await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+      await page.setViewportSize(size);
+      await presentControl(page).click();
+      await expect(stage(page)).toBeVisible();
+      await expectFrameFillsTheRoom(page);
+    }
   },
 );
 

@@ -1,5 +1,14 @@
 import type { DrawnClipboardFailure } from './embedded-publication';
-import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
@@ -8,6 +17,8 @@ import type { OpenSpace } from './open-spaces';
 import { resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
+import { presentingFullscreen } from './presenting-fullscreen';
+import { FullscreenContext } from './fullscreen-context';
 import type { DestinationOpening } from './destination-opening';
 import { useOpenSpacesStanding } from './open-spaces-context';
 import { useAddressedResource } from './addressed-resource';
@@ -114,6 +125,18 @@ export const createApp = (
     const { selectedMapId, activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
+    const fullscreen = useContext(FullscreenContext);
+    const presentation = useMemo(
+      () =>
+        presentingFullscreen(fullscreen, {
+          presenting: () => navigation.getState().mode === 'presenting',
+          subscribe: navigation.subscribe,
+          present: navigation.present,
+          exitPresenting: navigation.exitPresenting,
+        }),
+      [fullscreen],
+    );
+    useEffect(() => presentation.connect(), [presentation]);
     const { addressedResourceId, destinationNotFound } = useAddressedResource(
       browserLocation,
       useRenderAdapter,
@@ -186,6 +209,7 @@ export const createApp = (
         projection,
         activeGraphId,
         presenting,
+        present: presentation.present,
         active,
         persistence: sessionState.persistence,
         replacementEpoch,

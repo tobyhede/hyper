@@ -2,7 +2,7 @@
 
 Hyper is for technical talks and designs whose ideas connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. [React Flow](https://reactflow.dev) draws every Graph at once, each in its own colour, at the positions you chose.
 
-**Presenting is traversing a Graph on its own Stage** ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)). Present draws the Graph's first Resource on a full-window Stage, one 16:9 frame letterboxed over the canvas, which stays behind it untouched ([ADR 0123](docs/adr/0123-presenting-draws-on-its-own-stage-not-on-the-canvas.md)). Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork. Leaving presenting shows the canvas exactly as it was.
+**Presenting is traversing a Graph on its own Stage** ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)). Present takes the browser fullscreen where it can and draws the Graph's first Resource on a full-window Stage, one 16:9 frame letterboxed over the canvas, which stays behind it untouched ([ADR 0123](docs/adr/0123-presenting-draws-on-its-own-stage-not-on-the-canvas.md)). Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork. Leaving presenting shows the canvas exactly as it was.
 
 Your work is a directory of plain files, an [Aggregate directory](docs/aggregate-directory.md), that you keep in its own git repository.
 

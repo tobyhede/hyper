@@ -70,6 +70,8 @@ export interface DockChromeInput {
   readonly projection: Pick<PendingCanvasProjection, 'visibleGraphs' | 'colors'>;
   readonly activeGraphId: GraphId | null;
   readonly presenting: boolean;
+  /** Starts presenting the Active Graph, from the Dock's Present gesture. */
+  readonly present: () => void;
   /** Whether this Space is the one on the canvas. */
   readonly active: boolean;
   readonly persistence: SpaceSessionState['persistence'];
@@ -106,13 +108,14 @@ export function useDockChrome(
   input: DockChromeInput,
 ): DockChromeState {
   const { app, spaceResources } = open;
-  const { authoring, commandOutcomes, navigation } = app;
+  const { authoring, commandOutcomes } = app;
   const {
     space,
     map: selectedMap,
     projection,
     activeGraphId,
     presenting,
+    present,
     active,
     persistence,
     replacementEpoch,
@@ -384,7 +387,7 @@ export function useDockChrome(
         COPY_LINK_ACTION_ID,
       ),
       presenting,
-      onPresent: navigation.present,
+      onPresent: present,
       // An empty Graph has nothing to traverse, which is a fact about the Graph
       // rather than about authoring availability; `availability.present` covers
       // a live content edit or chrome rename owning the keyboard.
