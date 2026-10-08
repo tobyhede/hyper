@@ -4,7 +4,7 @@
 
 **Blocked by:** 02 — Image bytes travel in the Aggregate directory; 03 — Running an Aggregate directory.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #339.
 
 - [x] The quick start uses only commands that exist, and was run as written on a fresh temp directory
 - [x] "How Running works" says: content lives in its own git repo at any path; Hyper writes the working tree on every edit; git is your undo, including for a pull mid-run or two runs on one directory; a crash before a write is the one accepted loss; a `*.md` beside `space.json` is removed by Export; pictures are written to `images/`

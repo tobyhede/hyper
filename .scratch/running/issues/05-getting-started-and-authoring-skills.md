@@ -4,10 +4,10 @@
 
 **Blocked by:** 02 — Image bytes travel in the Aggregate directory; 03 — Running an Aggregate directory.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #339.
 
 - [x] Both skills follow `writing-for-agents` conventions, with descriptions that trigger on starting Hyper and on editing an Aggregate directory respectively
 - [x] `hyper-authoring` points at `docs/aggregate-directory.md` for the full reference rather than restating it
 - [x] Each skill's steps were carried out once as written
 - [x] The existing agent-skill symlink and command unit tests pass with the new skills
-- [ ] Targeted local checks pass; the draft PR's `CI passed` is green
+- [x] Targeted local checks pass; the draft PR's `CI passed` is green (PR #339: `CI passed` green)

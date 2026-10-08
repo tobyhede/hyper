@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #339.
 
 - [x] ADR 0118 is written and ADR 0106's status block names the amendment; the `CONTEXT.md` Aggregate directory entry already lists `images/`
-- [x] Export writes `images/<content-id>.<ext>` for each referenced stored image, through the existing atomic staged write
+- [x] Export writes `images/<content-id>.<ext>` for each referenced stored image, through the existing atomic staged write (since refined by ADR 0119: every Export writes in place)
 - [x] Export rewrites `images/` whole: an image no Resource references leaves the directory
 - [x] An external image URL, and a stored URL whose bytes are missing, export as URLs only and do not fail the Export
 - [x] Import admits every image in `images/` before the aggregate is stored, on memory, SQLite and PostgreSQL
@@ -15,4 +15,4 @@
 - [x] An aggregate with images round-trips byte-for-byte through Import then Export
 - [x] The fixture's separate image directory collapses into the fixture's own `images/`, and the fixture importer uses the normal Import path
 - [x] Tests extend the existing aggregate round-trip, export and import unit tests; the SQLite and PostgreSQL integration suites assert admission
-- [ ] Targeted local checks pass; the draft PR's `CI passed` is green (including the `postgres` and `sqlite` jobs)
+- [x] Targeted local checks pass; the draft PR's `CI passed` is green (including the `postgres` and `sqlite` jobs) (PR #339: `CI passed` green)
