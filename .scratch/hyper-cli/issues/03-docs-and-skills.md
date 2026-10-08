@@ -12,4 +12,4 @@
 - [x] `hyper-getting-started` creates the content directory with `init` and starts it with `run`; `hyper-authoring` names `run` in its stop-before-editing rule; each skill's changed steps were carried out once as written
 - [x] `git grep -E "pnpm start|hyper:sqlite|dangerous-truncate"` outside `.scratch/`, `docs/adr/`, `docs/superpowers/` and migrations finds nothing but the ADR 0094 filename in `README.md`'s link to it and `test/unit/hyper-cli.test.ts`'s cases asserting `--dangerous-truncate` is refused
 - [x] The agent-skill unit tests pass; `prettier --check` passes on the changed files
-- [ ] The draft PR's `CI passed` is green
+- [x] The draft PR's `CI passed` is green

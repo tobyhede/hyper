@@ -14,4 +14,4 @@
 - [x] `init` and `run` refuse `--store` as a usage error
 - [x] The `hyper` script is the process pnpm signals for `run` (as `start` `exec`s today), and the start-command integration test, renamed for `run`, still asserts it
 - [x] `pnpm start` is gone, with no alias
-- [ ] Targeted local checks pass; the draft PR's `CI passed` is green
+- [x] Targeted local checks pass; the draft PR's `CI passed` is green
