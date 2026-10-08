@@ -1,6 +1,6 @@
 # A Map is a Map wherever it is drawn
 
-**Status:** implementation under verification
+**Status:** resolved
 
 Decision: ADR 0112. Blocked by PR #331 (image replacement owns its complete attempt), which composes one image replacement per Space.
 
@@ -62,16 +62,16 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 
 | # | | Blocked by | Status |
 | --- | --- | --- | --- |
-| 01 | The canvas's own Map is a surface | — | implementation under verification |
-| 02 | A Space is composed while anything holds it | — | implementation under verification |
-| 03 | Navigation is held while any composed Space replaces an image | 02 | implementation under verification |
-| 04 | One notice area for every drawn Space | 02 | implementation under verification |
-| 05 | One policy decides authoring, inert and read-only | 01 | implementation under verification |
-| 06 | An embedded Map is a surface over its own Space | 01, 02, 04, 05 | implementation under verification |
-| 07 | Each drawing has an occurrence that selection and continuation follow | 06 | implementation under verification |
-| 08 | Create inside an embedded Map | 07 | implementation under verification |
-| 09 | Entity menu and Replace inside an embedded Map | 03, 07 | implementation under verification |
-| 10 | Edges inside an embedded Map | 07 | implementation under verification |
+| 01 | The canvas's own Map is a surface | — | resolved |
+| 02 | A Space is composed while anything holds it | — | resolved |
+| 03 | Navigation is held while any composed Space replaces an image | 02 | resolved |
+| 04 | One notice area for every drawn Space | 02 | resolved |
+| 05 | One policy decides authoring, inert and read-only | 01 | resolved |
+| 06 | An embedded Map is a surface over its own Space | 01, 02, 04, 05 | resolved |
+| 07 | Each drawing has an occurrence that selection and continuation follow | 06 | resolved |
+| 08 | Create inside an embedded Map | 07 | resolved |
+| 09 | Entity menu and Replace inside an embedded Map | 03, 07 | resolved |
+| 10 | Edges inside an embedded Map | 07 | resolved |
 
 ## Out of scope
 

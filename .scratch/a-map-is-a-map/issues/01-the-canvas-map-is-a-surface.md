@@ -4,18 +4,18 @@
 
 **Blocked by:** None (can start immediately). PR #331 must be merged.
 
-**Status:** implementation under verification
+**Status:** resolved
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
-- [ ] One module answers what a drawn Map offers from a composed Space, a Map and Graph, and a policy; the canvas mounts it for its own Map.
-- [ ] The projection is built over the Map and Graph the surface is given; the canvas's own surface is given Navigation's selection, and the module reads no Navigation itself.
-- [ ] Every collaborator the surface uses comes from the one composition it is given.
-- [ ] Existing unit, application E2E and Ladle E2E assertions pass unmodified.
-- [ ] The surface is tested through its own interface over a real composition.
+- [x] One module answers what a drawn Map offers from a composed Space, a Map and Graph, and a policy; the canvas mounts it for its own Map.
+- [x] The projection is built over the Map and Graph the surface is given; the canvas's own surface is given Navigation's selection, and the module reads no Navigation itself.
+- [x] Every collaborator the surface uses comes from the one composition it is given.
+- [x] Existing unit, application E2E and Ladle E2E assertions pass unmodified.
+- [x] The surface is tested through its own interface over a real composition.
 
 ## Answer
 
 The canvas now mounts `MapSurface` over its own composition with an explicit Map, Graph and policy. The surface owns projection, contextual authoring, the render adapter, Edge Authoring and occurrence continuation. `map-surface.test.ts` exercises the interface over a real composition. PR #331 remains the stack base by the user’s explicit approval; merging is left to the user.
 
-Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
