@@ -1,6 +1,6 @@
 # The Aggregate directory
 
-An **Aggregate directory** is the on-disk form of everything Hyper holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm start <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), and the `hyper` CLI Imports one into a database and Exports one back out. Exporting writes the same format whichever store it reads from.
+An **Aggregate directory** is the on-disk form of everything Hyper holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm hyper init <dir>` creates one, `pnpm hyper run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), and `pnpm hyper import` and `pnpm hyper export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
 
 The directory is plain files meant for git: JSON in a fixed key order, one Markdown file per Resource, and pictures named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
 
@@ -186,7 +186,7 @@ Two layers:
 - **Shape.** Zod schemas in `@project/core` check `hyper.json`, each `space.json` and each Resource's frontmatter.
 - **References.** `@project/graph` checks that every Edge, placement, `activeGraph`, `defaultMap` and Reference Resource `target` resolves inside its Space, that there are no duplicate Ids or duplicate Edges, and then the aggregate rules above across Spaces.
 
-`pnpm start` and `pnpm hyper` print what they refuse and exit non-zero. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
+`pnpm hyper run` and `pnpm hyper import` print what they refuse and exit non-zero. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
 
 ## Durable URLs and HTTP resources
 

@@ -1,11 +1,11 @@
 ---
 name: hyper-getting-started
-description: Set a person up to run Hyper on their own content from a clone of this repository — tools, install, a content directory in its own git repository, and `pnpm start`. Use when someone wants to start, try or run Hyper, or open a talk or design directory in it.
+description: Set a person up to run Hyper on their own content from a clone of this repository — tools, install, a content directory in its own git repository, `pnpm hyper init` and `pnpm hyper run`. Use when someone wants to start, try or run Hyper, or open a talk or design directory in it.
 ---
 
 # Getting started with Hyper
 
-Hyper runs from a clone of this repository. `pnpm start <dir>` **runs** an Aggregate directory: it reads `<dir>`, serves the application, and writes every edit back into `<dir>`. The person's work is that directory, kept in its own git repository; git is their undo and their history.
+Hyper runs from a clone of this repository. `pnpm hyper init <dir>` creates an Aggregate directory, and `pnpm hyper run <dir>` **runs** one: it reads `<dir>`, serves the application, and writes every edit back into `<dir>`. The person's work is that directory, kept in its own git repository; git is their undo and their history.
 
 Work from the root of the Hyper clone. Each step ends on its completion criterion.
 
@@ -18,16 +18,16 @@ Work from the root of the Hyper clone. Each step ends on its completion criterio
    Done when it exits zero.
 
 3. **Content directory.** Ask the person where their work lives, or should live. It is any path outside the Hyper clone, for example `~/talks/rust-async`.
-   - **New work:** leave the directory missing or empty; the first run creates a new Space in it. Dot-entries such as `.git` and `.DS_Store` do not count, so a fresh `git init` directory is empty.
+   - **New work:** run `pnpm hyper init <dir>`. The directory must be missing or empty; dot-entries such as `.git` and `.DS_Store` do not count, so a fresh `git init` directory is empty. It writes a new aggregate, prints `Created a new aggregate; run it with: pnpm hyper run <dir>` and exits zero without serving. A directory that is not empty is refused and nothing is written: ask the person whether they meant existing work there, or another path.
    - **Existing work:** the directory must hold `hyper.json` at its top. A directory holding only `space.json` is one Space, not an Aggregate directory, and is refused.
 
-   Done when you know the absolute path and whether it is new or existing.
+   Done when you know the absolute path and `<dir>/hyper.json` exists.
 
-4. **Start.** For the person, in their terminal: `pnpm start <dir>`. It prints the address it serves (port 4173, or the next free port) and opens their browser. Add `--port <port>` to choose the port and `--no-open` to leave the browser alone.
-   If you start it yourself, use `pnpm start <dir> --no-open`, read the printed `Running <dir> at <url>` line for the address, and stop it with SIGINT to the process group you started, so its last write lands. A stop that wrote everything prints `Stopped; <dir> holds every edit.` and exits zero; one that prints `Stopped, but the last edits were not written:` and exits 1 has lost those edits, so tell the person what it printed rather than treating the directory as written. A refused directory exits non-zero and prints its problems; fix those (the `hyper-authoring` skill covers the format) and start again.
+4. **Start.** For the person, in their terminal: `pnpm hyper run <dir>`. It prints the address it serves (port 4173, or the next free port) and opens their browser. Add `--port <port>` to choose the port and `--no-open` to leave the browser alone.
+   If you start it yourself, use `pnpm hyper run <dir> --no-open`, read the printed `Running <dir> at <url>` line for the address, and stop it with SIGINT to the process group you started, so its last write lands. A stop that wrote everything prints `Stopped; <dir> holds every edit.` and exits zero; one that prints `Stopped, but the last edits were not written:` and exits 1 has lost those edits, so tell the person what it printed rather than treating the directory as written. A missing or empty directory is refused with the `pnpm hyper init` command that creates one, so go back to step 3. Any other refused directory exits non-zero and prints its problems; fix those (the `hyper-authoring` skill covers the format) and start again.
    Done when the `Running … at <url>` line has printed and the URL answers.
 
-5. **Git.** Make the directory a git repository if it is not in one: `git -C <dir> init`. It can be done before the first start or while Hyper runs.
+5. **Git.** Make the directory a git repository if it is not in one: `git -C <dir> init`. It can be done before `init`, before the first run, or while Hyper runs.
    Done when `git -C <dir> rev-parse --show-toplevel` succeeds.
 
 6. **Explain how the run treats their files.** Tell the person, in your own words:

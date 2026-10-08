@@ -72,7 +72,7 @@ describe('commands in the Hyper getting-started and authoring skills', () => {
     const named = namedRootScripts(skill);
     const availableScripts = new Set(Object.keys(rootPackage.scripts ?? {}));
 
-    expect(named).toContain('start');
+    expect(named).toContain('hyper');
     expect(named.filter((script) => !availableScripts.has(script))).toEqual([]);
   });
 });
