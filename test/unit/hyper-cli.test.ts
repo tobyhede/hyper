@@ -10,7 +10,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -1101,6 +1101,32 @@ describe('runHyper', () => {
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: OTHER_SPACE_ID, title: 'Replacement talk' },
     ]);
+  });
+
+  it('resolves a relative import or export directory against where the author invoked pnpm', async () => {
+    const directory = await writeSingleSpaceAggregate();
+    const workingDirectory = dirname(directory);
+    const repository = new MemorySpaceRepository();
+    const output = captureIo();
+    const over = (args: readonly string[]) =>
+      runHyper(args, {
+        io: output.io,
+        newId: newUuid,
+        targets: { postgres: heldTarget(repository), sqlite: unreachedTarget('sqlite') },
+        workingDirectory,
+        launchRun: unlaunched.launchRun,
+      });
+
+    expect(await over(['import', basename(directory)])).toBe(0);
+    expect(await over(['export', 'exported'])).toBe(0);
+
+    expect(output.stderr).toEqual([]);
+    expect(output.stdout).toContain(
+      `Exported the aggregate rooted at ${SPACE_ID} to ${join(workingDirectory, 'exported')}\n`,
+    );
+    await expect(
+      access(join(workingDirectory, 'exported', AGGREGATE_FILE_NAME)),
+    ).resolves.toBeUndefined();
   });
 });
 

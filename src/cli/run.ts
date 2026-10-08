@@ -10,7 +10,7 @@ import { shellWord } from './shell-word';
 export interface HyperDependencies {
   readonly io: CliIo;
   readonly newId: () => UUID;
-  /** What a relative `init` or `run` directory is relative to: where the author invoked pnpm. */
+  /** What every relative `<dir>` is relative to: where the author invoked pnpm. */
   readonly workingDirectory: string;
   /**
    * One target per store. Only the target `--store` names is opened, and only
@@ -52,16 +52,18 @@ export const runHyper = async (
     io.stderr(USAGE);
     return 2;
   }
+  if (command.verb === 'help') {
+    io.stdout(HELP);
+    return 0;
+  }
+  const directory = resolve(workingDirectory, command.directory);
   switch (command.verb) {
-    case 'help':
-      io.stdout(HELP);
-      return 0;
     case 'init':
-      return init(resolve(workingDirectory, command.directory), { io, newId });
+      return init(directory, { io, newId });
     case 'run':
-      return launchRun({ ...command, directory: resolve(workingDirectory, command.directory) });
+      return launchRun({ ...command, directory });
     case 'import':
     case 'export':
-      return runDatabaseCli(targets[command.store], command, io, newId);
+      return runDatabaseCli(targets[command.store], { ...command, directory }, io, newId);
   }
 };
