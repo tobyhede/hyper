@@ -16,7 +16,7 @@ export interface StageProps {
 }
 
 /**
- * The surface presenting draws on (ADR 0123): one fixed 16:9 frame, the largest
+ * The surface presenting draws on: one fixed 16:9 frame, the largest
  * that fits above the chrome strip, letterboxed in the room the Stage fills.
  *
  * The frame's size never depends on its content. Content that overflows scrolls

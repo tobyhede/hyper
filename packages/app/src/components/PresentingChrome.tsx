@@ -66,7 +66,7 @@ function availableCommands(
 }
 
 /**
- * The presenter's controls, drawn in the Stage's strip below the frame (ADR 0123).
+ * The presenter's controls, drawn in the Stage's strip below the frame.
  *
  * The Stage shows one Resource and no Map, so a fork's branches are not on
  * screen; what the presenter needs is to understand their options, and
