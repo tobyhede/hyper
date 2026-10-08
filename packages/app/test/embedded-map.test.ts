@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SPACE_RESOURCE_EMBED_INSET, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { loadSpaceSnapshot, Placement, positionedStrategy } from '@project/graph';
 import {
+  bareKindData,
   AUTHORING_HANDLE_DIAMETER,
   ROUTED_EDGE_TYPE,
   type ResourceFlowNode,
@@ -84,7 +85,7 @@ const parent = (source: ResourceFlowNode, width = 1000, height = 1000): Resource
     height,
     position: { x: 800, y: 900 },
     zIndex: 10,
-    data: { ...source.data, resourceId: PARENT, kind: 'space' },
+    data: { ...source.data, resourceId: PARENT, ...bareKindData('space') },
   };
 };
 

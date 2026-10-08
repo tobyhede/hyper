@@ -1,12 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type ResourceId, type SpaceSnapshot } from '@project/core';
-import { projectResourceNodes, type ResourceFlowNode } from '@project/react-flow-adapter';
+import {
+  bareKindData,
+  isResourceNodeOf,
+  projectResourceNodes,
+  type ResourceFlowNode,
+  type ResourceFlowNodeOf,
+} from '@project/react-flow-adapter';
 import { loadSpaceSnapshot } from '@project/graph';
 import {
   decorateImageResourceNode,
   decorateMarkdownResourceNode,
   decorateSharedResourceNode,
   decorateSpaceResourceNode,
+  decorateUrResourceNode,
   type CanvasResourceDecorationContext,
 } from '../src/canvas-resource-decoration';
 import { RESOURCE_SIZE } from '../src/resource';
@@ -52,7 +59,7 @@ const projectionNode = (
     resourceId,
     title: 'A',
     readOnly,
-    kind,
+    ...bareKindData(kind),
     ...fixtureFacts(kind),
     open,
     selectedForAuthoring: false,
@@ -61,6 +68,15 @@ const projectionNode = (
     activeGraphColor: '#8a94a6',
   },
 });
+
+/** `node`, narrowed to the kind a kind's decoration takes. */
+function ofKind<K extends ResourceFlowNode['data']['kind']>(
+  node: ResourceFlowNode,
+  kind: K,
+): ResourceFlowNodeOf<K> {
+  if (!isResourceNodeOf(node, kind)) throw new Error(`${node.id} is not a ${kind} Resource`);
+  return node;
+}
 
 const spaceDocument = {
   title: 'Architecture',
@@ -115,11 +131,9 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(RESOURCE_ID, 'markdown'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onEditResource).toBeTypeOf('function');
+    expect(patch.onOpenChange).toBeTypeOf('function');
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
-    expect(patch.onBeginBodyEditing).toBeUndefined();
-    expect(patch.spaceRail).toBeUndefined();
   });
 
   /** The menu carries Connect, so this gate also gates drawing an Edge from the keyboard. */
@@ -155,7 +169,7 @@ describe('decorateSharedResourceNode', () => {
       context({ bodyEditing: true }),
     );
     expect(patch.onBeginTitleEditing).toBeUndefined();
-    expect(patch.onEditResource).toBeTypeOf('function');
+    expect(patch.onOpenChange).toBeTypeOf('function');
   });
 
   it('keeps the live content editor’s Close drawn, and inert, while authoring is withdrawn', () => {
@@ -174,9 +188,9 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(RESOURCE_ID, 'markdown', true),
       withdrawn,
     );
-    expect(patch.onEditResource).toBeTypeOf('function');
-    expect(patch.onEditResource?.(false)).toBe('retained');
-    expect(patch.onEditResource?.(true)).toBe('retained');
+    expect(patch.onOpenChange).toBeTypeOf('function');
+    expect(patch.onOpenChange?.(false)).toBe('retained');
+    expect(patch.onOpenChange?.(true)).toBe('retained');
     expect(closeResource).not.toHaveBeenCalled();
     expect(openResource).not.toHaveBeenCalled();
     expect(patch.onBeginTitleEditing).toBeUndefined();
@@ -186,7 +200,7 @@ describe('decorateSharedResourceNode', () => {
 
     expect(
       decorateSharedResourceNode(projectionNode(REFERENCE_ID, 'markdown', true), withdrawn)
-        .onEditResource,
+        .onOpenChange,
     ).toBeUndefined();
   });
 
@@ -195,7 +209,7 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(MISSING_RESOURCE_ID, 'markdown', true),
       context(),
     );
-    expect(patch.onEditResource).toBeUndefined();
+    expect(patch.onOpenChange).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeUndefined();
     expect(patch.resize).toBeUndefined();
     expect(patch.titleEditor).toBeUndefined();
@@ -283,21 +297,20 @@ describe('an Ur Resource’s decoration', () => {
       projectionNode(UR_ID, 'ur'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onEditResource).toBeUndefined();
+    expect(patch.onOpenChange).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
-    expect(patch.onBeginBodyEditing).toBeUndefined();
   });
 
-  /** Only an Ur Resource takes a Shape (ADR 0121), whatever its projected state. */
-  it('offers the Shape choice where the Map may be authored, and on an Ur Resource alone', () => {
+  /** An Ur Resource takes a Shape (ADR 0121), whatever its projected state. */
+  it('offers the Shape choice where the Map may be authored', () => {
     const changeResourceShape = vi.fn();
+    const ur = (open = false) => ofKind(projectionNode(UR_ID, 'ur', open), 'ur');
     for (const open of [false, true]) {
-      const patch = decorateSharedResourceNode(
-        projectionNode(UR_ID, 'ur', open),
+      decorateUrResourceNode(
+        ur(open),
         context({ changeResourceShape }),
-      );
-      patch.onResourceShapeChange?.('ellipse');
+      ).kindOperations.onResourceShapeChange?.('ellipse');
     }
     expect(changeResourceShape.mock.calls).toEqual([
       [UR_ID, 'ellipse'],
@@ -305,62 +318,38 @@ describe('an Ur Resource’s decoration', () => {
     ]);
 
     expect(
-      decorateSharedResourceNode(
-        projectionNode(UR_ID, 'ur'),
-        context({ changeResourceShape, authorOnCanvas: false }),
-      ).onResourceShapeChange,
+      decorateUrResourceNode(ur(), context({ changeResourceShape, authorOnCanvas: false }))
+        .kindOperations.onResourceShapeChange,
     ).toBeUndefined();
     expect(
-      decorateSharedResourceNode(
-        projectionNode(UR_ID, 'ur'),
-        context({ changeResourceShape, editableResourceIds: new Set() }),
-      ).onResourceShapeChange,
+      decorateUrResourceNode(ur(), context({ changeResourceShape, editableResourceIds: new Set() }))
+        .kindOperations.onResourceShapeChange,
     ).toBeUndefined();
     expect(
-      decorateSharedResourceNode(projectionNode(UR_ID, 'ur'), context()).onResourceShapeChange,
+      decorateUrResourceNode(ur(), context()).kindOperations.onResourceShapeChange,
     ).toBeUndefined();
-    for (const kind of ['markdown', 'reference', 'space'] as const) {
-      expect(
-        decorateSharedResourceNode(
-          projectionNode(RESOURCE_ID, kind),
-          context({ changeResourceShape }),
-        ).onResourceShapeChange,
-      ).toBeUndefined();
-    }
-  });
-
-  it('is given no editor, replacer or rail, although its caret is live', () => {
-    const ur = projectionNode(UR_ID, 'ur', true);
-    const live = context({
-      bodyEditorResourceId: UR_ID,
-      replaceResourceImage: () => Promise.resolve(null),
-    });
-    expect(decorateMarkdownResourceNode(ur, live)).toEqual({});
-    expect(decorateImageResourceNode(ur, live)).toEqual({});
-    expect(decorateSpaceResourceNode(ur, live)).toEqual({});
   });
 });
 
 describe('decorateMarkdownResourceNode', () => {
-  it('attaches body editing only to a markdown Resource', () => {
+  it('offers body editing where the canvas is authored', () => {
     const beginBodyEditing = vi.fn();
-    const markdown = projectionNode(RESOURCE_ID, 'markdown', true);
-    const patch = decorateMarkdownResourceNode(markdown, context({ beginBodyEditing }));
-    expect(patch.onBeginBodyEditing).toBeTypeOf('function');
-    patch.onBeginBodyEditing?.();
+    const markdown = ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
+    const { kindOperations } = decorateMarkdownResourceNode(
+      markdown,
+      context({ beginBodyEditing }),
+    );
+    expect(kindOperations.onBeginEdit).toBeTypeOf('function');
+    kindOperations.onBeginEdit?.();
     expect(beginBodyEditing).toHaveBeenCalledWith(markdown);
     expect(
-      decorateMarkdownResourceNode(projectionNode(REFERENCE_ID, 'reference', true), context())
-        .onBeginBodyEditing,
-    ).toBeUndefined();
-    expect(
-      decorateMarkdownResourceNode(projectionNode(SPACE_RESOURCE_ID, 'space', true), context())
-        .onBeginBodyEditing,
+      decorateMarkdownResourceNode(markdown, context({ authorOnCanvas: false })).kindOperations
+        .onBeginEdit,
     ).toBeUndefined();
   });
 
   it('enters the editing display, focused, on an Open Resource whose caret is live', () => {
-    const markdown = projectionNode(RESOURCE_ID, 'markdown', true);
+    const markdown = ofKind(projectionNode(RESOURCE_ID, 'markdown', true), 'markdown');
     const patch = decorateMarkdownResourceNode(
       markdown,
       context({ bodyEditorResourceId: RESOURCE_ID }),
@@ -376,7 +365,7 @@ describe('decorateMarkdownResourceNode', () => {
   it('leaves a Closed Resource’s display alone although its caret is live', () => {
     expect(
       decorateMarkdownResourceNode(
-        projectionNode(RESOURCE_ID, 'markdown'),
+        ofKind(projectionNode(RESOURCE_ID, 'markdown'), 'markdown'),
         context({ bodyEditorResourceId: RESOURCE_ID }),
       ).display,
     ).toBeUndefined();
@@ -385,22 +374,25 @@ describe('decorateMarkdownResourceNode', () => {
 
 describe('decorateImageResourceNode', () => {
   const IMAGE_URL = 'https://example.com/figure.png';
-  const imageNode = (open: boolean): ResourceFlowNode => {
+  const imageNode = (open: boolean): ResourceFlowNodeOf<'image'> => {
     const node = projectionNode(RESOURCE_ID, 'markdown', open);
-    return {
-      ...node,
-      data: {
-        ...node.data,
-        kind: 'image',
-        ...fixtureFacts('image'),
-        display: open
-          ? {
-              shown: 'open',
-              content: { kind: 'image', url: IMAGE_URL, via: 'self' },
-            }
-          : node.data.display,
+    return ofKind(
+      {
+        ...node,
+        data: {
+          ...node.data,
+          ...bareKindData('image'),
+          ...fixtureFacts('image'),
+          display: open
+            ? {
+                shown: 'open',
+                content: { kind: 'image', url: IMAGE_URL, via: 'self' },
+              }
+            : node.data.display,
+        },
       },
-    };
+      'image',
+    );
   };
   const replacing = context({
     bodyEditorResourceId: RESOURCE_ID,
@@ -423,45 +415,43 @@ describe('decorateImageResourceNode', () => {
 describe('decorateSpaceResourceNode', () => {
   it('omits the rail while closed, unread, or read-only', () => {
     expect(
-      decorateSpaceResourceNode(projectionNode(SPACE_RESOURCE_ID, 'space'), context()).spaceRail,
+      decorateSpaceResourceNode(
+        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
+        context(),
+      ).kindOperations.spaceRail,
     ).toBeUndefined();
     expect(
       decorateSpaceResourceNode(
-        projectionNode(SPACE_RESOURCE_ID, 'space', true),
+        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
         context({ spaceResourceTargets: NO_SPACE_RESOURCE_TARGETS }),
-      ).spaceRail,
+      ).kindOperations.spaceRail,
     ).toBeUndefined();
     expect(
-      decorateSpaceResourceNode(projectionNode(SPACE_RESOURCE_ID, 'space', true, true), context())
-        .spaceRail,
+      decorateSpaceResourceNode(
+        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true, true), 'space'),
+        context(),
+      ).kindOperations.spaceRail,
     ).toBeUndefined();
   });
 
   it('builds the rail for an Open Space Resource whose target is read, and still when authoring is withdrawn', () => {
     expect(
-      decorateSpaceResourceNode(projectionNode(SPACE_RESOURCE_ID, 'space', true), context())
-        .spaceRail,
+      decorateSpaceResourceNode(
+        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
+        context(),
+      ).kindOperations.spaceRail,
     ).toBeDefined();
     expect(
       decorateSpaceResourceNode(
-        projectionNode(SPACE_RESOURCE_ID, 'space', true),
+        ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
         context({ authorOnCanvas: false }),
-      ).spaceRail,
+      ).kindOperations.spaceRail,
     ).toBeDefined();
-  });
-
-  it('leaves markdown and Reference Resource nodes untouched', () => {
-    expect(
-      decorateSpaceResourceNode(projectionNode(RESOURCE_ID, 'markdown', true), context()),
-    ).toEqual({});
-    expect(
-      decorateSpaceResourceNode(projectionNode(REFERENCE_ID, 'reference', true), context()),
-    ).toEqual({});
   });
 
   it('withholds context notice when the rail is absent', () => {
     const patch = decorateSpaceResourceNode(
-      projectionNode(SPACE_RESOURCE_ID, 'space'),
+      ofKind(projectionNode(SPACE_RESOURCE_ID, 'space'), 'space'),
       context({ contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]) }),
     );
     expect(patch.contextNotice).toBeUndefined();
@@ -470,7 +460,7 @@ describe('decorateSpaceResourceNode', () => {
   it('carries a context notice and portal Edit once the rail is present', () => {
     const onPortalEditingChange = vi.fn();
     const patch = decorateSpaceResourceNode(
-      projectionNode(SPACE_RESOURCE_ID, 'space', true),
+      ofKind(projectionNode(SPACE_RESOURCE_ID, 'space', true), 'space'),
       context({
         contextNotices: new Map([[SPACE_RESOURCE_ID, 'Link copied.']]),
         onPortalEditingChange,
@@ -478,9 +468,9 @@ describe('decorateSpaceResourceNode', () => {
       }),
     );
     expect(patch.contextNotice).toBe('Link copied.');
-    expect(patch.portal?.editing).toBe(true);
-    expect(patch.portal?.onEditingChange).toBeTypeOf('function');
-    patch.portal?.onEditingChange(false);
+    expect(patch.kindOperations.portal?.editing).toBe(true);
+    expect(patch.kindOperations.portal?.onEditingChange).toBeTypeOf('function');
+    patch.kindOperations.portal?.onEditingChange(false);
     expect(onPortalEditingChange).toHaveBeenCalledWith(SPACE_RESOURCE_ID, false);
   });
 });

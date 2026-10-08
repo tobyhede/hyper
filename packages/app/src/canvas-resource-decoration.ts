@@ -1,19 +1,24 @@
 import type { Continuation } from './continuation';
 import {
   takesOpen,
-  takesResourceShape,
   type GraphId,
   type ResourceDocument,
   type ResourceId,
   type ResourceShape,
   type UUID,
 } from '@project/core';
-import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
+import type {
+  KindOperationsOf,
+  ResourceFlowNode,
+  ResourceFlowNodeOf,
+  ResourceNodeData,
+} from '@project/react-flow-adapter';
 import {
   beginEditing,
   beginReplacing,
   type EntityActionGroup,
   type ImageReplacement,
+  type ResourceDisplay,
 } from '@project/ui';
 import { buildSpaceResourceRail } from './build-space-resource-rail';
 import type { SpaceResourceRailContext } from './space-resource-context-commands';
@@ -27,22 +32,32 @@ import { RESOURCE_SIZE } from './resource';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
+/** Each kind's operations and decoration, built by assigning what a gate allows. */
+type MarkdownOperations = Mutable<KindOperationsOf<'markdown'>>;
+type ImageOperations = Mutable<KindOperationsOf<'image'>>;
+type UrOperations = Mutable<KindOperationsOf<'ur'>>;
+type SpaceOperations = Mutable<KindOperationsOf<'space'>>;
+type MarkdownDecoration = Mutable<KindDecoration<'markdown'>>;
+type ImageDecoration = Mutable<KindDecoration<'image'>>;
+type SpaceDecoration = Mutable<KindDecoration<'space'>>;
+
+/** What the shared decoration adds to a Resource of any kind. */
 export type CanvasResourceDataPatch = Partial<
   Pick<
     ResourceNodeData,
-    | 'onEditResource'
-    | 'onResourceShapeChange'
-    | 'onBeginTitleEditing'
-    | 'resize'
-    | 'titleEditor'
-    | 'entityActions'
-    | 'onBeginBodyEditing'
-    | 'display'
-    | 'spaceRail'
-    | 'contextNotice'
-    | 'portal'
+    'onOpenChange' | 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'
   >
 >;
+
+/**
+ * What one kind's decoration supplies: that kind's operations whole, and the
+ * display or context notice where it changes them.
+ */
+export interface KindDecoration<K extends ResourceFlowNode['data']['kind']> {
+  readonly kindOperations: KindOperationsOf<K>;
+  readonly display?: ResourceDisplay;
+  readonly contextNotice?: string;
+}
 
 /**
  * Completions and canvas facts the decorate functions read. The hook owns
@@ -108,6 +123,23 @@ export function applyResourceDataPatch(
   return { ...node, data: { ...node.data, ...patch } };
 }
 
+/**
+ * `node` with its kind's decoration. A decoration that offers nothing beyond
+ * the bare kind the projection already carries leaves the node as it is, so a
+ * Resource whose operations did not change keeps its identity.
+ */
+export function applyKindDecoration<K extends ResourceFlowNode['data']['kind']>(
+  node: ResourceFlowNodeOf<K>,
+  decoration: KindDecoration<K>,
+): ResourceFlowNodeOf<K> {
+  const offersNothing =
+    Object.keys(decoration.kindOperations).length === 1 &&
+    decoration.display === undefined &&
+    decoration.contextNotice === undefined;
+  if (offersNothing) return node;
+  return { ...node, data: { ...node.data, ...decoration } };
+}
+
 type SharedResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   | 'authorOnCanvas'
@@ -123,7 +155,11 @@ type SharedResourceDecorationContext = Pick<
   | 'completeResourceTitle'
   | 'clearCaret'
   | 'resourceEntityActions'
-  | 'changeResourceShape'
+>;
+
+type UrResourceDecorationContext = Pick<
+  CanvasResourceDecorationContext,
+  'authorOnCanvas' | 'editableResourceIds' | 'changeResourceShape'
 >;
 
 type MarkdownResourceDecorationContext = Pick<
@@ -176,17 +212,12 @@ export function decorateSharedResourceNode(
   const patch: Mutable<
     Pick<
       ResourceNodeData,
-      | 'onEditResource'
-      | 'onResourceShapeChange'
-      | 'onBeginTitleEditing'
-      | 'resize'
-      | 'titleEditor'
-      | 'entityActions'
+      'onOpenChange' | 'onBeginTitleEditing' | 'resize' | 'titleEditor' | 'entityActions'
     >
   > = {};
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && takesOpen(node.data.kind)) {
     // An Ur Resource has no content to show, so it offers no Open or Close.
-    patch.onEditResource = (open) =>
+    patch.onOpenChange = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
   } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {
     // A live content editor keeps its Close drawn when the canvas withdraws
@@ -194,18 +225,7 @@ export function decorateSharedResourceNode(
     // stays in its slot, unavailable, instead of vanishing and returning.
     // `CanvasResource` draws it disabled while the edit runs; withdrawn, it
     // also retains rather than running an Open or Close Edit.
-    patch.onEditResource = () => 'retained';
-  }
-  const changeResourceShape = context.changeResourceShape;
-  if (
-    resourceBelongsToWorkingSpace &&
-    context.authorOnCanvas &&
-    changeResourceShape !== undefined &&
-    takesResourceShape(node.data.kind)
-  ) {
-    // Open and Closed alike (ADR 0121); every other kind is the rectangle.
-    patch.onResourceShapeChange = (resourceShape) =>
-      changeResourceShape(node.data.resourceId, resourceShape);
+    patch.onOpenChange = () => 'retained';
   }
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     patch.onBeginTitleEditing = () => context.beginTitleEditing(node.id);
@@ -263,10 +283,11 @@ export function decorateSharedResourceNode(
 }
 
 export function decorateMarkdownResourceNode(
-  node: ResourceFlowNode,
+  node: ResourceFlowNodeOf<'markdown'>,
   context: MarkdownResourceDecorationContext,
-): CanvasResourceDataPatch {
-  const patch: Mutable<Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'display'>>> = {};
+): KindDecoration<'markdown'> {
+  const kindOperations: MarkdownOperations = { kind: 'markdown' };
+  const decoration: MarkdownDecoration = { kindOperations };
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (
     resourceBelongsToWorkingSpace &&
@@ -274,7 +295,7 @@ export function decorateMarkdownResourceNode(
     !context.bodyEditing &&
     node.data.contentAction === 'edit-markdown'
   ) {
-    patch.onBeginBodyEditing = () => context.beginBodyEditing(node);
+    kindOperations.onBeginEdit = () => context.beginBodyEditing(node);
   }
   if (
     resourceBelongsToWorkingSpace &&
@@ -290,9 +311,9 @@ export function decorateMarkdownResourceNode(
     // nothing until it arrives. It takes focus, since the author just asked
     // to write.
     const display = beginEditing(node.data.display, editor, true);
-    if (display !== node.data.display) patch.display = display;
+    if (display !== node.data.display) decoration.display = display;
   }
-  return patch;
+  return decoration;
 }
 
 /**
@@ -301,15 +322,16 @@ export function decorateMarkdownResourceNode(
  * replacement while the caret is on it.
  */
 export function decorateImageResourceNode(
-  node: ResourceFlowNode,
+  node: ResourceFlowNodeOf<'image'>,
   context: ImageResourceDecorationContext,
-): CanvasResourceDataPatch {
+): KindDecoration<'image'> {
   const replace = context.replaceResourceImage;
-  if (node.data.contentAction !== 'replace-image') return {};
-  const patch: Mutable<Partial<Pick<ResourceNodeData, 'onBeginBodyEditing' | 'display'>>> = {};
+  const kindOperations: ImageOperations = { kind: 'image' };
+  const decoration: ImageDecoration = { kindOperations };
+  if (node.data.contentAction !== 'replace-image') return decoration;
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
-    patch.onBeginBodyEditing = () => context.beginBodyEditing(node);
+    kindOperations.onBeginEdit = () => context.beginBodyEditing(node);
   }
   if (resourceBelongsToWorkingSpace && context.bodyEditorResourceId === node.id) {
     const resourceId = node.data.resourceId;
@@ -319,17 +341,36 @@ export function decorateImageResourceNode(
       onEnd: () => context.clearCaret(),
     };
     const display = beginReplacing(node.data.display, replacer);
-    if (display !== node.data.display) patch.display = display;
+    if (display !== node.data.display) decoration.display = display;
   }
-  return patch;
+  return decoration;
+}
+
+/** An Ur Resource's Shape choice, offered Open and Closed alike (ADR 0121). */
+export function decorateUrResourceNode(
+  node: ResourceFlowNodeOf<'ur'>,
+  context: UrResourceDecorationContext,
+): KindDecoration<'ur'> {
+  const kindOperations: UrOperations = { kind: 'ur' };
+  const changeResourceShape = context.changeResourceShape;
+  if (
+    context.editableResourceIds.has(node.data.resourceId) &&
+    context.authorOnCanvas &&
+    changeResourceShape !== undefined
+  ) {
+    kindOperations.onResourceShapeChange = (resourceShape) =>
+      changeResourceShape(node.data.resourceId, resourceShape);
+  }
+  return { kindOperations };
 }
 
 export function decorateSpaceResourceNode(
-  node: ResourceFlowNode,
+  node: ResourceFlowNodeOf<'space'>,
   context: SpaceResourceDecorationContext,
-): CanvasResourceDataPatch {
-  if (node.data.contentAction !== 'author-space-view') return {};
-  const patch: Mutable<Pick<ResourceNodeData, 'spaceRail' | 'contextNotice' | 'portal'>> = {};
+): KindDecoration<'space'> {
+  const kindOperations: SpaceOperations = { kind: 'space' };
+  const decoration: SpaceDecoration = { kindOperations };
+  if (node.data.contentAction !== 'author-space-view') return decoration;
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   const spaceDocument = context.spaceDocuments.get(node.data.resourceId);
   const target =
@@ -361,7 +402,7 @@ export function decorateSpaceResourceNode(
         };
       }
     }
-    patch.spaceRail = buildSpaceResourceRail({
+    kindOperations.spaceRail = buildSpaceResourceRail({
       target,
       document: spaceDocument,
       disabled: !(resourceBelongsToWorkingSpace && context.authorOnCanvas),
@@ -372,20 +413,20 @@ export function decorateSpaceResourceNode(
       context: railContext,
     });
   }
-  if (patch.spaceRail !== undefined) {
+  if (kindOperations.spaceRail !== undefined) {
     const notice = context.contextNotices.get(node.data.resourceId);
-    if (notice !== undefined) patch.contextNotice = notice;
+    if (notice !== undefined) decoration.contextNotice = notice;
   }
   const onPortalEditingChange = context.onPortalEditingChange;
   if (
     onPortalEditingChange !== undefined &&
     node.data.open === true &&
-    patch.spaceRail !== undefined
+    kindOperations.spaceRail !== undefined
   ) {
-    patch.portal = {
+    kindOperations.portal = {
       editing: context.portalEditing?.has(node.data.resourceId) === true,
       onEditingChange: (editing) => onPortalEditingChange(node.data.resourceId, editing),
     };
   }
-  return patch;
+  return decoration;
 }

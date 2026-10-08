@@ -3,7 +3,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { uuidSchema } from '@project/core';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import type { OpenSpace } from '../src/open-spaces';
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import {
@@ -34,7 +34,7 @@ const spaceResource = (resourceId: typeof HOST, mapId: typeof MAP): ResourceFlow
     resourceId,
     title: 'Elsewhere',
     readOnly: false,
-    kind: 'space',
+    ...bareKindData('space'),
     ...fixtureFacts('space'),
     open: true,
     selectedForAuthoring: false,

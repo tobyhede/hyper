@@ -5,7 +5,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type UUID } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
@@ -90,7 +90,7 @@ function resourceNode(): ResourceFlowNode {
       resourceId: RESOURCE_ID,
       title: 'A',
       readOnly: false,
-      kind: 'markdown',
+      ...bareKindData('markdown'),
       ...fixtureFacts('markdown'),
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,

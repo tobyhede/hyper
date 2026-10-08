@@ -21,11 +21,8 @@ const tabStops = () => railButtons().filter((button) => button.tabIndex === 0);
 const openMarkdownResource = () =>
   render(
     <CanvasResource
-      kindOperations={{
-        kind: 'markdown',
-        onOpenChange: vi.fn(),
-        onBeginEdit: vi.fn(),
-      }}
+      kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+      onOpenChange={vi.fn()}
       display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
       state="rest"
       title="A"
@@ -53,11 +50,8 @@ describe('the Resource rail is one toolbar', () => {
     // because a canvas draws many Resources and each one has a rail.
     rerender(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange: vi.fn(),
-          onBeginEdit: vi.fn(),
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+        onOpenChange={vi.fn()}
         display={beginEditing(
           { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
           { onComplete: vi.fn(), onEnd: vi.fn() },
@@ -93,11 +87,8 @@ describe('the Resource rail is one toolbar', () => {
     const onOpenChange = vi.fn();
     render(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange,
-          onBeginEdit: vi.fn(),
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+        onOpenChange={onOpenChange}
         display={beginEditing(
           { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
           { onComplete: vi.fn(), onEnd: vi.fn() },
@@ -135,11 +126,8 @@ describe('the Resource rail is one toolbar', () => {
     render(
       <div onKeyDown={onKeyDown}>
         <CanvasResource
-          kindOperations={{
-            kind: 'markdown',
-            onOpenChange: vi.fn(),
-            onBeginEdit: vi.fn(),
-          }}
+          kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+          onOpenChange={vi.fn()}
           display={{
             shown: 'open',
             content: { kind: 'markdown', source: 'Markdown', via: 'self' },
@@ -193,11 +181,8 @@ describe('the rail says whose command each one is', () => {
   it("keeps the shared group while an edit replaces the kind's own commands", () => {
     render(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange: vi.fn(),
-          onBeginEdit: vi.fn(),
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+        onOpenChange={vi.fn()}
         display={beginEditing(
           { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } },
           { onComplete: vi.fn(), onEnd: vi.fn() },
@@ -224,7 +209,8 @@ describe('the rail says whose command each one is', () => {
   it('draws Reference Resource Open in the shared Resource command group', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'reference', onOpenChange: () => 'completed' }}
+        kindOperations={{ kind: 'reference' }}
+        onOpenChange={() => 'completed'}
         display={CLOSED_DISPLAY}
         state="rest"
         title="A"

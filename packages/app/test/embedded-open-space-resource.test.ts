@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { uuidSchema, type Resource } from '@project/core';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { CLOSED_DISPLAY, type ResourceDisplay } from '@project/ui';
 import { DRAG_TILT_RADIANS, tiltResourcePosition } from '../src/drag-tilt';
 import { embeddedMap } from '../src/embedded-map';
@@ -84,7 +84,7 @@ const openSpaceResource = (
     resourceId,
     title: 'Elsewhere',
     readOnly: false,
-    kind: geometry.kind ?? 'space',
+    ...bareKindData(geometry.kind ?? 'space'),
     contentAction: geometry.kind === 'reference' ? 'none' : 'author-space-view',
     embedsMap: geometry.kind !== 'markdown',
     open: geometry.open ?? true,
@@ -341,7 +341,7 @@ describe('embedded open Space Resource discovery', () => {
         resourceId: CHILD_RESOURCE,
         title: 'Note',
         readOnly: false,
-        kind: 'markdown',
+        ...bareKindData('markdown'),
         ...fixtureFacts('markdown'),
         open: false,
         selectedForAuthoring: false,
@@ -426,7 +426,7 @@ describe('embedded open Space Resource discovery', () => {
         resourceId: CHILD_RESOURCE,
         title: 'Note',
         readOnly: false,
-        kind: 'markdown',
+        ...bareKindData('markdown'),
         ...fixtureFacts('markdown'),
         open: true,
         selectedForAuthoring: false,
@@ -499,7 +499,7 @@ describe('the body height an embedding is clipped by', () => {
     expect(
       reportsBodyHeight({
         ...node,
-        data: { ...node.data, kind: 'image', embedsMap: false },
+        data: { ...node.data, ...bareKindData('image'), embedsMap: false },
       }),
     ).toBe(false);
   });

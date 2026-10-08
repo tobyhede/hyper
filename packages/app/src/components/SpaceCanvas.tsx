@@ -676,7 +676,7 @@ export function SpaceCanvas({
                 ...stamped,
                 data: {
                   ...stamped.data,
-                  onEditResource: () => {
+                  onOpenChange: () => {
                     void resumeEmbedded(request.spaceId);
                     return 'retained';
                   },

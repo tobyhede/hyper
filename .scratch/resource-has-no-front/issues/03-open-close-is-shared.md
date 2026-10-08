@@ -4,11 +4,11 @@
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Spec:** `.scratch/resource-has-no-front/spec.md`, decisions 6–7.
 
-- [ ] `onEditResource` → `onOpenChange` lands as a rename-only commit.
-- [ ] No arm of `KindOperations` carries `onOpenChange`; `CanvasResource` takes it as a shared prop.
-- [ ] No `preview` arm; `NewResourcePreview` draws what it drew.
-- [ ] E2E and Ladle E2E unchanged.
+- [x] `onEditResource` → `onOpenChange` lands as a rename-only commit.
+- [x] No arm of `KindOperations` carries `onOpenChange`; `CanvasResource` takes it as a shared prop.
+- [x] No `preview` arm; `NewResourcePreview` draws what it drew.
+- [x] E2E and Ladle E2E unchanged.

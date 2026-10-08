@@ -74,7 +74,7 @@ export function NewResourcePreview({
         }}
       >
         <CanvasResource
-          kindOperations={{ kind: 'preview' }}
+          kindOperations={{ kind: 'markdown' }}
           display={CLOSED_DISPLAY}
           state="rest"
           title={title}

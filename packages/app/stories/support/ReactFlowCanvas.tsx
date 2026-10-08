@@ -393,7 +393,7 @@ interface CanvasResourceNodeSpecimenBaseProps {
   readonly editingTitle?: boolean;
   readonly graphColor?: string;
   /**
-   * Whether this specimen supplies the Open/Close operation, `onEditResource`.
+   * Whether this specimen supplies the Open/Close operation, `onOpenChange`.
    * Every Resource kind Opens and Closes through the same operation (ADR
    * 0070), so this defaults to true regardless of kind; a story asking for a
    * Resource with no Open capability at all sets it false.
@@ -493,7 +493,7 @@ export function CanvasResourceNodeSpecimen({
     readOnly,
     onBeginTitleEditing: () => undefined,
   };
-  if (openOperationEnabled) data.onEditResource = onOpenChange ?? (() => 'completed');
+  if (openOperationEnabled) data.onOpenChange = onOpenChange ?? (() => 'completed');
   if (open !== undefined) data.open = open;
   if (title !== undefined) data.title = title;
   if (kind === 'image') data.kind = kind;
