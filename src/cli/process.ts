@@ -1,4 +1,4 @@
-import type { CliIo } from './run';
+import type { CliIo } from './database-command';
 
 /** The process's own streams, which only an entry module may name. */
 export const processIo: CliIo = {

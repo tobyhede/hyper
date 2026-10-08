@@ -188,7 +188,7 @@ export const startRun = async (directory: string, options: RunOptions): Promise<
     let imported;
     try {
       imported = await importAggregate(directory, repository, {
-        truncate: false,
+        replace: false,
         newId: options.newId,
       });
     } catch (error) {

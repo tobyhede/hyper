@@ -5,7 +5,11 @@ import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/cor
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCliMain } from '../../src/cli/main';
-import { runHyper, type CliIo } from '../../src/cli/run';
+import type { DatabaseCommand } from '../../src/cli/arguments';
+import type { CliIo } from '../../src/cli/database-command';
+import { runHyper } from '../../src/cli/run';
+import type { DatabaseTarget } from '../../src/database/database-target';
+import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
 import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
@@ -16,8 +20,7 @@ const GRAPH_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 
-const USAGE =
-  'Usage: hyper [<aggregate-path>] [--dangerous-truncate]\n       hyper export <destination-directory>\n';
+const USAGE = 'Usage: hyper <init|run|import|export|help> [arguments]\n';
 
 const storedSpace: LoadedSpace = {
   snapshot: {
@@ -82,6 +85,33 @@ const captureIo = (): CapturedIo => {
   };
 };
 
+interface OverRepository {
+  readonly repository: SpaceRepository;
+  readonly io: CliIo;
+  readonly newId: () => UUID;
+}
+
+/** A target over a repository the test already holds, closed as a no-op. */
+const heldTarget = (repository: SpaceRepository): DatabaseTarget => ({
+  open: () => Promise.resolve({ repository, close: () => Promise.resolve() }),
+});
+
+/** A target the command line must never reach. */
+const unreachedTarget = (store: string): DatabaseTarget => ({
+  open: () => Promise.reject(new Error(`${store} was opened`)),
+});
+
+/** Run a command line whose default store, PostgreSQL, is the held repository. */
+const hyperOver = (
+  args: readonly string[],
+  { repository, io, newId }: OverRepository,
+): Promise<number> =>
+  runHyper(args, {
+    io,
+    newId,
+    targets: { postgres: heldTarget(repository), sqlite: unreachedTarget('sqlite') },
+  });
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
@@ -93,7 +123,7 @@ describe('runHyper', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const output = captureIo();
 
-    const exitCode = await runHyper(['export', destination], {
+    const exitCode = await hyperOver(['export', destination], {
       repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: output.io,
       newId: newUuid,
@@ -128,7 +158,7 @@ describe('runHyper', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const output = captureIo();
 
-    const exitCode = await runHyper(['export', destination], {
+    const exitCode = await hyperOver(['export', destination], {
       repository: new MemorySpaceRepository(),
       io: output.io,
       newId: newUuid,
@@ -153,7 +183,7 @@ describe('runHyper', () => {
     await writeFile(join(spaceDirectory, 'resources', 'nested', 'keep.md'), 'keep nested\n');
     await writeFile(join(destination, 'notes.txt'), 'keep root\n');
 
-    const exitCode = await runHyper(['export', destination], {
+    const exitCode = await hyperOver(['export', destination], {
       repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: captureIo().io,
       newId: newUuid,
@@ -179,7 +209,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository([{ ...storedSpace, revision }], SPACE_ID);
 
     await expect(
-      runHyper(['export', destination], {
+      hyperOver(['export', destination], {
         repository,
         io: captureIo().io,
         newId: newUuid,
@@ -202,7 +232,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', destination], { repository, io: output.io, newId: newUuid }),
+      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr[0]).toMatch(/^Export failed:/);
@@ -239,7 +269,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', destination], { repository, io: output.io, newId: newUuid }),
+      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stdout).toEqual([]);
@@ -260,7 +290,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', destination], { repository, io: output.io, newId: newUuid }),
+      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -291,7 +321,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', destination], { repository, io: output.io, newId: newUuid }),
+      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -322,7 +352,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', destination], { repository, io: output.io, newId: newUuid }),
+      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -369,7 +399,7 @@ describe('runHyper', () => {
     };
 
     await expect(
-      runHyper(['export', destination], {
+      hyperOver(['export', destination], {
         repository,
         io: captureIo().io,
         newId: newUuid,
@@ -407,7 +437,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      runHyper(['export', destination], { repository, io: output.io, newId: newUuid }),
+      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(0);
 
     expect(output.stdout).toEqual([
@@ -478,7 +508,7 @@ describe('runHyper', () => {
     };
 
     await expect(
-      runHyper(['export', destination], {
+      hyperOver(['export', destination], {
         repository: new MemorySpaceRepository(
           [{ snapshot, revision: 7n, exportedRevision: null }],
           SPACE_ID,
@@ -520,7 +550,7 @@ describe('runHyper', () => {
     };
 
     await expect(
-      runHyper(['export', destination], {
+      hyperOver(['export', destination], {
         repository: new MemorySpaceRepository([reordered], SPACE_ID),
         io: captureIo().io,
         newId: newUuid,
@@ -554,7 +584,7 @@ describe('runHyper', () => {
     };
 
     await expect(
-      runHyper(['export', destination], {
+      hyperOver(['export', destination], {
         repository: new MemorySpaceRepository([withMixedLineEndings], SPACE_ID),
         io: captureIo().io,
         newId: newUuid,
@@ -569,49 +599,48 @@ describe('runHyper', () => {
     expect(resourceFile).toContain('\nFirst\nSecond\nThird\n');
   });
 
-  it('opens the stored Meta Space without filesystem import and preserves its revision', async () => {
-    const revision = 9_007_199_254_740_993n;
-    const output = captureIo();
-
-    const exitCode = await runHyper([], {
-      repository: new MemorySpaceRepository([{ ...storedSpace, revision }], SPACE_ID),
-      io: output.io,
-      newId: newUuid,
-    });
-
-    expect(exitCode).toBe(0);
-    expect(output.stdout).toEqual([`Opened space ${SPACE_ID} at revision 9007199254740993\n`]);
-    expect(output.stderr).toEqual([]);
-  });
-
   /*
    * Export takes a destination and nothing else because it is whole-aggregate,
    * so the Space-scoped `hyper export <space-uuid> <destination>` is wrong arity
    * rather than a Space that cannot be found — which is why it belongs with the
-   * other malformed command lines and exits 2.
+   * other malformed command lines and exits 2. A path with no verb is a usage
+   * error too: the verb is never implied by the arguments.
    */
   it.each([
-    { args: ['export'] },
-    { args: ['export', SPACE_ID, 'destination'] },
+    { args: [] },
+    { args: ['space'] },
     { args: ['first', 'second'] },
+    { args: ['--dangerous-replace'] },
     { args: ['--dangerous-truncate'] },
     { args: ['space', '--unknown'] },
+    { args: ['help', 'import'] },
+    { args: ['import'] },
+    { args: ['import', 'first', 'second'] },
+    { args: ['import', 'space', '--dangerous-truncate'] },
+    { args: ['import', 'space', '--dangerous-replace', '--dangerous-replace'] },
+    { args: ['import', 'space', '--store'] },
+    { args: ['import', 'space', '--store', 'memory'] },
+    { args: ['import', 'space', '--store', 'sqlite', '--store', 'postgres'] },
+    { args: ['import', 'space', '--store=sqlite'] },
+    { args: ['export'] },
+    { args: ['export', SPACE_ID, 'destination'] },
     /*
      * An option is never a destination. Accepted on arity alone, an operator
      * mixing the two commands would write a complete aggregate into a directory
-     * named `--dangerous-truncate` and be told nothing — the unknown-flag guard
-     * below only ever sees the import path.
+     * named after the flag and be told nothing.
      */
-    { args: ['export', '--dangerous-truncate'] },
+    { args: ['export', '--dangerous-replace'] },
+    { args: ['export', 'destination', '--dangerous-replace'] },
     { args: ['export', '--unknown'] },
     { args: ['export', ''] },
-  ])('rejects invalid arguments $args', async ({ args }) => {
+    { args: ['import', ''] },
+  ])('rejects invalid arguments $args without opening a store', async ({ args }) => {
     const output = captureIo();
 
     const exitCode = await runHyper(args, {
-      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: output.io,
       newId: newUuid,
+      targets: { postgres: unreachedTarget('postgres'), sqlite: unreachedTarget('sqlite') },
     });
 
     expect(exitCode).toBe(2);
@@ -648,7 +677,11 @@ describe('runHyper', () => {
     };
     const output = captureIo();
 
-    const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
+    const exitCode = await hyperOver(['import', directory], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
 
     expect(exitCode).toBe(0);
     expect(output.stdout).toEqual([
@@ -678,10 +711,14 @@ describe('runHyper', () => {
       },
     ]);
     const repository = new MemorySpaceRepository();
-    await runHyper([directory], { repository, io: captureIo().io, newId: newUuid });
+    await hyperOver(['import', directory], { repository, io: captureIo().io, newId: newUuid });
     const output = captureIo();
 
-    const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
+    const exitCode = await hyperOver(['import', directory], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
 
     expect(exitCode).toBe(0);
     expect(output.stdout).toEqual([
@@ -691,12 +728,12 @@ describe('runHyper', () => {
     expect(output.stderr).toEqual([]);
   });
 
-  it('replaces the stored aggregate when --dangerous-truncate is given', async () => {
+  it('replaces the stored aggregate when --dangerous-replace is given', async () => {
     const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
-    const exitCode = await runHyper([directory, '--dangerous-truncate'], {
+    const exitCode = await hyperOver(['import', directory, '--dangerous-replace'], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -728,7 +765,7 @@ describe('runHyper', () => {
       Promise.resolve({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
     const output = captureIo();
 
-    const exitCode = await runHyper([directory, '--dangerous-truncate'], {
+    const exitCode = await hyperOver(['import', directory, '--dangerous-replace'], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -753,12 +790,16 @@ describe('runHyper', () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
-    const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
+    const exitCode = await hyperOver(['import', directory], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
 
     expect(exitCode).not.toBe(0);
     expect(output.stdout).toEqual([]);
     expect(output.stderr.join('')).toContain(SPACE_ID);
-    expect(output.stderr.join('')).toContain('--dangerous-truncate');
+    expect(output.stderr.join('')).toContain('--dangerous-replace');
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: SPACE_ID, title: 'Stored talk' },
     ]);
@@ -780,7 +821,11 @@ describe('runHyper', () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository();
 
-    const exitCode = await runHyper([root], { repository, io: output.io, newId: newUuid });
+    const exitCode = await hyperOver(['import', root], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
 
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
@@ -837,7 +882,11 @@ describe('runHyper', () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository();
 
-    const exitCode = await runHyper([root], { repository, io: output.io, newId: newUuid });
+    const exitCode = await hyperOver(['import', root], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
 
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
@@ -855,7 +904,11 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     repository.initializeAggregate = () => Promise.reject(new Error('connection lost'));
 
-    const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
+    const exitCode = await hyperOver(['import', directory], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
 
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
@@ -868,7 +921,11 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     repository.loadSpace = () => Promise.reject(new Error('load unavailable'));
 
-    const exitCode = await runHyper([directory], { repository, io: output.io, newId: newUuid });
+    const exitCode = await hyperOver(['import', directory], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
 
     expect(exitCode).toBe(0);
     expect(output.stdout).toEqual([
@@ -896,7 +953,11 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     repository.listSpaces = () => Promise.reject(new Error('catalog unavailable'));
 
-    const exitCode = await runHyper([root], { repository, io: output.io, newId: newUuid });
+    const exitCode = await hyperOver(['import', root], {
+      repository,
+      io: output.io,
+      newId: newUuid,
+    });
 
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([]);
@@ -906,25 +967,119 @@ describe('runHyper', () => {
     await expect(repository.loadAggregate()).resolves.toEqual({ kind: 'uninitialized' });
   });
 
-  it('classifies a no-path repository failure as database startup without a stack', async () => {
-    const output = captureIo();
+  it.each([{ args: ['help'] }, { args: ['--help'] }])(
+    'prints every verb for $args, the author verbs first, without opening a store',
+    async ({ args }) => {
+      const output = captureIo();
+
+      const exitCode = await runHyper(args, {
+        io: output.io,
+        newId: newUuid,
+        targets: { postgres: unreachedTarget('postgres'), sqlite: unreachedTarget('sqlite') },
+      });
+
+      expect(exitCode).toBe(0);
+      expect(output.stderr).toEqual([]);
+      const verbLines = output.stdout
+        .join('')
+        .split('\n')
+        .filter((line) => line.startsWith('  hyper '));
+      expect(verbLines.map((line) => line.split(/\s+/)[2])).toEqual([
+        'init',
+        'run',
+        'import',
+        'export',
+        'help',
+      ]);
+      expect(verbLines.find((line) => line.includes(' import '))).toContain(
+        '--store postgres|sqlite',
+      );
+      expect(verbLines.find((line) => line.includes(' import '))).toContain('--dangerous-replace');
+      expect(verbLines.find((line) => line.includes(' export '))).toContain(
+        '--store postgres|sqlite',
+      );
+    },
+  );
+
+  it.each([
+    { verb: 'import', store: 'sqlite' },
+    { verb: 'export', store: 'sqlite' },
+    { verb: 'import', store: 'postgres' },
+    { verb: 'export', store: 'postgres' },
+  ] as const)('opens only the store --store $store names for $verb', async ({ verb, store }) => {
     const repository = new MemorySpaceRepository();
-    repository.loadAggregate = () => Promise.reject(new Error('catalog unavailable'));
+    const directory =
+      verb === 'import'
+        ? await writeSingleSpaceAggregate()
+        : join(await makeTemporaryDirectory(), 'exported');
+    if (verb === 'export') {
+      expect(
+        await hyperOver(['import', await writeSingleSpaceAggregate()], {
+          repository,
+          io: captureIo().io,
+          newId: newUuid,
+        }),
+      ).toBe(0);
+    }
+    const output = captureIo();
+    const other = store === 'sqlite' ? 'postgres' : 'sqlite';
+    const targets =
+      store === 'sqlite'
+        ? { sqlite: heldTarget(repository), postgres: unreachedTarget(other) }
+        : { postgres: heldTarget(repository), sqlite: unreachedTarget(other) };
 
-    const exitCode = await runHyper([], { repository, io: output.io, newId: newUuid });
+    const exitCode = await runHyper([verb, directory, '--store', store], {
+      io: output.io,
+      newId: newUuid,
+      targets,
+    });
 
-    expect(exitCode).toBe(1);
-    expect(output.stdout).toEqual([]);
-    expect(output.stderr).toEqual(['Database startup failed: catalog unavailable\n']);
+    expect(output.stderr).toEqual([]);
+    expect(exitCode).toBe(0);
+  });
+
+  it('accepts --store before the directory and beside --dangerous-replace', async () => {
+    const directory = await writeSingleSpaceAggregate(OTHER_SPACE_ID, 'Replacement talk');
+    const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
+    const output = captureIo();
+
+    const exitCode = await runHyper(
+      ['import', '--store', 'sqlite', '--dangerous-replace', directory],
+      {
+        io: output.io,
+        newId: newUuid,
+        targets: { sqlite: heldTarget(repository), postgres: unreachedTarget('postgres') },
+      },
+    );
+
+    expect(output.stderr).toEqual([]);
+    expect(exitCode).toBe(0);
+    await expect(repository.listSpaces()).resolves.toEqual([
+      { id: OTHER_SPACE_ID, title: 'Replacement talk' },
+    ]);
   });
 });
 
+const exportTo = (directory: string): DatabaseCommand => ({
+  verb: 'export',
+  directory,
+  store: 'postgres',
+});
+
+const importFrom = (directory: string): DatabaseCommand => ({
+  verb: 'import',
+  directory,
+  store: 'postgres',
+  replace: false,
+});
+
 describe('runCliMain', () => {
-  it('closes the database after no-path startup succeeds', async () => {
+  it('closes the database after an export succeeds', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
     const output = captureIo();
     let closed = false;
 
-    const exitCode = await runCliMain([], {
+    const exitCode = await runCliMain(exportTo(destination), {
       repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: output.io,
       newId: newUuid,
@@ -936,17 +1091,17 @@ describe('runCliMain', () => {
 
     expect(exitCode).toBe(0);
     expect(closed).toBe(true);
-    expect(output.stdout).toEqual([`Opened space ${SPACE_ID} at revision 0\n`]);
     expect(output.stderr).toEqual([]);
   });
 
-  it('closes the database after no-path startup fails', async () => {
+  it('closes the database after an export fails', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
     const output = captureIo();
     const repository = new MemorySpaceRepository();
     repository.loadAggregate = () => Promise.reject(new Error('catalog unavailable'));
     let closed = false;
 
-    const exitCode = await runCliMain([], {
+    const exitCode = await runCliMain(exportTo(destination), {
       repository,
       io: output.io,
       newId: newUuid,
@@ -959,7 +1114,7 @@ describe('runCliMain', () => {
     expect(exitCode).toBe(1);
     expect(closed).toBe(true);
     expect(output.stdout).toEqual([]);
-    expect(output.stderr).toEqual(['Database startup failed: catalog unavailable\n']);
+    expect(output.stderr).toEqual(['Export failed: catalog unavailable\n']);
   });
 
   it('preserves the import result after awaiting a successful database close', async () => {
@@ -967,7 +1122,7 @@ describe('runCliMain', () => {
     const output = captureIo();
     let closed = false;
 
-    const exitCode = await runCliMain([directory], {
+    const exitCode = await runCliMain(importFrom(directory), {
       repository: new MemorySpaceRepository(),
       io: output.io,
       newId: newUuid,
@@ -990,7 +1145,7 @@ describe('runCliMain', () => {
     const directory = await writeSingleSpaceAggregate();
     const output = captureIo();
 
-    const exitCode = await runCliMain([directory], {
+    const exitCode = await runCliMain(importFrom(directory), {
       repository: new MemorySpaceRepository(),
       io: output.io,
       newId: newUuid,
@@ -1005,8 +1160,16 @@ describe('runCliMain', () => {
     expect(output.stderr).toEqual(['Database shutdown failed: socket stuck\n']);
   });
 
+  /*
+   * The export's own failure is reported through stderr, so a stderr that
+   * throws on that first write makes the command reject rather than answer an
+   * exit code.
+   */
   it('closes the database when the command itself throws', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
     const output = captureIo();
+    const repository = new MemorySpaceRepository();
+    repository.loadAggregate = () => Promise.reject(new Error('catalog unavailable'));
     let closed = false;
     let failNextStderr = true;
     const io: CliIo = {
@@ -1020,8 +1183,8 @@ describe('runCliMain', () => {
       },
     };
 
-    const exitCode = await runCliMain(['--bogus'], {
-      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
+    const exitCode = await runCliMain(exportTo(destination), {
+      repository,
       io,
       newId: newUuid,
       close: () => {
@@ -1037,10 +1200,13 @@ describe('runCliMain', () => {
   });
 
   it('closes the database when command failure cannot be reported', async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const repository = new MemorySpaceRepository();
+    repository.loadAggregate = () => Promise.reject(new Error('catalog unavailable'));
     let closed = false;
 
-    const exitCode = await runCliMain(['--bogus'], {
-      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
+    const exitCode = await runCliMain(exportTo(destination), {
+      repository,
       newId: newUuid,
       io: {
         stdout: () => undefined,

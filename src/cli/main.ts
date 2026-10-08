@@ -1,11 +1,11 @@
-import type { UUID } from '@project/core';
-import { runHyper, type CliIo } from './run';
-import type { SpaceRepository } from '../persistence/space-repository';
+import type { DatabaseCommand } from './arguments';
+import {
+  runDatabaseCommand,
+  type CliIo,
+  type DatabaseCommandDependencies,
+} from './database-command';
 
-interface CliMainDependencies {
-  repository: SpaceRepository;
-  io: CliIo;
-  newId: () => UUID;
+interface CliMainDependencies extends DatabaseCommandDependencies {
   close(): Promise<void>;
 }
 
@@ -21,12 +21,12 @@ const tryReport = (io: CliIo, message: string): void => {
 };
 
 export const runCliMain = async (
-  args: readonly string[],
+  command: DatabaseCommand,
   dependencies: CliMainDependencies,
 ): Promise<number> => {
   let exitCode: number;
   try {
-    exitCode = await runHyper(args, dependencies);
+    exitCode = await runDatabaseCommand(command, dependencies);
   } catch (error) {
     tryReport(dependencies.io, `Command failed: ${describeError(error)}\n`);
     exitCode = 1;

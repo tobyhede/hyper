@@ -1,24 +1,7 @@
 import type { UUID } from '@project/core';
-import { classifyStoredFailure, type LoadedSpace } from '@project/persistence';
+import { classifyStoredFailure } from '@project/persistence';
 import type { SpaceRepository } from '../persistence/space-repository';
 import { defaultContentAggregate } from './default-content';
-
-export interface OpenedDatabaseStartup {
-  kind: 'opened';
-  space: LoadedSpace;
-}
-
-export type DatabaseStartupResult = OpenedDatabaseStartup;
-
-/** Open the durable Space selected from the database catalog. */
-export const openDatabaseSelection = async (
-  repository: SpaceRepository,
-  id: UUID,
-): Promise<OpenedDatabaseStartup> => {
-  const loaded = await repository.loadSpace(id);
-  if (loaded === undefined) throw new Error(`The selected space ${id} could not be loaded`);
-  return { kind: 'opened', space: loaded };
-};
 
 /**
  * Answer the repository's one permanent Meta identity, establishing it from
@@ -155,10 +138,3 @@ export const retryMetaSpaceEstablishment = async (
     }
   }
 };
-
-/** Open the Meta Space, initializing the repository first when it has none. */
-export const resolveDatabaseStartup = async (
-  repository: SpaceRepository,
-  newId: () => UUID,
-): Promise<DatabaseStartupResult> =>
-  openDatabaseSelection(repository, await establishMetaSpace(repository, newId));

@@ -30,7 +30,7 @@ export default defineConfig({
     /**
      * One database, so one file at a time (issue `12`).
      *
-     * Truncation here is global by design — `--dangerous-truncate` deletes all
+     * Truncation here is global by design — `--dangerous-replace` deletes all
      * Hyper content (ADR 0030), and `truncateHyperContent` is what the
      * truncate-mode tests exercise. Run in parallel worker threads against the
      * single `DATABASE_URL`, one file's truncation deletes rows another file is

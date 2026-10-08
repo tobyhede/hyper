@@ -1,14 +1,21 @@
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema } from '@project/core';
-import { nextGraphColor } from '@project/graph';
 import type { DatabaseTarget, OpenedDatabaseTarget } from '../../src/database/database-target';
-import { runDatabaseCli } from '../../src/cli/database-entry';
+import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
+import { runHyper } from '../../src/cli/run';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { openSqliteRepository } from '../support/sqlite-harness';
 import { postgresTestDatabase } from '../support/postgres-database';
+import { writeAggregateInto } from '../support/aggregate-directory';
+
+const META_SPACE_ID = uuidSchema.parse('f1111111-1111-4111-8111-111111111111');
+const RESOURCE_ID = uuidSchema.parse('f2222222-2222-4222-8222-222222222222');
 
 interface CliTargetCase {
   readonly name: string;
@@ -72,8 +79,26 @@ afterAll(async () => {
   await postgresTestDatabase.close();
 });
 
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
+  );
+});
+
+const temporaryDirectory = async (): Promise<string> => {
+  const directory = await mkdtemp(join(tmpdir(), 'hyper-cli-target-'));
+  temporaryDirectories.push(directory);
+  return directory;
+};
+
+const unreachedTarget: DatabaseTarget = {
+  open: () => Promise.reject(new Error('The store --store did not name was opened')),
+};
+
 describe.each(cases)('database CLI target ($name)', (targetCase) => {
-  it('initializes and reports the same complete Default Content aggregate', async () => {
+  it('imports and exports the same aggregate through the store --store names', async () => {
     const opened = await targetCase.arrange();
     let closeCount = 0;
     const target: DatabaseTarget = {
@@ -86,72 +111,51 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
           },
         }),
     };
+    const targets =
+      targetCase.target === 'postgres'
+        ? { postgres: target, sqlite: unreachedTarget }
+        : { sqlite: target, postgres: unreachedTarget };
     const stdout = vi.fn();
     const stderr = vi.fn();
-    try {
-      await expect(runDatabaseCli(target, [], { stdout, stderr }, newUuid)).resolves.toBe(0);
-      expect(stderr).not.toHaveBeenCalled();
-      expect(stdout).toHaveBeenCalledWith(
-        expect.stringMatching(/^Opened space .+ at revision 0\n$/),
-      );
-      await expect(opened.repository.listSpaces()).resolves.toEqual([
-        expect.objectContaining({ title: 'New space' }),
-      ]);
-      const catalog = await opened.repository.listSpaces();
-      const created = catalog[0];
-      if (created === undefined) throw new Error('Expected the new Space in the catalog');
-      const stored = await opened.repository.loadSpace(created.id);
-      const firstMap = stored?.snapshot.document.maps?.[0];
-      const graph = firstMap?.graphs[0];
-      const resourceId = stored?.snapshot.resources[0]?.id;
-      if (firstMap === undefined || graph === undefined || resourceId === undefined) {
-        throw new Error('Expected a complete new Space');
-      }
-      expect(stored).toEqual({
-        snapshot: {
-          id: created.id,
-          document: {
-            version: 1,
-            title: 'New space',
-            maps: [
-              {
-                id: firstMap.id,
-                title: 'Map 1',
-                kind: 'positioned',
-                positions: { [resourceId]: { x: 0, y: 0, open: false } },
-                graphs: [
-                  {
-                    id: graph.id,
-                    title: 'Graph 1',
-                    color: nextGraphColor([]),
-                    headShape: 'arrow',
-                    edges: [],
-                  },
-                ],
-                activeGraph: graph.id,
-              },
-            ],
-            defaultMap: firstMap.id,
-          },
-          resources: [
-            {
-              id: resourceId,
-              document: { title: 'Resource 1', kind: 'markdown', body: '' },
-            },
-          ],
+    const source = await writeAggregateInto(await temporaryDirectory(), META_SPACE_ID, [
+      {
+        name: META_SPACE_ID,
+        spaceFile: JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Meta' }),
+        resources: {
+          [`${RESOURCE_ID}.md`]: `---\nid: ${RESOURCE_ID}\ntitle: Opening\nkind: markdown\n---\n\nHello.\n`,
         },
-        revision: 0n,
-        exportedRevision: null,
-      });
-      for (const id of [resourceId, firstMap.id, graph.id]) {
-        expect(uuidSchema.safeParse(id).success).toBe(true);
-      }
+      },
+    ]);
+    const destination = join(await temporaryDirectory(), 'exported');
+    try {
+      await expect(
+        runHyper(['import', source, '--store', targetCase.target], {
+          io: { stdout, stderr },
+          newId: newUuid,
+          targets,
+        }),
+      ).resolves.toBe(0);
+      expect(stderr).not.toHaveBeenCalled();
+      expect(stdout).toHaveBeenCalledWith(`Imported space ${META_SPACE_ID} at revision 0\n`);
 
-      stdout.mockClear();
-      await expect(runDatabaseCli(target, [], { stdout, stderr }, newUuid)).resolves.toBe(0);
-      expect(stdout).toHaveBeenCalledWith(`Opened space ${created.id} at revision 0\n`);
-      await expect(opened.repository.listSpaces()).resolves.toEqual([created]);
-      await expect(opened.repository.loadSpace(created.id)).resolves.toEqual(stored);
+      await expect(
+        runHyper(['export', destination, '--store', targetCase.target], {
+          io: { stdout, stderr },
+          newId: newUuid,
+          targets,
+        }),
+      ).resolves.toBe(0);
+      expect(stderr).not.toHaveBeenCalled();
+      await expect(readFile(join(destination, AGGREGATE_FILE_NAME), 'utf8')).resolves.toBe(
+        `${JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }, null, 2)}\n`,
+      );
+      await expect(
+        readFile(join(destination, META_SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
+      ).resolves.toBe(`---\nid: ${RESOURCE_ID}\ntitle: Opening\nkind: markdown\n---\n\nHello.\n`);
+      await expect(opened.repository.loadSpace(META_SPACE_ID)).resolves.toMatchObject({
+        revision: 0n,
+        exportedRevision: 0n,
+      });
       expect(closeCount).toBe(2);
     } finally {
       await opened.close();

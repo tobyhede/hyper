@@ -6,10 +6,10 @@
 
 **Status:** ready-for-agent
 
-- [ ] `import` and `export` are verbs; a path with no verb is a usage error
-- [ ] `--store postgres|sqlite` chooses the database, default `postgres`; `DATABASE_URL` and `SQLITE_PATH` still carry connection details
-- [ ] `--dangerous-replace` replaces the stored aggregate; without it an initialized store is refused with a message naming the flag
-- [ ] Bare `hyper` and any usage error print the usage line and exit 2; `help` and `--help` print every verb with one line each, `init` and `run` first
-- [ ] `pnpm hyper:sqlite`, `sqlite-entry.ts` and `--dangerous-truncate` are gone, with no alias
-- [ ] The CLI unit tests and both CLI integration suites (PostgreSQL and SQLite) are moved to the verbs
+- [x] `import` and `export` are verbs; a path with no verb is a usage error
+- [x] `--store postgres|sqlite` chooses the database, default `postgres`; `DATABASE_URL` and `SQLITE_PATH` still carry connection details
+- [x] `--dangerous-replace` replaces the stored aggregate; without it an initialized store is refused with a message naming the flag
+- [x] Bare `hyper` and any usage error print the usage line and exit 2; `help` and `--help` print every verb with one line each, `init` and `run` first
+- [x] `pnpm hyper:sqlite`, `sqlite-entry.ts` and `--dangerous-truncate` are gone, with no alias
+- [x] The CLI unit tests and both CLI integration suites (PostgreSQL and SQLite) are moved to the verbs
 - [ ] Targeted local checks pass; the draft PR's `CI passed` is green (including the `postgres` and `sqlite` jobs)

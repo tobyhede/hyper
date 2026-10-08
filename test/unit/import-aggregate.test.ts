@@ -37,7 +37,7 @@ const MAP_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
  *
  * Two lifecycle doors and no mode parameter (ADR 0078), so *which* door was
  * opened is part of the outcome rather than an implementation detail: an empty
- * repository under `--dangerous-truncate` has to initialize, and nothing but the
+ * repository under `--dangerous-replace` has to initialize, and nothing but the
  * call record tells that apart from a successful replacement. It is also how
  * "the repository was never touched" is stated — an assertion about stored state
  * would pass just as well for an import that wrote and rolled back.
@@ -144,9 +144,9 @@ const writeMetaOnlyAggregate = (
 const importFrom = (
   path: string,
   repository: SpaceRepository,
-  truncate = false,
+  replace = false,
 ): ReturnType<typeof importAggregate> =>
-  importAggregate(path, repository, { truncate, newId: countingIds() });
+  importAggregate(path, repository, { replace, newId: countingIds() });
 
 const storedMetaSpaceId = async (repository: SpaceRepository): Promise<UUID | undefined> => {
   const loaded = await repository.loadAggregate();
@@ -284,7 +284,7 @@ describe('importAggregate', () => {
     await expect(storedMetaSpaceId(repository)).resolves.toBe(META_SPACE_ID);
   });
 
-  it('replaces the stored aggregate and its Meta identity under truncate', async () => {
+  it('replaces the stored aggregate and its Meta identity under replace', async () => {
     const repository = new RecordingRepository();
     await importFrom(await writeMetaOnlyAggregate(META_SPACE_ID, 'Stored'), repository);
     const replacement = await writeMetaOnlyAggregate(OTHER_META_ID, 'Replacement');
@@ -312,7 +312,7 @@ describe('importAggregate', () => {
    * takes the initializing door once replacement says so: there is nothing to
    * truncate, and the flag does not turn a first import into anything else.
    */
-  it('initializes rather than replaces an empty repository under truncate', async () => {
+  it('initializes rather than replaces an empty repository under replace', async () => {
     const root = await writeMetaOnlyAggregate();
     const repository = new RecordingRepository();
 
@@ -334,7 +334,7 @@ describe('importAggregate', () => {
    * read, not what arrived afterwards, so it is reported as the conflict it is,
    * and the advice becomes "run it again".
    */
-  it('reports a Meta Space established during the truncate race as a conflict', async () => {
+  it('reports a Meta Space established during the replace race as a conflict', async () => {
     const stored = new MemorySpaceRepository();
     await stored.initializeAggregate({
       metaSpaceId: META_SPACE_ID,
@@ -359,7 +359,7 @@ describe('importAggregate', () => {
   });
 
   /*
-   * `--dangerous-truncate` truncates. Stored state `loadAggregate` refuses to
+   * `--dangerous-replace` truncates. Stored state `loadAggregate` refuses to
    * read is still stored state, and the flag replaces it rather than stopping
    * at the read (ADR 0094).
    */
@@ -495,7 +495,7 @@ describe('importing the images an Aggregate directory carries', () => {
     await expect(repository.loadImage(unshown.id)).resolves.toEqual(unshown);
   });
 
-  it('admits the images before replacing the stored aggregate under truncate', async () => {
+  it('admits the images before replacing the stored aggregate under replace', async () => {
     const image = await admitted(pngBytes(1));
     const stored = new MemorySpaceRepository();
     await importFrom(await writeMetaOnlyAggregate(OTHER_META_ID, 'Before'), stored);

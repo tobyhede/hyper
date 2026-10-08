@@ -34,10 +34,10 @@ export type AggregateImportResult =
 export interface AggregateImportOptions {
   /**
    * Replace the complete stored aggregate rather than initialize an empty
-   * repository. This is `--dangerous-truncate`, and the CLI is where the human
+   * repository. This is `--dangerous-replace`, and the CLI is where the human
    * choice becomes authority to call `replaceAggregate` (ADR 0078).
    */
-  readonly truncate: boolean;
+  readonly replace: boolean;
   readonly newId: () => UUID;
 }
 
@@ -75,17 +75,17 @@ const initialize = async (
 };
 
 /**
- * Initialize from the truncate path, where `already-initialized` means a race
+ * Initialize from the replace path, where `already-initialized` means a race
  * was lost rather than an overwrite was refused.
  *
- * The operator passed `--dangerous-truncate`; the repository held nothing when
+ * The operator passed `--dangerous-replace`; the repository held nothing when
  * replacement found it empty and holds a Meta Space by the time this writes,
  * because something else established one in between — `pnpm dev`'s startup, or a
  * concurrent `hyper`. Answering `already-initialized` would tell them to re-run
  * with the flag they just passed. It is the conflict outcome, whose sentence
  * already gives the true advice: nothing was written, run the command again.
  */
-const initializeUnderTruncate = async (
+const initializeUnderReplace = async (
   repository: SpaceRepository,
   input: AggregateInput,
 ): Promise<AggregateImportResult> => {
@@ -99,7 +99,7 @@ const initializeUnderTruncate = async (
  * Import one complete Meta-rooted aggregate from a canonical directory.
  *
  * Two doors, never a mode parameter on one (ADR 0078). Without
- * `--dangerous-truncate` this initializes a repository that has none, and an
+ * `--dangerous-replace` this initializes a repository that has none, and an
  * initialized repository is left exactly as it is — an import that would have
  * overwritten authored state says so instead of doing it. With it, whatever is
  * stored is truncated and the aggregate written in its place, atomically,
@@ -116,9 +116,9 @@ const initializeUnderTruncate = async (
 export const importAggregate = async (
   path: string,
   repository: SpaceRepository,
-  { truncate, newId }: AggregateImportOptions,
+  { replace, newId }: AggregateImportOptions,
 ): Promise<AggregateImportResult> =>
-  importAggregateContents(await readAggregate(path, newId), repository, { truncate });
+  importAggregateContents(await readAggregate(path, newId), repository, { replace });
 
 /**
  * Import what `readAggregate` read, for a caller that has to look at the
@@ -132,12 +132,12 @@ export const importAggregate = async (
 export const importAggregateContents = async (
   contents: AggregateDirectoryContents,
   repository: SpaceRepository,
-  { truncate }: Pick<AggregateImportOptions, 'truncate'>,
+  { replace }: Pick<AggregateImportOptions, 'replace'>,
 ): Promise<AggregateImportResult> => {
   const input: AggregateInput = { metaSpaceId: contents.metaSpaceId, spaces: contents.spaces };
   await storeImages(repository, contents.images);
 
-  if (!truncate) return initialize(repository, input);
+  if (!replace) return initialize(repository, input);
 
   const replaced = await repository.replaceAggregate(input, await repository.loadMetaSpaceId());
   switch (replaced.kind) {
@@ -148,7 +148,7 @@ export const importAggregateContents = async (
     // `replaceAggregate` refuses to establish first state, so an empty
     // repository takes the initializing door: there is nothing to truncate.
     case 'uninitialized':
-      return initializeUnderTruncate(repository, input);
+      return initializeUnderReplace(repository, input);
     case 'aggregate-refused':
       return { kind: 'aggregate-refused', errors: replaced.errors, spaces: input.spaces };
   }

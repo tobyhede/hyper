@@ -162,7 +162,7 @@ const exportTo = async (repository: MemorySpaceRepository, destination: string):
 
 const importFrom = async (destination: string): Promise<MemorySpaceRepository> => {
   const target = new MemorySpaceRepository();
-  const result = await importAggregate(destination, target, { truncate: false, newId: newUuid });
+  const result = await importAggregate(destination, target, { replace: false, newId: newUuid });
   if (result.kind !== 'imported') {
     throw new Error(
       result.kind === 'aggregate-refused'

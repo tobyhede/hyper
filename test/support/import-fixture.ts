@@ -104,7 +104,7 @@ export const importFixture = async (
       `Fixture ${directory} names stored images its images/ does not carry: ${uncarried.join(', ')}`,
     );
   }
-  const imported = await importAggregateContents(source, repository, { truncate: false });
+  const imported = await importAggregateContents(source, repository, { replace: false });
   if (imported.kind !== 'imported') {
     const because =
       imported.kind === 'aggregate-refused'

@@ -105,7 +105,7 @@ export const configuredSqlitePath = (options: SqlitePathOptions = {}): string | 
  * an unset `SQLITE_PATH`. The host lets the throw propagate at composition
  * (`src/http/sqlite-http-runtime.ts`); the CLI catches it and writes the same
  * message to stderr ahead of every other setup failure
- * (`src/cli/sqlite-entry.ts`).
+ * (`src/cli/database-entry.ts`).
  */
 export const requireConfiguredSqlitePath = (
   options: { readonly envPath?: string; readonly existing?: boolean } = {},

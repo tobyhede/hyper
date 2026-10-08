@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { newUuid } from '@project/core';
 import { runDatabaseCli } from '../../src/cli/database-entry';
+import type { DatabaseCommand } from '../../src/cli/arguments';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 
@@ -38,6 +39,12 @@ const openingTarget = (
   open: () => Promise.resolve({ repository, close }),
 });
 
+const exportCommand: DatabaseCommand = {
+  verb: 'export',
+  directory: 'destination',
+  store: 'postgres',
+};
+
 describe('database CLI entry phases', () => {
   it('reports a failing command as a command failure rather than a failure to open', async () => {
     const close = vi.fn(() => Promise.resolve());
@@ -46,7 +53,7 @@ describe('database CLI entry phases', () => {
     await expect(
       runDatabaseCli(
         openingTarget(rejectingRepository(new Error('driver exploded')), close),
-        ['export', 'destination'],
+        exportCommand,
         { stdout: vi.fn(), stderr },
         newUuid,
       ),
@@ -60,7 +67,7 @@ describe('database CLI entry phases', () => {
     const close = vi.fn(() => Promise.resolve());
     const reported: string[] = [];
     let pending = true;
-    // The usage path's only step is the `stderr` write, so a write that throws
+    // The export's failure is reported through `stderr`, so a write that throws
     // makes the command phase reject rather than return an exit code.
     const stderr = (message: string): void => {
       if (pending) {
@@ -72,8 +79,8 @@ describe('database CLI entry phases', () => {
 
     await expect(
       runDatabaseCli(
-        openingTarget(rejectingRepository(new Error('unreached')), close),
-        ['--unknown'],
+        openingTarget(rejectingRepository(new Error('driver exploded')), close),
+        exportCommand,
         { stdout: vi.fn(), stderr },
         newUuid,
       ),
@@ -88,7 +95,7 @@ describe('database CLI entry phases', () => {
     const target: DatabaseTarget = { open: () => Promise.reject(new Error('unavailable target')) };
 
     await expect(
-      runDatabaseCli(target, ['export', 'destination'], { stdout: vi.fn(), stderr }, newUuid),
+      runDatabaseCli(target, exportCommand, { stdout: vi.fn(), stderr }, newUuid),
     ).resolves.toBe(1);
 
     expect(stderr).toHaveBeenCalledWith('Database open failed: unavailable target\n');

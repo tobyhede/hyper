@@ -416,7 +416,7 @@
         "packages/http/src/index.ts",
         "packages/persistence/src/session.ts",
         "src/cli/main.ts",
-        "src/cli/run.ts",
+        "src/cli/database-command.ts",
         "scripts/start-run.ts",
         "src/aggregate-directory/space-directory.ts"
       ],
