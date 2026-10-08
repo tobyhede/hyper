@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
-import { ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
+import { bareKindData, ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { CLOSED_DISPLAY, Toolbar, ToolbarButton } from '@project/ui';
 import { authoringAvailability } from '../src/authoring-availability';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
@@ -126,7 +126,7 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       resourceId: uuidSchema.parse(id),
       title,
       readOnly: false,
-      kind: 'markdown',
+      ...bareKindData('markdown'),
       ...fixtureFacts('markdown'),
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,

@@ -7,7 +7,12 @@ import type { HTMLAttributes, ReactNode } from 'react';
 import { vi } from 'vitest';
 import { ResourceNode } from '../src/ResourceNode';
 import { ConnectionEndEligibilityContext } from '../src/connection-end-eligibility';
-import type { ResourceFlowNode, ResourceNodeData, ResourceTitleEditor } from '../src/projection';
+import {
+  bareKindData,
+  type ResourceFlowNode,
+  type ResourceNodeData,
+  type ResourceTitleEditor,
+} from '../src/projection';
 import type { ResourceContent } from '@project/core';
 import {
   beginEditing,
@@ -208,7 +213,7 @@ interface Overrides {
    * `url`, a Space view, or a Target's Markdown for a Reference Resource.
    */
   content?: ResourceContent;
-  onBeginBodyEditing?: () => void;
+  onBeginEdit?: () => void;
   /** A running body edit, entered through the display as decoration enters it. */
   editor?: CanvasResourceBodyEditor;
   /** A running image replacement, entered through the display as decoration enters it. */
@@ -268,7 +273,7 @@ function props({
   source = '',
   url = 'https://example.com/harbour.png',
   content,
-  onBeginBodyEditing,
+  onBeginEdit,
   editor,
   replacer,
   resize,
@@ -281,7 +286,7 @@ function props({
     shape: resourceShape,
     resourceId,
     title,
-    kind,
+    ...bareKindData(kind),
     contentAction: contentAction(resolved),
     embedsMap: embedsMap(resolved),
     selectedForAuthoring,
@@ -302,7 +307,10 @@ function props({
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
   if (titleEditor !== undefined) data.titleEditor = titleEditor;
   if (open !== undefined) data.open = open;
-  if (onBeginBodyEditing !== undefined) data.onBeginBodyEditing = onBeginBodyEditing;
+  if (onBeginEdit !== undefined && data.kind === 'markdown')
+    data.kindOperations = { kind: 'markdown', onBeginEdit };
+  if (onBeginEdit !== undefined && data.kind === 'image')
+    data.kindOperations = { kind: 'image', onBeginEdit };
   if (resize !== undefined) data.resize = resize;
   if (connectionAuthoringEnabled !== undefined)
     data.connectionAuthoringEnabled = connectionAuthoringEnabled;
@@ -407,11 +415,46 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
+  /**
+   * Node data carries a kind's operations whole, and `ResourceNode` hands them to
+   * `CanvasResource` as they are: nothing here re-derives them from other fields.
+   */
+  it("passes a Space Resource's kind operations through whole", () => {
+    const onEditingChange = vi.fn();
+    const node = props({ kind: 'space', title: 'Elsewhere', open: true, selected: true });
+    render(
+      <ResourceNode
+        {...node}
+        data={{
+          ...node.data,
+          kind: 'space',
+          kindOperations: {
+            kind: 'space',
+            spaceRail: <button type="button">Map: Overview</button>,
+            portal: { editing: false, onEditingChange },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Map: Overview' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Resource Elsewhere' }));
+    expect(onEditingChange).toHaveBeenCalledWith(true);
+  });
+
   it("passes an Ur Resource's Shape choice through its own kind operations", () => {
     const onResourceShapeChange = vi.fn();
     const node = props({ kind: 'ur', title: 'Gateway', selected: true });
     render(
-      <ResourceNode {...node} data={{ ...node.data, shape: 'diamond', onResourceShapeChange }} />,
+      <ResourceNode
+        {...node}
+        data={{
+          ...node.data,
+          kind: 'ur',
+          kindOperations: { kind: 'ur', onResourceShapeChange },
+          shape: 'diamond',
+        }}
+      />,
     );
 
     expect(screen.getByRole('button', { name: 'Shape: Diamond' })).toBeVisible();
@@ -433,7 +476,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
           kind: 'image',
           selected: true,
           onOpenChange,
-          onBeginBodyEditing: vi.fn(),
+          onBeginEdit: vi.fn(),
         })}
       />,
     );
@@ -447,15 +490,13 @@ describe('ResourceNode canvas Resource state adapter', () => {
 
   it('offers an Image Resource Replace, and draws the upload target while it is replacing', () => {
     const url = 'https://example.com/harbour.png';
-    const onBeginBodyEditing = vi.fn();
+    const onBeginEdit = vi.fn();
     const { rerender } = render(
-      <ResourceNode
-        {...props({ kind: 'image', url, open: true, selected: true, onBeginBodyEditing })}
-      />,
+      <ResourceNode {...props({ kind: 'image', url, open: true, selected: true, onBeginEdit })} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Replace image of Resource A' }));
-    expect(onBeginBodyEditing).toHaveBeenCalledTimes(1);
+    expect(onBeginEdit).toHaveBeenCalledTimes(1);
 
     rerender(
       <ResourceNode
@@ -490,14 +531,14 @@ describe('ResourceNode canvas Resource state adapter', () => {
 
   it('renders a Space Resource through explicit non-Markdown kind operations', () => {
     const onOpenChange = vi.fn();
-    const onBeginBodyEditing = vi.fn();
+    const onBeginEdit = vi.fn();
     render(
       <ResourceNode
         {...props({
           kind: 'space',
           open: true,
           onOpenChange,
-          onBeginBodyEditing,
+          onBeginEdit,
         })}
       />,
     );
@@ -587,7 +628,7 @@ describe('ResourceNode Ur Resource', () => {
           title: 'Gateway',
           selected: true,
           onOpenChange,
-          onBeginBodyEditing: vi.fn(),
+          onBeginEdit: vi.fn(),
         })}
       />,
     );
@@ -609,7 +650,7 @@ describe('ResourceNode Ur Resource', () => {
           open: true,
           selected: true,
           onOpenChange,
-          onBeginBodyEditing: vi.fn(),
+          onBeginEdit: vi.fn(),
           resize,
         })}
       />,

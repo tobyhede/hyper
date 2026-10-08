@@ -11,7 +11,7 @@ import {
   type GraphId,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { isResourceNodeOf, type ResourceFlowNode } from '@project/react-flow-adapter';
 import type { EntityActionGroup, ImageReplacement } from '@project/ui';
 import { PICKED_IMAGE_TYPES } from './image-creation';
 import { describeImageReplacement, type ImageReplacements } from './image-replacement';
@@ -26,11 +26,13 @@ import type { DeleteConfirmation } from './delete-confirmation';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
 import type { SpaceResourceFraming } from './space-resource-framing';
 import {
+  applyKindDecoration,
   applyResourceDataPatch,
   decorateImageResourceNode,
   decorateMarkdownResourceNode,
   decorateSharedResourceNode,
   decorateSpaceResourceNode,
+  decorateUrResourceNode,
 } from './canvas-resource-decoration';
 
 type Caret =
@@ -490,7 +492,6 @@ export function useCanvasResourceAuthoring({
       completeResourceTitle,
       clearCaret,
       resourceEntityActions,
-      changeResourceShape,
     }),
     [
       availability.authorOnCanvas,
@@ -506,8 +507,15 @@ export function useCanvasResourceAuthoring({
       completeResourceTitle,
       clearCaret,
       resourceEntityActions,
-      changeResourceShape,
     ],
+  );
+  const urContext = useMemo(
+    () => ({
+      authorOnCanvas: availability.authorOnCanvas,
+      editableResourceIds,
+      changeResourceShape,
+    }),
+    [availability.authorOnCanvas, editableResourceIds, changeResourceShape],
   );
   const markdownContext = useMemo(
     () => ({
@@ -597,10 +605,10 @@ export function useCanvasResourceAuthoring({
   const markdownDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (node.data.contentAction === 'edit-markdown') {
+      if (isResourceNodeOf(node, 'markdown')) {
         next.set(
           node.id,
-          applyResourceDataPatch(node, decorateMarkdownResourceNode(node, markdownContext)),
+          applyKindDecoration(node, decorateMarkdownResourceNode(node, markdownContext)),
         );
       }
     }
@@ -609,23 +617,26 @@ export function useCanvasResourceAuthoring({
   const imageDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (node.data.contentAction === 'replace-image') {
-        next.set(
-          node.id,
-          applyResourceDataPatch(node, decorateImageResourceNode(node, imageContext)),
-        );
+      if (isResourceNodeOf(node, 'image')) {
+        next.set(node.id, applyKindDecoration(node, decorateImageResourceNode(node, imageContext)));
       }
     }
     return next;
   }, [withShared, imageContext]);
+  const urDecorated = useMemo(() => {
+    const next = new Map<string, ResourceFlowNode>();
+    for (const node of withShared) {
+      if (isResourceNodeOf(node, 'ur')) {
+        next.set(node.id, applyKindDecoration(node, decorateUrResourceNode(node, urContext)));
+      }
+    }
+    return next;
+  }, [withShared, urContext]);
   const spaceDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (node.data.contentAction === 'author-space-view') {
-        next.set(
-          node.id,
-          applyResourceDataPatch(node, decorateSpaceResourceNode(node, spaceContext)),
-        );
+      if (isResourceNodeOf(node, 'space')) {
+        next.set(node.id, applyKindDecoration(node, decorateSpaceResourceNode(node, spaceContext)));
       }
     }
     return next;
@@ -636,10 +647,11 @@ export function useCanvasResourceAuthoring({
         (node) =>
           markdownDecorated.get(node.id) ??
           imageDecorated.get(node.id) ??
+          urDecorated.get(node.id) ??
           spaceDecorated.get(node.id) ??
           node,
       ),
-    [withShared, markdownDecorated, imageDecorated, spaceDecorated],
+    [withShared, markdownDecorated, imageDecorated, urDecorated, spaceDecorated],
   );
 
   return {

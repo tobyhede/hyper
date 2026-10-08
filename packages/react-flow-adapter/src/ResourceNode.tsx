@@ -11,7 +11,7 @@ import {
   type OnResizeStart,
   type ShouldResize,
 } from '@xyflow/react';
-import { CanvasResource, type KindOperations, type CanvasResourceProps } from '@project/ui';
+import { CanvasResource, type CanvasResourceProps } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { useConnectionEndEligible } from './connection-end-eligibility';
@@ -38,58 +38,6 @@ const AUTHORING_SIDES = [Position.Top, Position.Right, Position.Bottom, Position
  *  spread — the props themselves stay readonly to every other caller. The keys
  *  are already optional; this changes nothing but their mutability. */
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
-type MarkdownOperations = Mutable<Extract<KindOperations, { kind: 'markdown' }>>;
-type ReferenceOperations = Mutable<Extract<KindOperations, { kind: 'reference' }>>;
-type SpaceOperations = Mutable<Extract<KindOperations, { kind: 'space' }>>;
-type ImageOperations = Mutable<Extract<KindOperations, { kind: 'image' }>>;
-type UrOperations = Mutable<Extract<KindOperations, { kind: 'ur' }>>;
-
-type MutableKindOperations =
-  MarkdownOperations | ImageOperations | UrOperations | ReferenceOperations | SpaceOperations;
-
-/**
- * The operations each kind offers, by the Resource's own kind. What it draws is
- * the display's, and Open and Close are every kind's.
- */
-function operationsOfKind(data: ResourceFlowNode['data']): MutableKindOperations {
-  switch (data.kind) {
-    case 'markdown': {
-      const kindOperations: MarkdownOperations = { kind: 'markdown' };
-      if (data.contentAction === 'edit-markdown' && data.onBeginBodyEditing !== undefined) {
-        kindOperations.onBeginEdit = data.onBeginBodyEditing;
-      }
-      return kindOperations;
-    }
-    case 'image': {
-      // Closed, an Image Resource draws its Title and kind and no thumbnail; Open,
-      // its picture is the content, and replacing it takes the place a body edit
-      // takes on a Markdown Resource.
-      const kindOperations: ImageOperations = { kind: 'image' };
-      if (data.contentAction === 'replace-image' && data.onBeginBodyEditing !== undefined) {
-        kindOperations.onBeginEdit = data.onBeginBodyEditing;
-      }
-      return kindOperations;
-    }
-    case 'ur': {
-      // An Ur Resource has no content, so it offers no edit; it takes a Shape.
-      const kindOperations: UrOperations = { kind: 'ur' };
-      if (data.onResourceShapeChange !== undefined)
-        kindOperations.onResourceShapeChange = data.onResourceShapeChange;
-      return kindOperations;
-    }
-    case 'reference':
-      return { kind: 'reference' };
-    case 'space': {
-      // A Space Resource's own operations carry nothing it authors of the target: its
-      // Title is the Resource's, its content is the target Space's, and the
-      // composition hands down the rail fragment plus Enter.
-      const kindOperations: SpaceOperations = { kind: 'space' };
-      if (data.spaceRail !== undefined) kindOperations.spaceRail = data.spaceRail;
-      if (data.portal !== undefined) kindOperations.portal = data.portal;
-      return kindOperations;
-    }
-  }
-}
 
 /*
  * Handle geometry is *declared*, not measured, so nothing here reports a change
@@ -158,7 +106,7 @@ export function ResourceNode({
     [id, reportBodyHeight],
   );
 
-  const kindOperations: KindOperations = operationsOfKind(data);
+  const kindOperations = data.kindOperations;
   const display = data.display;
 
   /**
@@ -384,7 +332,7 @@ export function ResourceNode({
     ((visuallySelected && !otherSelected) ||
       display.shown === 'editing' ||
       display.shown === 'replacing' ||
-      data.portal?.editing === true) &&
+      (kindOperations.kind === 'space' && kindOperations.portal?.editing === true)) &&
     !dragging &&
     !resizeActive;
   /**

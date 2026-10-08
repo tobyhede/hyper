@@ -1,8 +1,7 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
-import type { ReactNode } from 'react';
 import { CLOSED_DISPLAY } from '@project/ui';
-import type { EntityActionGroup, ResourceDisplay } from '@project/ui';
+import type { EntityActionGroup, KindOperations, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
@@ -43,15 +42,30 @@ export type ResourceTitleEditor = {
   onCancel: () => void;
 };
 
+/** What one Resource kind offers on its node: the operations `CanvasResource` takes. */
+export type KindOperationsOf<K extends Resource['kind']> = Extract<
+  KindOperations,
+  { readonly kind: K }
+>;
+
+/**
+ * A Resource's own kind beside that kind's operations, one arm per kind, so the
+ * two cannot disagree. The kind is drawn as a persistent glyph on the Resource.
+ * A Reference Resource is `reference` whatever its Target is; what it draws is
+ * its `display`.
+ */
+type ResourceKindData = {
+  [K in Resource['kind']]: { kind: K; kindOperations: KindOperationsOf<K> };
+}[Resource['kind']];
+
 /** Data carried by each custom resource node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
-export type ResourceNodeData = {
-  /**
-   * The Resource's own kind, drawn as a persistent glyph on the Resource. A
-   * Reference Resource is `reference` whatever its Target is; what it draws is
-   * its `display`.
-   */
-  kind: Resource['kind'];
+export type ResourceNodeData = ResourceKindData & ResourceNodeCommonData;
+
+/** A Resource node's data for one kind. */
+export type ResourceNodeDataOf<K extends Resource['kind']> = Extract<ResourceNodeData, { kind: K }>;
+
+type ResourceNodeCommonData = {
   /** Resolved content facts remain available while the display is Closed. */
   contentAction: ReturnType<typeof contentAction>;
   embedsMap: boolean;
@@ -72,15 +86,10 @@ export type ResourceNodeData = {
    * **Not "owns content to edit".** A Reference Resource Opens and
    * Closes through this same operation (ADR 0070), so a Reference Resource is
    * offered it exactly as a Markdown Resource is. What separates the kinds is
-   * `onBeginBodyEditing`, which the application withholds from everything but
-   * `markdown` and `image`.
+   * their `kindOperations`: a content edit is offered to `markdown` and `image`
+   * alone.
    */
   onOpenChange?: (open: boolean) => 'completed' | 'retained';
-  /**
-   * Draw this Ur Resource in another Shape on its Map (ADR 0121). Absent on
-   * every other kind, and wherever the Map may not be authored.
-   */
-  onResourceShapeChange?: (resourceShape: ResourceShape) => void;
   onBeginTitleEditing?: () => void;
   /**
    * The inline title editor this Resource is currently showing, absent on one that
@@ -107,11 +116,6 @@ export type ResourceNodeData = {
    * An Open Reference Resource draws its immutable Target's content as its own would be drawn.
    */
   open?: boolean;
-  /**
-   * Present only when the Open content may be edited: a Markdown Resource's
-   * body, or an Image Resource's image, which is replaced rather than edited.
-   */
-  onBeginBodyEditing?: () => void;
   /**
    * Resizing this Open Resource, absent on one that may not be resized.
    *
@@ -153,25 +157,6 @@ export type ResourceNodeData = {
    */
   entityActions?: readonly EntityActionGroup[];
   /**
-   * Map and Graph clusters for an Open Space Resource, assembled by the
-   * application and inserted at the head of the Resource rail.
-   *
-   * Not derived here: it describes a second Space's choices, which this
-   * projection has no reader for. Absent while the Resource is closed, the surface
-   * is read-only, or the target has not been read yet (ADR 0068, ADR 0074).
-   */
-  spaceRail?: ReactNode;
-  /**
-   * The Read/Edit boundary for an Open Space Resource's embedded target canvas.
-   *
-   * Presence is the capability. The containing canvas owns which Resources are in
-   * Edit because the embedding is sibling nodes, not markup inside the Resource.
-   */
-  portal?: {
-    readonly editing: boolean;
-    readonly onEditingChange: (editing: boolean) => void;
-  };
-  /**
    * A refusal or busy notice from this Resource's context commands. Absent or null
    * leaves the alert region unmounted.
    */
@@ -207,6 +192,36 @@ export type ResourceNodeData = {
 };
 
 export type ResourceFlowNode = Node<ResourceNodeData, 'resource'>;
+
+/** A Resource node of one kind. */
+export type ResourceFlowNodeOf<K extends Resource['kind']> = Node<
+  ResourceNodeDataOf<K>,
+  'resource'
+>;
+
+/** Whether `node` is a Resource of `kind`, narrowing its data to that kind's. */
+export function isResourceNodeOf<K extends Resource['kind']>(
+  node: ResourceFlowNode,
+  kind: K,
+): node is ResourceFlowNodeOf<K> {
+  return node.data.kind === kind;
+}
+
+/** A Resource kind with none of its operations offered yet. */
+export function bareKindData(kind: Resource['kind']): ResourceKindData {
+  switch (kind) {
+    case 'markdown':
+      return { kind, kindOperations: { kind } };
+    case 'reference':
+      return { kind, kindOperations: { kind } };
+    case 'image':
+      return { kind, kindOperations: { kind } };
+    case 'ur':
+      return { kind, kindOperations: { kind } };
+    case 'space':
+      return { kind, kindOperations: { kind } };
+  }
+}
 
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 
@@ -307,7 +322,7 @@ export function projectResourceNodes(
         resourceId: resource.id,
         title: resource.title,
         readOnly: options.readOnly ?? false,
-        kind: resource.kind,
+        ...bareKindData(resource.kind),
         contentAction: contentAction(content),
         embedsMap: embedsMap(content),
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),

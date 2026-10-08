@@ -3,7 +3,11 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
-import type { ResourceFlowNode, ResourceNodeData } from '@project/react-flow-adapter';
+import {
+  bareKindData,
+  type ResourceFlowNode,
+  type ResourceNodeData,
+} from '@project/react-flow-adapter';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from '../src/components/ResourcesPopover';
 import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
@@ -73,7 +77,7 @@ const resourceNode = (
     resourceId: id,
     title,
     readOnly: false,
-    kind,
+    ...bareKindData(kind),
     ...fixtureFacts(kind),
     selectedForAuthoring: false,
     display: CLOSED_DISPLAY,

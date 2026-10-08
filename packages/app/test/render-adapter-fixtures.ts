@@ -7,7 +7,7 @@ import {
   type ResourceContent,
   type UUID,
 } from '@project/core';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { CLOSED_DISPLAY, type ResourceDisplay } from '@project/ui';
 import type { RenderAdapter } from '../src/render-adapter';
 
@@ -22,7 +22,7 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
       resourceId: uuidSchema.parse(id),
       title,
       readOnly: false,
-      kind: 'markdown',
+      ...bareKindData('markdown'),
       ...fixtureFacts('markdown'),
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,

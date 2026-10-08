@@ -4,7 +4,7 @@
 
 **Blocked by:** 03.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Spec:** `.scratch/resource-has-no-front/spec.md`, decisions 9–10.
 
