@@ -2679,56 +2679,42 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
   );
 });
 
-test('an Edge drawn from the presented Resource is a move the presenter can take now', async ({
+test('no connection handle is visible or reachable on the presented Resource or a neighbour', async ({
   page,
 }) => {
   const A = '00000000-0000-4000-8000-000000000002';
   await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await addExistingResource(page, 'E');
   const a = nodeByTitle(page, 'A').first();
+  const b = nodeByTitle(page, 'B').first();
   await expect(a).toBeVisible();
-
-  // Explicit creation preserves Long, whose A → B move is immediately
-  // presentable; the gesture below adds a second move while presenting.
-  const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '1');
   await settled(page);
-  // The gesture below is made from the presented Resource, so A has to be selected
-  // going in.
+  // Selected going in, so the selected-Resource reveal is in play as well as
+  // the hover one.
   await a.click();
   await expect(a).toHaveClass(/selected/);
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await expect(activeResource(page)).toHaveAttribute('data-id', A);
-  const moves = page.getByTestId('presenting-moves').getByRole('button');
-  await expect(moves).toHaveText(['B']);
-  // The presenting camera closes in over two animated moves; a handle box read
-  // during them is stale by the time the mouse arrives.
   await settled(page);
+  // By coordinates: the pane takes pointer events over a presented Resource, so
+  // Playwright's actionable hover would wait on it forever.
+  const presented = await boxOf(activeResource(page), 'the presented Resource');
+  await page.mouse.move(presented.x + presented.width / 2, presented.y + presented.height / 2);
 
-  // A self-Edge is valid authored structure (ADR 0032), and it is the Edge this
-  // gesture can reach: at a zoom where the active Resource is legible every other
-  // Resource is provably off frame (ADR 0027), so the presented Resource's own handles
-  // are the only ones on screen.
-  await connectHandles(
-    page,
-    authoringHandle(activeResource(page), 'source', 'right'),
-    authoringHandle(activeResource(page), 'target', 'left'),
-  );
-
-  // Attached rather than visible: with one Graph on the Resource its inbound and
-  // outbound handles sit at the same height, so a self-Edge is a flat line whose
-  // box has no height — which Playwright reads as hidden. The moves below are
-  // what prove it was authored.
-  await expect(page.getByLabel(new RegExp(`^Edge from A to A in `))).toBeAttached();
-  await expect(persistence).toHaveAttribute('data-revision', '2');
-  await expect(persistence).toHaveText('Persisted');
-
-  // The chrome enumerates the active Resource's outgoing Edges, so the Edge just
-  // drawn is available without leaving and re-entering presentation.
-  await expect(moves).toHaveText(['B', 'A']);
+  for (const [node, handles] of [
+    [a, a.locator('.rf-resource-node__authoring-handle')],
+    [b, b.locator('.rf-resource-node__authoring-handle')],
+  ] as const) {
+    await expect(node).toBeAttached();
+    await expect(handles).toHaveCount(8);
+    for (const handle of await handles.all()) {
+      await expect(handle).toHaveCSS('opacity', '0');
+      await expect(handle).toHaveCSS('pointer-events', 'none');
+      await expect(handle).not.toHaveClass(/connectable/);
+      await expect(handle).not.toHaveAttribute('aria-label');
+    }
+  }
 });
 
 /**

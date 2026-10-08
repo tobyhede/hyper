@@ -543,8 +543,8 @@ export function SpaceCanvas({
    *
    * Every reason the answers carry lives in `authoring-availability.ts`, beside
    * the answer it governs — including why the Edge lifecycle reads
-   * `authorOnCanvas`, and why a connection is reachable on the presented
-   * Resource that `authorOnCanvas` withdraws.
+   * `authorOnCanvas`, and why a connection survives a live embedded edit that
+   * `authorOnCanvas` withdraws.
    */
   const embeddedEditing = editingEmbeddingIds.size > 0;
   useLayoutEffect(() => {

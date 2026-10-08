@@ -1103,6 +1103,19 @@ describe('ResourceNode graph authoring', () => {
     );
   });
 
+  it('offers no affordance on a Resource the flow withholds connection from', () => {
+    render(<ResourceNode {...props({ selected: true, isConnectable: false })} />);
+
+    expect(document.querySelector('.rf-resource-node__inner')).toHaveAttribute(
+      'data-connection-authoring',
+      'false',
+    );
+    expect(screen.queryByRole('button', { name: /^Connect (from|to) / })).not.toBeInTheDocument();
+    const anchors = [...document.querySelectorAll('.rf-resource-node__authoring-handle')];
+    expect(anchors).toHaveLength(8);
+    expect(anchors.every((anchor) => anchor.getAttribute('aria-hidden') === 'true')).toBe(true);
+  });
+
   it('offers no drag affordance on a read-only Resource', () => {
     render(<ResourceNode {...props({ selected: true, readOnly: true })} />);
 
@@ -1210,26 +1223,36 @@ describe('ResourceNode graph authoring', () => {
    * graph ports are `isConnectable={false}` outright, being invisible attachment
    * points for overview Edges — so they are what the switch has to reach, or
    * the flow-level flag governs nothing but whether the connection *line*
-   * renders. CSS hiding the handles while presenting is presentation, not a
-   * withdrawal: a withdrawal that depends on something being drawn over it
-   * leaves a hidden control with a live gesture.
+   * renders. CSS hiding the handles is presentation, not a withdrawal: a
+   * withdrawal that depends on something being drawn over it leaves a hidden
+   * control with a live gesture.
    */
   it.each([
-    ['no drag in flight', false, 'Connect from' as const, 'start' as const],
-    ['a drag looking for a target', true, 'Connect to' as const, 'end' as const],
+    ['no drag in flight', false, 'source' as const, 'start' as const],
+    ['a drag looking for a target', true, 'target' as const, 'end' as const],
   ])(
     'offers no connectable handle when the flow is not connectable, with %s',
-    (_name, inProgress, label, end) => {
+    (_name, inProgress, role, end) => {
       connection.inProgress = inProgress;
 
       render(<ResourceNode {...props({ selected: true, isConnectable: false })} />);
 
-      expect(connectable(label, end)).toEqual([false, false, false, false]);
-      expect(
-        screen
-          .getAllByRole('button', { name: new RegExp(`^${label} `) })
-          .map((handle) => handle.getAttribute('data-connectable') === 'true'),
-      ).toEqual([false, false, false, false]);
+      const handles = [
+        ...document.querySelectorAll(`.rf-resource-node__authoring-handle--${role}`),
+      ];
+      expect(handles).toHaveLength(4);
+      expect(handles.map((handle) => handle.getAttribute(`data-connectable-${end}`))).toEqual([
+        'false',
+        'false',
+        'false',
+        'false',
+      ]);
+      expect(handles.map((handle) => handle.getAttribute('data-connectable'))).toEqual([
+        'false',
+        'false',
+        'false',
+        'false',
+      ]);
     },
   );
 });

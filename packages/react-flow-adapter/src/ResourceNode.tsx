@@ -181,9 +181,13 @@ export function ResourceNode({
    * Read-only draws a Resource without Resource-owned controls, and a Read embedding
    * withholds the gesture — but both still draw Edges, and an Edge attaches to
    * an anchor (ADR 0087). So the four sides render either way and this decides
-   * only whether an author may take hold of one.
+   * only whether an author may take hold of one. React Flow's own
+   * `isConnectable`, resolved from the flow's `nodesConnectable`, is a term too:
+   * a canvas that withholds connection, as presenting does, must not reveal an
+   * affordance it will not honour.
    */
-  const connectionAuthoring = !data.readOnly && data.connectionAuthoringEnabled !== false;
+  const connectionAuthoring =
+    !data.readOnly && data.connectionAuthoringEnabled !== false && isConnectable;
 
   const renderAuthoringHandle = (
     side: (typeof AUTHORING_SIDES)[number],
@@ -207,14 +211,12 @@ export function ResourceNode({
       // These are the only handles a gesture can begin at, so without it the
       // flow-level flag would govern nothing but whether the connection line
       // renders, with CSS standing in for the withdrawal.
-      isConnectable={connectionAuthoring && isConnectable}
-      isConnectableStart={
-        connectionAuthoring && isConnectable && role === 'source' && !connectionInProgress
-      }
+      isConnectable={connectionAuthoring}
+      isConnectableStart={connectionAuthoring && role === 'source' && !connectionInProgress}
       // Eligibility withdraws the end from snap as well as from reveal; proximity
       // only gates the latter — within React Flow's 20px snap the Resource is already
       // inside the 80-unit magnet, so a visible handle and a landable one agree.
-      isConnectableEnd={connectionAuthoring && isConnectable && role === seeking && eligible}
+      isConnectableEnd={connectionAuthoring && role === seeking && eligible}
       // A handle is a drag affordance, and a click is not a drag. A press and
       // release inside React Flow's drag threshold starts no connection, so the
       // click would reach the Resource underneath and open it to read — from the

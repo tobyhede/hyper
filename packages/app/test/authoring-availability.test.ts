@@ -86,6 +86,7 @@ describe('authoring availability', () => {
         authorOnCanvas: false,
         authorInEmbeddedMap: false,
         editResourceBody: false,
+        connectOnCanvas: false,
         dragNodes: false,
         selectNodes: false,
       },
@@ -178,10 +179,10 @@ describe('authoring availability', () => {
       expect(availability.addResource).toBe(true);
     });
 
-    it('keeps a connection reachable on the presented Resource that authoring is withdrawn from', () => {
+    it('withdraws canvas connection while presenting, with every other canvas authoring capability', () => {
       const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, presenting: true });
 
-      expect(availability.connectOnCanvas).toBe(true);
+      expect(availability.connectOnCanvas).toBe(false);
       expect(availability.authorOnCanvas).toBe(false);
     });
 

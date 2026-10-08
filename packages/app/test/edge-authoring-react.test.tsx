@@ -1049,21 +1049,17 @@ describe('a pane covering the graph', () => {
   });
 
   /**
-   * Presenting is the exception, and it is the reason `nodesConnectable` reads
-   * `connectOnCanvas` rather than `authorOnCanvas`.
-   *
-   * The presenting chrome enumerates the active Resource's outgoing Edges at render
-   * time so an Edge drawn from the presented Resource is a move available without
-   * leaving the presentation (ADR 0027). `editing.spec.ts` authors a self-Edge
-   * mid-presentation and asserts exactly that. Withdrawing the handles here
-   * would take the feature with them.
+   * Nothing on the canvas is authorable while presenting (ADR 0123), so the
+   * handles are withdrawn there as they are under a covering pane.
    */
-  it('keeps the handles connectable while presenting, where the Edge is a move', async () => {
+  it('leaves no handle a drag could start from while presenting', async () => {
     await mountCanvas(null, { presenting: true });
 
     const handles = document.querySelectorAll('.rf-resource-node__authoring-handle');
     expect(handles.length).toBeGreaterThan(0);
-    expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(true);
+    expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(
+      false,
+    );
   });
 
   it.each(['Backspace', 'Delete'] as const)(
