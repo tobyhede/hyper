@@ -3170,7 +3170,7 @@ describe('the Open state is named once (CONTEXT.md, Open)', () => {
 const RETIRED_SIDE = ['fr', 'ont'].join('');
 const RETIRED_SIDE_CAPITAL = `F${RETIRED_SIDE.slice(1)}`;
 const RETIRED_SIDE_SCREAMING = RETIRED_SIDE.toUpperCase();
-const RETIRED_SIDE_SHAPES = new RegExp(
+const RETIRED_SIDE_SPELLINGS = new RegExp(
   [
     `[A-Za-z]${RETIRED_SIDE_CAPITAL}`,
     `${RETIRED_SIDE_CAPITAL}[A-Z]`,
@@ -3204,7 +3204,7 @@ describe('the Resource has no front (ADR 0125)', () => {
     const found = scanned.flatMap((file) => {
       const source = readTracked(file);
       if (source === null) return [];
-      return hits(withoutFenceWord(source), RETIRED_SIDE_SHAPES).map((hit) => `${file}:${hit}`);
+      return hits(withoutFenceWord(source), RETIRED_SIDE_SPELLINGS).map((hit) => `${file}:${hit}`);
     });
 
     expect(found).toEqual([]);
@@ -3236,7 +3236,7 @@ describe('the Resource has no front (ADR 0125)', () => {
     ];
 
     for (const line of retired) {
-      expect(RETIRED_SIDE_SHAPES.test(withoutFenceWord(line)), line).toBe(true);
+      expect(RETIRED_SIDE_SPELLINGS.test(withoutFenceWord(line)), line).toBe(true);
     }
   });
 
@@ -3255,7 +3255,7 @@ describe('the Resource has no front (ADR 0125)', () => {
     ];
 
     for (const line of kept) {
-      expect(RETIRED_SIDE_SHAPES.test(withoutFenceWord(line)), line).toBe(false);
+      expect(RETIRED_SIDE_SPELLINGS.test(withoutFenceWord(line)), line).toBe(false);
     }
   });
 });
