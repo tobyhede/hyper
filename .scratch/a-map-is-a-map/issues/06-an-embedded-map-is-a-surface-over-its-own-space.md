@@ -18,4 +18,4 @@
 
 EmbeddedMapAuthoring mounts the same MapSurface over the held target composition. The separate completion allowlist is deleted. Target outcomes, deletion confirmation, image replacement and explicit Map/Graph authoring now travel together; root Navigation is unchanged by embedded Edits.
 
-Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

@@ -19,4 +19,4 @@
 
 One surface policy combines the inherited ceiling, reference/stale state, depth and local Edit state. Shared availability further restricts transient gestures without changing that policy. The nesting path starts at the canvas Map; second-level Maps remain inert. Policy enumeration and application nesting tests cover these boundaries.
 
-Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

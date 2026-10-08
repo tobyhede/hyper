@@ -8,6 +8,7 @@ import { recordingHistory } from './browser-history';
 import { createResource, unavailable } from './command-dock';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * The Spaces the Resources list offers, across every open Space.
@@ -126,20 +127,7 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
 });
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
   // Base UI's Select positioner measures, and jsdom ships neither pointer
   // capture nor `scrollIntoView`; both are reached before a list can open.
   HTMLElement.prototype.hasPointerCapture = () => false;

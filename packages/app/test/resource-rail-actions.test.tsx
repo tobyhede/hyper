@@ -24,6 +24,7 @@ import { openTestSpace } from './opened-space';
 import { mountSpace } from './space-mounting';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { unusedImageSources } from './image-sources';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * A Resource's own commands belong to the Resource (ADR 0073, ADR 0082).
@@ -260,20 +261,7 @@ const resourceIds = (session: SpaceSession): readonly string[] =>
   session.getState().working.resources.map((resource) => resource.id);
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());

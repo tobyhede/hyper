@@ -42,6 +42,7 @@ import {
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -118,20 +119,7 @@ const runtime = (value: SpaceSnapshot) => {
 };
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());
@@ -747,7 +735,7 @@ describe('Space app failure reporting', () => {
     expect(() =>
       mountSpaceApp(
         { id: runtime(valid).id, session, app, spaceResources },
-        createBrowserLocation(recordingHistory()),
+        createBrowserLocation(recordingHistory(), undefined, undefined, () => false),
         refusingFullscreen,
         (view) => {
           render(view);

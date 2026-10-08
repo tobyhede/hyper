@@ -21,6 +21,7 @@ import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
 import { selectResource } from './resource-selection';
 import { unusedImageSources } from './image-sources';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * The two selections an Open Space Resource authors.
@@ -303,20 +304,7 @@ function railMenuControls(resource: HTMLElement): HTMLElement[] {
 }
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
   // Base UI's Select positioner measures, and jsdom ships neither pointer
   // capture nor `scrollIntoView`; both are reached before a list can open.
   HTMLElement.prototype.hasPointerCapture = () => false;

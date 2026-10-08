@@ -20,6 +20,7 @@ import { CLOSED_DISPLAY } from '@project/ui';
 import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
 import type { SurfaceAuthoring } from '../src/space-authoring';
+import { stubResizeObserver } from './resize-observer';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -191,6 +192,7 @@ async function mountGraph(
         availability={authoringAvailability({
           editable,
           replacingImage: false,
+          navigationHeld: false,
           presenting: false,
           editingResourceBody: false,
           editingResourceTitle: false,
@@ -279,20 +281,7 @@ async function refuseTitleEdit(settle: 'enter' | 'blur' = 'enter'): Promise<Harn
 }
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());

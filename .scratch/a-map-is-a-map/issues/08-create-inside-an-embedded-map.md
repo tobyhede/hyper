@@ -17,4 +17,4 @@
 
 Pointer drop, paste and empty Alt-drop resolve the drawing under the point and convert coordinates through that drawing. Keyboard creation follows the selected occurrence. Inert/read-only targets refuse rather than forwarding creation to the containing Map. Naming continuation stays with the originating surface; application/browser tests cover these paths.
 
-Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

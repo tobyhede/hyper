@@ -94,18 +94,13 @@ export interface BrowserLocation {
  * asks what the browser should do about that position, and does it. The seam
  * it takes is a five-member interface rather than `window`, so every rule
  * below is reachable without mounting a React tree.
- *
- * `isNavigationHeld` is the open set's one answer over every composed Space,
- * which `createOpenSpaces` passes. A location built without one has no open
- * set, so the Space it follows is the only composed Space and that Space's own
- * replacement is the whole answer.
  */
 export function createBrowserLocation(
   history: HistoryApi,
   reportObserverError: ObserverErrorReporter = (error) =>
     console.error('Browser location observer failed', error),
-  openPath?: (pathname: string) => Promise<void>,
-  isNavigationHeld?: () => boolean,
+  openPath: ((pathname: string) => Promise<void>) | undefined,
+  isNavigationHeld: () => boolean,
 ): BrowserLocation {
   let followed: ComposedApp | null = null;
   let unfollow: (() => void) | null = null;
@@ -265,7 +260,7 @@ export function createBrowserLocation(
    * the published projection.
    */
   const deliberateMove = (move: () => void): void => {
-    if (navigationHeld()) return;
+    if (isNavigationHeld()) return;
     addressedResourceId = null;
     destinationNotFound = false;
     move();
@@ -325,12 +320,9 @@ export function createBrowserLocation(
     settle();
   };
 
-  const navigationHeld = (): boolean =>
-    isNavigationHeld?.() ?? followed?.imageReplacement.getState() === true;
-
   let restorationRequest = 0;
   const restore = (): PopStateAnswer => {
-    if (navigationHeld()) return false;
+    if (isNavigationHeld()) return false;
     if (openPath === undefined) {
       restoreFollowed();
       return undefined;
@@ -377,7 +369,7 @@ export function createBrowserLocation(
         return undefined;
       }
       if (!current()) return undefined;
-      if (navigationHeld()) return false;
+      if (isNavigationHeld()) return false;
       restoreFollowed();
       return undefined;
     };

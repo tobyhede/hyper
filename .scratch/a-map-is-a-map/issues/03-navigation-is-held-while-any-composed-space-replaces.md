@@ -16,4 +16,4 @@
 
 Browser-location navigation reads the replacement state of every composed Space, including only-drawn targets. The application browser proof holds Back and Forward during embedded replacement and verifies the target owns the completed Edit. The browser-exit guard also observes unsaved work in every composed Space. The Command Dock's navigation availability reads the same answer, so its Open Spaces and Map and Graph controls are drawn unavailable while an only-drawn Space replaces an image (`dock-navigation-hold.test.tsx`).
 
-Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green, except the Command Dock's navigation availability: on `main` it read only the canvas Space's own replacement, so the second criterion was met only by PR #346 (`bf4fc42a`). The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

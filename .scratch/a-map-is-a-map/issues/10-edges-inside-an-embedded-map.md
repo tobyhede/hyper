@@ -17,4 +17,4 @@
 
 Embedded Edges retain their domain subject while their rendered identities name the occurrence. The shared Edge Authoring surface handles selection, deletion and Connect to Resource. Cross-drawing connections report a refusal, and inert/read-only policies withhold authoring. Application tests verify target edits and same-drawing continuation.
 
-Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

@@ -156,6 +156,7 @@ const mountAuthoring = (
         availability: authoringAvailability({
           editable: true,
           replacingImage: false,
+          navigationHeld: false,
           presenting,
           editingResourceBody: false,
           editingResourceTitle: false,
@@ -623,6 +624,7 @@ describe('canvas Resource authoring Space rail', () => {
         availability: authoringAvailability({
           editable: true,
           replacingImage: false,
+          navigationHeld: false,
           presenting: false,
           editingResourceBody: false,
           editingResourceTitle: false,
@@ -736,6 +738,7 @@ describe('canvas Resource authoring decoration identity', () => {
           availability: authoringAvailability({
             editable: true,
             replacingImage: false,
+            navigationHeld: false,
             presenting: false,
             editingResourceBody: false,
             editingResourceTitle: false,
@@ -895,6 +898,7 @@ describe('canvas Resource authoring, replacing an image', () => {
         availability: authoringAvailability({
           editable: true,
           replacingImage: false,
+          navigationHeld: false,
           presenting: false,
           editingResourceBody: false,
           editingResourceTitle: false,

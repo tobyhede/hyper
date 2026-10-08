@@ -1024,7 +1024,10 @@ test('a connection from a drawn Map to a canvas Resource is refused with wording
 
 const DEEP_DIVE_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 const DEEP_DIVE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+const DEEP_DIVE_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000071');
+const DEEP_DIVE_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000072');
 const DEEP_DIVE_FIRST_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000073');
+const DEEP_DIVE_SECOND_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000074');
 const SECOND_DRAWING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
 
 /**
@@ -1041,10 +1044,10 @@ test('a connection between Resources of two different drawings is refused with w
   const response = await page.request.get(`/api/spaces/${DEEP_DIVE_SPACE_ID}`);
   expect(response.ok()).toBe(true);
   const loaded = decodeLoadedSpace(await response.json());
-  const drawnMap = loaded.snapshot.document.maps?.[0];
-  const drawnGraph = drawnMap?.graphs[0];
-  if (drawnMap === undefined || drawnGraph === undefined) {
-    throw new Error('Deep dive must have a Map with a Graph');
+  const maps = loaded.snapshot.document.maps ?? [];
+  const drawnMap = maps.find((map) => map.id === DEEP_DIVE_MAP_ID);
+  if (drawnMap?.graphs.some((graph) => graph.id === DEEP_DIVE_GRAPH_ID) !== true) {
+    throw new Error('Deep dive must have the Map and Graph its Space Resource selects');
   }
   const committed = await page.request.post('/api/spaces', {
     data: {
@@ -1056,16 +1059,18 @@ test('a connection between Resources of two different drawings is refused with w
             ...loaded.snapshot,
             document: {
               ...loaded.snapshot.document,
-              maps: [
-                {
-                  ...drawnMap,
-                  positions: {
-                    [DEEP_DIVE_FIRST_ID]: { x: 0, y: 0, open: false },
-                    '00000000-0000-4000-8000-000000000074': { x: 300, y: 0, open: false },
-                  },
-                  graphs: drawnMap.graphs.map((graph) => ({ ...graph, edges: [] })),
-                },
-              ],
+              maps: maps.map((map) =>
+                map.id === DEEP_DIVE_MAP_ID
+                  ? {
+                      ...map,
+                      positions: {
+                        [DEEP_DIVE_FIRST_ID]: { x: 0, y: 0, open: false },
+                        [DEEP_DIVE_SECOND_ID]: { x: 300, y: 0, open: false },
+                      },
+                      graphs: map.graphs.map((graph) => ({ ...graph, edges: [] })),
+                    }
+                  : map,
+              ),
             },
           },
           expectedRevision: loaded.revision.toString(),
@@ -1088,8 +1093,8 @@ test('a connection between Resources of two different drawings is refused with w
           title: 'Deep dive, again',
           kind: 'space',
           spaceId: DEEP_DIVE_SPACE_ID,
-          map: drawnMap.id,
-          graph: drawnGraph.id,
+          map: DEEP_DIVE_MAP_ID,
+          graph: DEEP_DIVE_GRAPH_ID,
         },
       },
     ],

@@ -23,6 +23,7 @@ import { anyPresentControl, beginRename, openSpaceMenu, unavailable } from './co
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * What an Open Space Resource *shows* (ADR 0068).
@@ -389,20 +390,7 @@ async function mountNested(): Promise<OpenSpaces> {
 }
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
   HTMLElement.prototype.hasPointerCapture = () => false;
   HTMLElement.prototype.setPointerCapture = () => undefined;
   HTMLElement.prototype.releasePointerCapture = () => undefined;

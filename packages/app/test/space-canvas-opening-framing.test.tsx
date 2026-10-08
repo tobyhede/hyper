@@ -18,6 +18,7 @@ import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { CLOSED_DISPLAY } from '@project/ui';
+import { stubResizeObserver } from './resize-observer';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -115,20 +116,7 @@ function stubEntry(
 }
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());
@@ -222,6 +210,7 @@ describe('opening framing on a mounted canvas', () => {
               availability={authoringAvailability({
                 editable: true,
                 replacingImage: false,
+                navigationHeld: false,
                 presenting: false,
                 editingResourceBody: false,
                 editingResourceTitle: false,
@@ -363,6 +352,7 @@ describe('opening framing on a mounted canvas', () => {
             availability={authoringAvailability({
               editable: true,
               replacingImage: false,
+              navigationHeld: false,
               presenting: false,
               editingResourceBody: false,
               editingResourceTitle: false,

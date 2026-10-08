@@ -59,3 +59,20 @@ export const useOpenSpacesStanding = (spaceId: UUID): OpenSpacesStanding => {
   );
   return { spaces, active: showsSpace(spaces === null ? null : state, spaceId) };
 };
+
+/**
+ * Whether navigation is held because some composed Space, listed or only
+ * drawn, is replacing an image (ADR 0112).
+ *
+ * Read as the boolean rather than the whole state, so a mount re-renders when
+ * the hold changes and not on every publish of the open set. An isolated mount
+ * has no open set and answers `false`: its own replacement is then the whole
+ * answer. `authoringAvailability` reads it as its `navigationHeld` fact.
+ */
+export const useNavigationHeld = (): boolean => {
+  const spaces = useOpenSpaces();
+  return useSyncExternalStore(
+    spaces?.subscribe ?? noOpenSpacesChanges,
+    () => (spaces?.getState ?? noOpenSpaces)().replacingImage,
+  );
+};

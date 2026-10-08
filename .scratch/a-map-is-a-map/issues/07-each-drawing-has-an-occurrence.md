@@ -22,4 +22,4 @@ The user confirmed on 2026-10-03 that Undo/Redo remains deferred until the appli
 
 Selection dispatch resolves one occurrence for root and embedded drawings. Enter, F2, Delete and keyboard creation use that occurrence; adapters and continuations are scoped to the drawing. Unmounting drops its pending continuation. The Dock retains the root composition. Undo/Redo is deferred as recorded in Scope clarification.
 
-Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

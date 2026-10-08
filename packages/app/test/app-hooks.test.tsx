@@ -407,6 +407,7 @@ describe('useAuthoringAvailability', () => {
   const facts: AuthoringFacts = {
     editable: true,
     replacingImage: false,
+    navigationHeld: false,
     presenting: false,
     spaceOnCanvas: true,
     editingEmbeddedMap: false,
@@ -635,6 +636,7 @@ describe('useDockChrome', () => {
     const availability = authoringAvailability({
       editable: true,
       replacingImage: false,
+      navigationHeld: false,
       presenting: false,
       editingResourceBody: false,
       editingResourceTitle: false,

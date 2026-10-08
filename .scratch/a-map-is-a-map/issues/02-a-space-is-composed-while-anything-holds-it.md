@@ -19,4 +19,4 @@
 
 OpenSpaces holds one composition for its listing and every drawing. Draw-only holds do not join the Dock listing; Enter reuses that composition and records its Opener, Exit releases only the listing, and the last release flushes and disposes. The public OpenSpaces tests cover each lifetime and returning to an only-drawn Opener.
 
-Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

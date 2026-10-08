@@ -9,6 +9,7 @@ import { recordingHistory } from './browser-history';
 import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * A drawn Map asks through its own Space's delete confirmation (ADR 0112), and
@@ -161,20 +162,7 @@ const railOf = (node: HTMLElement): HTMLElement => {
 };
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
   HTMLElement.prototype.hasPointerCapture = () => false;
   HTMLElement.prototype.setPointerCapture = () => undefined;
   HTMLElement.prototype.releasePointerCapture = () => undefined;

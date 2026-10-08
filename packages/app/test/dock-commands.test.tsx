@@ -15,6 +15,7 @@ import {
   deepDiveSnapshot,
 } from '../stories/support/spaces';
 import { Default, Replacing, SaveFailedElsewhere } from '../stories/space/command-dock.stories';
+import { stubResizeObserver } from './resize-observer';
 
 // The shared reading of "unavailable": ADR 0073 keeps a toolbar item focusable
 // while it is withdrawn, so `aria-disabled` is the attribute and `toBeDisabled`
@@ -48,20 +49,7 @@ async function renderDock(view: ReactElement): Promise<void> {
 
 /** jsdom ships none, and React Flow observes its own container. */
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 /**

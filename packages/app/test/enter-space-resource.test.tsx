@@ -10,6 +10,7 @@ import { expectMenuGroups } from './menu-assertions';
 import { selectResource } from './resource-selection';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * Entering a Space Resource from its rail (ADR 0068, ADR 0073).
@@ -198,20 +199,7 @@ async function enterArchitecture(): Promise<void> {
 }
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
   HTMLElement.prototype.hasPointerCapture = () => false;
   HTMLElement.prototype.setPointerCapture = () => undefined;
   HTMLElement.prototype.releasePointerCapture = () => undefined;

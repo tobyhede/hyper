@@ -8,6 +8,8 @@ import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { heldImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { mintingIds } from './minting';
+import { stubResizeObserver } from './resize-observer';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -19,6 +21,7 @@ const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007
 const OTHER_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const OTHER_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 const OTHER_IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+const UNMINTED_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000b');
 const HELD_REPLACEMENT = { kind: 'url', url: 'https://example.com/replacement.png' } as const;
 
 const meta: SpaceSnapshot = {
@@ -36,7 +39,13 @@ const meta: SpaceSnapshot = {
           [META_RESOURCE_ID]: { x: 0, y: 0, open: false },
           [META_SPACE_RESOURCE_ID]: { x: 0, y: 40, open: false },
         },
-        graphs: [{ id: META_GRAPH_ID, title: 'One', edges: [] }],
+        graphs: [
+          {
+            id: META_GRAPH_ID,
+            title: 'One',
+            edges: [{ from: META_RESOURCE_ID, to: META_SPACE_RESOURCE_ID }],
+          },
+        ],
         activeGraph: META_GRAPH_ID,
       },
     ],
@@ -83,26 +92,12 @@ const other: SpaceSnapshot = {
 };
 
 beforeAll(() => {
-  // React Flow measures the canvas, and jsdom ships no `ResizeObserver`.
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());
 
-it('withdraws the Dock’s navigation while an only-drawn Space replaces an image', async () => {
+it('withdraws the Dock’s navigation and Present while an only-drawn Space replaces an image', async () => {
   const held = heldImageSources();
   const backend = new MemorySpaceBackend(
     META_ID,
@@ -114,16 +109,20 @@ it('withdraws the Dock’s navigation while an only-drawn Space replaces an imag
     backend,
     metaSpaceId: META_ID,
     metaSpaceTitle: 'Meta',
-    newId: () => META_RESOURCE_ID,
+    newId: mintingIds(UNMINTED_ID),
     history: recordingHistory(),
   });
   const initial = await spaces.open(META_ID);
   const drawing = await spaces.hold(OTHER_ID);
   render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
   const openSpacesMenu = await screen.findByRole('button', { name: 'Spaces. 1 open.' });
-  const mapMenu = screen.getByRole('button', { name: 'Map: Map' });
+  const heldControls = [
+    screen.getByRole('button', { name: 'Map: Map' }),
+    screen.getByRole('button', { name: 'Active Graph: One' }),
+    screen.getByRole('button', { name: 'Present One' }),
+  ];
   await waitFor(() => expect(unavailable(openSpacesMenu)).toBe(false));
-  expect(unavailable(mapMenu)).toBe(false);
+  expect(heldControls.map(unavailable)).toEqual([false, false, false]);
 
   let replacement: Promise<unknown> = Promise.resolve();
   act(() => {
@@ -131,14 +130,14 @@ it('withdraws the Dock’s navigation while an only-drawn Space replaces an imag
   });
   expect(spaces.getState().replacingImage).toBe(true);
   await waitFor(() => expect(unavailable(openSpacesMenu)).toBe(true));
-  expect(unavailable(mapMenu)).toBe(true);
+  expect(heldControls.map(unavailable)).toEqual([true, true, true]);
 
   await act(async () => {
     held.release();
     await replacement;
   });
   await waitFor(() => expect(unavailable(openSpacesMenu)).toBe(false));
-  expect(unavailable(mapMenu)).toBe(false);
+  expect(heldControls.map(unavailable)).toEqual([false, false, false]);
   await act(async () => {
     await drawing.release();
   });

@@ -10,6 +10,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * React Flow re-measures a resource's handles through `updateNodeInternals`, and
@@ -75,20 +76,7 @@ const flow = (handles: number) => (
 const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());

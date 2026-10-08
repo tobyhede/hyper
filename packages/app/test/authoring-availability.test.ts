@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   authoringAvailability,
-  withNavigationHeld,
   type AuthoringAvailability,
   type AuthoringInProgress,
 } from '../src/authoring-availability';
@@ -15,6 +14,7 @@ import {
 const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editable: true,
   replacingImage: false,
+  navigationHeld: false,
   presenting: false,
   editingResourceBody: false,
   editingResourceTitle: false,
@@ -51,10 +51,10 @@ describe('authoring availability', () => {
       ),
     );
   });
-  it('withdraws only navigation while another composed Space replaces an image', () => {
-    const answer = authoringAvailability(NOTHING_IN_PROGRESS);
-    expect(withNavigationHeld(answer, true)).toEqual({ ...ALL_AVAILABLE, navigate: false });
-    expect(withNavigationHeld(answer, false)).toBe(answer);
+  it('withdraws the same answers while replacing an image whether or not navigation is held', () => {
+    expect(
+      authoringAvailability({ ...NOTHING_IN_PROGRESS, replacingImage: true, navigationHeld: true }),
+    ).toStrictEqual(authoringAvailability({ ...NOTHING_IN_PROGRESS, replacingImage: true }));
   });
 
   it('offers every operation when nothing is in progress', () => {
@@ -153,6 +153,11 @@ describe('authoring availability', () => {
       'a live Resource edit inside an embedded Map',
       { editingEmbeddedMap: true },
       { ...ALL_AVAILABLE, authorOnCanvas: false },
+    ],
+    [
+      'another composed Space replacing an image',
+      { navigationHeld: true },
+      { ...ALL_AVAILABLE, navigate: false, present: false },
     ],
     [
       'a Space Resource creation in flight',

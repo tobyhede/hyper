@@ -18,4 +18,4 @@
 
 The canvas now mounts `MapSurface` over its own composition with an explicit Map, Graph and policy. The surface owns projection, contextual authoring, the render adapter, Edge Authoring and occurrence continuation. `map-surface.test.ts` exercises the interface over a real composition. PR #331 remains the stack base by the user’s explicit approval; merging is left to the user.
 
-Delivered by PR #332, merged 2026-10-04 with its CI gate green. A verification pass on 2026-10-08 checked every criterion against `main` and added the tests it found missing in the closeout PR.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

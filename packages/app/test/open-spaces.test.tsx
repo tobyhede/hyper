@@ -27,6 +27,7 @@ import { mintingIds } from './minting';
 import { heldImageSources, unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -1434,20 +1435,7 @@ describe('Open Spaces', () => {
    */
   describe('choosing a closed Meta that cannot be opened, rendered', () => {
     beforeAll(() => {
-      vi.stubGlobal(
-        'ResizeObserver',
-        class {
-          observe(): void {
-            return undefined;
-          }
-          unobserve(): void {
-            return undefined;
-          }
-          disconnect(): void {
-            return undefined;
-          }
-        },
-      );
+      stubResizeObserver();
       // Base UI's positioner measures, and jsdom ships neither pointer capture
       // nor `scrollIntoView`; both are reached before a menu can open.
       HTMLElement.prototype.hasPointerCapture = () => false;

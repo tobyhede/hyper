@@ -7,6 +7,7 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * Through the application: a coordinated save whose
@@ -234,22 +235,8 @@ const blockedTarget = async () => {
 const notice = () => screen.getByTestId('persistence-failure');
 
 describe('A save another Space blocks', () => {
-  // React Flow and Base UI measure, and jsdom has no `ResizeObserver`.
   beforeAll(() => {
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        observe(): void {
-          return undefined;
-        }
-        unobserve(): void {
-          return undefined;
-        }
-        disconnect(): void {
-          return undefined;
-        }
-      },
-    );
+    stubResizeObserver();
   });
   afterAll(() => vi.unstubAllGlobals());
 
