@@ -199,6 +199,7 @@ describe('opening framing on a mounted canvas', () => {
         <Subscribed spaces={spaces}>
           <ReactFlowProvider>
             <SpaceCanvas
+              surface={app.surface}
               imageReplacement={app.imageReplacement}
               commandOutcomes={app.commandOutcomes}
               deleteConfirmation={app.deleteConfirmation}
@@ -340,6 +341,7 @@ describe('opening framing on a mounted canvas', () => {
       <OpenSpacesContext.Provider value={spaces}>
         <ReactFlowProvider>
           <SpaceCanvas
+            surface={app.surface}
             imageReplacement={app.imageReplacement}
             commandOutcomes={app.commandOutcomes}
             deleteConfirmation={app.deleteConfirmation}

@@ -177,6 +177,7 @@ async function mountGraph(
   const graph = () => (
     <ReactFlowProvider>
       <SpaceCanvas
+        surface={surface}
         imageReplacement={imageReplacement}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}

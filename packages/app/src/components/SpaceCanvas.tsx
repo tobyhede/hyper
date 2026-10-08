@@ -204,7 +204,7 @@ const fileDropAt = (
 };
 
 export interface SpaceCanvasProps {
-  readonly surface?: MapSurface;
+  readonly surface: MapSurface;
   readonly onDrawnClipboardFailuresChange?: (failures: readonly DrawnClipboardFailure[]) => void;
   readonly onDrawnSpacesChange?: (entries: readonly OpenSpace[]) => void;
   /** Where a Space Resource rail's Map report is held. */
@@ -464,7 +464,7 @@ export function SpaceCanvas({
   // Transient withdrawals — presenting, another authoring surface, an image
   // replacement — reach those Maps as availability (`spaceOnCanvas` below),
   // never as a change of policy (ADR 0112).
-  const rootPolicy = surface?.context().policy ?? 'authoring';
+  const rootPolicy = surface.context().policy;
   const embeddedRoot = useMemo(
     () => ({ spaceId: thisSpaceId, mapId, policy: rootPolicy }),
     [thisSpaceId, mapId, rootPolicy],
@@ -598,7 +598,7 @@ export function SpaceCanvas({
     [resourceEntityActions, placedResources, onSelectResource, mapId],
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
-    continuation: surface?.continuation,
+    continuation: surface.continuation,
     commandOutcomes,
     deleteConfirmation,
     nodes,
@@ -693,10 +693,7 @@ export function SpaceCanvas({
   );
 
   useEffect(() => {
-    const drawn = [
-      ...(surface === undefined ? [] : [surface]),
-      ...liveEmbeddings.map((entry) => entry.surface),
-    ];
+    const drawn = [surface, ...liveEmbeddings.map((entry) => entry.surface)];
     return observeMapSurfaces(drawn);
   }, [surface, liveEmbeddings]);
 
@@ -1712,13 +1709,11 @@ export function SpaceCanvas({
       // one Resource at screen size. See `MAX_ZOOM`.
       maxZoom={MAX_ZOOM}
     >
-      {surface !== undefined && (
-        <ChromeContinuation
-          continuation={surface.continuation}
-          within={canvasRef}
-          chromeRenameReady={availability.authorOnCanvas}
-        />
-      )}
+      <ChromeContinuation
+        continuation={surface.continuation}
+        within={canvasRef}
+        chromeRenameReady={availability.authorOnCanvas}
+      />
       <Background gap={24} />
       <GraphHeadMarkers />
       <svg aria-hidden="true" width={0} height={0}>

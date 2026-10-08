@@ -1,6 +1,7 @@
 import { expectTypeOf, it } from 'vitest';
 import type { GraphId } from '@project/core';
 import type { SpaceCanvasProps } from '../src/components/SpaceCanvas';
+import type { MapSurface } from '../src/map-surface';
 
 /**
  * `activeGraphId` carries Navigation's branded `GraphId` all the way to
@@ -20,4 +21,12 @@ it('carries the branded GraphId through, not a plain string', () => {
   // @ts-expect-error A plain string has not crossed the UUID validation seam.
   const activeGraphId: SpaceCanvasProps['activeGraphId'] = 'graph';
   void activeGraphId;
+});
+
+/**
+ * A canvas mounted without a Map surface would have no policy of its own to
+ * draw under (ADR 0112), so there is no way to mount one.
+ */
+it('requires the Map surface it draws', () => {
+  expectTypeOf<SpaceCanvasProps['surface']>().toEqualTypeOf<MapSurface>();
 });
