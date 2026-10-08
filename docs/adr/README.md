@@ -108,6 +108,7 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0098](0098-a-commit-outcome-is-named-once-on-both-sides-of-the-seam.md) | `CommitOutcome` is shared by both commit seams, its status codes are one table, and the identity rule is the store's alone. |
 | [0119](0119-export-writes-in-place-and-git-answers-for-a-partial-write.md) | Every Export writes the Aggregate directory in place: only the files Import reads, each changed one replaced by a per-file rename and the rest untouched; the directory is never moved, and git, not Hyper, answers for a write that fails part-way (refines 0030, 0117, 0118). |
 | [0117](0117-running-serves-an-aggregate-directory-as-the-durable-copy.md) | `pnpm start <dir>` runs an Aggregate directory: the directory is the durable copy, the memory store is discarded, and git answers for history, undo and concurrent writers. Edits are Exported after a quiet period and on stop; a crash before that write loses them. |
+| [0124](0124-one-hyper-cli.md) | Every command is a verb of one CLI, `pnpm hyper`: `init` makes a new Aggregate directory, `run` serves an existing one and refuses a missing or empty one, and `import`/`export` choose a database with `--store`; replacing is `--dangerous-replace` (refines 0078, 0117). |
 
 ## HTTP
 

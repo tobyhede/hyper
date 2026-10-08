@@ -180,7 +180,7 @@ Projecting the complete aggregate into the repository-friendly form an author ca
 _Avoid_: saving, publishing, syncing; exporting a single Space.
 
 **Aggregate directory**:
-The on-disk form Exporting projects and Importing replaces: a directory holding `hyper.json` (naming the Meta Space) and one child directory per Space, each named for that Space's Id in lower case and holding `space.json` plus Resource markdown (`*.md` beside the space file and under `resources/`), and an `images/` directory holding the bytes of every stored image the aggregate references, named by their content. Anything else in those directories is preserved across a round trip; what Exporting removes is exactly what Importing scans. Reading an Aggregate directory also identifies any omitted nested Ids before the persistence seam sees the Aggregate.
+The on-disk form Exporting projects and Importing replaces: a directory holding `hyper.json` (naming the Meta Space) and one child directory per Space, each named for that Space's Id in lower case and holding `space.json` plus Resource markdown (`*.md` beside the space file and under `resources/`), and an `images/` directory holding the bytes of every stored image the aggregate references, named by their content. Anything else in those directories is preserved across a round trip; what Exporting removes is exactly what Importing scans. Reading an Aggregate directory also identifies any omitted nested Ids before the persistence seam sees the Aggregate. A new Aggregate directory is made by establishing a new aggregate, whose Meta Space is a new space, and Exporting it to a missing or empty directory; Running does not make one (ADR 0124).
 _Avoid_: catalog, bundle, export root as a second name for the same artifact.
 
 **Importing**:
@@ -188,7 +188,7 @@ Taking a complete aggregate from outside Hyper and making it the stored one. It 
 _Avoid_: loading, restoring, syncing; merging.
 
 **Running**:
-Serving an Aggregate directory as the working aggregate: Importing it into a fresh store, Exporting back to it after every committed edit and once more on stopping, and discarding the store when the run ends. While Running, the directory is the only durable copy, so Exporting is what makes an edit durable. The directory is expected to be under version control, which is what answers for history, undo and concurrent writers; the last write wins.
+Serving an existing Aggregate directory as the working aggregate: Importing it into a fresh store, Exporting back to it after every committed edit and once more on stopping, and discarding the store when the run ends. While Running, the directory is the only durable copy, so Exporting is what makes an edit durable. The directory is expected to be under version control, which is what answers for history, undo and concurrent writers; the last write wins. A missing or empty directory is not run but refused, because it is more often a mistyped path than a new aggregate (ADR 0124).
 _Avoid_: watching, syncing, live mode, session (that is the client's edit-coalescing seam).
 
 **Opening**:
