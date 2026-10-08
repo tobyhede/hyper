@@ -4,14 +4,14 @@
 
 **Blocked by:** 02 — Present on the Stage.
 
-**Status:** ready-for-human — implemented and checked locally; the draft PR's `CI passed` gate has not yet been observed.
+**Status:** resolved — `1637e45d`; draft PR #341 `CI passed` observed green (run on `d22923ad`).
 
 - [x] The projection's presented display and the option that asked for it are deleted; a canvas node's display is Closed or Open, and every test fixture that set the option is updated.
 - [x] The presenting and overview cameras, the presenting padding and both camera durations are deleted with their tests. The overview fit constant stays, because it frames a Map when the canvas opens.
 - [x] The canvas presented-content styles and the active-Resource outline are deleted, with their design-system inventory entries; the container-unit type rules live on the Stage.
 - [x] The zoom ceiling stays at 16, and its doc comment gives the authoring reason instead of the presenting one.
 - [x] The root README's presenting prose and its known-limitation line about camera rasterisation, and the rendering guide's camera presenting section, describe the Stage.
-- [ ] `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm ui:catalog:check`, targeted lint and the affected unit, e2e and Ladle specs pass locally; the draft PR's `CI passed` gate is observed green before resolution. _(Local half done; CI not yet observed.)_
+- [x] `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm ui:catalog:check`, targeted lint and the affected unit, e2e and Ladle specs pass locally; the draft PR's `CI passed` gate is observed green before resolution.
 
 **Decisions taken:**
 
