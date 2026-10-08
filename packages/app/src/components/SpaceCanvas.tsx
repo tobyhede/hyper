@@ -17,7 +17,6 @@ import {
 import {
   Background,
   ReactFlow,
-  type Edge,
   type EdgeMouseHandler,
   type IsValidConnection,
   type OnConnect,
@@ -33,12 +32,8 @@ import {
   isAcceptedImageUrl,
   titleName,
   uuidSchema,
-  type Resource,
   type ResourceId,
-  type Graph,
-  type GraphId,
   type MapId,
-  type UUID,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
 import {
@@ -62,20 +57,14 @@ import {
   describeCanvasGestureRefusal,
   type CanvasGestureRefusal,
 } from '../authoring-refusal';
-import type { AuthoringAvailability } from '../authoring-availability';
 import { CANVAS_OCCURRENCE, observeMapSurfaces, type MapSurface } from '../map-surface';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
+import type { ResourcePlacementCommands } from '../resource-placement';
+import type { MapSurfaceReading } from '../use-map-surface';
+import { nextResourceTitle } from '../titles';
 import { useEdgeAuthoring } from '../edge-authoring-react';
-import type { EdgeAuthoring } from '../edge-authoring';
-import {
-  edgeSelectionOf,
-  sameSelection,
-  type CanvasSelection,
-  type ResourceResize,
-  type EdgeSubject,
-} from '../render-adapter';
-import type { SurfaceAuthoring } from '../space-authoring';
+import { edgeSelectionOf, sameSelection } from '../render-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { RESOURCE_SIZE } from '../resource';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from './ResourcesPopover';
@@ -204,95 +193,32 @@ const fileDropAt = (
 };
 
 export interface SpaceCanvasProps {
+  /** The canvas's own drawing: its policy, its context and the collaborators it authors through. */
   readonly surface: MapSurface;
+  /**
+   * What `useMapSurface` answers for `surface` this render. The canvas draws
+   * from it alone — the view its projection is built from, the render
+   * adapter's reading and the availability its surface's policy has narrowed —
+   * so the canvas and the Space's command surface cannot disagree about an
+   * operation they both offer (`CONTEXT.md`, Availability).
+   */
+  readonly reading: MapSurfaceReading;
+  /** Every way a Resource arrives on this canvas: created, dropped or pasted. */
+  readonly placement: Pick<
+    ResourcePlacementCommands,
+    'createResource' | 'dropExistingResource' | 'dropSpace' | 'dropImages' | 'pasteImageUrl'
+  >;
   readonly onDrawnClipboardFailuresChange?: (failures: readonly DrawnClipboardFailure[]) => void;
   readonly onDrawnSpacesChange?: (entries: readonly OpenSpace[]) => void;
   /** Where a Space Resource rail's Map report is held. */
   readonly commandOutcomes: CommandOutcomes;
   /** Where a Space Resource rail's Delete Map and Delete Graph ask first. */
   readonly deleteConfirmation: DeleteConfirmation;
-  nodes: ResourceFlowNode[];
-  edges: Edge[];
-  /** The next projection, merged in by a completed connection so its Edge draws. */
-  projectedNodes: readonly ResourceFlowNode[] | null;
-  /**
-   * That a traversal is running — the Navigation mode, not an availability
-   * answer. One consumer reads it, and it is not an authoring operation: the
-   * click that resumes an embedded read of a Space that has been Exited, which
-   * nothing edits. What presenting *withdraws* from authoring is
-   * `availability`'s to say.
-   */
-  presenting: boolean;
-  /**
-   * That the selected Map's placement has resolved and the store has taken
-   * it — the fact, not an operation, and read by one consumer: the aria
-   * description React Flow gives every node.
-   *
-   * It is here rather than folded into `availability` because that description
-   * is a *statement about the placement* and its withheld form says so in
-   * words: "This Resource is unavailable while placement is pending." Any
-   * availability answer would make it false somewhere — `connectOnCanvas`
-   * announces "pending" over a placement that resolved long ago the moment an
-   * author begins an inline Map rename on the Dock, which is a lie told
-   * to exactly the readers who depend on it, and told while the canvas behind
-   * that rename is fully reachable (nothing about a chrome rename covers the
-   * graph or traps focus).
-   *
-   * So it is named for the fact rather than for a control, and it is not a
-   * reinstatement of any withdrawal term: nothing that decides what may be
-   * *authored* reads it.
-   */
-  placementReady: boolean;
-  /**
-   * What may be authored right now, answered once for the whole application.
-   *
-   * Every withdrawal on this canvas is one of these answers rather than a
-   * recombination of the facts behind them, so the canvas and the Space's
-   * command surface cannot disagree about an operation they both offer
-   * (`CONTEXT.md`, Availability).
-   */
-  availability: AuthoringAvailability;
-  onNodesChange: OnNodesChange<ResourceFlowNode>;
-  onEdgesChange: OnEdgesChange;
-  /** The whole Edge interaction lifecycle, which this canvas composes rather than interprets. */
-  edgeAuthoring: EdgeAuthoring;
-  selection: CanvasSelection;
-  onSelectResource: (resourceId: ResourceId) => void;
-  onSelectEdge: (subject: EdgeSubject) => void;
-  /** The Resources this Map places — what an Edge picker may offer. */
-  placedResources: readonly Resource[];
-  /** Exact neutral title shown by the transient empty-drop preview. */
-  newResourceTitle: string;
-  /**
-   * Create a detached Resource at the visible centre — the graph-focused `C`, whose
-   * toolbar twin lives outside this component.
-   */
-  onAddResource: () => void;
-  /** Complete an external Resources View drop at an authored top-left anchor. */
-  onAddExistingResource: (
-    resourceId: ResourceId,
-    anchor: { readonly x: number; readonly y: number },
-  ) => void;
-  /**
-   * Complete an external Resources View drop of a Space at an authored top-left
-   * anchor — authoring the Space Resource that frames it.
-   */
-  onPlaceSpace: (spaceId: UUID, anchor: { readonly x: number; readonly y: number }) => void;
-  /**
-   * Image files dropped on the canvas, with the authored top-left anchor the
-   * first of them lands at (ADR 0106).
-   */
-  onDropImages: (
-    files: readonly File[],
-    anchor: { readonly x: number; readonly y: number },
-  ) => void;
-  /** An image URL pasted on the canvas, with the authored top-left anchor at the pointer. */
-  onPasteImageUrl: (url: string, anchor: { readonly x: number; readonly y: number }) => void;
   /**
    * The Space's image replacements (ADR 0106), which own the whole attempt.
    * The one way Replace reaches an Image Resource on this canvas that offers it.
    */
-  imageReplacement: Pick<ImageReplacements, 'replace'>;
+  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *
@@ -301,44 +227,12 @@ export interface SpaceCanvasProps {
    * continuation survives being a prop rather than a command. A remount takes
    * nothing with it, because the initial state is whatever arrives with it.
    */
-  nameOnCreation: string | null;
-  authoring: SurfaceAuthoring;
-  spaceSession: SpaceSession;
-  /**
-   * Whether a content edit is running, for the one control outside this canvas
-   * that has to know: Present.
-   *
-   * Presenting replaces the Resource with its content rather than drawing content on
-   * it, so an editor cannot survive it and the draft would go with no exit
-   * spent. The caret stays this component's (`spec.md` §6) — what leaves is the
-   * one bit a sibling surface needs to stay out of the way.
-   */
-  onBodyEditingChange?: (editing: boolean) => void;
-  /** Reports the Resource title draft so sibling naming surfaces stay withdrawn. */
-  onTitleEditingChange?: (editing: boolean) => void;
-  resourceResize: ResourceResize;
-  /**
-   * Report whether some embedded Map on this canvas is running a Resource edit.
-   *
-   * The one availability fact that is produced *inside* this subtree: an
-   * embedded Map publishes its live edits from within React Flow, so nothing
-   * above can see one without being told. It goes into the render adapter
-   * rather than up a chain of `useState` because that store re-renders the
-   * Space's command surface and this canvas together, and the answer derived
-   * from it comes back down as `availability.authorOnCanvas` — one answer, not
-   * a term recombined here (`authoring-availability.ts`).
-   */
-  reportEmbeddedMapEditing: (editing: boolean) => void;
+  readonly nameOnCreation: string | null;
+  readonly spaceSession: SpaceSession;
   /** Identity of the authored surface this canvas and its HUD are drawing. */
-  spaceTitle: string;
-  /** The selected Map, whose change disposes of an open Connect list. */
-  mapId: MapId;
-  mapTitle: string;
-  graphs: readonly Graph[];
-  colorByGraphId: Readonly<Record<string, string>>;
-  activeGraphId: GraphId | null;
+  readonly spaceTitle: string;
   /** What each Space Resource's target offers it, for the Resources of kind `space` on this canvas. */
-  spaceResourceTargets?: SpaceResourceTargets;
+  readonly spaceResourceTargets?: SpaceResourceTargets;
   /**
    * What commands each Resource on this canvas offers — copy an address, delete it
    * — drawn on the Resource's own rail (ADR 0073).
@@ -357,7 +251,7 @@ export interface SpaceCanvasProps {
    * Handed the Resource's Connect to Resource group, so the caller places it
    * among the others.
    */
-  resourceEntityActions?: (
+  readonly resourceEntityActions?: (
     resourceId: ResourceId,
     connect: EntityActionGroup,
   ) => readonly EntityActionGroup[];
@@ -384,46 +278,67 @@ interface EmbeddedConnectionStart {
 
 export function SpaceCanvas({
   surface,
+  reading,
+  placement,
   onDrawnClipboardFailuresChange,
   onDrawnSpacesChange,
   commandOutcomes,
   deleteConfirmation,
-  nodes,
-  edges,
-  projectedNodes,
-  presenting,
-  placementReady,
-  availability,
-  onNodesChange,
-  onEdgesChange,
-  edgeAuthoring,
-  selection,
-  onSelectResource,
-  onSelectEdge,
-  placedResources,
-  newResourceTitle,
-  onAddResource,
-  onAddExistingResource,
-  onPlaceSpace,
-  onDropImages,
-  onPasteImageUrl,
   imageReplacement,
   nameOnCreation,
-  authoring,
   spaceSession,
-  onBodyEditingChange,
-  onTitleEditingChange,
-  resourceResize,
-  reportEmbeddedMapEditing,
   spaceTitle,
-  mapId,
-  mapTitle,
-  graphs,
-  colorByGraphId,
-  activeGraphId,
   spaceResourceTargets,
   resourceEntityActions,
 }: SpaceCanvasProps) {
+  const {
+    view,
+    canvasRendering,
+    availability,
+    setEditingResourceBody: onBodyEditingChange,
+    setEditingResourceTitle: onTitleEditingChange,
+  } = reading;
+  const {
+    liveProjection,
+    projected,
+    selection,
+    changeNodes: onNodesChange,
+    changeEdges: onEdgesChange,
+    selectResource: onSelectResource,
+    selectEdge: onSelectEdge,
+    resourceResize,
+    reportEmbeddedMapEditing,
+  } = canvasRendering;
+  const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
+  const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
+  // Null while a replacement placement resolves. The canvas keeps drawing the
+  // Resources on screen through that window — deliberately, so a gesture is
+  // never interrupted — so a connection is reachable with no fresh projection
+  // to hand over, and the store keeps its live nodes rather than reconciling
+  // against nothing.
+  const projectedNodes = projected?.nodes ?? null;
+  // That the selected Map's placement has resolved and the store has taken it
+  // — the fact, not an operation, read by one consumer: the aria description
+  // React Flow gives every node. Its withheld form is a statement about the
+  // placement ("unavailable while placement is pending"), so no availability
+  // answer may stand in for it, and nothing that decides what may be authored
+  // reads it.
+  const placementReady = canvasRendering.hasResourcesOnCanvas;
+  const { authoring, edgeAuthoring } = surface;
+  const context = surface.context();
+  const { mapId, graphId: activeGraphId } = context;
+  // That a traversal is running — the Navigation mode, not an availability
+  // answer. What presenting withdraws from authoring is `availability`'s to
+  // say; this reaches only the click that resumes an embedded read of a Space
+  // that has been Exited, which nothing edits.
+  const presenting = context.kind === 'canvas' && context.presentingResourceId !== null;
+  const placedResources = view.placedResources;
+  const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
+  const mapTitle = view.selectedMap.map.title;
+  const working = spaceSession.getState().working;
+  const newResourceTitle = useMemo(() => nextResourceTitle(working), [working]);
+  const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
+  const addCanvasResource = useCallback(() => createResource('markdown'), [createResource]);
   const { screenToFlowPosition } = useReactFlow();
 
   const spaces = useOpenSpaces();
@@ -632,11 +547,11 @@ export function SpaceCanvas({
       embeddedPublications.get(request.parent.id)?.titleEditing === true,
   );
   useEffect(() => {
-    onBodyEditingChange?.(bodyEditing || embeddedBodyEditing);
+    onBodyEditingChange(bodyEditing || embeddedBodyEditing);
   }, [bodyEditing, embeddedBodyEditing, onBodyEditingChange]);
   useEffect(() => {
-    onTitleEditingChange?.(resourceAuthoring.titleEditing || embeddedTitleEditing);
-    return () => onTitleEditingChange?.(false);
+    onTitleEditingChange(resourceAuthoring.titleEditing || embeddedTitleEditing);
+    return () => onTitleEditingChange(false);
   }, [resourceAuthoring.titleEditing, embeddedTitleEditing, onTitleEditingChange]);
   const liveEmbeddings = useMemo(
     () =>
@@ -776,7 +691,7 @@ export function SpaceCanvas({
     () => [
       {
         id: CANVAS_OCCURRENCE,
-        addResource: onAddResource,
+        addResource: addCanvasResource,
         nodes,
         authoring,
         availability,
@@ -840,7 +755,7 @@ export function SpaceCanvas({
       edgeAuthoring,
       edgeSurface,
       liveEmbeddings,
-      onAddResource,
+      addCanvasResource,
     ],
   );
 
@@ -1486,11 +1401,11 @@ export function SpaceCanvas({
         setCommandRefusal(null);
         return;
       }
-      onPasteImageUrl(url, anchorAt(at.x, at.y));
+      pasteImageUrl(url, anchorAt(at.x, at.y));
     },
     [
       availability.authorOnCanvas,
-      onPasteImageUrl,
+      pasteImageUrl,
       anchorAt,
       screenToFlowPosition,
       embeddingAt,
@@ -1585,7 +1500,7 @@ export function SpaceCanvas({
       if (files !== null) {
         event.preventDefault();
         if (files === 'place')
-          onDropImages([...event.dataTransfer.files], anchorAt(event.clientX, event.clientY));
+          dropImages([...event.dataTransfer.files], anchorAt(event.clientX, event.clientY));
         return;
       }
       if (!availability.authorOnCanvas || !(event.target instanceof Element)) return;
@@ -1601,14 +1516,14 @@ export function SpaceCanvas({
       // it, is held by `e2e/space-resource.spec.ts` ("dragging a Space from
       // the Resources list places its Space Resource at the drop point").
       const anchor = anchorAt(event.clientX, event.clientY);
-      if (resourceId.success) onAddExistingResource(resourceId.data, anchor);
-      else if (spaceId.success) onPlaceSpace(spaceId.data, anchor);
+      if (resourceId.success) dropExistingResource(resourceId.data, anchor);
+      else if (spaceId.success) dropSpace(spaceId.data, anchor);
     },
     [
       availability.authorOnCanvas,
-      onAddExistingResource,
-      onPlaceSpace,
-      onDropImages,
+      dropExistingResource,
+      dropSpace,
+      dropImages,
       anchorAt,
       screenToFlowPosition,
       embeddingAt,
