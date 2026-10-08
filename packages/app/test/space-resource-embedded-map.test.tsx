@@ -22,6 +22,7 @@ import { newUuid } from '@project/core';
 import { anyPresentControl, openSpaceMenu, unavailable } from './command-dock';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { refusingFullscreen } from './fullscreen';
 
 /**
  * What an Open Space Resource *shows* (ADR 0068).
@@ -211,6 +212,7 @@ async function mountOpenSpaces(
     [meta, value, drawn].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
   );
   const spaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
@@ -340,6 +342,7 @@ describe('the Map an Open Space Resource draws', () => {
         control,
       );
       const spaces = createOpenSpaces({
+        fullscreen: refusingFullscreen,
         images: unusedImageSources,
         backend,
         metaSpaceId: META_ID,
@@ -832,6 +835,7 @@ describe('the Map an Open Space Resource draws', () => {
       [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
@@ -1076,6 +1080,7 @@ describe('the Map an Open Space Resource draws', () => {
       [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
@@ -1118,6 +1123,7 @@ describe('the Map an Open Space Resource draws', () => {
       [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
@@ -1225,6 +1231,7 @@ describe('the Map an Open Space Resource draws', () => {
       })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
@@ -1326,6 +1333,7 @@ describe('the Map an Open Space Resource draws', () => {
       })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
@@ -1430,6 +1438,7 @@ describe('the Map an Open Space Resource draws', () => {
       })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
@@ -1468,6 +1477,7 @@ describe('the Map an Open Space Resource draws', () => {
       [meta, value, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
@@ -1717,6 +1727,7 @@ describe('the Map an Open Space Resource draws', () => {
       })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
@@ -1762,6 +1773,7 @@ describe('the Map an Open Space Resource draws', () => {
       })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,

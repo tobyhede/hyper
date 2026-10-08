@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 import { createSpaceStartup, type SpaceStartup } from '../../packages/app/src/space';
 import { recordingHistory } from '../../packages/app/test/browser-history';
+import { refusingFullscreen } from '../../packages/app/test/fullscreen';
 
 /** A request that initializes no Space mints nothing, so any mint is a failure here. */
 const mintsNothing = (): UUID => {
@@ -27,10 +28,11 @@ const mintingIds =
  * third seam hands it to `createBrowserHistory`, the one adapter that reads
  * `window.location` and writes `window.history` (ADR 0081).
  * These tests run in the node environment, so each supplies the other adapter —
- * which is what a seam required below the composition root is for.
+ * which is what a seam required below the composition root is for — and a
+ * host that refuses fullscreen, which `createSpaceStartup` requires.
  */
 const startupOver = (backend: SpaceBackend, newId: () => UUID = newUuid): SpaceStartup =>
-  createSpaceStartup(backend, newId, recordingHistory());
+  createSpaceStartup(refusingFullscreen, backend, newId, recordingHistory());
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');

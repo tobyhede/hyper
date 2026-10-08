@@ -7,6 +7,7 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { createResource, unavailable } from './command-dock';
 import { unusedImageSources } from './image-sources';
+import { refusingFullscreen } from './fullscreen';
 
 /**
  * The Spaces the Resources list offers, across every open Space.
@@ -182,6 +183,7 @@ describe('the Spaces a Resources list offers', () => {
       [meta, home, other].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
     );
     const spaces = createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,

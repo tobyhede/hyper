@@ -4,6 +4,7 @@ import { productDestinationPath } from '@project/http';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createSpaceStartup } from '../src/space';
 import { recordingHistory } from './browser-history';
+import { refusingFullscreen } from './fullscreen';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -37,7 +38,7 @@ async function browserMeasurement() {
     revision: 0n,
     exportedRevision: null,
   });
-  const startup = createSpaceStartup(backend, newUuid, recordingHistory());
+  const startup = createSpaceStartup(refusingFullscreen, backend, newUuid, recordingHistory());
   const { opened } = await startup.resolve(
     productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
   );

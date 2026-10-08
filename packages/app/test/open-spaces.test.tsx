@@ -16,6 +16,7 @@ import { productDestinationPath } from '@project/http';
 import { mintingIds } from './minting';
 import { heldImageSources, unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { refusingFullscreen } from './fullscreen';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -169,6 +170,7 @@ const setup = (
     backend,
     history,
     openSpaces: createOpenSpaces({
+      fullscreen: refusingFullscreen,
       images,
       backend,
       metaSpaceId: META_ID,
@@ -1407,6 +1409,7 @@ describe('Open Spaces', () => {
       ]);
       const reported: unknown[] = [];
       const spaces = createOpenSpaces({
+        fullscreen: refusingFullscreen,
         images: unusedImageSources,
         backend,
         metaSpaceId: META_ID,

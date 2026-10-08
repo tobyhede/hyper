@@ -1,10 +1,8 @@
 import type { DrawnClipboardFailure } from './embedded-publication';
 import {
   useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -17,8 +15,7 @@ import type { OpenSpace } from './open-spaces';
 import { resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
-import { presentingFullscreen } from './presenting-fullscreen';
-import { FullscreenContext } from './fullscreen-context';
+import { presentingFullscreen, type Fullscreen } from './presenting-fullscreen';
 import type { DestinationOpening } from './destination-opening';
 import { useOpenSpacesStanding } from './open-spaces-context';
 import { useAddressedResource } from './addressed-resource';
@@ -46,6 +43,7 @@ import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/She
 export const createApp = (
   opened: OpenSpace,
   browserLocation: BrowserLocation,
+  fullscreen: Fullscreen,
   opening?: DestinationOpening,
 ) => {
   const { app: composition, session: spaceSession, spaceResources } = opened;
@@ -83,6 +81,13 @@ export const createApp = (
   } else if (openingGraphId !== null) {
     navigation.openGraph(navigation.getState().selectedMapId, openingGraphId);
   }
+
+  const presentation = presentingFullscreen(fullscreen, {
+    presenting: () => navigation.getState().mode === 'presenting',
+    subscribe: navigation.subscribe,
+    present: navigation.present,
+    exitPresenting: navigation.exitPresenting,
+  });
 
   function App() {
     const [drawnClipboardFailures, setDrawnClipboardFailures] = useState<
@@ -125,18 +130,7 @@ export const createApp = (
     const { selectedMapId, activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
-    const fullscreen = useContext(FullscreenContext);
-    const presentation = useMemo(
-      () =>
-        presentingFullscreen(fullscreen, {
-          presenting: () => navigation.getState().mode === 'presenting',
-          subscribe: navigation.subscribe,
-          present: navigation.present,
-          exitPresenting: navigation.exitPresenting,
-        }),
-      [fullscreen],
-    );
-    useEffect(() => presentation.connect(), [presentation]);
+    useEffect(() => presentation.connect(), []);
     const { addressedResourceId, destinationNotFound } = useAddressedResource(
       browserLocation,
       useRenderAdapter,

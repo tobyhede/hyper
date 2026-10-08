@@ -16,6 +16,7 @@ import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
+import { refusingFullscreen } from './fullscreen';
 import { CLOSED_DISPLAY } from '@project/ui';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -202,6 +203,7 @@ describe('opening framing on a mounted canvas', () => {
         href: unused,
         dispose: unused,
       },
+      fullscreen: refusingFullscreen,
     };
 
     await mountSettled(
@@ -343,6 +345,7 @@ describe('opening framing on a mounted canvas', () => {
         href: unused,
         dispose: unused,
       },
+      fullscreen: refusingFullscreen,
     };
 
     await mountSettled(

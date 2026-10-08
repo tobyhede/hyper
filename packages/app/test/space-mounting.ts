@@ -7,6 +7,7 @@ import type { DestinationOpening } from '../src/destination-opening';
 import type { OpenSpace } from '../src/open-spaces';
 import { mountSpaceApp, type SpaceAppRenderer } from '../src/SpaceApp';
 import { recordingHistory } from './browser-history';
+import { refusingFullscreen } from './fullscreen';
 
 /**
  * Mount one Space the way Open Spaces opens one: the session's browser location
@@ -24,6 +25,6 @@ export const mountSpace = (
 ): BrowserLocation => {
   const browserLocation = createBrowserLocation(history);
   browserLocation.follow(opened.app);
-  mountSpaceApp(opened, browserLocation, render, opening);
+  mountSpaceApp(opened, browserLocation, refusingFullscreen, render, opening);
   return browserLocation;
 };

@@ -7,6 +7,7 @@ import { spaceResourceContextCommands } from '../src/space-resource-context-comm
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { refusingFullscreen } from './fullscreen';
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
@@ -93,6 +94,7 @@ async function setup(available = true) {
     control,
   );
   const spaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend,
     metaSpaceId: META,
