@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 — Withdraw authoring while presenting.
 
-**Status:** ready-for-human — implemented and checked locally; the draft PR's `CI passed` gate has not yet been observed.
+**Status:** resolved — `8b2e02d6`; draft PR #341 `CI passed` observed green.
 
 - [x] Write the new e2e assertions first and record them failing on `main`: the frame fills the space above the chrome at 16:9; a Closed, an Open and a resized Resource are framed identically; no connection handle, Resource toolbar, resize control, `textbox` or `contenteditable` is visible or reachable; the canvas behind the Stage is not focusable; an oversized image fits inside the frame; a Space Resource and an Ur Resource show their name only; a Reference Resource shows its own name over its Target's content.
 - [x] Overflowing content scrolls vertically inside the frame by wheel, trackpad and Page Up or Page Down, and the arrow keys still traverse while the scroll region has focus; e2e asserts both.
@@ -13,7 +13,7 @@
 - [x] Leaving presenting, by Overview, Escape or the browser's Back, leaves the canvas viewport exactly as it was before Present; e2e asserts it.
 - [x] The presenting e2e suite is rewritten around the Stage rather than the camera. Other specs that read presenting through the canvas, including the restart proofs under `test/e2e/`, are updated to the Stage.
 - [x] The presenting and overview cameras may remain in the tree, unused by presenting, for ticket 03 to delete.
-- [ ] `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm ui:catalog:check`, targeted lint and the affected unit, e2e and Ladle specs pass locally; the draft PR's `CI passed` gate is observed green before resolution. _(Local half done; CI not yet observed.)_
+- [x] `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm ui:catalog:check`, targeted lint and the affected unit, e2e and Ladle specs pass locally; the draft PR's `CI passed` gate is observed green before resolution.
 
 **Decisions taken:**
 
