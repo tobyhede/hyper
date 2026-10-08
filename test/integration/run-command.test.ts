@@ -260,8 +260,10 @@ describe('pnpm hyper run', () => {
   );
 
   /*
-   * The launcher forwards a signal it receives as soon as the run process
-   * exists, which is before that process has loaded or Imported anything.
+   * The signal reaches the launcher once the run process exists, before that
+   * process has loaded or Imported anything. The launcher holds it until the
+   * run process sends `handling-signals` (RUN_HANDLING_SIGNALS) and then
+   * forwards it, so the stop lands on the run's own handler.
    */
   it(
     'stops, exiting zero and leaving the directory as it was, on SIGINT while it is still starting',
