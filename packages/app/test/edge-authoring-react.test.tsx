@@ -128,7 +128,6 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       readOnly: false,
       kind: 'markdown',
       ...fixtureFacts('markdown'),
-      active: false,
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,
       activeGraphId: GRAPH_ID,

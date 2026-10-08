@@ -75,7 +75,6 @@ const resourceNode = (
     readOnly: false,
     kind,
     ...fixtureFacts(kind),
-    active: false,
     selectedForAuthoring: false,
     display: CLOSED_DISPLAY,
     activeGraphId: null,

@@ -44,7 +44,6 @@ const replacer: ImageReplaceEditor = {
 const shown: fc.Arbitrary<ResourceDisplay> = fc.oneof(
   fc.constant(CLOSED_DISPLAY),
   content.map((value) => ({ shown: 'open' as const, content: value })),
-  content.map((value) => ({ shown: 'presented' as const, content: value })),
 );
 
 /** Every display, including the two only the helpers make. */
@@ -104,19 +103,17 @@ describe('the display states only a Resource’s own content enters', () => {
 });
 
 describe('the Space view a display shows', () => {
-  it('answers the view and how it was reached for an Open or presented Space', () => {
-    for (const shownAs of ['open', 'presented'] as const)
-      for (const reached of ['self', 'reference'] as const)
-        expect(
-          spaceViewOf({ shown: shownAs, content: { kind: 'space', view, via: reached } }),
-        ).toEqual({ view, via: reached });
+  it('answers the view and how it was reached for an Open Space', () => {
+    for (const reached of ['self', 'reference'] as const)
+      expect(
+        spaceViewOf({ shown: 'open', content: { kind: 'space', view, via: reached } }),
+      ).toEqual({ view, via: reached });
   });
 
   it('answers nothing for a Closed display, or one showing anything but a Space', () => {
     fc.assert(
       fc.property(display, (value) => {
-        const drawsSpace =
-          (value.shown === 'open' || value.shown === 'presented') && value.content.kind === 'space';
+        const drawsSpace = value.shown === 'open' && value.content.kind === 'space';
         expect(spaceViewOf(value) === undefined).toBe(!drawsSpace);
       }),
     );

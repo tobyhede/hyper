@@ -388,8 +388,6 @@ describe('useCanvasRendering', () => {
         projection: view.projection,
         mapPlacement: view.mapPlacement,
         activeGraphId: GRAPH_ID,
-        activeResourceId: null,
-        presenting: false,
       }),
     );
     expect(result.current.canvas.kind).toBe('placeholder');

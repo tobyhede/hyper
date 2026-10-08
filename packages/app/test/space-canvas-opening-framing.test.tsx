@@ -91,7 +91,6 @@ function resourceNode(): ResourceFlowNode {
       readOnly: false,
       kind: 'markdown',
       ...fixtureFacts('markdown'),
-      active: false,
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,
       activeGraphId: null,

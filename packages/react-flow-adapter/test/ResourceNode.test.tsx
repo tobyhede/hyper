@@ -198,18 +198,16 @@ interface Overrides {
   onEditResource?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
   open?: boolean;
-  /** The Markdown an Open or presented Markdown or Reference Resource draws. */
+  /** The Markdown an Open Markdown or Reference Resource draws. */
   source?: string;
-  /** The picture an Open or presented Image Resource draws. */
+  /** The picture an Open Image Resource draws. */
   url?: string;
   /**
-   * The resolved content an Open or presented Resource draws. Defaults to what
+   * The resolved content an Open Resource draws. Defaults to what
    * the projection resolves for the fixture's own kind: its `source`, its
    * `url`, a Space view, or a Target's Markdown for a Reference Resource.
    */
   content?: ResourceContent;
-  /** Whether presenting draws this Resource, whatever its authored Open state. */
-  presented?: boolean;
   onBeginBodyEditing?: () => void;
   /** A running body edit, entered through the display as decoration enters it. */
   editor?: CanvasResourceBodyEditor;
@@ -270,7 +268,6 @@ function props({
   source = '',
   url = 'https://example.com/harbour.png',
   content,
-  presented = false,
   onBeginBodyEditing,
   editor,
   replacer,
@@ -287,14 +284,9 @@ function props({
     kind,
     contentAction: contentAction(resolved),
     embedsMap: embedsMap(resolved),
-    active: false,
     selectedForAuthoring,
     display: running(
-      presented
-        ? { shown: 'presented', content: content ?? ownContent(kind, source, url) }
-        : open === true
-          ? { shown: 'open', content: content ?? ownContent(kind, source, url) }
-          : { shown: 'closed' },
+      open === true ? { shown: 'open', content: resolved } : { shown: 'closed' },
       editor,
       replacer,
     ),
@@ -570,77 +562,11 @@ describe('ResourceNode draws what the display shows', () => {
       unmount();
     }
   });
-
-  /**
-   * The rule between the two: what a Resource draws is the display's, and the
-   * Map's authored Open state is geometry — the resize control, z-order and the
-   * node's own `data-open` — never what is drawn. A Resource both presented and
-   * Open is presented, and keeps its authored Open state.
-   */
-  it('presents a Resource that is also Open, keeping its authored Open state on the node', () => {
-    const { container } = render(
-      <ResourceNode
-        {...props({
-          open: true,
-          presented: true,
-          source: '## Presented body',
-          onEditResource: vi.fn(),
-        })}
-      />,
-    );
-
-    expect(screen.getByTestId('resource-content')).toHaveTextContent('Presented body');
-    expect(screen.queryByTestId('resource')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Close Resource A' })).toBeNull();
-    expect(container.querySelector('.rf-resource-node__inner')).toHaveAttribute(
-      'data-open',
-      'true',
-    );
-  });
-
-  it('presents a Reference Resource to an Image Resource as its Target’s image', () => {
-    render(
-      <ResourceNode
-        {...props({
-          kind: 'reference',
-          title: 'Harbour, again',
-          presented: true,
-          content: { kind: 'image', url: FIGURE, via: 'reference' },
-        })}
-      />,
-    );
-
-    expect(screen.getByRole('img', { name: 'Harbour, again' })).toHaveAttribute('src', FIGURE);
-  });
-
-  it('presents a Space Resource as its name, with no empty document', () => {
-    const { container } = render(
-      <ResourceNode {...props({ kind: 'space', title: 'Roadmap', presented: true })} />,
-    );
-
-    expect(screen.getByRole('heading', { name: 'Roadmap' })).toBeVisible();
-    expect(container.querySelector('.resource__body')).toBeNull();
-  });
-
-  it('presents an unresolved Target as a notice', () => {
-    render(
-      <ResourceNode
-        {...props({
-          kind: 'reference',
-          presented: true,
-          content: { kind: 'unresolved', via: 'reference' },
-        })}
-      />,
-    );
-
-    expect(screen.getByTestId('unresolved-content')).toHaveTextContent('Target not found');
-  });
 });
 
 /**
  * An Ur Resource has no content (ADR 0113): it Opens, Closes and resizes as any
- * Resource does, offers no Edit even when an edit operation reaches it, and
- * presents as its name.
+ * Resource does, and offers no Edit even when an edit operation reaches it.
  */
 describe('ResourceNode Ur Resource', () => {
   const resize = {
@@ -716,26 +642,6 @@ describe('ResourceNode Ur Resource', () => {
     expect(resource).toHaveAttribute('data-content-kind', 'ur');
     expect(resource.querySelector('.canvas-resource__content')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway, again' })).toBeNull();
-  });
-
-  it('presents as a title slide, itself or through a Reference Resource', () => {
-    for (const [kind, via] of [
-      ['ur', 'self'],
-      ['reference', 'reference'],
-    ] as const) {
-      const { unmount } = render(
-        <ResourceNode
-          {...props({ kind, title: 'Gateway', presented: true, content: { kind: 'ur', via } })}
-        />,
-      );
-
-      const slide = screen.getByTestId('resource-content');
-      expect(slide).toHaveAttribute('data-content-kind', 'ur');
-      expect(screen.getByRole('heading', { name: 'Gateway' })).toBeVisible();
-      expect(slide.querySelector('.resource__body')).toBeNull();
-      expect(screen.queryByTestId('resource')).toBeNull();
-      unmount();
-    }
   });
 });
 

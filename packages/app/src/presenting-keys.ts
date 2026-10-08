@@ -77,7 +77,7 @@ function activatesFocusedControl(event: KeyboardEvent): boolean {
  * The global Traversal commands, bound while a traversal is on.
  *
  * Right commits the selected Edge, Left traverses back, Up and Down move the
- * selection among a fork's outgoing Edges without moving the camera — the move a
+ * selection among a fork's outgoing Edges without traversing — the move a
  * deck framework's per-key redirect cannot express, and the reason there is no
  * framework here. Escape leaves.
  *

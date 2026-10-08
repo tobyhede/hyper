@@ -141,7 +141,6 @@ describe('projectResourceNodes', () => {
     const a = nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000002')!;
     expect(a.type).toBe('resource');
     expect(a.data.title).toBe('Resource A');
-    expect(a.data.active).toBe(false);
     // ADR 0064: content is loaded when a resource is opened, not embedded per node.
     expect('markdown' in a.data).toBe(false);
   });
@@ -282,18 +281,6 @@ describe('projectResourceNodes', () => {
     expect('measured' in b).toBe(false);
   });
 
-  it('flags the active resource', () => {
-    const nodes = projectResourceNodes(space, {
-      activeResourceId: uuid('00000000-0000-4000-8000-000000000003'),
-    });
-    expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.data.active).toBe(
-      true,
-    );
-    expect(nodes.find((n) => n.id === '00000000-0000-4000-8000-000000000003')!.className).toContain(
-      'rf-resource-node--active',
-    );
-  });
-
   it("resolves an Open Reference Resource's Target Markdown under the Reference Resource identity", () => {
     const referenceId = uuid('00000000-0000-4000-8000-000000000007');
     const withReference = load(
@@ -329,7 +316,7 @@ describe('projectResourceNodes', () => {
     });
   });
 
-  it('carries an Image Resource’s own kind whether it is Closed, Open or presented', () => {
+  it('carries an Image Resource’s own kind whether it is Closed or Open', () => {
     const imageId = uuid('00000000-0000-4000-8000-000000000008');
     const url = 'https://example.com/harbour.png';
     const withImage = load(
@@ -355,9 +342,6 @@ describe('projectResourceNodes', () => {
       open: true,
       display: { shown: 'open', content: picture },
     });
-    expect(imageNode({ activeResourceId: imageId, showActiveResourceContent: true })).toMatchObject(
-      { kind: 'image', display: { shown: 'presented', content: picture } },
-    );
   });
 });
 
@@ -406,27 +390,6 @@ describe('projectResourceNodes display', () => {
       shown: 'open',
       content: { kind: 'image', url, via: 'reference' },
     });
-  });
-
-  it('presents the presented Resource even while it is Open, keeping its authored Open state', () => {
-    const nodes = projectResourceNodes(withKinds, {
-      openResourceIds: new Set([referenceId]),
-      activeResourceId: referenceId,
-      showActiveResourceContent: true,
-    });
-    expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
-      open: true,
-      display: {
-        shown: 'presented',
-        content: { kind: 'image', url, via: 'reference' },
-      },
-    });
-  });
-
-  it('shows the active Resource Open, not presented, while nothing is being presented', () => {
-    expect(
-      display(markdownId, { openResourceIds: new Set([markdownId]), activeResourceId: markdownId }),
-    ).toMatchObject({ shown: 'open' });
   });
 });
 

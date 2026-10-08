@@ -70,9 +70,7 @@ async function projection(open = false) {
     await positionedStrategy(Placement.fromMap(resolved.map))(pending.strategyGraph),
     {
       activeGraphId: GRAPH,
-      activeResourceId: null,
       selectedResourceId: null,
-      presenting: false,
     },
   );
 }

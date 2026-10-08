@@ -55,7 +55,6 @@ const projectionNode = (
     kind,
     ...fixtureFacts(kind),
     open,
-    active: false,
     selectedForAuthoring: false,
     display: fixtureDisplay(open, kind),
     activeGraphId: null,

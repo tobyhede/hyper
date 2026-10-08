@@ -125,15 +125,6 @@ export async function expectResourceFillsNode(node: Locator): Promise<void> {
 }
 
 /**
- * The canvas node of the Resource reached during traversal, by the class the
- * projection marks it with. What the audience sees is the Stage
- * ({@link presentedResource}); this is the Resource behind it on the canvas.
- */
-export function activeResource(page: Page): Locator {
-  return page.locator('.react-flow__node.rf-resource-node--active');
-}
-
-/**
  * The Stage presenting draws on, over the inert canvas (ADR 0123).
  *
  * Shared because presenting is read from several suites, and the test ids are

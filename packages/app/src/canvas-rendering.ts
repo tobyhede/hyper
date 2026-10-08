@@ -17,8 +17,6 @@ export interface CanvasRenderingInput {
   readonly projection: PendingCanvasProjection;
   readonly mapPlacement: Placement;
   readonly activeGraphId: GraphId | null;
-  readonly activeResourceId: ResourceId | null;
-  readonly presenting: boolean;
 }
 
 export interface CanvasRendering {
@@ -58,7 +56,7 @@ export interface CanvasRendering {
  */
 export function useCanvasRendering(
   useRenderAdapter: RenderAdapter,
-  { projection, mapPlacement, activeGraphId, activeResourceId, presenting }: CanvasRenderingInput,
+  { projection, mapPlacement, activeGraphId }: CanvasRenderingInput,
 ): CanvasRendering {
   const resizeDraft = useRenderAdapter((s) => s.resizeDraft);
   const selection = useRenderAdapter((s) => s.selection);
@@ -82,11 +80,9 @@ export function useCanvasRendering(
         ? null
         : projection.project(laidOut, {
             activeGraphId,
-            activeResourceId,
             selectedResourceId,
-            presenting,
           }),
-    [projection, laidOut, activeGraphId, activeResourceId, selectedResourceId, presenting],
+    [projection, laidOut, activeGraphId, selectedResourceId],
   );
   useEffect(() => {
     if (projected) syncProjection(projected.nodes, projected.edges);

@@ -287,8 +287,8 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   /**
    * Present reads `editingResourceBody` and nothing else about the canvas.
    *
-   * Presenting draws the active Resource's content *instead of* the Resource, so a live
-   * editor cannot survive it and the draft would go without one of ADR 0064's
+   * Presenting covers the canvas with the Stage and makes it inert (ADR 0123), so a
+   * live editor cannot survive it and the draft would go without one of ADR 0064's
    * four exits being spent. It does not read `presenting` itself — the surface
    * draws Stop rather than Present once a traversal is running.
    */
@@ -394,8 +394,8 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
    * The dialog owns its own modality, and the editor is still there when it
    * closes — so a Resource mid-edit is covered rather than settled, and none of
    * ADR 0064's four exits is spent behind the reader's back. What it cannot
-   * survive is presenting, which draws the active Resource's content *instead of*
-   * the Resource, and a placement that has not resolved, which has no Resource mounted
+   * survive is presenting, which covers the canvas with the Stage and makes it
+   * inert, and a placement that has not resolved, which has no Resource mounted
    * to hold it.
    */
   const editResourceBody = editable && !presenting;

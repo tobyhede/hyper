@@ -103,22 +103,12 @@ export const handRolledStyles = [
   {
     block: 'rf-resource-node',
     reason:
-      "The adapter's node wrapper: resource sizing from `--resource-width`/`--resource-height` and the Open Resource's fill of the box the Map authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, React Flow's own `NodeResizeControl` in the Resource's palette with the thin frame a selected Shape draws around its rect, and the one rule naming the actively presented Resource. React Flow measures against this box, so it cannot move into the component it wraps.",
-  },
-  {
-    block: 'resource',
-    reason:
-      "`PresentedResource`'s base appearance plus the container-query typography that scales a presented Resource with its 16:9 frame (ADR 0027). The scaling half is React Flow's, and the base half sits here with it because the two are separated only by source order.",
-  },
-  {
-    block: 'resource-image',
-    reason:
-      "Named only by the `.resource` block's rule that stacks a presented Image Resource's name over its picture: the presented frame is `.resource--full`'s, so the rule that lays it out lives with that block rather than in the picture's stylesheet. `ResourceImage`'s own appearance is in `packages/ui/src/resource-image.css`, beside the component.",
+      "The adapter's node wrapper: resource sizing from `--resource-width`/`--resource-height` and the Open Resource's fill of the box the Map authored, per-Graph port and authoring-handle geometry, handle reveal driven by the connection state, and React Flow's own `NodeResizeControl` in the Resource's palette with the thin frame a selected Shape draws around its rect. React Flow measures against this box, so it cannot move into the component it wraps.",
   },
   {
     block: 'canvas-resource',
     reason:
-      "Two rules, both adapter and application state rather than appearance: React Flow's \"this is the actively presented Resource\" fact, and the lean an embedded Resource is given while the Resource framing it is dragged — which is the application's, because only it knows which Resource frames which. `CanvasResource`'s own appearance is in `packages/ui/src/canvas-resource.css`, beside the component.",
+      "Application state rather than appearance: the lean an embedded Resource is given while the Resource framing it is dragged — which is the application's, because only it knows which Resource frames which. `CanvasResource`'s own appearance is in `packages/ui/src/canvas-resource.css`, beside the component.",
   },
   {
     block: 'graph-area',

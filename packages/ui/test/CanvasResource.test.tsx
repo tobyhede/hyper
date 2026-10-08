@@ -9,7 +9,7 @@ import {
   CLOSED_DISPLAY,
   type CanvasSpaceResourceSelection,
   type CanvasResourceFront,
-  type FrontDisplay,
+  type ResourceDisplay,
 } from '../src';
 
 const FIGURE_URL = 'https://example.com/figure.png';
@@ -26,7 +26,7 @@ const SPACE_CONTENT: ResourceContent = {
 };
 
 /** An Open display drawing `content`. */
-const opened = (content: ResourceContent): FrontDisplay => ({ shown: 'open', content });
+const opened = (content: ResourceContent): ResourceDisplay => ({ shown: 'open', content });
 
 it('takes a Reference Resource’s content-area layout from its Target, including its Close fade', () => {
   const props = {
@@ -1097,7 +1097,7 @@ describe('CanvasResource Title ladder', () => {
    */
   it('draws the same ladder Open and Closed, on every Resource kind', () => {
     const title = 'Strategies\nNo strategy is privileged\nADR 0014';
-    const fronts: readonly (readonly [CanvasResourceFront, FrontDisplay])[] = [
+    const fronts: readonly (readonly [CanvasResourceFront, ResourceDisplay])[] = [
       [{ kind: 'preview' }, CLOSED_DISPLAY],
       [{ kind: 'markdown' }, CLOSED_DISPLAY],
       [{ kind: 'markdown' }, opened({ kind: 'markdown', source: '', via: 'self' })],
@@ -2147,7 +2147,7 @@ describe('CanvasResource Close fade', () => {
  * Open it shows only its Title, and nothing anywhere offers to edit it.
  */
 describe('CanvasResource Ur front', () => {
-  const UR_OPEN: FrontDisplay = opened({ kind: 'ur', via: 'self' });
+  const UR_OPEN: ResourceDisplay = opened({ kind: 'ur', via: 'self' });
 
   it('presents a Closed Ur Resource by its Title alone, its Shape saying what it is', () => {
     render(

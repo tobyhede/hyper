@@ -1,5 +1,4 @@
 import { useSyncExternalStore } from 'react';
-import type { ResourceId } from '@project/core';
 import type { ComposedApp } from './compose-app';
 import { useCanvasRendering } from './canvas-rendering';
 import type { MapSurface } from './map-surface';
@@ -10,7 +9,6 @@ export function useMapSurface(
   app: ComposedApp,
   surface: MapSurface,
   facts: {
-    readonly activeResourceId: ResourceId | null;
     readonly presenting: boolean;
     readonly spaceOnCanvas: boolean;
     readonly creatingSpaceResource: boolean;
@@ -26,8 +24,6 @@ export function useMapSurface(
     projection: view.projection,
     mapPlacement: view.mapPlacement,
     activeGraphId: surface.context().graphId,
-    activeResourceId: facts.activeResourceId,
-    presenting: facts.presenting,
   });
   const availability = useAuthoringAvailability(
     {

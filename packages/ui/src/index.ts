@@ -20,7 +20,7 @@ export {
   CLOSED_DISPLAY,
   spaceViewOf,
 } from './resource-display';
-export type { FrontDisplay, OwnContent, ResourceDisplay } from './resource-display';
+export type { OwnContent, ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
 export type {

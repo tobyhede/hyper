@@ -143,7 +143,6 @@ export const createApp = (
       setEditingResourceTitle,
       setEditingChromeTitle,
     } = useMapSurface(composition, composition.surface, {
-      activeResourceId,
       presenting,
       spaceOnCanvas: active,
       creatingSpaceResource: placement.creatingSpaceResource,

@@ -11,12 +11,7 @@ import {
   type OnResizeStart,
   type ShouldResize,
 } from '@xyflow/react';
-import {
-  CanvasResource,
-  PresentedResource,
-  type CanvasResourceFront,
-  type CanvasResourceProps,
-} from '@project/ui';
+import { CanvasResource, type CanvasResourceFront, type CanvasResourceProps } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { useConnectionEndEligible } from './connection-end-eligibility';
@@ -25,9 +20,7 @@ import { offersConnectionEnd } from './connection-target-reveal';
 
 /**
  * React Flow custom node: a Resource front with one Edge anchor on each of its four
- * sides. An opened Markdown Resource draws its content inside the same node;
- * presenting independently draws the active Resource's rendered content at the
- * frame's scale (ADR 0064, ADR 0027).
+ * sides. An Open Resource draws its content inside the same node (ADR 0064).
  *
  * The Resource front itself — Markdown and Reference Resource treatment, title editing, refusal
  * display, Open/Edit controls and interaction-state visuals — is the
@@ -283,9 +276,7 @@ export function ResourceNode({
    * **Not a fourth arm of the branch below.** It is a prop handed to whichever
    * arm the *title* state selects, so a Resource can be open while it is being
    * renamed — Opening is what the Map authored and the caret is a gesture,
-   * and a branch would have made them exclusive. Presenting is the branch's
-   * first arm, because the projection has already decided that a presented
-   * Resource is presented whether or not it is Open.
+   * and a branch would have made them exclusive.
    *
    * `data.open` is the Map's authored Open state: the node's `data-open`
    * publishes it, and nothing drawn here reads it.
@@ -423,7 +414,6 @@ export function ResourceNode({
     <div
       ref={inner}
       className="rf-resource-node__inner"
-      data-active={data.active}
       data-selected={visuallySelected}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={offerEnd ? seeking : 'none'}
@@ -489,11 +479,7 @@ export function ResourceNode({
           />
         </>
       )}
-      {display.shown === 'presented' ? (
-        <div className="rf-resource-node__content">
-          <PresentedResource title={data.title} content={display.content} />
-        </div>
-      ) : titleEditor !== undefined ? (
+      {titleEditor !== undefined ? (
         <CanvasResource
           readOnly={data.readOnly}
           front={front}

@@ -59,9 +59,13 @@
 }
 
 /* A picture is fitted inside the frame, whole, so its Resource is exactly the
-   frame's height rather than at least it. */
+   frame's height rather than at least it: the name stacks over the picture, and
+   the picture takes the room left below the name. */
 .stage__body .resource--full:has(> .resource-image) {
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  overflow: hidden;
 }
 
 /* A Resource with no content below its name — an Ur Resource — is a title

@@ -41,12 +41,8 @@ import { mapResources } from './map-resolution';
 export interface CanvasInteraction {
   /** The Graph being emphasised, if one is active. */
   readonly activeGraphId: GraphId | null;
-  /** The Resource reached during traversal, if any. */
-  readonly activeResourceId: ResourceId | null;
   /** The Resource named by an authoring gesture, if any. */
   readonly selectedResourceId: ResourceId | null;
-  /** Presenting draws the active Resource's content rather than its title. */
-  readonly presenting: boolean;
 }
 
 /** React Flow's view of the Space, ready to publish. */
@@ -120,9 +116,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
       return {
         nodes: projectResourceNodes(space, {
           readOnly: false,
-          activeResourceId: interaction.activeResourceId,
           selectedResourceId: interaction.selectedResourceId,
-          showActiveResourceContent: interaction.presenting,
           activeGraphId,
           activeGraphColor: activeGraphColor(colors, activeGraphId),
           strategyGraph: laidOut,

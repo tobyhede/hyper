@@ -275,39 +275,23 @@ describe('what each node shows', () => {
     );
   });
 
-  /**
-   * Presenting over Open is decided once, in the projection: a Resource both
-   * presented and Open is presented, and keeps its authored Open state, which
-   * is geometry rather than what it draws.
-   */
-  it('shows the presented Resource as presented, the Open ones as open, and the rest Closed', () => {
+  /** A canvas Resource is Open or Closed, exactly as its Map authors it (ADR 0123). */
+  it('shows the Open Resources as open and the rest Closed', () => {
     fc.assert(
-      fc.property(
-        spaceFileArb,
-        fc.array(fc.boolean(), { minLength: 1 }),
-        fc.nat(),
-        (generated, openings, presentedIndex) => {
-          const result = loadSpace(generated.file, generated.resourceFiles);
-          if (!result.ok) throw new Error(JSON.stringify(result.errors));
-          const space = result.space;
-          const ids = space.resources.map((resource) => resource.id);
-          const openIds = new Set(ids.filter((_, index) => openings[index % openings.length]));
-          const presented = ids[presentedIndex % ids.length];
-          const nodes = projectResourceNodes(space, {
-            openResourceIds: openIds,
-            activeResourceId: presented ?? null,
-            showActiveResourceContent: true,
-          });
+      fc.property(spaceFileArb, fc.array(fc.boolean(), { minLength: 1 }), (generated, openings) => {
+        const result = loadSpace(generated.file, generated.resourceFiles);
+        if (!result.ok) throw new Error(JSON.stringify(result.errors));
+        const space = result.space;
+        const ids = space.resources.map((resource) => resource.id);
+        const openIds = new Set(ids.filter((_, index) => openings[index % openings.length]));
+        const nodes = projectResourceNodes(space, { openResourceIds: openIds });
 
-          for (const node of nodes) {
-            const open = openIds.has(node.data.resourceId);
-            const expected =
-              node.data.resourceId === presented ? 'presented' : open ? 'open' : 'closed';
-            expect(node.data.display.shown).toBe(expected);
-            expect(node.data.open === true).toBe(open);
-          }
-        },
-      ),
+        for (const node of nodes) {
+          const open = openIds.has(node.data.resourceId);
+          expect(node.data.display.shown).toBe(open ? 'open' : 'closed');
+          expect(node.data.open === true).toBe(open);
+        }
+      }),
     );
   });
 });

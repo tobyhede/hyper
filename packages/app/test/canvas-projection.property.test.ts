@@ -84,9 +84,7 @@ async function projectThroughMap(generated: { file: unknown; resourceFiles: Reso
   );
   return projection.project(laidOut, {
     activeGraphId: resolved.activeGraph.id,
-    activeResourceId: null,
     selectedResourceId: null,
-    presenting: false,
   });
 }
 

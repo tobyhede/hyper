@@ -11,7 +11,6 @@ import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
   AUTHORING_HANDLE_SIDES,
   activateGraph,
-  activeResource,
   presentedName,
   activeGraph,
   beginRename,
@@ -458,13 +457,11 @@ test('the Markdown editor code loads only when a Markdown Resource opens', async
  * The flat paper treatment ADR 0051 settled: cream face, heavy ink rule, and a
  * mono body that is the writing surface rather than a form control.
  *
- * Pinned because nothing else asserts it. The treatment's rules and the general
- * `.resource--full` rules they override have equal specificity, so only source
- * order separates them — the same cascade trap `presenting.spec.ts` pins for
- * `.resource--full`. With the treatment colocated in its own stylesheet, that order
- * is a fact about the module graph rather than about one file's line
- * numbers, and a reordered import would silently return the editor to the
- * generic dark pane with every other assertion still green.
+ * Pinned because nothing else asserts it. With the treatment colocated in its
+ * own stylesheet, the cascade it wins is a fact about the module graph rather
+ * than about one file's line numbers, and a reordered import would silently
+ * return the editor to the generic dark pane with every other assertion still
+ * green.
  */
 test('the opened Resource draws Markdown and its editor on the same paper surface', async ({
   page,
@@ -2674,7 +2671,6 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
 test('no connection handle is visible or reachable on the presented Resource or a neighbour', async ({
   page,
 }) => {
-  const A = '00000000-0000-4000-8000-000000000002';
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();
   const b = nodeByTitle(page, 'B').first();
@@ -2687,11 +2683,11 @@ test('no connection handle is visible or reachable on the presented Resource or 
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeResource(page)).toHaveAttribute('data-id', A);
+  await expect(presentedName(page)).toHaveText('A');
   await settled(page);
   // By coordinates: the Stage covers the canvas while presenting, so
   // Playwright's actionable hover would wait on it forever.
-  const presented = await boxOf(activeResource(page), 'the presented Resource');
+  const presented = await boxOf(a, 'the presented Resource');
   await page.mouse.move(presented.x + presented.width / 2, presented.y + presented.height / 2);
 
   for (const [node, handles] of [

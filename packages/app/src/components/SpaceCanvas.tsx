@@ -1692,8 +1692,8 @@ export function SpaceCanvas({
       // to the four authoring handles, and only then does this line mean
       // anything beyond whether the connection line draws.
       //
-      // **Not `authorOnCanvas`**: presenting deliberately keeps this one
-      // gesture, and `authoring-availability.ts` records why.
+      // **Not `authorOnCanvas`**: a live embedded edit leaves a pointer
+      // connection alone, and `authoring-availability.ts` records why.
       nodesConnectable={availability.connectOnCanvas}
       // **The placement fact, deliberately not an availability answer.** The
       // withheld form of this description is a sentence about placement, so the
@@ -1708,9 +1708,8 @@ export function SpaceCanvas({
       connectionLineStyle={connectionLineStyle}
       connectionLineComponent={GraphConnectionLine}
       minZoom={0.2}
-      // Presenting draws one resource full-screen, which is far closer than React
-      // Flow's default ceiling of 2. See `MAX_ZOOM` — without it the camera sits
-      // outside its own extent and the first wheel tick yanks it back.
+      // React Flow's default ceiling of 2 stops an author well short of reading
+      // one Resource at screen size. See `MAX_ZOOM`.
       maxZoom={MAX_ZOOM}
     >
       {surface !== undefined && (

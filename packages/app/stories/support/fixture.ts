@@ -75,7 +75,7 @@ export const resources: readonly Resource[] = [
     id: resourceIds.traversal,
     title: 'Traversal',
     kind: 'markdown',
-    body: '# Traversal\n\nPresenting is this canvas, closer in.',
+    body: '# Traversal\n\nPresenting draws on its own Stage.',
   },
   {
     id: resourceIds.openingReference,
