@@ -303,7 +303,7 @@
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
         "test/unit/raw-http-request.test.ts",
         "test/unit/vite-hono-host.test.ts",
-        "test/integration/start-command.test.ts",
+        "test/integration/run-command.test.ts",
         "test/unit/vite-space-http-plugin.test.ts",
         "test/support/refusing-postgres-server.ts",
         "test/support/unowned-react-updates.ts"
@@ -417,7 +417,7 @@
         "packages/persistence/src/session.ts",
         "src/cli/main.ts",
         "src/cli/database-command.ts",
-        "scripts/start-run.ts",
+        "src/cli/run-process.ts",
         "src/aggregate-directory/space-directory.ts"
       ],
       "rules": {

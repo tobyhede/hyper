@@ -1,11 +1,21 @@
-import { access, lstat, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  access,
+  lstat,
+  mkdtemp,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCliMain } from '../../src/cli/main';
-import type { DatabaseCommand } from '../../src/cli/arguments';
+import type { DatabaseCommand, RunCommand } from '../../src/cli/arguments';
 import type { CliIo } from '../../src/cli/database-command';
 import { runHyper } from '../../src/cli/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
@@ -101,6 +111,16 @@ const unreachedTarget = (store: string): DatabaseTarget => ({
   open: () => Promise.reject(new Error(`${store} was opened`)),
 });
 
+/**
+ * The author verbs' half of a command line's dependencies, for a command that
+ * must reach neither: a working directory nothing is written under, and a
+ * launcher that refuses.
+ */
+const unlaunched = {
+  workingDirectory: '/hyper-cli-unit/unreached',
+  launchRun: () => Promise.reject(new Error('A run was launched')),
+};
+
 /** Run a command line whose default store, PostgreSQL, is the held repository. */
 const hyperOver = (
   args: readonly string[],
@@ -110,6 +130,7 @@ const hyperOver = (
     io,
     newId,
     targets: { postgres: heldTarget(repository), sqlite: unreachedTarget('sqlite') },
+    ...unlaunched,
   });
 
 afterEach(async () => {
@@ -634,6 +655,25 @@ describe('runHyper', () => {
     { args: ['export', '--unknown'] },
     { args: ['export', ''] },
     { args: ['import', ''] },
+    { args: ['init'] },
+    { args: ['init', ''] },
+    { args: ['init', 'first', 'second'] },
+    { args: ['init', '--no-open'] },
+    { args: ['init', 'talk', '--no-open'] },
+    { args: ['init', 'talk', '--store', 'postgres'] },
+    { args: ['init', 'talk', '--store', 'sqlite'] },
+    { args: ['run'] },
+    { args: ['run', ''] },
+    { args: ['run', 'first', 'second'] },
+    { args: ['run', '--no-open'] },
+    { args: ['run', 'talk', '--store', 'postgres'] },
+    { args: ['run', 'talk', '--store', 'sqlite'] },
+    { args: ['run', 'talk', '--dangerous-replace'] },
+    { args: ['run', 'talk', '--port'] },
+    { args: ['run', 'talk', '--port', '0'] },
+    { args: ['run', 'talk', '--port', '65536'] },
+    { args: ['run', 'talk', '--port', 'eighty'] },
+    { args: ['run', 'talk', '--port', '4173', '--port', '4174'] },
   ])('rejects invalid arguments $args without opening a store', async ({ args }) => {
     const output = captureIo();
 
@@ -641,6 +681,7 @@ describe('runHyper', () => {
       io: output.io,
       newId: newUuid,
       targets: { postgres: unreachedTarget('postgres'), sqlite: unreachedTarget('sqlite') },
+      ...unlaunched,
     });
 
     expect(exitCode).toBe(2);
@@ -976,6 +1017,7 @@ describe('runHyper', () => {
         io: output.io,
         newId: newUuid,
         targets: { postgres: unreachedTarget('postgres'), sqlite: unreachedTarget('sqlite') },
+        ...unlaunched,
       });
 
       expect(exitCode).toBe(0);
@@ -1032,6 +1074,7 @@ describe('runHyper', () => {
       io: output.io,
       newId: newUuid,
       targets,
+      ...unlaunched,
     });
 
     expect(output.stderr).toEqual([]);
@@ -1049,6 +1092,7 @@ describe('runHyper', () => {
         io: output.io,
         newId: newUuid,
         targets: { sqlite: heldTarget(repository), postgres: unreachedTarget('postgres') },
+        ...unlaunched,
       },
     );
 
@@ -1223,4 +1267,103 @@ describe('runCliMain', () => {
     expect(exitCode).toBe(1);
     expect(closed).toBe(true);
   });
+});
+
+describe('runHyper author verbs', () => {
+  const noStores = {
+    postgres: unreachedTarget('postgres'),
+    sqlite: unreachedTarget('sqlite'),
+  };
+
+  /** Every file under `directory`, by relative path, with its contents. */
+  const filesUnder = async (directory: string): Promise<Record<string, string>> => {
+    const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+    const files: Record<string, string> = {};
+    for (const entry of entries.filter((candidate) => candidate.isFile())) {
+      const path = join(entry.parentPath, entry.name);
+      files[relative(directory, path)] = await readFile(path, 'base64');
+    }
+    return files;
+  };
+
+  const author = (args: readonly string[], workingDirectory: string) => {
+    const output = captureIo();
+    const launched: RunCommand[] = [];
+    const exitCode = runHyper(args, {
+      io: output.io,
+      newId: newUuid,
+      workingDirectory,
+      targets: noStores,
+      launchRun: (command) => {
+        launched.push(command);
+        return Promise.resolve(7);
+      },
+    });
+    return { output, launched, exitCode };
+  };
+
+  it.each([
+    { holding: 'nothing, being missing', make: () => Promise.resolve() },
+    {
+      holding: 'only dot-entries',
+      make: (directory: string) => mkdir(join(directory, '.git'), { recursive: true }),
+    },
+  ])(
+    'init writes a new aggregate to a directory holding $holding, prints the run command and opens no store',
+    async ({ make }) => {
+      const workingDirectory = await makeTemporaryDirectory();
+      const directory = join(workingDirectory, 'new talk');
+      await make(directory);
+
+      const { output, launched, exitCode } = author(['init', 'new talk'], workingDirectory);
+
+      expect(await exitCode).toBe(0);
+      expect(output.stderr).toEqual([]);
+      expect(output.stdout).toEqual([
+        `Created a new aggregate; run it with: pnpm hyper run '${directory}'\n`,
+      ]);
+      expect(launched).toEqual([]);
+      const aggregateFile: unknown = JSON.parse(
+        await readFile(join(directory, AGGREGATE_FILE_NAME), 'utf8'),
+      );
+      expect(aggregateFile).toMatchObject({ version: 1 });
+    },
+  );
+
+  it('init refuses a directory that is not empty, writing nothing', async () => {
+    const workingDirectory = await makeTemporaryDirectory();
+    const directory = await writeSingleSpaceAggregate();
+    await writeFile(join(directory, 'NOTES.txt'), 'kept\n');
+    const before = await filesUnder(directory);
+
+    const { output, exitCode } = author(['init', directory], workingDirectory);
+
+    expect(await exitCode).toBe(1);
+    expect(output.stdout).toEqual([]);
+    expect(output.stderr).toEqual([
+      `${directory} is not empty; init writes only to a missing or empty directory.\n`,
+    ]);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+
+  it.each([
+    {
+      args: ['run', 'talk'],
+      launched: { verb: 'run', directory: '/authors/home/talk', port: undefined, open: true },
+    },
+    {
+      args: ['run', '--no-open', '/elsewhere/talk', '--port', '4180'],
+      launched: { verb: 'run', directory: '/elsewhere/talk', port: 4180, open: false },
+    },
+  ])(
+    'run launches $args with the directory resolved, answering the run’s exit code',
+    async ({ args, launched: expected }) => {
+      const { output, launched, exitCode } = author(args, '/authors/home');
+
+      expect(await exitCode).toBe(7);
+      expect(launched).toEqual([expected]);
+      expect(output.stdout).toEqual([]);
+      expect(output.stderr).toEqual([]);
+    },
+  );
 });

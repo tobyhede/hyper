@@ -23,7 +23,7 @@ export type RunEvent =
   { readonly kind: 'written' } | { readonly kind: 'write-failed'; readonly reason: unknown };
 
 export interface RunOptions {
-  /** Mints the ids of the new Space, and those a hand-authored directory omits (ADR 0109). */
+  /** Mints the ids a hand-authored directory omits, and those the run's Edits mint (ADR 0109). */
   readonly newId: () => UUID;
   /** The clock behind the quiet period, injected so a test can advance it (ADR 0109). */
   readonly schedule: RunSchedule;
@@ -38,8 +38,6 @@ export type RunStopResult =
 export interface Run {
   /** The application the run serves, over the run's own memory store. */
   readonly host: SpaceHostApplication;
-  /** True when the directory was missing or empty and now holds the new Space. */
-  readonly established: boolean;
   /**
    * Write any edit not yet on disk, wait for every write in flight, and stop
    * writing. Resolves once the directory holds everything committed.
@@ -49,6 +47,8 @@ export interface Run {
 
 export type RunStart =
   | { readonly kind: 'running'; readonly run: Run }
+  /** The directory is missing or empty, so there is no aggregate to run; `init` makes one. */
+  | { readonly kind: 'empty' }
   /** The directory could not be read as an Aggregate directory. */
   | { readonly kind: 'unreadable'; readonly diagnostics: readonly string[] }
   /** The directory read cleanly, and aggregate intake refused what it holds. */
@@ -71,9 +71,10 @@ class ObservedRepository extends MemorySpaceRepository {
 }
 
 /**
- * Missing and empty are both the new Space; anything else is Imported. A
- * dot-entry — `.git` from a fresh `git init`, `.DS_Store` — is not content, so
- * a directory holding only those is empty.
+ * Missing and empty are the same to both `init` and a run: the first writes a
+ * new aggregate there and the second refuses it. A dot-entry — `.git` from a
+ * fresh `git init`, `.DS_Store` — is not content, so a directory holding only
+ * those is empty.
  */
 const holdsNothing = async (directory: string): Promise<boolean> => {
   try {
@@ -82,6 +83,37 @@ const holdsNothing = async (directory: string): Promise<boolean> => {
     if (isMissingFile(error)) return true;
     throw error;
   }
+};
+
+/** Export the store's aggregate to the directory, throwing whatever stops it. */
+const writeAggregate = async (
+  repository: MemorySpaceRepository,
+  directory: string,
+): Promise<void> => {
+  const result = await exportAggregate(repository, directory);
+  if (result.kind === 'uninitialized') {
+    throw new Error('The store holds no aggregate to write');
+  }
+  if (result.kind === 'would-not-read-back') {
+    throw new Error(
+      `The written aggregate does not read back as a valid aggregate:\n${describeAggregateRefusal(result.errors, result.spaces).join('\n')}`,
+    );
+  }
+};
+
+export type InitResult = { readonly kind: 'initialized' } | { readonly kind: 'not-empty' };
+
+/**
+ * Write a new aggregate, whose Meta Space is a new space (ADR 0018), to a
+ * missing or empty directory (ADR 0124), keeping any dot-entries it holds. A
+ * directory with anything else in it is refused and left untouched.
+ */
+export const initAggregate = async (directory: string, newId: () => UUID): Promise<InitResult> => {
+  if (!(await holdsNothing(directory))) return { kind: 'not-empty' };
+  const repository = new MemorySpaceRepository();
+  await establishMetaSpace(repository, newId);
+  await writeAggregate(repository, directory);
+  return { kind: 'initialized' };
 };
 
 /**
@@ -108,15 +140,7 @@ const createWriter = (
     if (!changed) return;
     changed = false;
     try {
-      const result = await exportAggregate(repository, directory);
-      if (result.kind === 'uninitialized') {
-        throw new Error('The run holds no aggregate to write');
-      }
-      if (result.kind === 'would-not-read-back') {
-        throw new Error(
-          `The written aggregate does not read back as a valid aggregate:\n${describeAggregateRefusal(result.errors, result.spaces).join('\n')}`,
-        );
-      }
+      await writeAggregate(repository, directory);
       failure = undefined;
       report({ kind: 'written' });
     } catch (reason) {
@@ -145,8 +169,7 @@ const createWriter = (
 
 /**
  * Run an Aggregate directory (ADR 0117): Import it into a fresh memory store,
- * or establish the new Space there when it is missing or empty and write it at
- * once, then write every committed edit back once edits have been quiet for
+ * refusing a missing or empty one (ADR 0124), then write every committed edit back once edits have been quiet for
  * {@link RUN_QUIET_MILLISECONDS}. A write that fails while the run serves is
  * tried again after the same period, so edits it did not write do not wait for
  * the next commit or the stop.
@@ -157,8 +180,8 @@ const createWriter = (
  */
 export const startRun = async (directory: string, options: RunOptions): Promise<RunStart> => {
   let pending: (() => void) | undefined;
-  // Writes are scheduled only while the run serves: a failed write during
-  // start-up fails the start, and nothing is scheduled once stop has begun.
+  // Writes are scheduled only while the run serves: the Import's own commits
+  // are not edits, and nothing is scheduled once stop has begun.
   let serving = false;
   const scheduleWrite = (): void => {
     pending?.();
@@ -177,39 +200,30 @@ export const startRun = async (directory: string, options: RunOptions): Promise<
     if (event.kind === 'write-failed' && serving) scheduleWrite();
   });
 
-  const established = await holdsNothing(directory);
-  if (established) {
-    await establishMetaSpace(repository, options.newId);
-    writer.changed();
-    await writer.write();
-    const failure = writer.failure();
-    if (failure !== undefined) throw failure.reason;
-  } else {
-    let imported;
-    try {
-      imported = await importAggregate(directory, repository, {
-        replace: false,
-        newId: options.newId,
-      });
-    } catch (error) {
-      if (!(error instanceof AggregateDirectoryError)) throw error;
-      return { kind: 'unreadable', diagnostics: error.diagnostics };
-    }
-    if (imported.kind === 'aggregate-refused') {
-      return {
-        kind: 'aggregate-refused',
-        diagnostics: describeAggregateRefusal(imported.errors, imported.spaces),
-      };
-    }
-    if (imported.kind !== 'imported') {
-      throw new Error(`A fresh store answered ${imported.kind} to Importing ${directory}`);
-    }
+  if (await holdsNothing(directory)) return { kind: 'empty' };
+  let imported;
+  try {
+    imported = await importAggregate(directory, repository, {
+      replace: false,
+      newId: options.newId,
+    });
+  } catch (error) {
+    if (!(error instanceof AggregateDirectoryError)) throw error;
+    return { kind: 'unreadable', diagnostics: error.diagnostics };
+  }
+  if (imported.kind === 'aggregate-refused') {
+    return {
+      kind: 'aggregate-refused',
+      diagnostics: describeAggregateRefusal(imported.errors, imported.spaces),
+    };
+  }
+  if (imported.kind !== 'imported') {
+    throw new Error(`A fresh store answered ${imported.kind} to Importing ${directory}`);
   }
 
   serving = true;
   const run: Run = {
     host: createSpaceHost(repository, options.newId),
-    established,
     stop: async () => {
       serving = false;
       pending?.();

@@ -1,17 +1,20 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aggregateFileSchema } from '@project/core';
+import { aggregateFileSchema, newUuid } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readSingleSpace } from '../../src/aggregate-directory';
+import { initAggregate } from '../../src/run/run';
+import { runCommand } from '../support/hyper-command';
 
 /**
- * `pnpm start` as an author runs it: its own process, a directory of its own,
- * one edit over HTTP and a signal (ADR 0117). Nothing here needs a database.
+ * `pnpm hyper init` and `pnpm hyper run` as an author runs them: their own
+ * process, a directory of their own, one edit over HTTP and a signal
+ * (ADR 0117, ADR 0124). Nothing here needs a database.
  */
 
 const START_TIMEOUT_MS = 60_000;
@@ -31,11 +34,11 @@ const freePort = (): Promise<number> =>
   });
 
 /**
- * The `start` script's command line, so the launcher can run without pnpm in
- * front of it. The script must `exec` node, for the reason `scripts/start.ts`
- * gives.
+ * The `hyper` script's command line, so the launcher can run without pnpm in
+ * front of it. The script must `exec` node, for the reason
+ * `src/cli/run-launcher.ts` gives.
  */
-const startScript = async (): Promise<readonly string[]> => {
+const hyperScript = async (): Promise<readonly string[]> => {
   const manifest: unknown = JSON.parse(
     await readFile(join(REPOSITORY_ROOT, 'package.json'), 'utf8'),
   );
@@ -45,16 +48,22 @@ const startScript = async (): Promise<readonly string[]> => {
     'scripts' in manifest &&
     typeof manifest.scripts === 'object' &&
     manifest.scripts !== null &&
-    'start' in manifest.scripts &&
-    typeof manifest.scripts.start === 'string'
-      ? manifest.scripts.start
+    'hyper' in manifest.scripts &&
+    typeof manifest.scripts.hyper === 'string'
+      ? manifest.scripts.hyper
       : '';
   const [exec, command, ...args] = script.split(' ');
   if (exec !== 'exec' || command !== 'node') {
-    throw new Error(`Expected the start script to exec node: ${script}`);
+    throw new Error(`Expected the hyper script to exec node: ${script}`);
   }
   return args;
 };
+
+const exists = (path: string): Promise<boolean> =>
+  access(path).then(
+    () => true,
+    () => false,
+  );
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -67,19 +76,20 @@ afterEach(async () => {
  * as an author does; `launcher` runs the launcher with nothing in front of it.
  */
 const startRunning = async (via: 'pnpm' | 'launcher') => {
-  const root = await mkdtemp(join(tmpdir(), 'hyper-start-'));
+  const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
   roots.push(root);
   const directory = join(root, 'talk');
+  await initAggregate(directory, newUuid);
   const port = await freePort();
-  const runArguments = [directory, '--no-open', '--port', String(port)];
+  const runArguments = ['run', directory, '--no-open', '--port', String(port)];
   const child =
     via === 'pnpm'
-      ? spawn('pnpm', ['--silent', 'start', ...runArguments], {
+      ? spawn('pnpm', ['--silent', 'hyper', ...runArguments], {
           cwd: REPOSITORY_ROOT,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
         })
-      : spawn(process.execPath, [...(await startScript()), ...runArguments], {
+      : spawn(process.execPath, [...(await hyperScript()), ...runArguments], {
           cwd: REPOSITORY_ROOT,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -119,11 +129,11 @@ const startRunning = async (via: 'pnpm' | 'launcher') => {
     JSON.parse(await readFile(join(directory, 'hyper.json'), 'utf8')),
   );
 
-  /** Rename the new Space over HTTP, exactly as the browser commits. */
+  /** Rename the Meta Space over HTTP, exactly as the browser commits. */
   const rename = async (title: string): Promise<void> => {
     const backend = new HttpSpaceBackend(`http://localhost:${String(port)}`);
     const loaded = await backend.loadSpace(metaSpaceId);
-    if (loaded === undefined) throw new Error('Expected the new Space');
+    if (loaded === undefined) throw new Error('Expected the Meta Space');
     const committed = await backend.commit({
       changes: [
         {
@@ -151,9 +161,62 @@ const startRunning = async (via: 'pnpm' | 'launcher') => {
   };
 };
 
-describe('pnpm start', () => {
+describe('pnpm hyper init', () => {
+  it(
+    'writes a new aggregate to a relative directory from where pnpm was invoked, and prints the run command',
+    async () => {
+      // The real path, which is the directory pnpm records as where it was invoked.
+      const root = await realpath(await mkdtemp(join(tmpdir(), 'hyper-init-')));
+      roots.push(root);
+      const directory = join(root, 'talk');
+
+      const result = await runCommand(
+        'pnpm',
+        ['--silent', '--dir', REPOSITORY_ROOT, 'hyper', 'init', 'talk'],
+        { cwd: root, timeoutMs: START_TIMEOUT_MS },
+      );
+
+      expect(result, result.stderr).toMatchObject({ status: 0, stderr: '' });
+      expect(result.stdout).toBe(
+        `Created a new aggregate; run it with: pnpm hyper run ${directory}\n`,
+      );
+      const { metaSpaceId } = aggregateFileSchema.parse(
+        JSON.parse(await readFile(join(directory, 'hyper.json'), 'utf8')),
+      );
+      expect((await readSingleSpace(join(directory, metaSpaceId))).document.title).toBe(
+        'New space',
+      );
+    },
+    START_TIMEOUT_MS,
+  );
+});
+
+describe('pnpm hyper run', () => {
+  it(
+    'refuses a missing directory, naming init, and writes nothing',
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
+      roots.push(root);
+      const directory = join(root, 'rust-asycn');
+
+      const result = await runCommand(
+        'pnpm',
+        ['--silent', 'hyper', 'run', directory, '--no-open'],
+        {
+          cwd: REPOSITORY_ROOT,
+          timeoutMs: START_TIMEOUT_MS,
+        },
+      );
+
+      expect(result.status, result.stderr).not.toBe(0);
+      expect(result.stderr).toContain(`pnpm hyper init ${directory}`);
+      expect(await exists(directory)).toBe(false);
+    },
+    START_TIMEOUT_MS,
+  );
+
   it.each(['SIGINT', 'SIGTERM'] as const)(
-    'serves a new directory, writes an edit and exits zero on %s',
+    'serves a directory, writes an edit and exits zero on %s',
     async (name) => {
       const running = await startRunning('pnpm');
       try {

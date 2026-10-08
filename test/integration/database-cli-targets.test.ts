@@ -97,6 +97,12 @@ const unreachedTarget: DatabaseTarget = {
   open: () => Promise.reject(new Error('The store --store did not name was opened')),
 };
 
+/** The author verbs' dependencies, which a database verb never reaches. */
+const unlaunched = {
+  workingDirectory: '/database-cli-targets/unreached',
+  launchRun: () => Promise.reject(new Error('A run was launched')),
+};
+
 describe.each(cases)('database CLI target ($name)', (targetCase) => {
   it('imports and exports the same aggregate through the store --store names', async () => {
     const opened = await targetCase.arrange();
@@ -133,6 +139,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
           io: { stdout, stderr },
           newId: newUuid,
           targets,
+          ...unlaunched,
         }),
       ).resolves.toBe(0);
       expect(stderr).not.toHaveBeenCalled();
@@ -143,6 +150,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
           io: { stdout, stderr },
           newId: newUuid,
           targets,
+          ...unlaunched,
         }),
       ).resolves.toBe(0);
       expect(stderr).not.toHaveBeenCalled();

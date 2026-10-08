@@ -1,64 +1,24 @@
-import { resolve } from 'node:path';
 import { newUuid } from '@project/core';
 import { createServer } from 'vite';
-import { runViteConfig } from '../packages/app/database-vite-config';
-import { startRun, type RunEvent } from '../src/run/run';
+import { runViteConfig } from '../../packages/app/database-vite-config';
+import { startRun, type RunEvent } from '../run/run';
+import { USAGE, parseHyperArguments } from './arguments';
+import { cliArguments } from './process';
+import { shellWord } from './shell-word';
 
 /**
- * The process behind `pnpm start <dir>` that runs an Aggregate directory
- * (ADR 0117). `scripts/start.ts` starts it in a process group of its own and
- * forwards it the signals the terminal sends.
+ * The process behind `hyper run <dir>` that runs an Aggregate directory
+ * (ADR 0117). `run-launcher.ts` starts it in a process group of its own,
+ * with the directory already resolved, and forwards it the signals the
+ * terminal sends.
  *
  * The composition root for a run. It names the process's clock, identity
- * source, streams, signals and working directory, and hands the first two to
- * the Run module; everything about when the directory is written is the Run
- * module's.
+ * source, streams and signals, and hands the first two to the Run module;
+ * everything about when the directory is written is the Run module's.
  */
 
-const USAGE = 'Usage: pnpm start <aggregate-directory> [--port <port>] [--no-open]\n';
 const DEFAULT_PORT = 4173;
 const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
-
-interface StartArguments {
-  readonly directory: string;
-  readonly port: number;
-  /** An explicit `--port` is the author's choice, so it is not moved to the next free one. */
-  readonly strictPort: boolean;
-  readonly open: boolean;
-}
-
-const parsePort = (value: string | undefined): number | undefined => {
-  if (value === undefined || !/^\d+$/.test(value)) return undefined;
-  const port = Number(value);
-  return port > 0 && port < 65_536 ? port : undefined;
-};
-
-const parseArguments = (args: readonly string[]): StartArguments | undefined => {
-  const paths: string[] = [];
-  let port: number | undefined;
-  let open = true;
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index] ?? '';
-    if (argument === '--no-open') {
-      open = false;
-    } else if (argument === '--port') {
-      if (port !== undefined) return undefined;
-      index += 1;
-      port = parsePort(args[index]);
-      if (port === undefined) return undefined;
-    } else if (argument.startsWith('-') || argument === '') {
-      return undefined;
-    } else {
-      paths.push(argument);
-    }
-  }
-  const [path, ...rest] = paths;
-  if (path === undefined || rest.length > 0) return undefined;
-  // pnpm runs a script from the repository root and records where it was
-  // invoked in `INIT_CWD`, which is what a relative directory is relative to.
-  const directory = resolve(process.env['INIT_CWD'] ?? process.cwd(), path);
-  return { directory, port: port ?? DEFAULT_PORT, strictPort: port !== undefined, open };
-};
 
 const describe = (reason: unknown): string =>
   reason instanceof Error ? reason.message : String(reason);
@@ -74,12 +34,18 @@ const report = (event: RunEvent): void => {
 // write lands. What the run prints is a courtesy; the directory is the record.
 for (const stream of [process.stdout, process.stderr]) stream.on('error', () => undefined);
 
-const processArgs = process.argv.slice(2);
-const parsed = parseArguments(processArgs[0] === '--' ? processArgs.slice(1) : processArgs);
-if (parsed === undefined) {
+const command = parseHyperArguments(cliArguments());
+if (command?.verb !== 'run') {
   process.stderr.write(USAGE);
   process.exit(2);
 }
+const parsed = {
+  directory: command.directory,
+  port: command.port ?? DEFAULT_PORT,
+  // An explicit `--port` is the author's choice, so it is not moved to the next free one.
+  strictPort: command.port !== undefined,
+  open: command.open,
+};
 
 const started = await startRun(parsed.directory, {
   newId: newUuid,
@@ -93,6 +59,12 @@ const started = await startRun(parsed.directory, {
   process.exit(1);
 });
 
+if (started.kind === 'empty') {
+  process.stderr.write(
+    `${parsed.directory} holds no aggregate: it is missing or empty. To create one there: pnpm hyper init ${shellWord(parsed.directory)}\n`,
+  );
+  process.exit(1);
+}
 if (started.kind === 'unreadable') {
   process.stderr.write(
     `${parsed.directory} is not an Aggregate directory:\n${started.diagnostics.join('\n')}\n`,
@@ -114,7 +86,7 @@ const server = await createServer({
 // and answers either by closing the server and exiting the process — before
 // the run has written its last edit. This process owns its signals and its
 // exit, so those listeners go; without this, the SIGTERM case in
-// `test/integration/start-command.test.ts` exits 143 with the edit unwritten.
+// `test/integration/run-command.test.ts` exits 143 with the edit unwritten.
 process.removeAllListeners('SIGTERM');
 process.stdin.removeAllListeners('end');
 
@@ -164,7 +136,6 @@ process.once('disconnect', () => {
 });
 
 await server.listen();
-if (run.established) process.stdout.write(`Created a new Space in ${parsed.directory}\n`);
 const url = server.resolvedUrls?.local[0] ?? `http://localhost:${String(parsed.port)}/`;
 process.stdout.write(`Running ${parsed.directory} at ${url}\nPress Ctrl-C to stop.\n`);
 if (parsed.open) server.openBrowser();

@@ -239,6 +239,8 @@ describe('hyper CLI --store sqlite', () => {
       };
       return runHyper(['import', proposal, '--dangerous-replace', '--store', 'sqlite'], {
         targets: { sqlite, postgres },
+        workingDirectory: '/sqlite-hyper-cli/unreached',
+        launchRun: () => Promise.reject(new Error('A run was launched')),
         io: {
           stdout: (message) => output.push(message),
           stderr: (message) => output.push(message),
