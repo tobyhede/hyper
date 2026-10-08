@@ -3,7 +3,7 @@ import type { ResourceShape } from '@project/core';
 import {
   CanvasResource,
   CLOSED_DISPLAY,
-  type CanvasResourceFront,
+  type KindOperations,
   type CanvasResourceState,
 } from '@project/ui';
 
@@ -18,7 +18,7 @@ interface CanvasResourceSpecimenCommonProps {
    * resized to it. Absent, it is the Closed Size.
    */
   readonly size?: { readonly width: number; readonly height: number };
-  readonly kind?: CanvasResourceFront['kind'];
+  readonly kind?: KindOperations['kind'];
 }
 
 /** The two custom properties the stylesheet sizes a Resource from. */
@@ -47,11 +47,11 @@ export function CanvasResourceSpecimen({
   shape: resourceShape = 'rectangle',
   size,
 }: CanvasResourceSpecimenProps) {
-  const front: CanvasResourceFront = { kind };
+  const kindOperations: KindOperations = { kind };
   if (size === undefined) {
     return (
       <CanvasResource
-        front={front}
+        kindOperations={kindOperations}
         display={CLOSED_DISPLAY}
         title={title}
         state={state}
@@ -67,7 +67,7 @@ export function CanvasResourceSpecimen({
   return (
     <div style={sized}>
       <CanvasResource
-        front={front}
+        kindOperations={kindOperations}
         display={CLOSED_DISPLAY}
         title={title}
         state={state}

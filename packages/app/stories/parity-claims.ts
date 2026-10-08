@@ -219,9 +219,9 @@ export const parityClaims: readonly ParityClaim[] = [
       'React Flow selection/dragging and their translation into state are covered by ResourceNode.test.tsx and by editing.spec.ts drag coverage; selection is also exercised by canvas-resource-exposes-kind-and-keyboard-actions. This story renders the shipped CanvasResource through CanvasResourceSpecimen (no facsimile) to pin the visual treatment per state for review, which is not itself a distinct browser-observable product behaviour beyond those.',
   },
   {
-    id: 'canvas-resource-front-draws-only-its-title-lines',
+    id: 'closed-resource-draws-only-its-title-lines',
     storyFile: 'components/resource.stories.tsx',
-    storyExport: 'Front',
+    storyExport: 'Closed',
     claim:
       'Every Resource front draws its kind glyph — bar an Ur Resource, whose Shape says what it is — its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
   },
@@ -247,9 +247,9 @@ export const parityClaims: readonly ParityClaim[] = [
       "An Ur Resource's rail draws its Shape as a control whose face is the Shape it is drawn in, named `Shape: <Shape>`; it opens the four Shapes as an uncaptioned radio list, each row the Shape's glyph and its name with the current one chosen, and choosing one redraws the Resource in it (ADR 0121).",
   },
   {
-    id: 'image-resource-closed-front-draws-title-and-kind',
+    id: 'closed-image-resource-draws-title-and-kind',
     storyFile: 'components/resource.stories.tsx',
-    storyExport: 'Front',
+    storyExport: 'Closed',
     claim:
       'A Closed Image Resource draws its Title and the image kind glyph at the one Closed size, and no picture (ADR 0106).',
   },

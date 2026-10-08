@@ -391,7 +391,7 @@ test(
  */
 test(
   'a Resource whose author wrote more than one line draws its Title as Title Lines',
-  { tag: '@parity:canvas-resource-front-draws-only-its-title-lines' },
+  { tag: '@parity:closed-resource-draws-only-its-title-lines' },
   async ({ page }) => {
     await page.goto('/');
     await selectCanvas(page, 'Collection 1');

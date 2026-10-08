@@ -48,7 +48,7 @@ test(
  * The table is the point: one loop over every front the component declares, so
  * a new kind cannot be added with its own story slice and reviewed on its own.
  */
-const FRONTS = [
+const CLOSED_KINDS = [
   { label: 'markdown', kind: 'markdown', glyph: 'Markdown Resource', border: 'solid' },
   { label: 'reference', kind: 'reference', glyph: 'Reference Resource', border: 'dotted' },
   { label: 'space', kind: 'space', glyph: 'Space Resource', border: 'solid' },
@@ -87,26 +87,26 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
  */
 test(
   'every Resource front draws its kind, its border and its Title Lines, and nothing beneath them',
-  { tag: '@parity:canvas-resource-front-draws-only-its-title-lines' },
+  { tag: '@parity:closed-resource-draws-only-its-title-lines' },
   async ({ page }) => {
-    await page.goto('/?story=components--resource--front&mode=preview');
+    await page.goto('/?story=components--resource--closed&mode=preview');
 
-    for (const front of FRONTS) {
+    for (const entry of CLOSED_KINDS) {
       for (const [suffix, expected] of [
         ['one line', ONE_LINE],
         ['three lines', THREE_LINES],
       ] as const) {
-        const resource = specimen(page, `${front.label} · ${suffix}`).getByRole('article');
-        await expect(resource).toHaveAttribute('data-kind', front.kind);
+        const resource = specimen(page, `${entry.label} · ${suffix}`).getByRole('article');
+        await expect(resource).toHaveAttribute('data-kind', entry.kind);
         await expect(resource).toHaveAttribute('data-state', 'rest');
         await expect(resource).toHaveAttribute('data-open', 'false');
-        if (front.glyph === null) {
+        if (entry.glyph === null) {
           await expect(resource.locator('.resource-rail__kind')).toHaveCount(0);
         } else {
-          await expect(resource.getByRole('img', { name: front.glyph })).toBeVisible();
+          await expect(resource.getByRole('img', { name: entry.glyph })).toBeVisible();
         }
         await expect(resource.getByTestId('canvas-resource-actions')).toHaveCount(0);
-        await expect(resource).toHaveCSS('border-style', front.border);
+        await expect(resource).toHaveCSS('border-style', entry.border);
 
         // One block element per Title Line, carrying the role `titleLines` gave
         // it — and exactly as many as the author typed.
@@ -151,9 +151,9 @@ test(
  */
 test(
   'a Closed Image Resource draws its Title and kind at the Closed size, and no picture',
-  { tag: '@parity:image-resource-closed-front-draws-title-and-kind' },
+  { tag: '@parity:closed-image-resource-draws-title-and-kind' },
   async ({ page }) => {
-    await page.goto('/?story=components--resource--front&mode=preview');
+    await page.goto('/?story=components--resource--closed&mode=preview');
 
     const image = specimen(page, 'image · one line').getByRole('article');
     await expect(image).toHaveAttribute('data-kind', 'image');
@@ -174,13 +174,13 @@ test(
  * drawn side by side: a break the **author** typed starts a rung and a break the
  * **box** chose does not.
  */
-// Untagged: the parity claim `canvas-resource-front-draws-only-its-title-lines`
+// Untagged: the parity claim `closed-resource-draws-only-its-title-lines`
 // above already owns this story's evidence, and one claim takes exactly one
 // Ladle test. This is the same story's second reading and needs no second claim.
 test('a wrapped single-line Title stays one rung while an authored three-line Title draws three', async ({
   page,
 }) => {
-  await page.goto('/?story=components--resource--front&mode=preview');
+  await page.goto('/?story=components--resource--closed&mode=preview');
 
   const wrapped = specimen(page, 'one Title Line, wrapped')
     .getByRole('article')

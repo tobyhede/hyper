@@ -63,7 +63,7 @@ import {
  * choice of operations, not a kind tag plus an optional field every other kind
  * ignores. What it draws, and whether it is Open, is the display's.
  */
-export type CanvasResourceFront =
+export type KindOperations =
   | {
       /** A creation ghost: Markdown treatment without authored content or open state. */
       readonly kind: 'preview';
@@ -138,7 +138,7 @@ export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
 export type CanvasResourceState = 'rest' | 'selected' | 'dragging' | 'editing';
 
 interface CanvasResourceCommonProps {
-  readonly front: CanvasResourceFront;
+  readonly kindOperations: KindOperations;
   /**
    * Whether this Resource is Open, the content it draws when it is, and the
    * body editor or image replacer while one runs. The front reads Open from
@@ -336,7 +336,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
  * own visual treatment lives in `canvas-resource.css`, colocated with this module.
  */
 export function CanvasResource(props: CanvasResourceProps) {
-  const { front, title, graphColor, entityActions, state, readOnly = false } = props;
+  const { kindOperations, title, graphColor, entityActions, state, readOnly = false } = props;
   /**
    * What this Resource is called wherever it is *named* rather than drawn.
    *
@@ -347,7 +347,7 @@ export function CanvasResource(props: CanvasResourceProps) {
    * A reader who wants the rest reads the heading.
    */
   const name = titleName(title);
-  const visualKind = front.kind === 'preview' ? 'markdown' : front.kind;
+  const visualKind = kindOperations.kind === 'preview' ? 'markdown' : kindOperations.kind;
   /*
    * Read-only is decided here, once: a read-only Resource draws its content at
    * rest, and every authoring affordance below reads one of these operations,
@@ -361,19 +361,21 @@ export function CanvasResource(props: CanvasResourceProps) {
   const drawsOutline = drawnResourceShape !== 'rectangle';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
-  const openableFront = front.kind === 'preview' ? undefined : front;
-  const onOpenChange = readOnly ? undefined : openableFront?.onOpenChange;
-  const contentFront =
-    !readOnly && 'onBeginEdit' in front && (content === null || contentAction(content) !== 'none')
-      ? front
+  const openableOperations = kindOperations.kind === 'preview' ? undefined : kindOperations;
+  const onOpenChange = readOnly ? undefined : openableOperations?.onOpenChange;
+  const contentOperations =
+    !readOnly &&
+    'onBeginEdit' in kindOperations &&
+    (content === null || contentAction(content) !== 'none')
+      ? kindOperations
       : undefined;
-  const onBeginContentEdit = contentFront?.onBeginEdit;
-  const spaceFront =
+  const onBeginContentEdit = contentOperations?.onBeginEdit;
+  const spaceOperations =
     !readOnly &&
     content !== null &&
     contentAction(content) === 'author-space-view' &&
-    front.kind === 'space'
-      ? front
+    kindOperations.kind === 'space'
+      ? kindOperations
       : undefined;
   const areaContent = useAreaContent(content);
   const bodyControl = useRef<HTMLDivElement>(null);
@@ -412,10 +414,10 @@ export function CanvasResource(props: CanvasResourceProps) {
   const actionableEntityActions =
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const onResourceShapeChange =
-    !readOnly && front.kind === 'ur' ? front.onResourceShapeChange : undefined;
+    !readOnly && kindOperations.kind === 'ur' ? kindOperations.onResourceShapeChange : undefined;
   const contextNotice = props.contextNotice ?? null;
-  const spaceRail = spaceFront?.spaceRail;
-  const portal = spaceFront?.portal;
+  const spaceRail = spaceOperations?.spaceRail;
+  const portal = spaceOperations?.portal;
   const portalEditing = portal?.editing === true;
   const showActions =
     state !== 'dragging' &&
@@ -556,11 +558,13 @@ export function CanvasResource(props: CanvasResourceProps) {
           <ResourceRailAction
             ref={editControl}
             aria-label={
-              front.kind === 'image' ? `Replace image of Resource ${name}` : `Edit Resource ${name}`
+              kindOperations.kind === 'image'
+                ? `Replace image of Resource ${name}`
+                : `Edit Resource ${name}`
             }
             onClick={beginContentEdit}
           >
-            {front.kind === 'image' ? (
+            {kindOperations.kind === 'image' ? (
               <ReplaceImageIcon data-icon="inline-start" />
             ) : (
               <EditIcon data-icon="inline-start" />
@@ -712,7 +716,7 @@ export function CanvasResource(props: CanvasResourceProps) {
         {/* Withheld while the Resource is read-only for the same reason every other
             authoring affordance is — a read-only surface draws what the Resource
             shows, not what could be changed about it. */}
-        {spaceFront !== undefined && spaceRail === undefined && (
+        {spaceOperations !== undefined && spaceRail === undefined && (
           <p className="canvas-resource__space-note">Reading the referenced Space…</p>
         )}
         {contextNotice !== null && (

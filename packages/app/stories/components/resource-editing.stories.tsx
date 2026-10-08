@@ -6,7 +6,7 @@ import {
   Button,
   CanvasResource,
   CLOSED_DISPLAY,
-  type CanvasResourceFront,
+  type KindOperations,
   type ResourceDisplay,
 } from '@project/ui';
 import { resourceSizeVars } from '#src/resource';
@@ -35,7 +35,7 @@ function TitleEditingResource({
     return 'completed' as const;
   };
   const group = useRef<HTMLDivElement>(null);
-  const front: CanvasResourceFront = { kind: 'markdown', onOpenChange: changeOpen };
+  const kindOperations: KindOperations = { kind: 'markdown', onOpenChange: changeOpen };
   const display: ResourceDisplay = open
     ? {
         shown: 'open',
@@ -56,7 +56,7 @@ function TitleEditingResource({
         data-testid="resource-group"
       >
         <CanvasResource
-          front={front}
+          kindOperations={kindOperations}
           display={display}
           title={title}
           graphColor="#ffc53d"
@@ -156,7 +156,7 @@ export const Markdown: Story = () => {
         mode === 'focused',
       )
     : shown;
-  const front: CanvasResourceFront = {
+  const kindOperations: KindOperations = {
     kind: 'markdown',
     onOpenChange: changeOpen,
     onBeginEdit: () => setMode('focused'),
@@ -177,7 +177,7 @@ export const Markdown: Story = () => {
       </div>
       <div style={openFrame}>
         <CanvasResource
-          front={front}
+          kindOperations={kindOperations}
           display={display}
           state="selected"
           title="Strategies"

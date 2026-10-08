@@ -11,7 +11,7 @@ import { productDestinationPath, type ProductDestination } from '@project/http';
 import {
   CanvasResource,
   CLOSED_DISPLAY,
-  type CanvasResourceFront,
+  type KindOperations,
   type CanvasResourceState,
   type ResourceDisplay,
 } from '@project/ui';
@@ -92,14 +92,14 @@ const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuf
  * without content or authored open state. Leaving it out would make this story
  * "every front but one", which is the shape this story exists to stop.
  */
-const FRONTS = [
+const CLOSED_KINDS = [
   { kind: 'markdown', label: 'markdown' },
   { kind: 'reference', label: 'reference' },
   { kind: 'space', label: 'space' },
   { kind: 'image', label: 'image' },
   { kind: 'ur', label: 'ur' },
   { kind: 'preview', label: 'creation ghost' },
-] as const satisfies readonly { kind: CanvasResourceFront['kind']; label: string }[];
+] as const satisfies readonly { kind: KindOperations['kind']; label: string }[];
 
 /**
  * The whole of a Resource front, at rest, for every front the component draws.
@@ -118,23 +118,23 @@ const FRONTS = [
  * handed an authoring callback, so no toolbar is drawn (ADR 0102); `Hover` and
  * `Actions` are where the commands live.
  */
-export const Front: Story = () => (
+export const Closed: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
       title="Resource front"
       note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A closed front draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
     >
       <div className="inv-row">
-        {FRONTS.map((front) => (
-          <Specimen key={front.label} label={`${front.label} · one line`}>
-            <CanvasResourceSpecimen kind={front.kind} title={ONE_LINE_TITLE} />
+        {CLOSED_KINDS.map((entry) => (
+          <Specimen key={entry.label} label={`${entry.label} · one line`}>
+            <CanvasResourceSpecimen kind={entry.kind} title={ONE_LINE_TITLE} />
           </Specimen>
         ))}
       </div>
       <div className="inv-row">
-        {FRONTS.map((front) => (
-          <Specimen key={front.label} label={`${front.label} · three lines`}>
-            <CanvasResourceSpecimen kind={front.kind} title={THREE_LINE_TITLE} />
+        {CLOSED_KINDS.map((entry) => (
+          <Specimen key={entry.label} label={`${entry.label} · three lines`}>
+            <CanvasResourceSpecimen kind={entry.kind} title={THREE_LINE_TITLE} />
           </Specimen>
         ))}
       </div>
@@ -154,7 +154,7 @@ export const Front: Story = () => (
     </CatalogueSection>
   </div>
 );
-Front.storyName = 'Front';
+Closed.storyName = 'Closed';
 
 /** The size the resized specimens are drawn at, as an author resizes an Ur Resource to. */
 const RESIZED_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
@@ -263,7 +263,7 @@ export const ResourceShapeChoice: Story = () => {
   return (
     <div className="p-8" style={resourceSizeVars}>
       <CanvasResource
-        front={{ kind: 'ur', onResourceShapeChange: setResourceShape }}
+        kindOperations={{ kind: 'ur', onResourceShapeChange: setResourceShape }}
         display={CLOSED_DISPLAY}
         shape={resourceShape}
         title="Decide"
@@ -463,7 +463,7 @@ function Instance({
   };
   // Every kind Opens and Closes through the one operation (ADR 0070), so the
   // Reference Resource carries it too.
-  const front: CanvasResourceFront = { kind, onOpenChange: changeOpen };
+  const kindOperations: KindOperations = { kind, onOpenChange: changeOpen };
   const display: ResourceDisplay = open
     ? {
         shown: 'open',
@@ -488,7 +488,7 @@ function Instance({
         onClick={() => setSelected(true)}
       >
         <CanvasResource
-          front={front}
+          kindOperations={kindOperations}
           display={display}
           state={state}
           title={title}
@@ -503,7 +503,7 @@ function Instance({
         />
         Dragging
       </label>
-      {front.kind === 'markdown' && (
+      {kindOperations.kind === 'markdown' && (
         <p className="text-xs text-muted-foreground" data-testid="open-report">
           {open ? `${title} is open.` : `${title} is closed.`}
         </p>
@@ -744,7 +744,7 @@ export const EnterSpace: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        front={{ kind: 'space', onOpenChange: changeOpen }}
+        kindOperations={{ kind: 'space', onOpenChange: changeOpen }}
         display={CLOSED_DISPLAY}
         state="selected"
         entityActions={[
@@ -811,7 +811,7 @@ export const OpenIndependently: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        front={{ kind: 'space', onOpenChange: changeOpen }}
+        kindOperations={{ kind: 'space', onOpenChange: changeOpen }}
         display={CLOSED_DISPLAY}
         state="selected"
         title="Architecture"
@@ -854,7 +854,7 @@ export const RailActions: Story = () => {
         {authoredSpace.resources.slice(0, 2).map((resource, index) => (
           <CanvasResource
             key={resource.id}
-            front={{ kind: 'markdown', onOpenChange: () => 'retained' }}
+            kindOperations={{ kind: 'markdown', onOpenChange: () => 'retained' }}
             display={CLOSED_DISPLAY}
             title={resource.title}
             state={index === 1 ? 'selected' : 'rest'}
