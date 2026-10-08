@@ -16,7 +16,7 @@
      0.78 and 0.67 draw 14px and 12px against an 18px name. Both keep
      `--canvas-resource-title` as their ink: the size and the weight step are
      already saying "descending", and dimming on top of that would be two
-     mechanisms for one meaning on a front where the Graph colour is carrying
+     mechanisms for one meaning on a Resource where the Graph colour is carrying
      information of its own. */
   --canvas-resource-title-size: 18px;
   --canvas-resource-title-leading: 1.12;
@@ -466,7 +466,7 @@
 }
 
 /* A Shape other than the rectangle (ADR 0121), drawn Open and Closed alike.
-   The Resource keeps its rect; the front's own paper and edge are withdrawn and
+   The Resource keeps its rect; the Resource's own paper and edge are withdrawn and
    `ResourceShapeOutlineDrawing` draws them as the Shape's outline at that rect,
    which touches the midpoint of each side, where Edges attach. `overflow` is released
    so the stroke at those points is not cut by the rect. The rectangle's box

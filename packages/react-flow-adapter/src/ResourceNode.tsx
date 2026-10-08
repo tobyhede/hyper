@@ -19,10 +19,10 @@ import { useConnectionTargetProximity } from './connection-target-proximity';
 import { offersConnectionEnd } from './connection-target-reveal';
 
 /**
- * React Flow custom node: a Resource front with one Edge anchor on each of its four
+ * React Flow custom node: a drawn Resource with one Edge anchor on each of its four
  * sides. An Open Resource draws its content inside the same node (ADR 0064).
  *
- * The Resource front itself — Markdown and Reference Resource treatment, title editing, refusal
+ * The drawn Resource itself — Markdown and Reference Resource treatment, title editing, refusal
  * display, Open/Edit controls and interaction-state visuals — is the
  * production `@project/ui` `CanvasResource`. This module owns everything React
  * Flow: handles and their declared geometry, connection state, translating
@@ -48,8 +48,8 @@ type MutableKindOperations =
   MarkdownOperations | ImageOperations | UrOperations | ReferenceOperations | SpaceOperations;
 
 /**
- * The operations each kind's front offers. What it draws is the display's, not
- * the front's. Every kind opens and closes, so Open/Close is set once here; the
+ * The operations each kind offers. What it draws is the display's, not
+ * the operations'. Every kind opens and closes, so Open/Close is set once here; the
  * rest is by the Resource's own kind.
  */
 function kindOperationsOf(data: ResourceFlowNode['data']): KindOperations {
@@ -87,7 +87,7 @@ function operationsOfKind(data: ResourceFlowNode['data']): MutableKindOperations
     case 'reference':
       return { kind: 'reference' };
     case 'space': {
-      // A Space Resource's own front carries nothing it authors of the target: its
+      // A Space Resource's own operations carry nothing it authors of the target: its
       // Title is the Resource's, its content is the target Space's, and the
       // composition hands down the rail fragment plus Enter.
       const kindOperations: SpaceOperations = { kind: 'space' };
@@ -240,7 +240,7 @@ export function ResourceNode({
   // The rect React Flow draws this Resource at, which the projection declares
   // from the Resource's Placement (`canvas-projection.test.ts`, "carries each
   // authored Open rect through strategy input and node projection"). Where React
-  // Flow gives none, the front is drawn at the Closed Size.
+  // Flow gives none, the Resource is drawn at the Closed Size.
   if (width !== undefined && height !== undefined) {
     canvasResourceOptionalProps.size = { width, height };
   }

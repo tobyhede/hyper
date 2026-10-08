@@ -33,8 +33,8 @@ interface InlineTitleEditorBase {
    * Whether this Title may be written on more than one line (ADR 0083).
    *
    * A capability the caller opts into rather than a reading of `variant`. A
-   * Resource's Title is Title Lines and the Resource front draws the ladder; a Space,
-   * Map or Graph title is a label in a list with no front to draw one on,
+   * Resource's Title is Title Lines and the drawn Resource draws the ladder; a Space,
+   * Map or Graph title is a label in a list with no drawn Resource to put one on,
    * and giving all three the capability because they share a field type would
    * be the model following the implementation. Where a Title stands in that
    * decision is the mounting surface's to know, so `CanvasResource` sets this and

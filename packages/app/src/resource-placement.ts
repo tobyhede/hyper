@@ -222,7 +222,7 @@ export function useResourcePlacement(
   /**
    * **The gesture supplies the Target, so nothing is chosen first**, and the
    * Title is the Target's, copied once and independent thereafter — ADR 0083
-   * keeps the Target's name off the Resource front, so this is the author's
+   * keeps the Target's name off the drawn Resource, so this is the author's
    * on-canvas indication of what the Reference Resource points at.
    */
   const createReferenceFrom = useCallback(

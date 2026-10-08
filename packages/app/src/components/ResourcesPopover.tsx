@@ -1058,7 +1058,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                         )}
                         {/* The name, not the whole Title: this is a row in a list
                             being scanned down, and ADR 0083 puts the ladder on the
-                            Resource front rather than on every surface that names one. A
+                            drawn Resource rather than on every surface that names one. A
                             Space's own title is one line under that ADR, so there the
                             Title and the name are the same string. */}
                         <span className="resources-popover__row-title">{name}</span>

@@ -47,7 +47,7 @@ export type ResourceTitleEditor = {
  *  React Flow's `Record<string, unknown>` data constraint. */
 export type ResourceNodeData = {
   /**
-   * The Resource's own kind, drawn as a persistent glyph on the Front. A
+   * The Resource's own kind, drawn as a persistent glyph on the Resource. A
    * Reference Resource is `reference` whatever its Target is; what it draws is
    * its `display`.
    */
@@ -104,7 +104,7 @@ export type ResourceNodeData = {
    * follows from it rather than the other way round. The adapter cannot read it
    * off the geometry — a Resource is not Open just because it is large.
    *
-   * An Open Reference Resource draws its immutable Target's content through the same front.
+   * An Open Reference Resource draws its immutable Target's content as its own would be drawn.
    */
   open?: boolean;
   /**

@@ -11,7 +11,7 @@ interface CanvasResourceSpecimenCommonProps {
   readonly title: string;
   readonly state?: Exclude<CanvasResourceState, 'editing'>;
   readonly graphColor?: string;
-  /** The Shape a Map records for the Resource, which its front draws at any size. */
+  /** The Shape a Map records for the Resource, which it is drawn in at any size. */
   readonly shape?: ResourceShape;
   /**
    * Draws the Resource Closed at this size, as a canvas adapter draws one
@@ -32,11 +32,11 @@ type CanvasResourceSpecimenProps = CanvasResourceSpecimenCommonProps;
 /**
  * Story fixture that composes the shipped visual primitive without redrawing it.
  *
- * Every front the component declares is reachable from here, each at rest and
+ * Every kind the component declares is reachable from here, each at rest and
  * Closed: every Resource kind and the creation ghost, which is not a Resource
  * yet and carries neither content nor open state. A specimen may also be drawn
  * at a given size. None of them is handed an authoring callback, so
- * what a specimen draws is the front itself rather than the controls a canvas
+ * what a specimen draws is the Resource itself rather than the controls a canvas
  * would hang off it.
  */
 export function CanvasResourceSpecimen({

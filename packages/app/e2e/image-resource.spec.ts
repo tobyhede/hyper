@@ -177,13 +177,13 @@ test(
 const SIZED_TO_PICTURE = { width: 408, height: 359 } as const;
 
 /**
- * An Open Image Resource is the Open Markdown front with its picture as the
+ * An Open Image Resource is drawn as an Open Markdown Resource with its picture as the
  * content. Opening changes no size, so at the Closed Size the picture is drawn
  * contained and scaled down, never enlarged, above the Title footer and named by
  * the Resource.
  */
 test(
-  'an Open Image Resource draws its picture contained in the Markdown front, at the size it already had',
+  'an Open Image Resource draws its picture contained where Markdown content is drawn, at the size it already had',
   { tag: '@parity:open-image-resource-draws-its-image' },
   async ({ page }) => {
     await serveFigure(page);

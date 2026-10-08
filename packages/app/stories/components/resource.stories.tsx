@@ -72,7 +72,7 @@ const ONE_LINE_TITLE = 'Strategies';
 const THREE_LINE_TITLE = 'Strategies\nno strategy is privileged\ngrid is one member of a set';
 
 /**
- * More Title Lines than any front draws, each long enough to wrap: the Title
+ * More Title Lines than any Resource draws, each long enough to wrap: the Title
  * wider than any Shape's inscribed rectangle.
  */
 const OVERLONG_TITLE =
@@ -85,12 +85,12 @@ const OVERLONG_TITLE =
 const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuffles on every edit';
 
 /**
- * Every front `CanvasResource` declares, with the label each specimen carries.
+ * Every kind `CanvasResource` declares, with the label each specimen carries.
  *
  * The creation ghost is in the list and is not a Resource: it is what the canvas
  * draws while a new Resource is being placed, and it takes the Markdown treatment
  * without content or authored open state. Leaving it out would make this story
- * "every front but one", which is the shape this story exists to stop.
+ * "every kind but one", which is the shape this story exists to stop.
  */
 const CLOSED_KINDS = [
   { kind: 'markdown', label: 'markdown' },
@@ -102,17 +102,17 @@ const CLOSED_KINDS = [
 ] as const satisfies readonly { kind: KindOperations['kind']; label: string }[];
 
 /**
- * The whole of a Resource front, at rest, for every front the component draws.
+ * The whole of a Closed Resource, at rest, for every kind the component draws.
  *
- * No other story shows a front entire: `States`, `Kinds`, `Hover`, `Colours`,
+ * No other story shows a Closed Resource entire: `States`, `Kinds`, `Hover`, `Colours`,
  * `Open and close`, `Open Reference Resource` and `Resize control` are each a
  * slice, and an element drawn only in a slice nobody reviews goes unreviewed.
  *
  * What every specimen below draws, and all it draws: the Resource's border —
- * dotted for a Reference Resource, solid for every other front — and the
+ * dotted for a Reference Resource, solid for every other kind — and the
  * Resource's Title, as one `.canvas-resource__title-line` per Title Line. Nothing
  * is drawn beneath the Title: a closed Resource's whole content is the Title its
- * author wrote. A closed front draws its kind glyph at its top-right corner,
+ * author wrote. A Closed Resource draws its kind glyph at its top-right corner,
  * whether or not it has a toolbar; an Open Resource draws none, and nor does an
  * Ur Resource, whose Shape says what it is. No specimen is
  * handed an authoring callback, so no toolbar is drawn (ADR 0102); `Hover` and
@@ -121,8 +121,8 @@ const CLOSED_KINDS = [
 export const Closed: Story = () => (
   <div className="inv inv-sheet" style={resourceSizeVars}>
     <CatalogueSection
-      title="Resource front"
-      note="Every front CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A front draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A closed front draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
+      title="Closed Resource"
+      note="Every kind CanvasResource draws, at rest and at the one authored Closed Size, each with a one-line Title beside a three-line one. A Closed Resource draws its border — dotted only for a Reference Resource — and its Title Lines, and beneath the Title it draws nothing. A Closed Resource draws its kind glyph at its top-right corner, with or without a toolbar; an Open Resource draws none, and nor does an Ur Resource, whose Shape says what it is."
     >
       <div className="inv-row">
         {CLOSED_KINDS.map((entry) => (
@@ -161,7 +161,7 @@ const RESIZED_SPECIMEN_SIZE = { width: 440, height: 260 } as const;
 
 /**
  * Every Shape a Map may give an Ur Resource (ADR 0121), drawn at the Closed
- * Size and at a larger size it is resized to: the rectangle is the front's own
+ * Size and at a larger size it is resized to: the rectangle is the Resource's own
  * border, and every other Shape is an outline touching the midpoint of each
  * side of the Resource's rect, with the Title ladder centred in the rectangle
  * inscribed in it. The rectangle draws the ladder centred in its rect. No
@@ -210,7 +210,7 @@ export const ResourceShapes: Story = () => (
   </div>
 );
 
-/** Every Shape but the rectangle, whose treatments are the front's own border and shadow. */
+/** Every Shape but the rectangle, whose treatments are the Resource's own border and shadow. */
 const DRAWN_RESOURCE_SHAPES = RESOURCE_SHAPES.filter(
   (resourceShape) => resourceShape !== 'rectangle',
 );
@@ -610,9 +610,9 @@ OpenReference.storyName = 'Open Reference Resource';
 OpenReference.meta = { iframed: true };
 
 /**
- * An Open Image Resource is the Open Markdown front with its picture as the
+ * An Open Image Resource is drawn as an Open Markdown Resource with its picture as the
  * content. Three specimens at one canvas unit per pixel: a 400×300 picture in
- * a Resource sized to hold it — the picture plus the front's chrome — the same
+ * a Resource sized to hold it — the picture plus the Resource's chrome — the same
  * picture in a Resource resized larger, where it keeps its natural size rather
  * than being enlarged, and a URL that does not load.
  */
@@ -687,11 +687,11 @@ const imageReferenceMap: DrawnMap = {
 
 /**
  * A Reference Resource whose Target is an Image Resource draws the Target's
- * picture read-only through the same front (ADR 0070, ADR 0106): its own
+ * picture read-only, as its own content would be (ADR 0070, ADR 0106): its own
  * Title, Close, and no Replace, even where the picture does not load. Both
  * Resources are in a Space that holds their Image Resource Targets, so what
  * each draws is resolved from its Target rather than handed to it. Each is
- * sized to hold the Target's 400×300 picture plus the front's chrome.
+ * sized to hold the Target's 400×300 picture plus the Resource's chrome.
  */
 export const OpenImageReference: Story = () => {
   const [open, setOpen] = useState(true);

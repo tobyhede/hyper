@@ -107,7 +107,7 @@ export interface CanvasSpaceResourceSelection {
 
 /**
  * What {@link SpaceResourceSelectors} needs to draw Map and Graph on a Space
- * Resource rail, minus portal Read/Edit which stays on the Resource front.
+ * Resource rail, minus portal Read/Edit which stays on the drawn Resource.
  *
  * The one shape both an embedded canvas Resource (`CanvasResource`'s own rail) and
  * the application's Space Resource rail render — the Dock's identical-looking

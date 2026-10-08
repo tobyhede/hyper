@@ -202,7 +202,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'States',
     claim:
-      'Rest, selected and dragging are visually distinct states for both the Markdown and Reference Resource front.',
+      'Rest, selected and dragging are visually distinct states for both a Markdown and a Reference Resource.',
     // React Flow's own selection/dragging booleans, and ResourceNode's translation
     // of them into CanvasResource's four-value `state`, are unit-tested directly
     // (`ResourceNode.test.tsx`, "translates React Flow selection and dragging into
@@ -223,7 +223,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Closed',
     claim:
-      'Every Resource front draws its kind glyph — bar an Ur Resource, whose Shape says what it is — its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
+      'Every Closed Resource draws its kind glyph — bar an Ur Resource, whose Shape says what it is — its border treatment and one element per Title Line at the role the domain gave it — and draws nothing beneath the Title but the Title Lines the author typed.',
   },
   {
     id: 'ur-resource-draws-its-shape',
@@ -258,7 +258,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImage',
     claim:
-      'An Open Image Resource is the Open Markdown front with its picture as the content: the picture fills the content area above the Title footer, contained and never enlarged past its natural size, named by the Resource (ADR 0106).',
+      'An Open Image Resource is drawn as an Open Markdown Resource with its picture as the content: the picture fills the content area above the Title footer, contained and never enlarged past its natural size, named by the Resource (ADR 0106).',
   },
   {
     id: 'open-image-resource-shows-failed-state',
@@ -307,7 +307,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'Kinds',
     claim:
-      "A Reference Resource front's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
+      "A Reference Resource's dotted border and redraw glyph, and a long Markdown title's three-line clamp, are the kind's own presentation.",
   },
   {
     // The claim sweeps the palette because what has to hold at every colour is
@@ -382,7 +382,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImageReference',
     claim:
-      "An Open Reference Resource whose Target is an Image Resource keeps its own Title and draws the Target's picture read-only through the same front, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106).",
+      "An Open Reference Resource whose Target is an Image Resource keeps its own Title and draws the Target's picture read-only, as its own content would be, offering Close and no Replace, and naming the URL with no Replace when the picture does not load (ADR 0070, ADR 0106).",
   },
   /*
    * **No claim covers a saving lifecycle.** The Command Dock mounts
@@ -830,7 +830,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/space-resource-embedded-map.stories.tsx',
     storyExport: 'SelectedMap',
     claim:
-      'Space Resource entity menus group Create Reference, Enter and independent opening, three concise copy links, and removal — Rename is absent, the Title editing on the Resource front instead; creating a Reference Resource shows the selected target Map read-only.',
+      'Space Resource entity menus group Create Reference, Enter and independent opening, three concise copy links, and removal — Rename is absent, the Title editing on the drawn Resource instead; creating a Reference Resource shows the selected target Map read-only.',
   },
   {
     id: 'space-resource-context-menus-share-dock-actions',

@@ -12,7 +12,7 @@ const specimen = (page: Page, label: string): Locator =>
   });
 
 test(
-  'rest, selected and dragging draw visually distinct treatments, for both fronts',
+  'rest, selected and dragging draw visually distinct treatments, for both kinds',
   { tag: '@parity:canvas-resource-shows-rest-selected-and-dragging-states' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--states&mode=preview');
@@ -43,9 +43,9 @@ test(
 );
 
 /**
- * What every front draws, kind by kind, and what none of them draws.
+ * What every Closed Resource draws, kind by kind, and what none of them draws.
  *
- * The table is the point: one loop over every front the component declares, so
+ * The table is the point: one loop over every kind the component declares, so
  * a new kind cannot be added with its own story slice and reviewed on its own.
  */
 const CLOSED_KINDS = [
@@ -74,7 +74,7 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
   );
 
 /**
- * The whole of what a Resource front draws, and the whole of what it does not.
+ * The whole of what a Closed Resource draws, and the whole of what it does not.
  *
  * This is the one place that states it. Every other Resource story is a slice —
  * states, kinds, hover, colours, opening, resizing — and an element drawn only
@@ -86,7 +86,7 @@ const sizesOf = (lines: Locator): Promise<readonly number[]> =>
  * Resource that is not one of the Title Lines the author typed.
  */
 test(
-  'every Resource front draws its kind, its border and its Title Lines, and nothing beneath them',
+  'every Closed Resource draws its kind, its border and its Title Lines, and nothing beneath them',
   { tag: '@parity:closed-resource-draws-only-its-title-lines' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--closed&mode=preview');
@@ -146,7 +146,7 @@ test(
 
 /**
  * A Closed Image Resource looks like any Resource (ADR 0106): its Title and its
- * kind glyph at the one Closed size, and no picture — the Closed front draws no
+ * kind glyph at the one Closed size, and no picture — a Closed Resource draws no
  * thumbnail, so no `img` element is mounted on it at all.
  */
 test(
@@ -208,7 +208,7 @@ test('a wrapped single-line Title stays one rung while an authored three-line Ti
 });
 
 test(
-  "a Reference Resource front's dotted border and a long Markdown title's three-line clamp are the kind's own presentation",
+  "a Reference Resource's dotted border and a long Markdown title's three-line clamp are the kind's own presentation",
   { tag: '@parity:canvas-resource-shows-kind-treatment' },
   async ({ page }) => {
     await page.goto('/?story=components--resource--kinds&mode=preview');
@@ -512,7 +512,7 @@ test(
     // arrangements apart: `Edit Title <name>` and the heading's own name are
     // then the same string, and an implementation that drew the name and
     // dropped every line after it reads as correct — which is exactly the
-    // regression ADR 0083's sentence about the Resource front's own heading exists
+    // regression ADR 0083's sentence about the drawn Resource's own heading exists
     // to prevent. The separator is one space per line because each Title Line
     // is its own block box, which is the name computation's rule and not this
     // test's.

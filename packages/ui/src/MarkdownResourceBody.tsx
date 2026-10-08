@@ -58,7 +58,7 @@ export interface MarkdownResourceBodyProps {
 }
 
 /**
- * The Markdown kind's Open front: rendered Markdown, on the Resource (ADR 0064).
+ * The Markdown kind's Open content: rendered Markdown, on the Resource (ADR 0064).
  *
  * **The same rendering as presentation mode.** At rest this reuses
  * `RenderedMarkdown`, the parser and sanitiser beneath `PresentedResource`; an

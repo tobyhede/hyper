@@ -162,7 +162,7 @@ describe('CanvasResource kind and interaction state', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('presents a Markdown front and its resting state', () => {
+  it('presents a Markdown Resource and its resting state', () => {
     render(
       <CanvasResource
         kindOperations={{ kind: 'markdown' }}
@@ -182,7 +182,7 @@ describe('CanvasResource kind and interaction state', () => {
     expect(screen.queryByRole('img', { name: 'Markdown Resource' })).toBeNull();
   });
 
-  it('presents a Reference Resource front by its kind alone', () => {
+  it('presents a Reference Resource by its kind alone', () => {
     render(
       <CanvasResource
         kindOperations={{ kind: 'reference', onOpenChange: vi.fn(() => 'completed' as const) }}
@@ -238,7 +238,7 @@ describe('CanvasResource kind and interaction state', () => {
     expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
-  it('draws an Open Image Resource as the Open Markdown front with its image as the content', () => {
+  it('draws an Open Image Resource as an Open Markdown Resource with its image as the content', () => {
     render(
       <CanvasResource
         kindOperations={{ kind: 'image' }}
@@ -255,7 +255,7 @@ describe('CanvasResource kind and interaction state', () => {
     const resource = screen.getByRole('article', { name: 'Figure' });
     const image = screen.getByRole('img', { name: 'Figure' });
     expect(image).toHaveAttribute('src', FIGURE_URL);
-    // The Markdown front's content area, and the Title ladder in its footer.
+    // An Open Markdown Resource's content area, and the Title ladder in its footer.
     expect(image.closest('.canvas-resource__content')).not.toBeNull();
     expect(resource.querySelector('.canvas-resource__body')).toHaveTextContent(
       'FigureFrom the north mole',
@@ -480,7 +480,7 @@ describe('CanvasResource kind and interaction state', () => {
   });
 
   /**
-   * Whose content is drawn, not which front draws it, decides whether it may be
+   * Whose content is drawn, not which kind draws it, decides whether it may be
    * replaced: a Target's image is read-only wherever it appears (ADR 0070).
    */
   it('offers no Replace for an image it draws through a Reference Resource', () => {
@@ -628,7 +628,7 @@ describe('CanvasResource Open and Close operation', () => {
     );
   });
 
-  it('owns the rendered body of an open Markdown front', () => {
+  it('owns the rendered body of an Open Markdown Resource', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
@@ -1092,7 +1092,7 @@ describe('CanvasResource Title ladder', () => {
   /**
    * A Title that changed shape when a Resource opened would teach an author that
    * Opening edits it, so Open and Closed draw the same ladder — and so does
-   * every kind, the Resource front being the one surface that draws one at all.
+   * every kind, the drawn Resource being the one surface that draws one at all.
    */
   it('draws the same ladder Open and Closed, on every Resource kind', () => {
     const title = 'Strategies\nNo strategy is privileged\nADR 0014';
@@ -1376,10 +1376,10 @@ describe('CanvasResource title editor', () => {
   });
 
   /**
-   * The Resource front is the surface that asks for Title Lines (ADR 0083).
+   * The drawn Resource is the surface that asks for Title Lines (ADR 0083).
    *
    * `InlineTitleEditor.test.tsx` holds the capability itself; what is proved
-   * here is that this front opts into it, which is the half a component
+   * here is that this component opts into it, which is the half a component
    * reading `variant` would not have needed and a Dock's name field must not
    * gain.
    */
@@ -1410,7 +1410,7 @@ describe('CanvasResource title editor', () => {
   });
 });
 
-describe('CanvasResource open Markdown front', () => {
+describe('CanvasResource Open Markdown Resource', () => {
   it('repeats transition durations cyclically when timing the opacity exit', async () => {
     vi.useFakeTimers();
     const computed = document.createElement('div').style;
@@ -1525,7 +1525,7 @@ describe('CanvasResource open Markdown front', () => {
   });
 });
 
-describe('CanvasResource Space front', () => {
+describe('CanvasResource Space Resource', () => {
   const spaceRail = (
     <>
       <button type="button" data-testid="space-resource-map">
@@ -1598,7 +1598,7 @@ describe('CanvasResource Space front', () => {
    * is the same rail control a Reference Resource uses and it names the same two states. A
    * Space Resource has no Markdown of its own, so there is no content Edit, Save or
    * Cancel for the rail to draw unless the portal Read/Edit boundary is composed
-   * onto the front — Enter is the kind command that sits beside them.
+   * onto the kind's operations — Enter is the kind command that sits beside them.
    */
   it('opens and closes through the shared rail control, and offers no content edit', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
@@ -1931,7 +1931,7 @@ describe('CanvasResource Close fade', () => {
  * An Ur Resource has no content (ADR 0113): Closed it draws like any Resource,
  * Open it shows only its Title, and nothing anywhere offers to edit it.
  */
-describe('CanvasResource Ur front', () => {
+describe('CanvasResource Ur Resource', () => {
   const UR_OPEN: ResourceDisplay = opened({ kind: 'ur', via: 'self' });
 
   it('presents a Closed Ur Resource by its Title alone, its Shape saying what it is', () => {
@@ -2027,7 +2027,7 @@ describe('CanvasResource Ur front', () => {
   });
 });
 
-describe('the Shape a Resource front is drawn in', () => {
+describe('the Shape a Resource is drawn in', () => {
   const props = {
     kindOperations: { kind: 'ur' as const },
     state: 'rest' as const,
@@ -2286,7 +2286,7 @@ describe('choosing an Ur Resource’s Shape from its rail', () => {
     }
   });
 
-  it('names the rectangle for a front given no Shape', () => {
+  it('names the rectangle for a Resource given no Shape', () => {
     render(
       <CanvasResource
         {...props}

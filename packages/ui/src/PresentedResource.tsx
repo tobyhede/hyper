@@ -8,7 +8,7 @@ import { UnresolvedContent } from './UnresolvedContent';
 export interface PresentedResourceProps {
   /**
    * The Resource's Title, whole. Presenting draws its **name** — the first line —
-   * because the Title ladder belongs to the Resource front and nothing else
+   * because the Title ladder belongs to the drawn Resource and nothing else
    * (ADR 0083), and a presented Resource is a different surface with a different
    * frame around it.
    */

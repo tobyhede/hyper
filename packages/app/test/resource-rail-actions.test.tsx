@@ -574,7 +574,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * The Title is the Target's, copied once and independent thereafter, and the
    * caret is in it.
    *
-   * ADR 0083 keeps the Target's name off the Resource front, so without the copy
+   * ADR 0083 keeps the Target's name off the drawn Resource, so without the copy
    * the author has no on-canvas indication of what the Reference Resource points at beyond
    * the dotted border. Copying it *once* is what keeps the two ordinary
    * independent Titles afterwards.
@@ -787,24 +787,24 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * Removing Rename from the Space Resource menu must not take on-front Title
+   * Removing Rename from the Space Resource menu must not take in-place Title
    * editing with it — the two are separate seams, and this presses the
-   * front's own control directly rather than through the menu.
+   * Resource's own control directly rather than through the menu.
    */
-  it('still edits a Space Resource’s Title on the Resource front, not through the menu', async () => {
+  it('still edits a Space Resource’s Title on the drawn Resource, not through the menu', async () => {
     const session = mount(undefined, undefined, withSpaceResource);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Edit Title A space' }));
     const editor = screen.getByRole('textbox', { name: 'Resource title' });
     expect(editor).toHaveFocus();
-    fireEvent.change(editor, { target: { value: 'Renamed on the front' } });
+    fireEvent.change(editor, { target: { value: 'Renamed in place' } });
     fireEvent.keyDown(editor, { key: 'Enter' });
 
-    expect(await screen.findByRole('heading', { name: 'Renamed on the front' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Renamed in place' })).toBeVisible();
     expect(
       session.getState().working.resources.find((resource) => resource.id === SPACE_RESOURCE_ID)
         ?.document,
-    ).toMatchObject({ title: 'Renamed on the front' });
+    ).toMatchObject({ title: 'Renamed in place' });
     await settled(session);
   });
 
@@ -1053,7 +1053,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * The question names the Resource by its **short Title**: the name, with an
    * ellipsis when lines follow it.
    *
-   * A Resource's Title is one or more Title Lines and the front draws the ladder;
+   * A Resource's Title is one or more Title Lines and the drawn Resource draws the ladder;
    * a dialog title is a sentence, and a line break arriving in one draws as a
    * broken-looking label rather than as an error.
    */

@@ -382,7 +382,7 @@ test(
  * The Title ladder, on the real canvas, against the space the app actually
  * loads.
  *
- * The Ladle story is where the front is reviewed whole; this is the half of that
+ * The Ladle story is where the Closed Resource is reviewed whole; this is the half of that
  * evidence a browser owns — the projection carrying a stored multiline Title
  * through to a drawn Resource, clamped inside the Resource the author sized rather than
  * growing it. `T` is the fixture's one such Title, one line of each role
@@ -410,7 +410,7 @@ test(
       ),
     ).toEqual(['title', 'subtitle', 'caption']);
 
-    // Descending, and nothing else drawn on the front: the Resource's own text is
+    // Descending, and nothing else drawn on the Resource: the Resource's own text is
     // its Title Lines, which is what the two undecided reference lines failed.
     const sizes = await lines.evaluateAll((elements) =>
       elements.map((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
@@ -547,7 +547,7 @@ test('the Close action closes an opened resource', async ({ page }) => {
   // here as the `null` it was when `leaving` appeared, and fail. An empty
   // record is a failure too, and a different one: the content never entered
   // `leaving` at all. The text is read in that same callback, so it is what the
-  // leaving commit drew: a Closed front carries no content, and the fade has to
+  // leaving commit drew: a Closed display carries no content, and the fade has to
   // draw the Markdown the Open one last drew rather than an empty body.
   const leaving = await resource.evaluateHandle((node) => {
     const commits: PresenceCommit[] = [];

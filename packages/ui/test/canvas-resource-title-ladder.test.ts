@@ -164,7 +164,7 @@ describe('the rungs below the name', () => {
 
   /**
    * The size and the weight step are already saying "descending". A third
-   * mechanism saying it again would be dimming, on a front where the Graph
+   * mechanism saying it again would be dimming, on a Resource where the Graph
    * colour is carrying information of its own — so no rung sets an ink or an
    * opacity, and all three take `--canvas-resource-title` from the heading.
    */

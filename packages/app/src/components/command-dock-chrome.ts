@@ -140,7 +140,7 @@ export interface DockSpace {
    * **Not the Title of a Space Resource that points here.** The two agree only at
    * creation, which writes one string into both, and either may be renamed
    * afterwards without the other (`CONTEXT.md`); ADR 0083 keeps the target's
-   * name off the Resource's front, so nothing propagates in either direction.
+   * name off the drawn Resource, so nothing propagates in either direction.
    */
   readonly title: string;
   /** Which Space the Dock is in, which is what the Open Spaces menu marks. */
@@ -160,7 +160,7 @@ export interface DockSpace {
    * `document.title` of the session it is completed on and nothing else: no Space
    * Resource pointing at this Space changes with it, because a Space's name and the
    * Title of a Resource that references it are two stored values that agree only at
-   * creation, and ADR 0083 keeps the target's name off that Resource's front. So
+   * creation, and ADR 0083 keeps the target's name off that drawn Resource. So
    * there is nothing here for this surface to keep in step — the Open Spaces
    * rows and the Opener control each read their own session's title and redraw on
    * its publication (`open-spaces.ts`). Renaming *another* Space, from a Space

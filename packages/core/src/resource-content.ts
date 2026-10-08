@@ -7,7 +7,7 @@ type SpaceResource = Extract<Resource, { kind: 'space' }>;
 
 /**
  * What an Open Space Resource shows: its Space, Map, Graph and framing. It is
- * not the Resource, because the front names nothing outside itself (ADR 0083).
+ * not the Resource, because a drawn Resource names nothing outside itself (ADR 0083).
  * `framing` is a required key that may hold `undefined`, so a value is built
  * whole rather than by a conditional spread.
  */
@@ -57,7 +57,7 @@ export function embedsMap(content: ResourceContent): boolean {
   return CONTENT_FACTS[content.kind].embedsMap;
 }
 
-/** Whether the Open front reserves an area above its Title for content. */
+/** Whether an Open Resource reserves an area above its Title for content. */
 export function drawsContentArea(content: ResourceContent): boolean {
   return CONTENT_FACTS[content.kind].drawsContentArea;
 }

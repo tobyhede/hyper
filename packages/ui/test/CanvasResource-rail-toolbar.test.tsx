@@ -209,7 +209,7 @@ describe('the rail says whose command each one is', () => {
       />,
     );
 
-    // Save and Cancel are the Markdown front's two ends and belong with Edit,
+    // Save and Cancel are a Markdown edit's two ends and belong with Edit,
     // which they replace while editing. Close is unavailable but still the Resource's.
     const markdown = kindGroup('Markdown Resource commands');
     expect(within(markdown).getByRole('button', { name: 'Save Resource A' })).toBeInTheDocument();

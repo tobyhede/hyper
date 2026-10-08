@@ -343,7 +343,7 @@ test('a Reference Resource’s actions menu keeps Create Reference leading, draw
  * production host: Create Reference; Connect to Resource; Enter and Open in New
  * Tab; the three copy links; then Remove from Map and Delete from Space sharing
  * the trailing destructive group — one separator between each. Rename is
- * absent — the Title edits on the Resource front.
+ * absent — the Title edits on the drawn Resource.
  */
 test('a Space Resource’s actions menu groups Create Reference, Connect, Enter, links, then Remove and Delete', async ({
   page,

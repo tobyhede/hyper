@@ -48,8 +48,8 @@ function TitleEditingResource({
       <div
         role="group"
         // The Resource's **name**, which is the Title's first line: everything that
-        // refers to a Resource rather than drawing its front shows that and nothing
-        // else (ADR 0083). The ladder belongs to the Resource front alone.
+        // refers to a Resource rather than drawing it shows that and nothing
+        // else (ADR 0083). The ladder belongs to the drawn Resource alone.
         aria-label={`${titleName(title)} on the canvas`}
         tabIndex={-1}
         ref={group}

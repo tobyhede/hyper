@@ -116,7 +116,7 @@ async function chooseResourceShape(
   await expect(face(ur)).toHaveAttribute('data-resource-shape', resourceShape);
 }
 
-/** The rect a Resource's front is drawn at, in canvas units. */
+/** The rect a Resource is drawn at, in canvas units. */
 const drawnSize = (node: Locator): Promise<readonly [number, number]> =>
   face(node).evaluate((element) =>
     element instanceof HTMLElement ? [element.offsetWidth, element.offsetHeight] : [0, 0],
