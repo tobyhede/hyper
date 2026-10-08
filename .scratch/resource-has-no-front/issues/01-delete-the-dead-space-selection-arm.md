@@ -8,7 +8,7 @@
 
 **Spec:** `.scratch/resource-has-no-front/spec.md`, decision 8.
 
-- [ ] No `selection` on any Resource kind's operations and no `spaceSelection` on node data.
-- [ ] `CanvasResource` draws a Space Resource's rail, portal and waiting state as before.
-- [ ] `SpaceResourceSelectors` and its tests are untouched.
-- [ ] E2E and Ladle E2E unchanged.
+- [x] No `selection` on any Resource kind's operations and no `spaceSelection` on node data.
+- [x] `CanvasResource` draws a Space Resource's rail, portal and waiting state as before.
+- [x] `SpaceResourceSelectors` and its tests are untouched. (Its props doc comment later named its one remaining renderer, after code review.)
+- [x] E2E and Ladle E2E unchanged.
