@@ -1746,7 +1746,20 @@ test('replacing an image in an only-drawn Space holds Back and Forward and edits
   await expect(page.getByRole('button', { name: 'Spaces. 1 open.' })).toBeVisible();
 });
 
-test('drop and paste create in an edited embedded Map and an inert drop is refused', async ({
+/**
+ * Paste text with the pointer over `over` while `focused` holds the caret: the
+ * paste goes to the focused element and lands where the pointer is.
+ */
+async function pasteOver(page: Page, focused: Locator, over: Locator, text: string): Promise<void> {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.evaluate((copied) => navigator.clipboard.writeText(copied), text);
+  await focused.focus();
+  const box = await boxOf(over, 'the paste target');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.keyboard.press('ControlOrMeta+V');
+}
+
+test('drop and paste create in an edited embedded Map and an inert drop or paste is refused', async ({
   page,
 }) => {
   await serveFigure(page);
@@ -1767,6 +1780,12 @@ test('drop and paste create in an edited embedded Map and an inert drop is refus
   await drawing.press('Enter');
   const child = page.locator(`.react-flow__node[data-id^="embedded:${frame.id}:"]`).first();
   await expect(child).toBeVisible();
+  await pasteOver(page, drawing, child, FIGURE_URL);
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'Edit this Map before adding Resources.',
+  );
+  await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
+  expect(await storedImages(page, rootId)).toHaveLength(0);
   expect(await dropPictureOn(child, FIRST_PICTURE)).toEqual({ taken: true, dropEffect: 'none' });
   await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
     'Edit this Map before adding Resources.',
@@ -1830,7 +1849,9 @@ async function openSpaceResource(
   return { drawing, id: frame.id, title, targetId: frame.document.spaceId };
 }
 
-test('a drop on the Map a Reference Resource draws is refused as read-only', async ({ page }) => {
+test('a drop or paste on the Map a Reference Resource draws is refused as read-only', async ({
+  page,
+}) => {
   const rootId = await openForCreation(page);
   const { drawing, id, title, targetId } = await openSpaceResource(page, rootId);
   await (
@@ -1854,6 +1875,12 @@ test('a drop on the Map a Reference Resource draws is refused as read-only', asy
   const child = page.locator(`.react-flow__node[data-id^="embedded:${reference.id}:"]`).first();
   await expect(child).toBeVisible();
 
+  await pasteOver(page, referenceNode, child, FIGURE_URL);
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'This Map is shown read-only, so nothing can be added to it.',
+  );
+  await expect(page.getByRole('textbox', { name: 'Resource title' })).toHaveCount(0);
+  expect(await storedImages(page, rootId)).toHaveLength(0);
   expect(await dropPictureOn(child, FIRST_PICTURE)).toEqual({ taken: true, dropEffect: 'none' });
   await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
     'This Map is shown read-only, so nothing can be added to it.',

@@ -19,6 +19,8 @@ import {
   exerciseSpaceResourceEntityMenu,
 } from './space-resource-context-menu';
 import { encodeCompactUuid, uuidSchema } from '@project/core';
+import { decodeLoadedSpace } from '@project/persistence';
+import { seedPositionedMap } from './seed';
 import { expect, test, type Locator, type Page } from './fixtures';
 import { expectEmbeddedResourceToFollowDrag } from './support/embedded-drag';
 import {
@@ -1018,6 +1020,129 @@ test('a connection from a drawn Map to a canvas Resource is refused with wording
   await settled(page);
   expect(await hostGraphEdgeCount(page, parent)).toBe(hostBefore);
   expect(await embeddedGraphEdgeCount(page, parent)).toBe(shownBefore);
+});
+
+const DEEP_DIVE_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const DEEP_DIVE_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+const DEEP_DIVE_FIRST_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000073');
+const SECOND_DRAWING_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000d1');
+
+/**
+ * Two Space Resources drawing the same Map are two drawings (ADR 0112), so a
+ * drag from a Resource in one to a Resource in the other is refused with the
+ * same wording as a drag out to the canvas, and authors nothing in the Space
+ * both of them draw.
+ */
+test('a connection between Resources of two different drawings is refused with wording', async ({
+  page,
+}) => {
+  // The drawn Space keeps two Resources side by side and no Edges, so each
+  // drawing frames both and any authored Edge is a new one.
+  const response = await page.request.get(`/api/spaces/${DEEP_DIVE_SPACE_ID}`);
+  expect(response.ok()).toBe(true);
+  const loaded = decodeLoadedSpace(await response.json());
+  const drawnMap = loaded.snapshot.document.maps?.[0];
+  const drawnGraph = drawnMap?.graphs[0];
+  if (drawnMap === undefined || drawnGraph === undefined) {
+    throw new Error('Deep dive must have a Map with a Graph');
+  }
+  const committed = await page.request.post('/api/spaces', {
+    data: {
+      changes: [
+        {
+          kind: 'update',
+          spaceId: DEEP_DIVE_SPACE_ID,
+          snapshot: {
+            ...loaded.snapshot,
+            document: {
+              ...loaded.snapshot.document,
+              maps: [
+                {
+                  ...drawnMap,
+                  positions: {
+                    [DEEP_DIVE_FIRST_ID]: { x: 0, y: 0, open: false },
+                    '00000000-0000-4000-8000-000000000074': { x: 300, y: 0, open: false },
+                  },
+                  graphs: drawnMap.graphs.map((graph) => ({ ...graph, edges: [] })),
+                },
+              ],
+            },
+          },
+          expectedRevision: loaded.revision.toString(),
+        },
+      ],
+    },
+  });
+  expect(committed.ok()).toBe(true);
+  const root = await seedPositionedMap(
+    page,
+    'Two drawings',
+    () => ({
+      [DEEP_DIVE_RESOURCE_ID]: { x: 0, y: 0, open: true, size: { width: 640, height: 420 } },
+      [SECOND_DRAWING_ID]: { x: 720, y: 0, open: true, size: { width: 640, height: 420 } },
+    }),
+    [
+      {
+        id: SECOND_DRAWING_ID,
+        document: {
+          title: 'Deep dive, again',
+          kind: 'space',
+          spaceId: DEEP_DIVE_SPACE_ID,
+          map: drawnMap.id,
+          graph: drawnGraph.id,
+        },
+      },
+    ],
+  );
+  await page.goto(`/spaces/${encodeCompactUuid(root.snapshot.id)}`);
+  const first = page.locator(`.react-flow__node[data-id="${DEEP_DIVE_RESOURCE_ID}"]`);
+  const second = page.locator(`.react-flow__node[data-id="${SECOND_DRAWING_ID}"]`);
+  const from = page.locator(
+    `.react-flow__node[data-id="embedded:${DEEP_DIVE_RESOURCE_ID}:${DEEP_DIVE_FIRST_ID}"]`,
+  );
+  const to = page.locator(
+    `.react-flow__node[data-id="embedded:${SECOND_DRAWING_ID}:${DEEP_DIVE_FIRST_ID}"]`,
+  );
+  await expect(from).toBeVisible();
+  await expect(to).toBeVisible();
+  await settled(page);
+  await beginPortalEdit(page, first);
+  await beginPortalEdit(page, second);
+  const firstBefore = await embeddedGraphEdgeCount(page, first);
+  const secondBefore = await embeddedGraphEdgeCount(page, second);
+
+  await from.hover();
+  const sourceHandle = authoringHandle(from, 'source', 'right');
+  await expect(sourceHandle).toHaveCSS('opacity', '1');
+  const start = await boxOf(sourceHandle, 'the source handle in the first drawing');
+  const end = await boxOf(to, 'the Resource in the second drawing');
+  const drop = { x: end.x + end.width / 2, y: end.y + end.height / 2 };
+  // The drop lands on the second drawing's Resource, not on the Space Resource
+  // around it, so this is a drag between drawings rather than out to the canvas.
+  expect(
+    await page.evaluate(
+      ({ x, y }) =>
+        document.elementFromPoint(x, y)?.closest<HTMLElement>('.react-flow__node[data-id]')
+          ?.dataset['id'],
+      drop,
+    ),
+  ).toBe(`embedded:${SECOND_DRAWING_ID}:${DEEP_DIVE_FIRST_ID}`);
+  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(start.x + start.width / 2 + 30, start.y + start.height / 2, { steps: 4 });
+  await page.mouse.move(drop.x, drop.y, { steps: 8 });
+  await page.mouse.up();
+
+  await expect(page.getByTestId('canvas-command-refusal')).toHaveText(
+    'An Edge can connect Resources only within the same drawn Map.',
+  );
+  await settled(page);
+  expect(await embeddedGraphEdgeCount(page, first)).toBe(firstBefore);
+  expect(await embeddedGraphEdgeCount(page, second)).toBe(secondBefore);
+  const stored = await page.request.get(`/api/spaces/${DEEP_DIVE_SPACE_ID}`);
+  expect(
+    decodeLoadedSpace(await stored.json()).snapshot.document.maps?.[0]?.graphs[0]?.edges,
+  ).toEqual([]);
 });
 
 /**
