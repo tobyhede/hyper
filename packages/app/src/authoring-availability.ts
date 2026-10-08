@@ -184,6 +184,25 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
   };
 }
 
+/**
+ * Withhold navigation while any composed Space, listed or only drawn, is
+ * replacing an image (ADR 0112).
+ *
+ * The open set answers that once, as `OpenSpacesState.replacingImage`, and the
+ * domain refuses navigation on the same answer. The rest of this Space's
+ * availability is its own replacement's, which `authoringAvailability` answers;
+ * another Space's replacement withdraws nothing here but navigation. Held by
+ * `packages/app/test/dock-navigation-hold.test.tsx`.
+ */
+export function withNavigationHeld(
+  availability: AuthoringAvailability,
+  navigationHeld: boolean,
+): AuthoringAvailability {
+  return navigationHeld && availability.navigate
+    ? { ...availability, navigate: false }
+    : availability;
+}
+
 /** Every answer as it stands when no image replacement is running. */
 function availabilityBesideReplacement(inProgress: AuthoringInProgress): AuthoringAvailability {
   const {

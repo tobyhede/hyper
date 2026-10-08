@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   authoringAvailability,
+  withNavigationHeld,
   type AuthoringAvailability,
   type AuthoringInProgress,
 } from '../src/authoring-availability';
@@ -50,6 +51,12 @@ describe('authoring availability', () => {
       ),
     );
   });
+  it('withdraws only navigation while another composed Space replaces an image', () => {
+    const answer = authoringAvailability(NOTHING_IN_PROGRESS);
+    expect(withNavigationHeld(answer, true)).toEqual({ ...ALL_AVAILABLE, navigate: false });
+    expect(withNavigationHeld(answer, false)).toBe(answer);
+  });
+
   it('offers every operation when nothing is in progress', () => {
     expect(authoringAvailability(NOTHING_IN_PROGRESS)).toStrictEqual(ALL_AVAILABLE);
   });

@@ -94,6 +94,11 @@ export interface BrowserLocation {
  * asks what the browser should do about that position, and does it. The seam
  * it takes is a five-member interface rather than `window`, so every rule
  * below is reachable without mounting a React tree.
+ *
+ * `isNavigationHeld` is the open set's one answer over every composed Space,
+ * which `createOpenSpaces` passes. A location built without one has no open
+ * set, so the Space it follows is the only composed Space and that Space's own
+ * replacement is the whole answer.
  */
 export function createBrowserLocation(
   history: HistoryApi,
