@@ -9,20 +9,23 @@ import {
   symlink,
   writeFile,
 } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { newUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
-import { runCliMain } from '../../src/cli/main';
+import { runDatabaseCli } from '../../src/cli/database-entry';
 import type { DatabaseCommand, RunCommand } from '../../src/cli/arguments';
-import type { CliIo } from '../../src/cli/database-command';
+import type { CliIo } from '../../src/cli/io';
 import { runHyper } from '../../src/cli/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
 import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { runCommand } from '../support/hyper-command';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -1143,21 +1146,25 @@ const importFrom = (directory: string): DatabaseCommand => ({
   replace: false,
 });
 
-describe('runCliMain', () => {
+describe('runDatabaseCli', () => {
+  /** A target over `repository` that closes through `close`. */
+  const targetOver = (repository: SpaceRepository, close: () => Promise<void>): DatabaseTarget => ({
+    open: () => Promise.resolve({ repository, close }),
+  });
+
   it('closes the database after an export succeeds', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const output = captureIo();
     let closed = false;
 
-    const exitCode = await runCliMain(exportTo(destination), {
-      repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
-      io: output.io,
-      newId: newUuid,
-      close: () => {
+    const exitCode = await runDatabaseCli(
+      targetOver(new MemorySpaceRepository([storedSpace], SPACE_ID), () => {
         closed = true;
         return Promise.resolve();
-      },
-    });
+      }),
+      exportTo(destination),
+      { io: output.io, newId: newUuid },
+    );
 
     expect(exitCode).toBe(0);
     expect(closed).toBe(true);
@@ -1171,15 +1178,14 @@ describe('runCliMain', () => {
     repository.loadAggregate = () => Promise.reject(new Error('catalog unavailable'));
     let closed = false;
 
-    const exitCode = await runCliMain(exportTo(destination), {
-      repository,
-      io: output.io,
-      newId: newUuid,
-      close: () => {
+    const exitCode = await runDatabaseCli(
+      targetOver(repository, () => {
         closed = true;
         return Promise.resolve();
-      },
-    });
+      }),
+      exportTo(destination),
+      { io: output.io, newId: newUuid },
+    );
 
     expect(exitCode).toBe(1);
     expect(closed).toBe(true);
@@ -1192,15 +1198,14 @@ describe('runCliMain', () => {
     const output = captureIo();
     let closed = false;
 
-    const exitCode = await runCliMain(importFrom(directory), {
-      repository: new MemorySpaceRepository(),
-      io: output.io,
-      newId: newUuid,
-      close: () => {
+    const exitCode = await runDatabaseCli(
+      targetOver(new MemorySpaceRepository(), () => {
         closed = true;
         return Promise.resolve();
-      },
-    });
+      }),
+      importFrom(directory),
+      { io: output.io, newId: newUuid },
+    );
 
     expect(exitCode).toBe(0);
     expect(closed).toBe(true);
@@ -1215,12 +1220,11 @@ describe('runCliMain', () => {
     const directory = await writeSingleSpaceAggregate();
     const output = captureIo();
 
-    const exitCode = await runCliMain(importFrom(directory), {
-      repository: new MemorySpaceRepository(),
-      io: output.io,
-      newId: newUuid,
-      close: () => Promise.reject(new Error('socket stuck')),
-    });
+    const exitCode = await runDatabaseCli(
+      targetOver(new MemorySpaceRepository(), () => Promise.reject(new Error('socket stuck'))),
+      importFrom(directory),
+      { io: output.io, newId: newUuid },
+    );
 
     expect(exitCode).toBe(1);
     expect(output.stdout).toEqual([
@@ -1253,15 +1257,14 @@ describe('runCliMain', () => {
       },
     };
 
-    const exitCode = await runCliMain(exportTo(destination), {
-      repository,
-      io,
-      newId: newUuid,
-      close: () => {
+    const exitCode = await runDatabaseCli(
+      targetOver(repository, () => {
         closed = true;
         return Promise.resolve();
-      },
-    });
+      }),
+      exportTo(destination),
+      { io, newId: newUuid },
+    );
 
     expect(exitCode).toBe(1);
     expect(closed).toBe(true);
@@ -1275,20 +1278,22 @@ describe('runCliMain', () => {
     repository.loadAggregate = () => Promise.reject(new Error('catalog unavailable'));
     let closed = false;
 
-    const exitCode = await runCliMain(exportTo(destination), {
-      repository,
-      newId: newUuid,
-      io: {
-        stdout: () => undefined,
-        stderr: () => {
-          throw new Error('closed pipe');
-        },
-      },
-      close: () => {
+    const exitCode = await runDatabaseCli(
+      targetOver(repository, () => {
         closed = true;
         return Promise.resolve();
+      }),
+      exportTo(destination),
+      {
+        io: {
+          stdout: () => undefined,
+          stderr: () => {
+            throw new Error('closed pipe');
+          },
+        },
+        newId: newUuid,
       },
-    });
+    );
 
     expect(exitCode).toBe(1);
     expect(closed).toBe(true);
@@ -1391,5 +1396,55 @@ describe('runHyper author verbs', () => {
       expect(output.stdout).toEqual([]);
       expect(output.stderr).toEqual([]);
     },
+  );
+});
+
+describe('the hyper entry point', () => {
+  const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  // Resolved from this file because the child's cwd is a temporary directory
+  // outside the monorepo, where neither `pnpm exec` nor `--import tsx` finds tsx.
+  const tsxCli = createRequire(import.meta.url).resolve('tsx/cli');
+
+  /** Start `src/cli/entry.ts` as its own process in `cwd`, with `env` added. */
+  const entry = (args: readonly string[], cwd: string, env: Readonly<Record<string, string>>) =>
+    runCommand(
+      process.execPath,
+      [
+        tsxCli,
+        '--tsconfig',
+        join(repositoryRoot, 'tsconfig.json'),
+        join(repositoryRoot, 'src/cli/entry.ts'),
+        ...args,
+      ],
+      { cwd, env, timeoutLabel: 'hyper entry point' },
+    );
+
+  /*
+   * pnpm sets `INIT_CWD` and `npm_lifecycle_event` for every script it runs,
+   * and a process an outer script started inherits both. Only the `hyper`
+   * script's own `INIT_CWD` says where the author invoked it.
+   */
+  it.each([
+    { invokedBy: 'the hyper script', lifecycleEvent: 'hyper', resolvesIn: 'invoked' },
+    { invokedBy: 'another script', lifecycleEvent: 'test', resolvesIn: 'cwd' },
+    { invokedBy: 'no script', lifecycleEvent: '', resolvesIn: 'cwd' },
+  ] as const)(
+    'resolves a relative directory where pnpm was invoked only when $invokedBy started it',
+    async ({ lifecycleEvent, resolvesIn }) => {
+      const invoked = await makeTemporaryDirectory();
+      const cwd = await makeTemporaryDirectory();
+      const expected = join(resolvesIn === 'invoked' ? invoked : cwd, 'talk');
+      const unexpected = join(resolvesIn === 'invoked' ? cwd : invoked, 'talk');
+
+      const result = await entry(['init', 'talk'], cwd, {
+        INIT_CWD: invoked,
+        npm_lifecycle_event: lifecycleEvent,
+      });
+
+      expect(result.status).toBe(0);
+      await expect(access(join(expected, AGGREGATE_FILE_NAME))).resolves.toBeUndefined();
+      await expect(access(unexpected)).rejects.toThrow();
+    },
+    20_000,
   );
 });

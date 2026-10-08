@@ -1,6 +1,6 @@
 import { newUuid } from '@project/core';
 import type { DatabaseTarget } from '../database/database-target';
-import { cliArguments, processIo } from './process';
+import { cliArguments, invocationDirectory, processIo } from './process';
 import { launchRun } from './run-launcher';
 import { runHyper } from './run';
 
@@ -19,9 +19,7 @@ const sqlite: DatabaseTarget = {
 process.exitCode = await runHyper(cliArguments(), {
   io: processIo,
   newId: newUuid,
-  // pnpm runs a script from the repository root and records where it was
-  // invoked in `INIT_CWD`, which is what a relative directory is relative to.
-  workingDirectory: process.env['INIT_CWD'] ?? process.cwd(),
+  workingDirectory: invocationDirectory(),
   targets: { postgres, sqlite },
   launchRun,
 });

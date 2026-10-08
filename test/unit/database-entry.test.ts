@@ -23,9 +23,9 @@ describe('database CLI entry', () => {
     const stdout = vi.fn();
     const stderr = vi.fn();
 
-    await expect(runDatabaseCli(target, exportCommand, { stdout, stderr }, newUuid)).resolves.toBe(
-      1,
-    );
+    await expect(
+      runDatabaseCli(target, exportCommand, { io: { stdout, stderr }, newId: newUuid }),
+    ).resolves.toBe(1);
     expect(close).toHaveBeenCalledOnce();
     expect(stderr).toHaveBeenCalledWith(
       'The repository is not initialized, so there is no aggregate to export\n',
@@ -39,7 +39,7 @@ describe('database CLI entry', () => {
     const stderr = vi.fn();
 
     await expect(
-      runDatabaseCli(target, exportCommand, { stdout: vi.fn(), stderr }, newUuid),
+      runDatabaseCli(target, exportCommand, { io: { stdout: vi.fn(), stderr }, newId: newUuid }),
     ).resolves.toBe(1);
     expect(stderr).toHaveBeenCalledWith('Database open failed: unavailable target\n');
   });
@@ -51,7 +51,7 @@ describe('database CLI entry', () => {
     const stderr = vi.fn();
 
     await expect(
-      runDatabaseCli(target, exportCommand, { stdout: vi.fn(), stderr }, newUuid),
+      runDatabaseCli(target, exportCommand, { io: { stdout: vi.fn(), stderr }, newId: newUuid }),
     ).resolves.toBe(1);
     expect(stderr).toHaveBeenCalledWith('name the database\n');
   });

@@ -102,12 +102,11 @@ const initializeUnderReplace = async (
  * `--dangerous-replace` this initializes a repository that has none, and an
  * initialized repository is left exactly as it is — an import that would have
  * overwritten authored state says so instead of doing it. With it, whatever is
- * stored is truncated and the aggregate written in its place, atomically,
- * whether or not the stored state is a valid aggregate (ADR 0094). The Meta
- * identity `loadMetaSpaceId` just read is what authorizes that, rather than one
- * the caller supplies: an identity that moved in between is a conflict, and the
- * replacement rolls back rather than destroying a repository the operator was
- * not looking at.
+ * stored is replaced by the aggregate, atomically, whether or not the stored
+ * state is a valid aggregate (ADR 0094). The Meta identity `loadMetaSpaceId`
+ * just read is what authorizes that, rather than one the caller supplies: an
+ * identity that moved in between is a conflict, and the replacement rolls back
+ * rather than destroying a repository the operator was not looking at.
  *
  * There is deliberately **no merge**. Import does not update, reconcile or add
  * to stored content; the aggregate on disk becomes the whole of the aggregate
@@ -146,7 +145,7 @@ export const importAggregateContents = async (
     case 'conflict':
       return { kind: 'conflict', currentMetaSpaceId: replaced.currentMetaSpaceId };
     // `replaceAggregate` refuses to establish first state, so an empty
-    // repository takes the initializing door: there is nothing to truncate.
+    // repository takes the initializing door: there is nothing to replace.
     case 'uninitialized':
       return initializeUnderReplace(repository, input);
     case 'aggregate-refused':

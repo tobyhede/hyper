@@ -68,21 +68,15 @@ const parseStore = (value: string | undefined): HyperStore | undefined => {
   }
 };
 
-interface DatabaseArguments {
-  readonly directory: string;
-  readonly store: HyperStore;
-  readonly replace: boolean;
-}
-
 /**
- * One directory, at most one `--store <store>`, and — where the verb allows it
- * — at most one `--dangerous-replace`. An option is never a directory, and
- * neither is the empty string, which would resolve to the working directory.
+ * One directory, at most one `--store <store>`, and — for `import` alone — at
+ * most one `--dangerous-replace`. An option is never a directory, and neither
+ * is the empty string, which would resolve to the working directory.
  */
 const parseDatabaseArguments = (
+  verb: DatabaseCommand['verb'],
   args: readonly string[],
-  allowReplace: boolean,
-): DatabaseArguments | undefined => {
+): DatabaseCommand | undefined => {
   let directory: string | undefined;
   let store: HyperStore | undefined;
   let replace = false;
@@ -94,7 +88,7 @@ const parseDatabaseArguments = (
       store = parseStore(args[index]);
       if (store === undefined) return undefined;
     } else if (argument === '--dangerous-replace') {
-      if (!allowReplace || replace) return undefined;
+      if (verb !== 'import' || replace) return undefined;
       replace = true;
     } else if (!isDirectory(argument) || directory !== undefined) {
       return undefined;
@@ -103,7 +97,10 @@ const parseDatabaseArguments = (
     }
   }
   if (directory === undefined) return undefined;
-  return { directory, store: store ?? 'postgres', replace };
+  const chosen = store ?? 'postgres';
+  return verb === 'import'
+    ? { verb, directory, store: chosen, replace }
+    : { verb, directory, store: chosen };
 };
 
 /** Neither the empty string nor an option is a directory. */
@@ -152,16 +149,9 @@ export const parseHyperArguments = (args: readonly string[]): HyperCommand | und
     }
     case 'run':
       return parseRunArguments(rest);
-    case 'import': {
-      const parsed = parseDatabaseArguments(rest, true);
-      return parsed === undefined ? undefined : { verb: 'import', ...parsed };
-    }
-    case 'export': {
-      const parsed = parseDatabaseArguments(rest, false);
-      return parsed === undefined
-        ? undefined
-        : { verb: 'export', directory: parsed.directory, store: parsed.store };
-    }
+    case 'import':
+    case 'export':
+      return parseDatabaseArguments(verb, rest);
     case undefined:
     default:
       return undefined;

@@ -59,6 +59,17 @@ const hyperScript = async (): Promise<readonly string[]> => {
   return args;
 };
 
+/** Resolves once the launcher `pid` has started its run process. */
+const runProcessStarted = async (pid: number): Promise<void> => {
+  const deadline = Date.now() + START_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const children = await runCommand('pgrep', ['-P', String(pid)]);
+    if (children.stdout.trim() !== '') return;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error('The launcher never started its run process');
+};
+
 const exists = (path: string): Promise<boolean> =>
   access(path).then(
     () => true,
@@ -211,6 +222,85 @@ describe('pnpm hyper run', () => {
       expect(result.status, result.stderr).not.toBe(0);
       expect(result.stderr).toContain(`pnpm hyper init ${directory}`);
       expect(await exists(directory)).toBe(false);
+    },
+    START_TIMEOUT_MS,
+  );
+
+  it(
+    'refuses a port already in use with a sentence, exiting one',
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
+      roots.push(root);
+      const directory = join(root, 'talk');
+      await initAggregate(directory, newUuid);
+      // Held on `localhost`, the address the run's server binds.
+      const occupied = createServer();
+      await new Promise<void>((resolve) => occupied.listen(0, 'localhost', resolve));
+      const address = occupied.address();
+      if (address === null || typeof address === 'string') throw new Error('No port');
+      try {
+        const result = await runCommand(
+          process.execPath,
+          [...(await hyperScript()), 'run', directory, '--no-open', '--port', String(address.port)],
+          { cwd: REPOSITORY_ROOT, timeoutMs: START_TIMEOUT_MS },
+        );
+
+        expect(result.status, result.stderr).toBe(1);
+        // One sentence and no stack trace.
+        const [sentence, ...rest] = result.stderr.split('\n');
+        expect(sentence, result.stderr).toMatch(
+          `Could not serve ${directory} on port ${String(address.port)}: `,
+        );
+        expect(rest, result.stderr).toEqual(['']);
+      } finally {
+        await new Promise((resolve) => occupied.close(resolve));
+      }
+    },
+    START_TIMEOUT_MS,
+  );
+
+  /*
+   * The launcher forwards a signal it receives as soon as the run process
+   * exists, which is before that process has loaded or Imported anything.
+   */
+  it(
+    'stops, exiting zero and leaving the directory as it was, on SIGINT while it is still starting',
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
+      roots.push(root);
+      const directory = join(root, 'talk');
+      await initAggregate(directory, newUuid);
+      const before = await readFile(join(directory, 'hyper.json'), 'utf8');
+      const launcher = spawn(
+        process.execPath,
+        [
+          ...(await hyperScript()),
+          'run',
+          directory,
+          '--no-open',
+          '--port',
+          String(await freePort()),
+        ],
+        { cwd: REPOSITORY_ROOT, detached: true, stdio: ['ignore', 'pipe', 'pipe'] },
+      );
+      let output = '';
+      launcher.stdout.setEncoding('utf8').on('data', (chunk: string) => (output += chunk));
+      launcher.stderr.setEncoding('utf8').on('data', (chunk: string) => (output += chunk));
+      const exited = new Promise<number | null>((resolve) => launcher.once('exit', resolve));
+      try {
+        const pid = launcher.pid;
+        if (pid === undefined) throw new Error('The launcher did not start');
+        await runProcessStarted(pid);
+        process.kill(-pid, 'SIGINT');
+
+        expect(await exited, output).toBe(0);
+        expect(output).toContain('Stopped');
+        expect(await readFile(join(directory, 'hyper.json'), 'utf8')).toBe(before);
+      } finally {
+        if (launcher.exitCode === null && launcher.signalCode === null && launcher.pid) {
+          process.kill(-launcher.pid, 'SIGKILL');
+        }
+      }
     },
     START_TIMEOUT_MS,
   );

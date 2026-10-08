@@ -6,11 +6,7 @@ import { importAggregate, type AggregateImportResult } from '../import/import-ag
 import { AggregateDirectoryError } from '../aggregate-directory';
 import type { SpaceRepository } from '../persistence/space-repository';
 import type { DatabaseCommand } from './arguments';
-
-export interface CliIo {
-  stdout(message: string): void;
-  stderr(message: string): void;
-}
+import type { CliIo } from './io';
 
 export interface DatabaseCommandDependencies {
   repository: SpaceRepository;

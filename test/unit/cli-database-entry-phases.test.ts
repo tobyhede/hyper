@@ -9,14 +9,6 @@ import type { SpaceRepository } from '../../src/persistence/space-repository';
  * Opening the target and running the command are two phases with two
  * diagnostics, and the target the first phase opened is closed however the
  * second one ends.
- *
- * `runDatabaseCli` awaits `runCliMain` inside the same `try` that guards
- * `target.open()`, which reads as though a command failure would be reported as
- * an open failure with the database left open. It is not: `runCliMain` catches
- * every failure out of `runHyper` as `Command failed:` and awaits `close()`
- * afterwards either way, so the only rejection that `try` ever sees is
- * `target.open()`'s. These tests hold that arrangement, because the two
- * modules are the ones that have to agree and neither says so alone.
  */
 
 const rejectingRepository = (error: Error): SpaceRepository => ({
@@ -54,8 +46,7 @@ describe('database CLI entry phases', () => {
       runDatabaseCli(
         openingTarget(rejectingRepository(new Error('driver exploded')), close),
         exportCommand,
-        { stdout: vi.fn(), stderr },
-        newUuid,
+        { io: { stdout: vi.fn(), stderr }, newId: newUuid },
       ),
     ).resolves.toBe(1);
 
@@ -81,8 +72,7 @@ describe('database CLI entry phases', () => {
       runDatabaseCli(
         openingTarget(rejectingRepository(new Error('driver exploded')), close),
         exportCommand,
-        { stdout: vi.fn(), stderr },
-        newUuid,
+        { io: { stdout: vi.fn(), stderr }, newId: newUuid },
       ),
     ).resolves.toBe(1);
 
@@ -95,7 +85,7 @@ describe('database CLI entry phases', () => {
     const target: DatabaseTarget = { open: () => Promise.reject(new Error('unavailable target')) };
 
     await expect(
-      runDatabaseCli(target, exportCommand, { stdout: vi.fn(), stderr }, newUuid),
+      runDatabaseCli(target, exportCommand, { io: { stdout: vi.fn(), stderr }, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(stderr).toHaveBeenCalledWith('Database open failed: unavailable target\n');

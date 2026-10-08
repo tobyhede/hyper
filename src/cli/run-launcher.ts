@@ -18,7 +18,16 @@ import type { RunCommand } from './arguments';
  * `hyper` script that does not `exec`.
  */
 
-const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+/** The signals that stop a run, which the launcher forwards and the run process answers. */
+export const RUN_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
+
+/**
+ * The message the run process sends once it answers {@link RUN_SIGNALS}
+ * itself. Until then a signal would end it by default, so the launcher holds
+ * each signal and forwards it on this message.
+ */
+export const RUN_HANDLING_SIGNALS = 'handling-signals';
+
 const RUN = fileURLToPath(new URL('./run-process.ts', import.meta.url));
 
 /**
@@ -33,36 +42,62 @@ const RUN = fileURLToPath(new URL('./run-process.ts', import.meta.url));
  */
 const REPEATED_SIGNAL_MILLISECONDS = 250;
 
-/** The run process's command line, which it parses as `hyper` parses its own. */
-const runArguments = ({ directory, port, open }: RunCommand): readonly string[] => {
-  const args = ['run', directory];
-  if (port !== undefined) args.push('--port', String(port));
-  if (!open) args.push('--no-open');
-  return args;
+/** The resolved command as the run process's arguments, which {@link decodeRunCommand} reads. */
+export const encodeRunCommand = ({ directory, port, open }: RunCommand): readonly string[] => [
+  directory,
+  port === undefined ? '' : String(port),
+  open ? 'open' : 'no-open',
+];
+
+/** The command {@link encodeRunCommand} encoded, or `undefined` for anything else. */
+export const decodeRunCommand = (args: readonly string[]): RunCommand | undefined => {
+  const [directory, port, open, ...extra] = args;
+  if (directory === undefined || port === undefined || extra.length > 0) return undefined;
+  if (port !== '' && !/^\d+$/.test(port)) return undefined;
+  if (open !== 'open' && open !== 'no-open') return undefined;
+  return {
+    verb: 'run',
+    directory,
+    port: port === '' ? undefined : Number(port),
+    open: open === 'open',
+  };
 };
 
 /** Start the run and forward it the author's signals, answering its exit code. */
 export const launchRun = (command: RunCommand): Promise<number> =>
   new Promise((resolve) => {
-    const child = spawn(process.execPath, [...process.execArgv, RUN, ...runArguments(command)], {
-      detached: true,
-      stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+    const child = spawn(
+      process.execPath,
+      [...process.execArgv, RUN, ...encodeRunCommand(command)],
+      {
+        detached: true,
+        stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+      },
+    );
+    let handling = false;
+    const held: NodeJS.Signals[] = [];
+    child.on('message', (message) => {
+      if (message !== RUN_HANDLING_SIGNALS || handling) return;
+      handling = true;
+      for (const signal of held.splice(0)) child.kill(signal);
     });
     const forwardedAt = new Map<NodeJS.Signals, number>();
-    for (const signal of SIGNALS) {
+    for (const signal of RUN_SIGNALS) {
       process.on(signal, () => {
         const now = Date.now();
         const previous = forwardedAt.get(signal);
         if (previous !== undefined && now - previous < REPEATED_SIGNAL_MILLISECONDS) return;
         forwardedAt.set(signal, now);
-        child.kill(signal);
+        if (handling) child.kill(signal);
+        else held.push(signal);
       });
     }
     child.once('error', (error) => {
       process.stderr.write(`Could not start the run: ${error.message}\n`);
       resolve(1);
     });
-    child.once('exit', (code) => {
+    child.once('exit', (code, signal) => {
+      if (code === null) process.stderr.write(`The run ended on ${String(signal)}.\n`);
       resolve(code ?? 1);
     });
   });

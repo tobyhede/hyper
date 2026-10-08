@@ -105,8 +105,8 @@ export type InitResult = { readonly kind: 'initialized' } | { readonly kind: 'no
 
 /**
  * Write a new aggregate, whose Meta Space is a new space (ADR 0018), to a
- * missing or empty directory (ADR 0124), keeping any dot-entries it holds. A
- * directory with anything else in it is refused and left untouched.
+ * missing or empty directory, keeping any dot-entries it holds. A directory
+ * with anything else in it is refused and left untouched.
  */
 export const initAggregate = async (directory: string, newId: () => UUID): Promise<InitResult> => {
   if (!(await holdsNothing(directory))) return { kind: 'not-empty' };
@@ -169,8 +169,8 @@ const createWriter = (
 
 /**
  * Run an Aggregate directory (ADR 0117): Import it into a fresh memory store,
- * refusing a missing or empty one (ADR 0124), then write every committed edit back once edits have been quiet for
- * {@link RUN_QUIET_MILLISECONDS}. A write that fails while the run serves is
+ * refusing a missing or empty one, then write every committed edit back once
+ * edits have been quiet for {@link RUN_QUIET_MILLISECONDS}. A write that fails while the run serves is
  * tried again after the same period, so edits it did not write do not wait for
  * the next commit or the stop.
  *

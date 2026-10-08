@@ -3,8 +3,7 @@ import { describeError } from './describe-error';
 import type { UUID } from '@project/core';
 import type { DatabaseTarget } from '../database/database-target';
 import { HELP, USAGE, parseHyperArguments, type HyperStore, type RunCommand } from './arguments';
-import type { CliIo } from './database-command';
-import { runDatabaseCli } from './database-entry';
+import type { CliIo } from './io';
 import { shellWord } from './shell-word';
 
 export interface HyperDependencies {
@@ -64,7 +63,9 @@ export const runHyper = async (
     case 'run':
       return launchRun({ ...command, directory });
     case 'import':
-    case 'export':
-      return runDatabaseCli(targets[command.store], { ...command, directory }, io, newId);
+    case 'export': {
+      const { runDatabaseCli } = await import('./database-entry');
+      return runDatabaseCli(targets[command.store], { ...command, directory }, { io, newId });
+    }
   }
 };
