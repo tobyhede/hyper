@@ -96,12 +96,7 @@ const parseDatabaseArguments = (
     } else if (argument === '--dangerous-replace') {
       if (!allowReplace || replace) return undefined;
       replace = true;
-    } else if (
-      argument === undefined ||
-      argument === '' ||
-      argument.startsWith('-') ||
-      directory !== undefined
-    ) {
+    } else if (!isDirectory(argument) || directory !== undefined) {
       return undefined;
     } else {
       directory = argument;

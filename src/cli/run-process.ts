@@ -1,4 +1,5 @@
 import { newUuid } from '@project/core';
+import { describeError } from './describe-error';
 import { createServer } from 'vite';
 import { runViteConfig } from '../../packages/app/database-vite-config';
 import { startRun, type RunEvent } from '../run/run';
@@ -20,12 +21,9 @@ import { shellWord } from './shell-word';
 const DEFAULT_PORT = 4173;
 const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 
-const describe = (reason: unknown): string =>
-  reason instanceof Error ? reason.message : String(reason);
-
 const report = (event: RunEvent): void => {
   if (event.kind === 'write-failed') {
-    process.stderr.write(`Could not write the directory: ${describe(event.reason)}\n`);
+    process.stderr.write(`Could not write the directory: ${describeError(event.reason)}\n`);
   }
 };
 
@@ -55,7 +53,7 @@ const started = await startRun(parsed.directory, {
   },
   report,
 }).catch((error: unknown) => {
-  process.stderr.write(`Could not start a run on ${parsed.directory}: ${describe(error)}\n`);
+  process.stderr.write(`Could not start a run on ${parsed.directory}: ${describeError(error)}\n`);
   process.exit(1);
 });
 
@@ -95,12 +93,12 @@ const stop = async (): Promise<void> => {
   // The server closes first, so no edit can be committed behind the last write.
   // Its failing to close is no reason to skip the write.
   await server.close().catch((error: unknown) => {
-    process.stderr.write(`Could not close the server: ${describe(error)}\n`);
+    process.stderr.write(`Could not close the server: ${describeError(error)}\n`);
   });
   const stopped = await run.stop();
   if (stopped.kind === 'unwritten') {
     process.stderr.write(
-      `Stopped, but the last edits were not written: ${describe(stopped.reason)}\n`,
+      `Stopped, but the last edits were not written: ${describeError(stopped.reason)}\n`,
     );
     process.exit(1);
   }
@@ -111,7 +109,7 @@ const beginStopping = (): void => {
   stopping = true;
   process.stdout.write('Stopping: writing any edit not yet on disk…\n');
   stop().catch((error: unknown) => {
-    process.stderr.write(`Could not stop cleanly: ${describe(error)}\n`);
+    process.stderr.write(`Could not stop cleanly: ${describeError(error)}\n`);
     process.exit(1);
   });
 };

@@ -1,4 +1,5 @@
 import type { UUID } from '@project/core';
+import { describeError } from './describe-error';
 import { describeAggregateRefusal } from './aggregate-refusal';
 import { exportAggregate } from '../export/export-aggregate';
 import { importAggregate, type AggregateImportResult } from '../import/import-aggregate';
@@ -20,9 +21,6 @@ export interface DatabaseCommandDependencies {
    */
   newId: () => UUID;
 }
-
-const describeError = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 const reportImportFileError = (error: unknown, io: CliIo): void => {
   if (error instanceof AggregateDirectoryError) {

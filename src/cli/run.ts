@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
+import { describeError } from './describe-error';
 import type { UUID } from '@project/core';
 import type { DatabaseTarget } from '../database/database-target';
-import { initAggregate } from '../run/run';
 import { HELP, USAGE, parseHyperArguments, type HyperStore, type RunCommand } from './arguments';
 import type { CliIo } from './database-command';
 import { runDatabaseCli } from './database-entry';
@@ -28,9 +28,10 @@ const init = async (
 ): Promise<number> => {
   let result;
   try {
+    const { initAggregate } = await import('../run/run');
     result = await initAggregate(directory, newId);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
+    const reason = describeError(error);
     io.stderr(`Could not init ${directory}: ${reason}\n`);
     return 1;
   }

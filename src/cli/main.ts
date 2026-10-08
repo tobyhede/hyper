@@ -1,4 +1,5 @@
 import type { DatabaseCommand } from './arguments';
+import { describeError } from './describe-error';
 import {
   runDatabaseCommand,
   type CliIo,
@@ -8,9 +9,6 @@ import {
 interface CliMainDependencies extends DatabaseCommandDependencies {
   close(): Promise<void>;
 }
-
-const describeError = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 const tryReport = (io: CliIo, message: string): void => {
   try {

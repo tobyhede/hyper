@@ -1,4 +1,5 @@
 import type { UUID } from '@project/core';
+import { describeError } from './describe-error';
 import { DatabaseTargetConfigurationError, type DatabaseTarget } from '../database/database-target';
 import { runCliMain } from './main';
 import type { DatabaseCommand } from './arguments';
@@ -19,7 +20,7 @@ export const runDatabaseCli = async (
       close: () => opened.close(),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = describeError(error);
     io.stderr(
       error instanceof DatabaseTargetConfigurationError
         ? `${message}\n`

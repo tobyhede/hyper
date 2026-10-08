@@ -391,6 +391,7 @@
       // literal exempted name (`cause`) was considered and rejected: most of
       // them are the error being reported, not a wrapped cause, and inventing
       // a name to dodge a linter is worse than a scoped exception.
+      // `src/cli/describe-error.ts` is the CLI's one copy of the narrowing below.
       // `failure-message.ts` is that narrowing itself, extracted so the five
       // copies of it became one; `command-outcomes.ts` is the one place a
       // chrome command's throw is caught, reported and described. Two are
@@ -415,7 +416,7 @@
         "packages/app/test/space-authoring.test.ts",
         "packages/http/src/index.ts",
         "packages/persistence/src/session.ts",
-        "src/cli/main.ts",
+        "src/cli/describe-error.ts",
         "src/cli/database-command.ts",
         "src/cli/run-process.ts",
         "src/aggregate-directory/space-directory.ts"
