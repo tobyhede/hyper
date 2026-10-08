@@ -113,7 +113,7 @@ type ResourceNodeCommonData = {
    * follows from it rather than the other way round. The adapter cannot read it
    * off the geometry — a Resource is not Open just because it is large.
    *
-   * An Open Reference Resource draws its immutable Target's content as its own would be drawn.
+   * An Open Reference Resource draws its Target's content read-only (ADR 0070).
    */
   open?: boolean;
   /**
@@ -207,7 +207,11 @@ export function isResourceNodeOf<K extends Resource['kind']>(
   return node.data.kind === kind;
 }
 
-/** A Resource kind with none of its operations offered yet. */
+/**
+ * A Resource kind with none of its operations offered yet. One arm per kind,
+ * each identical in spelling, because a narrowed `kind` is what lets the
+ * compiler pair `kind` with its own `kindOperations` arm.
+ */
 export function bareKindData(kind: Resource['kind']): ResourceKindData {
   switch (kind) {
     case 'markdown':
