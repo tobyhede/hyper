@@ -15,8 +15,6 @@ import {
   establishMetaSpace,
   META_SPACE_RETRY_INITIAL_DELAY_MS,
   META_SPACE_RETRY_MAX_DELAY_MS,
-  openDatabaseSelection,
-  resolveDatabaseStartup,
   retryMetaSpaceEstablishment,
 } from '../../src/startup/database-startup';
 import { defaultContentAggregate } from '../../src/startup/default-content';
@@ -30,12 +28,8 @@ import { startRefusingPostgresServer } from '../support/refusing-postgres-server
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const RESOURCE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
-const OTHER_RESOURCE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const MAP_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
 const GRAPH_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
-const LINK_RESOURCE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
-const CHILD_MAP_ID = uuidSchema.parse('88888888-8888-4888-8888-888888888888');
-const CHILD_GRAPH_ID = uuidSchema.parse('99999999-9999-4999-8999-999999999999');
 
 /**
  * The identities startup is about to mint, named in the order it mints them
@@ -109,36 +103,6 @@ describe('defaultContentAggregate', () => {
         },
       ],
     });
-  });
-});
-
-describe('openDatabaseSelection', () => {
-  it('opens the space selected by its UUID', async () => {
-    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space');
-    const repository = new MemorySpaceRepository([storedSpace(4n), selected], SPACE_ID);
-
-    const result = await openDatabaseSelection(repository, OTHER_SPACE_ID);
-
-    expect(result).toEqual({ kind: 'opened', space: selected });
-  });
-
-  it('rejects a selected UUID that disappeared without falling back to another space', async () => {
-    const remaining = storedSpace(0n);
-    const selected = storedSpace(7n, OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space');
-    const repository = new MemorySpaceRepository([remaining, selected], SPACE_ID);
-    // Not a lifecycle assertion — the Space is made to vanish after construction,
-    // through `replaceAggregate`.
-    const replaced = await repository.replaceAggregate(
-      { metaSpaceId: SPACE_ID, spaces: [remaining.snapshot] },
-      SPACE_ID,
-    );
-    expect(replaced).toMatchObject({ kind: 'replaced' });
-
-    await expect(openDatabaseSelection(repository, OTHER_SPACE_ID)).rejects.toThrow(OTHER_SPACE_ID);
-    await expect(repository.listSpaces()).resolves.toEqual([
-      { id: SPACE_ID, title: 'Existing space' },
-    ]);
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(remaining);
   });
 });
 
@@ -521,122 +485,5 @@ describe('retryMetaSpaceEstablishment over a PostgreSQL server that refuses this
     } finally {
       await close();
     }
-  });
-});
-
-describe('resolveDatabaseStartup', () => {
-  it('creates and opens the Meta Space when the repository is uninitialized', async () => {
-    const repository = new MemorySpaceRepository();
-
-    const result = await resolveDatabaseStartup(
-      repository,
-      mintingIds(SPACE_ID, RESOURCE_ID, MAP_ID, GRAPH_ID),
-    );
-
-    expect(result).toEqual({
-      kind: 'opened',
-      space: {
-        snapshot: {
-          id: SPACE_ID,
-          document: {
-            version: 1,
-            title: 'New space',
-            defaultMap: MAP_ID,
-            maps: [
-              {
-                id: MAP_ID,
-                title: 'Map 1',
-                kind: 'positioned',
-                positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
-                graphs: [
-                  {
-                    id: GRAPH_ID,
-                    title: 'Graph 1',
-                    color: nextGraphColor([]),
-                    headShape: 'arrow',
-                    edges: [],
-                  },
-                ],
-                activeGraph: GRAPH_ID,
-              },
-            ],
-          },
-          resources: [
-            { id: RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
-          ],
-        },
-        revision: 0n,
-        exportedRevision: null,
-      },
-    });
-    await expect(repository.loadSpace(SPACE_ID)).resolves.toEqual(result.space);
-  });
-
-  it('opens the stored Meta Space without losing its revision precision', async () => {
-    const existing = storedSpace(BigInt(Number.MAX_SAFE_INTEGER) + 1n);
-    const repository = new MemorySpaceRepository([existing], SPACE_ID);
-
-    const result = await resolveDatabaseStartup(repository, mintingIds(OTHER_SPACE_ID));
-
-    expect(result).toEqual({ kind: 'opened', space: existing });
-  });
-
-  it('opens the Meta Space rather than the first of several stored Spaces', async () => {
-    // Ordinary Spaces live inside the Meta reachability closure, so the second
-    // one is stored *because* a Space Resource in Meta names it.
-    const meta: LoadedSpace = {
-      snapshot: {
-        id: OTHER_SPACE_ID,
-        document: { version: 1, title: 'Meta space' },
-        resources: [
-          {
-            id: OTHER_RESOURCE_ID,
-            document: { title: 'Meta resource', kind: 'markdown', body: '' },
-          },
-          {
-            id: LINK_RESOURCE_ID,
-            document: {
-              title: 'Open the child',
-              kind: 'space',
-              spaceId: SPACE_ID,
-              map: CHILD_MAP_ID,
-              graph: CHILD_GRAPH_ID,
-            },
-          },
-        ],
-      },
-      revision: 7n,
-      exportedRevision: null,
-    };
-    // The child carries the Map that Space Resource selects. A Space Resource
-    // names a Map of its target and a Graph that Map owns from the
-    // moment it exists (ADR 0079), so the ordinary Space inside the closure
-    // cannot be the structureless one `storedSpace` builds.
-    const stored = storedSpace(4n);
-    const child: LoadedSpace = {
-      ...stored,
-      snapshot: {
-        ...stored.snapshot,
-        document: {
-          ...stored.snapshot.document,
-          defaultMap: CHILD_MAP_ID,
-          maps: [
-            {
-              id: CHILD_MAP_ID,
-              title: 'Map 1',
-              kind: 'positioned',
-              positions: { [RESOURCE_ID]: { x: 0, y: 0, open: false } },
-              graphs: [{ id: CHILD_GRAPH_ID, title: 'Graph 1', edges: [] }],
-              activeGraph: CHILD_GRAPH_ID,
-            },
-          ],
-        },
-      },
-    };
-    const repository = new MemorySpaceRepository([child, meta], OTHER_SPACE_ID);
-
-    const result = await resolveDatabaseStartup(repository, mintingIds(MAP_ID));
-
-    expect(result).toEqual({ kind: 'opened', space: meta });
   });
 });

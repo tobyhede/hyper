@@ -11,7 +11,7 @@ import { recreatingBeforeRowLock, spaceRepositoryContract } from '../support/rep
 import { expectPersisted } from '../support/persistence-contract';
 
 /**
- * Every Hyper row, gone. The same deletion `--dangerous-truncate` performs, and safe
+ * Every Hyper row, gone. The same deletion `--dangerous-replace` performs, and safe
  * for the same reason the replacement cases below are: `fileParallelism` is
  * off, so one integration file at a time owns the single `DATABASE_URL`.
  */

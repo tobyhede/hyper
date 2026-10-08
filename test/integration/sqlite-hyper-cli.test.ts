@@ -8,6 +8,7 @@ import {
   writeSpaceDirectory as writeLoadedSpaceDirectory,
 } from '../../src/aggregate-directory';
 import { runHyper } from '../../src/cli/run';
+import type { DatabaseTarget } from '../../src/database/database-target';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { createSqliteDatabase } from '../../src/sqlite/db';
@@ -72,7 +73,7 @@ const otherMeta: SpaceSnapshot = {
   resources: [],
 };
 
-describe('hyper:sqlite CLI', () => {
+describe('hyper CLI --store sqlite', () => {
   const temporaryDirectories = new Set<string>();
 
   afterEach(async () => {
@@ -130,13 +131,13 @@ describe('hyper:sqlite CLI', () => {
   };
 
   const hyper = (path: string, args: readonly string[]) =>
-    runHyperScript('hyper:sqlite', args, { SQLITE_PATH: path });
+    runHyperScript([...args, '--store', 'sqlite'], { SQLITE_PATH: path });
 
   it('initializes an empty file, reports an identical re-import as unchanged, and refuses a different one', async () => {
     const path = await migratedFile();
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
 
-    await expect(hyper(path, [linked])).resolves.toEqual({
+    await expect(hyper(path, ['import', linked])).resolves.toEqual({
       status: 0,
       stdout:
         'Imported the aggregate\n' +
@@ -144,7 +145,7 @@ describe('hyper:sqlite CLI', () => {
         `Imported space ${TARGET_SPACE_ID} at revision 0\n`,
       stderr: '',
     });
-    await expect(hyper(path, [linked])).resolves.toEqual({
+    await expect(hyper(path, ['import', linked])).resolves.toEqual({
       status: 0,
       stdout:
         'The repository already holds this aggregate\n' +
@@ -154,10 +155,10 @@ describe('hyper:sqlite CLI', () => {
     });
 
     const different = await aggregateDirectory(OTHER_META_SPACE_ID, [otherMeta]);
-    await expect(hyper(path, [different])).resolves.toEqual({
+    await expect(hyper(path, ['import', different])).resolves.toEqual({
       status: 1,
       stdout: '',
-      stderr: `The repository is already initialized as Meta Space ${META_SPACE_ID}. Re-run with --dangerous-truncate to replace it.\n`,
+      stderr: `The repository is already initialized as Meta Space ${META_SPACE_ID}. Re-run with --dangerous-replace to replace it.\n`,
     });
 
     await withRepository(path, async (repository) => {
@@ -174,13 +175,13 @@ describe('hyper:sqlite CLI', () => {
     });
   });
 
-  it('replaces the stored aggregate only with --dangerous-truncate', async () => {
+  it('replaces the stored aggregate only with --dangerous-replace', async () => {
     const path = await migratedFile();
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
-    expect((await hyper(path, [linked])).status).toBe(0);
+    expect((await hyper(path, ['import', linked])).status).toBe(0);
     const different = await aggregateDirectory(OTHER_META_SPACE_ID, [otherMeta]);
 
-    await expect(hyper(path, [different, '--dangerous-truncate'])).resolves.toEqual({
+    await expect(hyper(path, ['import', different, '--dangerous-replace'])).resolves.toEqual({
       status: 0,
       stdout: `Imported the aggregate\nImported space ${OTHER_META_SPACE_ID} at revision 0\n`,
       stderr: '',
@@ -206,31 +207,40 @@ describe('hyper:sqlite CLI', () => {
   it('answers a replacement authorized against a superseded Meta identity as a conflict', async () => {
     const path = await migratedFile();
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
-    expect((await hyper(path, [linked])).status).toBe(0);
+    expect((await hyper(path, ['import', linked])).status).toBe(0);
     const proposal = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
     const output: string[] = [];
 
-    const status = await withRepository(path, (repository) =>
-      runHyper([proposal, '--dangerous-truncate'], {
-        repository: {
-          listSpaces: () => repository.listSpaces(),
-          loadSpace: (id) => repository.loadSpace(id),
-          loadAggregate: () => repository.loadAggregate(),
-          initializeAggregate: (input) => repository.initializeAggregate(input),
-          replaceAggregate: (input, expected) => repository.replaceAggregate(input, expected),
-          markExported: (id, revision) => repository.markExported(id, revision),
-          commit: (request) => repository.commit(request),
-          storeImage: (image) => repository.storeImage(image),
-          loadImage: (id) => repository.loadImage(id),
-          loadMetaSpaceId: async () => {
-            const read = await repository.loadMetaSpaceId();
-            await repository.replaceAggregate(
-              { metaSpaceId: OTHER_META_SPACE_ID, spaces: [otherMeta] },
-              read,
-            );
-            return read;
-          },
+    const status = await withRepository(path, (repository) => {
+      const racing: SpaceRepository = {
+        listSpaces: () => repository.listSpaces(),
+        loadSpace: (id) => repository.loadSpace(id),
+        loadAggregate: () => repository.loadAggregate(),
+        initializeAggregate: (input) => repository.initializeAggregate(input),
+        replaceAggregate: (input, expected) => repository.replaceAggregate(input, expected),
+        markExported: (id, revision) => repository.markExported(id, revision),
+        commit: (request) => repository.commit(request),
+        storeImage: (image) => repository.storeImage(image),
+        loadImage: (id) => repository.loadImage(id),
+        loadMetaSpaceId: async () => {
+          const read = await repository.loadMetaSpaceId();
+          await repository.replaceAggregate(
+            { metaSpaceId: OTHER_META_SPACE_ID, spaces: [otherMeta] },
+            read,
+          );
+          return read;
         },
+      };
+      const sqlite: DatabaseTarget = {
+        open: () => Promise.resolve({ repository: racing, close: () => Promise.resolve() }),
+      };
+      const postgres: DatabaseTarget = {
+        open: () => Promise.reject(new Error('--store sqlite opened PostgreSQL')),
+      };
+      return runHyper(['import', proposal, '--dangerous-replace', '--store', 'sqlite'], {
+        targets: { sqlite, postgres },
+        workingDirectory: '/sqlite-hyper-cli/unreached',
+        launchRun: () => Promise.reject(new Error('A run was launched')),
         io: {
           stdout: (message) => output.push(message),
           stderr: (message) => output.push(message),
@@ -238,8 +248,8 @@ describe('hyper:sqlite CLI', () => {
         newId: () => {
           throw new Error('A fully identified aggregate mints nothing');
         },
-      }),
-    );
+      });
+    });
 
     expect(status).toBe(1);
     expect(output).toEqual([
@@ -253,7 +263,7 @@ describe('hyper:sqlite CLI', () => {
     });
   });
 
-  it('truncates a file holding broken state with --dangerous-truncate, and only with it', async () => {
+  it('truncates a file holding broken state with --dangerous-replace, and only with it', async () => {
     const path = await migratedFile();
     // Written raw: no lifecycle door stores an aggregate whose Meta Space does
     // not reach every other Space.
@@ -277,11 +287,11 @@ describe('hyper:sqlite CLI', () => {
     }
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
 
-    const refused = await hyper(path, [linked]);
+    const refused = await hyper(path, ['import', linked]);
     expect(refused.status).toBe(1);
     expect(refused.stdout).toBe('');
 
-    await expect(hyper(path, [linked, '--dangerous-truncate'])).resolves.toEqual({
+    await expect(hyper(path, ['import', linked, '--dangerous-replace'])).resolves.toEqual({
       status: 0,
       stdout:
         'Imported the aggregate\n' +
@@ -306,7 +316,7 @@ describe('hyper:sqlite CLI', () => {
   it('exports the canonical directory, records the projected revisions, and survives reopen', async () => {
     const path = await migratedFile();
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
-    expect((await hyper(path, [linked])).status).toBe(0);
+    expect((await hyper(path, ['import', linked])).status).toBe(0);
     const destination = join(await temporaryDirectory('hyper-sqlite-cli-export-'), 'exported');
 
     await expect(hyper(path, ['export', destination])).resolves.toEqual({
@@ -347,7 +357,7 @@ describe('hyper:sqlite CLI', () => {
     // The exported directory is an ordinary aggregate: a second, empty file
     // imports it whole. That is the only bridge between two databases.
     const second = await migratedFile();
-    expect((await hyper(second, [destination])).status).toBe(0);
+    expect((await hyper(second, ['import', destination])).status).toBe(0);
     await withRepository(second, async (repository) => {
       await expect(repository.loadAggregate()).resolves.toEqual({
         kind: 'loaded',
@@ -378,7 +388,7 @@ describe('hyper:sqlite CLI', () => {
     await mkdir(join(source, 'images'));
     await writeFile(join(source, 'images', `${image.id}.png`), pngBytes(1));
 
-    expect((await hyper(path, [source])).status).toBe(0);
+    expect((await hyper(path, ['import', source])).status).toBe(0);
     await withRepository(path, async (repository) => {
       await expect(repository.loadImage(image.id)).resolves.toEqual(image);
     });
@@ -391,7 +401,9 @@ describe('hyper:sqlite CLI', () => {
   });
 
   it('refuses to run without SQLITE_PATH naming a file', async () => {
-    await expect(runHyperScript('hyper:sqlite', [], { SQLITE_PATH: '' })).resolves.toEqual({
+    await expect(
+      runHyperScript(['import', 'unread', '--store', 'sqlite'], { SQLITE_PATH: '' }),
+    ).resolves.toEqual({
       status: 1,
       stdout: '',
       stderr: 'SQLITE_PATH must name the SQLite database file\n',
@@ -401,7 +413,7 @@ describe('hyper:sqlite CLI', () => {
   it('refuses a SQLITE_PATH naming no file and creates nothing there', async () => {
     const path = join(await temporaryDirectory('hyper-sqlite-cli-typo-'), 'hyper.db');
 
-    await expect(hyper(path, [])).resolves.toEqual({
+    await expect(hyper(path, ['import', 'unread'])).resolves.toEqual({
       status: 1,
       stdout: '',
       stderr: `Database open failed: SQLite database file does not exist: ${path}. Run pnpm db:migrate:sqlite first.\n`,

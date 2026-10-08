@@ -14,10 +14,11 @@ You need Node ≥ 26.8.1 and pnpm 9.
 git clone https://github.com/tobyhede/hyper.git
 cd hyper
 pnpm install
-pnpm start ~/talks/rust-async
+pnpm hyper init ~/talks/rust-async
+pnpm hyper run ~/talks/rust-async
 ```
 
-`~/talks/rust-async` does not need to exist: Hyper creates a new Space there, prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
+`init` writes a new aggregate to `~/talks/rust-async`, which must be missing or empty, and prints the command that runs it. `run` prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
 
 1. Edit. Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go.
 2. Press **Present** to traverse the Graph: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the Map.
@@ -31,11 +32,11 @@ pnpm start ~/talks/rust-async
    git commit -m "First draft"
    ```
 
-Run `pnpm start` from the Hyper clone every time, pointing at whichever directory you are working on. A relative path is relative to where you ran the command.
+Run `pnpm hyper run` from the Hyper clone every time, pointing at whichever directory you are working on. For every `pnpm hyper` verb, a relative path is relative to where you ran pnpm.
 
 ## How Running works
 
-`pnpm start <dir>` **runs** an Aggregate directory ([ADR 0117](docs/adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)). Hyper reads the directory into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept.
+`pnpm hyper run <dir>` **runs** an Aggregate directory ([ADR 0117](docs/adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)). Hyper reads the directory into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept.
 
 - **Your content lives in its own git repository**, at any path you like. Hyper does not need it to be inside the Hyper clone, and nothing of yours belongs there.
 - **Hyper writes the directory on every edit.** Once your edits have been quiet for about a second, Hyper writes the directory, so `git status` shows what you changed. Stopping Hyper writes anything still pending. Ctrl-C, closing the terminal (SIGHUP) and SIGTERM all stop it the same way; a second Ctrl-C exits at once without waiting.
@@ -44,11 +45,11 @@ Run `pnpm start` from the Hyper clone every time, pointing at whichever director
 - **Hyper writes only its own files, in place.** It writes `hyper.json`, the Space directories' `space.json` and Resource files, and `images/`, changing only the files whose content changed. Anything else in the directory, such as `.git`, a README or a `notes/` directory, is left alone, and the directory itself is never moved or recreated. A crash in the middle of a write can leave some files new and some old; git restores them.
 - **A `*.md` file beside `space.json` is removed by the next write.** Hyper reads every Markdown file in a Space's directory and its `resources/` directory as a Resource, and rewrites them all. Keep your own notes elsewhere, for example in a `notes/` directory: other files and directories are left alone.
 - **Pictures are written to `images/`.** A picture you upload is written to the directory's `images/`, named by its content, so committing the directory commits the picture. A picture linked by `https:` URL stays a link.
-- **Starting.** A missing or empty directory becomes a new Space and is written at once. Dot-entries such as `.git` and `.DS_Store` do not count, so `git init` before the first start is fine. A directory that is not a valid Aggregate directory is refused, with its problems printed, and nothing is served; fix the files and start again. A run with no edits leaves the directory byte-for-byte as it was.
+- **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm hyper init` command that creates one there, so a mistyped path never becomes a new aggregate. Dot-entries such as `.git` and `.DS_Store` do not count, so `git init` before `init` is fine. A directory that is not a valid Aggregate directory is refused, with its problems printed, and nothing is served; fix the files and start again. A run with no edits leaves the directory byte-for-byte as it was.
 - **Ports and the browser.** Hyper serves on port 4173, or the next free port if that one is taken. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running Hyper headless or from an agent:
 
   ```sh
-  pnpm start ~/talks/rust-async --port 4200 --no-open
+  pnpm hyper run ~/talks/rust-async --port 4200 --no-open
   ```
 
 The file format, including what Hyper keeps and removes when it writes, is described in [`docs/aggregate-directory.md`](docs/aggregate-directory.md).
@@ -75,7 +76,7 @@ pnpm dev:new         # fresh one-resource memory space at http://localhost:5174
 pnpm dev:fixture     # tracked test fixture in memory at http://localhost:5175
 ```
 
-A completed edit is committed automatically through the persistence session; the persistence indicator reports `Saving changes` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart. Under `pnpm start` it is written to the directory being run.
+A completed edit is committed automatically through the persistence session; the persistence indicator reports `Saving changes` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart. Under `pnpm hyper run` it is written to the directory being run.
 
 The Space, a Map, a Resource, a Graph and each Active Resource reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)). The Command Dock and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
 
@@ -140,9 +141,9 @@ SQLITE_PATH=/absolute/path/hyper.db pnpm test:integration:sqlite
 
 `SQLITE_PATH` names the file for the host and the CLI. The integration suite needs it set but does not test against it: `pnpm test:integration:sqlite` runs `pnpm db:migrate:sqlite` first, which fails with `PN-CLI-4005` when the variable is absent because `prisma-next.config.sqlite.ts` then declares no `db.connection`, while the cases themselves each mint and remove a fresh temp file through `openSqliteRepository`. So the value the suite is given is migrated and then left alone.
 
-Use a stable absolute path in a local directory the application owns. The host and CLI both refuse to start when `SQLITE_PATH` is unset or blank, or when its parent directory is missing or not writable, and the CLI also refuses a file that does not exist, since SQLite would otherwise create an empty unmigrated one and fail on a missing table. **A relative value is refused by the host but not by the CLI.** `pnpm db:migrate:sqlite` runs from the repository root while the host runs from `packages/app`, so a relative value would migrate one file and open another: `pnpm dev:sqlite` refuses one before migrating, so nothing under the repository root is touched, and the host checks again at composition, so a relative path reaching it by another route is still refused. `pnpm hyper:sqlite` has no such check and will act on whatever that relative path names from its own working directory — pass it an absolute one. A network filesystem, a file shared between hosts and a hosted SQLite service are not supported deployments.
+Use a stable absolute path in a local directory the application owns. The host and CLI both refuse to start when `SQLITE_PATH` is unset or blank, or when its parent directory is missing or not writable, and the CLI also refuses a file that does not exist, since SQLite would otherwise create an empty unmigrated one and fail on a missing table. **A relative value is refused by the host and by the CLI.** `pnpm db:migrate:sqlite` runs from the repository root while the host runs from `packages/app`, so a relative value would migrate one file and open another: `pnpm dev:sqlite` refuses one before migrating, so nothing under the repository root is touched, and the host checks again at composition, so a relative path reaching it by another route is still refused. `pnpm hyper import --store sqlite` and `pnpm hyper export --store sqlite` refuse one too, with `SQLITE_PATH must be an absolute path`. A network filesystem, a file shared between hosts and a hosted SQLite service are not supported deployments.
 
-**One Hyper process per file.** Inside that process every repository operation is serialised, so overlapping Edits answer as they would on PostgreSQL: a stale revision is a conflict, and nothing waits on SQLite. A second process on the same live file — `pnpm hyper:sqlite` against a file `pnpm dev:sqlite` holds, or two hosts — is unsupported. SQLite locks the whole file, so when the two meet, an operation either fails at once, waits out the driver's fixed 5 second busy timeout and then fails, or waits and succeeds if the other process's lock clears before that timeout. A second process that is only reading is enough: a commit here cannot finish while that read's transaction is open. The wait is synchronous, so the host answers nothing else for those seconds. A failure either way answers `503 persistence-unavailable`, which the browser retries, never a `409`, and no partial write or stuck lock is left behind (`test/integration/sqlite-contention.test.ts`).
+**One Hyper process per file.** Inside that process every repository operation is serialised, so overlapping Edits answer as they would on PostgreSQL: a stale revision is a conflict, and nothing waits on SQLite. A second process on the same live file — `pnpm hyper import --store sqlite` against a file `pnpm dev:sqlite` holds, or two hosts — is unsupported. SQLite locks the whole file, so when the two meet, an operation either fails at once, waits out the driver's fixed 5 second busy timeout and then fails, or waits and succeeds if the other process's lock clears before that timeout. A second process that is only reading is enough: a commit here cannot finish while that read's transaction is open. The wait is synchronous, so the host answers nothing else for those seconds. A failure either way answers `503 persistence-unavailable`, which the browser retries, never a `409`, and no partial write or stuck lock is left behind (`test/integration/sqlite-contention.test.ts`).
 
 The file uses SQLite's default rollback journal (`journal_mode=delete`) with `synchronous=FULL`; WAL is not enabled. To back it up, stop the host (or anything else writing the file) and copy the file, or use SQLite's own backup API (`sqlite3 hyper.db ".backup copy.db"`). Do not copy the file while a writer has it open: a copy taken mid-transaction need not be a consistent database.
 
@@ -151,22 +152,24 @@ The file uses SQLite's default rollback journal (`journal_mode=delete`) with `sy
 The `hyper` CLI moves a complete [Aggregate directory](docs/aggregate-directory.md) in and out of a database. The unit is always the whole aggregate, every Space rooted at the Meta Space, never one Space chosen from among them.
 
 ```sh
-pnpm hyper export ./my-aggregate           # write the complete stored aggregate
-pnpm hyper ./my-aggregate                  # initialize an empty repository from it
-pnpm hyper ./my-aggregate --dangerous-truncate   # replace the stored aggregate outright
+pnpm hyper export ./my-aggregate                       # write the complete stored aggregate
+pnpm hyper import ./my-aggregate                       # initialize an empty repository from it
+pnpm hyper import ./my-aggregate --dangerous-replace   # replace the stored aggregate outright
 ```
 
-Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, whatever is stored — a valid aggregate or state the repository refuses to read — is truncated and replaced atomically, authorized by the Meta identity the repository just reported ([ADR 0094](docs/adr/0094-dangerous-truncate-replaces-whatever-is-stored.md)). There is no merge mode.
+Both verbs reach PostgreSQL unless `--store sqlite` names SQLite. Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, whatever is stored — a valid aggregate or state the repository refuses to read — is replaced atomically, authorized by the Meta identity the repository just reported ([ADR 0094](docs/adr/0094-dangerous-truncate-replaces-whatever-is-stored.md)). There is no merge mode.
 
-The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to truncate, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
+The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to replace, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
+
+Initializing a database is not a command: a host establishes a new Space in an empty database at start-up ([ADR 0124](docs/adr/0124-one-hyper-cli.md)). So a database a host has already started on holds an aggregate, and importing into it needs `--dangerous-replace`.
 
 Export writes the destination in place, exactly as a run does ([ADR 0119](docs/adr/0119-export-writes-in-place-and-git-answers-for-a-partial-write.md)): only the files Import reads, and nothing else in the directory. It records the revision it projected for each Space, and writes and Import admits the pictures in `images/` on every store ([ADR 0118](docs/adr/0118-an-aggregate-directory-carries-stored-image-bytes.md)).
 
-The same commands run against a SQLite file through `pnpm hyper:sqlite`, which requires `SQLITE_PATH` to name an already-migrated file (`pnpm db:migrate:sqlite`). The script, not an argument or the environment's contents, picks the database, so `pnpm hyper` stays PostgreSQL even when `.env` names both. Run it only against a file no host has open — stop `pnpm dev:sqlite` first, or point it at a different file. An exported directory is the only way to move an aggregate between the two databases:
+The same commands run against a SQLite file with `--store sqlite`, which requires `SQLITE_PATH` to name an already-migrated file (`pnpm db:migrate:sqlite`). The flag, not the environment's contents, picks the database, so a command without it stays PostgreSQL even when `.env` names both. Run it only against a file no host has open — stop `pnpm dev:sqlite` first, or point it at a different file. An exported directory is the only way to move an aggregate between the two databases:
 
 ```sh
 pnpm hyper export ./my-aggregate                               # from PostgreSQL
-SQLITE_PATH=/absolute/path/hyper.db pnpm hyper:sqlite ./my-aggregate   # into an empty SQLite file
+SQLITE_PATH=/absolute/path/hyper.db pnpm hyper import ./my-aggregate --store sqlite   # into an empty SQLite file
 ```
 
 ### Architecture
@@ -197,7 +200,7 @@ Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy 
 
 **Resources.** The graph draws a Closed Resource's **Title**, not its content. Opening a Resource grows it in place and shows its content ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md)); editing its source is a separate action. The same renderer shows the Active Resource while Presenting. A Resource occupies exactly one position in a Map; showing the same content at a second position is the job of a Reference Resource ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 
-**The browser never touches files.** It lists, opens and commits Spaces over HTTP and nothing else. Reading and writing an Aggregate directory is server-side: the `hyper` CLI, and the run behind `pnpm start`.
+**The browser never touches files.** It lists, opens and commits Spaces over HTTP and nothing else. Reading and writing an Aggregate directory is server-side: the `hyper` CLI's `init`, `run`, `import` and `export`.
 
 ### Tests
 
@@ -205,12 +208,12 @@ Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy 
 - Unresolved Resource, Edge and Graph references and duplicate ids (`@project/graph`).
 - Graph navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
 - React Flow projection correctness (`@project/react-flow-adapter`).
-- Aggregate directory round trips, Export and Import, and a run of `pnpm start` that edits over HTTP and stops on SIGINT (`test/unit`, `test/integration`).
+- Aggregate directory round trips, Export and Import, and a `pnpm hyper run` that edits over HTTP and stops on SIGINT (`test/unit`, `test/integration`).
 - Playwright flows: app loads, the graph is visible, a Graph is selected, Resources open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a Graph, and a Graph is traversed under the camera.
 
 ### Current limitations
 
-- **No undo inside the application.** Under `pnpm start`, git is the undo.
+- **No undo inside the application.** Under `pnpm hyper run`, git is the undo.
 - **Overlay legibility.** The graph draws every Graph at once, at the positions the Map authored. An Edge runs backward whenever the author placed its target left of its source — which two Graphs disagreeing about the order of Resources they share will force on one of them — and nothing routes an Edge around a Resource: every Edge is the bezier React Flow draws, so a backward one curls back on itself. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Closed Resources are a fixed shape.** A Closed Resource draws its Title, so every Closed Resource is the same size — declared once in `packages/app/src/resource.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the Resource, not the reverse, which is why a measured DOM size never decides placement.
 - **No speaker view, timer, transitions or export to another presentation format.** They return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).

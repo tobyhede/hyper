@@ -27,7 +27,7 @@ const TARGET_GRAPH_ID = uuidSchema.parse('d9999999-9999-4999-8999-999999999999')
 const LINK_RESOURCE_ID = uuidSchema.parse('dabababa-abab-4bab-8bab-abababababab');
 const PICTURE_ID = uuidSchema.parse('dcdcdcdc-dcdc-4cdc-8cdc-dcdcdcdcdcdc');
 
-const runHyperCommand = (args: readonly string[]) => runHyperScript('hyper', args);
+const runHyperCommand = (args: readonly string[]) => runHyperScript(args);
 
 /**
  * The Space the Meta below points at, carrying the Map and Graph that Space
@@ -144,12 +144,12 @@ describe('hyper CLI', () => {
   /*
    * Every Hyper row, before each case rather than a list of the ids one created.
    *
-   * The two lifecycle doors are whole-aggregate doors: `--dangerous-truncate`
+   * The two lifecycle doors are whole-aggregate doors: `--dangerous-replace`
    * deletes rows this file never named, and an id-less Resource in a fixture is
    * minted during import, so a per-id cleanup list cannot be written from what
-   * the test knows. Clearing up front also gives the `hyper` startup cases the
-   * empty repository they assert against, rather than inheriting whatever the
-   * previous case left. Safe because `fileParallelism` is off: one integration
+   * the test knows. Clearing up front also gives every import the empty
+   * repository it asserts against, rather than inheriting whatever the previous
+   * case left. Safe because `fileParallelism` is off: one integration
    * file at a time owns the single `DATABASE_URL`.
    */
   beforeEach(clearHyperContent);
@@ -182,7 +182,7 @@ describe('hyper CLI', () => {
       '---\ntitle: Opening\n---\nDurable CLI body.\n',
     );
 
-    const result = await runHyperCommand([directory]);
+    const result = await runHyperCommand(['import', directory]);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(
@@ -218,7 +218,7 @@ describe('hyper CLI', () => {
       metaSpaceSnapshot,
     ]);
 
-    const result = await runHyperCommand([directory]);
+    const result = await runHyperCommand(['import', directory]);
 
     // Reported in stored id order, which is `loadEverySpace`'s. That puts the
     // ordinary Space first and Meta second — the opposite of what an importer
@@ -262,16 +262,16 @@ describe('hyper CLI', () => {
       },
     ]);
 
-    const result = await runHyperCommand([directory]);
+    const result = await runHyperCommand(['import', directory]);
 
     // There is no third outcome to fall into. Import either establishes first
-    // state or, with `--dangerous-truncate`, replaces it; adding a Space beside
+    // state or, with `--dangerous-replace`, replaces it; adding a Space beside
     // stored content is not a mode (ADR 0078), so an initialized
     // repository is told what it holds and what flag would replace it.
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      `The repository is already initialized as Meta Space ${UNRELATED_SPACE_ID}. Re-run with --dangerous-truncate to replace it.\n`,
+      `The repository is already initialized as Meta Space ${UNRELATED_SPACE_ID}. Re-run with --dangerous-replace to replace it.\n`,
     );
     await expect(repository.listSpaces()).resolves.toEqual([
       { id: UNRELATED_SPACE_ID, title: 'Unrelated talk' },
@@ -358,7 +358,7 @@ describe('hyper CLI', () => {
     // The repository is initialized, so re-importing what it just wrote needs
     // the destructive flag — which is the round trip worth proving. Without it
     // the command would refuse, and the two halves would never meet.
-    const reimported = await runHyperCommand([destination, '--dangerous-truncate']);
+    const reimported = await runHyperCommand(['import', destination, '--dangerous-replace']);
     expect(reimported).toEqual({
       status: 0,
       stdout:
@@ -402,11 +402,11 @@ describe('hyper CLI', () => {
     await mkdir(join(source, 'images'));
     await writeFile(join(source, 'images', `${image.id}.png`), pngBytes(1));
 
-    expect((await runHyperCommand([source])).status).toBe(0);
+    expect((await runHyperCommand(['import', source])).status).toBe(0);
     await expect(repository.loadImage(image.id)).resolves.toEqual(image);
 
     const destination = await temporaryDirectory('hyper-cli-images-');
-    expect((await runHyperCommand(['export', destination])).status).toBe(0);
+    expect((await runHyperCommand(['export', destination, '--store', 'postgres'])).status).toBe(0);
     expect(new Uint8Array(await readFile(join(destination, 'images', `${image.id}.png`)))).toEqual(
       pngBytes(1),
     );
@@ -423,7 +423,7 @@ describe('hyper CLI', () => {
     const resourcePath = join(directory, MALFORMED_SPACE_ID, 'resources', 'broken.md');
     await writeFile(resourcePath, 'Missing frontmatter.\n');
 
-    const result = await runHyperCommand([directory]);
+    const result = await runHyperCommand(['import', directory]);
 
     expect(result.status).not.toBe(0);
     expect(result.stdout).toBe('');

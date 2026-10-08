@@ -9,10 +9,10 @@ An **Aggregate directory** is Hyper's on-disk form: `hyper.json` naming the Meta
 
 ## Steps
 
-1. **Stop the run.** If `pnpm start` is running on this directory, stop it (Ctrl-C, or SIGINT to the process group you started) and wait for it to exit. A running Hyper writes every file it owns from memory after every edit, so its next write replaces anything you change in those files underneath it.
-   Done when nothing is serving the directory: `pgrep -fl "start-run.ts.*<dir>"` prints nothing.
+1. **Stop the run.** If `pnpm hyper run` is running on this directory, stop it (Ctrl-C, or SIGINT to the process group you started) and wait for it to exit. A running Hyper writes every file it owns from memory after every edit, so its next write replaces anything you change in those files underneath it.
+   Done when nothing is serving the directory: `pgrep -fl "run-process.ts run <dir>"`, with `<dir>` absolute, prints nothing.
 
-2. **Read what is there.** If the directory exists, read `hyper.json`, every Space's `space.json` and its Resource files, and check `git -C <dir> status` so your change starts from a clean or known state. A new directory needs a `hyper.json`, and a Meta Space directory with a `space.json`, before anything else.
+2. **Read what is there.** If the directory exists, read `hyper.json`, every Space's `space.json` and its Resource files, and check `git -C <dir> status` so your change starts from a clean or known state. A new directory needs a `hyper.json`, and a Meta Space directory with a `space.json`, before anything else: `pnpm hyper init <dir>` from the Hyper clone writes both to a missing or empty directory.
    Done when you can name the Meta Space, every Space, and the Ids of the Maps, Graphs and Resources you will touch.
 
 3. **Write the change.** Follow the reference. The rules that most often refuse a hand-written directory:
@@ -26,7 +26,7 @@ An **Aggregate directory** is Hyper's on-disk form: `hyper.json` naming the Meta
 
    Done when every file you meant to add or change is written.
 
-4. **Check it.** Start a run headless on the directory: `pnpm start <dir> --no-open --port <free port>` from the Hyper clone. A refused directory exits non-zero and prints each problem, naming a file by its path and a broken reference by its Space and Ids; fix them and repeat, since a second round of problems can follow the first. When it prints `Running <dir> at <url>`, stop it with SIGINT.
+4. **Check it.** Start a run headless on the directory: `pnpm hyper run <dir> --no-open --port <free port>` from the Hyper clone. A refused directory exits non-zero and prints each problem, naming a file by its path and a broken reference by its Space and Ids; fix them and repeat, since a second round of problems can follow the first. When it prints `Running <dir> at <url>`, stop it with SIGINT.
    Done when a run starts cleanly and has been stopped.
 
 5. **Expect the canonical rewrite.** Hyper rewrites what it reads in a fixed form the first time an edit is written: every Resource becomes `resources/<id>.md`, minted Ids are filled in, and opening a Space that names no `defaultMap` records one, which is itself an edit. Starting and stopping a run with no edit changes nothing. Tell the person to review the diff and commit in the content directory's own repository.

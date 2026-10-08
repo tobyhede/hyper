@@ -106,18 +106,17 @@ export const runCommand = (
   });
 
 /**
- * Run one `hyper` package script as its own process, as an operator would.
+ * Run the `hyper` package script as its own process, as an operator would.
  *
- * `script` is the target: `hyper` is PostgreSQL and `hyper:sqlite` is SQLite.
- * `env` is added to this process's environment, which is how a SQLite case
- * names the file it owns.
+ * `--store` in `args` chooses the database, PostgreSQL by default. `env` is
+ * added to this process's environment, which is how a SQLite case names the
+ * file it owns.
  */
 export const runHyperScript = (
-  script: 'hyper' | 'hyper:sqlite',
   args: readonly string[],
   env: Readonly<Record<string, string>> = {},
 ): Promise<CommandResult> =>
-  runCommand('pnpm', ['--silent', script, '--', ...args], {
+  runCommand('pnpm', ['--silent', 'hyper', '--', ...args], {
     env,
     timeoutLabel: 'hyper CLI command',
   });

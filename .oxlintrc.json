@@ -303,7 +303,7 @@
         "packages/react-flow-adapter/test/GraphHud.test.tsx",
         "test/unit/raw-http-request.test.ts",
         "test/unit/vite-hono-host.test.ts",
-        "test/integration/start-command.test.ts",
+        "test/integration/run-command.test.ts",
         "test/unit/vite-space-http-plugin.test.ts",
         "test/support/refusing-postgres-server.ts",
         "test/support/unowned-react-updates.ts"
@@ -393,7 +393,11 @@
       // a name to dodge a linter is worse than a scoped exception.
       // `failure-message.ts` is that narrowing itself, extracted so the five
       // copies of it became one; `command-outcomes.ts` is the one place a
-      // chrome command's throw is caught, reported and described. Two are
+      // chrome command's throw is caught, reported and described. The CLI has
+      // its own copy of the narrowing, `src/cli/describe-error.ts`, and two
+      // reporters that receive the caught value and pass it there:
+      // `database-command.ts`'s `reportImportFileError` and `run-process.ts`'s
+      // `.catch` callbacks. Two are
       // genuine external contracts, not our own seam: `SpaceApp.tsx`'s
       // `getDerivedStateFromError` overrides React's own lifecycle method
       // signature, and `space-authoring.test.ts`'s
@@ -415,9 +419,9 @@
         "packages/app/test/space-authoring.test.ts",
         "packages/http/src/index.ts",
         "packages/persistence/src/session.ts",
-        "src/cli/main.ts",
-        "src/cli/run.ts",
-        "scripts/start-run.ts",
+        "src/cli/describe-error.ts",
+        "src/cli/database-command.ts",
+        "src/cli/run-process.ts",
         "src/aggregate-directory/space-directory.ts"
       ],
       "rules": {

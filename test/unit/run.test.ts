@@ -19,6 +19,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
 import {
   RUN_QUIET_MILLISECONDS,
+  initAggregate,
   startRun,
   type Run,
   type RunEvent,
@@ -134,6 +135,29 @@ const renameMeta = async (run: Run, title: string): Promise<void> => {
 };
 
 const writes = (events: readonly RunEvent[]) => events.filter(({ kind }) => kind === 'written');
+
+/** Each directory `init` and a run both read as empty, made under `root`. */
+const EMPTY_DIRECTORIES = [
+  ['missing', (root: string) => Promise.resolve(join(root, 'new-talk'))],
+  [
+    'empty',
+    async (root: string) => {
+      const directory = join(root, 'new-talk');
+      await mkdir(directory);
+      return directory;
+    },
+  ],
+  [
+    'dot-entries-only',
+    async (root: string) => {
+      const directory = join(root, 'new-talk');
+      await mkdir(join(directory, '.git'), { recursive: true });
+      await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+      await writeFile(join(directory, '.DS_Store'), 'finder\n');
+      return directory;
+    },
+  ],
+] as const;
 
 describe('Running an Aggregate directory', () => {
   it('serves the directory it was started on', async () => {
@@ -277,64 +301,19 @@ describe('Running an Aggregate directory', () => {
     expect(await filesUnder(directory)).toEqual(before);
   });
 
-  it.each([
-    ['missing', (root: string) => Promise.resolve(join(root, 'new-talk'))],
-    [
-      'empty',
-      async (root: string) => {
-        const directory = join(root, 'new-talk');
-        await mkdir(directory);
-        return directory;
-      },
-    ],
-    [
-      'dot-entries-only',
-      async (root: string) => {
-        const directory = join(root, 'new-talk');
-        await mkdir(join(directory, '.git'), { recursive: true });
-        await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
-        await writeFile(join(directory, '.DS_Store'), 'finder\n');
-        return directory;
-      },
-    ],
-  ])('establishes the new Space in a %s directory and writes it at once', async (_, make) => {
-    const directory = await make(await temporaryRoot());
-    const { start } = await started(directory);
-    const run = running(start);
+  it.each(EMPTY_DIRECTORIES)(
+    'refuses a %s directory as holding no aggregate, and writes nothing',
+    async (_, make) => {
+      const root = await temporaryRoot();
+      const directory = await make(root);
+      const before = await filesUnder(root);
+      const { start, events } = await started(directory);
 
-    const aggregateFile: unknown = JSON.parse(
-      await readFile(join(directory, AGGREGATE_FILE_NAME), 'utf8'),
-    );
-    expect(aggregateFile).toMatchObject({ version: 1 });
-    const spaces = await backendFor(run).listSpaces();
-    expect(spaces).toHaveLength(1);
-    expect(spaces[0]?.title).toBe('New space');
-    const spaceId = spaces[0]?.id ?? '';
-    expect(await spaceTitle(directory, spaceId)).toBe('New space');
-    await run.stop();
-  });
-
-  /*
-   * A fresh `git init` leaves only `.git`, and Finder leaves `.DS_Store`:
-   * neither is content, so the run establishes the new Space beside them and
-   * leaves them as it found them.
-   */
-  it('keeps the dot-entries of a directory it establishes the new Space in', async () => {
-    const directory = join(await temporaryRoot(), 'new-talk');
-    await mkdir(join(directory, '.git'), { recursive: true });
-    await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
-    await writeFile(join(directory, '.DS_Store'), 'finder\n');
-    const { start } = await started(directory);
-    await running(start).stop();
-
-    await expect(readFile(join(directory, AGGREGATE_FILE_NAME), 'utf8')).resolves.toContain(
-      '"version"',
-    );
-    await expect(readFile(join(directory, '.git', 'HEAD'), 'utf8')).resolves.toBe(
-      'ref: refs/heads/main\n',
-    );
-    await expect(readFile(join(directory, '.DS_Store'), 'utf8')).resolves.toBe('finder\n');
-  });
+      expect(start.kind).toBe('empty');
+      expect(events).toEqual([]);
+      expect(await filesUnder(root)).toEqual(before);
+    },
+  );
 
   it('writes a picture uploaded during the run to images/', async () => {
     const directory = await fixtureCopy();
@@ -400,6 +379,72 @@ describe('Running an Aggregate directory', () => {
     expect(start.kind).toBe('aggregate-refused');
     if (start.kind !== 'aggregate-refused') return;
     expect(start.diagnostics.length).toBeGreaterThan(0);
+    expect(await filesUnder(directory)).toEqual(before);
+  });
+});
+
+describe('Initializing an Aggregate directory', () => {
+  it.each(EMPTY_DIRECTORIES)(
+    'writes a new aggregate to a %s directory, which a run then serves',
+    async (_, make) => {
+      const directory = await make(await temporaryRoot());
+
+      await expect(initAggregate(directory, newUuid)).resolves.toEqual({ kind: 'initialized' });
+
+      const aggregateFile: unknown = JSON.parse(
+        await readFile(join(directory, AGGREGATE_FILE_NAME), 'utf8'),
+      );
+      expect(aggregateFile).toMatchObject({ version: 1 });
+      const { start, events } = await started(directory);
+      const run = running(start);
+      const spaces = await backendFor(run).listSpaces();
+      expect(spaces).toHaveLength(1);
+      expect(spaces[0]?.title).toBe('New space');
+      expect(await spaceTitle(directory, spaces[0]?.id ?? '')).toBe('New space');
+      await run.stop();
+      expect(events).toEqual([]);
+    },
+  );
+
+  /*
+   * A fresh `git init` leaves only `.git`, and Finder leaves `.DS_Store`:
+   * neither is content, so `init` writes the new aggregate beside them and
+   * leaves them as it found them.
+   */
+  it('keeps the dot-entries of the directory it writes the new aggregate to', async () => {
+    const directory = join(await temporaryRoot(), 'new-talk');
+    await mkdir(join(directory, '.git'), { recursive: true });
+    await writeFile(join(directory, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+    await writeFile(join(directory, '.DS_Store'), 'finder\n');
+
+    await initAggregate(directory, newUuid);
+
+    await expect(readFile(join(directory, AGGREGATE_FILE_NAME), 'utf8')).resolves.toContain(
+      '"version"',
+    );
+    await expect(readFile(join(directory, '.git', 'HEAD'), 'utf8')).resolves.toBe(
+      'ref: refs/heads/main\n',
+    );
+    await expect(readFile(join(directory, '.DS_Store'), 'utf8')).resolves.toBe('finder\n');
+  });
+
+  it.each([
+    ['an Aggregate directory', fixtureCopy],
+    [
+      'a single file',
+      async () => {
+        const directory = join(await temporaryRoot(), 'notes');
+        await mkdir(directory);
+        await writeFile(join(directory, 'NOTES.txt'), 'kept\n');
+        return directory;
+      },
+    ],
+  ])('refuses a directory holding %s, and writes nothing', async (_, make) => {
+    const directory = await make();
+    const before = await filesUnder(directory);
+
+    await expect(initAggregate(directory, newUuid)).resolves.toEqual({ kind: 'not-empty' });
+
     expect(await filesUnder(directory)).toEqual(before);
   });
 });
