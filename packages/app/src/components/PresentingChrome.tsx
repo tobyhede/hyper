@@ -66,13 +66,11 @@ function availableCommands(
 }
 
 /**
- * The presenter's controls, fixed to the screen rather than drawn on the canvas.
+ * The presenter's controls, drawn in the Stage's strip below the frame.
  *
- * At a zoom where the active resource is legible, a fork's branch resources are not in
- * frame — a neighbour cannot be both far enough off-axis to read as a direction
- * and close enough to stay in a 16:9 viewport (ADR 0027). That does not need
- * fixing on the canvas; what the presenter needs is to understand their options,
- * and enumerating them here does that while the camera still frames one resource.
+ * The Stage shows one Resource and no Map, so a fork's branches are not on
+ * screen; what the presenter needs is to understand their options, and
+ * enumerating them here does that.
  *
  * A line renders as a one-item list: the degenerate fork, not a second mode
  * (ADR 0024). A sink renders as none, marking the end of this traversal. Zero,
@@ -80,7 +78,7 @@ function availableCommands(
  * Graph is linear.
  *
  * **A move names the action it performs.** Choosing is not going: an unselected
- * move is `Choose <Title>` and selects without moving the camera, while the
+ * move is `Choose <Title>` and selects without moving on, while the
  * selected one is `Go to <Title>` and commits. They are deliberately not radios,
  * toggles or disabled destinations — selection alone is not the completed
  * action, and every control here is a button that does what its name says.
@@ -158,7 +156,7 @@ export function PresentingChrome({
       // chrome actually has rather than the viewport's.
       // React Flow's live Space-key pan activation subscription reaches this
       // chrome outside the canvas, so `.nokey` excludes all of its controls.
-      className="nokey @container absolute inset-x-0 bottom-0 z-20 border-t border-border bg-background/90"
+      className="nokey @container border-t border-border bg-background"
     >
       <div className="flex items-center gap-4 p-3 @max-3xl:flex-col @max-3xl:items-stretch">
         {/*

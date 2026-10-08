@@ -4,6 +4,7 @@ import type { SpaceBackend } from '@project/persistence';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import type { ImageSources } from './image-creation';
+import type { Fullscreen } from './presenting-fullscreen';
 import type { OpenedApplicationStartup } from './startup';
 import { createOpenSpaces, type OpenSpaces } from './open-spaces';
 
@@ -60,11 +61,15 @@ const browserImageSources = (): ImageSources => {
 /**
  * Compose browser startup around one fixed persistence backend.
  *
- * The four seams default together and for one reason: this is the composition
+ * `fullscreen` is required with no default: `main.tsx` names `document` and
+ * hands it the one adapter over it, and a test supplies a host of its own.
+ *
+ * The other four seams default together and for one reason: this is the composition
  * root, and it is where the ambient browser, the ambient generator and the real
  * transport — for Spaces and for images — are named. Everything below takes each of them required.
  */
 export const createSpaceStartup = (
+  fullscreen: Fullscreen,
   backend: SpaceBackend = new HttpSpaceBackend(),
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
@@ -86,6 +91,7 @@ export const createSpaceStartup = (
         newId,
         history,
         images,
+        fullscreen,
       });
     });
     owner = opening;

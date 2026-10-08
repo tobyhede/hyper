@@ -9,6 +9,7 @@ import { beginRename, dock, exitSpaceItem } from './command-dock';
 import { expectMenuGroups } from './menu-assertions';
 import { selectResource } from './resource-selection';
 import { unusedImageSources } from './image-sources';
+import { refusingFullscreen } from './fullscreen';
 
 /**
  * Entering a Space Resource from its rail (ADR 0068, ADR 0073).
@@ -171,6 +172,7 @@ async function mount(): Promise<OpenSpaces> {
     [meta, home, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
   );
   const spaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,

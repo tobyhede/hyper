@@ -104,7 +104,6 @@ export function EmbeddedMapAuthoring({
     setEditingResourceBody,
     setEditingResourceTitle,
   } = useMapSurface(entry.app, composition, {
-    activeResourceId: null,
     presenting: false,
     spaceOnCanvas: policy === 'authoring' && spaceOnCanvas,
     creatingSpaceResource: false,

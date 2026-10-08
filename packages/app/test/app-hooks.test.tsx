@@ -388,8 +388,6 @@ describe('useCanvasRendering', () => {
         projection: view.projection,
         mapPlacement: view.mapPlacement,
         activeGraphId: GRAPH_ID,
-        activeResourceId: null,
-        presenting: false,
       }),
     );
     expect(result.current.canvas.kind).toBe('placeholder');
@@ -662,6 +660,7 @@ describe('useDockChrome', () => {
         projection: view.projection,
         activeGraphId,
         presenting: false,
+        present: opened.app.navigation.present,
         active: false,
         persistence: { kind: 'settled' },
         replacementEpoch: 0,

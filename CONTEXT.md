@@ -212,8 +212,12 @@ Every open Space records its **Opener**: the Space it was Entered from, or none 
 _Avoid_: rail (that is a Resource's toolbar), tab (that is a browser's), stack (the model in which selecting an outer Space closes everything inside it, considered and rejected), breadcrumb, depth, parent step and step back (for the Opener and the control that names it), switcher (it named the set after `switchTo`, the operation that spends it; the Command Dock's disclosure over the set is the Open Spaces menu).
 
 **Presenting**:
-Traversing a Graph through a Map for an audience, drawn close enough that one Resource fills the screen. At the Active Resource, the presenter follows one of the Active Graph's outgoing Edges. A Graph that is a line traverses as a line; a Graph that forks offers a choice. There is no separate artefact and no second surface — a presentation is not an artefact a Graph is turned into, it is a way of moving through one.
+Traversing a Graph through a Map for an audience, one Resource at a time on the **Stage**. At the Active Resource, the presenter follows one of the Active Graph's outgoing Edges. A Graph that is a line traverses as a line; a Graph that forks offers a choice. There is no separate artefact — a presentation is not an artefact a Graph is turned into, it is a way of moving through one.
 _Avoid_: deck, slide, step, slideshow, playback, present mode (that is a mode name, not the activity).
+
+**Stage**:
+The surface presenting draws on, in place of the canvas: the Active Resource's content, filling the screen. The Stage draws a Resource by its kind, never by how the Resource is placed, sized, shaped or Opened on a Map — those are the Map's, and the audience does not see the Map. The Stage offers no authoring: to change what a presentation can reach, the author leaves presenting, changes the Map or Graph, and presents again. Leaving presenting returns to the canvas exactly as it was left, because presenting never moved it.
+_Avoid_: slide (retired with deck), viewer, presenter view, canvas (the canvas is where a Map is drawn and authored, and presenting no longer draws there).
 
 **Graph navigation**:
 Moving keyboard focus through the Active Graph while working in its Map. It uses the same fork, merge, cycle, and backtracking rules as Presenting but remains a separate transient interaction rather than an audience-facing presentation.

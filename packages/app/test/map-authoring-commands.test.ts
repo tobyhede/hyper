@@ -23,6 +23,7 @@ import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { refusingFullscreen } from './fullscreen';
 
 /** Where these tests' Map creations continue; what it names is not under test here. */
 const CONTINUE_IN_NAME: MapCreateContinuation = {
@@ -98,6 +99,7 @@ const target: SpaceSnapshot = {
 
 const openSpaces = (control?: MemorySpaceBackendTestControl) =>
   createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend: new MemorySpaceBackend(
       META,

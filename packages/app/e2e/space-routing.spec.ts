@@ -1,7 +1,7 @@
 import { encodeCompactUuid, uuidSchema } from '@project/core';
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
-import { mapMenu, expectMenuGroups, graphMenu, spaceMenu } from './graph';
+import { mapMenu, expectMenuGroups, graphMenu, presentedName, spaceMenu } from './graph';
 import { SEEDED_GRAPH_ID, SEEDED_MAP_ID, seedPositionedMap } from './seed';
 
 const FIXTURE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
@@ -471,16 +471,12 @@ test('an exact presentation link starts fresh at its Resource and moves through 
 
   expect((await page.goto(atB))?.status()).toBe(200);
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(page.locator(`.react-flow__node[data-id="${RESOURCE_B_ID}"]`)).toHaveClass(
-    /rf-resource-node--active/,
-  );
+  await expect(presentedName(page)).toHaveText('B');
   await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
   await page.reload();
   await expect(page).toHaveURL(atB);
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(page.locator(`.react-flow__node[data-id="${RESOURCE_B_ID}"]`)).toHaveClass(
-    /rf-resource-node--active/,
-  );
+  await expect(presentedName(page)).toHaveText('B');
   await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
 
   await page.keyboard.press('ArrowRight');

@@ -11,7 +11,7 @@ import { markdownSource, PRIMARY_MODIFIER } from './markdown-source';
 import {
   AUTHORING_HANDLE_SIDES,
   activateGraph,
-  activeResource,
+  presentedName,
   activeGraph,
   beginRename,
   allPositions,
@@ -457,13 +457,11 @@ test('the Markdown editor code loads only when a Markdown Resource opens', async
  * The flat paper treatment ADR 0051 settled: cream face, heavy ink rule, and a
  * mono body that is the writing surface rather than a form control.
  *
- * Pinned because nothing else asserts it. The treatment's rules and the general
- * `.resource--full` rules they override have equal specificity, so only source
- * order separates them — the same cascade trap `presenting.spec.ts` pins for
- * `.resource--full`. With the treatment colocated in its own stylesheet, that order
- * is a fact about the module graph rather than about one file's line
- * numbers, and a reordered import would silently return the editor to the
- * generic dark pane with every other assertion still green.
+ * Pinned because nothing else asserts it. With the treatment colocated in its
+ * own stylesheet, the cascade it wins is a fact about the module graph rather
+ * than about one file's line numbers, and a reordered import would silently
+ * return the editor to the generic dark pane with every other assertion still
+ * green.
  */
 test('the opened Resource draws Markdown and its editor on the same paper surface', async ({
   page,
@@ -2661,74 +2659,50 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeResource(page)).toHaveAttribute(
-    'data-id',
-    '00000000-0000-4000-8000-000000000008',
-  );
+  await expect(presentedName(page)).toHaveText('E');
   await expect(page.getByTestId('presenting-moves').getByRole('button')).toHaveText('A');
 
   await page.keyboard.press('ArrowRight');
-  await expect(activeResource(page)).toHaveAttribute(
-    'data-id',
-    '00000000-0000-4000-8000-000000000002',
-  );
+  await expect(presentedName(page)).toHaveText('A');
   await page.keyboard.press('ArrowLeft');
-  await expect(activeResource(page)).toHaveAttribute(
-    'data-id',
-    '00000000-0000-4000-8000-000000000008',
-  );
+  await expect(presentedName(page)).toHaveText('E');
 });
 
-test('an Edge drawn from the presented Resource is a move the presenter can take now', async ({
+test('no connection handle is visible or reachable on the presented Resource or a neighbour', async ({
   page,
 }) => {
-  const A = '00000000-0000-4000-8000-000000000002';
   await page.goto('/');
-  await selectCanvas(page, 'Collection 1');
-  await addExistingResource(page, 'E');
   const a = nodeByTitle(page, 'A').first();
+  const b = nodeByTitle(page, 'B').first();
   await expect(a).toBeVisible();
-
-  // Explicit creation preserves Long, whose A → B move is immediately
-  // presentable; the gesture below adds a second move while presenting.
-  const persistence = page.getByTestId('persistence-status');
-  await expect(persistence).toHaveAttribute('data-revision', '1');
   await settled(page);
-  // The gesture below is made from the presented Resource, so A has to be selected
-  // going in.
+  // Selected going in, so the selected-Resource reveal is in play as well as
+  // the hover one.
   await a.click();
   await expect(a).toHaveClass(/selected/);
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeResource(page)).toHaveAttribute('data-id', A);
-  const moves = page.getByTestId('presenting-moves').getByRole('button');
-  await expect(moves).toHaveText(['B']);
-  // The presenting camera closes in over two animated moves; a handle box read
-  // during them is stale by the time the mouse arrives.
+  await expect(presentedName(page)).toHaveText('A');
   await settled(page);
+  // By coordinates: the Stage covers the canvas while presenting, so
+  // Playwright's actionable hover would wait on it forever.
+  const presented = await boxOf(a, 'the presented Resource');
+  await page.mouse.move(presented.x + presented.width / 2, presented.y + presented.height / 2);
 
-  // A self-Edge is valid authored structure (ADR 0032), and it is the Edge this
-  // gesture can reach: at a zoom where the active Resource is legible every other
-  // Resource is provably off frame (ADR 0027), so the presented Resource's own handles
-  // are the only ones on screen.
-  await connectHandles(
-    page,
-    authoringHandle(activeResource(page), 'source', 'right'),
-    authoringHandle(activeResource(page), 'target', 'left'),
-  );
-
-  // Attached rather than visible: with one Graph on the Resource its inbound and
-  // outbound handles sit at the same height, so a self-Edge is a flat line whose
-  // box has no height — which Playwright reads as hidden. The moves below are
-  // what prove it was authored.
-  await expect(page.getByLabel(new RegExp(`^Edge from A to A in `))).toBeAttached();
-  await expect(persistence).toHaveAttribute('data-revision', '2');
-  await expect(persistence).toHaveText('Persisted');
-
-  // The chrome enumerates the active Resource's outgoing Edges, so the Edge just
-  // drawn is available without leaving and re-entering presentation.
-  await expect(moves).toHaveText(['B', 'A']);
+  for (const [node, handles] of [
+    [a, a.locator('.rf-resource-node__authoring-handle')],
+    [b, b.locator('.rf-resource-node__authoring-handle')],
+  ] as const) {
+    await expect(node).toBeAttached();
+    await expect(handles).toHaveCount(8);
+    for (const handle of await handles.all()) {
+      await expect(handle).toHaveCSS('opacity', '0');
+      await expect(handle).toHaveCSS('pointer-events', 'none');
+      await expect(handle).not.toHaveClass(/connectable/);
+      await expect(handle).not.toHaveAttribute('aria-label');
+    }
+  }
 });
 
 /**

@@ -187,12 +187,8 @@ export type ResourceNodeData = {
    */
   contextNotice?: string | null;
   /**
-   * What this Resource shows now: Closed with no content, or Open or presented
-   * with its resolved content, its own or its Target's.
-   *
-   * A Resource both presented and Open is `presented`, decided here and nowhere
-   * else. `open` stays beside it as the Map's authored geometry — z-order,
-   * resize and displacement read it — and never chooses what is drawn.
+   * What this Resource shows now: Closed with no content, or Open with its
+   * resolved content, its own or its Target's.
    */
   display: ResourceDisplay;
   /**
@@ -200,7 +196,6 @@ export type ResourceNodeData = {
    * its entry stores none — and drawn Open and Closed alike (ADR 0121).
    */
   shape: ResourceShape;
-  active: boolean;
   /** Ordinary renderer selection, kept outside the authored Space. */
   selectedForAuthoring: boolean;
   /** The graph being emphasised, if any. Drives handle dimming. */
@@ -234,16 +229,8 @@ export interface ProjectResourceNodesOptions {
    *  and React Flow draws no Edge at all for a Resource whose handles it cannot
    *  resolve (ADR 0087) — so this withholds the affordance, not the anchor. */
   readOnly?: boolean;
-  /** Resource id reached during traversal, if any, to flag as active. */
-  activeResourceId?: ResourceId | null;
   /** Ordinary renderer selection used to expose continued-authoring handles. */
   selectedResourceId?: ResourceId | null;
-  /**
-   * Draw the active resource's content instead of its title — what presenting does
-   * (ADR 0027). Only the active resource is affected, so this costs one resource's body
-   * in the projection rather than every resource's.
-   */
-  showActiveResourceContent?: boolean;
   /** The graph to emphasise, if any. */
   activeGraphId?: GraphId | null;
   /** The active Graph's resolved colour for graph authoring controls. */
@@ -309,8 +296,6 @@ export function projectResourceNodes(
   space: Space,
   options: ProjectResourceNodesOptions = {},
 ): ResourceFlowNode[] {
-  const activeResourceId = options.activeResourceId ?? null;
-  const showActiveResourceContent = options.showActiveResourceContent ?? false;
   const activeGraphId = options.activeGraphId ?? null;
   const visible = options.resourceIds ? new Set(options.resourceIds) : null;
   const laidOut = new Map((options.strategyGraph?.resources ?? []).map((r) => [r.id, r]));
@@ -319,15 +304,11 @@ export function projectResourceNodes(
 
   return source.map((resource) => {
     const placedResource = laidOut.get(resource.id);
-    const active = resource.id === activeResourceId;
-    // Only the active Resource is presented, never the whole graph (ADR 0027).
-    const presented = active && showActiveResourceContent;
     // Every Resource kind Opens, so the Map's Open set is the whole answer and
     // there is no kind guard beside it.
     const open = options.openResourceIds?.has(resource.id) === true;
-    const shown = presented ? 'presented' : open ? 'open' : 'closed';
     const content = resolveResourceContent(space, resource);
-    const display: ResourceDisplay = shown === 'closed' ? CLOSED_DISPLAY : { shown, content };
+    const display: ResourceDisplay = open ? { shown: 'open', content } : CLOSED_DISPLAY;
     const node: ResourceFlowNode = {
       id: resource.id,
       type: 'resource',
@@ -339,14 +320,13 @@ export function projectResourceNodes(
         kind: resource.kind,
         contentAction: contentAction(content),
         embedsMap: embedsMap(content),
-        active,
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         display,
         shape: options.resourceShape?.(resource.id) ?? DEFAULT_RESOURCE_SHAPE,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
       },
-      className: active ? 'rf-resource-node rf-resource-node--active' : 'rf-resource-node',
+      className: 'rf-resource-node',
     };
     // Carry the map's dimensions through when it has placed the resource. Every
     // strategy works at a fixed `RESOURCE_SIZE`, so declaring width/height

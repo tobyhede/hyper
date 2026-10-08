@@ -5,7 +5,6 @@ import { COLLAPSED_RESOURCE_SIZE, encodeCompactUuid, uuidSchema, type UUID } fro
 import { decodeLoadedSpace } from '@project/persistence';
 import { expect, test, type Locator, type Page } from './fixtures';
 import {
-  activeResource,
   boxOf,
   createResource,
   dock,
@@ -16,12 +15,16 @@ import {
   nodeByTitle,
   openResource,
   presentControl,
+  presentedName,
+  presentedResource,
   resourceActions,
   resourceControls,
   selectedCanvas,
   selectCanvas,
   newMap,
   settled,
+  stageBody,
+  stageFrame,
 } from './graph';
 import { expectPictureLoaded, HARBOUR_SIZE } from './image';
 import { SEEDED_MAP_ID, seedPositionedMap } from './seed';
@@ -30,6 +33,8 @@ const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000a1');
 const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 const HARBOUR_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000076');
 const FIGURE_URL = 'https://example.com/figure.png';
+/** A picture many times the size of any frame the Stage draws. */
+const OVERSIZED = { width: 4000, height: 3000 } as const;
 /**
  * The tracked fixture's 400×300 picture, served in place of the external URL so
  * nothing reaches the network.
@@ -237,21 +242,55 @@ test('a longer Title takes its room from the picture, not from the size', async 
   expect(bottom).toBeLessThanOrEqual(titleBox.y + 1);
 });
 
-/** Presenting an Image Resource draws its picture, named by the Resource. */
+/** Presenting an Image Resource draws its picture on the Stage, named by the Resource. */
 test('presenting an Image Resource draws its picture', async ({ page }) => {
   await serveFigure(page);
   await openPictures(page, { presentable: true });
   await presentControl(page).click();
-  await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeResource(page)).toHaveAttribute('data-id', IMAGE_ID);
+  await expect(presentedName(page)).toHaveText('Figure');
 
-  const content = activeResource(page).getByTestId('resource-content');
-  await expect(content.locator('.resource__title')).toHaveText('Figure');
-  const picture = content.getByRole('img', { name: 'Figure' });
+  const picture = presentedResource(page).getByRole('img', { name: 'Figure' });
   await expect(picture).toHaveAttribute('src', FIGURE_URL);
   await expectPictureLoaded(picture, HARBOUR_SIZE.width);
   await expect(picture).toBeVisible();
 });
+
+/**
+ * A picture far larger than the frame is fitted inside it, whole: the Stage
+ * neither clips it nor scrolls to show the rest.
+ */
+test(
+  'presenting an oversized picture fits it inside the frame',
+  { tag: '@parity:stage-fits-an-oversized-picture' },
+  async ({ page }) => {
+    await page.route(FIGURE_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'image/svg+xml',
+        body: `<svg xmlns="http://www.w3.org/2000/svg" width="${OVERSIZED.width}" height="${OVERSIZED.height}"><rect width="100%" height="100%" fill="#2a6f97"/></svg>`,
+      }),
+    );
+    await openPictures(page, { presentable: true, naturalSize: OVERSIZED });
+    await presentControl(page).click();
+    await expect(presentedName(page)).toHaveText('Figure');
+
+    const picture = presentedResource(page).getByRole('img', { name: 'Figure' });
+    await expectPictureLoaded(picture, OVERSIZED.width);
+    const frame = await boxOf(stageFrame(page), 'the Stage frame');
+    const room = await boxOf(picture, 'the picture');
+    expect(room.x).toBeGreaterThanOrEqual(frame.x - 0.5);
+    expect(room.y).toBeGreaterThanOrEqual(frame.y - 0.5);
+    expect(room.x + room.width).toBeLessThanOrEqual(frame.x + frame.width + 0.5);
+    expect(room.y + room.height).toBeLessThanOrEqual(frame.y + frame.height + 0.5);
+    // Fitted rather than clipped: the picture keeps its whole aspect inside the
+    // room it is given, and the frame has nothing below it to scroll to.
+    await expect(picture).toHaveCSS('object-fit', 'scale-down');
+    expect(
+      await stageBody(page).evaluate((body) => body.scrollHeight <= body.clientHeight),
+      'the frame scrolls',
+    ).toBe(true);
+  },
+);
 
 /**
  * A picture that will not load is not a refusal (ADR 0106): the Space stays as it

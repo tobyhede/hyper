@@ -16,6 +16,7 @@ import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
+import { refusingFullscreen } from './fullscreen';
 import { CLOSED_DISPLAY } from '@project/ui';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -91,7 +92,6 @@ function resourceNode(): ResourceFlowNode {
       readOnly: false,
       kind: 'markdown',
       ...fixtureFacts('markdown'),
-      active: false,
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,
       activeGraphId: null,
@@ -203,6 +203,7 @@ describe('opening framing on a mounted canvas', () => {
         href: unused,
         dispose: unused,
       },
+      fullscreen: refusingFullscreen,
     };
 
     await mountSettled(
@@ -216,7 +217,6 @@ describe('opening framing on a mounted canvas', () => {
               nodes={[resourceNode()]}
               edges={[]}
               projectedNodes={null}
-              activeResourceId={null}
               presenting={false}
               placementReady={true}
               availability={authoringAvailability({
@@ -345,6 +345,7 @@ describe('opening framing on a mounted canvas', () => {
         href: unused,
         dispose: unused,
       },
+      fullscreen: refusingFullscreen,
     };
 
     await mountSettled(
@@ -357,7 +358,6 @@ describe('opening framing on a mounted canvas', () => {
             nodes={[resourceNode()]}
             edges={[]}
             projectedNodes={null}
-            activeResourceId={null}
             presenting={false}
             placementReady={true}
             availability={authoringAvailability({

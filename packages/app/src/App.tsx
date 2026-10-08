@@ -1,5 +1,12 @@
 import type { DrawnClipboardFailure } from './embedded-publication';
-import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
@@ -8,6 +15,7 @@ import type { OpenSpace } from './open-spaces';
 import { resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
+import { presentingFullscreen, type Fullscreen } from './presenting-fullscreen';
 import type { DestinationOpening } from './destination-opening';
 import { useOpenSpacesStanding } from './open-spaces-context';
 import { useAddressedResource } from './addressed-resource';
@@ -29,12 +37,13 @@ import { ArmedDeleteConfirmation } from './components/DeleteConfirmation';
 import { CommandDock } from './components/CommandDock';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
-import { PresentingChrome } from './components/PresentingChrome';
+import { PresentingStage } from './components/PresentingStage';
 import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/ShellNotice';
 
 export const createApp = (
   opened: OpenSpace,
   browserLocation: BrowserLocation,
+  fullscreen: Fullscreen,
   opening?: DestinationOpening,
 ) => {
   const { app: composition, session: spaceSession, spaceResources } = opened;
@@ -72,6 +81,13 @@ export const createApp = (
   } else if (openingGraphId !== null) {
     navigation.openGraph(navigation.getState().selectedMapId, openingGraphId);
   }
+
+  const presentation = presentingFullscreen(fullscreen, {
+    presenting: () => navigation.getState().mode === 'presenting',
+    subscribe: navigation.subscribe,
+    present: navigation.present,
+    exitPresenting: navigation.exitPresenting,
+  });
 
   function App() {
     const [drawnClipboardFailures, setDrawnClipboardFailures] = useState<
@@ -114,6 +130,7 @@ export const createApp = (
     const { selectedMapId, activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
+    useEffect(() => presentation.connect(), []);
     const { addressedResourceId, destinationNotFound } = useAddressedResource(
       browserLocation,
       useRenderAdapter,
@@ -143,7 +160,6 @@ export const createApp = (
       setEditingResourceTitle,
       setEditingChromeTitle,
     } = useMapSurface(composition, composition.surface, {
-      activeResourceId,
       presenting,
       spaceOnCanvas: active,
       creatingSpaceResource: placement.creatingSpaceResource,
@@ -187,6 +203,7 @@ export const createApp = (
         projection,
         activeGraphId,
         presenting,
+        present: presentation.present,
         active,
         persistence: sessionState.persistence,
         replacementEpoch,
@@ -212,6 +229,12 @@ export const createApp = (
      * window.
      */
     const graphArea = useRef<HTMLDivElement | null>(null);
+    const canvasLayer = useRef<HTMLDivElement | null>(null);
+    // An attribute rather than a prop, because the React this application
+    // runs on does not know `inert`.
+    useLayoutEffect(() => {
+      canvasLayer.current?.toggleAttribute('inert', presenting);
+    }, [presenting]);
 
     return (
       <AppShell
@@ -312,88 +335,94 @@ export const createApp = (
           {dockChrome === null ? null : (
             <CommandDock chrome={dockChrome} container={graphArea} initialEdge="top" />
           )}
-          {canvas.kind === 'failure' ? (
-            <PlacementFailure error={canvas.error} />
-          ) : (
-            // Keyed on the replacement epoch: React Flow's store holds a drag in
-            // flight, and the canvas stays mounted while placement is pending,
-            // so only a new store ends a drag begun in the replaced Space.
-            <ReactFlowProvider key={replacementEpoch}>
-              {canvas.kind === 'placeholder' ? <PlacementPending /> : null}
-              {/* Inside the provider and outside the canvas: it reads React
-                  Flow's viewport for controls that live in the toolbar and in
-                  the panes over the graph. */}
-              <CanvasCentre report={placement.reportVisibleCentre} />
-              {/* The canvas half of where an Edit continues. Inside the
-                  provider because `reveal` moves the camera and because an Edge
-                  subject becomes an element only through the projection React
-                  Flow is drawing. Its chrome half is mounted at the root, since
-                  this subtree is conditional on there being Resources at all. */}
-              <CanvasContinuation
-                continuation={continuation}
-                onSelectResource={canvasRendering.selectResource}
-                onSelectEdge={canvasRendering.selectEdge}
-              />
-              <SpaceCanvas
-                surface={composition.surface}
-                onDrawnClipboardFailuresChange={reportDrawnClipboardFailures}
-                onDrawnSpacesChange={reportDrawnSpaces}
-                commandOutcomes={commandOutcomes}
-                deleteConfirmation={deleteConfirmation}
-                // Keyed on the replacement epoch, so accepting the stored Space
-                // takes the canvas's local editing state with it. The render
-                // adapter already drops the projection and drag bookkeeping, but
-                // an open title editor is the graph's own: it names a Resource from
-                // a Space that is gone, and its raised invalid guard would go on
-                // swallowing clicks in the one that replaced it.
-                key={replacementEpoch}
-                nodes={liveProjection?.nodes ?? []}
-                edges={liveProjection?.edges ?? []}
-                // Null while a replacement placement resolves. The canvas keeps
-                // drawing the Resources on screen through that window — deliberately, so
-                // a gesture is never interrupted — so a connection is reachable
-                // with no fresh projection to hand over, and the store keeps its
-                // live nodes rather than reconciling against nothing.
-                projectedNodes={projected?.nodes ?? null}
-                activeResourceId={activeResourceId}
-                presenting={presenting}
-                placementReady={hasResourcesOnCanvas}
-                availability={availability}
-                onNodesChange={canvasRendering.changeNodes}
-                onEdgesChange={canvasRendering.changeEdges}
-                edgeAuthoring={edgeAuthoring}
-                selection={canvasRendering.selection}
-                onSelectResource={canvasRendering.selectResource}
-                onSelectEdge={canvasRendering.selectEdge}
-                placedResources={view.placedResources}
-                newResourceTitle={view.newResourceTitle}
-                onAddResource={() => placement.createResource('markdown')}
-                onAddExistingResource={placement.dropExistingResource}
-                onPlaceSpace={placement.dropSpace}
-                onDropImages={placement.dropImages}
-                onPasteImageUrl={placement.pasteImageUrl}
-                imageReplacement={composition.imageReplacement}
-                nameOnCreation={nameOnCreation}
-                authoring={composition.surface.authoring}
-                spaceSession={spaceSession}
-                onBodyEditingChange={setEditingResourceBody}
-                onTitleEditingChange={setEditingResourceTitle}
-                resourceResize={canvasRendering.resourceResize}
-                reportEmbeddedMapEditing={canvasRendering.reportEmbeddedMapEditing}
-                spaceTitle={renderedSpace.title}
-                mapId={selectedMapId}
-                mapTitle={selectedMap.map.title}
-                graphs={projection.visibleGraphs}
-                colorByGraphId={projection.colors}
-                activeGraphId={activeGraphId}
-                spaceResourceTargets={spaceResourceTargets.targets}
-                resourceEntityActions={resourceRailActions}
-              />
-            </ReactFlowProvider>
-          )}
+          {/* The canvas layer. Inert while presenting, so nothing on it is
+              reachable, focusable or announced behind the Stage (ADR 0123);
+              it stays mounted, so leaving presenting finds it as it was. */}
+          <div ref={canvasLayer} className="size-full">
+            {canvas.kind === 'failure' ? (
+              <PlacementFailure error={canvas.error} />
+            ) : (
+              // Keyed on the replacement epoch: React Flow's store holds a drag in
+              // flight, and the canvas stays mounted while placement is pending,
+              // so only a new store ends a drag begun in the replaced Space.
+              <ReactFlowProvider key={replacementEpoch}>
+                {canvas.kind === 'placeholder' ? <PlacementPending /> : null}
+                {/* Inside the provider and outside the canvas: it reads React
+                    Flow's viewport for controls that live in the toolbar and in
+                    the panes over the graph. */}
+                <CanvasCentre report={placement.reportVisibleCentre} />
+                {/* The canvas half of where an Edit continues. Inside the
+                    provider because `reveal` moves the camera and because an Edge
+                    subject becomes an element only through the projection React
+                    Flow is drawing. Its chrome half is mounted at the root, since
+                    this subtree is conditional on there being Resources at all. */}
+                <CanvasContinuation
+                  continuation={continuation}
+                  onSelectResource={canvasRendering.selectResource}
+                  onSelectEdge={canvasRendering.selectEdge}
+                />
+                <SpaceCanvas
+                  surface={composition.surface}
+                  onDrawnClipboardFailuresChange={reportDrawnClipboardFailures}
+                  onDrawnSpacesChange={reportDrawnSpaces}
+                  commandOutcomes={commandOutcomes}
+                  deleteConfirmation={deleteConfirmation}
+                  // Keyed on the replacement epoch, so accepting the stored Space
+                  // takes the canvas's local editing state with it. The render
+                  // adapter already drops the projection and drag bookkeeping, but
+                  // an open title editor is the graph's own: it names a Resource from
+                  // a Space that is gone, and its raised invalid guard would go on
+                  // swallowing clicks in the one that replaced it.
+                  key={replacementEpoch}
+                  nodes={liveProjection?.nodes ?? []}
+                  edges={liveProjection?.edges ?? []}
+                  // Null while a replacement placement resolves. The canvas keeps
+                  // drawing the Resources on screen through that window — deliberately, so
+                  // a gesture is never interrupted — so a connection is reachable
+                  // with no fresh projection to hand over, and the store keeps its
+                  // live nodes rather than reconciling against nothing.
+                  projectedNodes={projected?.nodes ?? null}
+                  presenting={presenting}
+                  placementReady={hasResourcesOnCanvas}
+                  availability={availability}
+                  onNodesChange={canvasRendering.changeNodes}
+                  onEdgesChange={canvasRendering.changeEdges}
+                  edgeAuthoring={edgeAuthoring}
+                  selection={canvasRendering.selection}
+                  onSelectResource={canvasRendering.selectResource}
+                  onSelectEdge={canvasRendering.selectEdge}
+                  placedResources={view.placedResources}
+                  newResourceTitle={view.newResourceTitle}
+                  onAddResource={() => placement.createResource('markdown')}
+                  onAddExistingResource={placement.dropExistingResource}
+                  onPlaceSpace={placement.dropSpace}
+                  onDropImages={placement.dropImages}
+                  onPasteImageUrl={placement.pasteImageUrl}
+                  imageReplacement={composition.imageReplacement}
+                  nameOnCreation={nameOnCreation}
+                  authoring={composition.surface.authoring}
+                  spaceSession={spaceSession}
+                  onBodyEditingChange={setEditingResourceBody}
+                  onTitleEditingChange={setEditingResourceTitle}
+                  resourceResize={canvasRendering.resourceResize}
+                  reportEmbeddedMapEditing={canvasRendering.reportEmbeddedMapEditing}
+                  spaceTitle={renderedSpace.title}
+                  mapId={selectedMapId}
+                  mapTitle={selectedMap.map.title}
+                  graphs={projection.visibleGraphs}
+                  colorByGraphId={projection.colors}
+                  activeGraphId={activeGraphId}
+                  spaceResourceTargets={spaceResourceTargets.targets}
+                  resourceEntityActions={resourceRailActions}
+                />
+              </ReactFlowProvider>
+            )}
+          </div>
 
-          {presenting && (
-            <PresentingChrome
+          {presenting && activeResourceId !== null && (
+            <PresentingStage
+              space={renderedSpace}
+              resourceId={activeResourceId}
               moves={moves}
               canRetreat={canRetreat(navigationState)}
               onSelectBranch={navigation.selectBranch}
@@ -401,7 +430,7 @@ export const createApp = (
               onRetreat={navigation.retreat}
               onExit={navigation.exitPresenting}
               onCopyLink={() => {
-                if (activeGraphId === null || activeResourceId === null) return;
+                if (activeGraphId === null) return;
                 // `void`: presenting chrome's Copy link is a plain button with
                 // no label to swap, so it has nothing to do with the outcome
                 // beyond the alert `copyProductDestination` already renders.

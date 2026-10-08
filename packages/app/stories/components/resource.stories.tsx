@@ -13,7 +13,7 @@ import {
   CLOSED_DISPLAY,
   type CanvasResourceFront,
   type CanvasResourceState,
-  type FrontDisplay,
+  type ResourceDisplay,
 } from '@project/ui';
 import { spaceEntityActions } from '#src/entity-actions';
 import { resourceSizeVars } from '#src/resource';
@@ -464,7 +464,7 @@ function Instance({
   // Every kind Opens and Closes through the one operation (ADR 0070), so the
   // Reference Resource carries it too.
   const front: CanvasResourceFront = { kind, onOpenChange: changeOpen };
-  const display: FrontDisplay = open
+  const display: ResourceDisplay = open
     ? {
         shown: 'open',
         content: {

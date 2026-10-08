@@ -14,12 +14,10 @@ export type OwnContent<K extends 'markdown' | 'image'> = Extract<
 > & { readonly via: 'self' };
 
 /**
- * What a Resource shows now. A Closed Resource carries no content (ADR 0006, as
- * narrowed by ADR 0064); an Open or presented one carries its resolved content,
- * its own or its Target's.
- *
- * Presenting and Open are decided between once, where the display is made: a
- * Resource both presented and Open is `presented`.
+ * What a Resource front shows now. A Closed Resource carries no content (ADR
+ * 0006, as narrowed by ADR 0064); an Open one carries its resolved content, its
+ * own or its Target's. Presenting draws on the Stage through
+ * `PresentedResource`, never through a front (ADR 0123).
  *
  * `editing` and `replacing` are made only by `beginEditing` and
  * `beginReplacing`, and carry only the Resource's own content, so a Target's
@@ -29,7 +27,6 @@ export type OwnContent<K extends 'markdown' | 'image'> = Extract<
 export type ResourceDisplay =
   | { readonly shown: 'closed' }
   | { readonly shown: 'open'; readonly content: ResourceContent }
-  | { readonly shown: 'presented'; readonly content: ResourceContent }
   | {
       readonly shown: 'editing';
       readonly content: OwnContent<'markdown'>;
@@ -42,9 +39,6 @@ export type ResourceDisplay =
       readonly content: OwnContent<'image'>;
       readonly replacer: ImageReplaceEditor;
     };
-
-/** What a Resource front draws. A presented Resource is drawn by `PresentedResource`. */
-export type FrontDisplay = Exclude<ResourceDisplay, { readonly shown: 'presented' }>;
 
 /** The one Closed display, so every Closed Resource shares its identity. */
 export const CLOSED_DISPLAY: Extract<ResourceDisplay, { readonly shown: 'closed' }> = {
@@ -93,8 +87,6 @@ export function beginReplacing<D extends ResourceDisplay>(
 type Running = { readonly shown: 'editing' | 'replacing' };
 
 /** The display with no edit or replacement running: `open`, with the same content. */
-export function atRest(display: FrontDisplay): Exclude<FrontDisplay, Running>;
-export function atRest(display: ResourceDisplay): Exclude<ResourceDisplay, Running>;
 export function atRest(display: ResourceDisplay): Exclude<ResourceDisplay, Running> {
   switch (display.shown) {
     case 'editing':
@@ -102,13 +94,12 @@ export function atRest(display: ResourceDisplay): Exclude<ResourceDisplay, Runni
       return { shown: 'open', content: display.content };
     case 'closed':
     case 'open':
-    case 'presented':
       return display;
   }
 }
 
 /**
- * The Space view an Open or presented Resource shows, and whether it is the
+ * The Space view an Open Resource shows, and whether it is the
  * Resource's own or its Target's. A Space reached through a Reference Resource
  * is drawn read-only (ADR 0070). A Closed display shows no Space.
  */
@@ -117,7 +108,6 @@ export function spaceViewOf(
 ): { readonly view: SpaceView; readonly via: ContentVia } | undefined {
   switch (display.shown) {
     case 'open':
-    case 'presented':
       return display.content.kind === 'space'
         ? { view: display.content.view, via: display.content.via }
         : undefined;

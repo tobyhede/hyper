@@ -17,7 +17,7 @@ export type VisibleCentre = () => MapPosition;
  * Hence a getter handed upwards rather than a value: this component subscribes
  * to nothing and re-renders never. `useStoreApi` reads React Flow's store on
  * demand, where the pane's measured size and the live viewport transform both
- * already are — the same store the cameras read, rather than a second
+ * already are — the same store the opening camera reads, rather than a second
  * measurement of the same DOM that could disagree with it.
  *
  * **Do not derive the centre through `screenToFlowPosition`.** It is the right

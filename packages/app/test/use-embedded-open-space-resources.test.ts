@@ -37,7 +37,6 @@ const spaceResource = (resourceId: typeof HOST, mapId: typeof MAP): ResourceFlow
     kind: 'space',
     ...fixtureFacts('space'),
     open: true,
-    active: false,
     selectedForAuthoring: false,
     display: fixtureDisplay(true, 'space', '', { spaceId: TARGET, map: mapId }),
     activeGraphId: null,

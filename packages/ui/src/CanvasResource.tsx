@@ -54,7 +54,7 @@ import { InlineTitleEditor } from './InlineTitleEditor';
 import { ResourceImage } from './ResourceImage';
 import { ImageReplaceTarget } from './ImageReplaceTarget';
 import { UnresolvedContent } from './UnresolvedContent';
-import { atRest, type FrontDisplay } from './resource-display';
+import { atRest, type ResourceDisplay } from './resource-display';
 import {
   resourceShapeOutline,
   type OutlinePoint,
@@ -155,7 +155,7 @@ interface CanvasResourceCommonProps {
    * this alone; the Map's authored Open state reaches it only through the
    * display the projection made from it.
    */
-  readonly display: FrontDisplay;
+  readonly display: ResourceDisplay;
   /**
    * The Shape the Map draws this Resource in (ADR 0121), whatever the display.
    * Absent, as on a front no Map places — a creation ghost, a specimen — the

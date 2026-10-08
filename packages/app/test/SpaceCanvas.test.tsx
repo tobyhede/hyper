@@ -75,7 +75,6 @@ const resourceNode = (
     readOnly: false,
     kind,
     ...fixtureFacts(kind),
-    active: false,
     selectedForAuthoring: false,
     display: CLOSED_DISPLAY,
     activeGraphId: null,
@@ -179,7 +178,6 @@ async function mountGraph(
         nodes={nodes}
         edges={[]}
         projectedNodes={null}
-        activeResourceId={null}
         presenting={false}
         placementReady={editable}
         // The facts a mounted canvas is given, turned into answers by the one

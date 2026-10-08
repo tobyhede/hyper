@@ -8,6 +8,7 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
+import { refusingFullscreen } from './fullscreen';
 
 /**
  * A drawn Map asks through its own Space's delete confirmation (ADR 0112), and
@@ -188,6 +189,7 @@ it('asks once when the drawn Space is also listed and hidden', async () => {
     [meta, home, target].map((snapshot) => ({ snapshot, revision: 0n, exportedRevision: null })),
   );
   const spaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,

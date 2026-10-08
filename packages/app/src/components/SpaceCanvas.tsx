@@ -80,7 +80,7 @@ import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { RESOURCE_SIZE } from '../resource';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from './ResourcesPopover';
 import { ResourceConnect, type Connecting } from './ResourceConnect';
-import { OverviewCamera, PresentingCamera, OpeningFramingCamera } from './cameras';
+import { OpeningFramingCamera } from './cameras';
 import {
   canvasNodeConnection,
   clipEmbeddedNode,
@@ -215,14 +215,11 @@ export interface SpaceCanvasProps {
   edges: Edge[];
   /** The next projection, merged in by a completed connection so its Edge draws. */
   projectedNodes: readonly ResourceFlowNode[] | null;
-  /** The Resource the traversal has reached, or `null` in overview. */
-  activeResourceId: string | null;
   /**
    * That a traversal is running — the Navigation mode, not an availability
-   * answer. Two consumers read it, and neither is an authoring operation: the
-   * camera that returns to the overview when the traversal ends (ADR 0027), and
-   * the click that resumes an embedded read of a Space that has been Exited,
-   * which nothing edits. What presenting *withdraws* from authoring is
+   * answer. One consumer reads it, and it is not an authoring operation: the
+   * click that resumes an embedded read of a Space that has been Exited, which
+   * nothing edits. What presenting *withdraws* from authoring is
    * `availability`'s to say.
    */
   presenting: boolean;
@@ -394,7 +391,6 @@ export function SpaceCanvas({
   nodes,
   edges,
   projectedNodes,
-  activeResourceId,
   presenting,
   placementReady,
   availability,
@@ -543,8 +539,8 @@ export function SpaceCanvas({
    *
    * Every reason the answers carry lives in `authoring-availability.ts`, beside
    * the answer it governs — including why the Edge lifecycle reads
-   * `authorOnCanvas`, and why a connection is reachable on the presented
-   * Resource that `authorOnCanvas` withdraws.
+   * `authorOnCanvas`, and why a connection survives a live embedded edit that
+   * `authorOnCanvas` withdraws.
    */
   const embeddedEditing = editingEmbeddingIds.size > 0;
   useLayoutEffect(() => {
@@ -1696,8 +1692,8 @@ export function SpaceCanvas({
       // to the four authoring handles, and only then does this line mean
       // anything beyond whether the connection line draws.
       //
-      // **Not `authorOnCanvas`**: presenting deliberately keeps this one
-      // gesture, and `authoring-availability.ts` records why.
+      // **Not `authorOnCanvas`**: a live embedded edit leaves a pointer
+      // connection alone, and `authoring-availability.ts` records why.
       nodesConnectable={availability.connectOnCanvas}
       // **The placement fact, deliberately not an availability answer.** The
       // withheld form of this description is a sentence about placement, so the
@@ -1712,9 +1708,8 @@ export function SpaceCanvas({
       connectionLineStyle={connectionLineStyle}
       connectionLineComponent={GraphConnectionLine}
       minZoom={0.2}
-      // Presenting draws one resource full-screen, which is far closer than React
-      // Flow's default ceiling of 2. See `MAX_ZOOM` — without it the camera sits
-      // outside its own extent and the first wheel tick yanks it back.
+      // React Flow's default ceiling of 2 stops an author well short of reading
+      // one Resource at screen size. See `MAX_ZOOM`.
       maxZoom={MAX_ZOOM}
     >
       {surface !== undefined && (
@@ -1812,8 +1807,6 @@ export function SpaceCanvas({
           activeGraphId={activeGraphId}
         />
       )}
-      <OverviewCamera presenting={presenting} />
-      <PresentingCamera activeResourceId={activeResourceId} />
       <OpeningFramingCamera framing={openingFraming} />
       {edgeSurface.layer}
       <ResourceConnect

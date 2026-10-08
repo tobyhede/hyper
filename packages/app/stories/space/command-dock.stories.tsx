@@ -49,7 +49,7 @@ NewSpace.meta = { iframed: true };
 /**
  * Presenting, where the whole surface goes.
  *
- * The Dock is furniture over the paper, so presenting removes the furniture. What the audience is left with is the canvas and
+ * The Dock is furniture over the paper, so presenting removes the furniture. What the audience is left with is the Stage and
  * `PresentingChrome`, which carries the way out.
  *
  * Real Navigation presents the Active Graph, so the chrome is the application's.

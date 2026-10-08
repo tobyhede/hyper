@@ -10,6 +10,8 @@ export { StatusBusy, StatusFailure } from './StatusPanel';
 export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { PresentedResource } from './PresentedResource';
 export type { PresentedResourceProps } from './PresentedResource';
+export { Stage } from './Stage';
+export type { StageProps } from './Stage';
 export { CanvasResource, CANVAS_RESOURCE_DRAG_TILT_DEGREES } from './CanvasResource';
 export {
   atRest,
@@ -18,7 +20,7 @@ export {
   CLOSED_DISPLAY,
   spaceViewOf,
 } from './resource-display';
-export type { FrontDisplay, OwnContent, ResourceDisplay } from './resource-display';
+export type { OwnContent, ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
 export type {

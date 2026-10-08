@@ -287,8 +287,8 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   /**
    * Present reads `editingResourceBody` and nothing else about the canvas.
    *
-   * Presenting draws the active Resource's content *instead of* the Resource, so a live
-   * editor cannot survive it and the draft would go without one of ADR 0064's
+   * Presenting covers the canvas with the Stage and makes it inert (ADR 0123), so a
+   * live editor cannot survive it and the draft would go without one of ADR 0064's
    * four exits being spent. It does not read `presenting` itself — the surface
    * draws Stop rather than Present once a traversal is running.
    */
@@ -371,32 +371,21 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
    * `editingEmbeddedMap` is the fourth term, and it is deliberately **not**
    * in `soleAuthoringSurface`. It withdraws exactly what an embedded edit must
    * not be interrupted by: every control drawn on a containing Resource, and the
-   * whole Edge editing lifecycle. It leaves `connectOnCanvas` alone, which is
-   * the distinction presenting already draws here — a pointer connection is a
-   * completed Edit rather than an editor, it cannot reach into the embedding,
-   * and none of ADR 0064's four exits is spent by it. Moving the term into
-   * `soleAuthoringSurface` would take that connection away, which is a decision
-   * about the product rather than a simplification.
+   * whole Edge editing lifecycle. It leaves `connectOnCanvas` alone: a pointer
+   * connection is a completed Edit rather than an editor, it cannot reach into
+   * the embedding, and none of ADR 0064's four exits is spent by it. Moving the
+   * term into `soleAuthoringSurface` would take that connection away, which is a
+   * decision about the product rather than a simplification.
    */
   const authorOnCanvas = authorInEmbeddedMap && !editingEmbeddedMap;
 
   /**
-   * **The one authoring gesture presenting does not withdraw**, which is why
-   * this is not `authorOnCanvas`.
-   *
-   * The difference is a product decision rather than an oversight: the
-   * presenting chrome enumerates the active Resource's outgoing Edges at render
-   * time precisely so an Edge drawn from the presented Resource is a move the
-   * presenter can take without leaving the presentation (ADR 0027, and the
-   * `moves()` note in `docs/agents/rendering.md`). `editing.spec.ts` authors a
-   * self-Edge mid-presentation and asserts the chrome offers it.
-   *
-   * Another live authoring surface is different, and so is a canvas with no
-   * Resources on it yet — one is already taking the Edit, the other has nowhere to
-   * write. Do not add `!presenting` here: it takes away that presented-Resource
-   * connection.
+   * Whether a drag may begin at a Resource's authoring handles. Not
+   * `authorOnCanvas`, because a live embedded edit leaves it alone (above);
+   * every other term withdraws it, presenting included, since nothing on the
+   * canvas is authorable while presenting (ADR 0123).
    */
-  const connectOnCanvas = editable && soleAuthoringSurface;
+  const connectOnCanvas = editable && soleAuthoringSurface && !presenting;
 
   /**
    * **Deliberately not `authorOnCanvas`**: a live content editor survives a
@@ -405,8 +394,8 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
    * The dialog owns its own modality, and the editor is still there when it
    * closes — so a Resource mid-edit is covered rather than settled, and none of
    * ADR 0064's four exits is spent behind the reader's back. What it cannot
-   * survive is presenting, which draws the active Resource's content *instead of*
-   * the Resource, and a placement that has not resolved, which has no Resource mounted
+   * survive is presenting, which covers the canvas with the Stage and makes it
+   * inert, and a placement that has not resolved, which has no Resource mounted
    * to hold it.
    */
   const editResourceBody = editable && !presenting;

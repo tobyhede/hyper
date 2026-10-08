@@ -6,6 +6,7 @@ import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '../src/open-s
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
+import { refusingFullscreen } from './fullscreen';
 
 /**
  * Through the application: a coordinated save whose
@@ -93,6 +94,7 @@ const blockedSequence = async () => {
     control,
   );
   const openSpaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
@@ -166,6 +168,7 @@ const blockedTarget = async () => {
     control,
   );
   const openSpaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,

@@ -21,6 +21,7 @@ import {
 import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 import type { ImageSources } from './image-creation';
+import type { Fullscreen } from './presenting-fullscreen';
 import {
   createSpaceResourceLifecycle,
   type SpaceResourceAuthoring,
@@ -218,6 +219,13 @@ export interface OpenSpaces {
    * the one model that knows how many Spaces there are.
    */
   readonly browserLocation: BrowserLocation;
+  /**
+   * The browser's fullscreen, which every `App` hands its presentation.
+   *
+   * One for the session for the reason `browserLocation` is: there is one
+   * document to put fullscreen.
+   */
+  readonly fullscreen: Fullscreen;
 }
 
 export interface OpenSpacesOptions {
@@ -240,6 +248,13 @@ export interface OpenSpacesOptions {
    * and the browser, and a test supplies answers of its own.
    */
   readonly images: ImageSources;
+  /**
+   * What Present asks to put fullscreen, required with no default for the
+   * reason `history` is: `main.tsx` supplies the one adapter over `document`,
+   * and a test or a story supplies one of its own. A default would let a mount
+   * lose fullscreen without anything saying so.
+   */
+  readonly fullscreen: Fullscreen;
   readonly reportObserverError?: ObserverErrorReporter;
 }
 
@@ -361,6 +376,7 @@ export function createOpenSpaces({
   newId,
   history,
   images,
+  fullscreen,
   reportObserverError,
 }: OpenSpacesOptions): OpenSpaces {
   const report: ObserverErrorReporter =
@@ -996,5 +1012,6 @@ export function createOpenSpaces({
     exit,
     spaceResources,
     browserLocation,
+    fullscreen,
   };
 }

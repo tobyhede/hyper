@@ -4,8 +4,9 @@ import { productDestinationPath } from '@project/http';
 import type { ImageSources } from '#src/image-creation';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '#src/open-spaces';
 import { storelessImages } from './image-sources';
+import { refusingFullscreen } from './fullscreen';
 
-/** Fixture data and an isolated history adapter; all session behavior is production's. */
+/** Fixture data, an isolated history adapter and a host that refuses fullscreen; all session behavior is production's. */
 export function storySpaces(
   metaSpaceId: UUID,
   snapshots: readonly SpaceSnapshot[],
@@ -26,6 +27,7 @@ export function storySpaces(
     metaSpaceTitle: meta.document.title,
     newId: newUuid,
     images,
+    fullscreen: refusingFullscreen,
     history: {
       pathname: () => pathname,
       href: () => `https://example.test${pathname}`,

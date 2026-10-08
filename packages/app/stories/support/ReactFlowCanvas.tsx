@@ -71,9 +71,7 @@ const interaction = (
   selectedResourceId: ResourceId | null = null,
 ): CanvasInteraction => ({
   activeGraphId,
-  activeResourceId: null,
   selectedResourceId,
-  presenting: false,
 });
 
 type ProjectedCanvas = CanvasNodesAndEdges;

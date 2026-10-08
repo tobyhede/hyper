@@ -2,7 +2,7 @@
 
 Hyper is for technical talks and designs whose ideas connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. [React Flow](https://reactflow.dev) draws every Graph at once, each in its own colour, at the positions you chose.
 
-**Presenting is the same canvas, closer in.** There is no second surface to build ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)): Present moves the camera to the Graph's first Resource and shows its content. Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork ([ADR 0027](docs/adr/0027-presenting-is-the-graph-canvas-under-camera-control.md)).
+**Presenting is traversing a Graph on its own Stage** ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)). Present takes the browser fullscreen where it can and draws the Graph's first Resource on a full-window Stage, one 16:9 frame letterboxed over the canvas, which stays behind it untouched ([ADR 0123](docs/adr/0123-presenting-draws-on-its-own-stage-not-on-the-canvas.md)). Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork. Leaving presenting shows the canvas exactly as it was.
 
 Your work is a directory of plain files, an [Aggregate directory](docs/aggregate-directory.md), that you keep in its own git repository.
 
@@ -184,7 +184,7 @@ A pnpm workspace with strict TypeScript and enforced package boundaries:
 | `@project/http` | The browser-safe Fetch transport: the Hono `/api` route tree and its request and response policy. |
 | `@project/react-flow-adapter` | Owns React Flow projection and every React Flow specific. Projects the domain model, already laid out, into coloured React Flow Resource nodes and Edges. It implements no `LayoutStrategy` and applies none — `@project/app` does that. |
 | `@project/ui` | Reusable, framework-agnostic React: the Resource renderer, the Command Dock's surfaces, presentation controls, the app shell. |
-| `@project/app` | Wiring: Navigation, Space Authoring and Edge Authoring, product-URL navigation over the browser History API (no router library), the Zustand-backed render adapter, the canvas and its cameras, and Vite. |
+| `@project/app` | Wiring: Navigation, Space Authoring and Edge Authoring, product-URL navigation over the browser History API (no router library), the Zustand-backed render adapter, the canvas, the presenting Stage, and Vite. |
 
 Design rules kept throughout: domain logic stays out of React components, React Flow specifics stay in the adapter, and app wiring stays in `@project/app`.
 
@@ -198,7 +198,7 @@ type LayoutStrategy = (graph: LayoutStrategyGraph) => Promise<LayoutStrategyGrap
 
 Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy that places Resources on a grid, and nothing selects it today. `positionedStrategy` reads an authored Map, and it is what the canvas draws. An automatic layout returns as a destructive Edit over a Map rather than as a render path ([ADR 0086](docs/adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md)). Where an Edge attaches is the render layer's own question. Which Resources a strategy arranges is the view's choice, not the strategy's.
 
-**Resources.** The graph draws a Closed Resource's **Title**, not its content. Opening a Resource grows it in place and shows its content ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md)); editing its source is a separate action. The same renderer shows the Active Resource while Presenting. A Resource occupies exactly one position in a Map; showing the same content at a second position is the job of a Reference Resource ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
+**Resources.** The graph draws a Closed Resource's **Title**, not its content. Opening a Resource grows it in place and shows its content ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md)); editing its source is a separate action. The same Markdown renderer draws the Active Resource on the Stage while Presenting. A Resource occupies exactly one position in a Map; showing the same content at a second position is the job of a Reference Resource ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 
 **The browser never touches files.** It lists, opens and commits Spaces over HTTP and nothing else. Reading and writing an Aggregate directory is server-side: the `hyper` CLI's `init`, `run`, `import` and `export`.
 
@@ -209,7 +209,7 @@ Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy 
 - Graph navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
 - React Flow projection correctness (`@project/react-flow-adapter`).
 - Aggregate directory round trips, Export and Import, and a `pnpm hyper run` that edits over HTTP and stops on SIGINT (`test/unit`, `test/integration`).
-- Playwright flows: app loads, the graph is visible, a Graph is selected, Resources open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a Graph, and a Graph is traversed under the camera.
+- Playwright flows: app loads, the graph is visible, a Graph is selected, Resources open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a Graph, and a Graph is traversed on the Stage.
 
 ### Current limitations
 
@@ -217,5 +217,4 @@ Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy 
 - **Overlay legibility.** The graph draws every Graph at once, at the positions the Map authored. An Edge runs backward whenever the author placed its target left of its source — which two Graphs disagreeing about the order of Resources they share will force on one of them — and nothing routes an Edge around a Resource: every Edge is the bezier React Flow draws, so a backward one curls back on itself. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
 - **Closed Resources are a fixed shape.** A Closed Resource draws its Title, so every Closed Resource is the same size — declared once in `packages/app/src/resource.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the Resource, not the reverse, which is why a measured DOM size never decides placement.
 - **No speaker view, timer, transitions or export to another presentation format.** They return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
-- **The presented Resource is scaled by the camera**, so its text is rasterised rather than laid out at its final size — a property of wanting a spatial camera at all.
 - The production bundle ships React Flow in a single chunk — fine for a prototype, not tuned for size. Remeasured after elkjs left: the entry chunk is ~1.2 MB (381 kB gzipped) beside ~106 kB of CSS, and `MarkdownSourceEditor` is split out as a further ~623 kB fetched on first edit.

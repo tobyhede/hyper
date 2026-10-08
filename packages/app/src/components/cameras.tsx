@@ -1,121 +1,22 @@
 import { useEffect, useRef } from 'react';
 import { useReactFlow, useStore } from '@xyflow/react';
-import {
-  OVERVIEW_DURATION,
-  OVERVIEW_FIT,
-  PRESENTING_DURATION,
-  PRESENTING_PADDING,
-} from '../camera';
 import { viewportFromFraming, type SpaceResourceFraming } from '../space-resource-framing';
-
-/**
- * The camera seam (ADR 0027): the components that move React Flow's viewport
- * when presenting starts, advances or ends, and when a Space Resource is
- * entered.
- *
- * Overview and presenting are one `fitView` call (ADR 0044). Enter from a Space
- * Resource is not: the stored framing is a Map-coordinate camera, and
- * `viewportFromFraming` places it on the *entered* canvas's own size so the
- * source Resource's rectangle never becomes the destination viewport.
- *
- * **A camera command is issued, never awaited (ADR 0043).** Read against
- * `@xyflow/react@12.11.2` and `@xyflow/system@0.0.79`, a camera Promise has three
- * outcomes and only one of them is settlement:
- *
- * - It resolves, when the animation runs to its end.
- * - It never settles, when the animation is superseded. `getD3Transition`
- *   resolves via `.on('end', onEnd)`, and a superseded d3 transition fires
- *   `interrupt`, not `end`. This is the *common* case in normal use — any second
- *   camera command issued while the first is still running produces it.
- * - It never settles, when `fitView` runs before `panZoom` exists.
- *   `resolveFitView()` begins `if (!panZoom) return`, abandoning the resolver
- *   `withResolvers()` built.
- *
- * So **no required behaviour is chained on one of these Promises** — not with
- * `.then`, not with `await`: a superseded move would strand the follow-up.
- * `fitView` additionally *reuses* one resolver across calls,
- * so a second call before the first settles cannot be told apart from it.
- *
- * Rejection is a separate matter and is deliberately left unhandled. Nothing in
- * either library calls `reject`; the one reachable rejection is a synchronous
- * throw inside a Promise executor calling into d3, which is a genuine fault
- * rather than an interruption. A blanket `.catch` would silence the only signal
- * worth hearing while doing nothing about either hang above, so the `void` here
- * is exactly what it looks like: an unhandled rejection surfaces with its stack.
- *
- * Every claim above is a fact about the pinned release rather than about the
- * library's contract. Re-read `setTransform`, `resolveFitView` and
- * `getD3Transition` when the pin moves.
- */
-
-/**
- * Returns the camera from presenting to the whole-graph overview (ADR 0027).
- *
- * Only the *return* — the initial fit belongs to React Flow's own `fitView`
- * prop, which runs before first paint at the identity transform. Do not also
- * fit on mount: a second, animated fit after the prop's would start every load
- * at the viewport origin and fly the whole graph in.
- *
- * `previouslyPresenting` is what separates the two: an effect keyed on
- * `presenting` cannot otherwise tell "arrived at false" from "was always
- * false".
- */
-export function OverviewCamera({ presenting }: { presenting: boolean }) {
-  const { fitView } = useReactFlow();
-  const previouslyPresenting = useRef(presenting);
-
-  useEffect(() => {
-    const wasPresenting = previouslyPresenting.current;
-    previouslyPresenting.current = presenting;
-    if (presenting || !wasPresenting) return;
-    void fitView({ ...OVERVIEW_FIT, duration: OVERVIEW_DURATION });
-  }, [presenting, fitView]);
-
-  return null;
-}
-
-/**
- * Moves the camera to the Resource the traversal has reached (ADR 0027).
- *
- * There is no second surface: presenting is this canvas, drawn close enough that
- * one resource fills the screen. One `fitView` over that one resource is the whole
- * mechanism. **Don't split it into a pan then a close-in** (ADR 0044): React
- * Flow animates through d3-zoom, whose default interpolator is
- * `interpolateZoom`, the Van Wijk smooth zoom-out-pan-zoom-in path, which
- * solves the same problem in one call.
- *
- * The viewport size is a dependency rather than an argument to the fit: `fitView`
- * reads the container itself, but the effect must re-run when it changes, or a
- * resized window leaves the resource framed for the old one.
- */
-export function PresentingCamera({ activeResourceId }: { activeResourceId: string | null }) {
-  const { fitView, getNode } = useReactFlow();
-  const viewportWidth = useStore((s) => s.width);
-  const viewportHeight = useStore((s) => s.height);
-
-  useEffect(() => {
-    if (!activeResourceId || viewportWidth === 0 || viewportHeight === 0) return;
-    // A `nodes` filter that matches nothing does not cancel the fit — it fits the
-    // bounds of nothing, a zero-size rect at the origin, which lands the camera
-    // at `maxZoom` on empty canvas. So the resource has to be on screen first.
-    if (!getNode(activeResourceId)) return;
-
-    void fitView({
-      nodes: [{ id: activeResourceId }],
-      padding: PRESENTING_PADDING,
-      duration: PRESENTING_DURATION,
-    });
-  }, [activeResourceId, viewportWidth, viewportHeight, getNode, fitView]);
-
-  return null;
-}
 
 /**
  * Places the entered canvas at a Space Resource's stored camera.
  *
- * Uses the mounted canvas's own width and height, never the source Resource's
- * rectangle. Issued, never awaited (ADR 0043), matching the two `fitView`
- * cameras above. Absent framing leaves React Flow's `fitView` prop to run.
+ * The stored framing is a Map-coordinate camera, and `viewportFromFraming`
+ * places it on the *entered* canvas's own size, so the source Resource's
+ * rectangle never becomes the destination viewport.
+ *
+ * **A camera command is issued, never awaited (ADR 0043).** Read against
+ * `@xyflow/react@12.11.2` and `@xyflow/system@0.0.79`, a camera Promise never
+ * settles when its animation is superseded: `getD3Transition` resolves on d3's
+ * `end`, and a superseded transition fires `interrupt` instead. So no required
+ * behaviour is chained on it. Re-read `setTransform` and `getD3Transition` when
+ * the pin moves.
+ *
+ * Absent framing leaves React Flow's `fitView` prop to run.
  */
 export function OpeningFramingCamera({ framing }: { framing: SpaceResourceFraming | undefined }) {
   const { setViewport } = useReactFlow();

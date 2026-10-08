@@ -11,9 +11,6 @@ describe('React Flow adapter identity types', () => {
   it('preserves validated domain identities through the public projection contract', () => {
     expectTypeOf<ResourceNodeData['resourceId']>().toEqualTypeOf<ResourceId>();
     expectTypeOf<ResourceNodeData['activeGraphId']>().toEqualTypeOf<GraphId | null>();
-    expectTypeOf<ProjectResourceNodesOptions['activeResourceId']>().toEqualTypeOf<
-      ResourceId | null | undefined
-    >();
     expectTypeOf<ProjectResourceNodesOptions['activeGraphId']>().toEqualTypeOf<
       GraphId | null | undefined
     >();

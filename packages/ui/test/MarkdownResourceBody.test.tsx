@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { beginEditing, CanvasResource, type FrontDisplay } from '../src';
+import { beginEditing, CanvasResource, type ResourceDisplay } from '../src';
 import { MarkdownResourceBody } from '../src/MarkdownResourceBody';
 
 beforeAll(() => {
@@ -50,7 +50,7 @@ const body = (props: Partial<Parameters<typeof MarkdownResourceBody>[0]> = {}) =
  * (`resource-content-edit.ts`). Mounted alone, the body keeps its keys and offers no
  * control of its own.
  */
-const STRATEGIES: FrontDisplay = {
+const STRATEGIES: ResourceDisplay = {
   shown: 'open',
   content: { kind: 'markdown', source: '# Strategies\n\nNo strategy is privileged.', via: 'self' },
 };

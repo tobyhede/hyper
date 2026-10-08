@@ -7,7 +7,7 @@ import {
   CanvasResource,
   CLOSED_DISPLAY,
   type CanvasResourceFront,
-  type FrontDisplay,
+  type ResourceDisplay,
 } from '@project/ui';
 import { resourceSizeVars } from '#src/resource';
 import type { ResourceFrameStyle } from '../support/CanvasResourceSpecimen';
@@ -36,7 +36,7 @@ function TitleEditingResource({
   };
   const group = useRef<HTMLDivElement>(null);
   const front: CanvasResourceFront = { kind: 'markdown', onOpenChange: changeOpen };
-  const display: FrontDisplay = open
+  const display: ResourceDisplay = open
     ? {
         shown: 'open',
         content: { kind: 'markdown', source: '## Open Resource body', via: 'self' },
@@ -139,7 +139,7 @@ export const Markdown: Story = () => {
     return 'completed' as const;
   };
   const editing = mode !== 'rendered';
-  const shown: FrontDisplay =
+  const shown: ResourceDisplay =
     editing || open
       ? { shown: 'open', content: { kind: 'markdown', source, via: 'self' } }
       : CLOSED_DISPLAY;

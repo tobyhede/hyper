@@ -47,9 +47,7 @@ const mapOwning = (...graphs: readonly object[]) => ({
 /** Nothing activated, nothing selected. */
 const AT_REST: CanvasInteraction = {
   activeGraphId: null,
-  activeResourceId: null,
   selectedResourceId: null,
-  presenting: false,
 };
 
 function spaceWith(
@@ -183,21 +181,19 @@ describe('canvasProjection', () => {
     expect(opacityOf(onOther.edges, DRAWN_GRAPH)).toBeLessThan(1);
   });
 
-  it('names the traversal position, the authoring selection and what Presenting draws', async () => {
+  it('names the authoring selection, and draws each Resource Closed or Open as its Map authors it', async () => {
     const space = spaceWith({ maps: [mapOwning(DRAWN)] });
 
-    const { nodes } = await projectThrough(space, {
-      ...AT_REST,
-      activeResourceId: RESOURCE_A,
-      selectedResourceId: RESOURCE_B,
-      presenting: true,
-    });
+    const { nodes } = await projectThrough(space, { ...AT_REST, selectedResourceId: RESOURCE_B });
 
     const byId = Object.fromEntries(nodes.map((node) => [node.id, node.data]));
-    expect(byId[RESOURCE_A]?.active).toBe(true);
     expect(byId[RESOURCE_B]?.selectedForAuthoring).toBe(true);
-    // Presenting draws the Active Resource's content, and only that Resource's (ADR 0027).
-    expect(byId[RESOURCE_A]?.display.shown).toBe('presented');
+    // Presenting draws on the Stage (ADR 0123), so nothing here names a
+    // traversal position or a presented display.
+    expect(nodes.map((node) => Object.keys(node.data))).not.toContainEqual(
+      expect.arrayContaining(['active']),
+    );
+    expect(byId[RESOURCE_A]?.display.shown).toBe('closed');
     expect(byId[RESOURCE_B]?.display.shown).toBe('closed');
   });
 

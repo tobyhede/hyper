@@ -609,6 +609,33 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'A narrow chrome keeps the choices in their own row above Back, guidance and Overview.',
   },
   {
+    id: 'stage-frames-the-largest-16-9-above-the-chrome',
+    storyFile: 'components/stage.stories.tsx',
+    storyExport: 'LongRead',
+    claim:
+      'The Stage draws one 16:9 frame, the largest that fits above the presenting chrome, letterboxed in the room left over.',
+  },
+  {
+    id: 'stage-scrolls-overflow-and-arrows-still-traverse',
+    storyFile: 'components/stage.stories.tsx',
+    storyExport: 'LongRead',
+    claim:
+      'Content longer than the frame scrolls inside it by wheel and Page Up or Page Down, the arrow keys still traverse while the scroll region has focus, and the next Resource starts at its top.',
+  },
+  {
+    id: 'stage-fits-an-oversized-picture',
+    storyFile: 'components/stage.stories.tsx',
+    storyExport: 'Picture',
+    claim:
+      'A picture larger than the frame is fitted inside it whole, neither clipped nor scrolled.',
+  },
+  {
+    id: 'stage-centres-a-title-slide',
+    storyFile: 'components/stage.stories.tsx',
+    storyExport: 'TitleSlide',
+    claim: 'An Ur Resource is drawn as its name alone, centred in the frame.',
+  },
+  {
     id: 'operational-feedback-startup-pending',
     storyFile: 'components/operational-feedback.stories.tsx',
     storyExport: 'Starting',

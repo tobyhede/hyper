@@ -41,6 +41,7 @@ import {
 } from './command-dock';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { refusingFullscreen } from './fullscreen';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -154,6 +155,7 @@ it('offers Exit on a Space opened by its own address, which has no opener', asyn
     [meta, other].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
   );
   const spaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
@@ -200,6 +202,7 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
     })),
   );
   const spaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
     images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
@@ -745,6 +748,7 @@ describe('Space app failure reporting', () => {
       mountSpaceApp(
         { id: runtime(valid).id, session, app, spaceResources },
         createBrowserLocation(recordingHistory()),
+        refusingFullscreen,
         (view) => {
           render(view);
         },

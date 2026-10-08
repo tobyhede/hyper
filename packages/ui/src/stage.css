@@ -1,0 +1,108 @@
+/* The Stage fills the box it is placed in and stacks above the canvas drawn
+   there. Its room takes what the chrome strip leaves. */
+.stage {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: var(--background);
+}
+
+/* The room is a size container, so the frame can be the largest 16:9 box that
+   fits it on whichever axis binds; the rest of the room is letterboxing. */
+.stage__room {
+  container-type: size;
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+}
+
+/* The frame is itself an inline-size container, so the type inside it is sized
+   against the frame's width and scales with it. */
+.stage__frame {
+  container-type: inline-size;
+  width: min(100cqw, 100cqh * 16 / 9);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--canvas-resource-face-rest);
+  color: var(--canvas-resource-title-color);
+}
+
+.stage__body {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.stage__body:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+/* The presented Resource fills the frame at least, and a long one grows past it
+   for the body to scroll. */
+.stage__body .resource--full {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 4cqw 5cqw;
+  text-align: left;
+  font-size: 3.4cqw;
+  line-height: 1.5;
+}
+
+.stage__body .resource--full .resource__title {
+  margin: 0 0 2cqw;
+  font-size: 5cqw;
+  line-height: 1.2;
+}
+
+/* A picture is fitted inside the frame, whole, so its Resource is exactly the
+   frame's height rather than at least it: the name stacks over the picture, and
+   the picture takes the room left below the name. */
+.stage__body .resource--full:has(> .resource-image) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* A Resource with no content below its name — an Ur Resource — is a title
+   slide: the name alone, centred in the frame. */
+.stage__body .resource--full[data-content-kind='ur'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.stage__body .resource--full[data-content-kind='ur'] .resource__title {
+  margin: 0;
+}
+
+.stage__body .resource__body > * {
+  margin: 0 0 2cqw;
+}
+
+.stage__body .resource__body :is(h1, h2, h3, h4) {
+  margin: 0 0 1.6cqw;
+  font-size: 4.2cqw;
+  line-height: 1.25;
+}
+
+.stage__body .resource__body :is(ul, ol) {
+  padding-left: 4cqw;
+}
+
+.stage__body .resource__body :is(code, pre) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.stage__body .resource__body pre {
+  overflow-x: auto;
+  padding: 2cqw;
+  border-radius: var(--canvas-resource-radius);
+  background: color-mix(in srgb, currentcolor 8%, transparent);
+}

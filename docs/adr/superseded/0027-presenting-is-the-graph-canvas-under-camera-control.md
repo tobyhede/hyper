@@ -1,6 +1,7 @@
 # Presenting is the graph canvas under camera control; there is no second surface
 
-Status: accepted
+Status: superseded
+Superseded by: 0123
 Refines: 0024
 Refined by: 0041, 0043, 0044
 Related: 0002, 0006, 0023, 0025, 0026

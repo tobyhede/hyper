@@ -67,9 +67,7 @@ export interface MapSurface {
   readonly project: (
     placed: LayoutStrategyGraph,
     interaction?: {
-      readonly activeResourceId?: ResourceId | null;
       readonly selectedResourceId?: ResourceId | null;
-      readonly presenting?: boolean;
     },
   ) => CanvasNodesAndEdges;
   readonly dispose: () => void;
@@ -222,9 +220,7 @@ export function createMapSurface(
     project: (placed, interaction = {}) =>
       view().projection.project(placed, {
         activeGraphId: context().graphId,
-        activeResourceId: interaction.activeResourceId ?? null,
         selectedResourceId: interaction.selectedResourceId ?? null,
-        presenting: interaction.presenting ?? false,
       }),
     dispose: () => {
       disposed = true;

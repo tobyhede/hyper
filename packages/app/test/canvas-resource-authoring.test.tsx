@@ -110,7 +110,6 @@ const node = (
     kind,
     ...fixtureFacts(kind),
     open,
-    active: false,
     selectedForAuthoring: false,
     display: fixtureDisplay(open, kind, 'A source'),
     activeGraphId: GRAPH_ID,
@@ -843,7 +842,6 @@ describe('canvas Resource authoring, replacing an image', () => {
       kind: 'image',
       ...fixtureFacts('image'),
       open: true,
-      active: false,
       selectedForAuthoring: false,
       display: {
         shown: 'open',

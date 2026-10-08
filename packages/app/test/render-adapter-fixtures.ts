@@ -24,7 +24,6 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
       readOnly: false,
       kind: 'markdown',
       ...fixtureFacts('markdown'),
-      active: false,
       selectedForAuthoring: false,
       display: CLOSED_DISPLAY,
       activeGraphId: null,
