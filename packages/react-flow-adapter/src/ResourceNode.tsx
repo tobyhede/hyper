@@ -48,16 +48,9 @@ type MutableKindOperations =
   MarkdownOperations | ImageOperations | UrOperations | ReferenceOperations | SpaceOperations;
 
 /**
- * The operations each kind offers. What it draws is the display's, not
- * the operations'. Every kind opens and closes, so Open/Close is set once here; the
- * rest is by the Resource's own kind.
+ * The operations each kind offers, by the Resource's own kind. What it draws is
+ * the display's, and Open and Close are every kind's.
  */
-function kindOperationsOf(data: ResourceFlowNode['data']): KindOperations {
-  const kindOperations = operationsOfKind(data);
-  if (data.onOpenChange !== undefined) kindOperations.onOpenChange = data.onOpenChange;
-  return kindOperations;
-}
-
 function operationsOfKind(data: ResourceFlowNode['data']): MutableKindOperations {
   switch (data.kind) {
     case 'markdown': {
@@ -165,7 +158,7 @@ export function ResourceNode({
     [id, reportBodyHeight],
   );
 
-  const kindOperations = kindOperationsOf(data);
+  const kindOperations: KindOperations = operationsOfKind(data);
   const display = data.display;
 
   /**
@@ -234,7 +227,12 @@ export function ResourceNode({
   const canvasResourceOptionalProps: Mutable<
     Pick<
       CanvasResourceProps,
-      'onBeginTitleEdit' | 'entityActions' | 'onBodyHeightChange' | 'contextNotice' | 'size'
+      | 'onBeginTitleEdit'
+      | 'onOpenChange'
+      | 'entityActions'
+      | 'onBodyHeightChange'
+      | 'contextNotice'
+      | 'size'
     >
   > = {};
   // The rect React Flow draws this Resource at, which the projection declares
@@ -252,6 +250,9 @@ export function ResourceNode({
   }
   if (data.onBeginTitleEditing !== undefined) {
     canvasResourceOptionalProps.onBeginTitleEdit = data.onBeginTitleEditing;
+  }
+  if (data.onOpenChange !== undefined) {
+    canvasResourceOptionalProps.onOpenChange = data.onOpenChange;
   }
   /*
    * Forwarded whole rather than flag-and-operation, because a command list is

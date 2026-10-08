@@ -35,7 +35,7 @@ function TitleEditingResource({
     return 'completed' as const;
   };
   const group = useRef<HTMLDivElement>(null);
-  const kindOperations: KindOperations = { kind: 'markdown', onOpenChange: changeOpen };
+  const kindOperations: KindOperations = { kind: 'markdown' };
   const display: ResourceDisplay = open
     ? {
         shown: 'open',
@@ -57,6 +57,7 @@ function TitleEditingResource({
       >
         <CanvasResource
           kindOperations={kindOperations}
+          onOpenChange={changeOpen}
           display={display}
           title={title}
           graphColor="#ffc53d"
@@ -158,7 +159,6 @@ export const Markdown: Story = () => {
     : shown;
   const kindOperations: KindOperations = {
     kind: 'markdown',
-    onOpenChange: changeOpen,
     onBeginEdit: () => setMode('focused'),
   };
 
@@ -178,6 +178,7 @@ export const Markdown: Story = () => {
       <div style={openFrame}>
         <CanvasResource
           kindOperations={kindOperations}
+          onOpenChange={changeOpen}
           display={display}
           state="selected"
           title="Strategies"

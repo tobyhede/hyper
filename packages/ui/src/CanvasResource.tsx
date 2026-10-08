@@ -61,36 +61,25 @@ import {
 /**
  * What a Resource's kind offers beyond its shared Title (ADR 0051): a kind-owned
  * choice of operations, not a kind tag plus an optional field every other kind
- * ignores. What it draws, and whether it is Open, is the display's.
+ * ignores. Opening and Closing are every Resource's and are not here; what it
+ * draws, and whether it is Open, is the display's.
  */
 export type KindOperations =
   | {
-      /** A creation ghost: Markdown treatment without authored content or open state. */
-      readonly kind: 'preview';
-    }
-  | {
       readonly kind: 'markdown';
-      /** Request that authored state open or close this Resource. */
-      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /** Put a caret in this Resource's Markdown source. */
       readonly onBeginEdit?: () => void;
     }
   | {
       readonly kind: 'reference';
-      /** A Reference Resource Opens through the shared Resource operation (ADR 0070). */
-      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
     }
   | {
       readonly kind: 'image';
-      /** An Image Resource Opens through the shared Resource operation. */
-      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /** Begin replacing the image: the image kind's counterpart to a Markdown edit. */
       readonly onBeginEdit?: () => void;
     }
   | {
       readonly kind: 'ur';
-      /** An Ur Resource Opens through the shared Resource operation, and has nothing to edit. */
-      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /**
        * Draw this Resource in another Shape on its Map (ADR 0121), chosen from
        * its rail Open and Closed alike. Absent where the Map may not be authored.
@@ -99,8 +88,6 @@ export type KindOperations =
     }
   | {
       readonly kind: 'space';
-      /** A Space Resource Opens through the shared Resource operation. */
-      readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
       /**
        * Map and Graph clusters, assembled by the application and inserted
        * at the head of this Resource's rail. Absent while the Resource is closed, the
@@ -190,6 +177,12 @@ interface CanvasResourceCommonProps {
   readonly readOnly?: boolean;
   /** Present only when activating the displayed Title may begin a rename. */
   readonly onBeginTitleEdit?: () => void;
+  /**
+   * Request that the Map Open or Close this Resource, answering whether it did.
+   * Every kind Opens through this one operation; absent, no Open or Close
+   * control is drawn.
+   */
+  readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
   /**
    * This Resource's own commands — rename it, copy an address it can be reached by,
    * open it elsewhere — drawn as one more control on the rail.
@@ -347,7 +340,7 @@ export function CanvasResource(props: CanvasResourceProps) {
    * A reader who wants the rest reads the heading.
    */
   const name = titleName(title);
-  const visualKind = kindOperations.kind === 'preview' ? 'markdown' : kindOperations.kind;
+  const kind = kindOperations.kind;
   /*
    * Read-only is decided here, once: a read-only Resource draws its content at
    * rest, and every authoring affordance below reads one of these operations,
@@ -361,8 +354,7 @@ export function CanvasResource(props: CanvasResourceProps) {
   const drawsOutline = drawnResourceShape !== 'rectangle';
   const content = display.shown === 'closed' ? null : display.content;
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
-  const openableOperations = kindOperations.kind === 'preview' ? undefined : kindOperations;
-  const onOpenChange = readOnly ? undefined : openableOperations?.onOpenChange;
+  const onOpenChange = readOnly ? undefined : props.onOpenChange;
   const contentOperations =
     !readOnly &&
     'onBeginEdit' in kindOperations &&
@@ -517,7 +509,7 @@ export function CanvasResource(props: CanvasResourceProps) {
 
   // An Open Resource's content already says what it is, and an Ur Resource's
   // Shape does (ADR 0121), so neither draws its kind.
-  const kindMark = open || visualKind === 'ur' ? null : <ResourceRailKind kind={visualKind} />;
+  const kindMark = open || kind === 'ur' ? null : <ResourceRailKind kind={kind} />;
   const toolbar = showActions ? (
     // ADR 0073. One tab stop for the whole rail, arrows between its
     // controls: a canvas carries many Resources and a Resource's rail carries
@@ -548,7 +540,7 @@ export function CanvasResource(props: CanvasResourceProps) {
         />
       )}
       {spaceRail}
-      <ResourceRailKindActions kind={visualKind}>
+      <ResourceRailKindActions kind={kind}>
         {onResourceShapeChange !== undefined && (
           <ResourceShapeMenu shape={drawnResourceShape} onChoose={onResourceShapeChange} />
         )}
@@ -632,8 +624,8 @@ export function CanvasResource(props: CanvasResourceProps) {
       aria-label={name}
       className="canvas-resource"
       data-testid="resource"
-      data-kind={visualKind}
-      data-content-kind={content === null ? visualKind : content.kind}
+      data-kind={kind}
+      data-content-kind={content === null ? kind : content.kind}
       data-content-area={
         (contentPresence.mounted && drawsContentArea(contentPresence.value)) || undefined
       }

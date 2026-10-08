@@ -88,9 +88,9 @@ const WRAPPING_TITLE = 'Why authored placement beats a layout engine that reshuf
  * Every kind `CanvasResource` declares, with the label each specimen carries.
  *
  * The creation ghost is in the list and is not a Resource: it is what the canvas
- * draws while a new Resource is being placed, and it takes the Markdown treatment
- * without content or authored open state. Leaving it out would make this story
- * "every kind but one", which is the shape this story exists to stop.
+ * draws while a new Resource is being placed, a Markdown Resource with no
+ * operations, content or authored open state. Leaving it out would make this
+ * story "every kind but one", which is the shape this story exists to stop.
  */
 const CLOSED_KINDS = [
   { kind: 'markdown', label: 'markdown' },
@@ -98,7 +98,7 @@ const CLOSED_KINDS = [
   { kind: 'space', label: 'space' },
   { kind: 'image', label: 'image' },
   { kind: 'ur', label: 'ur' },
-  { kind: 'preview', label: 'creation ghost' },
+  { kind: 'markdown', label: 'creation ghost' },
 ] as const satisfies readonly { kind: KindOperations['kind']; label: string }[];
 
 /**
@@ -462,8 +462,8 @@ function Instance({
     return 'completed' as const;
   };
   // Every kind Opens and Closes through the one operation (ADR 0070), so the
-  // Reference Resource carries it too.
-  const kindOperations: KindOperations = { kind, onOpenChange: changeOpen };
+  // Reference Resource takes it too.
+  const kindOperations: KindOperations = { kind };
   const display: ResourceDisplay = open
     ? {
         shown: 'open',
@@ -489,6 +489,7 @@ function Instance({
       >
         <CanvasResource
           kindOperations={kindOperations}
+          onOpenChange={changeOpen}
           display={display}
           state={state}
           title={title}
@@ -744,7 +745,8 @@ export const EnterSpace: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        kindOperations={{ kind: 'space', onOpenChange: changeOpen }}
+        kindOperations={{ kind: 'space' }}
+        onOpenChange={changeOpen}
         display={CLOSED_DISPLAY}
         state="selected"
         entityActions={[
@@ -811,7 +813,8 @@ export const OpenIndependently: Story = () => {
   return (
     <div className="p-8">
       <CanvasResource
-        kindOperations={{ kind: 'space', onOpenChange: changeOpen }}
+        kindOperations={{ kind: 'space' }}
+        onOpenChange={changeOpen}
         display={CLOSED_DISPLAY}
         state="selected"
         title="Architecture"
@@ -854,7 +857,8 @@ export const RailActions: Story = () => {
         {authoredSpace.resources.slice(0, 2).map((resource, index) => (
           <CanvasResource
             key={resource.id}
-            kindOperations={{ kind: 'markdown', onOpenChange: () => 'retained' }}
+            kindOperations={{ kind: 'markdown' }}
+            onOpenChange={() => 'retained'}
             display={CLOSED_DISPLAY}
             title={resource.title}
             state={index === 1 ? 'selected' : 'rest'}

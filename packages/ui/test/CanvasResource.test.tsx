@@ -143,10 +143,10 @@ describe('CanvasResource kind and interaction state', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('draws a creation preview without authored Markdown or open state', () => {
+  it('draws a creation ghost as a Markdown Resource offering nothing', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'preview' }}
+        kindOperations={{ kind: 'markdown' }}
         display={CLOSED_DISPLAY}
         state="rest"
         title="Resource 2"
@@ -185,7 +185,8 @@ describe('CanvasResource kind and interaction state', () => {
   it('presents a Reference Resource by its kind alone', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'reference', onOpenChange: vi.fn(() => 'completed' as const) }}
+        kindOperations={{ kind: 'reference' }}
+        onOpenChange={vi.fn(() => 'completed' as const)}
         display={CLOSED_DISPLAY}
         state="selected"
         title="Opening, again"
@@ -226,7 +227,8 @@ describe('CanvasResource kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        kindOperations={{ kind: 'image', onOpenChange }}
+        kindOperations={{ kind: 'image' }}
+        onOpenChange={onOpenChange}
         display={CLOSED_DISPLAY}
         state="selected"
         title="Figure"
@@ -289,7 +291,8 @@ describe('CanvasResource kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        kindOperations={{ kind: 'image', onOpenChange }}
+        kindOperations={{ kind: 'image' }}
+        onOpenChange={onOpenChange}
         display={{
           shown: 'open',
           content: { kind: 'image', url: FIGURE_URL, via: 'self' },
@@ -316,7 +319,8 @@ describe('CanvasResource kind and interaction state', () => {
     const onBeginEdit = vi.fn(() => calls.push('replace'));
     render(
       <CanvasResource
-        kindOperations={{ kind: 'image', onOpenChange, onBeginEdit }}
+        kindOperations={{ kind: 'image', onBeginEdit }}
+        onOpenChange={onOpenChange}
         display={CLOSED_DISPLAY}
         state="selected"
         title="Figure"
@@ -335,11 +339,8 @@ describe('CanvasResource kind and interaction state', () => {
     const onEnd = vi.fn();
     render(
       <CanvasResource
-        kindOperations={{
-          kind: 'image',
-          onOpenChange: () => 'completed',
-          onBeginEdit: () => undefined,
-        }}
+        kindOperations={{ kind: 'image', onBeginEdit: () => undefined }}
+        onOpenChange={() => 'completed'}
         display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
           accept: 'image/png',
           onReplace: () => Promise.resolve(null),
@@ -368,10 +369,8 @@ describe('CanvasResource kind and interaction state', () => {
     const onEnd = vi.fn();
     render(
       <CanvasResource
-        kindOperations={{
-          kind: 'image',
-          onOpenChange: () => 'completed',
-        }}
+        kindOperations={{ kind: 'image' }}
+        onOpenChange={() => 'completed'}
         display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
           accept: 'image/png',
           onReplace: () => new Promise(() => undefined),
@@ -438,7 +437,8 @@ describe('CanvasResource kind and interaction state', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        kindOperations={{ kind: 'reference', onOpenChange }}
+        kindOperations={{ kind: 'reference' }}
+        onOpenChange={onOpenChange}
         display={CLOSED_DISPLAY}
         state="selected"
         title="Return"
@@ -454,7 +454,8 @@ describe('CanvasResource kind and interaction state', () => {
   it('draws an Open Reference Resource to an Image Resource as its Target’s image, with no Replace', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'reference', onOpenChange: () => 'completed' }}
+        kindOperations={{ kind: 'reference' }}
+        onOpenChange={() => 'completed'}
         display={opened({
           kind: 'image',
           url: FIGURE_URL,
@@ -507,7 +508,8 @@ describe('CanvasResource kind and interaction state', () => {
   it('draws an unresolved Target as a notice, not an empty document', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'reference', onOpenChange: () => 'completed' }}
+        kindOperations={{ kind: 'reference' }}
+        onOpenChange={() => 'completed'}
         display={opened({ kind: 'unresolved', via: 'reference' })}
         state="rest"
         title="Dangling"
@@ -545,11 +547,8 @@ describe('CanvasResource Open and Close operation', () => {
     render(
       <CanvasResource
         readOnly
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange: vi.fn(() => 'completed' as const),
-          onBeginEdit: vi.fn(),
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: vi.fn() }}
+        onOpenChange={vi.fn(() => 'completed' as const)}
         display={CLOSED_DISPLAY}
         state="selected"
         title="A"
@@ -632,7 +631,8 @@ describe('CanvasResource Open and Close operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown', onOpenChange }}
+        kindOperations={{ kind: 'markdown' }}
+        onOpenChange={onOpenChange}
         display={{
           shown: 'open',
           content: { kind: 'markdown', source: '## Authored placement', via: 'self' },
@@ -666,7 +666,8 @@ describe('CanvasResource Open and Close operation', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown', onOpenChange }}
+        kindOperations={{ kind: 'markdown' }}
+        onOpenChange={onOpenChange}
         display={CLOSED_DISPLAY}
         state="selected"
         title="A"
@@ -681,7 +682,8 @@ describe('CanvasResource Open and Close operation', () => {
 
     rerender(
       <CanvasResource
-        kindOperations={{ kind: 'markdown', onOpenChange }}
+        kindOperations={{ kind: 'markdown' }}
+        onOpenChange={onOpenChange}
         display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
         state="selected"
         title="A"
@@ -699,11 +701,8 @@ describe('CanvasResource Open and Close operation', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     const { rerender } = render(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange,
-          onBeginEdit: onBeginContentEdit,
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: onBeginContentEdit }}
+        onOpenChange={onOpenChange}
         display={CLOSED_DISPLAY}
         state="selected"
         title="A"
@@ -728,11 +727,8 @@ describe('CanvasResource Open and Close operation', () => {
 
     rerender(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange,
-          onBeginEdit: onBeginContentEdit,
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: onBeginContentEdit }}
+        onOpenChange={onOpenChange}
         display={{ shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }}
         state="selected"
         title="A"
@@ -767,11 +763,8 @@ describe('CanvasResource Open and Close operation', () => {
     const onBeginContentEdit = vi.fn();
     render(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange: () => 'retained',
-          onBeginEdit: onBeginContentEdit,
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: onBeginContentEdit }}
+        onOpenChange={() => 'retained'}
         display={CLOSED_DISPLAY}
         state="selected"
         title="A"
@@ -790,11 +783,8 @@ describe('CanvasResource Open and Close operation', () => {
     const onBeginContentEdit = vi.fn();
     render(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange: vi.fn(),
-          onBeginEdit: onBeginContentEdit,
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: onBeginContentEdit }}
+        onOpenChange={vi.fn()}
         display={beginEditing(
           opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
           {
@@ -843,10 +833,8 @@ describe('CanvasResource Open and Close operation', () => {
   it('draws those two ends as the rail actions beside them, not as a second kind', () => {
     render(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange: vi.fn(),
-        }}
+        kindOperations={{ kind: 'markdown' }}
+        onOpenChange={vi.fn()}
         display={beginEditing(
           opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
           {
@@ -881,10 +869,8 @@ describe('CanvasResource Open and Close operation', () => {
   it('keeps the caret in the content when one of those two ends is pressed', () => {
     render(
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange: vi.fn(),
-        }}
+        kindOperations={{ kind: 'markdown' }}
+        onOpenChange={vi.fn()}
         display={beginEditing(
           opened({ kind: 'markdown', source: 'Markdown', via: 'self' }),
           {
@@ -911,7 +897,8 @@ describe('CanvasResource Open and Close operation', () => {
   it('hides both actions while the title is being edited', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown', onOpenChange: () => 'completed' }}
+        kindOperations={{ kind: 'markdown' }}
+        onOpenChange={() => 'completed'}
         display={CLOSED_DISPLAY}
         state="editing"
         title="A"
@@ -928,7 +915,8 @@ describe('CanvasResource Open and Close operation', () => {
   it('hides both actions while dragging', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'markdown', onOpenChange: () => 'completed' }}
+        kindOperations={{ kind: 'markdown' }}
+        onOpenChange={() => 'completed'}
         display={CLOSED_DISPLAY}
         state="dragging"
         title="A"
@@ -1097,7 +1085,6 @@ describe('CanvasResource Title ladder', () => {
   it('draws the same ladder Open and Closed, on every Resource kind', () => {
     const title = 'Strategies\nNo strategy is privileged\nADR 0014';
     const cases: readonly (readonly [KindOperations, ResourceDisplay])[] = [
-      [{ kind: 'preview' }, CLOSED_DISPLAY],
       [{ kind: 'markdown' }, CLOSED_DISPLAY],
       [{ kind: 'markdown' }, opened({ kind: 'markdown', source: '', via: 'self' })],
       [{ kind: 'reference' }, CLOSED_DISPLAY],
@@ -1174,11 +1161,8 @@ describe('CanvasResource Title ladder', () => {
     const title = 'Strategies\nNo strategy is privileged\nADR 0014';
     const resource = (open: boolean) => (
       <CanvasResource
-        kindOperations={{
-          kind: 'markdown',
-          onOpenChange: () => 'completed' as const,
-          onBeginEdit: () => undefined,
-        }}
+        kindOperations={{ kind: 'markdown', onBeginEdit: () => undefined }}
+        onOpenChange={() => 'completed' as const}
         display={
           open
             ? { shown: 'open', content: { kind: 'markdown', source: 'Markdown', via: 'self' } }
@@ -1604,7 +1588,8 @@ describe('CanvasResource Space Resource', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     const { rerender } = render(
       <CanvasResource
-        kindOperations={{ kind: 'space', onOpenChange }}
+        kindOperations={{ kind: 'space' }}
+        onOpenChange={onOpenChange}
         display={CLOSED_DISPLAY}
         state="selected"
         title="Elsewhere"
@@ -1620,7 +1605,8 @@ describe('CanvasResource Space Resource', () => {
 
     rerender(
       <CanvasResource
-        kindOperations={{ kind: 'space', onOpenChange }}
+        kindOperations={{ kind: 'space' }}
+        onOpenChange={onOpenChange}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="selected"
         title="Elsewhere"
@@ -1641,12 +1627,8 @@ describe('CanvasResource Space Resource', () => {
     const onEditingChange = vi.fn();
     const { rerender } = render(
       <CanvasResource
-        kindOperations={{
-          kind: 'space',
-          onOpenChange: () => 'completed',
-          spaceRail,
-          portal: { editing: false, onEditingChange },
-        }}
+        kindOperations={{ kind: 'space', spaceRail, portal: { editing: false, onEditingChange } }}
+        onOpenChange={() => 'completed'}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="selected"
         title="Elsewhere"
@@ -1663,12 +1645,8 @@ describe('CanvasResource Space Resource', () => {
 
     rerender(
       <CanvasResource
-        kindOperations={{
-          kind: 'space',
-          onOpenChange: () => 'completed',
-          spaceRail,
-          portal: { editing: true, onEditingChange },
-        }}
+        kindOperations={{ kind: 'space', spaceRail, portal: { editing: true, onEditingChange } }}
+        onOpenChange={() => 'completed'}
         display={{ shown: 'open', content: SPACE_CONTENT }}
         state="selected"
         title="Elsewhere"
@@ -1744,11 +1722,8 @@ describe('CanvasResource Open Markdown body', () => {
    */
   const openMarkdown = (state: 'rest' | 'selected', onBeginEdit: () => void) => (
     <CanvasResource
-      kindOperations={{
-        kind: 'markdown',
-        onOpenChange: () => 'completed' as const,
-        onBeginEdit,
-      }}
+      kindOperations={{ kind: 'markdown', onBeginEdit }}
+      onOpenChange={() => 'completed' as const}
       display={{ shown: 'open', content: { kind: 'markdown', source: 'Body', via: 'self' } }}
       state={state}
       title="A"
@@ -1957,7 +1932,8 @@ describe('CanvasResource Ur Resource', () => {
     const onOpenChange = vi.fn(() => 'completed' as const);
     const { rerender } = render(
       <CanvasResource
-        kindOperations={{ kind: 'ur', onOpenChange }}
+        kindOperations={{ kind: 'ur' }}
+        onOpenChange={onOpenChange}
         display={CLOSED_DISPLAY}
         state="selected"
         title="Gateway"
@@ -1972,7 +1948,8 @@ describe('CanvasResource Ur Resource', () => {
 
     rerender(
       <CanvasResource
-        kindOperations={{ kind: 'ur', onOpenChange }}
+        kindOperations={{ kind: 'ur' }}
+        onOpenChange={onOpenChange}
         display={UR_OPEN}
         state="selected"
         title="Gateway"
@@ -2009,7 +1986,8 @@ describe('CanvasResource Ur Resource', () => {
   it('draws an Open Reference Resource to an Ur Resource the same, read-only', () => {
     render(
       <CanvasResource
-        kindOperations={{ kind: 'reference', onOpenChange: () => 'completed' }}
+        kindOperations={{ kind: 'reference' }}
+        onOpenChange={() => 'completed'}
         display={opened({ kind: 'ur', via: 'reference' })}
         state="selected"
         title="Gateway, again"
@@ -2344,7 +2322,8 @@ describe('choosing an Ur Resource’s Shape from its rail', () => {
     const { rerender } = render(
       <CanvasResource
         {...props}
-        kindOperations={{ kind: 'ur', onOpenChange: () => 'completed' }}
+        kindOperations={{ kind: 'ur' }}
+        onOpenChange={() => 'completed'}
         display={CLOSED_DISPLAY}
       />,
     );
