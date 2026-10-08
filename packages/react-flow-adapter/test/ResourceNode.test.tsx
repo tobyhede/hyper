@@ -195,7 +195,7 @@ interface Overrides {
   title?: string;
   kind?: ResourceNodeData['kind'];
   titleEditor?: ResourceTitleEditor;
-  onEditResource?: (open: boolean) => void;
+  onOpenChange?: (open: boolean) => void;
   onBeginTitleEditing?: () => void;
   open?: boolean;
   /** The Markdown an Open Markdown or Reference Resource draws. */
@@ -262,7 +262,7 @@ function props({
   title = 'A',
   kind = 'markdown',
   titleEditor,
-  onEditResource,
+  onOpenChange,
   onBeginTitleEditing,
   open,
   source = '',
@@ -294,9 +294,9 @@ function props({
     activeGraphColor: '#1f77b4',
     readOnly,
   };
-  if (onEditResource !== undefined)
-    data.onEditResource = (next) => {
-      onEditResource(next);
+  if (onOpenChange !== undefined)
+    data.onOpenChange = (next) => {
+      onOpenChange(next);
       return 'completed';
     };
   if (onBeginTitleEditing !== undefined) data.onBeginTitleEditing = onBeginTitleEditing;
@@ -378,7 +378,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
           kind: 'reference',
           title: 'A, again',
           selected: true,
-          onEditResource: vi.fn(),
+          onOpenChange: vi.fn(),
         })}
       />,
     );
@@ -391,20 +391,20 @@ describe('ResourceNode canvas Resource state adapter', () => {
   });
 
   it('passes the Reference Resource metadata Open operation through its own kind operations', () => {
-    const onEditResource = vi.fn();
+    const onOpenChange = vi.fn();
     render(
       <ResourceNode
         {...props({
           kind: 'reference',
           title: 'A, again',
           selected: true,
-          onEditResource,
+          onOpenChange,
         })}
       />,
     );
 
     screen.getByRole('button', { name: 'Open Resource A, again' }).click();
-    expect(onEditResource).toHaveBeenCalledWith(true);
+    expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
   it("passes an Ur Resource's Shape choice through its own kind operations", () => {
@@ -419,20 +419,20 @@ describe('ResourceNode canvas Resource state adapter', () => {
 
   it('draws a Markdown Resource kind glyph like any other kind', () => {
     render(
-      <ResourceNode {...props({ kind: 'markdown', selected: true, onEditResource: vi.fn() })} />,
+      <ResourceNode {...props({ kind: 'markdown', selected: true, onOpenChange: vi.fn() })} />,
     );
 
     expect(screen.getByRole('img', { name: 'Markdown Resource' })).toBeVisible();
   });
 
   it('renders a Closed Image Resource by its Title and kind, with no Markdown to edit', () => {
-    const onEditResource = vi.fn();
+    const onOpenChange = vi.fn();
     render(
       <ResourceNode
         {...props({
           kind: 'image',
           selected: true,
-          onEditResource,
+          onOpenChange,
           onBeginBodyEditing: vi.fn(),
         })}
       />,
@@ -442,7 +442,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
     expect(screen.getByRole('img', { name: 'Image Resource' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Edit Resource A' })).toBeNull();
     screen.getByRole('button', { name: 'Open Resource A' }).click();
-    expect(onEditResource).toHaveBeenCalledWith(true);
+    expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
   it('offers an Image Resource Replace, and draws the upload target while it is replacing', () => {
@@ -489,14 +489,14 @@ describe('ResourceNode canvas Resource state adapter', () => {
   });
 
   it('renders a Space Resource through explicit non-Markdown kind operations', () => {
-    const onEditResource = vi.fn();
+    const onOpenChange = vi.fn();
     const onBeginBodyEditing = vi.fn();
     render(
       <ResourceNode
         {...props({
           kind: 'space',
           open: true,
-          onEditResource,
+          onOpenChange,
           onBeginBodyEditing,
         })}
       />,
@@ -521,7 +521,7 @@ describe('ResourceNode draws what the display shows', () => {
           open: true,
           selected: true,
           content: { kind: 'image', url: FIGURE, via: 'reference' },
-          onEditResource: vi.fn(),
+          onOpenChange: vi.fn(),
         })}
       />,
     );
@@ -579,14 +579,14 @@ describe('ResourceNode Ur Resource', () => {
   };
 
   it('opens through the shared operation and offers no Edit, even when one is supplied', () => {
-    const onEditResource = vi.fn();
+    const onOpenChange = vi.fn();
     render(
       <ResourceNode
         {...props({
           kind: 'ur',
           title: 'Gateway',
           selected: true,
-          onEditResource,
+          onOpenChange,
           onBeginBodyEditing: vi.fn(),
         })}
       />,
@@ -596,11 +596,11 @@ describe('ResourceNode Ur Resource', () => {
     expect(screen.queryByRole('img', { name: 'Ur Resource' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
     screen.getByRole('button', { name: 'Open Resource Gateway' }).click();
-    expect(onEditResource).toHaveBeenCalledWith(true);
+    expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
   it('draws only its Title while Open, and offers Close and the resize control', () => {
-    const onEditResource = vi.fn();
+    const onOpenChange = vi.fn();
     render(
       <ResourceNode
         {...props({
@@ -608,7 +608,7 @@ describe('ResourceNode Ur Resource', () => {
           title: 'Gateway',
           open: true,
           selected: true,
-          onEditResource,
+          onOpenChange,
           onBeginBodyEditing: vi.fn(),
           resize,
         })}
@@ -621,7 +621,7 @@ describe('ResourceNode Ur Resource', () => {
     expect(screen.getByTestId('resize-control')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit Resource Gateway' })).toBeNull();
     screen.getByRole('button', { name: 'Close Resource Gateway' }).click();
-    expect(onEditResource).toHaveBeenCalledWith(false);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('draws an Open Reference Resource to an Ur Resource as its Title alone, read-only', () => {
@@ -633,7 +633,7 @@ describe('ResourceNode Ur Resource', () => {
           open: true,
           selected: true,
           content: { kind: 'ur', via: 'reference' },
-          onEditResource: vi.fn(),
+          onOpenChange: vi.fn(),
         })}
       />,
     );
@@ -650,7 +650,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
 
   it('draws them above the top-right corner while the Resource is the one selected', () => {
     flow.selected = [resourceId];
-    render(<ResourceNode {...props({ selected: true, onEditResource: vi.fn() })} />);
+    render(<ResourceNode {...props({ selected: true, onOpenChange: vi.fn() })} />);
 
     const floating = toolbar()?.closest('.react-flow__node-toolbar');
     expect(floating).toHaveAttribute('data-position', 'top');
@@ -659,27 +659,25 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
   });
 
   it('draws none on a Resource at rest', () => {
-    render(<ResourceNode {...props({ onEditResource: vi.fn() })} />);
+    render(<ResourceNode {...props({ onOpenChange: vi.fn() })} />);
     expect(toolbar()).toBeNull();
   });
 
   it('draws none while several Resources are selected', () => {
     flow.selected = [resourceId, 'other'];
-    render(<ResourceNode {...props({ selected: true, onEditResource: vi.fn() })} />);
+    render(<ResourceNode {...props({ selected: true, onOpenChange: vi.fn() })} />);
     expect(toolbar()).toBeNull();
   });
 
   it('draws none for the authoring selection while React Flow holds another Resource selected', () => {
     flow.selected = ['other'];
-    render(<ResourceNode {...props({ selectedForAuthoring: true, onEditResource: vi.fn() })} />);
+    render(<ResourceNode {...props({ selectedForAuthoring: true, onOpenChange: vi.fn() })} />);
     expect(toolbar()).toBeNull();
   });
 
   it('draws none while the Resource is dragged', () => {
     flow.selected = [resourceId];
-    render(
-      <ResourceNode {...props({ selected: true, dragging: true, onEditResource: vi.fn() })} />,
-    );
+    render(<ResourceNode {...props({ selected: true, dragging: true, onOpenChange: vi.fn() })} />);
     expect(toolbar()).toBeNull();
   });
 
@@ -700,7 +698,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
           open: true,
           source: 'Body',
           resize,
-          onEditResource: vi.fn(),
+          onOpenChange: vi.fn(),
         })}
       />,
     );
@@ -714,7 +712,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
     const running = props({
       open: true,
       source: 'Body',
-      onEditResource: vi.fn(),
+      onOpenChange: vi.fn(),
       editor: { onComplete: vi.fn(), onEnd: vi.fn() },
     });
     const inNode = (node: NodeProps<ResourceFlowNode>) => (
@@ -726,7 +724,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
     await screen.findByRole('button', { name: 'Save Resource A' });
 
     // Save or Cancel ends the edit, and with it the reason the toolbar was drawn.
-    rerender(inNode(props({ open: true, source: 'Body', onEditResource: vi.fn() })));
+    rerender(inNode(props({ open: true, source: 'Body', onOpenChange: vi.fn() })));
 
     expect(toolbar()).toBeNull();
     expect(container.querySelector('.react-flow__node')).toHaveFocus();
@@ -738,7 +736,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
         {...props({
           open: true,
           source: 'Body',
-          onEditResource: vi.fn(),
+          onOpenChange: vi.fn(),
           editor: { onComplete: vi.fn(), onEnd: vi.fn() },
         })}
       />,
@@ -772,13 +770,13 @@ describe('ResourceNode Open authoring', () => {
    * surface. Renaming is the title's own gesture and `F2`.
    */
   it('edits the Resource from the affordance, without touching the title', () => {
-    const onEditResource = vi.fn();
+    const onOpenChange = vi.fn();
     const onBeginTitleEditing = vi.fn();
     render(
       <ResourceNode
         {...props({
           selected: true,
-          onEditResource,
+          onOpenChange,
           onBeginTitleEditing,
         })}
       />,
@@ -786,7 +784,7 @@ describe('ResourceNode Open authoring', () => {
 
     screen.getByRole('button', { name: 'Open Resource A' }).click();
 
-    expect(onEditResource).toHaveBeenCalledOnce();
+    expect(onOpenChange).toHaveBeenCalledOnce();
     expect(onBeginTitleEditing).not.toHaveBeenCalled();
   });
 
@@ -930,17 +928,17 @@ describe('ResourceNode title authoring', () => {
  */
 describe('ResourceNode readOnly suppresses controls despite a supplied operation', () => {
   it('withholds the Open control from a read-only Closed Resource', () => {
-    const onEditResource = vi.fn();
-    render(<ResourceNode {...props({ selected: true, readOnly: true, onEditResource })} />);
+    const onOpenChange = vi.fn();
+    render(<ResourceNode {...props({ selected: true, readOnly: true, onOpenChange })} />);
 
     expect(screen.queryByRole('button', { name: 'Open Resource A' })).not.toBeInTheDocument();
   });
 
   it('withholds the Close control from a read-only Open Resource', () => {
-    const onEditResource = vi.fn();
+    const onOpenChange = vi.fn();
     render(
       <ResourceNode
-        {...props({ selected: true, readOnly: true, open: true, source: 'x', onEditResource })}
+        {...props({ selected: true, readOnly: true, open: true, source: 'x', onOpenChange })}
       />,
     );
 
@@ -1288,7 +1286,7 @@ describe('ResourceNode Open Resource', () => {
           open: true,
           source: SOURCE,
           selected: true,
-          onEditResource: vi.fn(),
+          onOpenChange: vi.fn(),
         })}
       />,
     );

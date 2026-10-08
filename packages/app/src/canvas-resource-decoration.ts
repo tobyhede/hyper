@@ -30,7 +30,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 export type CanvasResourceDataPatch = Partial<
   Pick<
     ResourceNodeData,
-    | 'onEditResource'
+    | 'onOpenChange'
     | 'onResourceShapeChange'
     | 'onBeginTitleEditing'
     | 'resize'
@@ -176,7 +176,7 @@ export function decorateSharedResourceNode(
   const patch: Mutable<
     Pick<
       ResourceNodeData,
-      | 'onEditResource'
+      | 'onOpenChange'
       | 'onResourceShapeChange'
       | 'onBeginTitleEditing'
       | 'resize'
@@ -186,7 +186,7 @@ export function decorateSharedResourceNode(
   > = {};
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && takesOpen(node.data.kind)) {
     // An Ur Resource has no content to show, so it offers no Open or Close.
-    patch.onEditResource = (open) =>
+    patch.onOpenChange = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
   } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {
     // A live content editor keeps its Close drawn when the canvas withdraws
@@ -194,7 +194,7 @@ export function decorateSharedResourceNode(
     // stays in its slot, unavailable, instead of vanishing and returning.
     // `CanvasResource` draws it disabled while the edit runs; withdrawn, it
     // also retains rather than running an Open or Close Edit.
-    patch.onEditResource = () => 'retained';
+    patch.onOpenChange = () => 'retained';
   }
   const changeResourceShape = context.changeResourceShape;
   if (

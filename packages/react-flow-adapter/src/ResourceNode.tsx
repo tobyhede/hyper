@@ -54,7 +54,7 @@ type MutableKindOperations =
  */
 function kindOperationsOf(data: ResourceFlowNode['data']): KindOperations {
   const kindOperations = operationsOfKind(data);
-  if (data.onEditResource !== undefined) kindOperations.onOpenChange = data.onEditResource;
+  if (data.onOpenChange !== undefined) kindOperations.onOpenChange = data.onOpenChange;
   return kindOperations;
 }
 

@@ -193,7 +193,7 @@ describe('canvas Resource authoring', () => {
     expect(closed.data.display.shown).not.toBe('editing');
 
     act(() => {
-      expect(closed.data.onEditResource?.(true)).toBe('completed');
+      expect(closed.data.onOpenChange?.(true)).toBe('completed');
       closed.data.onBeginBodyEditing?.();
     });
     expect(spaceSession.getState().working.document.maps?.[0]?.positions[RESOURCE_ID]?.open).toBe(
@@ -239,7 +239,7 @@ describe('canvas Resource authoring', () => {
     // Close and the shared Title interaction; it never hands the Reference Resource the
     // caret or the editor that would let it author the Target's content.
     const reference = onlyNode(result.current.nodes);
-    expect(reference.data.onEditResource).toBeDefined();
+    expect(reference.data.onOpenChange).toBeDefined();
     expect(reference.data.onBeginTitleEditing).toBeDefined();
     expect(reference.data.onBeginBodyEditing).toBeUndefined();
     expect(reference.data.display.shown).not.toBe('editing');
@@ -260,7 +260,7 @@ describe('canvas Resource authoring', () => {
       resourceId: UR_ID,
     });
     const ur = onlyNode(result.current.nodes);
-    expect(ur.data.onEditResource).toBeUndefined();
+    expect(ur.data.onOpenChange).toBeUndefined();
     expect(ur.data.onBeginTitleEditing).toBeDefined();
     expect(ur.data.onBeginBodyEditing).toBeUndefined();
     const before = spaceSession.getState().working;
@@ -498,7 +498,7 @@ describe('canvas Resource authoring', () => {
       act(() => result.current.beginTitleEditing(MISSING_RESOURCE_ID));
 
       const missing = onlyNode(result.current.nodes);
-      expect(missing.data.onEditResource).toBeUndefined();
+      expect(missing.data.onOpenChange).toBeUndefined();
       expect(missing.data.onBeginTitleEditing).toBeUndefined();
       expect(missing.data.onBeginBodyEditing).toBeUndefined();
       expect(missing.data.resize).toBeUndefined();
@@ -509,12 +509,12 @@ describe('canvas Resource authoring', () => {
 
   it('withdraws authoring when the working Space changes without a projection render', () => {
     const { result, spaceSession } = mountAuthoring();
-    expect(onlyNode(result.current.nodes).data.onEditResource).toBeDefined();
+    expect(onlyNode(result.current.nodes).data.onOpenChange).toBeDefined();
 
     act(() => spaceSession.submit(snapshotWithoutResource));
 
     const staleProjection = onlyNode(result.current.nodes);
-    expect(staleProjection.data.onEditResource).toBeUndefined();
+    expect(staleProjection.data.onOpenChange).toBeUndefined();
     expect(staleProjection.data.onBeginTitleEditing).toBeUndefined();
   });
 

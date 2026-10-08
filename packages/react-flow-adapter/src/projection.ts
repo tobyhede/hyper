@@ -75,7 +75,7 @@ export type ResourceNodeData = {
    * `onBeginBodyEditing`, which the application withholds from everything but
    * `markdown` and `image`.
    */
-  onEditResource?: (open: boolean) => 'completed' | 'retained';
+  onOpenChange?: (open: boolean) => 'completed' | 'retained';
   /**
    * Draw this Ur Resource in another Shape on its Map (ADR 0121). Absent on
    * every other kind, and wherever the Map may not be authored.

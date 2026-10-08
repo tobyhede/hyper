@@ -115,7 +115,7 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(RESOURCE_ID, 'markdown'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onEditResource).toBeTypeOf('function');
+    expect(patch.onOpenChange).toBeTypeOf('function');
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
     expect(patch.onBeginBodyEditing).toBeUndefined();
@@ -155,7 +155,7 @@ describe('decorateSharedResourceNode', () => {
       context({ bodyEditing: true }),
     );
     expect(patch.onBeginTitleEditing).toBeUndefined();
-    expect(patch.onEditResource).toBeTypeOf('function');
+    expect(patch.onOpenChange).toBeTypeOf('function');
   });
 
   it('keeps the live content editor’s Close drawn, and inert, while authoring is withdrawn', () => {
@@ -174,9 +174,9 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(RESOURCE_ID, 'markdown', true),
       withdrawn,
     );
-    expect(patch.onEditResource).toBeTypeOf('function');
-    expect(patch.onEditResource?.(false)).toBe('retained');
-    expect(patch.onEditResource?.(true)).toBe('retained');
+    expect(patch.onOpenChange).toBeTypeOf('function');
+    expect(patch.onOpenChange?.(false)).toBe('retained');
+    expect(patch.onOpenChange?.(true)).toBe('retained');
     expect(closeResource).not.toHaveBeenCalled();
     expect(openResource).not.toHaveBeenCalled();
     expect(patch.onBeginTitleEditing).toBeUndefined();
@@ -186,7 +186,7 @@ describe('decorateSharedResourceNode', () => {
 
     expect(
       decorateSharedResourceNode(projectionNode(REFERENCE_ID, 'markdown', true), withdrawn)
-        .onEditResource,
+        .onOpenChange,
     ).toBeUndefined();
   });
 
@@ -195,7 +195,7 @@ describe('decorateSharedResourceNode', () => {
       projectionNode(MISSING_RESOURCE_ID, 'markdown', true),
       context(),
     );
-    expect(patch.onEditResource).toBeUndefined();
+    expect(patch.onOpenChange).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeUndefined();
     expect(patch.resize).toBeUndefined();
     expect(patch.titleEditor).toBeUndefined();
@@ -283,7 +283,7 @@ describe('an Ur Resource’s decoration', () => {
       projectionNode(UR_ID, 'ur'),
       context({ resourceEntityActions: () => [] }),
     );
-    expect(patch.onEditResource).toBeUndefined();
+    expect(patch.onOpenChange).toBeUndefined();
     expect(patch.onBeginTitleEditing).toBeTypeOf('function');
     expect(patch.entityActions).toEqual([]);
     expect(patch.onBeginBodyEditing).toBeUndefined();
