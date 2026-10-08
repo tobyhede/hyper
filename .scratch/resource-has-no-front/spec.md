@@ -15,7 +15,7 @@ The second meaning is written three times: in decoration (`packages/app/src/canv
 
 1. Retire "front" from the vocabulary. `CONTEXT.md` describes a Resource drawn on a Map as Closed (its Title) or Open (its content); front, back, face and card go into _Avoid_. No "Resource view" term is added: Open already names it, and "view" is taken by the Space Resource.
 2. A short ADR, "The Resource has no front", refines ADR 0051 and records the rejected option of keeping "front" as a loose metaphor, with its cost: about twenty ADRs keep the word as history.
-3. Renames: `CanvasResourceFront` → `KindOperations`, `CanvasResource`'s `front` prop → `kindOperations`, `FrontDisplay` → `CanvasResourceDisplay`, locals and helpers to match. Story `Front` → `Closed`. Parity claims `canvas-resource-front-draws-only-its-title-lines` → `closed-resource-draws-only-its-title-lines` and `image-resource-closed-front-draws-title-and-kind` → `closed-image-resource-draws-title-and-kind`.
+3. Renames: `CanvasResourceFront` → `KindOperations`, `CanvasResource`'s `front` prop → `kindOperations`, locals and helpers to match. Story `Front` → `Closed`. Parity claims `canvas-resource-front-draws-only-its-title-lines` → `closed-resource-draws-only-its-title-lines` and `image-resource-closed-front-draws-title-and-kind` → `closed-image-resource-draws-title-and-kind`.
 4. The rename is a tracked codemod for identifiers, story ids, parity ids and CSS. Prose comments are rewritten by hand in their own commit.
 5. The vocabulary guard scans identifier shapes everywhere (PascalCase and camelCase compounds, kebab-case, screaming constant) and the phrases `Resource front`, `Closed front`, `Open front`. The bare English word and `frontmatter` stay legal.
 6. Open/Close leaves `KindOperations` and becomes a shared `CanvasResource` prop beside `onBeginTitleEdit`. Node data's `onEditResource` is renamed `onOpenChange` in its own commit.
@@ -36,7 +36,7 @@ Behaviour-preserving: for both PRs the diff under `packages/app/e2e/`, `packages
 
 ## Constraints
 
-- ADR 0070: the `display` (`closed | open | presented`, then `editing | replacing`) and `resolveResourceContent`'s `via` are unchanged.
+- ADR 0070: the `display` (`closed | open`, then `editing | replacing`) and `resolveResourceContent`'s `via` are unchanged.
 - React Flow specifics stay in `react-flow-adapter`; `ui` depends on `core` only.
 - `CanvasResource` changes go through `shadcn-first-ui` and `pnpm ui:catalog:check`.
 - Renames never share a commit with structural change (`docs/agents/workflow.md`, "Renames").

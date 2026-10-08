@@ -6,7 +6,7 @@ Related: 0064, 0070, 0122
 
 A Resource on a Map is drawn **Closed**, as its Title, or **Open**, as its content, at the size its Map entry authors. "Front" is not a word for either, and it is not a word for anything else. The Resource is what is drawn; Closed and Open say how.
 
-"Front" came from the card prototype, where a card had a face. Nothing in the domain has a back. Over time the word came to mean two things that already had names: a Resource as drawn on a Map, which is Closed or Open (ADR 0064) at a size independent of Open (ADR 0122), and, in code, the operations a kind offers beyond the shared Title (ADR 0051). The type that carries those operations is `KindOperations`, `CanvasResource` takes it as `kindOperations`, and the display it draws while placed on a Map is `CanvasResourceDisplay`.
+"Front" came from the card prototype, where a card had a face. Nothing in the domain has a back. Over time the word came to mean two things that already had names: a Resource as drawn on a Map, which is Closed or Open (ADR 0064) at a size independent of Open (ADR 0122), and, in code, the operations a kind offers beyond the shared Title (ADR 0051). The type that carries those operations is `KindOperations`, and `CanvasResource` takes it as `kindOperations`.
 
 This refines ADR 0051 in its vocabulary only. A kind still owns everything beyond the Title, and Resources still keep one uniform geometry across kinds.
 

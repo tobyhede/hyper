@@ -328,9 +328,9 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
 /**
  * The one drawn Resource shared by the production canvas and its stories.
  *
- * The deep production module for Markdown and Reference Resources, title
- * editing, refusal display and interaction-state visual treatment. React Flow
- * geometry, connection state, selection/drag translation and containment stay
+ * The deep production module for every Resource kind: title editing, refusal
+ * display and interaction-state visual treatment. React Flow geometry,
+ * connection state, selection/drag translation and containment stay
  * with the adapter that renders this component (`@project/react-flow-adapter`
  * `ResourceNode`) — nothing here imports React Flow or reaches into its DOM. Its
  * own visual treatment lives in `canvas-resource.css`, colocated with this module.
