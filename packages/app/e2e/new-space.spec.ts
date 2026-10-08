@@ -1,6 +1,5 @@
 import { expect, test, type Page } from './fixtures';
 import {
-  activeResource,
   activeGraph,
   authoringHandle,
   connectHandles,
@@ -12,6 +11,7 @@ import {
   presentControl,
   selectedCanvas,
   settled,
+  presentedName,
 } from './graph';
 import { seedPositionedMap, type HttpLoadedSpace } from './seed';
 
@@ -330,8 +330,6 @@ test('the Graph the explicit Map owns can be self-connected and presented', asyn
   const resource = nodeByTitle(page, 'Resource 1');
   await expect(resource).toBeVisible();
   await settled(page);
-  const resourceId = await resource.getAttribute('data-id');
-  expect(resourceId).not.toBeNull();
   await resource.hover();
 
   await connectHandles(
@@ -347,7 +345,7 @@ test('the Graph the explicit Map owns can be self-connected and presented', asyn
   await presentControl(page).click();
 
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeResource(page)).toHaveAttribute('data-id', resourceId!);
+  await expect(presentedName(page)).toHaveText('Resource 1');
   const moves = page.getByTestId('presenting-moves').getByRole('button');
   await expect(moves).toHaveCount(1);
   await expect(moves).toHaveText('Resource 1');

@@ -179,7 +179,6 @@ async function mountGraph(
         nodes={nodes}
         edges={[]}
         projectedNodes={null}
-        activeResourceId={null}
         presenting={false}
         placementReady={editable}
         // The facts a mounted canvas is given, turned into answers by the one

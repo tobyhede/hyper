@@ -1062,3 +1062,78 @@ export const imageReferenceSnapshot: SpaceSnapshot = {
 };
 
 export const imageReferenceSpace: Space = loaded(loadSpaceSnapshot(imageReferenceSnapshot));
+
+/* -------------------------------------------------------------------------- */
+/* Stage                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** Where the Stage fixture's identities live: `0x300`..`0x30f`. */
+const STAGE_ID_BASE = 0x300;
+
+const stageId = (offset: number): UUID =>
+  uuidSchema.parse(
+    `00000000-0000-4000-8000-${(STAGE_ID_BASE + offset).toString(16).padStart(12, '0')}`,
+  );
+
+const STAGE_MAP = stageId(0);
+
+/** The ids of the Resources the Stage stories present, in the order the Graph visits them. */
+export const stageIds = {
+  longRead: stageId(2),
+  picture: stageId(3),
+  titleSlide: stageId(4),
+} as const;
+
+/** The Stage's picture, which the catalogue test serves far larger than any frame. */
+export const STAGE_PICTURE_URL = 'https://example.com/stage-picture.png';
+
+/** Twenty list items: more than a 16:9 frame holds at the Stage's type size. */
+const LONG_READ_BODY = [
+  'A Resource longer than its frame scrolls inside it.',
+  '',
+  ...Array.from({ length: 20 }, (_, index) => `- Point ${index + 1}`),
+].join('\n');
+
+/**
+ * A line through the three shapes of content the Stage frames: Markdown longer
+ * than the frame, a picture, and an Ur Resource with no content below its name.
+ */
+export const stageSnapshot: SpaceSnapshot = {
+  id: stageId(0xf),
+  document: {
+    version: 1,
+    title: 'Stage',
+    defaultMap: STAGE_MAP,
+    maps: [
+      {
+        id: STAGE_MAP,
+        title: 'Talk',
+        kind: 'positioned',
+        positions: traversalPositions(Object.values(stageIds)),
+        graphs: [
+          {
+            id: stageId(1),
+            title: 'Talk',
+            edges: [
+              { from: stageIds.longRead, to: stageIds.picture },
+              { from: stageIds.picture, to: stageIds.titleSlide },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  resources: [
+    {
+      id: stageIds.longRead,
+      document: { title: 'Long read', kind: 'markdown', body: LONG_READ_BODY },
+    },
+    {
+      id: stageIds.picture,
+      document: { title: 'Picture', kind: 'image', url: STAGE_PICTURE_URL },
+    },
+    { id: stageIds.titleSlide, document: { title: 'Title slide', kind: 'ur' } },
+  ],
+};
+
+export const stageSpace: Space = loaded(loadSpaceSnapshot(stageSnapshot));

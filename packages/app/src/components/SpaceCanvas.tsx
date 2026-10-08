@@ -80,7 +80,7 @@ import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
 import { RESOURCE_SIZE } from '../resource';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from './ResourcesPopover';
 import { ResourceConnect, type Connecting } from './ResourceConnect';
-import { OverviewCamera, PresentingCamera, OpeningFramingCamera } from './cameras';
+import { OpeningFramingCamera } from './cameras';
 import {
   canvasNodeConnection,
   clipEmbeddedNode,
@@ -215,14 +215,11 @@ export interface SpaceCanvasProps {
   edges: Edge[];
   /** The next projection, merged in by a completed connection so its Edge draws. */
   projectedNodes: readonly ResourceFlowNode[] | null;
-  /** The Resource the traversal has reached, or `null` in overview. */
-  activeResourceId: string | null;
   /**
    * That a traversal is running — the Navigation mode, not an availability
-   * answer. Two consumers read it, and neither is an authoring operation: the
-   * camera that returns to the overview when the traversal ends (ADR 0027), and
-   * the click that resumes an embedded read of a Space that has been Exited,
-   * which nothing edits. What presenting *withdraws* from authoring is
+   * answer. One consumer reads it, and it is not an authoring operation: the
+   * click that resumes an embedded read of a Space that has been Exited, which
+   * nothing edits. What presenting *withdraws* from authoring is
    * `availability`'s to say.
    */
   presenting: boolean;
@@ -394,7 +391,6 @@ export function SpaceCanvas({
   nodes,
   edges,
   projectedNodes,
-  activeResourceId,
   presenting,
   placementReady,
   availability,
@@ -1812,8 +1808,6 @@ export function SpaceCanvas({
           activeGraphId={activeGraphId}
         />
       )}
-      <OverviewCamera presenting={presenting} />
-      <PresentingCamera activeResourceId={activeResourceId} />
       <OpeningFramingCamera framing={openingFraming} />
       {edgeSurface.layer}
       <ResourceConnect

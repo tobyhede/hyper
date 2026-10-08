@@ -21,6 +21,7 @@ import {
   settled,
   resourceActions,
   resourceControls,
+  presentedName,
 } from './graph';
 
 /**
@@ -287,11 +288,11 @@ test('Delete on a Dock control leaves the selected Resource on the canvas', asyn
 });
 
 /**
- * Presenting removes the strip entirely and hands the keyboard to the canvas.
+ * Presenting removes the strip entirely and hands the keyboard to the Stage.
  *
  * Nothing has to be dismissed before a presentation can be driven: the strip
- * is simply gone, and what is left is `PresentingChrome` and the canvas the
- * arrows reach.
+ * is simply gone, and what is left is the Stage, whose `PresentingChrome` and
+ * traversal the arrows reach.
  */
 test('Present from the strip leaves the presentation reachable', async ({ page }) => {
   await page.goto('/');
@@ -305,7 +306,7 @@ test('Present from the strip leaves the presentation reachable', async ({ page }
   await expect(dock(page)).toBeHidden();
 
   await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.react-flow__node.rf-resource-node--active')).toHaveCount(1);
+  await expect(presentedName(page)).toHaveText('B');
 });
 
 /**

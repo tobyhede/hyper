@@ -12,6 +12,7 @@ import {
   AUTHORING_HANDLE_SIDES,
   activateGraph,
   activeResource,
+  presentedName,
   activeGraph,
   beginRename,
   allPositions,
@@ -2661,22 +2662,13 @@ test('an authored Edge is immediately available when presenting the Graph', asyn
 
   await presentControl(page).click();
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
-  await expect(activeResource(page)).toHaveAttribute(
-    'data-id',
-    '00000000-0000-4000-8000-000000000008',
-  );
+  await expect(presentedName(page)).toHaveText('E');
   await expect(page.getByTestId('presenting-moves').getByRole('button')).toHaveText('A');
 
   await page.keyboard.press('ArrowRight');
-  await expect(activeResource(page)).toHaveAttribute(
-    'data-id',
-    '00000000-0000-4000-8000-000000000002',
-  );
+  await expect(presentedName(page)).toHaveText('A');
   await page.keyboard.press('ArrowLeft');
-  await expect(activeResource(page)).toHaveAttribute(
-    'data-id',
-    '00000000-0000-4000-8000-000000000008',
-  );
+  await expect(presentedName(page)).toHaveText('E');
 });
 
 test('no connection handle is visible or reachable on the presented Resource or a neighbour', async ({
@@ -2697,7 +2689,7 @@ test('no connection handle is visible or reachable on the presented Resource or 
   await expect(page.getByTestId('presenting-chrome')).toBeVisible();
   await expect(activeResource(page)).toHaveAttribute('data-id', A);
   await settled(page);
-  // By coordinates: the pane takes pointer events over a presented Resource, so
+  // By coordinates: the Stage covers the canvas while presenting, so
   // Playwright's actionable hover would wait on it forever.
   const presented = await boxOf(activeResource(page), 'the presented Resource');
   await page.mouse.move(presented.x + presented.width / 2, presented.y + presented.height / 2);

@@ -9,19 +9,12 @@ import { requireDefaultMap } from '#src/map-resolution';
 /**
  * Production Navigation, composed the way a story needs it and no other way.
  *
- * One surface opens a real Navigation — the presenting chrome — and
- * `PresentingChromeFixture` is this module's only importer, so this is a
- * single-consumer helper rather than a shared seam.
- *
- * What it carries is the reasoning, not the line count. Three rules live
- * here and each one is a mistake a fixture would otherwise make again: the
- * Space reader Navigation resolves every selection against has to answer *now*
- * rather than at mount (`composeStoryNavigation` below), the instance is
- * *state* rather than a memo, and the opening call runs exactly once. Inlining
- * them into the one fixture would put a page of lifecycle argument in the
- * middle of a component whose subject is the chrome — a decision to take
- * deliberately if a reader thinks the indirection costs more than it saves,
- * not a tidy-up to do in passing.
+ * Two fixtures open a real Navigation — `PresentingChromeFixture` and
+ * `PresentingStageFixture` — and three rules live here that each would
+ * otherwise have to get right again: the Space reader Navigation resolves
+ * every selection against has to answer *now* rather than at mount
+ * (`composeStoryNavigation` below), the instance is *state* rather than a
+ * memo, and the opening call runs exactly once.
  *
  * It is deliberately **not** a second lifecycle owner and not a visual facsimile
  * (ADR 0052). It holds no selected index, no Traversal history and no copy of

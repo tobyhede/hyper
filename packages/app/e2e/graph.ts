@@ -125,16 +125,42 @@ export async function expectResourceFillsNode(node: Locator): Promise<void> {
 }
 
 /**
- * The Resource reached during traversal, by the class the projection marks it with.
- *
- * Shared because presenting is asserted from both projects: `presenting.spec`
- * traverses the fixture's authored Graphs, and `new-space.spec` presents the Graph a
- * self-connection mints in a Space that started with none. The class is the
- * render layer's, not the domain's, so a second copy of the string is one the
- * next rename leaves behind.
+ * The canvas node of the Resource reached during traversal, by the class the
+ * projection marks it with. What the audience sees is the Stage
+ * ({@link presentedResource}); this is the Resource behind it on the canvas.
  */
 export function activeResource(page: Page): Locator {
   return page.locator('.react-flow__node.rf-resource-node--active');
+}
+
+/**
+ * The Stage presenting draws on, over the inert canvas (ADR 0123).
+ *
+ * Shared because presenting is read from several suites, and the test ids are
+ * the Stage's own rather than any one suite's.
+ */
+export function stage(page: Page): Locator {
+  return page.getByTestId('stage');
+}
+
+/** The Stage's 16:9 frame, which the Resource being presented is drawn in. */
+export function stageFrame(page: Page): Locator {
+  return page.getByTestId('stage-frame');
+}
+
+/** The frame's scrolling body, named for what it shows. */
+export function stageBody(page: Page): Locator {
+  return stage(page).getByRole('region', { name: 'Presented Resource' });
+}
+
+/** The Resource being presented, as the Stage draws it. */
+export function presentedResource(page: Page): Locator {
+  return stage(page).getByTestId('resource-content');
+}
+
+/** The name the Stage draws for the Resource being presented. */
+export function presentedName(page: Page): Locator {
+  return presentedResource(page).locator('.resource__title');
 }
 
 /**

@@ -10,6 +10,8 @@ export { StatusBusy, StatusFailure } from './StatusPanel';
 export type { StatusBusyProps, StatusFailureProps } from './StatusPanel';
 export { PresentedResource } from './PresentedResource';
 export type { PresentedResourceProps } from './PresentedResource';
+export { Stage } from './Stage';
+export type { StageProps } from './Stage';
 export { CanvasResource, CANVAS_RESOURCE_DRAG_TILT_DEGREES } from './CanvasResource';
 export {
   atRest,

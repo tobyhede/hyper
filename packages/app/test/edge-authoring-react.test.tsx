@@ -371,7 +371,6 @@ function CanvasHarness({
         nodes={projection?.nodes ?? []}
         edges={projection?.edges ?? []}
         projectedNodes={null}
-        activeResourceId={null}
         presenting={presenting}
         placementReady={true}
         availability={authoringAvailability({
