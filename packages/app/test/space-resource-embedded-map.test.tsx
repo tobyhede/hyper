@@ -24,6 +24,7 @@ import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
 import { stubResizeObserver } from './resize-observer';
+import { holdCanvasPolicy } from './map-surfaces';
 
 /**
  * What an Open Space Resource *shows* (ADR 0068).
@@ -691,6 +692,32 @@ describe('the Map an Open Space Resource draws', () => {
     fireEvent.click(within(controlsOf(parent)).getByRole('button', { name: /Done Resource/ }));
     await waitFor(() => expect(queryCommand(embeddedNode(DRAWN_A), /Edit Resource/)).toBeNull());
     expect(within(controlsOf(parent)).getByRole('button', { name: /Edit Resource/ })).toBeTruthy();
+  });
+
+  /**
+   * The canvas's own policy is the ceiling its first-level drawn Maps inherit
+   * (ADR 0112): a portal Edit begun while the canvas authored stops authoring
+   * the drawn Map once the canvas surface holds the inert policy.
+   */
+  it('keeps a drawn Map inert under a canvas surface that holds the inert policy', async () => {
+    const value = home({
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: TARGET_ID,
+      map: SELECTED_MAP_ID,
+      graph: SELECTED_GRAPH_ID,
+    });
+    const { spaces } = await mountOpenSpaces(value);
+    await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
+    beginPortalEdit(containingNode(SPACE_RESOURCE_ID));
+    await waitFor(() =>
+      expect(embeddedNode(DRAWN_A).className.split(/\s+/)).not.toContain('nodrag'),
+    );
+    const surface = spaces.entry(HOME_ID)?.app.surface;
+    if (surface === undefined) throw new Error('Home is not open');
+    act(() => holdCanvasPolicy(surface, 'inert'));
+    await waitFor(() => expect(embeddedNode(DRAWN_A).className.split(/\s+/)).toContain('nodrag'));
+    expect(embeddedNode(DRAWN_A).style.pointerEvents).toBe('none');
   });
 
   /**

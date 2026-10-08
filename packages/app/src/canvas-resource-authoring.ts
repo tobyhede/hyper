@@ -93,7 +93,7 @@ const completeEditedSpaceResource = (
 };
 
 export interface CanvasResourceAuthoringInput {
-  readonly continuation?: Continuation | undefined;
+  readonly continuation: Continuation;
   /** This canvas Space's outcomes; target rails resolve their target's composition. */
   readonly commandOutcomes?: CommandOutcomes | undefined;
   /** This canvas Space's confirmation; target rails use the target's confirmation. */

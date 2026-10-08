@@ -19,6 +19,7 @@ import {
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
+import type { Continuation } from '../src/continuation';
 import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -86,6 +87,18 @@ const spaceDocument = {
   graph: TARGET_GRAPH_ID,
 };
 
+/**
+ * Never spent: these contexts hold `spaces: null`, so no Space Resource rail is
+ * built and nothing reads the continuation.
+ */
+const continuation: Continuation = {
+  getState: () => ({ pending: null }),
+  subscribe: () => () => undefined,
+  request: () => undefined,
+  take: () => undefined,
+  dispose: () => undefined,
+};
+
 const context = (
   overrides: Partial<CanvasResourceDecorationContext> = {},
 ): CanvasResourceDecorationContext => ({
@@ -110,6 +123,7 @@ const context = (
   beginBodyEditing: () => undefined,
   bodyEditorResourceId: null,
   completeResourceBody: () => 'completed',
+  continuation,
   containingSpaceId: SPACE_ID,
   spaceDocuments: new Map([[SPACE_RESOURCE_ID, spaceDocument]]),
   spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
