@@ -149,6 +149,29 @@ describe('presentingFullscreen', () => {
     expect(navigation.isPresenting()).toBe(true);
   });
 
+  it('requests nothing when the document is already fullscreen', () => {
+    const { browser, navigation, coordinator } = connected();
+    browser.enterByBrowser();
+
+    coordinator.present();
+
+    expect(navigation.isPresenting()).toBe(true);
+    expect(browser.requests()).toBe(0);
+  });
+
+  it('does not adopt a later fullscreen after presenting began in one it did not request', () => {
+    const { browser, navigation, coordinator } = connected();
+    browser.enterByBrowser();
+    coordinator.present();
+
+    browser.leaveByBrowser();
+    expect(navigation.isPresenting()).toBe(true);
+    browser.enterByBrowser();
+    browser.leaveByBrowser();
+
+    expect(navigation.isPresenting()).toBe(true);
+  });
+
   it('exits a fullscreen granted after presenting already ended', async () => {
     const { browser, navigation, coordinator } = connected();
     coordinator.present();

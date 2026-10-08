@@ -106,3 +106,46 @@ test('a presentation opened from a link does not request fullscreen and survives
   await expect(stage(page)).toBeVisible();
   await expect(presentedName(page)).toHaveText('B');
 });
+
+/**
+ * Leave fullscreen and wait until the page has handled it: the document's
+ * `fullscreenchange` arrives after `exitFullscreen()` resolves, so an
+ * assertion that presenting survived must wait for the event and a frame.
+ */
+const leaveFullscreenAndSettle = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        document.addEventListener(
+          'fullscreenchange',
+          () => requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          { once: true },
+        );
+        void document.exitFullscreen();
+      }),
+  );
+
+test('Present while already fullscreen leaves that fullscreen and a later one alone', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  await settled(page);
+  await page.locator('body').click({ position: { x: 1, y: 1 } });
+  await page.evaluate(() => document.documentElement.requestFullscreen());
+  await expect.poll(() => fullscreenElement(page)).toBe('HTML');
+
+  await presentControl(page).click();
+  await expect(stage(page)).toBeVisible();
+
+  // That fullscreen is not the presentation's: leaving it leaves presenting
+  // on, and neither is one something else turns on and off afterwards.
+  await leaveFullscreenAndSettle(page);
+  await expect(stage(page)).toBeVisible();
+  await page.locator('body').click({ position: { x: 1, y: 1 } });
+  await page.evaluate(() => document.documentElement.requestFullscreen());
+  await expect.poll(() => fullscreenElement(page)).toBe('HTML');
+  await leaveFullscreenAndSettle(page);
+
+  await expect(stage(page)).toBeVisible();
+});
