@@ -7,7 +7,6 @@ import {
   beginReplacing,
   CanvasResource,
   CLOSED_DISPLAY,
-  type CanvasSpaceResourceSelection,
   type CanvasResourceFront,
   type ResourceDisplay,
 } from '../src';
@@ -1527,21 +1526,6 @@ describe('CanvasResource open Markdown front', () => {
 });
 
 describe('CanvasResource Space front', () => {
-  const selection = (
-    over: Partial<CanvasSpaceResourceSelection> = {},
-  ): CanvasSpaceResourceSelection => ({
-    maps: [
-      { id: 'l1', title: 'Collection 1' },
-      { id: 'l2', title: 'Collection 2' },
-    ],
-    graphs: [{ id: 'g1', title: 'Long', color: '#1f77b4', headShape: 'arrow' }],
-    mapId: 'l1',
-    graphId: 'g1',
-    onMapChange: vi.fn(),
-    onGraphChange: vi.fn(),
-    ...over,
-  });
-
   const spaceRail = (
     <>
       <button type="button" data-testid="space-resource-map">
@@ -1585,105 +1569,6 @@ describe('CanvasResource Space front', () => {
     );
 
     expect(screen.getByRole('status')).toHaveTextContent('Link copied.');
-  });
-
-  it('keeps focus on the destination when a context rename completes on blur', async () => {
-    const onRename = vi.fn(() => null);
-    render(
-      <>
-        <CanvasResource
-          front={{
-            kind: 'space',
-            selection: selection({
-              mapCommands: {
-                onRename,
-                onCreate: () => Promise.resolve(false),
-                onDelete: () => undefined,
-                onCopyLink: () => Promise.resolve(null),
-              },
-            }),
-          }}
-          display={{ shown: 'open', content: SPACE_CONTENT }}
-          state="selected"
-          title="Elsewhere"
-          graphColor="#35d6c3"
-        />
-        <button>Destination</button>
-      </>,
-    );
-    fireEvent.click(screen.getByTestId('space-resource-map'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
-      await Promise.resolve();
-    });
-    const editor = screen.getByRole('textbox', { name: 'Map name' });
-    expect(editor).toHaveFocus();
-    fireEvent.change(editor, { target: { value: 'New title' } });
-    const destination = screen.getByRole('button', { name: 'Destination' });
-    act(() => destination.focus());
-    expect(onRename).toHaveBeenCalledWith('New title');
-    expect(screen.queryByRole('textbox', { name: 'Map name' })).not.toBeInTheDocument();
-    expect(destination).toHaveFocus();
-  });
-
-  it('releases busy when creating a Map rejects', async () => {
-    let rejectCreate: () => void = () => undefined;
-    render(
-      <CanvasResource
-        front={{
-          kind: 'space',
-          selection: selection({
-            mapCommands: {
-              onRename: () => null,
-              onCreate: () =>
-                new Promise<boolean>((_, reject) => {
-                  rejectCreate = () => {
-                    reject(new Error('persist failed'));
-                  };
-                }),
-              onDelete: () => undefined,
-              onCopyLink: () => Promise.resolve(null),
-            },
-          }),
-        }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="selected"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-    fireEvent.click(screen.getByTestId('space-resource-map'));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'New Map' }));
-    expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    await act(async () => {
-      rejectCreate();
-      await Promise.resolve();
-    });
-    expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();
-  });
-
-  /**
-   * A Closed Space Resource draws neither selector even when the selections are
-   * available to it: those are what Opening it is for.
-   */
-  it('withholds both selectors while closed', () => {
-    render(
-      <CanvasResource
-        front={{ kind: 'space', selection: selection() }}
-        display={CLOSED_DISPLAY}
-        state="rest"
-        title="Strategy elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    const resource = screen.getByRole('article', { name: 'Strategy elsewhere' });
-    expect(resource).toHaveAttribute('data-kind', 'space');
-    expect(screen.queryByTestId('space-resource-map')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('space-resource-graph')).not.toBeInTheDocument();
   });
 
   /**
@@ -1745,90 +1630,6 @@ describe('CanvasResource Space front', () => {
 
     screen.getByRole('button', { name: 'Close Resource Elsewhere' }).click();
     expect(onOpenChange).toHaveBeenCalledWith(false);
-  });
-
-  it('offers both selectors seeded with the Resource’s own selections when open', () => {
-    render(
-      <CanvasResource
-        front={{ kind: 'space', selection: selection() }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    // Named by the set they choose from as well as by what they hold, not only
-    // reachable by test id: the two controls are one word apart and an author
-    // has to be able to tell which is which by ear.
-    expect(screen.getByRole('button', { name: 'Map: Collection 1' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Graph: Long' })).toBeEnabled();
-    const rail = screen.getByTestId('canvas-resource-actions');
-    expect(screen.getByRole('toolbar')).toContainElement(rail);
-    for (const id of ['space-resource-map', 'space-resource-graph']) {
-      expect(rail).toContainElement(screen.getByTestId(id));
-      expect(screen.getByTestId(id).closest('.canvas-resource__body')).toBeNull();
-    }
-    // And each draws the title it holds, which is what a reader sees.
-    expect(screen.getByTestId('space-resource-map')).toHaveTextContent('Collection 1');
-    expect(screen.getByTestId('space-resource-graph')).toHaveTextContent('Long');
-  });
-
-  /**
-   * The Resource publishes the choice and authors nothing itself — the selected
-   * Map is the caller's to store and hand back, which is what makes the
-   * Graph list beside it the selected Map's rather than a stale one.
-   */
-  it('publishes a chosen Map without selecting it itself', () => {
-    const onMapChange = vi.fn();
-    render(
-      <CanvasResource
-        front={{ kind: 'space', selection: selection({ onMapChange }) }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    // The shared `ChoiceMenu` the Command Dock's own Map list is: a menu of
-    // radio rows, one marked, opened from its trigger. Its keyboard is Base UI's
-    // and is not restated here.
-    fireEvent.click(screen.getByTestId('space-resource-map'));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Collection 2' }));
-
-    expect(onMapChange).toHaveBeenCalledWith('l2');
-    expect(screen.getByTestId('space-resource-map')).toHaveTextContent('Collection 1');
-  });
-
-  /**
-   * The one state that leaves a selector with nothing to say: the Map this
-   * Resource names is no longer in the target.
-   *
-   * A Space Resource selects a Map and a Graph from the moment it exists
-   * (ADR 0079), so a `null` here is a dangling reference to something deleted
-   * and never a choice that was not made. The Graphs on offer are the selected
-   * Map's alone, so a Map resolving to nothing leaves none — while the
-   * Map list stays the target's, because choosing another is exactly what
-   * answers this.
-   */
-  it('draws a selection the target no longer holds as unavailable', () => {
-    render(
-      <CanvasResource
-        front={{ kind: 'space', selection: selection({ mapId: null, graphs: [], graphId: null }) }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    const mapSelector = screen.getByTestId('space-resource-map');
-    expect(mapSelector).toBeEnabled();
-    expect(mapSelector).toHaveTextContent('No Map');
-    const graph = screen.getByTestId('space-resource-graph');
-    expect(graph).toHaveAttribute('aria-disabled', 'true');
-    expect(graph).toHaveTextContent('No Graph');
   });
 
   /**
@@ -1902,22 +1703,6 @@ describe('CanvasResource Space front', () => {
     // One note, not a live region: a canvas of Space Resources resolving would
     // otherwise announce each one, for a wait nobody asked for.
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('withholds both selectors from a read-only Resource', () => {
-    render(
-      <CanvasResource
-        readOnly
-        front={{ kind: 'space', selection: selection() }}
-        display={{ shown: 'open', content: SPACE_CONTENT }}
-        state="rest"
-        title="Elsewhere"
-        graphColor="#35d6c3"
-      />,
-    );
-
-    expect(screen.queryByTestId('space-resource-map')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('space-resource-graph')).not.toBeInTheDocument();
   });
 
   it('withholds a supplied spaceRail from a read-only Resource', () => {

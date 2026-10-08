@@ -26,10 +26,6 @@ import {
   ResourceRailSharedActions,
 } from './ResourceRailActions';
 import { ResourceContentEditProvider, type ResourceContentEdit } from './resource-content-edit';
-import {
-  SpaceResourceSelectors,
-  type CanvasSpaceResourceSelection,
-} from './SpaceResourceSelectors';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ResourceRail, ResourceRailKind } from './ResourceRail';
 import { ResourceShapeMenu } from './ResourceShapeMenu';
@@ -105,12 +101,6 @@ export type CanvasResourceFront =
       readonly kind: 'space';
       /** A Space Resource Opens through the shared Resource operation. */
       readonly onOpenChange?: (open: boolean) => 'completed' | 'retained';
-      /**
-       * What an Open Space Resource offers to author: the target's Maps, the
-       * Graphs of the selected one, and this Resource's own selections. Absent while
-       * the target Space has not been read yet.
-       */
-      readonly selection?: CanvasSpaceResourceSelection;
       /**
        * Map and Graph clusters, assembled by the application and inserted
        * at the head of this Resource's rail. Absent while the Resource is closed, the
@@ -423,17 +413,14 @@ export function CanvasResource(props: CanvasResourceProps) {
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const onResourceShapeChange =
     !readOnly && front.kind === 'ur' ? front.onResourceShapeChange : undefined;
-  const [selectorNotice, setContextNotice] = useState<string | null>(null);
-  const contextNotice = props.contextNotice ?? selectorNotice;
-  const spaceSelection = spaceFront?.selection;
+  const contextNotice = props.contextNotice ?? null;
   const spaceRail = spaceFront?.spaceRail;
   const portal = spaceFront?.portal;
   const portalEditing = portal?.editing === true;
   const showActions =
     state !== 'dragging' &&
     state !== 'editing' &&
-    (spaceSelection !== undefined ||
-      spaceRail !== undefined ||
+    (spaceRail !== undefined ||
       portal !== undefined ||
       visibleContentEdit !== null ||
       onOpenChange !== undefined ||
@@ -557,9 +544,6 @@ export function CanvasResource(props: CanvasResourceProps) {
           icon={<EntityActionsIcon />}
           render={<ResourceRailAction />}
         />
-      )}
-      {spaceSelection !== undefined && (
-        <SpaceResourceSelectors {...spaceSelection} onReport={setContextNotice} />
       )}
       {spaceRail}
       <ResourceRailKindActions kind={visualKind}>
@@ -728,7 +712,7 @@ export function CanvasResource(props: CanvasResourceProps) {
         {/* Withheld while the Resource is read-only for the same reason every other
             authoring affordance is — a read-only surface draws what the Resource
             shows, not what could be changed about it. */}
-        {spaceFront !== undefined && spaceSelection === undefined && spaceRail === undefined && (
+        {spaceFront !== undefined && spaceRail === undefined && (
           <p className="canvas-resource__space-note">Reading the referenced Space…</p>
         )}
         {contextNotice !== null && (

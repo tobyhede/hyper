@@ -2,7 +2,7 @@ import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
 import type { ReactNode } from 'react';
 import { CLOSED_DISPLAY } from '@project/ui';
-import type { CanvasSpaceResourceSelection, EntityActionGroup, ResourceDisplay } from '@project/ui';
+import type { EntityActionGroup, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
@@ -152,16 +152,6 @@ export type ResourceNodeData = {
    * already applies to the value it is handed.
    */
   entityActions?: readonly EntityActionGroup[];
-  /**
-   * For a space resource, what the Space it references offers its selections to be
-   * chosen from.
-   *
-   * Not derived here, and it could not be: it describes a *second* Space, which
-   * this projection has no reader for and no business loading. The composition
-   * that read the target supplies it, exactly as it supplies every other
-   * operation on this node (ADR 0068, ADR 0074).
-   */
-  spaceSelection?: CanvasSpaceResourceSelection;
   /**
    * Map and Graph clusters for an Open Space Resource, assembled by the
    * application and inserted at the head of the Resource rail.

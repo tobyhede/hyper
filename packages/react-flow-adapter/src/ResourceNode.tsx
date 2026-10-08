@@ -90,7 +90,6 @@ function kindFrontOf(data: ResourceFlowNode['data']): MutableFront {
       // Title is the Resource's, its content is the target Space's, and the
       // composition hands down the rail fragment plus Enter.
       const front: SpaceFront = { kind: 'space' };
-      if (data.spaceSelection !== undefined) front.selection = data.spaceSelection;
       if (data.spaceRail !== undefined) front.spaceRail = data.spaceRail;
       if (data.portal !== undefined) front.portal = data.portal;
       return front;
