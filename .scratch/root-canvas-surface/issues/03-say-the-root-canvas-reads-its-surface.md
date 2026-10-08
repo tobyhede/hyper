@@ -1,0 +1,13 @@
+# 03: Say the root canvas reads its surface
+
+**What to build:** The docs describe the root canvas reading its Map surface the way a drawn Map does.
+
+**Blocked by:** 02.
+
+**Status:** ready-for-agent
+
+**Spec:** `.scratch/root-canvas-surface/spec.md`.
+
+- [ ] `docs/agents/rendering.md` says `SpaceCanvas` takes a required surface and its reading, and names the root-only inputs.
+- [ ] ADR 0112's delivery note and AGENTS.md's ADR 0070 entry mention the root canvas reading its surface.
+- [ ] The spec's status is resolved and each ticket's boxes are ticked.
