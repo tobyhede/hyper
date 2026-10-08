@@ -3148,3 +3148,114 @@ describe('the Open state is named once (CONTEXT.md, Open)', () => {
     }
   });
 });
+
+/**
+ * ADR 0125 retires the card prototype's word for a Resource as drawn. A Resource
+ * on a Map is Closed or Open; what a kind offers is `KindOperations`; nothing is
+ * its front.
+ *
+ * The bare English word stays legal — a position, as in "the verb in ___ of
+ * it" — so the arms read the shapes the domain sense was written in: a compound
+ * in either direction, the screaming constant, the capitalised noun, a
+ * kebab-case id or story slug, the word after a Resource kind or state, and the
+ * prop, local and member spellings the codemod renamed. Each arm is shown by an
+ * example below.
+ *
+ * `frontmatter` is the one compound that is not ours: it is the Markdown fence a
+ * Resource file opens with, and `core` and `graph` name their schemas after it.
+ * It is masked by spelling, and asserted below to still be written somewhere.
+ * The word is composed from fragments, so this file holds none of its shapes
+ * literally.
+ */
+const RETIRED_SIDE = ['fr', 'ont'].join('');
+const RETIRED_SIDE_CAPITAL = `F${RETIRED_SIDE.slice(1)}`;
+const RETIRED_SIDE_SCREAMING = RETIRED_SIDE.toUpperCase();
+const RETIRED_SIDE_SHAPES = new RegExp(
+  [
+    `[A-Za-z]${RETIRED_SIDE_CAPITAL}`,
+    `${RETIRED_SIDE_CAPITAL}[A-Z]`,
+    `${RETIRED_SIDE}[A-Z]`,
+    `\\b${RETIRED_SIDE_CAPITAL}s?\\b`,
+    RETIRED_SIDE_SCREAMING,
+    `-${RETIRED_SIDE}s?\\b`,
+    `\\b${RETIRED_SIDE}-`,
+    `\\b(?:[Rr]esource|[Cc]losed|[Oo]pen|[Mm]arkdown|[Ii]mage|[Ss]pace|[Uu]r|[Rr]eference)(?:'s|’s)? ${RETIRED_SIDE}s?\\b`,
+    `\\b${RETIRED_SIDE}=\\{`,
+    `\\b${RETIRED_SIDE}s?: \\{`,
+    `\\b(?:const|let) ${RETIRED_SIDE}s?\\b`,
+    `\\b${RETIRED_SIDE}s?\\.kind\\b`,
+  ].join('|'),
+);
+const FENCE_WORD = new RegExp(`${RETIRED_SIDE}matter`, 'gi');
+const withoutFenceWord = (source: string): string => source.replace(FENCE_WORD, 'fence');
+
+describe('the Resource has no front (ADR 0125)', () => {
+  const scanned = scannableFiles();
+
+  it('reaches the kinds of file the rename actually touched', () => {
+    expect(scanned).toContain('packages/ui/src/CanvasResource.tsx');
+    expect(scanned).toContain('packages/react-flow-adapter/src/ResourceNode.tsx');
+    expect(scanned).toContain('packages/app/stories/parity-claims.ts');
+    expect(scanned).toContain('packages/app/ladle-e2e/resource.spec.ts');
+    expect(scanned).toContain('packages/ui/src/canvas-resource.css');
+  });
+
+  it('finds no shape of the retired word anywhere it governs', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      if (source === null) return [];
+      return hits(withoutFenceWord(source), RETIRED_SIDE_SHAPES).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no mask that has stopped earning itself', () => {
+    const stillWritten = scanned.some((file) => FENCE_WORD.test(readTracked(file) ?? ''));
+    expect(stillWritten, 'the fence word is masked but no longer written anywhere').toBe(true);
+  });
+
+  it('reports the retired word in every shape it was written in', () => {
+    const retired = [
+      `export type CanvasResource${RETIRED_SIDE_CAPITAL} =`,
+      `export type ${RETIRED_SIDE_CAPITAL}Display = Exclude<ResourceDisplay, never>;`,
+      `function kind${RETIRED_SIDE_CAPITAL}Of(data: Data) {}`,
+      `function ${RETIRED_SIDE}Of(data: Data) {}`,
+      `const ${RETIRED_SIDE_SCREAMING}S = [] as const;`,
+      `export const ${RETIRED_SIDE_CAPITAL}: Story = () => null;`,
+      `await page.goto('/?story=components--resource--${RETIRED_SIDE}&mode=preview');`,
+      `{ tag: '@parity:canvas-resource-${RETIRED_SIDE}-draws-only-its-title-lines' },`,
+      `// A Closed ${RETIRED_SIDE} draws its kind glyph.`,
+      `// The Resource ${RETIRED_SIDE} names nothing outside itself.`,
+      `// An Open Image Resource is the Open Markdown ${RETIRED_SIDE}.`,
+      `// A Reference Resource's ${RETIRED_SIDE} draws a dotted border.`,
+      `<CanvasResource ${RETIRED_SIDE}={{ kind: 'markdown' }} />`,
+      `const props = { ${RETIRED_SIDE}: { kind: 'reference' as const } };`,
+      `const ${RETIRED_SIDE}: Operations = { kind: 'image' };`,
+      `const visualKind = ${RETIRED_SIDE}.kind;`,
+    ];
+
+    for (const line of retired) {
+      expect(RETIRED_SIDE_SHAPES.test(withoutFenceWord(line)), line).toBe(true);
+    }
+  });
+
+  it('stays silent on the English word, on the fence, and on the vocabulary that replaced it', () => {
+    const kept = [
+      `// the name is that title with the verb in ${RETIRED_SIDE} of it`,
+      `// presenting stands on it rather than carrying it at the ${RETIRED_SIDE}.`,
+      `// so the launcher can run without pnpm in ${RETIRED_SIDE} of it.`,
+      `export const resource${RETIRED_SIDE_CAPITAL}matterSchema = z.object({`,
+      `export function split${RETIRED_SIDE_CAPITAL}matter(text: string) {}`,
+      `await writeFile(path, 'No ${RETIRED_SIDE}matter here.\\n');`,
+      `export type KindOperations =`,
+      `export type CanvasResourceDisplay = Exclude<ResourceDisplay, never>;`,
+      `<CanvasResource kindOperations={{ kind: 'markdown' }} />`,
+      `// A Closed Resource draws its kind glyph.`,
+    ];
+
+    for (const line of kept) {
+      expect(RETIRED_SIDE_SHAPES.test(withoutFenceWord(line)), line).toBe(false);
+    }
+  });
+});
