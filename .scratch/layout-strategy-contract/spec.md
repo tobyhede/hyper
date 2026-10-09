@@ -1,5 +1,7 @@
 # What the LayoutStrategy seam actually guarantees
 
+> **Superseded (triage, 2026-10-09):** ADR 0086 removed elkjs (`0a5c42d17`), routed sections and placed ports, so the strategy contract now carries positions only (`docs/agents/maps-and-graphs.md` R4, A3) and the asymmetry this spec describes no longer exists. Its one ticket, `01`, is `wontfix`.
+
 Source: `/improve-codebase-architecture` review, 2026-08-04.
 
 ## Read first
