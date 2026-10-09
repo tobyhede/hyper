@@ -1,7 +1,7 @@
 import { act, createEvent, fireEvent, screen, type RenderResult } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { resourceOpen, spaceSnapshotSchema, uuidSchema } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import {
   bareKindData,
@@ -88,7 +88,8 @@ const resourceNode = (
 
 interface Harness {
   readonly view: RenderResult;
-  readonly openResource: ReturnType<typeof vi.fn>;
+  /** The Resources the session's Map holds Open: what an Open Edit leaves behind. */
+  readonly opened: () => readonly string[];
   readonly addResource: ReturnType<typeof vi.fn>;
   /** What an external Resource drop from the Resources list asked for. */
   readonly addExistingResource: ReturnType<typeof vi.fn>;
@@ -120,7 +121,6 @@ async function mountGraph(
   },
   held: 'placed' | 'replacing' | 'nothing' = 'placed',
 ): Promise<Harness> {
-  const openResource = vi.fn();
   const addResource = vi.fn();
   const addExistingResource = vi.fn();
   const placeSpace = vi.fn();
@@ -133,11 +133,6 @@ async function mountGraph(
   const { surface, commandOutcomes, deleteConfirmation, imageReplacement } = composeApp({
     images: unusedImageSources,
     spaceSession,
-  });
-  const complete = surface.authoring.complete;
-  vi.spyOn(surface.authoring, 'complete').mockImplementation((completion) => {
-    if (completion.kind === 'opened-resource') openResource(completion.resourceId);
-    return complete(completion);
   });
   const placement = {
     ...IDLE_PLACEMENT,
@@ -176,7 +171,13 @@ async function mountGraph(
   const view = await mountSettled(graph());
   return {
     view,
-    openResource,
+    opened: () => {
+      const { maps = [] } = spaceSession.getState().working.document;
+      const map = maps.find(({ id }) => id === MAP_ID);
+      return Object.entries(map?.positions ?? {})
+        .filter(([, entry]) => entry !== undefined && resourceOpen(entry))
+        .map(([resourceId]) => resourceId);
+    },
     addResource,
     addExistingResource,
     placeSpace,
@@ -240,22 +241,22 @@ afterAll(() => vi.unstubAllGlobals());
  */
 describe('a title Edit the graph refused', () => {
   it('does not open a Resource on the click that blurred it', async () => {
-    const { openResource } = await refuseTitleEdit('blur');
+    const { opened } = await refuseTitleEdit('blur');
 
     fireEvent.click(nodeOf(RESOURCE_ID));
 
-    expect(openResource).not.toHaveBeenCalled();
+    expect(opened()).toEqual([]);
   });
 
   it('leaves the rest of the graph working', async () => {
-    const { openResource, setNodes } = await refuseTitleEdit('blur');
+    const { opened, setNodes } = await refuseTitleEdit('blur');
     // B's commands are drawn once B is the selected Resource (`ResourceNode`'s
     // `toolbarVisible`), so selection moves to B the way React Flow reports it.
     setNodes([resourceNode('A', RESOURCE_ID), resourceNode('B', OTHER_RESOURCE_ID, true)]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource B' }));
 
-    expect(openResource).toHaveBeenCalledWith(OTHER_RESOURCE_ID);
+    expect(opened()).toEqual([OTHER_RESOURCE_ID]);
   });
 });
 
@@ -269,28 +270,28 @@ describe('opening a Resource', () => {
     ['a single click', (node: HTMLElement) => fireEvent.click(node)],
     ['a double click', (node: HTMLElement) => fireEvent.doubleClick(node)],
   ])('does not happen on %s of the Resource body', async (_name, gesture) => {
-    const { openResource } = await mountGraph();
+    const { opened } = await mountGraph();
 
     gesture(nodeOf(RESOURCE_ID));
 
-    expect(openResource).not.toHaveBeenCalled();
+    expect(opened()).toEqual([]);
   });
 
   it('happens from the Resource affordance', async () => {
-    const { openResource } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+    const { opened } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
-    expect(openResource).toHaveBeenCalledWith(RESOURCE_ID);
+    expect(opened()).toEqual([RESOURCE_ID]);
   });
 
   it('leaves the Title control free to rename without Opening the Resource', async () => {
-    const { openResource } = await mountGraph();
+    const { opened } = await mountGraph();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
 
     expect(screen.getByRole('textbox', { name: 'Resource title' })).toHaveValue('A');
-    expect(openResource).not.toHaveBeenCalled();
+    expect(opened()).toEqual([]);
   });
 });
 
@@ -339,30 +340,34 @@ describe.each([
   ['Space', ' ', 'composite'],
 ] as const)('%s on the focused Resource affordance', (_name, key, activation) => {
   it('opens the Resource once through the button rather than the graph', async () => {
-    const { openResource } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+    const { opened } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
     const button = screen.getByRole('button', { name: 'Open Resource A' });
     act(() => {
       button.focus();
     });
 
-    fireEvent.keyDown(button, { key });
-    if (activation === 'native') fireEvent.click(button);
+    const defaultAllowed = fireEvent.keyDown(button, { key });
+    if (activation === 'native') {
+      // The graph's handler sees the key first; preventing its default would
+      // cancel the click the browser activates the button with.
+      expect(defaultAllowed).toBe(true);
+      fireEvent.click(button);
+    }
 
-    expect(openResource).toHaveBeenCalledTimes(1);
-    expect(openResource).toHaveBeenCalledWith(RESOURCE_ID);
+    expect(opened()).toEqual([RESOURCE_ID]);
   });
 });
 
 it.each(['Enter', ' '])('opens a focused Reference Resource with %s', async (key) => {
   const reference = resourceNode('A again', REFERENCE_ID);
   reference.data.kind = 'reference';
-  const { openResource } = await mountGraph([reference]);
+  const { opened } = await mountGraph([reference]);
 
   const focusedReference = nodeOf(REFERENCE_ID);
   focusedReference.focus();
   fireEvent.keyDown(focusedReference, { key });
 
-  expect(openResource).toHaveBeenCalledWith(REFERENCE_ID);
+  expect(opened()).toEqual([REFERENCE_ID]);
 });
 
 /**
@@ -389,18 +394,13 @@ it('draws no Resource while the render adapter holds no projection', async () =>
  */
 describe('a Resource held while a replacement placement resolves', () => {
   it.each(['Enter', ' '])('opens with %s', async (key) => {
-    const { openResource } = await mountGraph(
-      [resourceNode('A')],
-      undefined,
-      undefined,
-      'replacing',
-    );
+    const { opened } = await mountGraph([resourceNode('A')], undefined, undefined, 'replacing');
     const focused = nodeOf(RESOURCE_ID);
     focused.focus();
 
     fireEvent.keyDown(focused, { key });
 
-    expect(openResource).toHaveBeenCalledWith(RESOURCE_ID);
+    expect(opened()).toEqual([RESOURCE_ID]);
   });
 
   it('announces the authoring keyboard commands', async () => {
@@ -414,11 +414,11 @@ describe('a Resource held while a replacement placement resolves', () => {
 
 describe('the Resource affordance', () => {
   it('opens the Resource rather than renaming its title on the graph', async () => {
-    const { openResource } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+    const { opened } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Resource A' }));
 
-    expect(openResource).toHaveBeenCalledWith(RESOURCE_ID);
+    expect(opened()).toEqual([RESOURCE_ID]);
     expect(screen.queryByRole('textbox', { name: 'Resource title' })).not.toBeInTheDocument();
   });
 });
@@ -442,10 +442,10 @@ describe('withdrawing canvas authoring from an Open Resource', () => {
   it.each(['Enter', ' '])(
     'does not Open a Resource with %s while its body is being edited',
     async (key) => {
-      const opened = resourceNode('A', RESOURCE_ID, true);
-      opened.data.open = true;
-      opened.data.display = fixtureDisplay(true, 'markdown', '# A');
-      const { openResource } = await mountGraph([opened]);
+      const drawn = resourceNode('A', RESOURCE_ID, true);
+      drawn.data.open = true;
+      drawn.data.display = fixtureDisplay(true, 'markdown', '# A');
+      const { opened } = await mountGraph([drawn]);
       fireEvent.click(screen.getByRole('button', { name: 'Edit Markdown source of A' }));
 
       const editor = await screen.findByRole('textbox', { name: 'Markdown source of A' });
@@ -453,7 +453,7 @@ describe('withdrawing canvas authoring from an Open Resource', () => {
       expect(editor).toBe(document.activeElement);
       fireEvent.keyDown(editor, { key });
 
-      expect(openResource).not.toHaveBeenCalled();
+      expect(opened()).toEqual([]);
     },
   );
 });
@@ -874,14 +874,14 @@ describe.each([
   ['Space', ' '],
 ] as const)('%s typed into a text control inside a Resource', (_name, key) => {
   it('is a keypress rather than a request to open that Resource', async () => {
-    const { openResource } = await mountGraph();
+    const { opened } = await mountGraph();
     const field = document.createElement('div');
     field.setAttribute('contenteditable', 'true');
     nodeOf(RESOURCE_ID).append(field);
 
     fireEvent.keyDown(field, { key });
 
-    expect(openResource).not.toHaveBeenCalled();
+    expect(opened()).toEqual([]);
   });
 });
 
