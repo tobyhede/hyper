@@ -1,6 +1,6 @@
 # One Map reading for the Dock and the canvas
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

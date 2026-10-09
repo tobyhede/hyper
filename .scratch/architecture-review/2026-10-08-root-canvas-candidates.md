@@ -39,3 +39,7 @@ Solution. Reassess after candidate 3. Extract only genuinely shared derived read
 - Locality: a Dock fact skips `App`.
 - `App` becomes a testable composition point.
 - Do after 3; measure the remaining duplicated reading before choosing an interface.
+
+### Outcome, 2026-10-09
+
+Done in the narrowed form `.scratch/one-map-reading/` records: one Map reading. `useMapView` is deleted, `MapView` carries its Space, and `App` feeds the Dock and the presenting Stage from the root surface's `reading.view`, which the canvas reads too; `SpaceCanvas` reads the Space title off that reading. The broad form — an opened-Space object that `useDockChrome` and `SpaceCanvas` both read — is set aside: `useDockChrome`'s input is unchanged, and it is revisited only if that input is shown to keep churning.
