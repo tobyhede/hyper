@@ -4,7 +4,6 @@ import { Placement, type ResolvedMap, type Space } from '@project/graph';
 import { canvasProjection, type PendingCanvasProjection } from './canvas-projection';
 import { mapResources, resolveMap, resourcesOutsideMap } from './map-resolution';
 import { otherMapMemberships, type MapMemberships } from './map-memberships';
-import { nextResourceTitle } from './titles';
 
 /** Everything the canvas and the Dock read off the Map being drawn. */
 export interface MapView {
@@ -37,8 +36,6 @@ export function mapView(space: Space, mapId: MapId): MapView {
 export interface RenderedMapView extends MapView {
   /** The validated Space behind the working snapshot being rendered. */
   readonly renderedSpace: Space;
-  /** The Title the next created Resource takes. */
-  readonly newResourceTitle: string;
 }
 
 /**
@@ -48,8 +45,7 @@ export interface RenderedMapView extends MapView {
  * re-renders the component without moving either, so every identity here —
  * the placement `usePlacementRendering` lays out, the Resources Edge
  * Authoring's commands are built over, the projection — holds still across it,
- * and the strategy does not re-run mid-drag. The next Resource Title scans every
- * Title in the Space, so it is keyed on the snapshot alone.
+ * and the strategy does not re-run mid-drag.
  */
 export function useMapView(
   readWorkingSpace: (snapshot: SpaceSnapshot) => Space,
@@ -57,7 +53,6 @@ export function useMapView(
   selectedMapId: MapId,
 ): RenderedMapView {
   const renderedSpace = useMemo(() => readWorkingSpace(working), [readWorkingSpace, working]);
-  const newResourceTitle = useMemo(() => nextResourceTitle(working), [working]);
   const view = useMemo(() => mapView(renderedSpace, selectedMapId), [renderedSpace, selectedMapId]);
-  return { renderedSpace, newResourceTitle, ...view };
+  return { renderedSpace, ...view };
 }

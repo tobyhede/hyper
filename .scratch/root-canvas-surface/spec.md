@@ -1,6 +1,6 @@
 # The root canvas reads its Map surface
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
@@ -24,14 +24,14 @@ Two consequences for whoever changes the canvas:
 5. As a developer, I want `SpaceCanvas` to read placed Resources, Graphs, colours and the Map title from the same view its projection is built from, so that the canvas cannot draw one Space while authoring against another.
 6. As a developer, I want `SpaceCanvas` to read the Map id and the Active Graph from the surface's context, so that the canvas and its surface cannot name different Maps or Graphs.
 7. As a developer, I want `SpaceCanvas` to work out whether it is presenting from the surface's context, so that presenting is one fact rather than a prop that could disagree with the surface (if the context's presenting Resource is non-null exactly when Navigation presents).
-8. As a developer, I want `SpaceCanvas` to mint the next Resource title from the Space session, the way a drawn Map does, so that both drawings name a new Resource by one rule.
+8. As a developer, I want `SpaceCanvas` to read the next Resource title from the reading, which derives it from the same Space Authoring state an Edit mints from, the way a drawn Map does, so that both drawings name a new Resource by one rule.
 9. As a developer, I want the canvas selection, its select handlers, node and Edge changes, resize and embedded-editing reports to come from the surface's render adapter reading, so that `App` stops re-exporting the adapter one field at a time.
 10. As a developer, I want Edge Authoring and Space Authoring to come from the surface, so that the canvas authors through the same collaborators its surface composed.
 11. As a developer, I want availability to arrive inside the surface reading, already narrowed by the surface's policy and by the open set's image replacement, so that the canvas and the Dock withdraw the same commands.
 12. As a developer, I want Resource placement passed as one value rather than five drop and paste callbacks, so that placement reads as one owner, as it does in a drawn Map's publication.
 13. As a developer, I want placement readiness and the live projection kept as two separate facts, so that a gesture is never interrupted while a replacement placement resolves.
 14. As a developer, I want the comment explaining why the projection is null while placement resolves to sit where `SpaceCanvas` reads it, so that the reason travels with the code it constrains.
-15. As a developer, I want the root-only inputs — command outcomes, delete confirmation, the Space session, image replacement, naming on creation, the Space title, Space Resource target titles, Resource rail actions, the editing reports and the drawn-Map sinks — to stay explicit props, so that what only the root has is visible at its one call site.
+15. As a developer, I want the Space-level collaborators no surface holds — command outcomes, delete confirmation, the Space session, image replacement, naming on creation, the Space title, Space Resource target titles, Resource rail actions, and the two callbacks through which drawn Maps report their Spaces and clipboard failures — to stay explicit props, so that what the surface does not hold is visible at its one call site.
 16. As a developer, I want `App` to keep one `useMapSurface` call for the root, so that the Dock and the canvas share one subscription and one render-adapter reading.
 17. As a developer, I want `App` to keep `useMapView` for the Dock and the presenting stage for now, so that this change does not decide candidate 6's opened-Space view.
 18. As a developer writing a `SpaceCanvas` test, I want one shared helper that builds a real Map surface over a composed Space, so that tests mount the canvas the way production does without restating the composition.
@@ -42,14 +42,14 @@ Two consequences for whoever changes the canvas:
 ## Implementation Decisions
 
 - Scope is candidate 3 of the 2026-10-08 architecture review only. Candidate 6 (one opened-Space view for the Dock and the canvas) is reassessed after this lands, by measuring the reading still duplicated.
-- `SpaceCanvas`'s props become: a required `surface` (`MapSurface`); `reading`, the value `useMapSurface` answers for that surface; `placement`, the Resource placement value whole; and the root-only inputs listed in story 15. No new "root extras" type is introduced.
+- `SpaceCanvas`'s props become: a required `surface` (`MapSurface`); `reading`, the value `useMapSurface` answers for that surface; `placement`, the Resource placement value whole; and the props listed in story 15. No new "root extras" type is introduced.
 - Derived inside `SpaceCanvas`:
   - from `reading.view`: placed Resources, visible Graphs, Graph colours, the Map title;
+  - from `reading.newResourceTitle`: the next Resource title;
   - from `reading.canvasRendering`: nodes, edges, the projected nodes, selection and its handlers, node and Edge changes, resize, embedded-editing reports, placement readiness;
   - from `reading.availability`: availability;
   - from `surface`: Space Authoring and Edge Authoring;
-  - from `surface.context()`: the Map id, the Active Graph and presenting;
-  - from the Space session: the next Resource title.
+  - from `surface.context()`: the Map id, the Active Graph and presenting.
 - If a canvas context's `presentingResourceId` is not non-null exactly when Navigation is presenting, `presenting` stays a prop and the reason is recorded in ticket 01.
 - The `authoring` fallback for a missing surface is deleted. The surface's policy is the only policy.
 - `App` keeps one `useMapSurface` call per root and keeps `useMapView` for the Dock, `renderedSpace` and the presenting stage.
@@ -75,4 +75,4 @@ Two consequences for whoever changes the canvas:
 ## Further Notes
 
 - Source: candidate 3 of the 2026-10-08 architecture review, recorded in `.scratch/architecture-review/2026-10-08-root-canvas-candidates.md`, grilled 2026-10-08.
-- Stacked on PR #346 (`a-map-is-a-map-closeout`), which records ADR 0112 as built.
+- Delivered in PR #347 on top of PR #346, which records ADR 0112 as built; the review follow-up and these docs are PR #349.

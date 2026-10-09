@@ -62,7 +62,6 @@ import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
 import type { ResourcePlacementCommands } from '../resource-placement';
 import type { MapSurfaceReading } from '../use-map-surface';
-import { nextResourceTitle } from '../titles';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import { edgeSelectionOf, sameSelection } from '../render-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
@@ -111,14 +110,6 @@ const ARIA_LABEL_CONFIG = {
     'Press enter or space to open a Resource, backspace or delete to remove it from this Map, the arrow keys to move it, and escape to cancel.',
   'edge.a11yDescription.default':
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
-} as const;
-
-/** A pending placement keeps Resources readable without advertising authored gestures. */
-const PENDING_ARIA_LABEL_CONFIG = {
-  ...ARIA_LABEL_CONFIG,
-  'node.a11yDescription.default': 'This Resource is unavailable while placement is pending.',
-  'node.a11yDescription.keyboardDisabled':
-    'This Resource is unavailable while placement is pending.',
 } as const;
 
 /**
@@ -197,10 +188,9 @@ export interface SpaceCanvasProps {
   readonly surface: MapSurface;
   /**
    * What `useMapSurface` answers for `surface` this render. The canvas draws
-   * from it alone — the view its projection is built from, the render
-   * adapter's reading and the availability its surface's policy has narrowed —
-   * so the canvas and the Space's command surface cannot disagree about an
-   * operation they both offer (`CONTEXT.md`, Availability).
+   * from it alone: the view its projection is built from, the next Resource
+   * Title, the render adapter's reading and the availability its surface's
+   * policy has narrowed.
    */
   readonly reading: MapSurfaceReading;
   /** Every way a Resource arrives on this canvas: created, dropped or pasted. */
@@ -293,37 +283,37 @@ export function SpaceCanvas({
 }: SpaceCanvasProps) {
   const {
     view,
+    newResourceTitle,
     canvasRendering,
     availability,
-    setEditingResourceBody: onBodyEditingChange,
-    setEditingResourceTitle: onTitleEditingChange,
+    setEditingResourceBody,
+    setEditingResourceTitle,
   } = reading;
   const {
     liveProjection,
     projected,
     selection,
-    changeNodes: onNodesChange,
-    changeEdges: onEdgesChange,
-    selectResource: onSelectResource,
-    selectEdge: onSelectEdge,
+    changeNodes,
+    changeEdges,
+    selectResource,
+    selectEdge,
     resourceResize,
     reportEmbeddedMapEditing,
   } = canvasRendering;
   const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
   const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
   // Null while a replacement placement resolves. The canvas keeps drawing the
-  // Resources on screen through that window — deliberately, so a gesture is
-  // never interrupted — so a connection is reachable with no fresh projection
-  // to hand over, and the store keeps its live nodes rather than reconciling
-  // against nothing.
+  // Resources on screen through that window, so a connection is reachable with
+  // no fresh projection to hand over, and the store keeps its live nodes rather
+  // than reconciling against nothing (`render-adapter.test.ts`, "keeps the
+  // Resources on screen when a connection completes with no fresh projection").
   const projectedNodes = projected?.nodes ?? null;
-  // That the selected Map's placement has resolved and the store has taken it
-  // — the fact, not an operation, read by one consumer: the aria description
-  // React Flow gives every node. Its withheld form is a statement about the
-  // placement ("unavailable while placement is pending"), so no availability
-  // answer may stand in for it, and nothing that decides what may be authored
-  // reads it.
-  const placementReady = canvasRendering.hasResourcesOnCanvas;
+  // That the render adapter holds a projection — so `nodes` is what it holds,
+  // not the empty list that stands in for none. No gesture here waits for
+  // `projected`: a Resource held while a replacement placement resolves stays
+  // authorable (`SpaceCanvas.test.tsx`, "a %s held while a replacement
+  // placement resolves").
+  const { hasResourcesOnCanvas } = canvasRendering;
   const { authoring, edgeAuthoring } = surface;
   const context = surface.context();
   const { mapId, graphId: activeGraphId } = context;
@@ -335,8 +325,6 @@ export function SpaceCanvas({
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
   const mapTitle = view.selectedMap.map.title;
-  const working = spaceSession.getState().working;
-  const newResourceTitle = useMemo(() => nextResourceTitle(working), [working]);
   const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
   const addCanvasResource = useCallback(() => createResource('markdown'), [createResource]);
   const { screenToFlowPosition } = useReactFlow();
@@ -395,14 +383,14 @@ export function SpaceCanvas({
     onPortalEditingChange: setPortalEditing,
     portalDraft,
     setPortalDraft,
-  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds, embeddedRoot, placementReady);
+  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds, embeddedRoot, hasResourcesOnCanvas);
 
   const onPortalEditingChange = useCallback(
     (resourceId: ResourceId, editing: boolean) => {
       setPortalEditing(resourceId, editing);
-      if (!editing) onSelectResource(resourceId);
+      if (!editing) selectResource(resourceId);
     },
-    [setPortalEditing, onSelectResource],
+    [setPortalEditing, selectResource],
   );
 
   const drawnSpaces = useMemo(
@@ -502,7 +490,7 @@ export function SpaceCanvas({
                       label: 'Connect to Resource',
                       icon: <GraphIcon size={14} />,
                       onSelect: (opener) => {
-                        onSelectResource(resourceId);
+                        selectResource(resourceId);
                         setConnecting({ from: resourceId, anchor: opener, mapId });
                         return 'done';
                       },
@@ -510,7 +498,7 @@ export function SpaceCanvas({
                   ]
                 : [],
             ),
-    [resourceEntityActions, placedResources, onSelectResource, mapId],
+    [resourceEntityActions, placedResources, selectResource, mapId],
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
     continuation: surface.continuation,
@@ -522,7 +510,7 @@ export function SpaceCanvas({
     authoring,
     spaceSession,
     resourceResize,
-    onSelectResource,
+    onSelectResource: selectResource,
     imageReplacement,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
@@ -547,12 +535,12 @@ export function SpaceCanvas({
       embeddedPublications.get(request.parent.id)?.titleEditing === true,
   );
   useEffect(() => {
-    onBodyEditingChange(bodyEditing || embeddedBodyEditing);
-  }, [bodyEditing, embeddedBodyEditing, onBodyEditingChange]);
+    setEditingResourceBody(bodyEditing || embeddedBodyEditing);
+  }, [bodyEditing, embeddedBodyEditing, setEditingResourceBody]);
   useEffect(() => {
-    onTitleEditingChange(resourceAuthoring.titleEditing || embeddedTitleEditing);
-    return () => onTitleEditingChange(false);
-  }, [resourceAuthoring.titleEditing, embeddedTitleEditing, onTitleEditingChange]);
+    setEditingResourceTitle(resourceAuthoring.titleEditing || embeddedTitleEditing);
+    return () => setEditingResourceTitle(false);
+  }, [resourceAuthoring.titleEditing, embeddedTitleEditing, setEditingResourceTitle]);
   const liveEmbeddings = useMemo(
     () =>
       embeddedRequests.flatMap((request) => {
@@ -666,7 +654,7 @@ export function SpaceCanvas({
     placedResources,
     newResourceTitle,
     enabled: availability.authorOnCanvas,
-    onSelectEdge,
+    onSelectEdge: selectEdge,
     mayOfferAlso: mayOfferEmbedded,
   });
 
@@ -925,9 +913,9 @@ export function SpaceCanvas({
         else if (sameSelection(adapter.selection, subject)) adapter.clearSelection();
         return false;
       });
-      onEdgesChange(rootChanges);
+      changeEdges(rootChanges);
     },
-    [liveEmbeddings, onEdgesChange],
+    [liveEmbeddings, changeEdges],
   );
   // A stable identity, or React Flow warns of a fresh `edgeTypes` object (#002).
   const canvasEdgeTypes = useMemo(
@@ -936,10 +924,10 @@ export function SpaceCanvas({
   );
   const changeCanvasNodes: OnNodesChange<ResourceFlowNode> = useCallback(
     (changes) => {
-      onNodesChange(changes);
+      changeNodes(changes);
       for (const value of liveEmbeddings) value.changeNodes(changes);
     },
-    [onNodesChange, liveEmbeddings],
+    [changeNodes, liveEmbeddings],
   );
   const canvasRef = useRef<HTMLDivElement>(null);
   const portalGestureSnapshot = useRef({
@@ -1607,12 +1595,7 @@ export function SpaceCanvas({
       // **Not `authorOnCanvas`**: a live embedded edit leaves a pointer
       // connection alone, and `authoring-availability.ts` records why.
       nodesConnectable={availability.connectOnCanvas}
-      // **The placement fact, deliberately not an availability answer.** The
-      // withheld form of this description is a sentence about placement, so the
-      // only condition that may gate it is whether placement resolved. Any
-      // other withdrawal — presenting, a live chrome rename — would leave the
-      // description saying "pending" about a placement that is not.
-      ariaLabelConfig={placementReady ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
+      ariaLabelConfig={ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
       // authoring handles refuse via `isConnectableEnd` and the graph ports via

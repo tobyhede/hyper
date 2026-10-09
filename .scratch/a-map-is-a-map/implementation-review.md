@@ -36,3 +36,11 @@ PR #332 merged on 2026-10-04 with `CI passed` green. A pass over the ten tickets
   - `packages/app/e2e/image-resource.spec.ts`: the two embedded drop tests now cover paste as well.
 
 Undo and Redo (ticket 07) stay unticked and deferred.
+
+## The root canvas reads its surface, 2026-10-09
+
+The closeout left the root canvas drawn from about thirty props `App` took off the root surface, with an optional `surface` that fell back to the authoring policy. `.scratch/root-canvas-surface/` (PR #347, review follow-up PR #349) made `SpaceCanvas` take a required surface and its reading, as `EmbeddedMapAuthoring` does, and deleted the fallback.
+
+- `packages/app/test/SpaceCanvas-types.test.tsx`: `requires the Map surface it draws` and `takes exactly its surface, reading, placement and Space-level collaborators`.
+- `packages/app/test/space-resource-embedded-map.test.tsx`: `keeps a drawn Map inert under a canvas surface that holds the inert policy`.
+- `packages/app/test/SpaceCanvas.test.tsx`: `is withdrawn when the canvas surface is %s`, for inert and read-only.

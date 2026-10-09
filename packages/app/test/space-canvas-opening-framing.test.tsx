@@ -6,10 +6,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { spaceSnapshotSchema, uuidSchema, type UUID } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
-import type { EdgeAuthoring } from '../src/edge-authoring';
 import { OpenSpacesContext } from '../src/open-spaces-context';
 import type { OpenSpace, OpenSpaces, OpenSpacesState } from '../src/open-spaces';
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
@@ -48,32 +46,6 @@ const snapshot = spaceSnapshotSchema.parse({
   },
   resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'A' } }],
 });
-
-const IDLE_EDGE_STATE = { draft: null, refusal: null } as const;
-
-function inertEdgeAuthoring(): EdgeAuthoring {
-  return {
-    getState: () => IDLE_EDGE_STATE,
-    subscribe: () => () => undefined,
-    eligibility: () => ({
-      kind: 'refused',
-      refusal: { code: 'map-required', operation: 'deleted-edge' },
-    }),
-    accepts: () => false,
-    beginPointerConnect: () => undefined,
-    connect: () => undefined,
-    createConnectedResource: () => undefined,
-    connectTo: () => ({ kind: 'unavailable' }),
-    endPointerDrag: () => undefined,
-    beginTitleEdit: () => undefined,
-    completeTitle: () => null,
-    setTitleHidden: () => false,
-    askToDelete: () => undefined,
-    deleteEdge: () => false,
-    cancelDraft: () => undefined,
-    dispose: () => undefined,
-  };
-}
 
 function unused(): never {
   throw new Error('OpenSpaces method unused by this canvas mount');
@@ -195,7 +167,7 @@ describe('opening framing on a mounted canvas', () => {
       fullscreen: refusingFullscreen,
     };
 
-    const surface = { ...app.surface, edgeAuthoring: inertEdgeAuthoring() };
+    const { surface } = app;
     await mountSettled(
       <OpenSpacesContext.Provider value={spaces}>
         <Subscribed spaces={spaces}>
@@ -203,18 +175,7 @@ describe('opening framing on a mounted canvas', () => {
             <SpaceCanvas
               surface={surface}
               reading={canvasReading(surface, {
-                nodes: [resourceNode()],
-                availability: authoringAvailability({
-                  editable: true,
-                  replacingImage: false,
-                  presenting: false,
-                  editingResourceBody: false,
-                  editingResourceTitle: false,
-                  editingChromeTitle: false,
-                  spaceOnCanvas: true,
-                  editingEmbeddedMap: false,
-                  creatingSpaceResource: false,
-                }),
+                projection: { nodes: [resourceNode()], edges: [] },
               })}
               placement={IDLE_PLACEMENT}
               imageReplacement={app.imageReplacement}
@@ -310,25 +271,14 @@ describe('opening framing on a mounted canvas', () => {
       fullscreen: refusingFullscreen,
     };
 
-    const surface = { ...app.surface, edgeAuthoring: inertEdgeAuthoring() };
+    const { surface } = app;
     await mountSettled(
       <OpenSpacesContext.Provider value={spaces}>
         <ReactFlowProvider>
           <SpaceCanvas
             surface={surface}
             reading={canvasReading(surface, {
-              nodes: [resourceNode()],
-              availability: authoringAvailability({
-                editable: true,
-                replacingImage: false,
-                presenting: false,
-                editingResourceBody: false,
-                editingResourceTitle: false,
-                editingChromeTitle: false,
-                spaceOnCanvas: true,
-                editingEmbeddedMap: false,
-                creatingSpaceResource: false,
-              }),
+              projection: { nodes: [resourceNode()], edges: [] },
             })}
             placement={IDLE_PLACEMENT}
             imageReplacement={app.imageReplacement}

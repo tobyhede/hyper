@@ -1,6 +1,6 @@
 import { fixtureFacts } from './render-adapter-fixtures';
 import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react';
-import { useLayoutEffect, type ReactNode } from 'react';
+import { useLayoutEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { Position, ReactFlowProvider, type Edge } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
@@ -8,7 +8,6 @@ import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { bareKindData, ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { CLOSED_DISPLAY, Toolbar, ToolbarButton } from '@project/ui';
-import { authoringAvailability } from '../src/authoring-availability';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -275,10 +274,13 @@ async function mountCanvas(
   } = {},
 ) {
   const composed = compose({ connections, selection });
+  // Presenting is Navigation's mode, as in `App`: the canvas surface's context
+  // follows it, and the harness reads the availability fact back off it.
+  if (presenting) composed.navigation.present();
   const canvas = (paneOpen: boolean) => (
     <ReactFlowProvider>
       {beside}
-      <CanvasHarness {...composed} covered={paneOpen} presenting={presenting} />
+      <CanvasHarness {...composed} covered={paneOpen} />
       {deleteWhenCoveredCommits ? <DeleteWhenCommitted armed={paneOpen} /> : null}
     </ReactFlowProvider>
   );
@@ -316,8 +318,8 @@ function CanvasHarness({
   commandOutcomes,
   session,
   deleteConfirmation,
+  navigation,
   covered,
-  presenting,
 }: Pick<
   ReturnType<typeof compose>,
   | 'surface'
@@ -327,11 +329,15 @@ function CanvasHarness({
   | 'commandOutcomes'
   | 'session'
   | 'deleteConfirmation'
+  | 'navigation'
 > & {
   /** A modal pane is open over the graph, withdrawing everything on it. */
   readonly covered: boolean;
-  readonly presenting: boolean;
 }) {
+  const presenting = useSyncExternalStore(
+    navigation.subscribe,
+    () => navigation.getState().mode === 'presenting',
+  );
   const projection = adapter((state) => state.projection);
   const selection = adapter((state) => state.selection);
   return (
@@ -350,19 +356,8 @@ function CanvasHarness({
       <SpaceCanvas
         surface={surface}
         reading={canvasReading(surface, {
-          nodes: projection?.nodes ?? [],
-          edges: projection?.edges ?? [],
-          availability: authoringAvailability({
-            editable: true,
-            replacingImage: false,
-            presenting,
-            editingResourceBody: false,
-            editingResourceTitle: false,
-            editingChromeTitle: covered,
-            spaceOnCanvas: true,
-            editingEmbeddedMap: false,
-            creatingSpaceResource: false,
-          }),
+          projection,
+          facts: { presenting, editingChromeTitle: covered },
           changeNodes: adapter.getState().changeNodes,
           changeEdges: adapter.getState().changeEdges,
           selection,
@@ -901,6 +896,18 @@ describe("the app's canvas delete key", () => {
     fireEvent.keyDown(screen.getByRole(role), { key: 'Delete' });
 
     expectUnasked(session);
+  });
+
+  /**
+   * Presenting is Navigation's mode, and the canvas reads it twice — as an
+   * availability fact and off its surface's context, which follows Navigation.
+   * A presenting canvas here is one where the two agree, as `App` makes them.
+   */
+  it('presents through Navigation, so the surface the canvas reads is presenting too', async () => {
+    const { surface } = await mountCanvas(null, { presenting: true });
+
+    expect(surface.context()).toMatchObject({ kind: 'canvas', presentingResourceId: RESOURCE_A });
+    expect(surface.authoring.getState().navigation.mode).toBe('presenting');
   });
 
   it('leaves the Edge standing while presenting', async () => {
