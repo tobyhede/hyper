@@ -303,14 +303,16 @@ export function SpaceCanvas({
   const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
   const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
   // Null while a replacement placement resolves. The canvas keeps drawing the
-  // Resources on screen through that window — deliberately, so a gesture is
-  // never interrupted — so a connection is reachable with no fresh projection
-  // to hand over, and the store keeps its live nodes rather than reconciling
-  // against nothing.
+  // Resources on screen through that window, so a connection is reachable with
+  // no fresh projection to hand over, and the store keeps its live nodes rather
+  // than reconciling against nothing (`render-adapter.test.ts`, "keeps the
+  // Resources on screen when a connection completes with no fresh projection").
   const projectedNodes = projected?.nodes ?? null;
   // That the render adapter holds a projection — so `nodes` is what it holds,
-  // not the empty list that stands in for none. It stays true while a
-  // replacement placement resolves, so nothing here gates a gesture on it.
+  // not the empty list that stands in for none. No gesture here waits for
+  // `projected`: a Resource held while a replacement placement resolves stays
+  // authorable (`SpaceCanvas.test.tsx`, "a %s held while a replacement
+  // placement resolves").
   const { hasResourcesOnCanvas } = canvasRendering;
   const { authoring, edgeAuthoring } = surface;
   const context = surface.context();

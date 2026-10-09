@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, type ReactNode } from 'react';
+import { StrictMode, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
@@ -80,5 +80,45 @@ describe('useMapSurface', () => {
     await act(() => Promise.resolve());
 
     expect(result.current.newResourceTitle).toBe('Resource 3');
+  });
+
+  it('commits no title other than the one an Edit would mint, before the drawing observes the Space', async () => {
+    const app = composition();
+    const surface = createMapSurface(app, () => ({
+      kind: 'drawn',
+      mapId: MAP,
+      graphId: GRAPH,
+      policy: 'authoring',
+      occurrence: 'drawing',
+    }));
+    // The Space gains `Resource 2` between the surface's creation and its
+    // `observe()`, as `EmbeddedMapAuthoring` creates in `useState` and observes
+    // in an effect.
+    app.authoring.complete(CANVAS, {
+      kind: 'created-resource',
+      resourceKind: 'markdown',
+      anchor: { x: 0, y: 0 },
+    });
+    await vi.waitFor(() =>
+      expect(app.authoring.getState().session.persistence.kind).toBe('settled'),
+    );
+
+    const committed: string[] = [];
+    renderHook(() => {
+      useEffect(() => surface.observe(), []);
+      const reading = useMapSurface(app, surface, {
+        presenting: false,
+        spaceOnCanvas: true,
+        creatingSpaceResource: false,
+      });
+      useLayoutEffect(() => {
+        committed.push(reading.newResourceTitle);
+      });
+      return reading;
+    });
+    await act(() => Promise.resolve());
+
+    expect(committed).not.toHaveLength(0);
+    expect(new Set(committed)).toEqual(new Set(['Resource 3']));
   });
 });

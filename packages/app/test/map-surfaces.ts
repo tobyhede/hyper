@@ -6,7 +6,7 @@ import type { CanvasRendering } from '../src/canvas-rendering';
 import type { SpaceCanvasProps } from '../src/components/SpaceCanvas';
 import type { MapSurface } from '../src/map-surface';
 import type { Projection, ResourceResize } from '../src/render-adapter';
-import type { MapSurfaceReading } from '../src/use-map-surface';
+import { renderedFacts, type MapSurfaceReading } from '../src/use-map-surface';
 import type { MapSurfacePolicy } from '../src/map-surface-policy';
 import { nextResourceTitle } from '../src/titles';
 
@@ -117,8 +117,7 @@ export function canvasReading(
         spaceOnCanvas: true,
         creatingSpaceResource: false,
         ...facts,
-        editable: hasResourcesOnCanvas,
-        editingEmbeddedMap,
+        ...renderedFacts({ hasResourcesOnCanvas, editingEmbeddedMap }),
       }),
     ),
     editingResourceBody: facts.editingResourceBody ?? false,
