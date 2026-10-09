@@ -49,8 +49,10 @@ export interface AuthoringInProgress {
    * Some composed Space, listed or only drawn, is replacing an image (ADR 0112).
    *
    * The open set answers it once, as `OpenSpacesState.replacingImage`, and the
-   * domain refuses navigation on the same answer; an isolated mount has no open
-   * set and answers `false`, leaving `replacingImage` the whole answer. It
+   * domain refuses navigation on the same answer
+   * (`packages/app/test/open-spaces.test.tsx`, `holds Back and Forward while an
+   * only-drawn Space replaces an image`); an isolated mount has no open set and
+   * answers `false`, leaving `replacingImage` the whole answer. It
    * withdraws `navigate` and `present` and nothing else: presenting is the
    * canvas Space's Navigation, and beginning a traversal moves the address,
    * which writes a history entry while Back and Forward are being held. The

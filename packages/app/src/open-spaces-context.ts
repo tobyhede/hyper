@@ -67,7 +67,8 @@ export const useOpenSpacesStanding = (spaceId: UUID): OpenSpacesStanding => {
  * Read as the boolean rather than the whole state, so a mount re-renders when
  * the hold changes and not on every publish of the open set. An isolated mount
  * has no open set and answers `false`: its own replacement is then the whole
- * answer. `authoringAvailability` reads it as its `navigationHeld` fact.
+ * answer. `useMapSurface` hands it to `authoringAvailability` as its
+ * `navigationHeld` fact (`packages/app/test/dock-navigation-hold.test.tsx`).
  */
 export const useNavigationHeld = (): boolean => {
   const spaces = useOpenSpaces();
