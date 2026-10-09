@@ -1544,13 +1544,11 @@ describe('Space app Resources list', () => {
    * outliving that has no editor left to cancel it and still withdraws Add
    * Resource, Present, Delete Resource and every entity menu's Edits.
    *
-   * Choosing a Map row spends `setSpaceChromeEdit(null)` at the call site,
-   * and this arrival does not — it is `authoringAvailability`'s
-   * `chromeTitleEdit` that answers it,
-   * because the Map change clears the published projection and the canvas
-   * holds no Resources until placement resolves. That is one clear standing on
-   * another's condition, which is why the behaviour is pinned here rather than
-   * left to the reader of either.
+   * `useDockRenaming` records the subject a rename was begun on and discards
+   * the draft when the name it is renaming comes to name a different subject,
+   * or when the replacement epoch advances. The arrival changes both the
+   * selected Map and the Active Graph, so the subject check discards the draft
+   * whether it was begun on the Map's name or the Graph's.
    */
   it('discards an open chrome title draft when a Back moves to another Map', async () => {
     const base = snapshot('Space', 'Resource', 10, 20);

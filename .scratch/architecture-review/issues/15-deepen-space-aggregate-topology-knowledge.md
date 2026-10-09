@@ -45,8 +45,10 @@ and no mark-and-sweep reachability collector is introduced.
 
 - Does complete export need topology beyond `aggregate.spaces` and
   `lookup.space`? **No** — export is built (`v1-release/08`, resolved) and
-  `src/export/export-aggregate.ts:95-176` reads only `loadSpaceAggregate`'s
-  `aggregate.spaces`.
+  `src/export/export-aggregate.ts` iterates only persistence's
+  `LoadedAggregate.spaces`, from `repository.loadAggregate()` (`:171-176`, and
+  `:136-141` to mark each Space exported), and calls `loadSpaceAggregate`
+  (`:95`) only to check that the files it wrote read back (`intake.ok`).
 - Does destructive confirmation need the exact deletion closure before the
   lifecycle completes it? **Not today** — the Space Resource's confirmation is
   fixed text (`DELETION_DESCRIPTIONS.space`,
@@ -73,4 +75,4 @@ and no mark-and-sweep reachability collector is introduced.
 
 **Category:** enhancement. **State:** wontfix.
 
-There is still one consumer. `cascadeDeletion` (`packages/persistence/src/space-resource-planning.ts:457-488`) is the only code that rebuilds inbound reference counts. The export trigger came and went without needing it: `v1-release/08` is resolved and `src/export/export-aggregate.ts:95-176` uses only `aggregate.spaces`. Deletion confirmation is fixed text (`packages/app/src/resource-deletion.ts:35-41`). The body was refreshed for Space Card → Space Resource, the resolved blocker (the old line misnamed `space-cards/03`; the lifecycle was `space-cards/16`) and the fact that the cascade lives in persistence over `LoadedAggregate` rather than in graph's `SpaceAggregate`. Reopen only if a second production consumer of the deletion closure appears.
+There is still one consumer. `cascadeDeletion` (`packages/persistence/src/space-resource-planning.ts:457-488`) is the only code that rebuilds inbound reference counts. The export trigger came and went without needing it: `v1-release/08` is resolved and `src/export/export-aggregate.ts` iterates only the `LoadedAggregate.spaces` that `repository.loadAggregate()` answers (`:136-176`), and calls `loadSpaceAggregate` (`:95`) only to check the written files read back. Deletion confirmation is fixed text (`packages/app/src/resource-deletion.ts:35-41`). The body was refreshed for Space Card → Space Resource, the resolved blocker (the old line misnamed `space-cards/03`; the lifecycle was `space-cards/16`) and the fact that the cascade lives in persistence over `LoadedAggregate` rather than in graph's `SpaceAggregate`. Reopen only if a second production consumer of the deletion closure appears.

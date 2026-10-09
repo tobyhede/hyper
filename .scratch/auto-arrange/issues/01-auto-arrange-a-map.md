@@ -6,7 +6,7 @@
 
 The accepted design is R6 and R7 in `docs/agents/maps-and-graphs.md` (ADR 0086). It runs only when the author asks, and only over an existing Map. It never runs at render, creates no Map and is never a selectable canvas context. An automatic strategy is never seeded or constrained to honour a drop point. It lives in `graph`, so the change re-sites the render-time `elkjs` ban in `eslint.config.js` (the `paths` and `patterns` entries) rather than obeying it.
 
-**No automatic strategy exists today.** elkjs has been a dependency of no package since ADR 0086. The only layout strategies left are `gridStrategy` and `positionedStrategy` in `packages/graph/src/layout.ts`, and neither computes an arrangement from the Graphs. So two things have to be decided before building, as well as the open questions below:
+**No automatic strategy exists today.** elkjs has been a dependency of no package since ADR 0086. The only layout strategies left are `gridStrategy` and `positionedStrategy` in `packages/graph/src/layout.ts`, and neither derives positions from the Graphs' Edges. So two things have to be decided before building, as well as the open questions below:
 
 - **The engine.** Bring elkjs back into `graph`, use `gridStrategy`, or use something else.
 - **The command surface.** Where the author invokes it, for example a command in the Command Dock. This goes through `$shadcn-first-ui`.

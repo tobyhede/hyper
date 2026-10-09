@@ -119,6 +119,43 @@ describe('ticket numbers', () => {
     expect(roadmap.features.map((feature) => feature.slug)).toContain('command-dock');
     expect(roadmap.features.flatMap((feature) => feature.duplicateNumbers)).toEqual([]);
   });
+
+  it('reads no blocker in the tracked tracker that names a ticket that does not exist', () => {
+    const roadmap = buildRoadmap(join(REPOSITORY_ROOT, '.scratch'));
+    const tickets = new Set(
+      roadmap.features.flatMap((feature) =>
+        feature.issues.flatMap((issue) =>
+          issue.number === null ? [] : [`${feature.slug}/${issue.number}`],
+        ),
+      ),
+    );
+
+    // A file or line citation inside a Blocked-by paragraph reads as a blocker
+    // reference, and the roadmap then reports the ticket blocked on nothing.
+    const dangling = roadmap.features.flatMap((feature) =>
+      feature.issues.flatMap((issue) =>
+        issue.blockers
+          .map((blocker) => `${blocker.feature ?? feature.slug}/${blocker.number}`)
+          .filter((key) => !tickets.has(key))
+          .map((key) => `${issue.path} -> ${key}`),
+      ),
+    );
+
+    expect(tickets.size).toBeGreaterThan(100);
+    expect(dangling).toEqual([]);
+  });
+
+  it('counts only numbered tickets among the tracked tracker issues', () => {
+    const roadmap = buildRoadmap(join(REPOSITORY_ROOT, '.scratch'));
+
+    // A record kept under `issues/` without the `<NN>-<slug>.md` shape is not a
+    // ticket, so a Status line on it must not put it in an effort's totals.
+    const unnumbered = roadmap.features.flatMap((feature) =>
+      feature.issues.filter((issue) => issue.number === null).map((issue) => issue.path),
+    );
+
+    expect(unnumbered).toEqual([]);
+  });
 });
 
 describe('issue tags', () => {

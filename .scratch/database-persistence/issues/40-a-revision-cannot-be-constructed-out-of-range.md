@@ -6,7 +6,7 @@ Blocked by: None.
 
 Recommended sequence: none. Ticket 31, whose Part A this was to follow, is resolved.
 
-Audited: 2026-09-20 against `b1ac983d`. Bare-bigint Revision values and the codec remain. Module ownership and the ceiling-advancement outcome still need design decisions, so this remains `needs-triage` on the release roadmap.
+Audited: 2026-09-20 against `b1ac983d`. Bare-bigint Revision values and the codec remain. Module ownership and the ceiling-advancement outcome still need design decisions, so this is `ready-for-human` on the release roadmap.
 
 Surfaced by: the architecture review of 2026-09-20 (candidate D).
 

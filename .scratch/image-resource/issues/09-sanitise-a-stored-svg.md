@@ -2,7 +2,9 @@
 
 **What to build:** Defence in depth behind ADR 0107's response policy: when the host stores an SVG, it sanitises it with DOMPurify's SVG profile (`{ USE_PROFILES: { svg: true, svgFilters: true } }`) and stores the sanitised bytes, whose SHA-256 is the image's id. DOMPurify runs server-side only over the latest jsdom; its README says happy-dom "will likely lead to XSS". Needs an ADR refining ADR 0106 first, because the id stops being the digest of the bytes the author sent.
 
-**Blocked by:** ADR 0107 accepted and SVG stored. Neither holds yet: ADR 0107 is still proposed rather than accepted and is missing from `docs/adr/README.md`; storing still refuses an SVG as `image-svg-unsupported` (`packages/persistence/src/images.ts:182`); and stored images are served with `X-Content-Type-Options: nosniff` only, with no `Content-Security-Policy` (`packages/http/src/index.ts:72`). No ticket implements ADR 0107, so nothing under way will clear this blocker.
+**Blocked by:** ADR 0107 accepted and SVG stored. No ticket implements ADR 0107, so nothing under way will clear this blocker.
+
+**Where the blocker stands:** neither condition holds yet. ADR 0107 is still proposed rather than accepted and is missing from `docs/adr/README.md`; storing still refuses an SVG as `image-svg-unsupported` (`packages/persistence/src/images.ts:182`); and stored images are served with `X-Content-Type-Options: nosniff` only, with no `Content-Security-Policy` (`packages/http/src/index.ts:72`).
 
 **Also to account for:** ADR 0118 carries a stored image's bytes in an Aggregate directory's `images/<content-id>.<ext>`, and Import admits them by that id. If the id becomes the digest of sanitised bytes, an Export writes sanitised bytes, and Import of a directory holding an unsanitised SVG either re-keys it or refuses it. The refining ADR has to say which. DOMPurify is already a dependency of `@project/ui`, where it runs in the browser (`packages/ui/src/PresentedResource.tsx:3`). Running it on the host would need jsdom as a runtime dependency of the storing package; today jsdom is only a root dev dependency.
 
