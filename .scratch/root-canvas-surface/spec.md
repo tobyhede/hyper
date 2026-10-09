@@ -74,5 +74,5 @@ Two consequences for whoever changes the canvas:
 
 ## Further Notes
 
-- Source: candidate 3 of `/private/var/folders/fx/m_71jpr51bqf9jjlgh8m_pq00000gn/T/architecture-review-20261008-142617.html`, grilled 2026-10-08.
+- Source: candidate 3 of the 2026-10-08 architecture review, recorded in `.scratch/architecture-review/2026-10-08-root-canvas-candidates.md`, grilled 2026-10-08.
 - Stacked on PR #346 (`a-map-is-a-map-closeout`), which records ADR 0112 as built.

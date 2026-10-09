@@ -1146,7 +1146,9 @@ test('a connection between Resources of two different drawings is refused with w
   expect(await embeddedGraphEdgeCount(page, second)).toBe(secondBefore);
   const stored = await page.request.get(`/api/spaces/${DEEP_DIVE_SPACE_ID}`);
   expect(
-    decodeLoadedSpace(await stored.json()).snapshot.document.maps?.[0]?.graphs[0]?.edges,
+    decodeLoadedSpace(await stored.json())
+      .snapshot.document.maps?.find((candidate) => candidate.id === DEEP_DIVE_MAP_ID)
+      ?.graphs.flatMap((graph) => graph.edges),
   ).toEqual([]);
 });
 
