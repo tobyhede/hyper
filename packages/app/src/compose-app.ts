@@ -1,4 +1,4 @@
-import { newUuid, type MapId, type SpaceSnapshot, type UUID } from '@project/core';
+import { newUuid, type MapId, type UUID } from '@project/core';
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSession } from '@project/persistence';
 import { createCommandOutcomes, type CommandOutcomes } from './command-outcomes';
@@ -116,15 +116,6 @@ export interface EdgeCollaborators {
 }
 
 export interface AppCore {
-  /**
-   * The validated aggregate behind a working snapshot.
-   *
-   * Returned as well as closed over, because the render path reads the snapshot
-   * *React is rendering* while `currentSpace` reads the session's live one, and
-   * sharing this one reader is what gives both the same `Space` identity to
-   * memoize on.
-   */
-  readonly readWorkingSpace: (snapshot: SpaceSnapshot) => Space;
   readonly currentSpace: () => Space;
   readonly navigation: Navigation;
   /**
@@ -191,9 +182,8 @@ export interface ComposedApp extends AppCore {
  * are about, and a hook for it would hide it.
  */
 export function composeCore({ spaceSession, selection }: ComposeCoreDependencies): AppCore {
-  // One validated aggregate per working snapshot, shared by the render path and
-  // by Navigation. Both read the same reader, so in the steady state a snapshot
-  // is parsed and indexed once rather than once per render.
+  // One validated aggregate per working snapshot, so every read of an unchanged
+  // snapshot answers the same `Space` and it is parsed and indexed once.
   const readWorkingSpace = createWorkingSpaceReader();
   const currentSpace = (): Space => readWorkingSpace(spaceSession.getState().working);
   // Which Map this space opens in. It also answers which Graphs are drawn
@@ -201,7 +191,7 @@ export function composeCore({ spaceSession, selection }: ComposeCoreDependencies
   // anything that reads the canvas is built.
   const openingSelection = selection ?? requireDefaultMap(currentSpace());
   const navigation = createNavigation(currentSpace, openingSelection);
-  return { readWorkingSpace, currentSpace, navigation, openingSelection };
+  return { currentSpace, navigation, openingSelection };
 }
 
 /** The whole composition: Navigation, Space Authoring, the render adapter and Edge Authoring. */

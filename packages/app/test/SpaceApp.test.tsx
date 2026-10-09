@@ -1761,10 +1761,12 @@ describe('Space app Resources list drop', () => {
  * Resources list and memberships no derivation of the Space would produce —
  * one outside Resource withheld, the other's membership of its Map dropped —
  * so what the Dock draws says which objects it was handed. The Graph colour
- * is the projection's, which the Dock already took from the surface.
+ * is the projection's, which the Dock also reads off this view. The view's
+ * Space carries a title the stored Space does not, and the canvas's HUD draws
+ * it, so the canvas is observed reading the same answered view.
  */
 describe('Space app Map reading', () => {
-  it('draws the Dock from the very Map view the canvas reads', async () => {
+  it('draws the Dock and the canvas from one Map view', async () => {
     const UNPLACED_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
     const base = snapshot('Space', 'Resource', 10, 20);
     const local: SpaceSnapshot = {
@@ -1804,6 +1806,8 @@ describe('Space app Map reading', () => {
       spaceSession: session,
       selection: MAP_ID,
     });
+    // One answered view per derived view, as `surface.view()` itself answers,
+    // or the canvas's render loop never settles.
     const views = new WeakMap<MapView, MapView>();
     const surface: MapSurface = {
       ...composed.surface,
@@ -1813,6 +1817,7 @@ describe('Space app Map reading', () => {
         if (known !== undefined) return known;
         const answered: MapView = {
           ...derived,
+          space: { ...derived.space, title: 'Answered Space' },
           projection: {
             ...derived.projection,
             colors: { ...derived.projection.colors, [OWNED_GRAPH_ID]: '#123456' },
@@ -1852,5 +1857,7 @@ describe('Space app Map reading', () => {
       'stroke',
       '#123456',
     );
+    // The canvas draws the Space title off the same answered view.
+    expect(screen.getByTestId('hud-space')).toHaveTextContent('Answered Space');
   });
 });

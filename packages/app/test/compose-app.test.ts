@@ -82,14 +82,6 @@ describe('the composed working Space', () => {
     expect(currentSpace()).not.toBe(before);
     expect(currentSpace().lookup.resource(RESOURCE_A)?.title).toBe('Renamed');
   });
-
-  /** The reader is returned as well as closed over, so the render path shares it. */
-  it('reads a rendered snapshot through the same reader `currentSpace` uses', () => {
-    const spaceSession = openSession();
-    const { readWorkingSpace, currentSpace } = composeCore({ spaceSession });
-
-    expect(readWorkingSpace(spaceSession.getState().working)).toBe(currentSpace());
-  });
 });
 
 describe('what the composition opens on', () => {

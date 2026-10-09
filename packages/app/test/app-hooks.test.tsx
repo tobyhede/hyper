@@ -21,6 +21,7 @@ import { useResourcesDisclosure } from '../src/resources-disclosure';
 import { useSpaceAddresses } from '../src/space-addresses';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import { useSpaceResourceTargetTitles } from '../src/space-resource-targets';
+import { useMapSurface } from '../src/use-map-surface';
 import { useAuthoringAvailability, type AuthoringFacts } from '../src/use-authoring-availability';
 import { useVisibleCentre } from '../src/visible-centre';
 import {
@@ -375,6 +376,37 @@ describe('useCanvasRendering', () => {
 
     act(() => result.current.selectResource(PLACED_A));
     expect(result.current.selection).toEqual({ kind: 'resource', resourceId: PLACED_A });
+  });
+});
+
+describe('useMapSurface', () => {
+  it("holds the view's identity across re-renders while the Space and Map hold", async () => {
+    const { app } = openDerivationSpace();
+    const { result, rerender } = renderHook(() =>
+      useMapSurface(app, app.surface, {
+        presenting: false,
+        spaceOnCanvas: true,
+        creatingSpaceResource: false,
+      }),
+    );
+    await waitFor(() => expect(result.current.canvasRendering.hasResourcesOnCanvas).toBe(true));
+    const first = result.current.view;
+
+    rerender();
+    expect(result.current.view).toBe(first);
+    expect(result.current.view.projection).toBe(first.projection);
+    expect(result.current.view.mapPlacement).toBe(first.mapPlacement);
+    expect(result.current.view.placedResources).toBe(first.placedResources);
+
+    act(() => app.navigation.selectMap(OTHER_MAP_ID));
+    rerender();
+    await waitFor(() => expect(result.current.view.selectedMap.map.id).toBe(OTHER_MAP_ID));
+    await waitFor(() =>
+      expect(result.current.canvasRendering.projected?.nodes.map(({ id }) => id)).toEqual([
+        OUTSIDE,
+      ]),
+    );
+    expect(result.current.view.projection).not.toBe(first.projection);
   });
 });
 

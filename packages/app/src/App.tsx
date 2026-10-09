@@ -126,8 +126,9 @@ export const createApp = (
     const { session: sessionState, navigation: navigationState, replacementEpoch } = authoringState;
     // The address, the disclosure and the Stage's Copy link read the Map id
     // from Navigation rather than off the surface's view: Navigation owns the
-    // address, and `composeApp` builds the canvas surface's context `mapId`
-    // from this same `selectedMapId`.
+    // address, and the root surface follows Navigation's selected Map, which
+    // this published state copies (`map-surface.test.ts`, "answers one view
+    // until the Space or the selected Map changes").
     const { selectedMapId, activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
