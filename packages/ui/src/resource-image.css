@@ -1,6 +1,7 @@
 /* The room an Image Resource's picture is drawn in. It takes the whole of that
    room and the picture sits centred inside it. */
 .resource-image {
+  position: relative;
   display: flex;
   flex: 1;
   align-items: center;
@@ -20,6 +21,18 @@
   width: 100%;
   height: 100%;
   object-fit: scale-down;
+}
+
+/* Until the picture loads, the skeleton takes its place: the picture stays
+   mounted so the browser fetches it, but draws nothing. */
+.resource-image__picture[data-loading] {
+  visibility: hidden;
+}
+
+.resource-image__skeleton {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
 }
 
 /* The failed-image state is drawn on the Resource's own paper, so it takes the

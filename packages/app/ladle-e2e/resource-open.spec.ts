@@ -852,3 +852,35 @@ test(
     await expect(failed.getByRole('button', { name: /Replace/ })).toHaveCount(0);
   },
 );
+
+/**
+ * Until a picture arrives, the content area draws a skeleton in its place,
+ * announced as loading, and the picture replaces it. A Reference Resource to an
+ * Image Resource draws through the same picture as the Target's own content,
+ * and this story's picture is one the test can hold back and then let through.
+ */
+test(
+  'an Open Image Resource draws a skeleton until its picture loads',
+  { tag: '@parity:open-image-resource-shows-skeleton-while-loading' },
+  async ({ page }) => {
+    const { promise: held, resolve: release } = Promise.withResolvers<null>();
+    await page.route(IMAGE_REFERENCE_HARBOUR_URL, async (route) => {
+      await held;
+      await route.fulfill({ status: 200, contentType: 'image/png', body: HARBOUR });
+    });
+    await page.goto(openImageReferenceStory);
+    const resource = page
+      .getByRole('region', { name: 'Image Target', exact: true })
+      .getByRole('article', { name: 'Harbour, again' });
+    const skeleton = resource.getByRole('status', { name: 'Loading image' });
+    await expect(skeleton).toBeVisible();
+    await expect(resource.getByRole('img', { name: 'Harbour, again' })).toHaveCount(0);
+
+    release(null);
+    await expectPictureLoaded(
+      resource.getByRole('img', { name: 'Harbour, again' }),
+      HARBOUR_SIZE.width,
+    );
+    await expect(skeleton).toHaveCount(0);
+  },
+);
