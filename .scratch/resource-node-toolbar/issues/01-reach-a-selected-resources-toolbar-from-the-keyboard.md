@@ -10,11 +10,11 @@ ADR 0102 moved a Resource's commands into React Flow's `NodeToolbar`, which port
 
 Whether this is answered by focus management, a key that moves into the toolbar, or accepted as the cost of the library's shape is a decision to take before building; ADR 0102 records it as open work.
 
-An Edge already answers the same problem: `enterToolbar` (`packages/app/src/edge-authoring-react.tsx:453`) moves focus from a focused Edge to its toolbar's first command on Enter, Escape in the chrome returns to the Edge, and Tab does not pass through the toolbar on the way to the next Edge (`docs/agents/rendering.md`). That shape cannot be copied as it stands, because Enter and Space already Open a focused Resource (`ARIA_LABEL_CONFIG` in `packages/app/src/components/SpaceCanvas.tsx`). The decision is which key enters a Resource's toolbar, or whether Open moves off Enter/Space.
+An Edge already answers the same problem: `enterToolbar` (`packages/app/src/edge-authoring-react.tsx:417`, wired at :496) moves focus from a focused Edge to its toolbar's first command on Enter, Escape in the chrome returns to the Edge, and Tab does not pass through the toolbar on the way to the next Edge (`docs/agents/rendering.md`). That shape cannot be copied as it stands, because Enter and Space already Open a focused Resource (`ARIA_LABEL_CONFIG` in `packages/app/src/components/SpaceCanvas.tsx`). The decision is which key enters a Resource's toolbar, or whether Open moves off Enter/Space.
 
 ## Acceptance criteria
 
-- [ ] The decision is recorded (in ADR 0102 or a successor).
+- [ ] The decision is recorded in a successor ADR to 0102, which amends 0102's status line, or on this ticket or a current contract if it only settles treatment no ADR states. ADR 0102's body is not edited.
 - [ ] If built: from a selected Resource, the keyboard reaches its toolbar's first command without passing another Resource, and an e2e test proves it.
 
 ## Comments
@@ -25,4 +25,4 @@ An Edge already answers the same problem: `enterToolbar` (`packages/app/src/edge
 
 **Category:** enhancement. **State:** ready-for-human.
 
-Still valid: `ResourceNode` still floats the toolbar in React Flow's `NodeToolbar` (`packages/react-flow-adapter/src/ResourceNode.tsx:347`), and ADR 0102's Consequences still name this ticket as open work. The body now cites the Edge precedent (`enterToolbar`, `packages/app/src/edge-authoring-react.tsx:453`) and names the conflict with it: Enter and Space already Open a Resource. Open decision: which key enters a Resource's toolbar, or whether Open moves off Enter/Space, recorded in ADR 0102 or a successor.
+Still valid: `ResourceNode` still floats the toolbar in React Flow's `NodeToolbar` (`packages/react-flow-adapter/src/ResourceNode.tsx:347`), and ADR 0102's Consequences still name this ticket as open work. The body now cites the Edge precedent (`enterToolbar`, `packages/app/src/edge-authoring-react.tsx:417`, wired at :496) and names the conflict with it: Enter and Space already Open a Resource. Open decision: which key enters a Resource's toolbar, or whether Open moves off Enter/Space. It is recorded in a successor ADR to 0102 (amending 0102's status line), or on this ticket or a current contract; ADR 0102's body stays as accepted.

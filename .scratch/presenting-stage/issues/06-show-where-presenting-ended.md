@@ -10,7 +10,7 @@ Building this changes accepted behaviour. ADR 0123's cost-accepted section says 
 
 - [ ] Decide whether leaving presenting should move the canvas at all before building it, and record the decision against ADR 0123's "returns the canvas exactly as it was".
 - [ ] If built, the pan is one camera command issued and never awaited (ADR 0043).
-- [ ] If built, `e2e/presenting.spec.ts:347` is rewritten to assert the pan instead of an unchanged viewport.
+- [ ] If built, `packages/app/e2e/presenting.spec.ts:347` is rewritten to assert the pan instead of an unchanged viewport.
 
 ## Comments
 
@@ -20,4 +20,4 @@ Building this changes accepted behaviour. ADR 0123's cost-accepted section says 
 
 **Category:** enhancement. **State:** needs-triage.
 
-Still valid as parked work: leaving presenting does not move the canvas today, as `e2e/presenting.spec.ts:347` asserts. The body now notes that a pan contradicts ADR 0123's "returns the canvas exactly as it was", that the presenting cameras were deleted in `1637e45d` so a pan needs a new camera command, that the e2e test would have to change, and that ticket 02 is resolved. The open decision is whether leaving presenting should move the canvas at all.
+Still valid as parked work: leaving presenting does not move the canvas today, as `packages/app/e2e/presenting.spec.ts:347` asserts. The body now notes that a pan contradicts ADR 0123's "returns the canvas exactly as it was", that the presenting cameras were deleted in `1637e45d` so a pan needs a new camera command, that the e2e test would have to change, and that ticket 02 is resolved. The open decision is whether leaving presenting should move the canvas at all.

@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 
-**What to build:** ADR 0120's rule for a missing `kind`. Both frontmatter schemas stop defaulting `kind` to `markdown`. In `packages/core/src/schema.ts`, `defaultMarkdownKind` (:200-203) is applied by `resourceFrontmatterSchema` (:211-212) and by `importResourceFrontmatterSchema` (:237-238). A Resource file with no `kind` and no body is an Ur Resource. One with no `kind` and a body is refused at intake, as an Ur Resource with a body already is: `parseResourceFile` refuses it with `invalid-frontmatter` (`packages/graph/src/resource-file.ts:129`).
+**What to build:** ADR 0120's rule for a missing `kind`. Both frontmatter schemas default a missing `kind` to `ur` instead of `markdown`. In `packages/core/src/schema.ts`, `defaultMarkdownKind` (:200-203) is applied by `resourceFrontmatterSchema` (:211-212) and by `importResourceFrontmatterSchema` (:237-238); keep that preprocess on both, and make it supply `ur` (renamed to match). Do not remove it: the `z.discriminatedUnion('kind', …)` it wraps refuses a frontmatter with no `kind` at all. A Resource file with no `kind` and no body is an Ur Resource. One with no `kind` and a body is refused at intake, as an Ur Resource with a body already is: `parseResourceFile` refuses it with `invalid-frontmatter` (`packages/graph/src/resource-file.ts:129`).
 
 **Also in the same change:**
 

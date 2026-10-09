@@ -10,7 +10,7 @@ active Graph and persists through the normal authoring path; refusals still
 surface through the existing Graph notice. The picker is palette-bound only —
 no hex field, no custom colours.
 
-**Blocked by:** 01 — Adopt Tableau 20 as the Graph palette; 02 — Palette colour picker component.
+**Blocked by:** 01, which adopts the Tableau palette as the Graph palette, and 02, the palette colour picker component.
 
 - [x] The Graph identity menu offers **Colour…** instead of an inline radio list of every slot.
 - [x] The picker lists all twenty Tableau slots with the shared labels from ticket 01.

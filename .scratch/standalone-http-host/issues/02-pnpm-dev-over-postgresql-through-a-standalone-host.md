@@ -2,7 +2,7 @@
 
 **What to build:** Tracer bullet. `pnpm dev` still starts everything with one command, but the PostgreSQL-backed HTTP application now runs as its own Node server, and Vite forwards `/api` and product addresses to it through the thin middleware ADR (01) describes. A browser sees no difference.
 
-**Blocked by:** 01 — Record that the HTTP host is its own process; database-persistence 26 — One database target composition.
+**Blocked by:** 01 — Record that the HTTP host is its own process; database-persistence/26 — One database target composition.
 
 **Status:** ready-for-agent
 

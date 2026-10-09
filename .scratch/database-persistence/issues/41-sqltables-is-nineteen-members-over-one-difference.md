@@ -1,4 +1,4 @@
-# 41 — `SqlTables` is nineteen members over one real difference
+# 41 — `SqlTables` is twenty-one members over one real difference
 
 Status: needs-triage
 Tags: Cleanup, release/v1
@@ -6,13 +6,13 @@ Blocked by: None.
 
 Recommended sequence: coordinate with tickets 31, 40 and 34 because they touch the same seam. These are not hard prerequisites; investigate the fixed ordering independently.
 
-Audited: 2026-09-20 against `b1ac983d`. The 19 table members and the exposed ordering callback remain. The strongest bounded change is to hide fixed ascending-id ordering; the operation-merging choices below still need design review. This ticket joins the final release proof with its `needs-triage` status intact.
+Audited: 2026-09-20 against `b1ac983d`. The table members (19 then, 21 at the 2026-10-09 triage) and the exposed ordering callback remain. The strongest bounded change is to hide fixed ascending-id ordering; the operation-merging choices below still need design review. This ticket joins the final release proof with its `needs-triage` status intact.
 
 Surfaced by: the architecture review of 2026-09-20 (candidate A).
 
 ## The defect
 
-ADR 0095 states the rule: each database supplies "only a small `SqlStore` value", and "a member added to that value is a place the two databases have begun to differ again, and needs a reason." That rule was applied to `SqlStore` when it had 7 members. `SqlStore` now has **10** (`src/persistence/sql-store.ts:308-320`): `lockAggregateShared` (`54e2aaff`), `lockAggregate` (`7b93b498`, ticket 42) and `isUnavailable` (`a77bc662`, ticket 38) were added later, and the ADR's prose list names none of the three, so that list is no longer accurate. The rule was never applied to `SqlTables`, which went from 2 members at ticket 22 to 19 across tickets 23 and 24 — the count in this ticket's title — and is now **21**, the `Image` table having added `create` and `find` (`d37ed7e7`, ADR 0106).
+ADR 0095 states the rule: each database supplies "only a small `SqlStore` value", and "a member added to that value is a place the two databases have begun to differ again, and needs a reason." That rule was applied to `SqlStore` when it had 7 members. `SqlStore` now has **10** (`src/persistence/sql-store.ts:308-320`): `lockAggregateShared` (`54e2aaff`), `lockAggregate` (`7b93b498`, ticket 42) and `isUnavailable` (`a77bc662`, ticket 38) were added later, and the ADR's prose list names none of the three, so that list is no longer accurate. The rule was never applied to `SqlTables`, which went from 2 members at ticket 22 to 19 across tickets 23 and 24 and is now **21** — the count in this ticket's title, the `Image` table having added `create` and `find` (`d37ed7e7`, ADR 0106).
 
 Of those 21, **one** of the three adapter-authored table operations has a different algorithm today. This is not a claim that the whole `SqlStore` varies in only one way: transactions, serialisation, document decoding and duplicate-key recognition also differ.
 
@@ -51,4 +51,4 @@ Ticket 34 examines the unused non-transactional `execute` capability. `Handle` s
 
 **Category:** enhancement. **State:** needs-triage.
 
-The premise holds but the counts were stale, and the title's "nineteen" is now wrong. `SqlTables` has 21 members, the two `Image` members having arrived in `d37ed7e7`. There are 11 internal slice interfaces (`src/persistence/sql-store.ts:341-427`), and `SqlStore` has 10 members, not 7 (`:308-320`), so ADR 0095's list of them is no longer accurate. The body now gives these counts, uses Resource names where it said Thing (`loadWithResources`, `Resource.deleteExcept`, `buildResourceTable`, the `Resource*` slices), and points `relockSpace` and `deleteResourcesForSpace` at their current lines. `Order` and the test's `<unknown, unknown>` (`test/unit/space-resource-repository.test.ts:13`) remain. Still open for design review: whether folding `relock` into `writeDocumentUnderLock` and `deleteAllForSpace` into `deleteExcept` reduces caller knowledge or just moves a placeholder argument into callers.
+The premise holds but the counts were stale, and the title said "nineteen"; it now says twenty-one. The filename keeps `nineteen` because other files cite this path (`.scratch/v1-release/architecture-ticket-audit-2026-09-20.md`). `SqlTables` has 21 members, the two `Image` members having arrived in `d37ed7e7`. There are 11 internal slice interfaces (`src/persistence/sql-store.ts:341-427`), and `SqlStore` has 10 members, not 7 (`:308-320`), so ADR 0095's list of them is no longer accurate. The body now gives these counts, uses Resource names where it said Thing (`loadWithResources`, `Resource.deleteExcept`, `buildResourceTable`, the `Resource*` slices), and points `relockSpace` and `deleteResourcesForSpace` at their current lines. `Order` and the test's `<unknown, unknown>` (`test/unit/space-resource-repository.test.ts:13`) remain. Still open for design review: whether folding `relock` into `writeDocumentUnderLock` and `deleteAllForSpace` into `deleteExcept` reduces caller knowledge or just moves a placeholder argument into callers.
