@@ -219,8 +219,6 @@ export interface SpaceCanvasProps {
    */
   readonly nameOnCreation: string | null;
   readonly spaceSession: SpaceSession;
-  /** Identity of the authored surface this canvas and its HUD are drawing. */
-  readonly spaceTitle: string;
   /** What each Space Resource's target offers it, for the Resources of kind `space` on this canvas. */
   readonly spaceResourceTargets?: SpaceResourceTargets;
   /**
@@ -277,7 +275,6 @@ export function SpaceCanvas({
   imageReplacement,
   nameOnCreation,
   spaceSession,
-  spaceTitle,
   spaceResourceTargets,
   resourceEntityActions,
 }: SpaceCanvasProps) {
@@ -325,6 +322,7 @@ export function SpaceCanvas({
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
   const mapTitle = view.selectedMap.map.title;
+  const spaceTitle = view.space.title;
   const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
   const addCanvasResource = useCallback(() => createResource('markdown'), [createResource]);
   const { screenToFlowPosition } = useReactFlow();

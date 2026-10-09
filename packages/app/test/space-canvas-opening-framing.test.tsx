@@ -183,7 +183,6 @@ describe('opening framing on a mounted canvas', () => {
               deleteConfirmation={app.deleteConfirmation}
               nameOnCreation={null}
               spaceSession={spaceSession}
-              spaceTitle="Test Space"
             />
           </ReactFlowProvider>
         </Subscribed>
@@ -286,7 +285,6 @@ describe('opening framing on a mounted canvas', () => {
             deleteConfirmation={app.deleteConfirmation}
             nameOnCreation={null}
             spaceSession={spaceSession}
-            spaceTitle="Test Space"
           />
         </ReactFlowProvider>
       </OpenSpacesContext.Provider>,

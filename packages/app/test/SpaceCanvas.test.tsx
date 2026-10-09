@@ -164,7 +164,6 @@ async function mountGraph(
         deleteConfirmation={deleteConfirmation}
         nameOnCreation={null}
         spaceSession={spaceSession}
-        spaceTitle="Test Space"
       />
     </ReactFlowProvider>
   );

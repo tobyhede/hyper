@@ -374,7 +374,6 @@ export const createApp = (
                   imageReplacement={composition.imageReplacement}
                   nameOnCreation={nameOnCreation}
                   spaceSession={spaceSession}
-                  spaceTitle={space.title}
                   spaceResourceTargets={spaceResourceTargets.targets}
                   resourceEntityActions={resourceRailActions}
                 />
