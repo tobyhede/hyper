@@ -210,7 +210,7 @@ describe('resourceRailGroups', () => {
     createReference: (): EntityActionOutcome => 'done',
     removeFromMap: () => undefined,
     deleteFromSpace: () => undefined,
-    enter: () => undefined,
+    enter: { run: () => undefined, available: true },
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -265,6 +265,29 @@ describe('resourceRailGroups', () => {
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);
+  });
+
+  it('draws Enter unavailable, beside Open in New Tab, while navigation is held', () => {
+    const target: Resource = {
+      id: OUTSIDE,
+      title: 'Elsewhere',
+      kind: 'space',
+      spaceId: SPACE_ID,
+      map: MAP_ID,
+      graph: GRAPH_ID,
+      framing: undefined,
+    };
+    const held = resourceRailGroups(target, addresses, connect, {
+      ...everything,
+      enter: { run: () => undefined, available: false },
+    })
+      .flat()
+      .find(({ id }) => id === 'enter');
+    expect(held).toMatchObject({ disabled: true });
+    const free = resourceRailGroups(target, addresses, connect, everything)
+      .flat()
+      .find(({ id }) => id === 'enter');
+    expect(free).toMatchObject({ disabled: false });
   });
 
   it('draws Create Reference unavailable on a Reference Resource', () => {

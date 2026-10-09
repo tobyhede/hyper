@@ -27,7 +27,20 @@ export interface ResourceRailCommands {
   /** Arm Delete from Space's confirmation, or `null` while it is unavailable. */
   readonly deleteFromSpace: (() => void) | null;
   /** Enter a Space Resource's Space, or `null` without an open set to enter it in. */
-  readonly enter: (() => void) | null;
+  readonly enter: RailNavigation | null;
+}
+
+/**
+ * A rail command that navigates, carrying its own availability.
+ *
+ * Entering moves the canvas to another Space, so it is drawn from the
+ * navigation answer (`AuthoringAvailability.navigate`) — the same answer the
+ * Dock's navigation draws from — rather than offered and then refused by
+ * `OpenSpaces.enter` (ADR 0112).
+ */
+export interface RailNavigation {
+  readonly run: () => void;
+  readonly available: boolean;
 }
 
 /**
@@ -126,8 +139,9 @@ export function resourceRailGroups(
               id: 'enter',
               label: 'Enter',
               icon: <EnterSpaceIcon />,
+              disabled: !enter.available,
               onSelect: () => {
-                enter();
+                enter.run();
                 return 'done';
               },
             },
@@ -149,7 +163,7 @@ export interface ResourceRailInput {
   readonly entityActions: (entity: SpaceEntity) => readonly EntityActionGroup[];
   readonly availability: Pick<
     AuthoringAvailability,
-    'addResource' | 'authorOnCanvas' | 'deleteResource'
+    'addResource' | 'authorOnCanvas' | 'deleteResource' | 'navigate'
   >;
   readonly editingResourceBody: boolean;
   readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
@@ -180,8 +194,9 @@ const railFocusFallback =
 /**
  * The builder a Resource's rail draws its menu from.
  *
- * Remove from Map follows the canvas key's availability and Delete from Space
- * follows Delete Resource's. Opening a Resource withdraws neither: each gives
+ * Remove from Map follows the canvas key's availability, Delete from Space
+ * follows Delete Resource's, and a Space Resource's Enter follows navigation's
+ * (`space-resource-enter-hold.test.tsx`). Opening a Resource withdraws neither: each gives
  * back the room the Open Resource held — `resource-rail-actions.test.tsx`
  * (`offers Remove from Map and Delete from Space while the Resource is Open`).
  */
@@ -197,7 +212,7 @@ export function useResourceRailActions(
     spaces,
   }: ResourceRailInput,
 ): (resourceId: ResourceId, connect: EntityActionGroup) => readonly EntityActionGroup[] {
-  const { addResource, authorOnCanvas, deleteResource } = availability;
+  const { addResource, authorOnCanvas, deleteResource, navigate } = availability;
   return useCallback(
     (resourceId: ResourceId, connect: EntityActionGroup): readonly EntityActionGroup[] => {
       const resource = space.lookup.resource(resourceId);
@@ -225,19 +240,22 @@ export function useResourceRailActions(
           enter:
             spaces === null || resource.kind !== 'space'
               ? null
-              : () => {
-                  void commandOutcomes.run(
-                    'space-enter',
-                    async () =>
-                      spaces.enter(
-                        resource.spaceId,
-                        resource.map,
-                        resource.graph,
-                        resource.framing,
-                        space.id,
-                      ),
-                    { subject: titleName(resource.title) },
-                  );
+              : {
+                  available: navigate,
+                  run: () => {
+                    void commandOutcomes.run(
+                      'space-enter',
+                      async () =>
+                        spaces.enter(
+                          resource.spaceId,
+                          resource.map,
+                          resource.graph,
+                          resource.framing,
+                          space.id,
+                        ),
+                      { subject: titleName(resource.title) },
+                    );
+                  },
                 },
         },
       );
@@ -249,6 +267,7 @@ export function useResourceRailActions(
       addResource,
       authorOnCanvas,
       deleteResource,
+      navigate,
       editingResourceBody,
       createReferenceFrom,
       spaces,
