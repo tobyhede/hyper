@@ -112,14 +112,6 @@ const ARIA_LABEL_CONFIG = {
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
 
-/** A pending placement keeps Resources readable without advertising authored gestures. */
-const PENDING_ARIA_LABEL_CONFIG = {
-  ...ARIA_LABEL_CONFIG,
-  'node.a11yDescription.default': 'This Resource is unavailable while placement is pending.',
-  'node.a11yDescription.keyboardDisabled':
-    'This Resource is unavailable while placement is pending.',
-} as const;
-
 /**
  * The one unmodified authoring shortcut, named where it is bound.
  *
@@ -316,13 +308,10 @@ export function SpaceCanvas({
   // to hand over, and the store keeps its live nodes rather than reconciling
   // against nothing.
   const projectedNodes = projected?.nodes ?? null;
-  // That the selected Map's placement has resolved and the store has taken it
-  // — the fact, not an operation, read by one consumer: the aria description
-  // React Flow gives every node. Its withheld form is a statement about the
-  // placement ("unavailable while placement is pending"), so no availability
-  // answer may stand in for it, and nothing that decides what may be authored
-  // reads it.
-  const placementReady = canvasRendering.hasResourcesOnCanvas;
+  // That the render adapter holds a projection — so `nodes` is what it holds,
+  // not the empty list that stands in for none. It stays true while a
+  // replacement placement resolves, so nothing here gates a gesture on it.
+  const { hasResourcesOnCanvas } = canvasRendering;
   const { authoring, edgeAuthoring } = surface;
   const context = surface.context();
   const { mapId, graphId: activeGraphId } = context;
@@ -392,7 +381,7 @@ export function SpaceCanvas({
     onPortalEditingChange: setPortalEditing,
     portalDraft,
     setPortalDraft,
-  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds, embeddedRoot, placementReady);
+  } = useEmbeddedOpenSpaceResources(nodes, spaces, draggingIds, embeddedRoot, hasResourcesOnCanvas);
 
   const onPortalEditingChange = useCallback(
     (resourceId: ResourceId, editing: boolean) => {
@@ -1604,12 +1593,7 @@ export function SpaceCanvas({
       // **Not `authorOnCanvas`**: a live embedded edit leaves a pointer
       // connection alone, and `authoring-availability.ts` records why.
       nodesConnectable={availability.connectOnCanvas}
-      // **The placement fact, deliberately not an availability answer.** The
-      // withheld form of this description is a sentence about placement, so the
-      // only condition that may gate it is whether placement resolved. Any
-      // other withdrawal — presenting, a live chrome rename — would leave the
-      // description saying "pending" about a placement that is not.
-      ariaLabelConfig={placementReady ? ARIA_LABEL_CONFIG : PENDING_ARIA_LABEL_CONFIG}
+      ariaLabelConfig={ARIA_LABEL_CONFIG}
       // No `connectionMode`: the default is Strict, and every legal drop here is
       // already source-to-target. Loose only adds source-to-source, which the
       // authoring handles refuse via `isConnectableEnd` and the graph ports via

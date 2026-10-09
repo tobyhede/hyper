@@ -1,6 +1,7 @@
 import type { AuthoringInProgress } from '../src/authoring-availability';
 import { authoringAvailability } from '../src/authoring-availability';
 import { canvasContent } from '../src/canvas-content';
+import type { CanvasNodesAndEdges } from '../src/canvas-projection';
 import type { CanvasRendering } from '../src/canvas-rendering';
 import type { SpaceCanvasProps } from '../src/components/SpaceCanvas';
 import type { MapSurface } from '../src/map-surface';
@@ -43,10 +44,19 @@ export interface CanvasReadingParts extends Partial<
   Omit<CanvasRendering, 'liveProjection' | 'hasResourcesOnCanvas' | 'projected' | 'canvas'>
 > {
   /**
-   * What the render adapter holds: `null` before it has taken a placement,
-   * which is also when no Resource is on the canvas. Empty by default.
+   * What the render adapter holds, and so what React Flow draws: `null` when
+   * it holds nothing. Resources are on the canvas exactly when it is not
+   * `null`, as `useCanvasRendering` answers (`app-hooks.test.tsx`, "lays the
+   * Map out and hands the projection to the render adapter"). Empty by default.
    */
   readonly projection?: Projection | null;
+  /**
+   * What the drawn Map's placement projects to: `null` while a placement
+   * resolves. The held projection by default, as once a placement has
+   * resolved and the adapter has taken it; set it to `null` beside a held
+   * projection for a replacement placement that is still resolving.
+   */
+  readonly projected?: CanvasNodesAndEdges | null;
   readonly facts?: CanvasFacts;
   readonly setEditingResourceBody?: (editing: boolean) => void;
   readonly setEditingResourceTitle?: (editing: boolean) => void;
@@ -54,16 +64,17 @@ export interface CanvasReadingParts extends Partial<
 
 /**
  * A reading of `surface` as `useMapSurface` answers one, over the surface's
- * own view. The test sets what the render adapter holds and the in-progress
- * facts, with placement resolved. Whether Resources are on the canvas, what is
- * projected and the canvas content follow from the held projection as
- * `useCanvasRendering` derives them; availability is answered from the facts
- * and narrowed by the surface's own policy.
+ * own view. The test sets what the render adapter holds, what the placement
+ * projects to and the in-progress facts. Whether Resources are on the canvas
+ * and the canvas content follow from those two as `useCanvasRendering` derives
+ * them; availability is answered from the facts and narrowed by the surface's
+ * own policy.
  */
 export function canvasReading(
   surface: MapSurface,
   {
     projection = { nodes: [], edges: [] },
+    projected = projection,
     facts = {},
     setEditingResourceBody = ignore,
     setEditingResourceTitle = ignore,
@@ -72,8 +83,9 @@ export function canvasReading(
 ): MapSurfaceReading {
   const hasResourcesOnCanvas = projection !== null;
   const editingEmbeddedMap = rendering.editingEmbeddedMap ?? false;
+  const view = surface.view();
   return {
-    view: surface.view(),
+    view,
     newResourceTitle: nextResourceTitle(surface.authoring.getState().session.working),
     canvasRendering: {
       selection: { kind: 'none' },
@@ -87,9 +99,11 @@ export function canvasReading(
       editingEmbeddedMap,
       liveProjection: projection,
       hasResourcesOnCanvas,
-      projected: projection,
+      projected,
       canvas: canvasContent(
-        { kind: 'ready', strategyGraph: surface.view().projection.strategyGraph },
+        projected === null
+          ? { kind: 'pending' }
+          : { kind: 'ready', strategyGraph: view.projection.strategyGraph },
         hasResourcesOnCanvas,
       ),
     },

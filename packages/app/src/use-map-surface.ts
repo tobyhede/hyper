@@ -1,10 +1,24 @@
-import { useMemo, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
+import type { SpaceSnapshot } from '@project/core';
 import type { ComposedApp } from './compose-app';
 import { useCanvasRendering } from './canvas-rendering';
 import type { MapSurface } from './map-surface';
 import { useAnySpaceReplacingImage } from './open-spaces-context';
 import { useAuthoringAvailability } from './use-authoring-availability';
 import { nextResourceTitle } from './titles';
+
+/**
+ * One title scan per working Space rather than per drawing: every drawing of a
+ * Space reads the same snapshot, which an Edit replaces rather than changes.
+ */
+const resourceTitles = new WeakMap<SpaceSnapshot, string>();
+const newResourceTitleOf = (working: SpaceSnapshot): string => {
+  const known = resourceTitles.get(working);
+  if (known !== undefined) return known;
+  const title = nextResourceTitle(working);
+  resourceTitles.set(working, title);
+  return title;
+};
 
 /** The same projection and availability for every drawing of a Map. */
 export function useMapSurface(
@@ -23,8 +37,7 @@ export function useMapSurface(
   );
   const anyReplacement = useAnySpaceReplacingImage();
   const view = surface.view();
-  const { working } = state.session;
-  const newResourceTitle = useMemo(() => nextResourceTitle(working), [working]);
+  const newResourceTitle = newResourceTitleOf(state.session.working);
   const canvasRendering = useCanvasRendering(surface.adapter, {
     projection: view.projection,
     mapPlacement: view.mapPlacement,

@@ -118,7 +118,7 @@ async function mountGraph(
     finishResize: () => undefined,
     cancelResize: () => undefined,
   },
-  editable = true,
+  held: 'placed' | 'replacing' | 'nothing' = 'placed',
 ): Promise<Harness> {
   const openResource = vi.fn();
   const addResource = vi.fn();
@@ -150,9 +150,11 @@ async function mountGraph(
       <SpaceCanvas
         surface={surface}
         reading={canvasReading(surface, {
-          // `editable` is whether the render adapter holds a projection; a
-          // canvas with none draws no Resource.
-          projection: editable ? { nodes, edges: [] } : null,
+          // What the render adapter holds, and whether the Map's placement has
+          // resolved into a projection: `replacing` holds the drawn Resources
+          // while a replacement placement resolves, and `nothing` holds none.
+          projection: held === 'nothing' ? null : { nodes, edges: [] },
+          projected: held === 'placed' ? { nodes, edges: [] } : null,
           // `titleEditing` is the chrome rename `App` reports — the fact that
           // withdraws canvas authoring.
           facts: { editingChromeTitle: !titleEditing },
@@ -364,14 +366,50 @@ it.each(['Enter', ' '])('opens a focused Reference Resource with %s', async (key
 });
 
 /**
- * The render adapter holds no projection until the selected Map's placement
- * resolves, and Resources are on the canvas exactly when it holds one — so
- * while it is pending there is no Resource to focus, open or describe.
+ * The render adapter holds no projection before the selected Map's first
+ * placement resolves, and drops it when the Map changes or a replacement Space
+ * opens (`render-adapter.test.ts`); Resources are on the canvas exactly when it
+ * holds one (`app-hooks.test.tsx`, "lays the Map out and hands the projection
+ * to the render adapter"). With none held there is no Resource to focus, open
+ * or describe.
  */
-it('draws no Resource while placement is pending', async () => {
-  const { view } = await mountGraph([resourceNode('A')], undefined, undefined, false);
+it('draws no Resource while the render adapter holds no projection', async () => {
+  const { view } = await mountGraph([resourceNode('A')], undefined, undefined, 'nothing');
 
   expect(view.container.querySelector('.react-flow__node')).toBeNull();
+});
+
+/**
+ * A placement change — a settled Edit, a resize draft — resolves its
+ * replacement placement while the render adapter keeps the Resources it holds,
+ * so a gesture already under way is not interrupted (`canvas-content.test.ts`,
+ * "keeps drawing the Resources on the canvas while a replacement placement is
+ * pending").
+ * Those Resources stay authorable through that window.
+ */
+describe('a Resource held while a replacement placement resolves', () => {
+  it.each(['Enter', ' '])('opens with %s', async (key) => {
+    const { openResource } = await mountGraph(
+      [resourceNode('A')],
+      undefined,
+      undefined,
+      'replacing',
+    );
+    const focused = nodeOf(RESOURCE_ID);
+    focused.focus();
+
+    fireEvent.keyDown(focused, { key });
+
+    expect(openResource).toHaveBeenCalledWith(RESOURCE_ID);
+  });
+
+  it('announces the authoring keyboard commands', async () => {
+    await mountGraph([resourceNode('A')], undefined, undefined, 'replacing');
+
+    expect(nodeOf(RESOURCE_ID)).toHaveAccessibleDescription(
+      'Press enter or space to open a Resource, backspace or delete to remove it from this Map, the arrow keys to move it, and escape to cancel.',
+    );
+  });
 });
 
 describe('the Resource affordance', () => {
@@ -923,7 +961,7 @@ describe('dropping a Space from the Resources list', () => {
   });
 
   it('places nothing while the canvas is not authorable', async () => {
-    const harness = await mountGraph(undefined, undefined, undefined, false);
+    const harness = await mountGraph(undefined, undefined, undefined, 'nothing');
     const dataTransfer = carrying(SPACE_DRAG_TYPE);
 
     fireEvent.dragOver(pane(), { dataTransfer });
