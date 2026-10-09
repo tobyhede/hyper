@@ -735,7 +735,7 @@ describe('Space app failure reporting', () => {
     expect(() =>
       mountSpaceApp(
         { id: runtime(valid).id, session, app, spaceResources },
-        createBrowserLocation(recordingHistory(), undefined, undefined, () => false),
+        createBrowserLocation(recordingHistory(), { isNavigationHeld: () => false }),
         refusingFullscreen,
         (view) => {
           render(view);

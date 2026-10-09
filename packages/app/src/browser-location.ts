@@ -87,6 +87,21 @@ export interface BrowserLocation {
   readonly dispose: () => void;
 }
 
+/** What a browser location is composed with besides the history it drives. */
+export interface BrowserLocationOptions {
+  /**
+   * Whether navigation is held: every composed Space's image replacement, not
+   * only the followed one's. Required, so no composition can forget the hold.
+   */
+  readonly isNavigationHeld: () => boolean;
+  /**
+   * Opens the Space a traversed pathname names before it is restored. Absent,
+   * a traversal restores against the followed Space alone.
+   */
+  readonly openPath?: (pathname: string) => Promise<void>;
+  readonly reportObserverError?: ObserverErrorReporter;
+}
+
 /**
  * Own the browser's location for whichever Space is on the canvas (ADR 0081).
  *
@@ -97,10 +112,11 @@ export interface BrowserLocation {
  */
 export function createBrowserLocation(
   history: HistoryApi,
-  reportObserverError: ObserverErrorReporter = (error) =>
-    console.error('Browser location observer failed', error),
-  openPath: ((pathname: string) => Promise<void>) | undefined,
-  isNavigationHeld: () => boolean,
+  {
+    isNavigationHeld,
+    openPath,
+    reportObserverError = (error) => console.error('Browser location observer failed', error),
+  }: BrowserLocationOptions,
 ): BrowserLocation {
   let followed: ComposedApp | null = null;
   let unfollow: (() => void) | null = null;

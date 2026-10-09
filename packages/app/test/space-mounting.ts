@@ -24,9 +24,9 @@ export const mountSpace = (
   history: HistoryApi = recordingHistory(),
 ): BrowserLocation => {
   // One Space and no open set around it, so its own replacement is the hold.
-  const browserLocation = createBrowserLocation(history, undefined, undefined, () =>
-    opened.app.imageReplacement.getState(),
-  );
+  const browserLocation = createBrowserLocation(history, {
+    isNavigationHeld: () => opened.app.imageReplacement.getState(),
+  });
   browserLocation.follow(opened.app);
   mountSpaceApp(opened, browserLocation, refusingFullscreen, render, opening);
   return browserLocation;
