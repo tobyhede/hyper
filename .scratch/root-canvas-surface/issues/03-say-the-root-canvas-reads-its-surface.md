@@ -9,5 +9,5 @@
 **Spec:** `.scratch/root-canvas-surface/spec.md`.
 
 - [x] `docs/agents/rendering.md` says `SpaceCanvas` takes a required surface and its reading, and names the root-only inputs.
-- [x] ADR 0112's delivery note and AGENTS.md's ADR 0070 entry mention the root canvas reading its surface.
+- [x] ADR 0112's delivery note and AGENTS.md's ADR 0070 entry mention the root canvas reading its surface. (ADR 0112's delivery evidence is `.scratch/a-map-is-a-map/implementation-review.md`, which AGENTS.md names; the ADR itself carries none.)
 - [x] The spec's status is resolved and each ticket's boxes are ticked.
