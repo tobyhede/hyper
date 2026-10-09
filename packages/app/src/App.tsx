@@ -19,7 +19,6 @@ import { presentingFullscreen, type Fullscreen } from './presenting-fullscreen';
 import type { DestinationOpening } from './destination-opening';
 import { useOpenSpacesStanding } from './open-spaces-context';
 import { useAddressedResource } from './addressed-resource';
-import { useMapView } from './map-view';
 import { useResourcePlacement } from './resource-placement';
 import { useMapSurface } from './use-map-surface';
 import { useResourcesDisclosure } from './resources-disclosure';
@@ -48,7 +47,6 @@ export const createApp = (
 ) => {
   const { app: composition, session: spaceSession, spaceResources } = opened;
   const {
-    readWorkingSpace,
     currentSpace,
     navigation,
     authoring,
@@ -126,6 +124,11 @@ export const createApp = (
     );
     const authoringState = useSyncExternalStore(authoring.subscribe, authoring.getState);
     const { session: sessionState, navigation: navigationState, replacementEpoch } = authoringState;
+    // The address, the disclosure and the Stage's Copy link read the Map id
+    // from Navigation rather than off the surface's view: Navigation owns the
+    // address, and the root surface follows Navigation's selected Map, which
+    // this published state copies (`map-surface.test.ts`, "answers one view
+    // until the Space or the selected Map changes").
     const { selectedMapId, activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
@@ -136,11 +139,12 @@ export const createApp = (
       continuation,
       selectedMapId,
     );
-    const view = useMapView(readWorkingSpace, sessionState.working, selectedMapId);
-    const { renderedSpace, selectedMap } = view;
-    const { projection } = composition.surface.view();
+    // Placement is called before the surface's reading, which needs whether a
+    // Space Resource is being created. `surface.view()` answers one view until
+    // the Space or the Map id changes (`map-surface.test.ts`), so this is the
+    // very view the reading carries.
     const placement = useResourcePlacement(opened, {
-      map: selectedMap.map,
+      map: composition.surface.view().selectedMap.map,
       presenting,
       replacementEpoch,
       reportBreak,
@@ -156,7 +160,9 @@ export const createApp = (
       spaceOnCanvas: active,
       creatingSpaceResource: placement.creatingSpaceResource,
     });
-    const { canvasRendering, availability, editingResourceBody, setEditingChromeTitle } = reading;
+    const { view, canvasRendering, availability, editingResourceBody, setEditingChromeTitle } =
+      reading;
+    const { space, selectedMap, projection } = view;
     const { canvas } = canvasRendering;
     const discloseResources = useResourcesDisclosure(availability.resourcesView, {
       addressedResourceId,
@@ -164,9 +170,9 @@ export const createApp = (
       resourcesOutsideMap: view.resourcesOutsideMap,
     });
     const { entityActions, copyProductDestination, clipboardFailure, dismissClipboardFailure } =
-      useSpaceAddresses(browserLocation, renderedSpace);
+      useSpaceAddresses(browserLocation, space);
     const resourceRailActions = useResourceRailActions(composition, {
-      space: renderedSpace,
+      space,
       map: selectedMap.map,
       entityActions,
       availability,
@@ -175,10 +181,7 @@ export const createApp = (
       spaces,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
-    const spaceResourceTargets = useSpaceResourceTargetTitles(
-      spaceResources,
-      renderedSpace.resources,
-    );
+    const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);
     const nameOnCreation = useNameOnCreation(continuation);
     // Inactive Spaces keep their traversal mounted without receiving global keys.
     usePresentingKeys(active && presenting, {
@@ -191,7 +194,7 @@ export const createApp = (
       opened,
       browserLocation,
       {
-        space: renderedSpace,
+        space,
         map: selectedMap.map,
         projection,
         activeGraphId,
@@ -372,7 +375,6 @@ export const createApp = (
                   imageReplacement={composition.imageReplacement}
                   nameOnCreation={nameOnCreation}
                   spaceSession={spaceSession}
-                  spaceTitle={renderedSpace.title}
                   spaceResourceTargets={spaceResourceTargets.targets}
                   resourceEntityActions={resourceRailActions}
                 />
@@ -382,7 +384,7 @@ export const createApp = (
 
           {presenting && activeResourceId !== null && (
             <PresentingStage
-              space={renderedSpace}
+              space={space}
               resourceId={activeResourceId}
               moves={moves}
               canRetreat={canRetreat(navigationState)}
@@ -397,7 +399,7 @@ export const createApp = (
                 // beyond the alert `copyProductDestination` already renders.
                 void copyProductDestination({
                   kind: 'presentation',
-                  spaceId: renderedSpace.id,
+                  spaceId: space.id,
                   mapId: selectedMapId,
                   graphId: activeGraphId,
                   resourceId: activeResourceId,

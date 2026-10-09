@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import type { MapId, Resource, SpaceSnapshot } from '@project/core';
+import type { MapId, Resource } from '@project/core';
 import { Placement, type ResolvedMap, type Space } from '@project/graph';
 import { canvasProjection, type PendingCanvasProjection } from './canvas-projection';
 import { mapResources, resolveMap, resourcesOutsideMap } from './map-resolution';
@@ -7,6 +6,8 @@ import { otherMapMemberships, type MapMemberships } from './map-memberships';
 
 /** Everything the canvas and the Dock read off the Map being drawn. */
 export interface MapView {
+  /** The Space this view was built from. */
+  readonly space: Space;
   readonly selectedMap: ResolvedMap;
   /** This Map's own placement, before any resize draft is laid over it. */
   readonly mapPlacement: Placement;
@@ -24,6 +25,7 @@ export interface MapView {
 export function mapView(space: Space, mapId: MapId): MapView {
   const selectedMap = resolveMap(space, mapId);
   return {
+    space,
     selectedMap,
     mapPlacement: Placement.fromMap(selectedMap.map),
     placedResources: mapResources(space, selectedMap.map),
@@ -31,28 +33,4 @@ export function mapView(space: Space, mapId: MapId): MapView {
     resourcesOutsideMap: resourcesOutsideMap(space, selectedMap.map),
     membershipsOutsideMap: otherMapMemberships(space, selectedMap.map.id),
   };
-}
-
-export interface RenderedMapView extends MapView {
-  /** The validated Space behind the working snapshot being rendered. */
-  readonly renderedSpace: Space;
-}
-
-/**
- * The Space React is rendering and the Map it draws.
- *
- * Memoized on the working snapshot and the selected Map alone. A drag frame
- * re-renders the component without moving either, so every identity here —
- * the placement `usePlacementRendering` lays out, the Resources Edge
- * Authoring's commands are built over, the projection — holds still across it,
- * and the strategy does not re-run mid-drag.
- */
-export function useMapView(
-  readWorkingSpace: (snapshot: SpaceSnapshot) => Space,
-  working: SpaceSnapshot,
-  selectedMapId: MapId,
-): RenderedMapView {
-  const renderedSpace = useMemo(() => readWorkingSpace(working), [readWorkingSpace, working]);
-  const view = useMemo(() => mapView(renderedSpace, selectedMapId), [renderedSpace, selectedMapId]);
-  return { renderedSpace, ...view };
 }

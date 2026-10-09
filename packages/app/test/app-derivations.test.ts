@@ -57,6 +57,7 @@ describe('mapView', () => {
   it('derives the drawn Map, its members and what it leaves out', () => {
     const view = mapView(space, MAP_ID);
 
+    expect(view.space).toBe(space);
     expect(view.selectedMap.map.id).toBe(MAP_ID);
     expect(view.placedResources.map(({ id }) => id)).toEqual([PLACED_A, PLACED_B]);
     expect(view.resourcesOutsideMap.map(({ id }) => id)).toEqual([OUTSIDE]);

@@ -370,7 +370,6 @@ function CanvasHarness({
         deleteConfirmation={deleteConfirmation}
         nameOnCreation={null}
         spaceSession={session}
-        spaceTitle="Test Space"
       />
     </>
   );

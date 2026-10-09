@@ -10,7 +10,7 @@ import { useCanvasRendering } from '../src/canvas-rendering';
 import { CLIPBOARD_REFUSAL } from '../src/clipboard';
 import { useDockChrome, type DockChromeInput } from '../src/dock-chrome';
 import { useUnsettledLeaveGuard } from '../src/leave-guard';
-import { mapView, useMapView } from '../src/map-view';
+import { mapView } from '../src/map-view';
 import { useNameOnCreation } from '../src/name-on-creation';
 import type { OpenSpace } from '../src/open-spaces';
 import { useOpenSpacesStanding } from '../src/open-spaces-context';
@@ -21,6 +21,7 @@ import { useResourcesDisclosure } from '../src/resources-disclosure';
 import { useSpaceAddresses } from '../src/space-addresses';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import { useSpaceResourceTargetTitles } from '../src/space-resource-targets';
+import { useMapSurface } from '../src/use-map-surface';
 import { useAuthoringAvailability, type AuthoringFacts } from '../src/use-authoring-availability';
 import { useVisibleCentre } from '../src/visible-centre';
 import {
@@ -130,30 +131,6 @@ describe('useAddressedResource', () => {
     );
     rerender({ mapId: OTHER_MAP_ID });
     expect(calls.filter((call) => call === `select ${PLACED_A}`)).toHaveLength(2);
-  });
-});
-
-describe('useMapView', () => {
-  it('holds every identity still while the snapshot and the Map do', () => {
-    const opened = openDerivationSpace();
-    const working = opened.session.getState().working;
-    const { result, rerender } = renderHook(
-      ({ mapId }: { readonly mapId: MapId }) =>
-        useMapView(opened.app.readWorkingSpace, working, mapId),
-      { initialProps: { mapId: MAP_ID } },
-    );
-    const first = result.current;
-
-    rerender({ mapId: MAP_ID });
-    expect(result.current.renderedSpace).toBe(first.renderedSpace);
-    expect(result.current.projection).toBe(first.projection);
-    expect(result.current.mapPlacement).toBe(first.mapPlacement);
-    expect(result.current.placedResources).toBe(first.placedResources);
-
-    rerender({ mapId: OTHER_MAP_ID });
-    expect(result.current.renderedSpace).toBe(first.renderedSpace);
-    expect(result.current.selectedMap.map.id).toBe(OTHER_MAP_ID);
-    expect(result.current.projection).not.toBe(first.projection);
   });
 });
 
@@ -399,6 +376,37 @@ describe('useCanvasRendering', () => {
 
     act(() => result.current.selectResource(PLACED_A));
     expect(result.current.selection).toEqual({ kind: 'resource', resourceId: PLACED_A });
+  });
+});
+
+describe('useMapSurface', () => {
+  it("holds the view's identity across re-renders while the Space and Map hold", async () => {
+    const { app } = openDerivationSpace();
+    const { result, rerender } = renderHook(() =>
+      useMapSurface(app, app.surface, {
+        presenting: false,
+        spaceOnCanvas: true,
+        creatingSpaceResource: false,
+      }),
+    );
+    await waitFor(() => expect(result.current.canvasRendering.hasResourcesOnCanvas).toBe(true));
+    const first = result.current.view;
+
+    rerender();
+    expect(result.current.view).toBe(first);
+    expect(result.current.view.projection).toBe(first.projection);
+    expect(result.current.view.mapPlacement).toBe(first.mapPlacement);
+    expect(result.current.view.placedResources).toBe(first.placedResources);
+
+    act(() => app.navigation.selectMap(OTHER_MAP_ID));
+    rerender();
+    await waitFor(() => expect(result.current.view.selectedMap.map.id).toBe(OTHER_MAP_ID));
+    await waitFor(() =>
+      expect(result.current.canvasRendering.projected?.nodes.map(({ id }) => id)).toEqual([
+        OUTSIDE,
+      ]),
+    );
+    expect(result.current.view.projection).not.toBe(first.projection);
   });
 });
 

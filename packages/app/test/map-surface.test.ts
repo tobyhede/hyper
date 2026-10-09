@@ -5,6 +5,7 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { createMapSurface, observeMapSurfaces, type DrawnSurfaceContext } from '../src/map-surface';
 import { unusedImageSources } from './image-sources';
+import { CANVAS } from '../src/space-authoring';
 
 const id = (tail: string) => uuidSchema.parse(`00000000-0000-4000-8000-${tail.padStart(12, '0')}`);
 const SPACE = id('1');
@@ -61,6 +62,30 @@ function drawing(
   surface.observe();
   return surface;
 }
+
+describe("the canvas's Map surface", () => {
+  it('answers one view until the Space or the selected Map changes', () => {
+    const app = composition();
+    const first = app.surface.view();
+
+    expect(first.space).toBe(app.currentSpace());
+    expect(app.surface.view()).toBe(first);
+
+    app.navigation.selectMap(OTHER_MAP);
+    const other = app.surface.view();
+    expect(other).not.toBe(first);
+    expect(other.selectedMap.map.id).toBe(OTHER_MAP);
+    expect(app.surface.view()).toBe(other);
+
+    expect(
+      app.authoring.complete(CANVAS, { kind: 'opened-resource', resourceId: OTHER_RESOURCE }),
+    ).toMatchObject({ kind: 'completed' });
+    const edited = app.surface.view();
+    expect(edited).not.toBe(other);
+    expect(edited.space).toBe(app.currentSpace());
+    expect(app.surface.view()).toBe(edited);
+  });
+});
 
 describe('a drawn Map', () => {
   it('projects its explicit Map and Graph independently of the Space navigation', async () => {

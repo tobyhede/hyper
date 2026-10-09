@@ -51,7 +51,6 @@ it('takes exactly its surface, reading, placement and Space-level collaborators'
     | 'imageReplacement'
     | 'nameOnCreation'
     | 'spaceSession'
-    | 'spaceTitle'
     | 'spaceResourceTargets'
     | 'resourceEntityActions'
   >();
