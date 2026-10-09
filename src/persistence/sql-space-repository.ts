@@ -853,6 +853,41 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     }
   }
 
+  /**
+   * Empties the store and writes `input` as the whole aggregate, inside the
+   * caller's transaction. Both callers have run `loadSpaceAggregate` over
+   * `input` and hold the aggregate lock exclusively (`#lockMetaIdentity`).
+   *
+   * What it can raise, and who recovers from what:
+   *
+   * - `ResourceOwnershipError` (a duplicate key on `resources`, translated by
+   *   `#importResources`), or the store's duplicate key on `spaces` or
+   *   `repository_state`. With the store emptied first, a collision is either
+   *   between rows this call writes or with rows a writer outside the
+   *   aggregate lock committed meanwhile. The first cannot happen to an
+   *   intake-checked `input`: intake refuses a repeated Space or Resource
+   *   identity (`duplicate-space-id`, `duplicate-resource-id`), and the
+   *   contract cases refusing a replacement that repeats either
+   *   (`test/support/repository-contract.ts`) fail if it stops. The second is
+   *   what the callers treat differently:
+   *   - `#initializeUnserialised` re-reads and classifies its proposal against
+   *     whatever state is now established, because "already initialized, the
+   *     same or different" is its answer whoever established it
+   *     (`test/integration/postgres-space-repository.test.ts`, "classifies
+   *     initialization when a concurrent winner takes a shared Resource
+   *     identity").
+   *   - `#replaceUnserialised` propagates it. It authorized the replacement
+   *     against the Meta identity and row revisions it locked; rows that
+   *     arrived without that lock are state it never judged, so there is no
+   *     answer for it to give.
+   * - `AggregateInvariantError`, from `#authoritativeAggregate` reading back
+   *   what was just written. Both callers propagate it.
+   * - Any other database failure, unavailability included. Both callers
+   *   propagate it, for `#naming` to classify.
+   *
+   * `StaleSpaceRevisionError` is not raised here: replacement raises it from
+   * its own re-lock loop, before this runs.
+   */
   async #replaceAllSpaces(
     tables: SqlTables<Order>,
     input: AggregateInput,
@@ -905,10 +940,9 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
         return { kind: 'initialized', aggregate: await this.#replaceAllSpaces(tables, input) };
       });
     } catch (error) {
-      // Identical and different first proposals race on the first durable
-      // Space identity. The loser reads the winner after its transaction
-      // rolls back and classifies authored meaning, rather than exposing SQL
-      // timing.
+      // State established outside the aggregate lock collided with this one
+      // (`#replaceAllSpaces`). It is read after the rollback and classified
+      // as authored meaning, rather than exposing SQL timing.
       if (
         !(error instanceof ResourceOwnershipError) &&
         !this.#store.isDuplicateKey(error, 'spaces') &&
