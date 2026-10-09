@@ -1,6 +1,6 @@
 # The root canvas reads its Map surface
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
@@ -75,4 +75,4 @@ Two consequences for whoever changes the canvas:
 ## Further Notes
 
 - Source: candidate 3 of the 2026-10-08 architecture review, recorded in `.scratch/architecture-review/2026-10-08-root-canvas-candidates.md`, grilled 2026-10-08.
-- Stacked on PR #346 (`a-map-is-a-map-closeout`), which records ADR 0112 as built.
+- Delivered in PR #347 on top of PR #346, which records ADR 0112 as built; the review follow-up and these docs are PR #349.
