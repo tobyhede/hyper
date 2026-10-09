@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { ComposedApp } from './compose-app';
 import { useCanvasRendering } from './canvas-rendering';
 import type { MapSurface } from './map-surface';
-import { useNavigationHeld } from './open-spaces-context';
+import { useAnySpaceReplacingImage } from './open-spaces-context';
 import { useAuthoringAvailability } from './use-authoring-availability';
 
 /** The same projection and availability for every drawing of a Map. */
@@ -16,11 +16,11 @@ export function useMapSurface(
   },
 ) {
   const state = useSyncExternalStore(surface.authoring.subscribe, surface.authoring.getState);
-  const replacingImage = useSyncExternalStore(
+  const ownReplacement = useSyncExternalStore(
     app.imageReplacement.subscribe,
     app.imageReplacement.getState,
   );
-  const navigationHeld = useNavigationHeld();
+  const anyReplacement = useAnySpaceReplacingImage();
   const view = surface.view();
   const canvasRendering = useCanvasRendering(surface.adapter, {
     projection: view.projection,
@@ -31,8 +31,7 @@ export function useMapSurface(
     {
       ...facts,
       editable: canvasRendering.hasResourcesOnCanvas,
-      replacingImage,
-      navigationHeld,
+      replacingImage: ownReplacement || anyReplacement,
       editingEmbeddedMap: canvasRendering.editingEmbeddedMap,
     },
     state.replacementEpoch,

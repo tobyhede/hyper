@@ -54,7 +54,6 @@ export function useAuthoringAvailability(
       authoringAvailability({
         editable: facts.editable,
         replacingImage: facts.replacingImage,
-        navigationHeld: facts.navigationHeld,
         presenting: facts.presenting,
         spaceOnCanvas: facts.spaceOnCanvas,
         editingEmbeddedMap: facts.editingEmbeddedMap,
@@ -66,7 +65,6 @@ export function useAuthoringAvailability(
     [
       facts.editable,
       facts.replacingImage,
-      facts.navigationHeld,
       facts.presenting,
       facts.spaceOnCanvas,
       facts.editingEmbeddedMap,

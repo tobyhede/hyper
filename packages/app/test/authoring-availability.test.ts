@@ -14,7 +14,6 @@ import {
 const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editable: true,
   replacingImage: false,
-  navigationHeld: false,
   presenting: false,
   editingResourceBody: false,
   editingResourceTitle: false,
@@ -51,12 +50,6 @@ describe('authoring availability', () => {
       ),
     );
   });
-  it('withdraws the same answers while replacing an image whether or not navigation is held', () => {
-    expect(
-      authoringAvailability({ ...NOTHING_IN_PROGRESS, replacingImage: true, navigationHeld: true }),
-    ).toStrictEqual(authoringAvailability({ ...NOTHING_IN_PROGRESS, replacingImage: true }));
-  });
-
   it('offers every operation when nothing is in progress', () => {
     expect(authoringAvailability(NOTHING_IN_PROGRESS)).toStrictEqual(ALL_AVAILABLE);
   });
@@ -153,11 +146,6 @@ describe('authoring availability', () => {
       'a live Resource edit inside an embedded Map',
       { editingEmbeddedMap: true },
       { ...ALL_AVAILABLE, authorOnCanvas: false },
-    ],
-    [
-      'another composed Space replacing an image',
-      { navigationHeld: true },
-      { ...ALL_AVAILABLE, navigate: false, present: false },
     ],
     [
       'a Space Resource creation in flight',

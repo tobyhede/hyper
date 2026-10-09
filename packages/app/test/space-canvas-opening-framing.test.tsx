@@ -210,7 +210,6 @@ describe('opening framing on a mounted canvas', () => {
               availability={authoringAvailability({
                 editable: true,
                 replacingImage: false,
-                navigationHeld: false,
                 presenting: false,
                 editingResourceBody: false,
                 editingResourceTitle: false,
@@ -352,7 +351,6 @@ describe('opening framing on a mounted canvas', () => {
             availability={authoringAvailability({
               editable: true,
               replacingImage: false,
-              navigationHeld: false,
               presenting: false,
               editingResourceBody: false,
               editingResourceTitle: false,

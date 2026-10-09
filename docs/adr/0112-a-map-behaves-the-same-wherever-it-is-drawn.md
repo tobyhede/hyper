@@ -3,7 +3,7 @@
 Status: accepted
 Refines: 0068
 Related: 0070, 0079, 0082, 0102, 0105, 0109, 0111
-Refined by: 0116
+Refined by: 0116, 0126
 
 A Map drawn inside an Open Space Resource is a Map. Every command, gesture, refusal and notice a Map offers on the canvas it offers there, against the Space it belongs to. A difference between the two is allowed only when this ADR, or a later one, records it with its reason. A difference without a recorded reason is a defect.
 

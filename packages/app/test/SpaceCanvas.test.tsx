@@ -192,7 +192,6 @@ async function mountGraph(
         availability={authoringAvailability({
           editable,
           replacingImage: false,
-          navigationHeld: false,
           presenting: false,
           editingResourceBody: false,
           editingResourceTitle: false,

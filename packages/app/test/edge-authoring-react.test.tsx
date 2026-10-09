@@ -363,7 +363,6 @@ function CanvasHarness({
         availability={authoringAvailability({
           editable: true,
           replacingImage: false,
-          navigationHeld: false,
           presenting,
           editingResourceBody: false,
           editingResourceTitle: false,

@@ -99,12 +99,11 @@ beforeAll(() => {
 afterAll(() => vi.unstubAllGlobals());
 
 /**
- * A Space Resource's Enter is a navigation, so its rail reads the same hold the
- * Dock's navigation does (ADR 0112): drawn unavailable while any composed Space,
- * listed or only drawn, replaces an image, rather than offered and refused by
- * `OpenSpaces.enter`. Open in New Tab leaves this tab where it is and stays.
+ * A replacement in any composed Space is the application's exclusive operation
+ * (ADR 0126), so the canvas Space's rail is withdrawn with the rest of its
+ * authoring: its Enter is not offered and then refused by `OpenSpaces.enter`.
  */
-it('withdraws a Space Resource’s Enter while an only-drawn Space replaces an image', async () => {
+it('withdraws a Space Resource’s rail, Enter with it, while an only-drawn Space replaces an image', async () => {
   const held = heldImageSources();
   const backend = new MemorySpaceBackend(
     META_ID,
@@ -123,28 +122,25 @@ it('withdraws a Space Resource’s Enter while an only-drawn Space replaces an i
   const drawing = await spaces.hold(OTHER_ID);
   render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
   await screen.findByRole('article', { name: 'Other' });
+  await selectResource('Other');
+  fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Other' }));
+  expect(unavailable(await screen.findByRole('menuitem', { name: 'Enter' }))).toBe(false);
 
   let replacement: Promise<unknown> = Promise.resolve();
   act(() => {
     replacement = drawing.entry.app.imageReplacement.replace(OTHER_IMAGE_ID, HELD_REPLACEMENT);
   });
   expect(spaces.getState().replacingImage).toBe(true);
-  await selectResource('Other');
-  fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Other' }));
-  const enter = await screen.findByRole('menuitem', { name: 'Enter' });
-  expect(unavailable(enter)).toBe(true);
-  expect(unavailable(screen.getByRole('menuitem', { name: 'Open in New Tab' }))).toBe(false);
-  fireEvent.click(enter);
+  await waitFor(() => expect(screen.queryByRole('menuitem', { name: 'Enter' })).toBeNull());
+  expect(screen.queryByRole('button', { name: 'Actions for Resource Other' })).toBeNull();
   expect(spaces.getState().activeSpaceId).toBe(META_ID);
-  expect(screen.queryByText('Other could not be entered.')).not.toBeInTheDocument();
 
   await act(async () => {
     held.release();
     await replacement;
   });
-  await waitFor(() =>
-    expect(unavailable(screen.getByRole('menuitem', { name: 'Enter' }))).toBe(false),
-  );
+  fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Other' }));
+  expect(unavailable(await screen.findByRole('menuitem', { name: 'Enter' }))).toBe(false);
   await act(async () => {
     await drawing.release();
   });

@@ -27,7 +27,7 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 4. Only the root surface presents (ADR 0111).
 5. Surfaces nest by construction. A surface's policy is the lower of an inherited ceiling and its local state: read-only passes down, and every surface below the first embedded level is `inert` at most. Edit is offered only on a Space Resource in the root Map.
 6. One canvas selection names its surface's occurrence; keyboard, rail and Undo/Redo dispatch to it, otherwise to the root.
-7. Navigation is held while any composed Space — listed or only drawn — is replacing an image.
+7. Navigation is held while any composed Space — listed or only drawn — is replacing an image; ADR 0126 widens this to authoring, so a replacement anywhere is the application's exclusive operation.
 8. Per Space, from its composition: authoring, `commandOutcomes`, `deleteConfirmation`, image replacement, and Edge Authoring's completion and eligibility. Per surface: the render adapter. Per canvas, keyed by occurrence: the selection, continuation and in-progress gesture state.
 9. One notice area shows the outcomes of every Space drawn on the canvas.
 10. Pointer gestures land in the surface under the point; keyboard creation in the selection's surface; the Dock in the root Space. A drop on an inert or read-only surface is refused with wording.

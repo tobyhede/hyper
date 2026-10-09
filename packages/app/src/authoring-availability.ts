@@ -36,29 +36,25 @@
  */
 export interface AuthoringInProgress {
   /**
-   * An Image Resource's replacement is being stored, measured and applied.
+   * Some composed Space, listed or only drawn, is replacing an image.
    *
-   * It is the application's exclusive operation until its Edit is applied
-   * (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`, "Other
-   * actions while a replacement runs"): every answer is withdrawn except
-   * `editResourceBody`, which is what keeps the replacement's own target mounted
-   * to show its answer.
-   */
-  readonly replacingImage: boolean;
-  /**
-   * Some composed Space, listed or only drawn, is replacing an image (ADR 0112).
+   * A replacement is the application's exclusive operation until its Edit is
+   * applied (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`,
+   * "Other actions while a replacement runs"; ADR 0112), wherever it began:
+   * every answer is withdrawn except `editResourceBody`, which is what keeps
+   * the replacement's own target mounted to show its answer. Several Edits
+   * move the address as well as authoring — New Map and New Graph continue in
+   * what they create, and deleting the selected Map reselects — so authoring
+   * and navigation are withdrawn together rather than one at a time.
    *
-   * The open set answers it once, as `OpenSpacesState.replacingImage`, and the
-   * domain refuses navigation on the same answer
+   * The open set answers it for every composed Space, as
+   * `OpenSpacesState.replacingImage`, and refuses navigation on the same answer
    * (`packages/app/test/open-spaces.test.tsx`, `holds Back and Forward while an
    * only-drawn Space replaces an image`); an isolated mount has no open set and
-   * answers `false`, leaving `replacingImage` the whole answer. It
-   * withdraws `navigate` and `present` and nothing else: presenting is the
-   * canvas Space's Navigation, and beginning a traversal moves the address,
-   * which writes a history entry while Back and Forward are being held. The
-   * rest of this Space's availability belongs to its own replacement.
+   * answers with its own replacement alone
+   * (`packages/app/test/dock-navigation-hold.test.tsx`).
    */
-  readonly navigationHeld: boolean;
+  readonly replacingImage: boolean;
   /**
    * Whether the selected Map's placement is ready for authoring.
    *
@@ -209,7 +205,6 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
     spaceOnCanvas,
     editingEmbeddedMap,
     creatingSpaceResource,
-    navigationHeld,
   } = inProgress;
 
   /**
@@ -305,10 +300,9 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
    * Presenting covers the canvas with the Stage and makes it inert (ADR 0123), so a
    * live editor cannot survive it and the draft would go without one of ADR 0064's
    * four exits being spent. It does not read `presenting` itself — the surface
-   * draws Stop rather than Present once a traversal is running. It reads
-   * `navigationHeld` because beginning a traversal is a navigation.
+   * draws Stop rather than Present once a traversal is running.
    */
-  const present = !editingResourceBody && !editingChromeTitle && !navigationHeld;
+  const present = !editingResourceBody && !editingChromeTitle;
 
   /**
    * Add Resource reads `editingResourceBody` for the reason Present does, and that term
@@ -428,11 +422,10 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const selectNodes = !presenting;
 
   /**
-   * Navigating is withheld while any composed Space replaces an image; this
-   * Space's own replacement withholds it, and replacing the session, in
-   * `authoringAvailability` over this result.
+   * Navigating and replacing the session are withheld only by a running
+   * replacement, in `authoringAvailability` over this result.
    */
-  const navigate = !navigationHeld;
+  const navigate = true;
   const replaceSession = true;
 
   return {

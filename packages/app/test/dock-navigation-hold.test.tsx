@@ -4,7 +4,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
-import { unavailable } from './command-dock';
+import { createResourceControl, unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { heldImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
@@ -97,7 +97,7 @@ beforeAll(() => {
 
 afterAll(() => vi.unstubAllGlobals());
 
-it('withdraws the Dock’s navigation and Present while an only-drawn Space replaces an image', async () => {
+it('withdraws the canvas Space’s navigation and authoring while an only-drawn Space replaces an image', async () => {
   const held = heldImageSources();
   const backend = new MemorySpaceBackend(
     META_ID,
@@ -120,9 +120,10 @@ it('withdraws the Dock’s navigation and Present while an only-drawn Space repl
     screen.getByRole('button', { name: 'Map: Map' }),
     screen.getByRole('button', { name: 'Active Graph: One' }),
     screen.getByRole('button', { name: 'Present One' }),
+    createResourceControl(),
   ];
   await waitFor(() => expect(unavailable(openSpacesMenu)).toBe(false));
-  expect(heldControls.map(unavailable)).toEqual([false, false, false]);
+  expect(heldControls.map(unavailable)).toEqual([false, false, false, false]);
 
   let replacement: Promise<unknown> = Promise.resolve();
   act(() => {
@@ -130,14 +131,14 @@ it('withdraws the Dock’s navigation and Present while an only-drawn Space repl
   });
   expect(spaces.getState().replacingImage).toBe(true);
   await waitFor(() => expect(unavailable(openSpacesMenu)).toBe(true));
-  expect(heldControls.map(unavailable)).toEqual([true, true, true]);
+  expect(heldControls.map(unavailable)).toEqual([true, true, true, true]);
 
   await act(async () => {
     held.release();
     await replacement;
   });
   await waitFor(() => expect(unavailable(openSpacesMenu)).toBe(false));
-  expect(heldControls.map(unavailable)).toEqual([false, false, false]);
+  expect(heldControls.map(unavailable)).toEqual([false, false, false, false]);
   await act(async () => {
     await drawing.release();
   });
