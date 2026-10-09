@@ -14,7 +14,6 @@ import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import type { ConnectionCompletion } from '../src/connection-completion';
 import { useEdgeAuthoring } from '../src/edge-authoring-react';
 import { CANVAS } from '../src/space-authoring';
-import { canvasAuthoring } from './canvas-authoring';
 import { CanvasContinuation } from '../src/components/CanvasContinuation';
 import { ArmedDeleteConfirmation } from '../src/components/DeleteConfirmation';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
@@ -22,6 +21,7 @@ import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
+import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -309,26 +309,22 @@ function DeleteWhenCommitted({ armed }: { readonly armed: boolean }) {
 
 /** The composition `App` performs, narrowed to what an Edge test needs. */
 function CanvasHarness({
+  surface,
   imageReplacement,
   adapter,
-  edgeAuthoring,
   continuation,
   commandOutcomes,
-  currentSpace,
-  authoring,
   session,
   deleteConfirmation,
   covered,
   presenting,
 }: Pick<
   ReturnType<typeof compose>,
+  | 'surface'
   | 'imageReplacement'
   | 'adapter'
-  | 'edgeAuthoring'
   | 'continuation'
   | 'commandOutcomes'
-  | 'currentSpace'
-  | 'authoring'
   | 'session'
   | 'deleteConfirmation'
 > & {
@@ -352,54 +348,34 @@ function CanvasHarness({
       {/* Production's dialog, drawn at the root as `App` draws it. */}
       <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} />
       <SpaceCanvas
+        surface={surface}
+        reading={canvasReading(surface, {
+          nodes: projection?.nodes ?? [],
+          edges: projection?.edges ?? [],
+          availability: authoringAvailability({
+            editable: true,
+            replacingImage: false,
+            presenting,
+            editingResourceBody: false,
+            editingResourceTitle: false,
+            editingChromeTitle: covered,
+            spaceOnCanvas: true,
+            editingEmbeddedMap: false,
+            creatingSpaceResource: false,
+          }),
+          changeNodes: adapter.getState().changeNodes,
+          changeEdges: adapter.getState().changeEdges,
+          selection,
+          selectResource: adapter.getState().selectResource,
+          selectEdge: adapter.getState().selectEdge,
+        })}
+        placement={IDLE_PLACEMENT}
         imageReplacement={imageReplacement}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}
-        nodes={projection?.nodes ?? []}
-        edges={projection?.edges ?? []}
-        projectedNodes={null}
-        presenting={presenting}
-        placementReady={true}
-        availability={authoringAvailability({
-          editable: true,
-          replacingImage: false,
-          presenting,
-          editingResourceBody: false,
-          editingResourceTitle: false,
-          editingChromeTitle: covered,
-          spaceOnCanvas: true,
-          editingEmbeddedMap: false,
-          creatingSpaceResource: false,
-        })}
-        onNodesChange={adapter.getState().changeNodes}
-        onEdgesChange={adapter.getState().changeEdges}
-        edgeAuthoring={edgeAuthoring}
-        selection={selection}
-        onSelectResource={adapter.getState().selectResource}
-        onSelectEdge={adapter.getState().selectEdge}
-        placedResources={currentSpace().resources}
-        newResourceTitle="Resource 4"
-        onAddResource={() => undefined}
-        onAddExistingResource={() => undefined}
-        onPlaceSpace={() => undefined}
-        onDropImages={() => undefined}
-        onPasteImageUrl={() => undefined}
         nameOnCreation={null}
-        authoring={canvasAuthoring(authoring)}
         spaceSession={session}
-        resourceResize={{
-          beginResize: () => undefined,
-          previewResize: () => undefined,
-          finishResize: () => undefined,
-          cancelResize: () => undefined,
-        }}
-        reportEmbeddedMapEditing={() => undefined}
         spaceTitle="Test Space"
-        mapId={MAP_ID}
-        mapTitle="Test Map"
-        graphs={currentSpace().graphs}
-        colorByGraphId={{}}
-        activeGraphId={GRAPH_ID}
       />
     </>
   );

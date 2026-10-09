@@ -96,7 +96,7 @@ export interface CanvasResourceDecorationContext {
    */
   readonly changeResourceShape?:
     ((resourceId: ResourceId, resourceShape: ResourceShape) => void) | undefined;
-  readonly continuation?: Continuation | undefined;
+  readonly continuation: Continuation;
   readonly containingSpaceId: UUID;
   readonly spaceDocuments: ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: 'space' }>>;
   readonly spaceResourceTargets: SpaceResourceTargets;
@@ -385,7 +385,6 @@ export function decorateSpaceResourceNode(
     const resourceId = node.data.resourceId;
     let railContext: SpaceResourceRailContext | undefined;
     if (
-      context.continuation !== undefined &&
       context.spaces !== null &&
       context.commandOutcomes !== undefined &&
       context.deleteConfirmation !== undefined &&

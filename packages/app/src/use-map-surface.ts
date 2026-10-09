@@ -39,3 +39,6 @@ export function useMapSurface(
   const offered = surface.availability(availability.availability);
   return { view, canvasRendering, ...availability, availability: offered };
 }
+
+/** What one drawing of a Map reads off its surface in a render. */
+export type MapSurfaceReading = ReturnType<typeof useMapSurface>;

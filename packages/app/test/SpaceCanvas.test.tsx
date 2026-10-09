@@ -21,6 +21,7 @@ import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
 import type { SurfaceAuthoring } from '../src/space-authoring';
 import { stubResizeObserver } from './resize-observer';
+import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -174,58 +175,47 @@ async function mountGraph(
       return surface.authoring.complete(completion);
     },
   };
+  const canvasSurface = { ...surface, authoring: testedAuthoring, edgeAuthoring };
+  const placement = {
+    ...IDLE_PLACEMENT,
+    createResource: addResource,
+    dropExistingResource: addExistingResource,
+    dropSpace: placeSpace,
+  };
   const graph = () => (
     <ReactFlowProvider>
       <SpaceCanvas
+        surface={canvasSurface}
+        reading={canvasReading(canvasSurface, {
+          nodes,
+          hasResourcesOnCanvas: editable,
+          // The facts a mounted canvas is given, turned into answers by the one
+          // module that owns them: `titleEditing` is the chrome rename `App`
+          // reports — the fact that withdraws canvas authoring — and `editable`
+          // is a resolved placement.
+          availability: authoringAvailability({
+            editable,
+            replacingImage: false,
+            presenting: false,
+            editingResourceBody: false,
+            editingResourceTitle: false,
+            editingChromeTitle: !titleEditing,
+            spaceOnCanvas: true,
+            editingEmbeddedMap: false,
+            creatingSpaceResource: false,
+          }),
+          changeNodes: nodesChanged,
+          selectResource: onSelectResource,
+          resourceResize,
+          setEditingResourceTitle: titleEditingChanged,
+        })}
+        placement={placement}
         imageReplacement={imageReplacement}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}
-        nodes={nodes}
-        edges={[]}
-        projectedNodes={null}
-        presenting={false}
-        placementReady={editable}
-        // The facts a mounted canvas is given, turned into answers by the one
-        // module that owns them: `titleEditing` is the chrome rename `App`
-        // reports — the fact that withdraws canvas authoring — and `editable`
-        // is a resolved placement.
-        availability={authoringAvailability({
-          editable,
-          replacingImage: false,
-          presenting: false,
-          editingResourceBody: false,
-          editingResourceTitle: false,
-          editingChromeTitle: !titleEditing,
-          spaceOnCanvas: true,
-          editingEmbeddedMap: false,
-          creatingSpaceResource: false,
-        })}
-        onNodesChange={nodesChanged}
-        onEdgesChange={() => undefined}
-        edgeAuthoring={edgeAuthoring}
-        selection={{ kind: 'none' }}
-        onSelectResource={onSelectResource}
-        onSelectEdge={() => undefined}
-        placedResources={[]}
-        newResourceTitle="Resource 2"
-        onAddResource={addResource}
-        onAddExistingResource={addExistingResource}
-        onPlaceSpace={placeSpace}
-        onDropImages={() => undefined}
-        onPasteImageUrl={() => undefined}
         nameOnCreation={null}
-        authoring={testedAuthoring}
         spaceSession={spaceSession}
-        onBodyEditingChange={() => undefined}
-        onTitleEditingChange={titleEditingChanged}
-        resourceResize={resourceResize}
-        reportEmbeddedMapEditing={() => undefined}
         spaceTitle="Test Space"
-        mapId={MAP_ID}
-        mapTitle="Test Map"
-        graphs={[]}
-        colorByGraphId={{}}
-        activeGraphId={null}
       />
     </ReactFlowProvider>
   );

@@ -54,7 +54,6 @@ export const createApp = (
     authoring,
     adapter: useRenderAdapter,
     continuation,
-    edgeAuthoring,
     commandOutcomes,
     deleteConfirmation,
     reportObserverError,
@@ -152,19 +151,13 @@ export const createApp = (
     // being presented is traversable at once, and nothing subscribes to the
     // array's identity.
     const moves = navigation.moves();
-    const {
-      canvasRendering,
-      availability,
-      editingResourceBody,
-      setEditingResourceBody,
-      setEditingResourceTitle,
-      setEditingChromeTitle,
-    } = useMapSurface(composition, composition.surface, {
+    const reading = useMapSurface(composition, composition.surface, {
       presenting,
       spaceOnCanvas: active,
       creatingSpaceResource: placement.creatingSpaceResource,
     });
-    const { hasResourcesOnCanvas, liveProjection, projected, canvas } = canvasRendering;
+    const { canvasRendering, availability, editingResourceBody, setEditingChromeTitle } = reading;
+    const { canvas } = canvasRendering;
     const discloseResources = useResourcesDisclosure(availability.resourcesView, {
       addressedResourceId,
       mapId: selectedMapId,
@@ -362,11 +355,6 @@ export const createApp = (
                   onSelectEdge={canvasRendering.selectEdge}
                 />
                 <SpaceCanvas
-                  surface={composition.surface}
-                  onDrawnClipboardFailuresChange={reportDrawnClipboardFailures}
-                  onDrawnSpacesChange={reportDrawnSpaces}
-                  commandOutcomes={commandOutcomes}
-                  deleteConfirmation={deleteConfirmation}
                   // Keyed on the replacement epoch, so accepting the stored Space
                   // takes the canvas's local editing state with it. The render
                   // adapter already drops the projection and drag bookkeeping, but
@@ -374,44 +362,17 @@ export const createApp = (
                   // a Space that is gone, and its raised invalid guard would go on
                   // swallowing clicks in the one that replaced it.
                   key={replacementEpoch}
-                  nodes={liveProjection?.nodes ?? []}
-                  edges={liveProjection?.edges ?? []}
-                  // Null while a replacement placement resolves. The canvas keeps
-                  // drawing the Resources on screen through that window — deliberately, so
-                  // a gesture is never interrupted — so a connection is reachable
-                  // with no fresh projection to hand over, and the store keeps its
-                  // live nodes rather than reconciling against nothing.
-                  projectedNodes={projected?.nodes ?? null}
-                  presenting={presenting}
-                  placementReady={hasResourcesOnCanvas}
-                  availability={availability}
-                  onNodesChange={canvasRendering.changeNodes}
-                  onEdgesChange={canvasRendering.changeEdges}
-                  edgeAuthoring={edgeAuthoring}
-                  selection={canvasRendering.selection}
-                  onSelectResource={canvasRendering.selectResource}
-                  onSelectEdge={canvasRendering.selectEdge}
-                  placedResources={view.placedResources}
-                  newResourceTitle={view.newResourceTitle}
-                  onAddResource={() => placement.createResource('markdown')}
-                  onAddExistingResource={placement.dropExistingResource}
-                  onPlaceSpace={placement.dropSpace}
-                  onDropImages={placement.dropImages}
-                  onPasteImageUrl={placement.pasteImageUrl}
+                  surface={composition.surface}
+                  reading={reading}
+                  placement={placement}
+                  onDrawnClipboardFailuresChange={reportDrawnClipboardFailures}
+                  onDrawnSpacesChange={reportDrawnSpaces}
+                  commandOutcomes={commandOutcomes}
+                  deleteConfirmation={deleteConfirmation}
                   imageReplacement={composition.imageReplacement}
                   nameOnCreation={nameOnCreation}
-                  authoring={composition.surface.authoring}
                   spaceSession={spaceSession}
-                  onBodyEditingChange={setEditingResourceBody}
-                  onTitleEditingChange={setEditingResourceTitle}
-                  resourceResize={canvasRendering.resourceResize}
-                  reportEmbeddedMapEditing={canvasRendering.reportEmbeddedMapEditing}
                   spaceTitle={renderedSpace.title}
-                  mapId={selectedMapId}
-                  mapTitle={selectedMap.map.title}
-                  graphs={projection.visibleGraphs}
-                  colorByGraphId={projection.colors}
-                  activeGraphId={activeGraphId}
                   spaceResourceTargets={spaceResourceTargets.targets}
                   resourceEntityActions={resourceRailActions}
                 />

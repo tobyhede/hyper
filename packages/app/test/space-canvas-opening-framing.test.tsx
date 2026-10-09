@@ -19,6 +19,7 @@ import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { CLOSED_DISPLAY } from '@project/ui';
 import { stubResizeObserver } from './resize-observer';
+import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const TARGET_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -194,61 +195,34 @@ describe('opening framing on a mounted canvas', () => {
       fullscreen: refusingFullscreen,
     };
 
+    const surface = { ...app.surface, edgeAuthoring: inertEdgeAuthoring() };
     await mountSettled(
       <OpenSpacesContext.Provider value={spaces}>
         <Subscribed spaces={spaces}>
           <ReactFlowProvider>
             <SpaceCanvas
+              surface={surface}
+              reading={canvasReading(surface, {
+                nodes: [resourceNode()],
+                availability: authoringAvailability({
+                  editable: true,
+                  replacingImage: false,
+                  presenting: false,
+                  editingResourceBody: false,
+                  editingResourceTitle: false,
+                  editingChromeTitle: false,
+                  spaceOnCanvas: true,
+                  editingEmbeddedMap: false,
+                  creatingSpaceResource: false,
+                }),
+              })}
+              placement={IDLE_PLACEMENT}
               imageReplacement={app.imageReplacement}
               commandOutcomes={app.commandOutcomes}
               deleteConfirmation={app.deleteConfirmation}
-              nodes={[resourceNode()]}
-              edges={[]}
-              projectedNodes={null}
-              presenting={false}
-              placementReady={true}
-              availability={authoringAvailability({
-                editable: true,
-                replacingImage: false,
-                presenting: false,
-                editingResourceBody: false,
-                editingResourceTitle: false,
-                editingChromeTitle: false,
-                spaceOnCanvas: true,
-                editingEmbeddedMap: false,
-                creatingSpaceResource: false,
-              })}
-              onNodesChange={() => undefined}
-              onEdgesChange={() => undefined}
-              edgeAuthoring={inertEdgeAuthoring()}
-              selection={{ kind: 'none' }}
-              onSelectResource={() => undefined}
-              onSelectEdge={() => undefined}
-              placedResources={[]}
-              newResourceTitle="Resource 2"
-              onAddResource={() => undefined}
-              onAddExistingResource={() => undefined}
-              onPlaceSpace={() => undefined}
-              onDropImages={() => undefined}
-              onPasteImageUrl={() => undefined}
               nameOnCreation={null}
-              authoring={app.surface.authoring}
               spaceSession={spaceSession}
-              onBodyEditingChange={() => undefined}
-              onTitleEditingChange={() => undefined}
-              resourceResize={{
-                beginResize: () => undefined,
-                previewResize: () => undefined,
-                finishResize: () => undefined,
-                cancelResize: () => undefined,
-              }}
-              reportEmbeddedMapEditing={() => undefined}
               spaceTitle="Test Space"
-              mapId={MAP_ID}
-              mapTitle="Test Map"
-              graphs={[]}
-              colorByGraphId={{}}
-              activeGraphId={null}
             />
           </ReactFlowProvider>
         </Subscribed>
@@ -336,60 +310,33 @@ describe('opening framing on a mounted canvas', () => {
       fullscreen: refusingFullscreen,
     };
 
+    const surface = { ...app.surface, edgeAuthoring: inertEdgeAuthoring() };
     await mountSettled(
       <OpenSpacesContext.Provider value={spaces}>
         <ReactFlowProvider>
           <SpaceCanvas
+            surface={surface}
+            reading={canvasReading(surface, {
+              nodes: [resourceNode()],
+              availability: authoringAvailability({
+                editable: true,
+                replacingImage: false,
+                presenting: false,
+                editingResourceBody: false,
+                editingResourceTitle: false,
+                editingChromeTitle: false,
+                spaceOnCanvas: true,
+                editingEmbeddedMap: false,
+                creatingSpaceResource: false,
+              }),
+            })}
+            placement={IDLE_PLACEMENT}
             imageReplacement={app.imageReplacement}
             commandOutcomes={app.commandOutcomes}
             deleteConfirmation={app.deleteConfirmation}
-            nodes={[resourceNode()]}
-            edges={[]}
-            projectedNodes={null}
-            presenting={false}
-            placementReady={true}
-            availability={authoringAvailability({
-              editable: true,
-              replacingImage: false,
-              presenting: false,
-              editingResourceBody: false,
-              editingResourceTitle: false,
-              editingChromeTitle: false,
-              spaceOnCanvas: true,
-              editingEmbeddedMap: false,
-              creatingSpaceResource: false,
-            })}
-            onNodesChange={() => undefined}
-            onEdgesChange={() => undefined}
-            edgeAuthoring={inertEdgeAuthoring()}
-            selection={{ kind: 'none' }}
-            onSelectResource={() => undefined}
-            onSelectEdge={() => undefined}
-            placedResources={[]}
-            newResourceTitle="Resource 2"
-            onAddResource={() => undefined}
-            onAddExistingResource={() => undefined}
-            onPlaceSpace={() => undefined}
-            onDropImages={() => undefined}
-            onPasteImageUrl={() => undefined}
             nameOnCreation={null}
-            authoring={app.surface.authoring}
             spaceSession={spaceSession}
-            onBodyEditingChange={() => undefined}
-            onTitleEditingChange={() => undefined}
-            resourceResize={{
-              beginResize: () => undefined,
-              previewResize: () => undefined,
-              finishResize: () => undefined,
-              cancelResize: () => undefined,
-            }}
-            reportEmbeddedMapEditing={() => undefined}
             spaceTitle="Test Space"
-            mapId={MAP_ID}
-            mapTitle="Test Map"
-            graphs={[]}
-            colorByGraphId={{}}
-            activeGraphId={null}
           />
         </ReactFlowProvider>
       </OpenSpacesContext.Provider>,
