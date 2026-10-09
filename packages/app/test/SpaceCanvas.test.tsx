@@ -173,8 +173,8 @@ async function mountGraph(
     view,
     opened: () => {
       const { maps = [] } = spaceSession.getState().working.document;
-      const map = maps.find(({ id }) => id === MAP_ID);
-      return Object.entries(map?.positions ?? {})
+      const positions = maps.find(({ id }) => id === MAP_ID)?.positions ?? {};
+      return Object.entries(positions)
         .filter(([, entry]) => entry !== undefined && resourceOpen(entry))
         .map(([resourceId]) => resourceId);
     },
@@ -392,21 +392,24 @@ it('draws no Resource while the render adapter holds no projection', async () =>
  * pending").
  * Those Resources stay authorable through that window.
  */
-describe('a Resource held while a replacement placement resolves', () => {
+describe.each([
+  ['Resource', resourceNode('A'), RESOURCE_ID],
+  ['Reference Resource', resourceNode('A again', REFERENCE_ID, false, 'reference'), REFERENCE_ID],
+] as const)('a %s held while a replacement placement resolves', (_kind, held, id) => {
   it.each(['Enter', ' '])('opens with %s', async (key) => {
-    const { opened } = await mountGraph([resourceNode('A')], undefined, undefined, 'replacing');
-    const focused = nodeOf(RESOURCE_ID);
+    const { opened } = await mountGraph([held], undefined, undefined, 'replacing');
+    const focused = nodeOf(id);
     focused.focus();
 
     fireEvent.keyDown(focused, { key });
 
-    expect(opened()).toEqual([RESOURCE_ID]);
+    expect(opened()).toEqual([id]);
   });
 
   it('announces the authoring keyboard commands', async () => {
-    await mountGraph([resourceNode('A')], undefined, undefined, 'replacing');
+    await mountGraph([held], undefined, undefined, 'replacing');
 
-    expect(nodeOf(RESOURCE_ID)).toHaveAccessibleDescription(
+    expect(nodeOf(id)).toHaveAccessibleDescription(
       'Press enter or space to open a Resource, backspace or delete to remove it from this Map, the arrow keys to move it, and escape to cancel.',
     );
   });
