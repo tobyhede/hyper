@@ -41,6 +41,8 @@ import {
 } from './command-dock';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import type { MapSurface } from '../src/map-surface';
+import type { MapView } from '../src/map-view';
 import { refusingFullscreen } from './fullscreen';
 import { stubResizeObserver } from './resize-observer';
 
@@ -1747,5 +1749,108 @@ describe('Space app Resources list drop', () => {
     const alert = await within(list).findByRole('alert');
     expect(alert).toHaveTextContent('Resource not added');
     expect(alert).toHaveTextContent('This Resource is already in this Map.');
+  });
+});
+
+/**
+ * **The Dock and the canvas read one Map view: the canvas surface's.**
+ *
+ * `mapView` builds fresh arrays on every call, so a Dock fed by a second
+ * derivation would draw equal lists from different objects, and nothing on the
+ * screen could tell the two apart. The surface here answers a view whose
+ * Resources list and memberships no derivation of the Space would produce —
+ * one outside Resource withheld, the other's membership of its Map dropped —
+ * so what the Dock draws says which objects it was handed. The Graph colour
+ * is the projection's, which the Dock already took from the surface.
+ */
+describe('Space app Map reading', () => {
+  it('draws the Dock from the very Map view the canvas reads', async () => {
+    const UNPLACED_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000a');
+    const base = snapshot('Space', 'Resource', 10, 20);
+    const local: SpaceSnapshot = {
+      ...base,
+      resources: [
+        ...base.resources,
+        {
+          id: OUTSIDE_RESOURCE_ID,
+          document: { title: 'Outside resource', kind: 'markdown', body: '' },
+        },
+        {
+          id: UNPLACED_RESOURCE_ID,
+          document: { title: 'Unplaced resource', kind: 'markdown', body: '' },
+        },
+      ],
+      document: {
+        ...base.document,
+        maps: [
+          ...(base.document.maps ?? []),
+          {
+            id: OTHER_MAP_ID,
+            title: 'Other Map',
+            kind: 'positioned',
+            positions: { [OUTSIDE_RESOURCE_ID]: { x: 40, y: 50, open: false } },
+            graphs: [{ id: OTHER_GRAPH_ID, title: 'Other Graph', edges: [] }],
+          },
+        ],
+      },
+    };
+    const stored = { snapshot: local, revision: 0n, exportedRevision: null };
+    const { spaceSession: session, spaceResources } = openTestSpace(
+      new MemorySpaceBackend(SPACE_ID, [stored]),
+      stored,
+    );
+    const composed = composeApp({
+      images: unusedImageSources,
+      spaceSession: session,
+      selection: MAP_ID,
+    });
+    const views = new WeakMap<MapView, MapView>();
+    const surface: MapSurface = {
+      ...composed.surface,
+      view: () => {
+        const derived = composed.surface.view();
+        const known = views.get(derived);
+        if (known !== undefined) return known;
+        const answered: MapView = {
+          ...derived,
+          projection: {
+            ...derived.projection,
+            colors: { ...derived.projection.colors, [OWNED_GRAPH_ID]: '#123456' },
+          },
+          resourcesOutsideMap: derived.resourcesOutsideMap.filter(
+            (resource) => resource.id === OUTSIDE_RESOURCE_ID,
+          ),
+          membershipsOutsideMap: new Map(),
+        };
+        views.set(derived, answered);
+        return answered;
+      },
+    };
+
+    mountSpace(
+      { id: runtime(local).id, session, app: { ...composed, surface }, spaceResources },
+      (app) => render(app),
+    );
+
+    const read = surface.view();
+    expect(read.resourcesOutsideMap.map((resource) => resource.title)).toEqual([
+      'Outside resource',
+    ]);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Resources' })).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Resources' }));
+    const list = await screen.findByRole('dialog', { name: 'Resources' });
+    const rows = within(list).getAllByRole('button', { name: /^Add .* to Map$/u });
+    expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
+      'Add Outside resource to Map',
+    ]);
+    // No membership reaches the row, so it carries no description of one.
+    expect(rows[0]).not.toHaveAttribute('aria-describedby');
+    // Supporting evidence: the Graph glyph is drawn in the projection's colour.
+    expect(screen.getByTestId('active-graph').querySelector('svg')).toHaveAttribute(
+      'stroke',
+      '#123456',
+    );
   });
 });

@@ -10,7 +10,7 @@ import { useCanvasRendering } from '../src/canvas-rendering';
 import { CLIPBOARD_REFUSAL } from '../src/clipboard';
 import { useDockChrome, type DockChromeInput } from '../src/dock-chrome';
 import { useUnsettledLeaveGuard } from '../src/leave-guard';
-import { mapView, useMapView } from '../src/map-view';
+import { mapView } from '../src/map-view';
 import { useNameOnCreation } from '../src/name-on-creation';
 import type { OpenSpace } from '../src/open-spaces';
 import { useOpenSpacesStanding } from '../src/open-spaces-context';
@@ -130,30 +130,6 @@ describe('useAddressedResource', () => {
     );
     rerender({ mapId: OTHER_MAP_ID });
     expect(calls.filter((call) => call === `select ${PLACED_A}`)).toHaveLength(2);
-  });
-});
-
-describe('useMapView', () => {
-  it('holds every identity still while the snapshot and the Map do', () => {
-    const opened = openDerivationSpace();
-    const working = opened.session.getState().working;
-    const { result, rerender } = renderHook(
-      ({ mapId }: { readonly mapId: MapId }) =>
-        useMapView(opened.app.readWorkingSpace, working, mapId),
-      { initialProps: { mapId: MAP_ID } },
-    );
-    const first = result.current;
-
-    rerender({ mapId: MAP_ID });
-    expect(result.current.renderedSpace).toBe(first.renderedSpace);
-    expect(result.current.projection).toBe(first.projection);
-    expect(result.current.mapPlacement).toBe(first.mapPlacement);
-    expect(result.current.placedResources).toBe(first.placedResources);
-
-    rerender({ mapId: OTHER_MAP_ID });
-    expect(result.current.renderedSpace).toBe(first.renderedSpace);
-    expect(result.current.selectedMap.map.id).toBe(OTHER_MAP_ID);
-    expect(result.current.projection).not.toBe(first.projection);
   });
 });
 
