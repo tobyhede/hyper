@@ -850,10 +850,9 @@ export const spaceRepositoryContract = (
   });
 
   /*
-   * Replacement clears what is stored before it writes, so a proposal that
-   * repeats an identity would collide with itself, and replacement does not
-   * recover from a collision. Aggregate intake refusing it before anything is
-   * written is what these cases hold.
+   * replaceAggregate refuses a proposal that repeats a Space or Resource
+   * identity with intake's matching error, and the stored aggregate is
+   * unchanged afterwards.
    */
   for (const repeat of [
     {

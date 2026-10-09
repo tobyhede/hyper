@@ -856,7 +856,11 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
   /**
    * Empties the store and writes `input` as the whole aggregate, inside the
    * caller's transaction. Both callers have run `loadSpaceAggregate` over
-   * `input` and hold the aggregate lock exclusively (`#lockMetaIdentity`).
+   * `input` and hold the aggregate lock exclusively (`#lockMetaIdentity`):
+   * the store's `lockAggregate`. On PostgreSQL that is an advisory lock. On
+   * SQLite it is the file locks plus the same-handle queue, so a writer on
+   * another handle is refused as unavailable (BUSY/LOCKED) rather than
+   * colliding here.
    *
    * What it can raise, and who recovers from what:
    *
@@ -940,9 +944,10 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
         return { kind: 'initialized', aggregate: await this.#replaceAllSpaces(tables, input) };
       });
     } catch (error) {
-      // State established outside the aggregate lock collided with this one
-      // (`#replaceAllSpaces`). It is read after the rollback and classified
-      // as authored meaning, rather than exposing SQL timing.
+      // State a writer outside the aggregate lock established collided with
+      // this one (see `#replaceAllSpaces` for what that lock is per store).
+      // It is read after the rollback and classified as authored meaning,
+      // rather than exposing SQL timing.
       if (
         !(error instanceof ResourceOwnershipError) &&
         !this.#store.isDuplicateKey(error, 'spaces') &&
