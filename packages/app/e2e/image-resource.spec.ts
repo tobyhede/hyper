@@ -314,6 +314,86 @@ test(
   },
 );
 
+/**
+ * Between opening and the picture arriving, the content area draws a skeleton in
+ * the picture's place rather than an empty box, a status named Loading image;
+ * the picture replaces it, and the Stage draws the same. That a picture the
+ * browser already holds draws none is `packages/ui/test/ResourceImage.test.tsx`'s:
+ * Playwright disables the HTTP cache while routing is enabled
+ * (https://playwright.dev/docs/api/class-page#page-route), so no routed picture
+ * is ever already held here.
+ */
+test(
+  'an Open Image Resource draws a skeleton until its picture loads',
+  { tag: '@parity:open-image-resource-shows-skeleton-while-loading' },
+  async ({ page }) => {
+    const { promise: held, resolve: releasePicture } = Promise.withResolvers<null>();
+    await page.route(FIGURE_URL, async (route) => {
+      await held;
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: HARBOUR,
+      });
+    });
+    await openPictures(page);
+    const node = page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`);
+    await openResource(node, 'Figure');
+
+    const resource = node.getByRole('article', { name: 'Figure' });
+    const skeleton = resource.getByRole('status', { name: 'Loading image' });
+    await expect(skeleton).toBeVisible();
+    await expect(resource.getByRole('img', { name: 'Figure' })).toHaveCount(0);
+
+    releasePicture(null);
+    const picture = resource.getByRole('img', { name: 'Figure' });
+    await expectPictureLoaded(picture, HARBOUR_SIZE.width);
+    await expect(skeleton).toHaveCount(0);
+  },
+);
+
+/** On the Stage too, a picture still arriving draws the skeleton in its place. */
+test('a presented Image Resource draws a skeleton until its picture loads', async ({ page }) => {
+  const { promise: held, resolve: releasePicture } = Promise.withResolvers<null>();
+  await page.route(FIGURE_URL, async (route) => {
+    await held;
+    await route.fulfill({ status: 200, contentType: 'image/png', body: HARBOUR });
+  });
+  await openPictures(page, { presentable: true });
+  await presentControl(page).click();
+  await expect(presentedName(page)).toHaveText('Figure');
+
+  const skeleton = presentedResource(page).getByRole('status', { name: 'Loading image' });
+  await expect(skeleton).toBeVisible();
+  releasePicture(null);
+  await expectPictureLoaded(
+    presentedResource(page).getByRole('img', { name: 'Figure' }),
+    HARBOUR_SIZE.width,
+  );
+  await expect(skeleton).toHaveCount(0);
+});
+
+/** A picture that fails after the skeleton is drawn gives way to the failed-image state. */
+test('a picture that fails while loading replaces the skeleton with the failed-image state', async ({
+  page,
+}) => {
+  const { promise: held, resolve: releasePicture } = Promise.withResolvers<null>();
+  await page.route(FIGURE_URL, async (route) => {
+    await held;
+    await route.abort();
+  });
+  await openPictures(page);
+  const node = page.locator(`.react-flow__node[data-id="${IMAGE_ID}"]`);
+  await openResource(node, 'Figure');
+
+  const resource = node.getByRole('article', { name: 'Figure' });
+  const skeleton = resource.getByRole('status', { name: 'Loading image' });
+  await expect(skeleton).toBeVisible();
+  releasePicture(null);
+  await expect(resource.getByText('Image did not load')).toBeVisible();
+  await expect(skeleton).toHaveCount(0);
+});
+
 /** Three small PNGs, each a size the created Resource is expected to record. */
 const PICTURES = [
   {
@@ -358,7 +438,7 @@ async function storedImages(page: Page, spaceId: UUID) {
   const { snapshot } = decodeLoadedSpace(await response.json());
   const positions = snapshot.document.maps?.find(({ id }) => id === SEEDED_MAP_ID)?.positions;
   return snapshot.resources.flatMap(({ id, document }) =>
-    document.kind === 'image' ? [{ document, at: positions?.[id] }] : [],
+    document.kind === 'image' ? [{ id, document, at: positions?.[id] }] : [],
   );
 }
 
@@ -467,6 +547,13 @@ test('dropping three images creates three Resources in one Edit, numbered in ord
   expect(new Set([first?.y, second?.y, third?.y]).size).toBe(1);
   expect((second?.x ?? 0) - (first?.x ?? 0)).toBeGreaterThan(0);
   expect((third?.x ?? 0) - (second?.x ?? 0)).toBe((second?.x ?? 0) - (first?.x ?? 0));
+  // The row starts at the drop point: the first Resource is centred under it.
+  const firstBox = await boxOf(
+    page.locator(`.react-flow__node[data-id="${created[0]?.id ?? ''}"]`),
+    'the first dropped Image Resource',
+  );
+  expect(firstBox.x + firstBox.width / 2).toBeCloseTo(at.clientX, -1);
+  expect(firstBox.y + firstBox.height / 2).toBeCloseTo(at.clientY, -1);
   // One Edit: the three arrived in one commit. V1 has no Undo; one Edit is
   // what a single Undo would reverse.
   expect(commits).toHaveLength(1);

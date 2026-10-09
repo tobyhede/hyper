@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Button } from './Button';
 import {
   Empty,
@@ -8,6 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from './components/empty';
+import { Skeleton } from './components/skeleton';
 import { ImageIcon } from './icons';
 import './resource-image.css';
 
@@ -25,15 +26,26 @@ export interface ResourceImageProps {
 
 /**
  * An Image Resource's content: its picture, contained in the room it is given and
- * never scaled past its natural size, or — when the picture will not load — the
- * failed-image state naming the URL.
+ * never scaled past its natural size; a skeleton in the picture's place until it
+ * loads; or — when the picture will not load — the failed-image state naming
+ * the URL.
  *
- * A failed load is a fact about this mount, not the Space, so a caller that
+ * How the load went is a fact about this mount, not the Space, so a caller that
  * changes the URL keys this on it to try again.
  */
 export function ResourceImage({ url, name, onReplace }: ResourceImageProps) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
+  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  const picture = useRef<HTMLImageElement>(null);
+  // A picture the browser already holds is complete as it mounts, but its load
+  // event still arrives after the first paint; read it before that paint so no
+  // skeleton flashes (`ResourceImage.test.tsx`, "draws no skeleton for a picture
+  // the browser already has"). A complete picture with no width is left to its
+  // load or error event, which still arrive.
+  useLayoutEffect(() => {
+    const image = picture.current;
+    if (image?.complete === true && image.naturalWidth > 0) setLoadState('loaded');
+  }, []);
+  if (loadState === 'failed') {
     return (
       <Empty className="resource-image resource-image--failed" data-testid="resource-image-failed">
         <EmptyHeader>
@@ -64,14 +76,20 @@ export function ResourceImage({ url, name, onReplace }: ResourceImageProps) {
     );
   }
   return (
-    <div className="resource-image">
+    <div className="resource-image" aria-busy={loadState === 'loading'}>
       <img
+        ref={picture}
         className="resource-image__picture"
+        data-loading={loadState === 'loading' ? '' : undefined}
         src={url}
         alt={name}
         draggable={false}
-        onError={() => setFailed(true)}
+        onLoad={() => setLoadState('loaded')}
+        onError={() => setLoadState('failed')}
       />
+      {loadState === 'loading' && (
+        <Skeleton role="status" aria-label="Loading image" className="resource-image__skeleton" />
+      )}
     </div>
   );
 }

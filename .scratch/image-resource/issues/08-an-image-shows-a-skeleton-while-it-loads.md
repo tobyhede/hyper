@@ -6,11 +6,11 @@ For the no-flash criterion, read the `<img>`'s `complete` (with a non-zero `natu
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] A picture that has not loaded yet draws the skeleton; loading replaces it with the picture; an error replaces it with the failed-image state.
-- [ ] A picture already in the browser's cache draws no skeleton flash.
-- [ ] Ladle story and application proof (ADR 0052).
+- [x] A picture that has not loaded yet draws the skeleton; loading replaces it with the picture; an error replaces it with the failed-image state.
+- [x] A picture already in the browser's cache draws no skeleton flash.
+- [x] Ladle story and application proof (ADR 0052).
 
 ## Comments
 
@@ -21,3 +21,11 @@ For the no-flash criterion, read the `<img>`'s `complete` (with a non-zero `natu
 **Category:** enhancement. **State:** ready-for-agent.
 
 Still valid: `ResourceImage` (`packages/ui/src/ResourceImage.tsx`) draws an empty box until the picture loads, holding only a `failed` state, and `packages/ui/src/components/` has no skeleton. The body now names `ResourceImage` as the single change site, covering own content (`CanvasResource.tsx:469`), Reference Targets (through the same path) and presenting (`PresentedResource.tsx:91`), and suggests reading `img.complete` on mount for the no-flash criterion. The acceptance criteria are testable and no design decision is open.
+
+### Resolved, 2026-10-09
+
+`ResourceImage` holds `loading | loaded | failed`: the picture stays mounted but hidden while the restored shadcn `Skeleton` (`packages/ui/src/components/skeleton.tsx`, the registry's `base-nova` item) takes its place as a status named "Loading image", with the room marked `aria-busy`; load replaces it with the picture and error with the failed-image state. A picture already `complete` with a non-zero `naturalWidth` is read in a layout effect, before the first paint; a complete picture with no width is left to its load or error event.
+
+Evidence: `packages/ui/test/ResourceImage.test.tsx` holds the component behaviour, each case proven red first (the cached-picture case by removing the mount read). The parity claim `open-image-resource-shows-skeleton-while-loading` is held by `packages/app/e2e/image-resource.spec.ts` (own content, "an Open Image Resource draws a skeleton until its picture loads") and `packages/app/ladle-e2e/resource-open.spec.ts` (through a Reference Resource on the `OpenImageReference` story, because `OpenImage`'s picture is small enough for Vite to inline as a `data:` URI that cannot be held back). The same spec also proves the Stage ("a presented Image Resource draws a skeleton until its picture loads") and the error transition ("a picture that fails while loading replaces the skeleton with the failed-image state").
+
+The no-flash criterion is proved only in jsdom. Playwright disables the HTTP cache while routing is enabled, so no routed picture is ever already held, and an app proof attempted through presenting showed exactly that. A browser proof would need an unrouted, host-served picture; that is not built.

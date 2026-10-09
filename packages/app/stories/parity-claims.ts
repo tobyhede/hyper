@@ -268,6 +268,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'An Open Image Resource whose picture does not load keeps its Title and draws the failed-image state naming the URL (ADR 0106).',
   },
   {
+    id: 'open-image-resource-shows-skeleton-while-loading',
+    storyFile: 'components/resource.stories.tsx',
+    storyExport: 'OpenImageReference',
+    claim:
+      "Wherever an Image Resource's picture is drawn — its own content, a Reference Resource's, the Stage — a picture that has not loaded yet draws a skeleton in its place, a status named Loading image, and the picture replaces it on load. The Ladle story draws it through a Reference Resource, the one story whose picture a test can hold back.",
+  },
+  {
     id: 'image-resource-replace-from-the-upload-target',
     storyFile: 'space/replace-image.stories.tsx',
     storyExport: 'Default',
