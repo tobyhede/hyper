@@ -849,6 +849,49 @@ export const spaceRepositoryContract = (
     });
   });
 
+  /*
+   * replaceAggregate refuses a proposal that repeats a Space or Resource
+   * identity with intake's matching error, and the stored aggregate is
+   * unchanged afterwards.
+   */
+  for (const repeat of [
+    {
+      identity: 'Space',
+      spaces: [
+        space(OTHER_SPACE_ID, 'First', [RESOURCE_ID]),
+        space(OTHER_SPACE_ID, 'Repeat', [SECOND_RESOURCE_ID]),
+      ],
+      error: { kind: 'duplicate-space-id', spaceId: OTHER_SPACE_ID },
+    },
+    {
+      identity: 'Resource',
+      spaces: [
+        space(OTHER_SPACE_ID, 'First', [RESOURCE_ID]),
+        space(SPACE_ID, 'Second', [RESOURCE_ID]),
+      ],
+      error: { kind: 'duplicate-resource-id', resourceId: RESOURCE_ID },
+    },
+  ]) {
+    it(`${name} refuses a replacement that repeats a ${repeat.identity} identity, keeping the stored aggregate`, async () => {
+      await withHarness(async (repository) => {
+        const existing = space(SPACE_ID, 'Existing', [OTHER_RESOURCE_ID]);
+        await seed(repository, existing);
+
+        const result = await repository.replaceAggregate(
+          { metaSpaceId: OTHER_SPACE_ID, spaces: repeat.spaces },
+          SPACE_ID,
+        );
+        expect(result.kind).toBe('aggregate-refused');
+        if (result.kind !== 'aggregate-refused') throw new Error(result.kind);
+        expect(result.errors).toContainEqual(expect.objectContaining(repeat.error));
+        await expect(repository.loadAggregate()).resolves.toEqual({
+          kind: 'loaded',
+          aggregate: { metaSpaceId: SPACE_ID, spaces: [stored(existing, 0n, null)] },
+        });
+      });
+    });
+  }
+
   it(`${name} refuses an initialization that fails domain intake, storing none of it`, async () => {
     await withHarness(async (repository) => {
       const valid = space(SPACE_ID, 'Must roll back', [RESOURCE_ID]);
