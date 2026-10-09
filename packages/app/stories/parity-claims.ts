@@ -272,7 +272,7 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/resource.stories.tsx',
     storyExport: 'OpenImageReference',
     claim:
-      "An Open Image Resource, or a Reference Resource drawing one, whose picture has not loaded yet draws a skeleton in the picture's place, announced as loading, and the picture replaces it on load.",
+      "Wherever an Image Resource's picture is drawn — its own content, a Reference Resource's, the Stage — a picture that has not loaded yet draws a skeleton in its place, a status named Loading image, and the picture replaces it on load. The Ladle story draws it through a Reference Resource, the one story whose picture a test can hold back.",
   },
   {
     id: 'image-resource-replace-from-the-upload-target',

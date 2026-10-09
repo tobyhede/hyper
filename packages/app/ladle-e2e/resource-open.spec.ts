@@ -854,8 +854,8 @@ test(
 );
 
 /**
- * Until a picture arrives, the content area draws a skeleton in its place,
- * announced as loading, and the picture replaces it. A Reference Resource to an
+ * Until a picture arrives, the content area draws a skeleton in its place, a
+ * status named Loading image, and the picture replaces it. A Reference Resource to an
  * Image Resource draws through the same picture as the Target's own content,
  * and this story's picture is one the test can hold back and then let through.
  */

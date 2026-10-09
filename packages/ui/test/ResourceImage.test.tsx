@@ -36,4 +36,15 @@ describe('ResourceImage', () => {
     expect(loading()).not.toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Harbour' })).toBeVisible();
   });
+
+  it('leaves a complete picture with no width to its load or error event', () => {
+    vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
+    vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(0);
+
+    render(<ResourceImage url={URL} name="Harbour" />);
+    expect(loading()).toBeInTheDocument();
+
+    fireEvent.error(screen.getByRole('img', { name: 'Harbour' }));
+    expect(screen.getByText('Image did not load')).toBeInTheDocument();
+  });
 });

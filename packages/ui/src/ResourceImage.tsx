@@ -34,18 +34,18 @@ export interface ResourceImageProps {
  * changes the URL keys this on it to try again.
  */
 export function ResourceImage({ url, name, onReplace }: ResourceImageProps) {
-  const [load, setLoad] = useState<'loading' | 'loaded' | 'failed'>('loading');
+  const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'failed'>('loading');
   const picture = useRef<HTMLImageElement>(null);
   // A picture the browser already holds is complete as it mounts, but its load
   // event still arrives after the first paint; read it before that paint so no
   // skeleton flashes (`ResourceImage.test.tsx`, "draws no skeleton for a picture
-  // the browser already has").
+  // the browser already has"). A complete picture with no width is left to its
+  // load or error event, which still arrive.
   useLayoutEffect(() => {
     const image = picture.current;
-    if (!image?.complete) return;
-    setLoad(image.naturalWidth > 0 ? 'loaded' : 'failed');
+    if (image?.complete === true && image.naturalWidth > 0) setLoadState('loaded');
   }, []);
-  if (load === 'failed') {
+  if (loadState === 'failed') {
     return (
       <Empty className="resource-image resource-image--failed" data-testid="resource-image-failed">
         <EmptyHeader>
@@ -76,18 +76,18 @@ export function ResourceImage({ url, name, onReplace }: ResourceImageProps) {
     );
   }
   return (
-    <div className="resource-image">
+    <div className="resource-image" aria-busy={loadState === 'loading'}>
       <img
         ref={picture}
         className="resource-image__picture"
-        data-loading={load === 'loading' ? '' : undefined}
+        data-loading={loadState === 'loading' ? '' : undefined}
         src={url}
         alt={name}
         draggable={false}
-        onLoad={() => setLoad('loaded')}
-        onError={() => setLoad('failed')}
+        onLoad={() => setLoadState('loaded')}
+        onError={() => setLoadState('failed')}
       />
-      {load === 'loading' && (
+      {loadState === 'loading' && (
         <Skeleton role="status" aria-label="Loading image" className="resource-image__skeleton" />
       )}
     </div>
