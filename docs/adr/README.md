@@ -131,6 +131,7 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0090](0090-seeking-handles-reveal-by-proximity-and-eligibility.md) | Seeking-end authoring handles reveal only on Things near the pointer that `edgeEligibility` would accept. |
 | [0091](0091-context-deletion-relocates-every-space-thing.md) | Deleting a Diagram or Graph atomically relocates every Space Thing that selected it. |
 | [0112](0112-a-map-behaves-the-same-wherever-it-is-drawn.md) | A Map drawn inside an Open Space Resource is a Map: its own Space's composition, one Map and Graph, one policy (authoring, inert, read-only). Every other difference from the canvas is recorded or a defect (refines 0068). |
+| [0126](0126-an-image-replacement-is-the-application-s-exclusive-operation-wherever-it-runs.md) | While any composed Space replaces an image, every Space withdraws authoring and navigation; the target stays mounted (refines 0112). |
 
 ## UI foundation
 

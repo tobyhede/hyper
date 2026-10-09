@@ -14,6 +14,7 @@ import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * Through the application: a save over the request size limit is explained by the Dock's notice rather than a dialog, keeps every
@@ -136,22 +137,8 @@ const notice = () => screen.getByTestId('persistence-failure');
 const persistenceOf = (space: OpenSpace) => space.session.getState().persistence;
 
 describe('A save over the request size limit', () => {
-  // React Flow and Base UI measure, and jsdom has no `ResizeObserver`.
   beforeAll(() => {
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        observe(): void {
-          return undefined;
-        }
-        unobserve(): void {
-          return undefined;
-        }
-        disconnect(): void {
-          return undefined;
-        }
-      },
-    );
+    stubResizeObserver();
   });
   afterAll(() => vi.unstubAllGlobals());
 

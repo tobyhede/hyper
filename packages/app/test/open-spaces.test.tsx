@@ -1,12 +1,22 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import {
+  contentAction,
+  embedsMap,
+  uuidSchema,
+  type ResourceContent,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
+import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter';
+import { CLOSED_DISPLAY } from '@project/ui';
 import {
   MemorySpaceBackend,
   MemorySpaceBackendTestControl,
   type CommitResult,
 } from '@project/persistence';
 import { NavigationUnavailableError } from '../src/browser-location';
+import { useEmbeddedOpenSpaceResources } from '../src/use-embedded-open-space-resources';
 import { createOpenSpaces } from '../src/open-spaces';
 import type { ImageSources } from '../src/image-creation';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
@@ -17,6 +27,7 @@ import { mintingIds } from './minting';
 import { heldImageSources, unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -349,6 +360,61 @@ describe('Open Spaces', () => {
     await first.release();
     await second.release();
     expect(openSpaces.entry(OTHER_ID)).toBe(first.entry);
+  });
+
+  it('holds the target a Reference Resource to a Space Resource draws, and Close releases it', async () => {
+    const { openSpaces } = setup();
+    const containing = await openSpaces.open(META_ID);
+    // What the projection draws for an Open Reference Resource whose Target is
+    // `Meta`'s Space Resource: the Target's Space view, reached by reference.
+    const content: ResourceContent = {
+      kind: 'space',
+      view: { spaceId: OTHER_ID, map: MAP_ID, graph: GRAPH_ONE, framing: undefined },
+      via: 'reference',
+    };
+    const reference = (open: boolean): ResourceFlowNode => ({
+      id: MINTED_RESOURCE_ID,
+      type: 'resource',
+      position: { x: 0, y: 80 },
+      width: 700,
+      height: 500,
+      data: {
+        shape: 'rectangle',
+        resourceId: MINTED_RESOURCE_ID,
+        title: 'Other',
+        readOnly: false,
+        ...bareKindData('reference'),
+        contentAction: contentAction(content),
+        embedsMap: embedsMap(content),
+        open,
+        selectedForAuthoring: false,
+        display: open ? { shown: 'open', content } : CLOSED_DISPLAY,
+        activeGraphId: null,
+        activeGraphColor: '#8a94a6',
+      },
+    });
+    const { result, rerender, unmount } = renderHook(
+      ({ nodes }) =>
+        useEmbeddedOpenSpaceResources(nodes, openSpaces, new Set(), {
+          spaceId: META_ID,
+          mapId: META_MAP_ID,
+          policy: 'authoring',
+        }),
+      { initialProps: { nodes: [reference(true)] } },
+    );
+
+    await waitFor(() => expect(openSpaces.entry(OTHER_ID)).toBeDefined());
+    expect(
+      result.current.embeddedRequests.map(({ spaceId, policy }) => ({ spaceId, policy })),
+    ).toEqual([{ spaceId: OTHER_ID, policy: 'read-only' }]);
+    expect(openSpaces.getState().entries).toEqual([containing]);
+    expect(openSpaces.listing().map((row) => row.spaceId)).toEqual([META_ID]);
+    expect(openSpaces.opener(OTHER_ID)).toBeNull();
+
+    rerender({ nodes: [reference(false)] });
+    await waitFor(() => expect(openSpaces.entry(OTHER_ID)).toBeUndefined());
+    expect(openSpaces.entry(META_ID)).toBe(containing);
+    unmount();
   });
 
   it('records a drawn-only Space as Opener without hiding or listing it', async () => {
@@ -1369,20 +1435,7 @@ describe('Open Spaces', () => {
    */
   describe('choosing a closed Meta that cannot be opened, rendered', () => {
     beforeAll(() => {
-      vi.stubGlobal(
-        'ResizeObserver',
-        class {
-          observe(): void {
-            return undefined;
-          }
-          unobserve(): void {
-            return undefined;
-          }
-          disconnect(): void {
-            return undefined;
-          }
-        },
-      );
+      stubResizeObserver();
       // Base UI's positioner measures, and jsdom ships neither pointer capture
       // nor `scrollIntoView`; both are reached before a menu can open.
       HTMLElement.prototype.hasPointerCapture = () => false;

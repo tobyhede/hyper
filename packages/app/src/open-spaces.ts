@@ -418,14 +418,13 @@ export function createOpenSpaces({
    */
   const shownOnCanvas = new WeakSet<OpenSpace>();
   const openingFramingByEntry = new WeakMap<OpenSpace, SpaceResourceFraming>();
-  const browserLocation = createBrowserLocation(
-    history,
-    report,
-    async (pathname) => {
+  const browserLocation = createBrowserLocation(history, {
+    reportObserverError: report,
+    openPath: async (pathname) => {
       await openPath(pathname);
     },
-    () => observable.getState().replacingImage,
-  );
+    isNavigationHeld: () => observable.getState().replacingImage,
+  });
 
   /**
    * Hand the browser's location whichever composition is now on the canvas.

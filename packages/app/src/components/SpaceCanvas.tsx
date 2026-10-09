@@ -290,7 +290,7 @@ export interface SpaceCanvasProps {
   onPasteImageUrl: (url: string, anchor: { readonly x: number; readonly y: number }) => void;
   /**
    * The Space's image replacements (ADR 0106), which own the whole attempt.
-   * Absent offers no Replace on an Image Resource.
+   * The one way Replace reaches an Image Resource on this canvas that offers it.
    */
   imageReplacement: Pick<ImageReplacements, 'replace'>;
   /**

@@ -18,6 +18,7 @@ import { openTestSpace } from './opened-space';
 import { beginRename } from './command-dock';
 import { selectResource } from './resource-selection';
 import { unusedImageSources } from './image-sources';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * ADR 0042's "one shared contract test": an Interaction draft open when a stored
@@ -253,20 +254,7 @@ function beginDrag(node: HTMLElement): void {
 }
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());

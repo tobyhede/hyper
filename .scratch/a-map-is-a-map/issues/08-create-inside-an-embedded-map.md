@@ -4,17 +4,17 @@
 
 **Blocked by:** 07.
 
-**Status:** implementation under verification
+**Status:** resolved
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
-- [ ] Every creation gesture the canvas offers creates in the embedded Map's Space and Map when made there in Edit.
-- [ ] The continuation selects the new Resource and places the caret in the originating drawing, including when another drawing shows the same Map.
-- [ ] A drop or paste on an inert or read-only Map is refused with wording and never lands in the Map beneath it.
-- [ ] The Command Dock still creates in the canvas's own Space.
+- [x] Every creation gesture the canvas offers creates in the embedded Map's Space and Map when made there in Edit.
+- [x] The continuation selects the new Resource and places the caret in the originating drawing, including when another drawing shows the same Map.
+- [x] A drop or paste on an inert or read-only Map is refused with wording and never lands in the Map beneath it.
+- [x] The Command Dock still creates in the canvas's own Space.
 
 ## Answer
 
 Pointer drop, paste and empty Alt-drop resolve the drawing under the point and convert coordinates through that drawing. Keyboard creation follows the selected occurrence. Inert/read-only targets refuse rather than forwarding creation to the containing Map. Naming continuation stays with the originating surface; application/browser tests cover these paths.
 
-Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

@@ -4,15 +4,15 @@
 
 **Blocked by:** 06.
 
-**Status:** implementation under verification
+**Status:** resolved
 
 **Spec:** `.scratch/a-map-is-a-map/spec.md`. **Decision:** ADR 0112.
 
-- [ ] At most one Resource or Edge is selected on the canvas, and the selection names its occurrence; two drawings of the same Map are told apart.
-- [ ] A continuation is spent only in the occurrence that requested it; if that occurrence stops being drawn before the Edit completes, the Edit stands and the continuation is dropped, with no fallback.
-- [ ] Enter, F2 and Delete act on the selection's occurrence and do the same thing in every drawing; the canvas has no separate embedded branch for them.
-- [ ] Undo and Redo act on the selection's Space, or the canvas's own Space when nothing is selected.
-- [ ] The Command Dock always acts on the canvas's own Space.
+- [x] At most one Resource or Edge is selected on the canvas, and the selection names its occurrence; two drawings of the same Map are told apart.
+- [x] A continuation is spent only in the occurrence that requested it; if that occurrence stops being drawn before the Edit completes, the Edit stands and the continuation is dropped, with no fallback.
+- [x] Enter, F2 and Delete act on the selection's occurrence and do the same thing in every drawing; the canvas has no separate embedded branch for them.
+- [ ] Undo and Redo act on the selection's Space, or the canvas's own Space when nothing is selected. Deferred until the application has history (Scope clarification).
+- [x] The Command Dock always acts on the canvas's own Space.
 
 ## Scope clarification
 
@@ -22,4 +22,4 @@ The user confirmed on 2026-10-03 that Undo/Redo remains deferred until the appli
 
 Selection dispatch resolves one occurrence for root and embedded drawings. Enter, F2, Delete and keyboard creation use that occurrence; adapters and continuations are scoped to the drawing. Unmounting drops its pending continuation. The Dock retains the root composition. Undo/Redo is deferred as recorded in Scope clarification.
 
-Targeted verification is recorded on draft PR #332; the full CI gate must pass before this work is complete.
+Delivered by PR #332, merged 2026-10-04 with its CI gate green. The 2026-10-08 closeout verification, and the tests it added in PR #346, are recorded in `implementation-review.md`.

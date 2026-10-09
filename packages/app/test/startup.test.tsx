@@ -10,6 +10,7 @@ import { recordingHistory } from './browser-history';
 import { startApplication } from '../src/startup';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { stubResizeObserver } from './resize-observer';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -27,20 +28,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
 
 beforeAll(() => {
   vi.stubGlobal('scrollTo', () => undefined);
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());

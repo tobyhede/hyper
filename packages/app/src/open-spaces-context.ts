@@ -59,3 +59,20 @@ export const useOpenSpacesStanding = (spaceId: UUID): OpenSpacesStanding => {
   );
   return { spaces, active: showsSpace(spaces === null ? null : state, spaceId) };
 };
+
+/**
+ * Whether some composed Space, listed or only drawn, is replacing an image —
+ * the application's one exclusive operation (ADR 0112).
+ *
+ * Read as the boolean rather than the whole state, so a mount re-renders when
+ * it changes and not on every publish of the open set. An isolated mount has
+ * no open set and answers `false`, so `useMapSurface` combines it with the
+ * Space's own replacement (`packages/app/test/dock-navigation-hold.test.tsx`).
+ */
+export const useAnySpaceReplacingImage = (): boolean => {
+  const spaces = useOpenSpaces();
+  return useSyncExternalStore(
+    spaces?.subscribe ?? noOpenSpacesChanges,
+    () => (spaces?.getState ?? noOpenSpaces)().replacingImage,
+  );
+};

@@ -509,6 +509,7 @@ describe('useResourceRailActions', () => {
           addResource: available,
           authorOnCanvas: available,
           deleteResource: available,
+          navigate: available,
         },
         editingResourceBody: false,
         createReferenceFrom: () => 'done',

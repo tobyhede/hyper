@@ -21,6 +21,7 @@ import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * Edge Authoring's React interface: what it hands React Flow, and the controls
@@ -246,20 +247,7 @@ beforeAll(() => {
   // Answering `null` is what a release over nothing really produces, which
   // `elementDropTargetOf` reads as off-canvas.
   document.elementFromPoint = () => null;
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());

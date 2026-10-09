@@ -26,7 +26,7 @@
  */
 
 /**
- * The ten facts every answer below is derived from.
+ * The facts every answer below is derived from.
  *
  * Every Resource creation completes its Edit on activation, so there is no
  * modal creation surface for the rest of the product to stand out of the way
@@ -36,13 +36,23 @@
  */
 export interface AuthoringInProgress {
   /**
-   * An Image Resource's replacement is being stored, measured and applied.
+   * Some composed Space, listed or only drawn, is replacing an image.
    *
-   * It is the application's exclusive operation until its Edit is applied
-   * (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`, "Other
-   * actions while a replacement runs"): every answer is withdrawn except
-   * `editResourceBody`, which is what keeps the replacement's own target mounted
-   * to show its answer.
+   * A replacement is the application's exclusive operation until its Edit is
+   * applied (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`,
+   * "Other actions while a replacement runs"; ADR 0112), wherever it began:
+   * every answer is withdrawn except `editResourceBody`, which is what keeps
+   * the replacement's own target mounted to show its answer. Several Edits
+   * move the address as well as authoring — New Map and New Graph continue in
+   * what they create, and deleting the selected Map reselects — so authoring
+   * and navigation are withdrawn together rather than one at a time.
+   *
+   * The open set answers it for every composed Space, as
+   * `OpenSpacesState.replacingImage`, and refuses navigation on the same answer
+   * (`packages/app/test/open-spaces.test.tsx`, `holds Back and Forward while an
+   * only-drawn Space replaces an image`); an isolated mount has no open set and
+   * answers with its own replacement alone
+   * (`packages/app/test/dock-navigation-hold.test.tsx`).
    */
   readonly replacingImage: boolean;
   /**
@@ -412,8 +422,8 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const selectNodes = !presenting;
 
   /**
-   * Only a replacement withholds navigating or replacing the session, which
-   * `authoringAvailability` answers over this result.
+   * Navigating and replacing the session are withheld only by a running
+   * replacement, in `authoringAvailability` over this result.
    */
   const navigate = true;
   const replaceSession = true;

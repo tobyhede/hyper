@@ -28,6 +28,7 @@ import {
 } from './command-dock';
 import { selectResource } from './resource-selection';
 import { unusedImageSources } from './image-sources';
+import { stubResizeObserver } from './resize-observer';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -207,20 +208,7 @@ const settled = (session: SpaceSession): Promise<void> =>
   waitFor(() => expect(session.getState().persistence.kind).toBe('settled'));
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
 });
 
 afterAll(() => vi.unstubAllGlobals());

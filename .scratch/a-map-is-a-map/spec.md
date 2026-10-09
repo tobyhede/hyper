@@ -1,6 +1,6 @@
 # A Map is a Map wherever it is drawn
 
-**Status:** implementation under verification
+**Status:** resolved
 
 Decision: ADR 0112. Blocked by PR #331 (image replacement owns its complete attempt), which composes one image replacement per Space.
 
@@ -27,7 +27,7 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 4. Only the root surface presents (ADR 0111).
 5. Surfaces nest by construction. A surface's policy is the lower of an inherited ceiling and its local state: read-only passes down, and every surface below the first embedded level is `inert` at most. Edit is offered only on a Space Resource in the root Map.
 6. One canvas selection names its surface's occurrence; keyboard, rail and Undo/Redo dispatch to it, otherwise to the root.
-7. Navigation is held while any composed Space — listed or only drawn — is replacing an image.
+7. Navigation is held while any composed Space — listed or only drawn — is replacing an image; ADR 0126 widens this to authoring, so a replacement anywhere is the application's exclusive operation.
 8. Per Space, from its composition: authoring, `commandOutcomes`, `deleteConfirmation`, image replacement, and Edge Authoring's completion and eligibility. Per surface: the render adapter. Per canvas, keyed by occurrence: the selection, continuation and in-progress gesture state.
 9. One notice area shows the outcomes of every Space drawn on the canvas.
 10. Pointer gestures land in the surface under the point; keyboard creation in the selection's surface; the Dock in the root Space. A drop on an inert or read-only surface is refused with wording.
@@ -62,16 +62,16 @@ One drawn-Map module — a *surface* in code — owns everything a Map does on t
 
 | # | | Blocked by | Status |
 | --- | --- | --- | --- |
-| 01 | The canvas's own Map is a surface | — | implementation under verification |
-| 02 | A Space is composed while anything holds it | — | implementation under verification |
-| 03 | Navigation is held while any composed Space replaces an image | 02 | implementation under verification |
-| 04 | One notice area for every drawn Space | 02 | implementation under verification |
-| 05 | One policy decides authoring, inert and read-only | 01 | implementation under verification |
-| 06 | An embedded Map is a surface over its own Space | 01, 02, 04, 05 | implementation under verification |
-| 07 | Each drawing has an occurrence that selection and continuation follow | 06 | implementation under verification |
-| 08 | Create inside an embedded Map | 07 | implementation under verification |
-| 09 | Entity menu and Replace inside an embedded Map | 03, 07 | implementation under verification |
-| 10 | Edges inside an embedded Map | 07 | implementation under verification |
+| 01 | The canvas's own Map is a surface | — | resolved |
+| 02 | A Space is composed while anything holds it | — | resolved |
+| 03 | Navigation is held while any composed Space replaces an image | 02 | resolved |
+| 04 | One notice area for every drawn Space | 02 | resolved |
+| 05 | One policy decides authoring, inert and read-only | 01 | resolved |
+| 06 | An embedded Map is a surface over its own Space | 01, 02, 04, 05 | resolved |
+| 07 | Each drawing has an occurrence that selection and continuation follow | 06 | resolved |
+| 08 | Create inside an embedded Map | 07 | resolved |
+| 09 | Entity menu and Replace inside an embedded Map | 03, 07 | resolved |
+| 10 | Edges inside an embedded Map | 07 | resolved |
 
 ## Out of scope
 

@@ -100,6 +100,9 @@ const compose = (opened: SpaceSnapshot = snapshot, images: ImageSources = unused
   });
 };
 
+/** The hold for a location whose open set is replacing no image. */
+const nothingHeld = (): boolean => false;
+
 /** An Image Resource no Map places, so a replacement has something to replace. */
 const IMAGE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
@@ -152,7 +155,9 @@ const deadPath = mapPath(MISSING_MAP_ID);
 it('holds Maps, Graphs and browser traversal during replacement, then permits navigation', async () => {
   const { app, replace, release } = composeReplacing();
   const history = recordingHistory(mapPath(MAP_ID));
-  const location = createBrowserLocation(history);
+  const location = createBrowserLocation(history, {
+    isNavigationHeld: () => app.imageReplacement.getState(),
+  });
   location.follow(app);
   const pending = replace();
   location.activateGraph(SECOND_GRAPH_ID);
@@ -174,9 +179,9 @@ it('holds Back, Forward and deliberate navigation when another composed Space re
   const app = compose();
   const other = composeReplacing();
   const history = recordingHistory(mapPath(MAP_ID));
-  const location = createBrowserLocation(history, undefined, undefined, () =>
-    other.app.imageReplacement.getState(),
-  );
+  const location = createBrowserLocation(history, {
+    isNavigationHeld: () => other.app.imageReplacement.getState(),
+  });
   location.follow(app);
   const pending = other.replace();
   location.activateGraph(SECOND_GRAPH_ID);
@@ -206,11 +211,14 @@ it('holds a Back refused by a replacement while a later held Back is still retur
   app.navigation.selectMap(OTHER_MAP_ID);
   const opened: string[] = [];
   const openings: PromiseWithResolvers<undefined>[] = [];
-  const location = createBrowserLocation(history, undefined, (pathname) => {
-    const opening = Promise.withResolvers<undefined>();
-    opened.push(pathname);
-    openings.push(opening);
-    return opening.promise;
+  const location = createBrowserLocation(history, {
+    openPath: (pathname) => {
+      const opening = Promise.withResolvers<undefined>();
+      opened.push(pathname);
+      openings.push(opening);
+      return opening.promise;
+    },
+    isNavigationHeld: () => app.imageReplacement.getState(),
   });
   location.follow(app);
   stand.back();
@@ -245,7 +253,7 @@ describe('the browser location', () => {
   it('writes nothing when it begins following, whatever the location says', () => {
     const app = compose();
     const history = recordingHistory(mapPath(OTHER_MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
 
     location.follow(app);
 
@@ -263,7 +271,7 @@ describe('the browser location', () => {
   it('writes nothing when the same position is decided a second time', () => {
     const app = compose();
     const history = recordingHistory(mapPath(OTHER_MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
 
     location.follow(app);
     location.follow(app);
@@ -282,7 +290,7 @@ describe('the browser location', () => {
   it('reports a Back onto a dead address rather than correcting it', () => {
     const app = compose();
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
     location.follow(app);
 
     history.popTo(deadPath);
@@ -308,7 +316,10 @@ describe('the browser location', () => {
     const history = recordingHistory(mapPath(MAP_ID));
     const refusal = Promise.reject(new Error('The URL is outside product addressing.'));
     const settled = refusal.catch(() => undefined);
-    const location = createBrowserLocation(history, undefined, () => refusal);
+    const location = createBrowserLocation(history, {
+      openPath: () => refusal,
+      isNavigationHeld: nothingHeld,
+    });
     location.follow(app);
 
     history.popTo('/not-a-product-url');
@@ -325,7 +336,10 @@ describe('the browser location', () => {
     const history = recordingHistory(mapPath(MAP_ID));
     const refusal = Promise.reject(new Error('The product URL does not resolve.'));
     const settled = refusal.catch(() => undefined);
-    const location = createBrowserLocation(history, undefined, () => refusal);
+    const location = createBrowserLocation(history, {
+      openPath: () => refusal,
+      isNavigationHeld: nothingHeld,
+    });
     location.follow(app);
 
     history.popTo(deadPath);
@@ -347,7 +361,7 @@ describe('the browser location', () => {
   it('corrects an unresolved location when a repeated Map choice answers the report', () => {
     const app = compose();
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
     location.follow(app);
     history.popTo(deadPath);
 
@@ -368,7 +382,7 @@ describe('the browser location', () => {
   it('clears the report and takes one entry when presenting moves off an unresolved location', () => {
     const app = compose();
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
     location.follow(app);
     history.popTo(deadPath);
 
@@ -387,7 +401,7 @@ describe('the browser location', () => {
   it('takes one entry for a presentation a self-Edge never moves', () => {
     const app = compose(selfEdge);
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
     location.follow(app);
 
     app.navigation.present();
@@ -414,7 +428,7 @@ describe('the browser location', () => {
         resourceId: RESOURCE_A,
       }),
     );
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
     location.follow(app);
     app.adapter.getState().syncProjection([], []);
     expect(location.getState().addressedResourceId).toBe(RESOURCE_A);
@@ -434,7 +448,9 @@ describe('the browser location', () => {
   /** The contrast the test above rests on: a Map choice *does* clear it. */
   it('clears the published projection when a choice changes the Map', () => {
     const app = compose();
-    const location = createBrowserLocation(recordingHistory(mapPath(MAP_ID)));
+    const location = createBrowserLocation(recordingHistory(mapPath(MAP_ID)), {
+      isNavigationHeld: nothingHeld,
+    });
     location.follow(app);
     app.adapter.getState().syncProjection([], []);
 
@@ -448,7 +464,7 @@ describe('the browser location', () => {
   it('resolves a destination against the current location for the clipboard', () => {
     const app = compose();
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
     location.follow(app);
 
     expect(location.href({ kind: 'map', spaceId: SPACE_ID, mapId: OTHER_MAP_ID })).toBe(
@@ -471,7 +487,7 @@ describe('the browser location', () => {
   it('restores a Back onto a resolvable Resource location without earning an entry', () => {
     const app = compose();
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
     location.follow(app);
     location.chooseMap(OTHER_MAP_ID);
     expect(history.writes).toEqual([{ method: 'push', path: mapPath(OTHER_MAP_ID) }]);
@@ -497,7 +513,7 @@ describe('the browser location', () => {
     const first = compose();
     const second = compose();
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
 
     location.follow(first);
     location.follow(second);
@@ -511,7 +527,7 @@ describe('the browser location', () => {
 
   it('releases the Back listener it registered when disposed', () => {
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
     location.follow(compose());
     expect(history.listenerCount()).toBe(1);
 
@@ -535,6 +551,7 @@ describe('the browser location', () => {
           resourceId: RESOURCE_B,
         }),
       ),
+      { isNavigationHeld: nothingHeld },
     );
 
     location.follow(app);

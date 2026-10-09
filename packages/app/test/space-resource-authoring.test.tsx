@@ -29,6 +29,7 @@ import { openTestSpace } from './opened-space';
 import type { SpaceResourceAuthoring } from '../src/space-resource-lifecycle';
 import { createResource, createResourceControl, unavailable } from './command-dock';
 import { unusedImageSources } from './image-sources';
+import { stubResizeObserver } from './resize-observer';
 
 /**
  * Creating a Space Resource, from the control an author actually has.
@@ -403,20 +404,7 @@ async function addExistingSpace(title: string): Promise<void> {
 }
 
 beforeAll(() => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe(): void {
-        return undefined;
-      }
-      unobserve(): void {
-        return undefined;
-      }
-      disconnect(): void {
-        return undefined;
-      }
-    },
-  );
+  stubResizeObserver();
   // Base UI's Select positioner measures, and jsdom ships neither pointer
   // capture nor `scrollIntoView`; both are reached before a list can open.
   HTMLElement.prototype.hasPointerCapture = () => false;
