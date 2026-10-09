@@ -33,39 +33,26 @@ it('takes Resource placement as one value', () => {
 });
 
 /**
- * Nothing the surface or its reading already answers is a prop, so the canvas
- * cannot draw one Map while its surface names another.
+ * The canvas takes its surface, that surface's reading, placement, and the
+ * Space-level collaborators no surface holds, and nothing else. Whatever the
+ * surface or its reading answers — the Map, its Graphs, the projection,
+ * selection and availability — is read from them, so the canvas cannot draw
+ * one Map while its surface names another. Any prop added or removed fails here.
  */
-it('takes nothing its surface or reading answers', () => {
-  type Answered =
-    | 'nodes'
-    | 'edges'
-    | 'projectedNodes'
-    | 'presenting'
-    | 'placementReady'
-    | 'availability'
-    | 'onNodesChange'
-    | 'onEdgesChange'
-    | 'edgeAuthoring'
-    | 'selection'
-    | 'onSelectResource'
-    | 'onSelectEdge'
-    | 'placedResources'
-    | 'newResourceTitle'
-    | 'onAddResource'
-    | 'onAddExistingResource'
-    | 'onPlaceSpace'
-    | 'onDropImages'
-    | 'onPasteImageUrl'
-    | 'authoring'
-    | 'onBodyEditingChange'
-    | 'onTitleEditingChange'
-    | 'resourceResize'
-    | 'reportEmbeddedMapEditing'
-    | 'mapId'
-    | 'mapTitle'
-    | 'graphs'
-    | 'colorByGraphId'
-    | 'activeGraphId';
-  expectTypeOf<Extract<keyof SpaceCanvasProps, Answered>>().toBeNever();
+it('takes exactly its surface, reading, placement and Space-level collaborators', () => {
+  expectTypeOf<keyof SpaceCanvasProps>().toEqualTypeOf<
+    | 'surface'
+    | 'reading'
+    | 'placement'
+    | 'onDrawnClipboardFailuresChange'
+    | 'onDrawnSpacesChange'
+    | 'commandOutcomes'
+    | 'deleteConfirmation'
+    | 'imageReplacement'
+    | 'nameOnCreation'
+    | 'spaceSession'
+    | 'spaceTitle'
+    | 'spaceResourceTargets'
+    | 'resourceEntityActions'
+  >();
 });

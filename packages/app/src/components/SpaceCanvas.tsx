@@ -62,7 +62,6 @@ import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
 import type { ResourcePlacementCommands } from '../resource-placement';
 import type { MapSurfaceReading } from '../use-map-surface';
-import { nextResourceTitle } from '../titles';
 import { useEdgeAuthoring } from '../edge-authoring-react';
 import { edgeSelectionOf, sameSelection } from '../render-adapter';
 import { MAX_ZOOM, OVERVIEW_FIT } from '../camera';
@@ -197,10 +196,9 @@ export interface SpaceCanvasProps {
   readonly surface: MapSurface;
   /**
    * What `useMapSurface` answers for `surface` this render. The canvas draws
-   * from it alone — the view its projection is built from, the render
-   * adapter's reading and the availability its surface's policy has narrowed —
-   * so the canvas and the Space's command surface cannot disagree about an
-   * operation they both offer (`CONTEXT.md`, Availability).
+   * from it alone: the view its projection is built from, the next Resource
+   * Title, the render adapter's reading and the availability its surface's
+   * policy has narrowed.
    */
   readonly reading: MapSurfaceReading;
   /** Every way a Resource arrives on this canvas: created, dropped or pasted. */
@@ -293,19 +291,20 @@ export function SpaceCanvas({
 }: SpaceCanvasProps) {
   const {
     view,
+    newResourceTitle,
     canvasRendering,
     availability,
-    setEditingResourceBody: onBodyEditingChange,
-    setEditingResourceTitle: onTitleEditingChange,
+    setEditingResourceBody,
+    setEditingResourceTitle,
   } = reading;
   const {
     liveProjection,
     projected,
     selection,
-    changeNodes: onNodesChange,
-    changeEdges: onEdgesChange,
-    selectResource: onSelectResource,
-    selectEdge: onSelectEdge,
+    changeNodes,
+    changeEdges,
+    selectResource,
+    selectEdge,
     resourceResize,
     reportEmbeddedMapEditing,
   } = canvasRendering;
@@ -335,8 +334,6 @@ export function SpaceCanvas({
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
   const mapTitle = view.selectedMap.map.title;
-  const working = spaceSession.getState().working;
-  const newResourceTitle = useMemo(() => nextResourceTitle(working), [working]);
   const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
   const addCanvasResource = useCallback(() => createResource('markdown'), [createResource]);
   const { screenToFlowPosition } = useReactFlow();
@@ -400,9 +397,9 @@ export function SpaceCanvas({
   const onPortalEditingChange = useCallback(
     (resourceId: ResourceId, editing: boolean) => {
       setPortalEditing(resourceId, editing);
-      if (!editing) onSelectResource(resourceId);
+      if (!editing) selectResource(resourceId);
     },
-    [setPortalEditing, onSelectResource],
+    [setPortalEditing, selectResource],
   );
 
   const drawnSpaces = useMemo(
@@ -502,7 +499,7 @@ export function SpaceCanvas({
                       label: 'Connect to Resource',
                       icon: <GraphIcon size={14} />,
                       onSelect: (opener) => {
-                        onSelectResource(resourceId);
+                        selectResource(resourceId);
                         setConnecting({ from: resourceId, anchor: opener, mapId });
                         return 'done';
                       },
@@ -510,7 +507,7 @@ export function SpaceCanvas({
                   ]
                 : [],
             ),
-    [resourceEntityActions, placedResources, onSelectResource, mapId],
+    [resourceEntityActions, placedResources, selectResource, mapId],
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
     continuation: surface.continuation,
@@ -522,7 +519,7 @@ export function SpaceCanvas({
     authoring,
     spaceSession,
     resourceResize,
-    onSelectResource,
+    onSelectResource: selectResource,
     imageReplacement,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
@@ -547,12 +544,12 @@ export function SpaceCanvas({
       embeddedPublications.get(request.parent.id)?.titleEditing === true,
   );
   useEffect(() => {
-    onBodyEditingChange(bodyEditing || embeddedBodyEditing);
-  }, [bodyEditing, embeddedBodyEditing, onBodyEditingChange]);
+    setEditingResourceBody(bodyEditing || embeddedBodyEditing);
+  }, [bodyEditing, embeddedBodyEditing, setEditingResourceBody]);
   useEffect(() => {
-    onTitleEditingChange(resourceAuthoring.titleEditing || embeddedTitleEditing);
-    return () => onTitleEditingChange(false);
-  }, [resourceAuthoring.titleEditing, embeddedTitleEditing, onTitleEditingChange]);
+    setEditingResourceTitle(resourceAuthoring.titleEditing || embeddedTitleEditing);
+    return () => setEditingResourceTitle(false);
+  }, [resourceAuthoring.titleEditing, embeddedTitleEditing, setEditingResourceTitle]);
   const liveEmbeddings = useMemo(
     () =>
       embeddedRequests.flatMap((request) => {
@@ -666,7 +663,7 @@ export function SpaceCanvas({
     placedResources,
     newResourceTitle,
     enabled: availability.authorOnCanvas,
-    onSelectEdge,
+    onSelectEdge: selectEdge,
     mayOfferAlso: mayOfferEmbedded,
   });
 
@@ -925,9 +922,9 @@ export function SpaceCanvas({
         else if (sameSelection(adapter.selection, subject)) adapter.clearSelection();
         return false;
       });
-      onEdgesChange(rootChanges);
+      changeEdges(rootChanges);
     },
-    [liveEmbeddings, onEdgesChange],
+    [liveEmbeddings, changeEdges],
   );
   // A stable identity, or React Flow warns of a fresh `edgeTypes` object (#002).
   const canvasEdgeTypes = useMemo(
@@ -936,10 +933,10 @@ export function SpaceCanvas({
   );
   const changeCanvasNodes: OnNodesChange<ResourceFlowNode> = useCallback(
     (changes) => {
-      onNodesChange(changes);
+      changeNodes(changes);
       for (const value of liveEmbeddings) value.changeNodes(changes);
     },
-    [onNodesChange, liveEmbeddings],
+    [changeNodes, liveEmbeddings],
   );
   const canvasRef = useRef<HTMLDivElement>(null);
   const portalGestureSnapshot = useRef({

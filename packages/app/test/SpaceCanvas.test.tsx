@@ -9,19 +9,17 @@ import {
   type ResourceNodeData,
 } from '@project/react-flow-adapter';
 import { RESOURCE_DRAG_TYPE, SPACE_DRAG_TYPE } from '../src/components/ResourcesPopover';
-import { authoringAvailability } from '../src/authoring-availability';
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
-import type { EdgeAuthoring } from '../src/edge-authoring';
 import { RESOURCE_SIZE } from '../src/resource';
 import type { ResourceResize } from '../src/render-adapter';
 import { mountSettled } from './settled-mount';
 import { CLOSED_DISPLAY } from '@project/ui';
 import { fixtureDisplay, fixtureFacts } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
-import type { SurfaceAuthoring } from '../src/space-authoring';
 import { stubResizeObserver } from './resize-observer';
-import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
+import { canvasReading, holdCanvasPolicy, IDLE_PLACEMENT } from './map-surfaces';
+import type { MapSurfacePolicy } from '../src/map-surface-policy';
 
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
@@ -106,39 +104,8 @@ interface Harness {
   readonly nodesChanged: ReturnType<typeof vi.fn>;
   /** What the canvas told its parent about a live Resource title edit. */
   readonly titleEditingChanged: ReturnType<typeof vi.fn>;
-}
-
-/**
- * An Edge Authoring that answers nothing, so these Resource-authoring tests are not
- * also exercising the Edge lifecycle. Its own behaviour is covered by
- * `edge-authoring.test.ts` and `edge-authoring-react.test.tsx`.
- */
-const IDLE_EDGE_STATE = { draft: null, refusal: null } as const;
-
-function inertEdgeAuthoring(): EdgeAuthoring {
-  return {
-    // One identity, because `useSyncExternalStore` re-renders on every changed
-    // snapshot: a fresh object per call is an infinite loop, not a stub detail.
-    getState: () => IDLE_EDGE_STATE,
-    subscribe: () => () => undefined,
-    eligibility: () => ({
-      kind: 'refused',
-      refusal: { code: 'map-required', operation: 'deleted-edge' },
-    }),
-    accepts: () => false,
-    beginPointerConnect: () => undefined,
-    connect: () => undefined,
-    createConnectedResource: () => undefined,
-    connectTo: () => ({ kind: 'unavailable' }),
-    endPointerDrag: () => undefined,
-    beginTitleEdit: () => undefined,
-    completeTitle: () => null,
-    setTitleHidden: () => false,
-    askToDelete: () => undefined,
-    deleteEdge: () => false,
-    cancelDraft: () => undefined,
-    dispose: () => undefined,
-  };
+  /** Re-render with the canvas's own surface held at `policy`. */
+  readonly holdPolicy: (policy: MapSurfacePolicy) => void;
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
@@ -160,7 +127,6 @@ async function mountGraph(
   const titleEditingChanged = vi.fn();
   const nodesChanged = vi.fn();
   let nodes = initialNodes;
-  const edgeAuthoring = inertEdgeAuthoring();
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
@@ -168,14 +134,11 @@ async function mountGraph(
     images: unusedImageSources,
     spaceSession,
   });
-  const testedAuthoring: SurfaceAuthoring = {
-    ...surface.authoring,
-    complete: (completion) => {
-      if (completion.kind === 'opened-resource') openResource(completion.resourceId);
-      return surface.authoring.complete(completion);
-    },
-  };
-  const canvasSurface = { ...surface, authoring: testedAuthoring, edgeAuthoring };
+  const complete = surface.authoring.complete;
+  vi.spyOn(surface.authoring, 'complete').mockImplementation((completion) => {
+    if (completion.kind === 'opened-resource') openResource(completion.resourceId);
+    return complete(completion);
+  });
   const placement = {
     ...IDLE_PLACEMENT,
     createResource: addResource,
@@ -185,25 +148,14 @@ async function mountGraph(
   const graph = () => (
     <ReactFlowProvider>
       <SpaceCanvas
-        surface={canvasSurface}
-        reading={canvasReading(canvasSurface, {
-          nodes,
-          hasResourcesOnCanvas: editable,
-          // The facts a mounted canvas is given, turned into answers by the one
-          // module that owns them: `titleEditing` is the chrome rename `App`
-          // reports — the fact that withdraws canvas authoring — and `editable`
-          // is a resolved placement.
-          availability: authoringAvailability({
-            editable,
-            replacingImage: false,
-            presenting: false,
-            editingResourceBody: false,
-            editingResourceTitle: false,
-            editingChromeTitle: !titleEditing,
-            spaceOnCanvas: true,
-            editingEmbeddedMap: false,
-            creatingSpaceResource: false,
-          }),
+        surface={surface}
+        reading={canvasReading(surface, {
+          // `editable` is whether the render adapter holds a projection; a
+          // canvas with none draws no Resource.
+          projection: editable ? { nodes, edges: [] } : null,
+          // `titleEditing` is the chrome rename `App` reports — the fact that
+          // withdraws canvas authoring.
+          facts: { editingChromeTitle: !titleEditing },
           changeNodes: nodesChanged,
           selectResource: onSelectResource,
           resourceResize,
@@ -237,6 +189,10 @@ async function mountGraph(
       view.rerender(graph());
     },
     rerender: () => view.rerender(graph()),
+    holdPolicy: (policy) => {
+      holdCanvasPolicy(surface, policy);
+      view.rerender(graph());
+    },
   };
 }
 
@@ -407,27 +363,15 @@ it.each(['Enter', ' '])('opens a focused Reference Resource with %s', async (key
   expect(openResource).toHaveBeenCalledWith(REFERENCE_ID);
 });
 
-describe.each([
-  ['Resource', resourceNode('A'), RESOURCE_ID],
-  ['Reference Resource', resourceNode('A again', REFERENCE_ID, false, 'reference'), REFERENCE_ID],
-] as const)('a focused %s while placement is pending', (_kind, projected, id) => {
-  it.each(['Enter', ' '])('does not open with %s', async (key) => {
-    const { openResource } = await mountGraph([projected], undefined, undefined, false);
-    const focused = nodeOf(id);
-    focused.focus();
+/**
+ * The render adapter holds no projection until the selected Map's placement
+ * resolves, and Resources are on the canvas exactly when it holds one — so
+ * while it is pending there is no Resource to focus, open or describe.
+ */
+it('draws no Resource while placement is pending', async () => {
+  const { view } = await mountGraph([resourceNode('A')], undefined, undefined, false);
 
-    fireEvent.keyDown(focused, { key });
-
-    expect(openResource).not.toHaveBeenCalled();
-  });
-
-  it('does not announce authoring keyboard commands', async () => {
-    await mountGraph([projected], undefined, undefined, false);
-
-    expect(nodeOf(id)).toHaveAccessibleDescription(
-      'This Resource is unavailable while placement is pending.',
-    );
-  });
+  expect(view.container.querySelector('.react-flow__node')).toBeNull();
 });
 
 describe('the Resource affordance', () => {
@@ -794,6 +738,18 @@ describe('the C shortcut', () => {
 
     expect(addResource).not.toHaveBeenCalled();
   });
+
+  it.each(['inert', 'read-only'] as const)(
+    'is withdrawn when the canvas surface is %s',
+    async (policy) => {
+      const { addResource, holdPolicy } = await mountGraph();
+
+      holdPolicy(policy);
+      fireEvent.keyDown(nodeOf(RESOURCE_ID), { key: 'c' });
+
+      expect(addResource).not.toHaveBeenCalled();
+    },
+  );
 
   /**
    * The canvas zoom controls render *inside* the wrapper this shortcut is

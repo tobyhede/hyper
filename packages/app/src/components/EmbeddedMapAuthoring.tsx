@@ -1,7 +1,6 @@
 import { ChromeContinuation } from './ChromeContinuation';
 import { GraphIcon } from '@project/ui';
 import { ResourceConnect, type Connecting } from './ResourceConnect';
-import { nextResourceTitle } from '../titles';
 import { useEdgeAuthoring, type EdgeDrawing } from '../edge-authoring-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { NodeChange } from '@xyflow/react';
@@ -98,6 +97,7 @@ export function EmbeddedMapAuthoring({
   }, [composition, mapId, graphId, policy, parentId]);
   const {
     view,
+    newResourceTitle,
     canvasRendering,
     availability,
     editingResourceBody,
@@ -304,7 +304,7 @@ export function EmbeddedMapAuthoring({
     activeGraphId: graphId,
     graphs: view.projection.visibleGraphs,
     placedResources: view.placedResources,
-    newResourceTitle: nextResourceTitle(entry.session.getState().working),
+    newResourceTitle,
     resourceNodeId,
     enabled: availability.authorOnCanvas,
     onSelectEdge: state.selectEdge,

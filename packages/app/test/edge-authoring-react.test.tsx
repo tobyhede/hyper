@@ -8,7 +8,6 @@ import { graphRenderEdgeId } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession, type SpaceSession } from '@project/persistence';
 import { bareKindData, ROUTED_EDGE_TYPE, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { CLOSED_DISPLAY, Toolbar, ToolbarButton } from '@project/ui';
-import { authoringAvailability } from '../src/authoring-availability';
 import { RESOURCES_TRIGGER } from '../src/components/command-dock-triggers';
 import { composeApp, type EdgeCollaborators } from '../src/compose-app';
 import type { ConnectionCompletion } from '../src/connection-completion';
@@ -350,19 +349,8 @@ function CanvasHarness({
       <SpaceCanvas
         surface={surface}
         reading={canvasReading(surface, {
-          nodes: projection?.nodes ?? [],
-          edges: projection?.edges ?? [],
-          availability: authoringAvailability({
-            editable: true,
-            replacingImage: false,
-            presenting,
-            editingResourceBody: false,
-            editingResourceTitle: false,
-            editingChromeTitle: covered,
-            spaceOnCanvas: true,
-            editingEmbeddedMap: false,
-            creatingSpaceResource: false,
-          }),
+          projection,
+          facts: { presenting, editingChromeTitle: covered },
           changeNodes: adapter.getState().changeNodes,
           changeEdges: adapter.getState().changeEdges,
           selection,

@@ -143,7 +143,6 @@ describe('useMapView', () => {
       { initialProps: { mapId: MAP_ID } },
     );
     const first = result.current;
-    expect(first.newResourceTitle).toMatch(/^Resource \d+$/u);
 
     rerender({ mapId: MAP_ID });
     expect(result.current.renderedSpace).toBe(first.renderedSpace);

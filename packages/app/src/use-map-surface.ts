@@ -1,9 +1,10 @@
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import type { ComposedApp } from './compose-app';
 import { useCanvasRendering } from './canvas-rendering';
 import type { MapSurface } from './map-surface';
 import { useAnySpaceReplacingImage } from './open-spaces-context';
 import { useAuthoringAvailability } from './use-authoring-availability';
+import { nextResourceTitle } from './titles';
 
 /** The same projection and availability for every drawing of a Map. */
 export function useMapSurface(
@@ -22,6 +23,8 @@ export function useMapSurface(
   );
   const anyReplacement = useAnySpaceReplacingImage();
   const view = surface.view();
+  const { working } = state.session;
+  const newResourceTitle = useMemo(() => nextResourceTitle(working), [working]);
   const canvasRendering = useCanvasRendering(surface.adapter, {
     projection: view.projection,
     mapPlacement: view.mapPlacement,
@@ -37,7 +40,7 @@ export function useMapSurface(
     state.replacementEpoch,
   );
   const offered = surface.availability(availability.availability);
-  return { view, canvasRendering, ...availability, availability: offered };
+  return { view, newResourceTitle, canvasRendering, ...availability, availability: offered };
 }
 
 /** What one drawing of a Map reads off its surface in a render. */

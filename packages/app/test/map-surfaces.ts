@@ -1,12 +1,13 @@
-import type { Edge } from '@xyflow/react';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import type { AuthoringAvailability } from '../src/authoring-availability';
+import type { AuthoringInProgress } from '../src/authoring-availability';
+import { authoringAvailability } from '../src/authoring-availability';
+import { canvasContent } from '../src/canvas-content';
 import type { CanvasRendering } from '../src/canvas-rendering';
 import type { SpaceCanvasProps } from '../src/components/SpaceCanvas';
 import type { MapSurface } from '../src/map-surface';
-import type { ResourceResize } from '../src/render-adapter';
+import type { Projection, ResourceResize } from '../src/render-adapter';
 import type { MapSurfaceReading } from '../src/use-map-surface';
 import type { MapSurfacePolicy } from '../src/map-surface-policy';
+import { nextResourceTitle } from '../src/titles';
 
 /**
  * Hold a canvas surface at one policy, at the Map and Graph it draws now.
@@ -30,41 +31,52 @@ const IDLE_RESIZE: ResourceResize = {
   cancelResize: ignore,
 };
 
+/**
+ * The availability facts a canvas test sets. `editable` and
+ * `editingEmbeddedMap` are absent because the reading answers them from its
+ * own render-adapter half, as `useMapSurface` does.
+ */
+export type CanvasFacts = Partial<Omit<AuthoringInProgress, 'editable' | 'editingEmbeddedMap'>>;
+
 /** The render adapter's reading, and the editing reports, a canvas test sets itself. */
-export interface CanvasReadingParts extends Partial<CanvasRendering> {
-  readonly availability: AuthoringAvailability;
-  /** What the adapter holds; the live projection's nodes. */
-  readonly nodes?: ResourceFlowNode[];
-  readonly edges?: Edge[];
+export interface CanvasReadingParts extends Partial<
+  Omit<CanvasRendering, 'liveProjection' | 'hasResourcesOnCanvas' | 'projected' | 'canvas'>
+> {
+  /**
+   * What the render adapter holds: `null` before it has taken a placement,
+   * which is also when no Resource is on the canvas. Empty by default.
+   */
+  readonly projection?: Projection | null;
+  readonly facts?: CanvasFacts;
   readonly setEditingResourceBody?: (editing: boolean) => void;
   readonly setEditingResourceTitle?: (editing: boolean) => void;
 }
 
 /**
  * A reading of `surface` as `useMapSurface` answers one, over the surface's
- * own view, with the render adapter's half and the availability set by the
- * test. Placement is ready unless the test says otherwise.
+ * own view. The test sets what the render adapter holds and the in-progress
+ * facts, with placement resolved. Whether Resources are on the canvas, what is
+ * projected and the canvas content follow from the held projection as
+ * `useCanvasRendering` derives them; availability is answered from the facts
+ * and narrowed by the surface's own policy.
  */
 export function canvasReading(
   surface: MapSurface,
   {
-    availability,
-    nodes = [],
-    edges = [],
+    projection = { nodes: [], edges: [] },
+    facts = {},
     setEditingResourceBody = ignore,
     setEditingResourceTitle = ignore,
     ...rendering
-  }: CanvasReadingParts,
+  }: CanvasReadingParts = {},
 ): MapSurfaceReading {
+  const hasResourcesOnCanvas = projection !== null;
+  const editingEmbeddedMap = rendering.editingEmbeddedMap ?? false;
   return {
     view: surface.view(),
+    newResourceTitle: nextResourceTitle(surface.authoring.getState().session.working),
     canvasRendering: {
       selection: { kind: 'none' },
-      liveProjection: { nodes, edges },
-      hasResourcesOnCanvas: true,
-      editingEmbeddedMap: false,
-      projected: null,
-      canvas: { kind: 'resources' },
       changeNodes: ignore,
       changeEdges: ignore,
       resourceResize: IDLE_RESIZE,
@@ -72,9 +84,30 @@ export function canvasReading(
       selectResource: ignore,
       selectEdge: ignore,
       ...rendering,
+      editingEmbeddedMap,
+      liveProjection: projection,
+      hasResourcesOnCanvas,
+      projected: projection,
+      canvas: canvasContent(
+        { kind: 'ready', strategyGraph: surface.view().projection.strategyGraph },
+        hasResourcesOnCanvas,
+      ),
     },
-    availability,
-    editingResourceBody: false,
+    availability: surface.availability(
+      authoringAvailability({
+        replacingImage: false,
+        presenting: false,
+        editingResourceBody: false,
+        editingResourceTitle: false,
+        editingChromeTitle: false,
+        spaceOnCanvas: true,
+        creatingSpaceResource: false,
+        ...facts,
+        editable: hasResourcesOnCanvas,
+        editingEmbeddedMap,
+      }),
+    ),
+    editingResourceBody: facts.editingResourceBody ?? false,
     setEditingResourceBody,
     setEditingResourceTitle,
     setEditingChromeTitle: ignore,
