@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/tobyhede/hyper/blob/main/docs/schema/resource/resource.schema.json",
-  "title": "Hyper Resource manifest",
+  "title": "Hyper Resource file",
   "description": "One Resource, as the file resources/<id>.json in a Space directory (ADR 0128). The envelope is the core's; content belongs to the kind and is validated by that kind's schema. Strict at both levels: the core refuses a top-level key it does not own, and the kind refuses a key inside content it does not declare.",
   "type": "object",
   "required": ["id", "title", "kind", "content"],

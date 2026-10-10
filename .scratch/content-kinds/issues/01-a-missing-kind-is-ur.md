@@ -22,7 +22,7 @@ Status: resolved
 
 ## Answer
 
-Built by c3abbdc ("Refuse unknown keys in Resource file frontmatter and read a missing kind as ur"), recorded as ADR 0127: `defaultUrKind` in `packages/core/src/schema.ts` supplies `ur`. ADR 0128 later reverses the default: once Resource files are JSON manifests, a missing `kind` is refused (`.scratch/resource-kind-modules/issues/07-json-manifests-on-disk.md`).
+Built by c3abbdc ("Refuse unknown keys in Resource file frontmatter and read a missing kind as ur"), recorded as ADR 0127: `defaultUrKind` in `packages/core/src/schema.ts` supplies `ur`. ADR 0128 later reverses the default: once Resource files are JSON, a missing `kind` is refused (`.scratch/resource-kind-modules/issues/07-json-resource-files-on-disk.md`).
 
 ## Comments
 

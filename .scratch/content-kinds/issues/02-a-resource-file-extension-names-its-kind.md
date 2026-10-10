@@ -15,7 +15,7 @@ The second changes the Aggregate directory format settled by ADR 0117 and ADR 01
 
 ## Answer
 
-ADR 0128 decides it, and takes neither option as written: every Resource file is a JSON manifest, `resources/<id>.json`, and only a Markdown Resource has a `.md` file, its body as a sidecar. Delivery is `.scratch/resource-kind-modules/issues/07-json-manifests-on-disk.md`.
+ADR 0128 decides it, and takes neither option as written: every Resource file is JSON, `resources/<id>.json`, and only a Markdown Resource has a `.md` file, its body as a sidecar. Delivery is `.scratch/resource-kind-modules/issues/07-json-resource-files-on-disk.md`.
 
 ## Comments
 

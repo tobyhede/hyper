@@ -1,6 +1,6 @@
 # Every Resource kind is a module
 
-Delivery for [ADR 0128](../../docs/adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-a-json-manifest.md), which refines ADR 0120, ADR 0020 and ADR 0127. The decision, its rejected options and its prior art are in the ADR; this file is the plan.
+Delivery for [ADR 0128](../../docs/adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md), which refines ADR 0120, ADR 0020 and ADR 0127. The decision, its rejected options and its prior art are in the ADR; this file is the plan.
 
 ## Where it starts
 
@@ -16,6 +16,6 @@ Each step is its own PR and leaves `main` green. The envelope comes first becaus
 1. `01` — the envelope document, no change in behaviour.
 2. `02` — the kind registry and module interface, with Ur moved onto it.
 3. `03`–`06` — one kind per step: Image, Markdown, Reference, Space. Each deletes that kind's branches outside its module.
-4. `07` — JSON manifests, the Markdown sidecar and the shared locator on disk; `kind` required.
+4. `07` — JSON Resource files, the Markdown sidecar and the shared locator on disk; `kind` required.
 
 When `06` lands, nothing outside a module names a kind id; `test/unit` gains a scan that holds that (see `06`).
