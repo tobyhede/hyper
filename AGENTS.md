@@ -108,7 +108,7 @@ Keep to the MVP. Don't over-generalize the domain model and don't add features b
 
 ### Workflow
 
-How work moves from a question to committed code: the grilling loop, when a decision earns an ADR, the rename rule, the verification bar. See `docs/agents/workflow.md`. The skills themselves are **tracked**: the files under `.agents/skills/` (where Codex looks), symlinked from `.claude/skills/` (where Claude Code looks), pinned by `skills-lock.json`. Both harnesses' paths are tracked deliberately — tracking one fixes only one. `workflow.md` remains the prose copy of the process, because a vendored third-party skill set can be updated out from under the repo and the loop is ours either way.
+How work moves from a question to committed code: the grilling loop, when a decision earns an ADR, the rename rule, the verification bar. See `docs/agents/workflow.md`. The skills themselves are **tracked**: the files under `.agents/skills/` (where Codex looks), symlinked from `.claude/skills/` (where Claude Code looks). `shadcn` is vendored from `shadcn/ui`, pinned by `skills-lock.json` and patched locally; `shadcn-first-ui`, `hyper-authoring` and `hyper-getting-started` are owned and reviewed here, and the lock does not pin them. Both harnesses' paths are tracked deliberately — tracking one fixes only one. `workflow.md` is the prose copy of the process, because no skill here carries the loop.
 
 ### Editing & persistence
 

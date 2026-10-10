@@ -16,13 +16,14 @@ test-results/
 !.env.example
 
 # Agent tooling. Session dirs and local settings are not project source, but the
-# installed skills ARE: an ordinary `git worktree add` populates only tracked
-# files, so ignoring them left every worktree running agents without the
-# grilling loop, tdd, domain-modeling and the rest. `.agents/skills/` is where
+# skills ARE: an ordinary `git worktree add` populates only tracked files, so an
+# ignored skill is missing from every worktree. The four are `shadcn`, vendored
+# and pinned by `skills-lock.json`, and the repo-owned `shadcn-first-ui`,
+# `hyper-authoring` and `hyper-getting-started`. `.agents/skills/` is where
 # Codex looks and holds the real files; `.claude/skills/` is where Claude Code
 # looks and holds symlinks into it — tracking only one fixes only one harness.
-# `skills-lock.json` rides along or the vendored copies have no recorded
-# upstream revision. The parents are `/*` rather than `/` because git will not
+# `skills-lock.json` rides along or the vendored copy has no recorded content
+# hash. The parents are `/*` rather than `/` because git will not
 # descend into an excluded directory, so a trailing-slash form cannot be negated.
 .agents/*
 !.agents/skills/
