@@ -63,7 +63,7 @@ const graph = (edges: Json[] = [edge()]) => ({
   edges,
 });
 const placement = () => ({ x: 0, y: 0, open: false });
-const map = (
+const mapEntry = (
   positions: Record<string, Json> = { [resourceA]: placement() },
   graphs: Json[] = [graph()],
 ) => ({
@@ -74,7 +74,7 @@ const map = (
   graphs,
   activeGraph: 'b0000000-0000-4000-8000-000000000002',
 });
-const space = (maps: Json[] = [map()]) => ({
+const space = (maps: Json[] = [mapEntry()]) => ({
   version: 1,
   id: '2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c',
   title: 'Rust async',
@@ -82,8 +82,8 @@ const space = (maps: Json[] = [map()]) => ({
   defaultMap: 'b0000000-0000-4000-8000-000000000001',
 });
 const withPlacement = (extra: Record<string, Json>) =>
-  space([map({ [resourceA]: { ...placement(), ...extra } })]);
-const withEdge = (next: Json) => space([map(undefined, [graph([next])])]);
+  space([mapEntry({ [resourceA]: { ...placement(), ...extra } })]);
+const withEdge = (next: Json) => space([mapEntry(undefined, [graph([next])])]);
 const { title: _title, ...untitledEdge } = edge();
 const hyper = { version: 1, metaSpaceId: '2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c' };
 
@@ -101,18 +101,18 @@ const spaceCases: [string, Json][] = [
   ['version 2', { ...space(), version: 2 }],
   ['an unknown top-level key', { ...space(), resources: [] }],
   ['an empty title', { ...space(), title: '' }],
-  ['a Map kind other than positioned', space([{ ...map(), kind: 'grid' }])],
-  ['a Map with no Graphs', space([map(undefined, [])])],
-  ['a position keyed by a non-Id', space([map({ nope: placement() })])],
+  ['a Map kind other than positioned', space([{ ...mapEntry(), kind: 'grid' }])],
+  ['a Map with no Graphs', space([mapEntry(undefined, [])])],
+  ['a position keyed by a non-Id', space([mapEntry({ nope: placement() })])],
   ['a misspelt placement key', withPlacement({ opne: true })],
   ['a Shape', withPlacement({ shape: 'pill' })],
   ['an unknown Shape', withPlacement({ shape: 'star' })],
   ['a size', withPlacement({ size: { width: 480, height: 320 } })],
   ['a size below the minimum', withPlacement({ size: { width: 100, height: 146 } })],
   ['an unknown size key', withPlacement({ size: { width: 300, height: 200, depth: 1 } })],
-  ['an unknown head shape', space([map(undefined, [{ ...graph(), headShape: 'none' }])])],
-  ['an empty colour', space([map(undefined, [{ ...graph(), color: '' }])])],
-  ['a Graph with no edges key', space([map(undefined, [{ title: 'G' }])])],
+  ['an unknown head shape', space([mapEntry(undefined, [{ ...graph(), headShape: 'none' }])])],
+  ['an empty colour', space([mapEntry(undefined, [{ ...graph(), color: '' }])])],
+  ['a Graph with no edges key', space([mapEntry(undefined, [{ title: 'G' }])])],
   ['an untrimmed Edge title', withEdge({ ...edge(), title: ' then' })],
   ['a two-line Edge title', withEdge({ ...edge(), title: 'a\nb' })],
   ['an empty Edge title', withEdge({ ...edge(), title: '' })],
