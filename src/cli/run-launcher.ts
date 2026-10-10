@@ -66,7 +66,9 @@ export const decodeRunCommand = (args: readonly string[]): RunCommand | undefine
 /**
  * The run process's own arguments, after node's: `run-process.ts` and the
  * encoded command. The process's command line ends with these, which is what
- * the `hyper-authoring` skill's check reads to find a run on a directory.
+ * the `hyper-authoring` skill's check reads to find a run on a directory;
+ * `test/unit/agent-skill-commands.test.ts`, "the hyper-authoring check that
+ * nothing is serving the directory", runs that check against them.
  */
 export const runProcessArguments = (command: RunCommand): readonly string[] => [
   RUN,

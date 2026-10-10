@@ -306,3 +306,83 @@ describe('a resource file that declares no kind is an Ur Resource', () => {
     }
   });
 });
+
+const intakeMessages = (text: string, path: string): string[][] =>
+  [parseResourceFile({ path, text }), parseImportResourceFile({ path, text })].map((result) =>
+    result.ok ? [] : result.errors.map(({ message }) => message),
+  );
+
+describe('resource file intake refuses a nested frontmatter key no kind declares', () => {
+  it('refuses a misspelt key inside an Image Resource naturalSize, naming it', () => {
+    const text = [
+      '---',
+      `id: ${RESOURCE_A}`,
+      'title: Picture',
+      'kind: image',
+      'url: https://example.com/a.png',
+      'naturalSize:',
+      '  width: 1',
+      '  height: 2',
+      '  widht: 3',
+      '---',
+      '',
+    ].join('\n');
+
+    for (const messages of intakeMessages(text, 'resources/picture.md')) {
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toContain('resources/picture.md');
+      expect(messages[0]).toContain("'widht'");
+    }
+  });
+
+  it('refuses a misspelt key inside a Space Resource framing, naming it', () => {
+    const text = [
+      '---',
+      `id: ${RESOURCE_A}`,
+      'title: Inner',
+      'kind: space',
+      `spaceId: ${RESOURCE_A}`,
+      `map: ${RESOURCE_A}`,
+      `graph: ${RESOURCE_A}`,
+      'framing:',
+      '  centreX: 0',
+      '  centreY: 0',
+      '  zoom: 1',
+      '  zooom: 2',
+      '---',
+      '',
+    ].join('\n');
+
+    for (const messages of intakeMessages(text, 'resources/inner.md')) {
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toContain('resources/inner.md');
+      expect(messages[0]).toContain("'zooom'");
+    }
+  });
+});
+
+describe('a blank body is no body', () => {
+  it('reads a kindless file whose closing fence is followed only by blank lines as an Ur Resource', () => {
+    for (const text of [
+      `---\nid: ${RESOURCE_A}\ntitle: Node\n---\n\n\n`,
+      `---\nid: ${RESOURCE_A}\ntitle: Node\n---\n \n`,
+      `---\nid: ${RESOURCE_A}\ntitle: Node\nkind: ur\n---\n\n\n`,
+    ]) {
+      expect(parseResourceFile({ path: 'resources/node.md', text })).toEqual({
+        ok: true,
+        resource: { id: RESOURCE_A, title: 'Node', kind: 'ur' },
+      });
+    }
+  });
+});
+
+describe('a kindless file carrying another kind’s key', () => {
+  it('tells the author the file declares no kind, and still names the key', () => {
+    const text = `---\nid: ${RESOURCE_A}\ntitle: Pointer\ntarget: 00000000-0000-4000-8000-000000000003\n---\n`;
+
+    for (const messages of intakeMessages(text, 'resources/pointer.md')) {
+      expect(messages.join('\n')).toContain("'target'");
+      expect(messages.join('\n')).toContain('kind:');
+    }
+  });
+});

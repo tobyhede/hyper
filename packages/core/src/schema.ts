@@ -105,6 +105,12 @@ export const referenceResourceFrontmatterSchema = z.object({
  * case the renderer fits the selected Map. It belongs here rather than on
  * the Map because two Space Resources may show the same Map differently.
  */
+const spaceResourceFramingSchema = z.object({
+  centreX: z.number().finite(),
+  centreY: z.number().finite(),
+  zoom: z.number().positive().finite(),
+});
+
 export const spaceResourceFrontmatterSchema = z.object({
   id: idSchema,
   title: resourceTitleSchema,
@@ -112,13 +118,7 @@ export const spaceResourceFrontmatterSchema = z.object({
   spaceId: idSchema,
   map: uuidSchema,
   graph: idSchema,
-  framing: z
-    .object({
-      centreX: z.number().finite(),
-      centreY: z.number().finite(),
-      zoom: z.number().positive().finite(),
-    })
-    .optional(),
+  framing: spaceResourceFramingSchema.optional(),
 });
 
 /** The refusal code for an image URL an Image Resource may not hold; the application owns the wording. */
@@ -199,23 +199,27 @@ export const urResourceFrontmatterSchema = z.object({
 
 const frontmatterRecordSchema = z.record(z.unknown());
 
-/**
- * A Resource file that declares no `kind` is an Ur Resource (ADR 0120): its
- * frontmatter is its id and Title, and nothing says how to read content, so the
- * default names no content kind. `decodeResourceFile` in `@project/graph` refuses
- * a body under such a file rather than guessing a kind for it.
- */
-const defaultUrKind = (value: unknown): unknown => {
-  const frontmatter = frontmatterRecordSchema.safeParse(value);
-  return frontmatter.success && !('kind' in frontmatter.data)
-    ? { ...frontmatter.data, kind: 'ur' }
-    : value;
+const frontmatterRecord = (value: unknown): Record<string, unknown> | undefined => {
+  const record = frontmatterRecordSchema.safeParse(value);
+  return record.success ? record.data : undefined;
 };
 
 /** Whether parsed frontmatter names its kind, rather than taking the `ur` default. */
 export const declaresResourceKind = (frontmatter: unknown): boolean => {
-  const record = frontmatterRecordSchema.safeParse(frontmatter);
-  return record.success && 'kind' in record.data;
+  const record = frontmatterRecord(frontmatter);
+  return record !== undefined && 'kind' in record;
+};
+
+/**
+ * A Resource file that declares no `kind` is an Ur Resource (ADR 0120): its
+ * frontmatter is its id and Title, and nothing says how to read content, so the
+ * default names no content kind. `decodeResourceFile` in `@project/graph` refuses
+ * a body under such a file (`packages/graph/test/resource-file.test.ts`, "refuses
+ * a body under frontmatter with no kind, telling the author to declare Markdown").
+ */
+const defaultUrKind = (value: unknown): unknown => {
+  const record = frontmatterRecord(value);
+  return record === undefined || declaresResourceKind(record) ? value : { ...record, kind: 'ur' };
 };
 
 /**
@@ -225,18 +229,28 @@ export const declaresResourceKind = (frontmatter: unknown): boolean => {
  * Title is an Ur Resource.
  *
  * Strict, as every `space.json` object is: a key no kind declares is refused,
- * naming the key, rather than dropped and lost on the next Export (ADR 0127).
- * Only file intake is strict. The per-kind objects stay non-strict because the
+ * naming the key, and so is one inside a nested object, `framing` or
+ * `naturalSize`, so no authored key is dropped on intake (ADR 0127). Only
+ * file intake is strict. The per-kind objects stay non-strict because the
  * stored document, HTTP and domain schemas are built from them, and those read
- * what Hyper's own code wrote.
+ * what Hyper's own code wrote. `.strict()` keeps the shape it is given, so the
+ * strict nested objects hold the same field rules as the shared ones
+ * (`packages/core/test/resource-document-equality.test.ts`).
  */
+const fileSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
+  framing: spaceResourceFramingSchema.strict().optional(),
+});
+const fileImageResourceFrontmatterSchema = imageResourceFrontmatterSchema.extend({
+  naturalSize: imageNaturalSizeSchema.strict().optional(),
+});
+
 export const resourceFrontmatterSchema = z.preprocess(
   defaultUrKind,
   z.discriminatedUnion('kind', [
     markdownResourceFrontmatterSchema.strict(),
     referenceResourceFrontmatterSchema.strict(),
-    spaceResourceFrontmatterSchema.strict(),
-    imageResourceFrontmatterSchema.strict(),
+    fileSpaceResourceFrontmatterSchema.strict(),
+    fileImageResourceFrontmatterSchema.strict(),
     urResourceFrontmatterSchema.strict(),
   ]),
 );
@@ -247,10 +261,10 @@ export const importMarkdownResourceFrontmatterSchema = markdownResourceFrontmatt
 export const importReferenceResourceFrontmatterSchema = referenceResourceFrontmatterSchema
   .extend({ id: uuidSchema.optional() })
   .strict();
-export const importSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema
+export const importSpaceResourceFrontmatterSchema = fileSpaceResourceFrontmatterSchema
   .extend({ id: uuidSchema.optional() })
   .strict();
-export const importImageResourceFrontmatterSchema = imageResourceFrontmatterSchema
+export const importImageResourceFrontmatterSchema = fileImageResourceFrontmatterSchema
   .extend({ id: uuidSchema.optional() })
   .strict();
 export const importUrResourceFrontmatterSchema = urResourceFrontmatterSchema

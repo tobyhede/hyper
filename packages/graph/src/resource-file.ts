@@ -46,7 +46,7 @@ interface FrontmatterSchema<T extends Frontmatter> {
     | { success: true; data: T }
     | {
         success: false;
-        error: { issues: { path: PropertyKey[]; message: string }[] };
+        error: { issues: { code: string; path: PropertyKey[]; message: string }[] };
       };
 }
 
@@ -113,22 +113,28 @@ function decodeResourceFile<T extends Frontmatter>(
 
   const parsed = schema.safeParse(yaml);
   if (!parsed.success) {
+    // A kindless file is read as an Ur Resource, so another kind's key is
+    // refused as unknown; the message says why the key is unknown.
+    const kindless = declaresResourceKind(yaml)
+      ? ''
+      : '; the file declares no kind, so it is read as an Ur Resource — declare its "kind:" if it is another kind';
     return {
       ok: false,
       errors: parsed.error.issues.map((issue) => ({
         kind: 'invalid-frontmatter',
         path: file.path,
-        message: `${file.path}: ${issue.path.join('.') || '(frontmatter)'}: ${issue.message}`,
+        message: `${file.path}: ${issue.path.join('.') || '(frontmatter)'}: ${issue.message}${
+          issue.code === 'unrecognized_keys' ? kindless : ''
+        }`,
       })),
     };
   }
 
   // Only a Markdown Resource owns the bytes after the frontmatter. Check before
   // constructing the domain value: the other schemas would otherwise strip a
-  // body as an unknown key and silently discard authored prose.
-  if (parsed.data.kind !== 'markdown' && split.body !== '') {
-    // A body is content only a kind can say how to read, so a file that
-    // declares no kind is not guessed to be Markdown for having one.
+  // body as an unknown key and silently discard authored prose. Blank lines
+  // after the fence are not a body.
+  if (parsed.data.kind !== 'markdown' && split.body.trim() !== '') {
     return fail(
       'invalid-frontmatter',
       declaresResourceKind(yaml)

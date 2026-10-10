@@ -1,5 +1,13 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -136,6 +144,33 @@ describe('the hyper-authoring check that nothing is serving the directory', () =
     mkdirSync(directory);
     const sibling = startRunOn(`${directory}-2`);
     expect(check(directory)).not.toContain(String(sibling.pid));
+  });
+
+  it('does not report nothing serving a directory it cannot enter', () => {
+    expect(check(join(parent, 'mistyped'))).not.toBe('');
+  });
+
+  // A symlink gives a directory two spellings. The run holds the one `runHyper`
+  // resolved: the physical `INIT_CWD` pnpm records for a relative `<dir>`, or
+  // the path as typed for an absolute one. The person may name either.
+  const spellingsOf = (name: string): { readonly physical: string; readonly linked: string } => {
+    const physical = join(realpathSync(parent), name);
+    const linked = join(parent, `${name}-link`);
+    mkdirSync(physical, { recursive: true });
+    symlinkSync(physical, linked);
+    return { physical, linked };
+  };
+
+  it('sees a run holding the physical path when the directory is named through a symlink', () => {
+    const { physical, linked } = spellingsOf('talk-relative');
+    const decoy = startRunOn(physical);
+    expect(check(linked)).toContain(String(decoy.pid));
+  });
+
+  it('sees a run started through a symlink when the directory is named by its physical path', () => {
+    const { physical, linked } = spellingsOf('talk-absolute');
+    const decoy = startRunOn(linked);
+    expect(check(physical)).toContain(String(decoy.pid));
   });
 });
 
