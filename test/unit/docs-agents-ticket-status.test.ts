@@ -1,35 +1,24 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { trackedFiles } from '../support/structural-scan';
 
 /**
  * AGENTS.md and `docs/agents/*.md` state build status, and some of it waits on
  * a `.scratch` ticket: a thing is unbuilt "until" a cited ticket lands, it
- * "waits on" a cited ticket, or a cited ticket's work is "being built". Once that ticket's `Status:` says it is
- * resolved, the sentence is false, and nothing but a reader notices. This reads
- * every such citation and fails when the ticket it waits on is resolved.
+ * "waits on" a cited ticket, a cited ticket's work is "being built", or an
+ * entry points at its "Open:" ticket. Once that ticket's `Status:` says it is
+ * closed, the sentence is false, and nothing but a reader notices. This reads
+ * every such citation and fails when the ticket it waits on is closed.
  *
- * Two scopes, because the claims are written differently. "until" and "waits
- * on" name their ticket in the same sentence. "being built" is a status written in an
- * entry's lead, with the ticket cited later in the same bullet or paragraph.
+ * Three scopes, because the claims are written differently. "until" and
+ * "waits on" name their ticket in the same sentence. "being built" is a status
+ * written in an entry's lead, with the ticket cited later in the same bullet,
+ * its sub-bullets or its paragraph. "Open:" is followed directly by its ticket.
  */
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
-
-/** The index modes of an ordinary blob; a tracked symlink is `120000`. */
-const REGULAR_FILE_MODES = new Set(['100644', '100755']);
-
-/** The repository's tracked regular files, the way `docs-agents-citation-accuracy.test.ts` reads them. */
-const trackedFiles = (): readonly string[] =>
-  execFileSync('git', ['ls-files', '--stage', '-z'], { cwd: repoRoot, encoding: 'utf8' })
-    .split('\0')
-    .flatMap((entry) => {
-      const separator = entry.indexOf('\t');
-      if (separator === -1) return [];
-      return REGULAR_FILE_MODES.has(entry.slice(0, 6)) ? [entry.slice(separator + 1)] : [];
-    });
 
 /** The agent docs this guard reads. */
 const isAgentDoc = (file: string): boolean =>
@@ -42,7 +31,7 @@ const isAgentDoc = (file: string): boolean =>
  */
 const TICKET_CITATION = /\.scratch\/([a-z0-9-]+)\/issues\/(\d+)(?:-[a-z0-9-]+)?(?:\.md)?/g;
 
-type Claim = 'until' | 'waits on' | 'being built';
+type Claim = 'until' | 'waits on' | 'being built' | 'open';
 
 interface TicketCitation {
   readonly doc: string;
@@ -53,15 +42,23 @@ interface TicketCitation {
   readonly number: string;
 }
 
-/** A bullet, a numbered step, a table row or a paragraph: each starts a new entry. */
+/**
+ * A top-level bullet, a numbered step, a table row or a paragraph: each starts
+ * a new entry. An indented sub-bullet stays in its parent's entry.
+ */
 const entriesOf = (text: string): readonly string[] =>
-  text.split(/\n\s*\n|\n(?=\s*(?:[-*]\s|\d+\.\s|\|))/);
+  text.split(/\n\s*\n|\n(?=(?:[-*]\s|\d+\.\s|\|))/);
 
 /**
- * Sentences end at `.`, `!` or `?` followed by space and a capital, a backtick,
- * a bracket or bold. A cited path's own dots are never followed by a space.
+ * Sentences end at `.`, `!` or `?` followed by space and a capital, a digit, a
+ * backtick, a bracket or bold, except after "e.g." and "i.e.". A cited path's
+ * own dots are never followed by a space. A sub-bullet starts a new sentence.
  */
-const sentencesOf = (entry: string): readonly string[] => entry.split(/(?<=[.!?])\s+(?=[A-Z*`([])/);
+const sentencesOf = (entry: string): readonly string[] =>
+  entry.split(/(?<=[.!?])(?<!\b(?:e\.g|i\.e)\.)\s+(?=[A-Z0-9*`([])|\n(?=\s*[-*]\s)/);
+
+/** "Open:" immediately followed by the ticket it points at, backticked or not. */
+const OPEN_POINTER = /\bOpen:\s*`?(\.scratch\/[^\s`]+)/g;
 
 const ticketsIn = (doc: string, claim: Claim, text: string): readonly TicketCitation[] =>
   [...text.matchAll(TICKET_CITATION)].map((match) => ({
@@ -72,10 +69,18 @@ const ticketsIn = (doc: string, claim: Claim, text: string): readonly TicketCita
     number: match[2] ?? '',
   }));
 
-/** Every ticket cited by an "until" or "waits on" sentence, or a "being built" entry, of one doc. */
+/** The ticket each "Open:" pointer in a text names. */
+const openPointersIn = (doc: string, text: string): readonly TicketCitation[] =>
+  [...text.matchAll(OPEN_POINTER)].flatMap((match) => ticketsIn(doc, 'open', match[1] ?? ''));
+
+/**
+ * Every ticket cited by an "until" or "waits on" sentence, a "being built"
+ * entry, or an "Open:" pointer, of one doc.
+ */
 const pendingCitations = (doc: string, text: string): readonly TicketCitation[] =>
   entriesOf(text).flatMap((entry) => [
     ...(/\bbeing built\b/i.test(entry) ? ticketsIn(doc, 'being built', entry) : []),
+    ...openPointersIn(doc, entry),
     ...sentencesOf(entry).flatMap((sentence) => [
       ...(/\buntil\b/i.test(sentence) ? ticketsIn(doc, 'until', sentence) : []),
       ...(/\bwaits on\b/i.test(sentence) ? ticketsIn(doc, 'waits on', sentence) : []),
@@ -93,13 +98,20 @@ const STATUS_LINE = /^\*{0,2}Status:\*{0,2}[ \t]+\**([A-Za-z-]+)/im;
 const ticketStatus = (ticket: string): string | null =>
   STATUS_LINE.exec(ticket)?.[1]?.toLowerCase() ?? null;
 
-/** The statuses that say a ticket's work has landed. */
-const RESOLVED_STATUSES = new Set(['resolved', 'done']);
+/** The statuses that close a ticket: its work landed, or it never will. */
+const CLOSED_STATUSES = new Set([
+  'resolved',
+  'done',
+  'implemented',
+  'built',
+  'wontfix',
+  'superseded',
+]);
 
 /** Reads a cited ticket's text, or answers `null` when no ticket has that number. */
 type TicketReader = (citation: TicketCitation) => string | null;
 
-/** Every citation that waits on a ticket which is resolved or does not exist. */
+/** Every citation that waits on a ticket which is closed or does not exist. */
 const staleCitationFaults = (
   citations: readonly TicketCitation[],
   readTicket: TicketReader,
@@ -109,7 +121,7 @@ const staleCitationFaults = (
     const ticket = readTicket(citation);
     if (ticket === null) return [`${where}, which names no ticket`];
     const status = ticketStatus(ticket);
-    return status !== null && RESOLVED_STATUSES.has(status) ? [`${where}, which is ${status}`] : [];
+    return status !== null && CLOSED_STATUSES.has(status) ? [`${where}, which is ${status}`] : [];
   });
 
 const trackedTicketReader =
@@ -120,7 +132,7 @@ const trackedTicketReader =
     return file === undefined ? null : readFileSync(join(repoRoot, file), 'utf8');
   };
 
-describe('an agent doc never waits on a resolved ticket', () => {
+describe('an agent doc never waits on a closed ticket', () => {
   const tracked = trackedFiles();
   const docs = tracked.filter(isAgentDoc);
 
@@ -130,7 +142,7 @@ describe('an agent doc never waits on a resolved ticket', () => {
     expect(docs).toContain('docs/agents/workflow.md');
   });
 
-  it('cites no resolved ticket beside "until", "waits on" or "being built"', () => {
+  it('cites no closed ticket beside "until", "waits on", "being built" or "Open:"', () => {
     const citations = docs.flatMap((doc) =>
       pendingCitations(doc, readFileSync(join(repoRoot, doc), 'utf8')),
     );
@@ -145,6 +157,10 @@ describe('the ticket-status guard', () => {
     ['size/02', '# 02: Resize\n\n**Status:** resolved\n'],
     ['seams/01', '# 01: One module\n\nStatus: done\n'],
     ['auto-arrange/01', '# 01: Auto-arrange\n\nStatus: ready-for-agent\n'],
+    ['closed/01', '# 01: Dropped\n\nStatus: wontfix\n'],
+    ['closed/02', '# 02: Replaced\n\n**Status:** superseded\n'],
+    ['closed/03', '# 03: Landed\n\nStatus: implemented\n'],
+    ['closed/04', '# 04: Landed\n\nStatus: built\n'],
   ]);
   const readFixture: TicketReader = ({ feature, number }) =>
     tickets.get(`${feature}/${number}`) ?? null;
@@ -219,6 +235,60 @@ describe('the ticket-status guard', () => {
       'Undo waits until history exists. The resize control is built (`.scratch/size/issues/02`).';
 
     expect(pendingCitations('AGENTS.md', doc)).toEqual([]);
+  });
+
+  it('fails "until" paired with a ticket the tracker has closed by any closing status', () => {
+    const doc = [
+      'Not built until `.scratch/closed/issues/01` lands.',
+      '',
+      'Not built until `.scratch/closed/issues/02` lands.',
+      '',
+      'Not built until `.scratch/closed/issues/03` lands.',
+      '',
+      'Not built until `.scratch/closed/issues/04` lands.',
+    ].join('\n');
+
+    expect(staleCitationFaults(pendingCitations('AGENTS.md', doc), readFixture)).toEqual([
+      'AGENTS.md says "until" citing .scratch/closed/issues/01, which is wontfix',
+      'AGENTS.md says "until" citing .scratch/closed/issues/02, which is superseded',
+      'AGENTS.md says "until" citing .scratch/closed/issues/03, which is implemented',
+      'AGENTS.md says "until" citing .scratch/closed/issues/04, which is built',
+    ]);
+  });
+
+  it('fails an "Open:" pointer to a resolved ticket', () => {
+    const doc =
+      '- **ADR 0095 — one repository — built.** The SQL guide. Open: `.scratch/size/issues/02`.';
+
+    expect(staleCitationFaults(pendingCitations('AGENTS.md', doc), readFixture)).toEqual([
+      'AGENTS.md says "open" citing .scratch/size/issues/02, which is resolved',
+    ]);
+  });
+
+  it('reads a "being built" entry together with its indented sub-bullets', () => {
+    const doc = [
+      '- **ADR 0064 — being built.** Open and Close author Open alone.',
+      '  - Delivery: `.scratch/seams/issues/01-one-module.md`.',
+    ].join('\n');
+
+    expect(staleCitationFaults(pendingCitations('AGENTS.md', doc), readFixture)).toEqual([
+      'AGENTS.md says "being built" citing .scratch/seams/issues/01-one-module.md, which is done',
+    ]);
+  });
+
+  it('ends an "until" sentence before a sentence that starts with a digit', () => {
+    const doc =
+      'Undo waits until history exists. 3 Resources are built by `.scratch/size/issues/02`.';
+
+    expect(pendingCitations('AGENTS.md', doc)).toEqual([]);
+  });
+
+  it('keeps an "e.g." citation in its "until" sentence', () => {
+    const doc = 'Not built until a later ticket lands, e.g. `.scratch/size/issues/02`.';
+
+    expect(staleCitationFaults(pendingCitations('AGENTS.md', doc), readFixture)).toEqual([
+      'AGENTS.md says "until" citing .scratch/size/issues/02, which is resolved',
+    ]);
   });
 
   it('reports a citation that names no ticket', () => {

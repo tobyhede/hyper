@@ -30,10 +30,12 @@ current words:
 | Written | Read as |
 | --- | --- |
 | Card, Thing | Resource |
-| Layout, Diagram, View | Map |
+| Layout, Diagram | Map |
+| View | a Map as drawn on the canvas, which is not a domain entity |
 | Alias, Reference Thing | Reference Resource |
 
-`CONTEXT.md`'s _Avoid_ entries name the ADR that retired each word.
+`CONTEXT.md`'s _Avoid_ entries name the ADR that retired Card, Thing, Layout
+and Diagram.
 
 `test/unit/adr-status-blocks.test.ts` holds the status blocks to their
 convention: one-word `Status:`, reciprocal `Refines`/`Refined by` and

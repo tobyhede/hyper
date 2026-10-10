@@ -23,7 +23,7 @@ The rest of the file carries no lineage, and the refusal-cascade guide is listed
 
 ## Answer
 
-**Size:** 68,871 bytes at the audit, 40,930 after tickets 05–07, **34,132 bytes** now (`wc -c AGENTS.md`), against the recorded target of at most 45,000: 50% smaller than the audit.
+**Size:** 68,871 bytes at the audit (this branch at `fb0397b6`; `main` holds 68,616), 40,930 after tickets 05–07, **33,440 bytes** now (`wc -c AGENTS.md`, after the review fixes), against the recorded target of at most 45,000: 51% smaller than the audit.
 
 **Rules block.** "Rules that bite" follows the one-paragraph summary, before any long entry. Each rule links to its explanation: `shadcn-first-ui` to the skill and `ui.md`; dev servers to Commands, "Dev"; `newId` to `anti-slop.md`'s new section; extensionless relative imports and `import type` to Conventions; the suppressions file to `anti-slop.md`, "The suppressions baseline"; Vite configs to `build-tooling.md`; `test/e2e/` to Commands, "E2E". The "only source of state" paragraph has its own heading after it.
 

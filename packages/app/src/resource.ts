@@ -2,10 +2,13 @@
  * The Closed Size, read from `COLLAPSED_RESOURCE_SIZE` in `@project/core` and
  * handed to the stylesheet.
  *
- * It is the size of a Resource whose Map entry authors none, and the floor every
- * authored size keeps (`resourceSize` in `@project/core`). A Resource's size is
- * authored and independent of Open: Resize changes it, Open and Close do not
- * (ADR 0122). So a measured DOM size never decides placement here, the way it
+ * It is the size of a Resource whose Map entry authors none (`resourceSize` in
+ * `@project/core`), and the floor every authored size keeps, which the Map
+ * entry's size schema enforces (`packages/core/test/schema.test.ts`, "refuses a
+ * size below the Closed Size on either axis, Open or Closed"). A Resource's size
+ * is authored and independent of Open: Resize changes it, Open and Close do not
+ * (`packages/app/test/space-authoring-operations.test.ts`, "Resource size and
+ * Open"). So a measured DOM size never decides placement here, the way it
  * must in a layout whose nodes are content-sized: content adapts to the
  * Resource, not the Resource to its content.
  *

@@ -96,9 +96,10 @@ export default {
    * entry in `.claude/skills/` (`hyper-authoring`, `hyper-getting-started`,
    * `shadcn`, `shadcn-first-ui`) is a git-tracked symlink to a *directory*
    * under `.agents/skills/` (deliberately — CLAUDE.md tracks both harnesses'
-   * skill paths; `test/unit/agent-skill-symlinks.test.ts` holds the mirror). Copying a directory symlink that way fails on
-   * macOS with `ENOTSUP: operation not supported on socket, copyfile`, which
-   * kills the run before any mutant is tested.
+   * skill paths; `test/unit/agent-skill-symlinks.test.ts` holds the mirror).
+   * Copying a directory symlink that way fails on macOS with `ENOTSUP:
+   * operation not supported on socket, copyfile`, which kills the run before
+   * any mutant is tested.
    *
    * `.worktrees/**` is load-bearing for a different reason: a git worktree is a
    * full checkout, so without it every branch checked out beside this one is

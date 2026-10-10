@@ -245,10 +245,10 @@ The vendored files differ from upstream in three ways:
 - `SKILL.md`'s opening note tells the agent to run the CLI through the project's package runner at that version, and `mcp.md`'s setup runs `pnpm dlx shadcn@<version>` rather than a bare `shadcn`. No test holds these.
 - `registry.md` warns that a workflow, template or MCP registry item changes what an agent does, and that it is previewed with `--dry-run`, `--diff` or `--view` before it is applied. `agent-skill-commands` holds the preview flags.
 
-An upstream update overwrites all three. After one, re-apply them (`git log -p -- .agents/skills/shadcn` shows the edits as made), run `agent-skill-commands`, then re-record the hash. The hash is SHA-256 over the skill directory's files, sorted by relative path with `localeCompare`, feeding each file's relative path and then its bytes:
+An upstream update overwrites all three. After one, re-apply them (`git log -p -- .agents/skills/shadcn` shows the edits as made), run `agent-skill-commands`, then re-record the hash. The hash is SHA-256 over the skill directory's git-tracked files, sorted by relative path with `localeCompare`, feeding each file's relative path and then its bytes. Upstream `skills` walks the working tree instead, so the two agree on a clean checkout; hashing the tracked set keeps an untracked file in the directory out of the result, so `git add` any file the update brings before hashing:
 
 ```sh
-node -e "const{createHash}=require('node:crypto'),fs=require('node:fs'),p=require('node:path');const d='.agents/skills/shadcn',w=r=>fs.readdirSync(p.join(d,r),{withFileTypes:true}).flatMap(e=>e.isDirectory()?w(p.join(r,e.name)):[p.join(r,e.name)]),h=createHash('sha256');for(const f of w('').sort((a,b)=>a.localeCompare(b))){h.update(f);h.update(fs.readFileSync(p.join(d,f)))}console.log(h.digest('hex'))"
+node -e "const{createHash}=require('node:crypto'),fs=require('node:fs'),{execFileSync}=require('node:child_process');const d='.agents/skills/shadcn/',h=createHash('sha256');for(const f of execFileSync('git',['ls-files','-z','--',d],{encoding:'utf8'}).split('\0').filter(Boolean).map(f=>f.slice(d.length)).sort((a,b)=>a.localeCompare(b))){h.update(f);h.update(fs.readFileSync(d+f))}console.log(h.digest('hex'))"
 ```
 
 Write the result into `skills-lock.json`'s `computedHash`.
