@@ -8,17 +8,20 @@ Your work is a directory of plain files, an [Aggregate directory](docs/aggregate
 
 ## Quick start
 
-You need Node ≥ 26.8.1 and pnpm 9.
+You need Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install pnpm with `npm install -g pnpm@9` if you do not have it.
 
 ```sh
 git clone https://github.com/tobyhede/hyper.git
 cd hyper
 pnpm install
+git init ~/talks/rust-async
 pnpm hyper init ~/talks/rust-async
+git -C ~/talks/rust-async add -A
+git -C ~/talks/rust-async commit -m "New talk"
 pnpm hyper run ~/talks/rust-async
 ```
 
-`init` writes a new aggregate to `~/talks/rust-async`, which must be missing or empty, and prints the command that runs it. `run` prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
+`init` writes a new aggregate to `~/talks/rust-async`, which must be empty apart from dot-entries such as `.git`, and prints the command that runs it. Committing what it wrote before the first run gives git a revision to restore. `run` prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
 
 1. Edit. Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go.
 2. Press **Present** to traverse the Graph: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the Map.
@@ -27,7 +30,6 @@ pnpm hyper run ~/talks/rust-async
 
    ```sh
    cd ~/talks/rust-async
-   git init        # the first time only
    git add -A
    git commit -m "First draft"
    ```
@@ -45,7 +47,7 @@ Run `pnpm hyper run` from the Hyper clone every time, pointing at whichever dire
 - **Hyper writes only its own files, in place.** It writes `hyper.json`, the Space directories' `space.json` and Resource files, and `images/`, changing only the files whose content changed. Anything else in the directory, such as `.git`, a README or a `notes/` directory, is left alone, and the directory itself is never moved or recreated. A crash in the middle of a write can leave some files new and some old; git restores them.
 - **A `*.md` file beside `space.json` is removed by the next write.** Hyper reads every Markdown file in a Space's directory and its `resources/` directory as a Resource, and rewrites them all. Keep your own notes elsewhere, for example in a `notes/` directory: other files and directories are left alone.
 - **Pictures are written to `images/`.** A picture you upload is written to the directory's `images/`, named by its content, so committing the directory commits the picture. A picture linked by `https:` URL stays a link.
-- **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm hyper init` command that creates one there, so a mistyped path never becomes a new aggregate. Dot-entries such as `.git` and `.DS_Store` do not count, so `git init` before `init` is fine. A directory that is not a valid Aggregate directory is refused, with its problems printed, and nothing is served; fix the files and start again. A run with no edits leaves the directory byte-for-byte as it was.
+- **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm hyper init` command that creates one there, so a mistyped path never becomes a new aggregate. Dot-entries such as `.git` and `.DS_Store` do not count, so `git init` before `init` is fine. A directory that is not a valid Aggregate directory is refused, with its problems printed, and nothing is served; fix the files and start again. A run with no edits leaves the directory byte-for-byte as it was. Opening a Space in the browser can itself be an edit: a Space that names no `defaultMap`, or a Meta Space with no Map, records one when it is first opened.
 - **Ports and the browser.** Hyper serves on port 4173, or the next free port if that one is taken. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running Hyper headless or from an agent:
 
   ```sh
@@ -56,10 +58,12 @@ The file format, including what Hyper keeps and removes when it writes, is descr
 
 ## Using Hyper with agents
 
-This repository carries two agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`:
+This repository carries four agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`. Two are for using Hyper:
 
 - **`hyper-getting-started`**: sets a person up from a fresh clone: checks Node and pnpm, installs, chooses or creates the content directory as its own git repository, and starts a run.
 - **`hyper-authoring`**: writes or changes an Aggregate directory as files: Spaces, Resources, Maps, Graphs, Edges and pictures. It stops the run first, because Hyper's next write would replace edits made underneath it.
+
+The other two, `shadcn-first-ui` and `shadcn`, are for developing Hyper's own UI.
 
 ## Developing Hyper
 
@@ -188,7 +192,7 @@ A pnpm workspace with strict TypeScript and enforced package boundaries:
 
 Design rules kept throughout: domain logic stays out of React components, React Flow specifics stay in the adapter, and app wiring stays in `@project/app`.
 
-**Graphs as colour-coded flows.** Each authored Edge becomes a coloured drawn Edge. Every Resource carries four Edge anchors, one on each side, and an Edge attaches to whichever anchor faces the other Resource — decided while the Edge is drawn, from where the two Resources are at that moment, so the attachment follows a drag (ADR 0087). `@project/graph` derives the Edges (`buildGraphRenderEdges`) and assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/react-flow-adapter` applies a `LayoutStrategy`, colours the projection (`projectResourceNodes`, `projectGraphEdges`) and chooses each Edge's two anchors (`edge-attachment.ts`). Switching Graphs changes emphasis, not visibility or placement.
+**Graphs as colour-coded flows.** Each authored Edge becomes a coloured drawn Edge. Every Resource carries four Edge anchors, one on each side, and an Edge attaches to whichever anchor faces the other Resource — decided while the Edge is drawn, from where the two Resources are at that moment, so the attachment follows a drag (ADR 0087). `@project/graph` derives the Edges (`buildGraphRenderEdges`) and assembles the graph to arrange (`buildLayoutStrategyGraph`); `@project/app` applies a `LayoutStrategy`; `@project/react-flow-adapter` colours the projection (`projectResourceNodes`, `projectGraphEdges`) and chooses each Edge's two anchors (`edge-attachment.ts`). Switching Graphs changes emphasis, not visibility or placement.
 
 **Maps and layout strategies.** A **Map** is authored data: a named Resource-to-position mapping stored with the Space. A **LayoutStrategy** is behaviour: it takes the layout-strategy graph to arrange and asynchronously returns that same value with positions on its Resources ([ADR 0014](docs/adr/0014-layout-is-the-authored-data-strategy-is-the-behaviour.md)):
 
@@ -198,7 +202,7 @@ type LayoutStrategy = (graph: LayoutStrategyGraph) => Promise<LayoutStrategyGrap
 
 Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy that places Resources on a grid, and nothing selects it today. `positionedStrategy` reads an authored Map, and it is what the canvas draws. An automatic layout returns as a destructive Edit over a Map rather than as a render path ([ADR 0086](docs/adr/0086-automatic-arrangement-is-an-edit-not-a-render-path.md)). Where an Edge attaches is the render layer's own question. Which Resources a strategy arranges is the view's choice, not the strategy's.
 
-**Resources.** The graph draws a Closed Resource's **Title**, not its content. Opening a Resource grows it in place and shows its content ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md)); editing its source is a separate action. The same Markdown renderer draws the Active Resource on the Stage while Presenting. A Resource occupies exactly one position in a Map; showing the same content at a second position is the job of a Reference Resource ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
+**Resources.** The graph draws a Closed Resource's **Title**, not its content. Opening a Resource shows its content inside the same rect, which Open never resizes or moves ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md), [ADR 0122](docs/adr/0122-a-resources-size-is-independent-of-open.md)); editing its source is a separate action. The same Markdown renderer draws the Active Resource on the Stage while Presenting. A Resource occupies exactly one position in a Map; showing the same content at a second position is the job of a Reference Resource ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 
 **The browser never touches files.** It lists, opens and commits Spaces over HTTP and nothing else. Reading and writing an Aggregate directory is server-side: the `hyper` CLI's `init`, `run`, `import` and `export`.
 
@@ -214,7 +218,7 @@ Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy 
 ### Current limitations
 
 - **No undo inside the application.** Under `pnpm hyper run`, git is the undo.
-- **Overlay legibility.** The graph draws every Graph at once, at the positions the Map authored. An Edge runs backward whenever the author placed its target left of its source — which two Graphs disagreeing about the order of Resources they share will force on one of them — and nothing routes an Edge around a Resource: every Edge is the bezier React Flow draws, so a backward one curls back on itself. See [`.scratch/multiple-routes/findings.md`](.scratch/multiple-routes/findings.md).
-- **Closed Resources are a fixed shape.** A Closed Resource draws its Title, so every Closed Resource is the same size — declared once in `packages/app/src/resource.ts` as a 16:9 ratio and consumed by both the layout and the stylesheet. Content adapts to the Resource, not the reverse, which is why a measured DOM size never decides placement.
+- **Overlay legibility.** The graph draws every Graph at once, at the positions the Map authored. An Edge runs backward whenever the author placed its target left of its source — which two Graphs disagreeing about the order of Resources they share will force on one of them — and nothing routes an Edge around a Resource: every Edge is the bezier React Flow draws, so a backward one curls back on itself.
+- **A Resource's size is authored, never measured.** Any placement may carry a `size`, no smaller than the Closed Size (260×146) on either axis, which is also its default whether the Resource is Open or Closed; only an Ur Resource may take a `shape` other than a rectangle. The Closed Size is declared once, as `COLLAPSED_RESOURCE_SIZE` in `packages/core/src/resource-geometry.ts`. Content adapts to the Resource, not the reverse, which is why a measured DOM size never decides placement.
 - **No speaker view, timer, transitions or export to another presentation format.** They return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
 - The production bundle ships React Flow in a single chunk — fine for a prototype, not tuned for size. Remeasured after elkjs left: the entry chunk is ~1.2 MB (381 kB gzipped) beside ~106 kB of CSS, and `MarkdownSourceEditor` is split out as a further ~623 kB fetched on first edit.

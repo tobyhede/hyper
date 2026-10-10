@@ -1,8 +1,11 @@
 import type { ResourceFile } from '@project/graph';
 
-/** A resource as it is authored: one file, frontmatter then body (ADR 0020). */
+/** A Markdown resource as it is authored: one file, frontmatter then body (ADR 0020). */
 export function resourceFile(id: string, title = defaultTitle(id), body = ''): ResourceFile {
-  return { path: `resources/${id}.md`, text: `---\nid: ${id}\ntitle: ${title}\n---\n\n${body}` };
+  return {
+    path: `resources/${id}.md`,
+    text: `---\nid: ${id}\ntitle: ${title}\nkind: markdown\n---\n\n${body}`,
+  };
 }
 
 const DEFAULT_TITLES = new Map([

@@ -134,6 +134,11 @@ describe('a stored markdown document is the resource less its id', () => {
  * The Image Resource's URL rule is one rule at every door (ADR 0106): the stored
  * document, the Resource and the import variant each hold the same instance of
  * every field schema but the id, so a URL one refuses the others refuse too.
+ *
+ * `naturalSize` is the one field whose object differs: file intake makes it
+ * strict (ADR 0127), so the import holds a strict copy of the shared object.
+ * What it must still share is that object's field rules, `width` and
+ * `height`, and that is what is asserted for it.
  */
 describe('an Image Resource is held to one rule at every door', () => {
   const RESOURCE_ID = '00000000-0000-4000-8000-000000000002';
@@ -153,10 +158,32 @@ describe('an Image Resource is held to one rule at every door', () => {
       expect(schema, `the document's "${field}" is not the resource's`).toBe(
         resourceFieldSchemas[field],
       );
+      if (field === 'naturalSize') continue;
       expect(schema, `the import's "${field}" is not the resource's`).toBe(
         importFieldSchemas[field],
       );
     }
+
+    const resourceSizeRules: ZodRawShape = imageResourceSchema.shape.naturalSize.unwrap().shape;
+    const importSizeRules: ZodRawShape =
+      importImageResourceFrontmatterSchema.shape.naturalSize.unwrap().shape;
+    expect(Object.keys(importSizeRules).sort()).toEqual(Object.keys(resourceSizeRules).sort());
+    for (const [field, schema] of Object.entries(resourceSizeRules)) {
+      expect(schema, `the import's "naturalSize.${field}" is not the resource's`).toBe(
+        importSizeRules[field],
+      );
+    }
+  });
+
+  it('refuses an unknown naturalSize key at import and not at the non-strict resource', () => {
+    const document = {
+      title: 'A',
+      kind: 'image',
+      url: 'https://example.com/a.png',
+      naturalSize: { width: 1, height: 2, widht: 3 },
+    };
+    expect(importImageResourceFrontmatterSchema.safeParse(document).success).toBe(false);
+    expect(imageResourceSchema.safeParse({ ...document, id: RESOURCE_ID }).success).toBe(true);
   });
 
   it.each([

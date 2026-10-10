@@ -1,6 +1,7 @@
 ---
 id: 00000000-0000-4000-8000-000000000003
 title: B
+kind: markdown
 ---
 
 Resource B is on the shared spine of the first collection.

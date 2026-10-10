@@ -18,7 +18,7 @@ function file(id: string, frontmatter: Record<string, string>, body: string): Re
 }
 
 export function resourceFile(id: string, title = defaultTitle(id), body = ''): ResourceFile {
-  return file(id, { id, title }, body);
+  return file(id, { id, title, kind: 'markdown' }, body);
 }
 
 export function referenceFile(id: string, title: string, target: string): ResourceFile {

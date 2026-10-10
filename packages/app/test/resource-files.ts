@@ -1,7 +1,7 @@
 import type { ResourceFile } from '@project/graph';
 
 /**
- * A resource as it is authored: one file, frontmatter then body (ADR 0020).
+ * A Markdown resource as it is authored: one file, frontmatter then body (ADR 0020).
  *
  * The title is written as a **quoted** scalar. JSON's own quoting is YAML's
  * double-quoted form, so it escapes what YAML would otherwise read as
@@ -12,7 +12,7 @@ import type { ResourceFile } from '@project/graph';
 export function resourceFile(id: string, title = defaultTitle(id), body = ''): ResourceFile {
   return {
     path: `resources/${id}.md`,
-    text: `---\nid: ${id}\ntitle: ${JSON.stringify(title)}\n---\n\n${body}`,
+    text: `---\nid: ${id}\ntitle: ${JSON.stringify(title)}\nkind: markdown\n---\n\n${body}`,
   };
 }
 

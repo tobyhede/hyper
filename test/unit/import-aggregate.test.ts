@@ -137,7 +137,7 @@ const writeMetaOnlyAggregate = (
     {
       name: metaSpaceId,
       spaceFile: JSON.stringify({ version: 1, id: metaSpaceId, title }),
-      resources: { 'opening.md': '---\ntitle: Opening\n---\nHello.\n' },
+      resources: { 'opening.md': '---\ntitle: Opening\nkind: markdown\n---\nHello.\n' },
     },
   ]);
 

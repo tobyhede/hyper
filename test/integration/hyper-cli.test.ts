@@ -179,7 +179,7 @@ describe('hyper CLI', () => {
     // can reference, and import mints it. Every *Space* Id stays explicit.
     await writeFile(
       join(directory, IMPORTED_SPACE_ID, 'resources', 'opening.md'),
-      '---\ntitle: Opening\n---\nDurable CLI body.\n',
+      '---\ntitle: Opening\nkind: markdown\n---\nDurable CLI body.\n',
     );
 
     const result = await runHyperCommand(['import', directory]);

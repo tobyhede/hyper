@@ -105,6 +105,12 @@ export const referenceResourceFrontmatterSchema = z.object({
  * case the renderer fits the selected Map. It belongs here rather than on
  * the Map because two Space Resources may show the same Map differently.
  */
+const spaceResourceFramingSchema = z.object({
+  centreX: z.number().finite(),
+  centreY: z.number().finite(),
+  zoom: z.number().positive().finite(),
+});
+
 export const spaceResourceFrontmatterSchema = z.object({
   id: idSchema,
   title: resourceTitleSchema,
@@ -112,13 +118,7 @@ export const spaceResourceFrontmatterSchema = z.object({
   spaceId: idSchema,
   map: uuidSchema,
   graph: idSchema,
-  framing: z
-    .object({
-      centreX: z.number().finite(),
-      centreY: z.number().finite(),
-      zoom: z.number().positive().finite(),
-    })
-    .optional(),
+  framing: spaceResourceFramingSchema.optional(),
 });
 
 /** The refusal code for an image URL an Image Resource may not hold; the application owns the wording. */
@@ -197,45 +197,82 @@ export const urResourceFrontmatterSchema = z.object({
   kind: z.literal('ur'),
 });
 
-const defaultMarkdownKind = (value: unknown): unknown =>
-  typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
-    ? { ...value, kind: 'markdown' }
-    : value;
+const frontmatterRecordSchema = z.record(z.unknown());
+
+const frontmatterRecord = (value: unknown) => {
+  const record = frontmatterRecordSchema.safeParse(value);
+  return record.success ? record.data : undefined;
+};
+
+/** Whether parsed frontmatter names its kind, rather than taking the `ur` default. */
+export const declaresResourceKind = (frontmatter: unknown): boolean => {
+  const record = frontmatterRecord(frontmatter);
+  return record !== undefined && 'kind' in record;
+};
+
+/**
+ * A Resource file that declares no `kind` is an Ur Resource (ADR 0120): its
+ * frontmatter is its id and Title, and nothing says how to read content, so the
+ * default names no content kind. `decodeResourceFile` in `@project/graph` refuses
+ * a body under such a file (`packages/graph/test/resource-file.test.ts`, "refuses
+ * a body under frontmatter with no kind, telling the author to declare Markdown").
+ */
+const defaultUrKind = (value: unknown): unknown => {
+  const record = frontmatterRecord(value);
+  return record === undefined || declaresResourceKind(record) ? value : { ...record, kind: 'ur' };
+};
 
 /**
  * What a resource file's frontmatter must contain (ADR 0020). A resource's identity
  * lives here and never in its filename, so renaming the file is not an identity
- * change. `kind` defaults to `'markdown'` exactly as {@link resourceSchema} does —
- * the common resource declares an id and a title and nothing else.
+ * change. `kind` defaults to `'ur'`, so a file that declares only an id and a
+ * Title is an Ur Resource.
+ *
+ * Strict, as every `space.json` object is: a key no kind declares is refused,
+ * naming the key, and so is one inside a nested object, `framing` or
+ * `naturalSize`, so no authored key is dropped on intake (ADR 0127). Only
+ * file intake is strict. The per-kind objects stay non-strict because the
+ * stored document, HTTP and domain schemas are built from them, and those read
+ * what Hyper's own code wrote. `.strict()` keeps the shape it is given, so the
+ * strict nested objects hold the same field rules as the shared ones
+ * (`packages/core/test/resource-document-equality.test.ts`).
  */
+const fileSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
+  framing: spaceResourceFramingSchema.strict().optional(),
+});
+const fileImageResourceFrontmatterSchema = imageResourceFrontmatterSchema.extend({
+  naturalSize: imageNaturalSizeSchema.strict().optional(),
+});
+
 export const resourceFrontmatterSchema = z.preprocess(
-  defaultMarkdownKind,
+  defaultUrKind,
   z.discriminatedUnion('kind', [
-    markdownResourceFrontmatterSchema,
-    referenceResourceFrontmatterSchema,
-    spaceResourceFrontmatterSchema,
-    imageResourceFrontmatterSchema,
-    urResourceFrontmatterSchema,
+    markdownResourceFrontmatterSchema.strict(),
+    referenceResourceFrontmatterSchema.strict(),
+    fileSpaceResourceFrontmatterSchema.strict(),
+    fileImageResourceFrontmatterSchema.strict(),
+    urResourceFrontmatterSchema.strict(),
   ]),
 );
 
-export const importMarkdownResourceFrontmatterSchema = markdownResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
-export const importReferenceResourceFrontmatterSchema = referenceResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
-export const importSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
-export const importImageResourceFrontmatterSchema = imageResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
-export const importUrResourceFrontmatterSchema = urResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
+export const importMarkdownResourceFrontmatterSchema = markdownResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+export const importReferenceResourceFrontmatterSchema = referenceResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+export const importSpaceResourceFrontmatterSchema = fileSpaceResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+export const importImageResourceFrontmatterSchema = fileImageResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+export const importUrResourceFrontmatterSchema = urResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+/** The import variant of {@link resourceFrontmatterSchema}: the same strictness and default, with `id` optional. */
 export const importResourceFrontmatterSchema = z.preprocess(
-  defaultMarkdownKind,
+  defaultUrKind,
   z.discriminatedUnion('kind', [
     importMarkdownResourceFrontmatterSchema,
     importReferenceResourceFrontmatterSchema,
@@ -266,7 +303,7 @@ export const urResourceSchema = urResourceFrontmatterSchema;
  * A resource parsed from its file (ADR 0020). A markdown resource carries the file body
  * that stores its content; a reference resource carries only the pointer to its target's
  * content (ADR 0009). No default for `kind` here — by the time a resource exists
- * its frontmatter has been parsed, and that is where the default was applied.
+ * its frontmatter has been parsed, and that is where the `ur` default was applied.
  */
 export const resourceSchema = z.discriminatedUnion('kind', [
   markdownResourceSchema,
@@ -332,28 +369,30 @@ export const GRAPH_HEAD_SHAPES = ['arrow', 'vee', 'dot', 'diamond'] as const;
 
 export const graphHeadShapeSchema = z.enum(GRAPH_HEAD_SHAPES);
 
-export const graphSchema = z.object({
-  id: idSchema,
-  title: z.string().min(1),
-  // Optional CSS color for this graph's edges; falls back to a palette by order.
-  color: z.string().min(1).optional(),
-  /**
-   * Optional, as `color` is: every creation gesture writes `arrow`, and a
-   * Graph with none stored draws as `arrow` (`graphHeadShape`).
-   */
-  headShape: graphHeadShapeSchema.optional(),
-  /**
-   * Possibly none. A Graph *is* its Edges, but it is not minted by drawing
-   * one: creating a Map creates its initial empty Active Graph in the same
-   * Edit, and Add Map produces exactly that — one fresh Graph holding no
-   * Edges. Deleting a Graph's last Edge leaves the same shape, and Graph
-   * management may not delete the Graph itself to avoid it.
-   *
-   * A Resource may appear as the `from` of several Edges (a fork) and the `to` of
-   * several (a merge); nothing here constrains that.
-   */
-  edges: z.array(graphEdgeSchema),
-});
+export const graphSchema = z
+  .object({
+    id: idSchema,
+    title: z.string().min(1),
+    // Optional CSS color for this graph's edges; falls back to a palette by order.
+    color: z.string().min(1).optional(),
+    /**
+     * Optional, as `color` is: every creation gesture writes `arrow`, and a
+     * Graph with none stored draws as `arrow` (`graphHeadShape`).
+     */
+    headShape: graphHeadShapeSchema.optional(),
+    /**
+     * Possibly none. A Graph *is* its Edges, but it is not minted by drawing
+     * one: creating a Map creates its initial empty Active Graph in the same
+     * Edit, and Add Map produces exactly that — one fresh Graph holding no
+     * Edges. Deleting a Graph's last Edge leaves the same shape, and Graph
+     * management may not delete the Graph itself to avoid it.
+     *
+     * A Resource may appear as the `from` of several Edges (a fork) and the `to` of
+     * several (a merge); nothing here constrains that.
+     */
+    edges: z.array(graphEdgeSchema),
+  })
+  .strict();
 
 /**
  * Where a positioned Map puts a Resource, in the Map's own coordinate space.
@@ -370,10 +409,12 @@ export const mapPositionSchema = z.object({
  * that is the one floor for every kind, Open or Closed, and content adapts to
  * the rect it is given.
  */
-const resourceSizeSchema = z.object({
-  width: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.width),
-  height: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.height),
-});
+const resourceSizeSchema = z
+  .object({
+    width: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.width),
+    height: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.height),
+  })
+  .strict();
 
 /**
  * The outline an Ur Resource is drawn in on a Map (ADR 0121), Open or Closed.
@@ -465,7 +506,7 @@ export const positionedMapSchema = z
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
- * `kind` defaults to `'positioned'` when absent, the same shape `resourceSchema`
+ * `kind` defaults to `'positioned'` when absent, the same shape `resourceFrontmatterSchema`
  * uses — here it is for hand-authoring rather than back-compat, so a Map can
  * be written as just an id, a title, and its positions.
  */

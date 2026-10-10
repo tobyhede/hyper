@@ -62,15 +62,18 @@ describe('readSingleSpace', () => {
 
     const spaceFile = join(talkDirectory, 'space.json');
     await writeFile(spaceFile, JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }));
-    await writeFile(join(talkDirectory, 'a.md'), '---\ntitle: A\n---\nA body\n');
+    await writeFile(join(talkDirectory, 'a.md'), '---\ntitle: A\nkind: markdown\n---\nA body\n');
     await writeFile(
       join(resourcesDirectory, 'detail.md'),
       '---\ntitle: Detail\nkind: markdown\n---\nDetail body\n',
     );
-    await writeFile(join(resourcesDirectory, 'z.md'), '---\ntitle: Z\n---\nZ body\n');
+    await writeFile(
+      join(resourcesDirectory, 'z.md'),
+      '---\ntitle: Z\nkind: markdown\n---\nZ body\n',
+    );
     await writeFile(
       join(talkDirectory, 'root.md'),
-      `---\nid: ${ROOT_RESOURCE_ID}\ntitle: Root\n---\nRoot body\n`,
+      `---\nid: ${ROOT_RESOURCE_ID}\ntitle: Root\nkind: markdown\n---\nRoot body\n`,
     );
     await writeFile(join(resourcesDirectory, 'nested', 'ignored.md'), 'not a discovered resource');
     await writeFile(join(talkDirectory, 'notes', 'ignored.md'), 'not a discovered resource');
@@ -116,8 +119,8 @@ describe('readSingleSpace', () => {
         join(talkDirectory, 'space.json'),
         JSON.stringify({ version: 1, title: 'Talk' }),
       );
-      await writeFile(rootResource, '---\ntitle: A\n---\nA body\n');
-      await writeFile(nestedResource, '---\ntitle: Z\n---\nZ body\n');
+      await writeFile(rootResource, '---\ntitle: A\nkind: markdown\n---\nA body\n');
+      await writeFile(nestedResource, '---\ntitle: Z\nkind: markdown\n---\nZ body\n');
       await chmod(rootResource, 0o000);
       await chmod(nestedResource, 0o000);
 
@@ -268,7 +271,7 @@ describe('readSingleSpace', () => {
       const spaceFile = join(talkDirectory, 'space.json');
       const unreadableResource = join(talkDirectory, 'a.md');
       await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
-      await writeFile(unreadableResource, '---\ntitle: A\n---\nA body\n');
+      await writeFile(unreadableResource, '---\ntitle: A\nkind: markdown\n---\nA body\n');
       await chmod(unreadableResource, 0o000);
 
       const thrown = await captureError(() => readSingleSpace(talkDirectory));

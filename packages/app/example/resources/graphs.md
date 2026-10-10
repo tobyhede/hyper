@@ -1,6 +1,7 @@
 ---
 id: 00000000-0000-4000-8000-000000000047
 title: Graphs are graphs
+kind: markdown
 ---
 
 A **Graph** is a set of directed edges between resources.
