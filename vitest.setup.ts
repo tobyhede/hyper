@@ -30,7 +30,7 @@ if (typeof document !== 'undefined') {
  * re-measures a node's handles. Under jsdom that throws — and it throws inside a
  * `requestAnimationFrame` callback, so the error never reaches a test body:
  * Vitest prints every test as passing and then exits 1 on the unhandled error.
- * `ResourceNode` deliberately never calls `updateNodeInternals` — see AGENTS.md — but
+ * `ResourceNode` deliberately never calls `updateNodeInternals` — see `docs/agents/rendering.md` — but
  * React Flow's own `useResizeObserver` reaches the same call with `force: true`,
  * so any test rendering a real `<ReactFlow>` can hit it without anyone asking.
  *

@@ -62,6 +62,14 @@ The fixtures are excluded from lint, format and the root program on purpose. ESL
 - `no-reflect-get`: use typed property access or parse dynamic input into a named type before reading it.
 - `no-conditional-empty-object-spread`: build the object, then add an optional property in a separate statement. Preserve omission semantics; assigning `undefined` is not equivalent under `exactOptionalPropertyTypes`.
 
+## Nondeterminism is injected at composition, never mocked (ADR 0109)
+
+A module that mints identities, reads time or otherwise depends on a nondeterministic in-process function receives that function when it is composed, so a test can supply a deterministic one. Its operational interface then stays in domain language and does not repeat the dependency on every call.
+
+- **`newId` is required, with no default.** `createSpaceAuthoring` takes it exactly as it takes `reportObserverError`, and mints the Resource, Map and Graph ids of a completed Edit from it. `packages/app/src/compose-app.ts` supplies it explicitly, so every authored identity has one visible source. `createOpenSpaces` takes the same `newId`, also required with no default, and supplies it to every `composeApp` call it makes, alongside its `reportObserverError`: omitting either lets `composeApp`'s own defaults reinstate the ambient generator and `console.error` behind the one owner's back.
+- **Do not answer a test's need for a known id with `vi.spyOn(crypto, 'randomUUID')`.** ADR 0109 rejects it on the grounds ADR 0016 gave for `loadSpace`: a constant collides across a property test's cases, so it needs a counter, at which point a generator exists anyway; `randomUUID` is an unseedable CSPRNG, so controlling it means owning it; and the mock stops working in silence the day the implementation moves to UUID v7 and reads the clock as well as the entropy pool. A spy also hides a miscount: a spy naming two ids for an Edit that mints three lets the third come from the real generator unnoticed. Tests name the ids they assert on through `packages/app/test/minting.ts`.
+- **Do not manufacture a port or adapter for a dependency with one in-process implementation**, and do not hide nondeterminism behind global mocking. Deterministic rules stay uninjected: `titles.ts` mints `Resource N`, `Map N` and `Graph N` through three named operations with the `<Prefix> N` arithmetic private, because nothing there is worth replacing in a test.
+
 ## Sources of truth
 
 `.oxlintrc.json` is the live enabled-rule and exception list. `tools/oxlint/anti-slop/PROVENANCE.md` pins the upstream source; upgrading requires a manual re-diff. `.scratch/anti-slop/research.md`, `spec.md`, and resolved issues record the adoption and migration history, not current instructions.
