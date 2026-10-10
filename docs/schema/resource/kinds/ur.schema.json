@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tobyhede/hyper/blob/main/docs/schema/resource/kinds/ur.schema.json",
+  "title": "Ur content",
+  "description": "An Ur Resource has no content (ADR 0113), so its content is the empty object.",
+  "type": "object",
+  "maxProperties": 0
+}

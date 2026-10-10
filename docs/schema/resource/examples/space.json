@@ -1,0 +1,11 @@
+{
+  "id": "4e6a8c0d-2f3b-4c5e-9a7d-9f1b3d5e7a91",
+  "title": "Deep dive",
+  "kind": "space",
+  "content": {
+    "spaceId": "5f7b9d1e-3a4c-4d6f-8b8e-0a2c4e6f8b02",
+    "map": "6a8c0e2f-4b5d-4e7a-9c9f-1b3d5f7a9c13",
+    "graph": "7b9d1f3a-5c6e-4f8b-8d0a-2c4e6a8b0d24",
+    "framing": { "centreX": 120, "centreY": -40, "zoom": 0.8 }
+  }
+}

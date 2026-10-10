@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tobyhede/hyper/blob/main/docs/schema/resource/kinds/markdown.schema.json",
+  "title": "Markdown content",
+  "description": "A Markdown Resource's body is a sidecar: a plain Markdown file with no frontmatter, beside its manifest, owned by the Resource and written and removed with it (ADR 0128). Export names it <id>.md.",
+  "type": "object",
+  "$ref": "../locator.schema.json",
+  "required": ["path", "mediaType"],
+  "properties": {
+    "path": { "type": "string", "pattern": "^[^/]+\\.md$" },
+    "mediaType": { "const": "text/markdown" }
+  },
+  "unevaluatedProperties": false
+}

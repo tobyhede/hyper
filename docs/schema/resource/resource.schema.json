@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tobyhede/hyper/blob/main/docs/schema/resource/resource.schema.json",
+  "title": "Hyper Resource manifest",
+  "description": "One Resource, as the file resources/<id>.json in a Space directory (ADR 0128). The envelope is the core's; content belongs to the kind and is validated by that kind's schema. Strict at both levels: the core refuses a top-level key it does not own, and the kind refuses a key inside content it does not declare.",
+  "type": "object",
+  "required": ["id", "title", "kind", "content"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "title": { "$ref": "#/$defs/title" },
+    "kind": { "$ref": "#/$defs/kind" },
+    "content": {
+      "type": "object",
+      "description": "The kind's own content, parsed only by the kind's module."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "ur" } } },
+      "then": { "properties": { "content": { "$ref": "kinds/ur.schema.json" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "markdown" } } },
+      "then": { "properties": { "content": { "$ref": "kinds/markdown.schema.json" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "image" } } },
+      "then": { "properties": { "content": { "$ref": "kinds/image.schema.json" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "reference" } } },
+      "then": { "properties": { "content": { "$ref": "kinds/reference.schema.json" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "space" } } },
+      "then": { "properties": { "content": { "$ref": "kinds/space.schema.json" } } }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "description": "A durable UUID. A Resource's identity is this field, never its file name.",
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "title": {
+      "description": "One or more Title Lines separated by newlines; the first is the Resource's name. At least one line must have something in it. Intake normalizes it: CR and CRLF fold to LF, trailing whitespace on each line and leading and trailing blank lines are dropped, interior blank lines are kept (ADR 0083).",
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "kind": {
+      "description": "Required (ADR 0128). A built-in kind's bare id, or a vendor kind's vnd.<owner>.<name> (ADR 0120). A kind the build does not register is refused at intake; this schema cannot know which vendor kinds are registered, so it validates their content only as an object.",
+      "type": "string",
+      "pattern": "^(ur|markdown|image|reference|space|vnd\\.[a-z0-9][a-z0-9-]*\\.[a-z0-9][a-z0-9-]*)$"
+    }
+  }
+}
