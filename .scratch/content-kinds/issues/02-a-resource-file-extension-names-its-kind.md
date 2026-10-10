@@ -1,6 +1,6 @@
 # 02 — A Resource file's extension claims Markdown for every kind
 
-Status: ready-for-human
+Status: resolved
 
 **Problem:** every Resource is stored as one `.md` file (ADR 0020), whatever its kind. Kinds other than `markdown` write frontmatter only (`serializeResourceFile`, `packages/graph/src/resource-file.ts`), so `harbour.md` in the fixture is an Image Resource with no Markdown in it. The extension claims the media type `text/markdown` for Image, Ur, Reference and Space Resources — the confusion between a kind and a media type that ADR 0120 separates. Folder intake finds Resource files by `*.md` (`src/aggregate-directory/space-directory.ts`, `src/aggregate-directory/aggregate-file.ts`).
 
@@ -12,6 +12,10 @@ Status: ready-for-human
 The second changes the Aggregate directory format settled by ADR 0117 and ADR 0118, so it rolls fixtures, Export, `docs/aggregate-directory.md` and the `hyper-authoring` skill forward in one change (ADR 0054). The skill's `.md` claims are at `.agents/skills/hyper-authoring/SKILL.md:25` ("every `*.md` there is read as a Resource") and :32 ("every Resource becomes `resources/<id>.md`").
 
 **Depends on:** 01 (a missing kind is an Ur Resource) only if the second option is chosen, since a file's extension would then say its kind.
+
+## Answer
+
+ADR 0128 decides it, and takes neither option as written: every Resource file is a JSON manifest, `resources/<id>.json`, and only a Markdown Resource has a `.md` file, its body as a sidecar. Delivery is `.scratch/resource-kind-modules/issues/07-json-manifests-on-disk.md`.
 
 ## Comments
 

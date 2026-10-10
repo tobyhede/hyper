@@ -55,6 +55,7 @@ under `superseded/`.
 | [0010](0010-space-is-the-root-loaded-by-loadspace.md) | `loadSpace` is the one intake, and the root value is a Space. |
 | [0020](0020-a-card-is-a-markdown-file-with-frontmatter.md) | A Card is one Markdown file. The directory is the inventory. |
 | [0127](0127-resource-file-frontmatter-is-strict-and-a-missing-kind-is-ur.md) | Resource file frontmatter refuses a key no kind declares, at file intake only; a file with no `kind` is an Ur Resource, and one with a body is refused naming `kind: markdown` (refines 0020). |
+| [0128](0128-every-resource-kind-is-a-module-and-a-resource-file-is-a-json-manifest.md) | Every kind, Ur, Reference and Space included, is a module and the domain names none; a Resource is `{ id, title, kind, content }` everywhere, a file is a JSON manifest with a Markdown body as a sidecar, `kind` is required, and the core enforces aggregate rules from references modules declare (refines 0020, 0120, 0127). |
 | [0038](0038-a-point-has-one-type.md) | `LayoutPosition` is the one representation of a point. |
 | [0051](0051-card-kinds-own-everything-beyond-the-title.md) | A Card kind owns everything past the Title. |
 | [0125](0125-the-resource-has-no-front.md) | A Resource on a Map is drawn Closed or Open, and nothing is its front; a kind's operations are `KindOperations` (refines 0051). |
