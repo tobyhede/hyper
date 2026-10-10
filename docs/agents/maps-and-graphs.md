@@ -188,14 +188,14 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R33, R34, R36 | §5 | [0040] |
 | R35 | §5 | [0122] |
 | R37, R38 | §6 | [0064], [0122] |
-| R39 | §6; Accepted, not built | [0122], [0113] (reversing its rejected option), [0128] |
+| R39 | §6 (its module flag Accepted, not built) | [0122], [0113] (reversing its rejected option), [0128] |
 | R40 | §6 | [0122], [0084] |
 | R41 | §6 | [0093], [0122] |
 | R42 | §6 | [0084], [0093], [0122] |
 | R43 | §6 | [0084] |
 | R44 | §6 | [0122] |
 | R45, R47, R49 | §7 | [0121] (R47 also [0105]; R49 also [0122]) |
-| R46 | §7; Accepted, not built | [0121], [0113], [0128] |
+| R46 | §7 (its module flag Accepted, not built) | [0121], [0113], [0128] |
 | R48 | §7 | [0121], [0110] |
 | R50 | §7 | [0121], [0112] |
 | A1–A26 | Rejected alternatives | Cited in each row |

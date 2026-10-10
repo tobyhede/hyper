@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tobyhede/hyper/blob/main/docs/schema/resource/locator.schema.json",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/locator.schema.json",
   "title": "Content locator",
   "description": "Where a content kind's content lives (ADR 0128). A path names a file the Resource owns, relative to its Resource file's directory, and requires a media type. A URL names content the Resource does not own: an external URL, or a picture in the aggregate's shared image store. Each kind narrows which forms and targets it accepts. Kind schemas apply unevaluatedProperties, so this schema does not close the object.",
   "type": "object",
@@ -12,7 +12,7 @@
         "path": {
           "description": "A relative POSIX path inside the Resource file's directory: no leading slash, no backslash, no . or .. segment.",
           "type": "string",
-          "pattern": "^(?!/)(?!.*\\\\)(?!(.*/)?\\.{1,2}(/|$))[^\\u0000]+$"
+          "pattern": "^(?!/)(?![\\s\\S]*\\\\)(?!([\\s\\S]*/)?\\.{1,2}(/|$))[^\\u0000]+$"
         },
         "mediaType": {
           "$ref": "#/$defs/mediaType"

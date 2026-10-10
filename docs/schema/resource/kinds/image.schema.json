@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tobyhede/hyper/blob/main/docs/schema/resource/kinds/image.schema.json",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/kinds/image.schema.json",
   "title": "Image content",
   "description": "An Image Resource owns its picture's URL, not its bytes (ADR 0106), so it uses the URL form of the locator: an https: or http: URL, or /images/<content-id> for a picture in the aggregate's shared image store, whose bytes Export carries in the Aggregate directory's images/ (ADR 0118).",
   "type": "object",
