@@ -296,7 +296,7 @@ reviews:
         environment reads, instructions that would exfiltrate repository
         contents, and any drift between the files and `skills-lock.json`.
 
-    - path: '{.agents/skills/shadcn-first-ui/**,.agents/skills/hyper-authoring/**,.agents/skills/hyper-getting-started/**}'
+    - path: '{.agents/skills/shadcn-first-ui/**,.agents/skills/hyper-authoring/**,.agents/skills/hyper-getting-started/**,.claude/skills/shadcn-first-ui,.claude/skills/hyper-authoring,.claude/skills/hyper-getting-started}'
       instructions: >-
         Agent skills this repository owns. Review them as repository
         documentation: accuracy against the code, commands the repository can

@@ -24,7 +24,7 @@ A throwaway prototype answers a visual or product question and is outside this s
 
 4. **Add the registry item to the `ui` package.**
    1. Preview the add with `pnpm dlx shadcn@4.18.0 add <item> --dry-run -c packages/ui`.
-   2. Read every file the preview lists with `--diff <file>`. That includes `packages/app/src/tailwind.css`, where the `ui` package's `components.json` points for CSS.
+   2. Read every file the preview lists with `pnpm dlx shadcn@4.18.0 add <item> --diff <file> -c packages/ui`, which implies `--dry-run` and writes nothing. That includes `packages/app/src/tailwind.css`, where the `ui` package's `components.json` points for CSS.
    3. Run the add without `--dry-run`, then export the component's public names from `packages/ui/src/index.ts`.
    4. When the item overwrites a component that is already here, keep Hyper's recorded extensions. The comment on the component names each one, as `components/badge.tsx`, `input.tsx` and `tooltip.tsx` do. `docs/agents/ui.md` names others, such as `Kbd`'s `keyName="modifier"`. Re-apply every extension the diff removes.
 

@@ -6,13 +6,13 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * AGENTS.md and `docs/agents/*.md` state build status, and some of it waits on
- * a `.scratch` ticket: a thing is unbuilt "until" a cited ticket lands, or a
- * cited ticket's work is "being built". Once that ticket's `Status:` says it is
+ * a `.scratch` ticket: a thing is unbuilt "until" a cited ticket lands, it
+ * "waits on" a cited ticket, or a cited ticket's work is "being built". Once that ticket's `Status:` says it is
  * resolved, the sentence is false, and nothing but a reader notices. This reads
  * every such citation and fails when the ticket it waits on is resolved.
  *
- * Two scopes, because the two claims are written differently. "until" names
- * its ticket in the same sentence. "being built" is a status written in an
+ * Two scopes, because the claims are written differently. "until" and "waits
+ * on" name their ticket in the same sentence. "being built" is a status written in an
  * entry's lead, with the ticket cited later in the same bullet or paragraph.
  */
 
@@ -42,7 +42,7 @@ const isAgentDoc = (file: string): boolean =>
  */
 const TICKET_CITATION = /\.scratch\/([a-z0-9-]+)\/issues\/(\d+)(?:-[a-z0-9-]+)?(?:\.md)?/g;
 
-type Claim = 'until' | 'being built';
+type Claim = 'until' | 'waits on' | 'being built';
 
 interface TicketCitation {
   readonly doc: string;
@@ -72,13 +72,14 @@ const ticketsIn = (doc: string, claim: Claim, text: string): readonly TicketCita
     number: match[2] ?? '',
   }));
 
-/** Every ticket cited by an "until" sentence or a "being built" entry of one doc. */
+/** Every ticket cited by an "until" or "waits on" sentence, or a "being built" entry, of one doc. */
 const pendingCitations = (doc: string, text: string): readonly TicketCitation[] =>
   entriesOf(text).flatMap((entry) => [
     ...(/\bbeing built\b/i.test(entry) ? ticketsIn(doc, 'being built', entry) : []),
-    ...sentencesOf(entry).flatMap((sentence) =>
-      /\buntil\b/i.test(sentence) ? ticketsIn(doc, 'until', sentence) : [],
-    ),
+    ...sentencesOf(entry).flatMap((sentence) => [
+      ...(/\buntil\b/i.test(sentence) ? ticketsIn(doc, 'until', sentence) : []),
+      ...(/\bwaits on\b/i.test(sentence) ? ticketsIn(doc, 'waits on', sentence) : []),
+    ]),
   ]);
 
 /**
@@ -129,7 +130,7 @@ describe('an agent doc never waits on a resolved ticket', () => {
     expect(docs).toContain('docs/agents/workflow.md');
   });
 
-  it('cites no resolved ticket beside "until" or "being built"', () => {
+  it('cites no resolved ticket beside "until", "waits on" or "being built"', () => {
     const citations = docs.flatMap((doc) =>
       pendingCitations(doc, readFileSync(join(repoRoot, doc), 'utf8')),
     );
@@ -171,6 +172,21 @@ describe('the ticket-status guard', () => {
     expect(staleCitationFaults(pendingCitations('AGENTS.md', doc), readFixture)).toEqual([
       'AGENTS.md says "being built" citing .scratch/seams/issues/01-one-module.md, which is done',
     ]);
+  });
+
+  it('fails "waits on" paired with a resolved ticket', () => {
+    const doc =
+      'The resize control is offered only on an Open Resource. Offering it on the selected one waits on `.scratch/size/issues/02`.';
+
+    expect(staleCitationFaults(pendingCitations('AGENTS.md', doc), readFixture)).toEqual([
+      'AGENTS.md says "waits on" citing .scratch/size/issues/02, which is resolved',
+    ]);
+  });
+
+  it('keeps "waits on" to its own sentence', () => {
+    const doc = 'Undo waits on history. The resize control is built (`.scratch/size/issues/02`).';
+
+    expect(pendingCitations('AGENTS.md', doc)).toEqual([]);
   });
 
   it('passes "until" paired with an open ticket', () => {
