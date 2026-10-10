@@ -7,7 +7,7 @@ description: Implement or change production React UI in Hyper. MUST be used for 
 
 Production UI in Hyper is design-system-first. The design-system workspace is the `ui` package, `packages/ui`, published as `@project/ui`. Its upstream is the shadcn `base-nova` registry over Base UI, with Lucide icons (ADR 0050). A component from there is the default, and hand-rolled interactive behaviour is a recorded deviation (ADR 0047). A stable Ladle story is production-parity evidence (ADR 0052).
 
-This skill, AGENTS.md and `docs/agents/ui.md` override the vendored `shadcn` skill wherever they disagree. Use the `shadcn` skill for CLI mechanics and component rules. Its generic recommendations name components Hyper deleted on purpose: `Sidebar`, `Sheet`, `Drawer` and `Tabs`. The Command Dock and the Resources list (`ResourcesPopover`) replaced them. AGENTS.md and `docs/agents/ui.md` say why, and what to use instead.
+This skill, AGENTS.md and `docs/agents/ui.md` override the vendored `shadcn` skill wherever they disagree. Use the `shadcn` skill for CLI mechanics and component rules. Its generic recommendations name components Hyper deleted on purpose: `Sidebar`, `Sheet`, `Drawer` and `Tabs`. The Command Dock and the Resources list (`ResourcesPopover`) replaced them. `docs/agents/ui.md` says why, and what to use instead.
 
 A throwaway prototype answers a visual or product question and is outside this skill. Once a design is chosen, build it again through these steps.
 
