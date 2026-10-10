@@ -1,6 +1,7 @@
 ---
 id: 00000000-0000-4000-8000-000000000006
 title: D
+kind: markdown
 ---
 
 Resource D is the last full resource of the first collection, on Long and Mid but not Short.

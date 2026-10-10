@@ -1,4 +1,5 @@
 import {
+  declaresResourceKind,
   resourceFrontmatterSchema,
   resourceSchema,
   importResourceFrontmatterSchema,
@@ -126,7 +127,14 @@ function decodeResourceFile<T extends Frontmatter>(
   // constructing the domain value: the other schemas would otherwise strip a
   // body as an unknown key and silently discard authored prose.
   if (parsed.data.kind !== 'markdown' && split.body !== '') {
-    return fail('invalid-frontmatter', `body: ${parsed.data.kind} resources may not have a body`);
+    // A body is content only a kind can say how to read, so a file that
+    // declares no kind is not guessed to be Markdown for having one.
+    return fail(
+      'invalid-frontmatter',
+      declaresResourceKind(yaml)
+        ? `body: ${parsed.data.kind} resources may not have a body`
+        : 'body: a resource file with no kind is an Ur Resource, which has no body; add "kind: markdown" to its frontmatter to keep the body as Markdown',
+    );
   }
 
   const candidate =
@@ -149,9 +157,10 @@ function decodeResourceFile<T extends Frontmatter>(
  * is the same mistake as hand-rolling the reading side, in the direction where
  * it silently produces a file that no longer parses.
  *
- * `kind` is written even though the reader defaults it. A file this produced is
- * one a human then edits, and a resource that says what kind it is can be read
- * without knowing the default.
+ * `kind` is written for every kind, `ur` included, even though the reader
+ * defaults an absent one to `ur`. A file this produced is one a human then
+ * edits, and a resource that says what kind it is can be read without knowing
+ * the default.
  */
 export function serializeResourceFile(resource: Resource): string {
   if (resource.kind !== 'markdown') {

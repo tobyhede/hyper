@@ -1,0 +1,19 @@
+# Resource file frontmatter is strict, and a missing kind is ur
+
+Status: accepted
+Refines: 0020
+Related: 0054, 0104, 0113, 0120
+
+A Resource file's frontmatter is **strict**: a key no kind declares is refused at intake, and the refusal names the key and the file. And a Resource file that declares no `kind` is an **Ur Resource**: a file with no `kind` and a body is refused, and the refusal tells the author to add `kind: markdown`.
+
+**Strictness.** Frontmatter used to be read leniently: a key the kind did not declare was accepted, dropped, and gone on the next Export, without a word. A misspelt `framng` on a Space Resource lost its framing, a misspelt `tilte` was quietly ignored beside the real one. Every `space.json` object already refused such a key, and Graphs, sizes and Edges were made strict for this reason (ADR 0104 for Edges). A hand-written Resource file is the one remaining place an author's typing could be thrown away. Now that one place refuses it too.
+
+Strictness is at **file intake only**: `resourceFrontmatterSchema` and `importResourceFrontmatterSchema` in `core`, which `parseResourceFile` and `parseImportResourceFile` read. The per-kind frontmatter objects stay non-strict, because the stored document, HTTP payload and domain Resource schemas are built from them, and those read what Hyper's own code wrote, key by key. File intake adds `.strict()` to each object. That copies the field schemas by reference, so the stored, import and file doors still share one instance of every field rule.
+
+**The kind default.** ADR 0120 decided that a Resource with no kind is an Ur Resource. This builds that rule at file intake, where `kind` used to default to `markdown`. A Resource that declares no kind is the Resource with nothing but a Title (ADR 0113), so the default names no content kind. A kindless file with a body is refused rather than read as Markdown, because a body is content and only a kind can say how to read it. Guessing Markdown from a body would make the same frontmatter mean two kinds depending on what follows it. The refusal is worded for the author who left `kind` out of a Markdown file, which is the common way to meet it, and names the line to add. Export writes `kind` for every Resource, so nothing Hyper writes depends on the default. Every tracked file that relied on the old default declares `kind: markdown` in the same change (ADR 0054).
+
+**Rejected: strict shared objects.** Making the per-kind objects strict would also make the stored document, HTTP and domain schemas strict. Those are fed by Hyper's own code, and test doubles pass them fuller values than the shape. Nothing a person typed would be protected, and the boundary where a person's typing arrives would be blurred.
+
+**Rejected: inferring `markdown` from a non-empty body.** It keeps every old file loading, at the cost of one frontmatter reading as two kinds. And an Ur Resource that gains a stray line would silently become a document.
+
+**Cost accepted:** keys another editor writes into frontmatter, such as Obsidian's `tags` and `aliases`, are refused. A directory kept in such an editor has to keep them out of Resource files. And every hand-written Markdown file must say `kind: markdown`.

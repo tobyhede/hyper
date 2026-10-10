@@ -44,8 +44,9 @@ const markdownFrontmatter = (title: string) => ({
   id: RESOURCE_ID,
   title,
   kind: 'markdown',
-  body: '',
 });
+/** A Markdown Resource as the stored doors read it, its body beside its frontmatter. */
+const markdownResource = (title: string) => ({ ...markdownFrontmatter(title), body: '' });
 const referenceFrontmatter = (title: string) => ({
   id: RESOURCE_ID,
   title,
@@ -99,12 +100,28 @@ const kindSchemas: readonly {
   },
 ];
 
-/** The unions and the stored document, each of which reads every kind. */
-const unionSchemas: readonly { readonly label: string; readonly schema: ResourceTitleSchema }[] = [
-  { label: 'resource frontmatter', schema: resourceFrontmatterSchema },
-  { label: 'resource', schema: resourceSchema },
-  { label: 'resource document', schema: resourceDocumentSchema },
-  { label: 'imported resource frontmatter', schema: importResourceFrontmatterSchema },
+/**
+ * The unions and the stored document, each of which reads every kind, beside
+ * how each is handed a Markdown Resource: file intake refuses a `body` key,
+ * because the body is the file's, and the stored doors require one.
+ */
+const unionSchemas: readonly {
+  readonly label: string;
+  readonly schema: ResourceTitleSchema;
+  readonly markdown: (title: string) => ResourceFrontmatterDraft;
+}[] = [
+  {
+    label: 'resource frontmatter',
+    schema: resourceFrontmatterSchema,
+    markdown: markdownFrontmatter,
+  },
+  { label: 'resource', schema: resourceSchema, markdown: markdownResource },
+  { label: 'resource document', schema: resourceDocumentSchema, markdown: markdownResource },
+  {
+    label: 'imported resource frontmatter',
+    schema: importResourceFrontmatterSchema,
+    markdown: markdownFrontmatter,
+  },
 ];
 
 /**
@@ -127,8 +144,8 @@ const titleCases = (
     schema,
     value: frontmatter(title),
   })),
-  ...unionSchemas.flatMap(({ label, schema }) =>
-    [markdownFrontmatter, referenceFrontmatter, spaceFrontmatter].map((frontmatter) => ({
+  ...unionSchemas.flatMap(({ label, schema, markdown }) =>
+    [markdown, referenceFrontmatter, spaceFrontmatter].map((frontmatter) => ({
       label,
       schema,
       value: frontmatter(title),

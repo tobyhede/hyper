@@ -54,6 +54,7 @@ under `superseded/`.
 | [0007](0007-routes-are-the-only-structure.md) | Cards and Graphs are the only structure. There are no separately authored edges. |
 | [0010](0010-space-is-the-root-loaded-by-loadspace.md) | `loadSpace` is the one intake, and the root value is a Space. |
 | [0020](0020-a-card-is-a-markdown-file-with-frontmatter.md) | A Card is one Markdown file. The directory is the inventory. |
+| [0127](0127-resource-file-frontmatter-is-strict-and-a-missing-kind-is-ur.md) | Resource file frontmatter refuses a key no kind declares, at file intake only; a file with no `kind` is an Ur Resource, and one with a body is refused naming `kind: markdown` (refines 0020). |
 | [0038](0038-a-point-has-one-type.md) | `LayoutPosition` is the one representation of a point. |
 | [0051](0051-card-kinds-own-everything-beyond-the-title.md) | A Card kind owns everything past the Title. |
 | [0125](0125-the-resource-has-no-front.md) | A Resource on a Map is drawn Closed or Open, and nothing is its front; a kind's operations are `KindOperations` (refines 0051). |

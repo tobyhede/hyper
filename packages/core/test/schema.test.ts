@@ -302,21 +302,24 @@ describe('resource frontmatter schema', () => {
     expect(resourceFrontmatterSchema.safeParse({ id: '', title: 'A' }).success).toBe(false);
   });
 
-  it('defaults a resource with no kind to markdown, so the common resource declares neither', () => {
-    const resource = resourceFrontmatterSchema.parse({
-      id: '00000000-0000-4000-8000-000000000002',
-      title: 'A',
-    });
-    expect(resource.kind).toBe('markdown');
+  it('reads a resource with no kind as an Ur Resource, which is its id and Title alone', () => {
+    for (const schema of [resourceFrontmatterSchema, importResourceFrontmatterSchema]) {
+      const resource = schema.parse({ id: '00000000-0000-4000-8000-000000000002', title: 'A' });
+      expect(resource.kind).toBe('ur');
+    }
   });
 
-  it('holds no content key — the file the frontmatter sits in is the content', () => {
-    const resource = resourceFrontmatterSchema.parse({
+  it('refuses a content key, naming it — the file the frontmatter sits in is the content', () => {
+    const parsed = resourceFrontmatterSchema.safeParse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
+      kind: 'markdown',
       content: 'resources/a.md',
     });
-    expect('content' in resource).toBe(false);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map(({ message }) => message)).toEqual([
+      "Unrecognized key(s) in object: 'content'",
+    ]);
   });
 
   it('parses a reference resource, which points at a target instead of holding content', () => {
@@ -395,10 +398,27 @@ describe('resource frontmatter schema', () => {
     ).toBe(false);
   });
 
-  it('does not make Description part of the shared Resource contract', () => {
-    const resource = resourceFrontmatterSchema.parse({
+  it('refuses a Description, which is no part of the shared Resource contract', () => {
+    for (const schema of [resourceFrontmatterSchema, importResourceFrontmatterSchema]) {
+      const parsed = schema.safeParse({
+        id: '00000000-0000-4000-8000-000000000002',
+        title: 'A',
+        kind: 'markdown',
+        description: 'What A is',
+      });
+      expect(parsed.success).toBe(false);
+      expect(parsed.error?.issues.map(({ message }) => message)).toEqual([
+        "Unrecognized key(s) in object: 'description'",
+      ]);
+    }
+  });
+
+  it('keeps the stored Resource schema non-strict, because Hyper wrote what it reads', () => {
+    const resource = resourceSchema.parse({
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
+      kind: 'markdown',
+      body: '',
       description: 'What A is',
     });
     expect('description' in resource).toBe(false);

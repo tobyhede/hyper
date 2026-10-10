@@ -1,6 +1,7 @@
 ---
 id: 00000000-0000-4000-8000-000000000074
 title: Opening in place
+kind: markdown
 ---
 
 # Opening in place

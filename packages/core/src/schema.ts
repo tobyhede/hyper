@@ -197,45 +197,68 @@ export const urResourceFrontmatterSchema = z.object({
   kind: z.literal('ur'),
 });
 
-const defaultMarkdownKind = (value: unknown): unknown =>
-  typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)
-    ? { ...value, kind: 'markdown' }
+const frontmatterRecordSchema = z.record(z.unknown());
+
+/**
+ * A Resource file that declares no `kind` is an Ur Resource (ADR 0120): its
+ * frontmatter is its id and Title, and nothing says how to read content, so the
+ * default names no content kind. `decodeResourceFile` in `@project/graph` refuses
+ * a body under such a file rather than guessing a kind for it.
+ */
+const defaultUrKind = (value: unknown): unknown => {
+  const frontmatter = frontmatterRecordSchema.safeParse(value);
+  return frontmatter.success && !('kind' in frontmatter.data)
+    ? { ...frontmatter.data, kind: 'ur' }
     : value;
+};
+
+/** Whether parsed frontmatter names its kind, rather than taking the `ur` default. */
+export const declaresResourceKind = (frontmatter: unknown): boolean => {
+  const record = frontmatterRecordSchema.safeParse(frontmatter);
+  return record.success && 'kind' in record.data;
+};
 
 /**
  * What a resource file's frontmatter must contain (ADR 0020). A resource's identity
  * lives here and never in its filename, so renaming the file is not an identity
- * change. `kind` defaults to `'markdown'` exactly as {@link resourceSchema} does —
- * the common resource declares an id and a title and nothing else.
+ * change. `kind` defaults to `'ur'`, so a file that declares only an id and a
+ * Title is an Ur Resource.
+ *
+ * Strict, as every `space.json` object is: a key no kind declares is refused,
+ * naming the key, rather than dropped and lost on the next Export (ADR 0127).
+ * Only file intake is strict. The per-kind objects stay non-strict because the
+ * stored document, HTTP and domain schemas are built from them, and those read
+ * what Hyper's own code wrote.
  */
 export const resourceFrontmatterSchema = z.preprocess(
-  defaultMarkdownKind,
+  defaultUrKind,
   z.discriminatedUnion('kind', [
-    markdownResourceFrontmatterSchema,
-    referenceResourceFrontmatterSchema,
-    spaceResourceFrontmatterSchema,
-    imageResourceFrontmatterSchema,
-    urResourceFrontmatterSchema,
+    markdownResourceFrontmatterSchema.strict(),
+    referenceResourceFrontmatterSchema.strict(),
+    spaceResourceFrontmatterSchema.strict(),
+    imageResourceFrontmatterSchema.strict(),
+    urResourceFrontmatterSchema.strict(),
   ]),
 );
 
-export const importMarkdownResourceFrontmatterSchema = markdownResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
-export const importReferenceResourceFrontmatterSchema = referenceResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
-export const importSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
-export const importImageResourceFrontmatterSchema = imageResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
-export const importUrResourceFrontmatterSchema = urResourceFrontmatterSchema.extend({
-  id: uuidSchema.optional(),
-});
+export const importMarkdownResourceFrontmatterSchema = markdownResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+export const importReferenceResourceFrontmatterSchema = referenceResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+export const importSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+export const importImageResourceFrontmatterSchema = imageResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+export const importUrResourceFrontmatterSchema = urResourceFrontmatterSchema
+  .extend({ id: uuidSchema.optional() })
+  .strict();
+/** The import variant of {@link resourceFrontmatterSchema}: the same strictness and default, with `id` optional. */
 export const importResourceFrontmatterSchema = z.preprocess(
-  defaultMarkdownKind,
+  defaultUrKind,
   z.discriminatedUnion('kind', [
     importMarkdownResourceFrontmatterSchema,
     importReferenceResourceFrontmatterSchema,
@@ -266,7 +289,7 @@ export const urResourceSchema = urResourceFrontmatterSchema;
  * A resource parsed from its file (ADR 0020). A markdown resource carries the file body
  * that stores its content; a reference resource carries only the pointer to its target's
  * content (ADR 0009). No default for `kind` here — by the time a resource exists
- * its frontmatter has been parsed, and that is where the default was applied.
+ * its frontmatter has been parsed, and that is where the `ur` default was applied.
  */
 export const resourceSchema = z.discriminatedUnion('kind', [
   markdownResourceSchema,
@@ -469,7 +492,7 @@ export const positionedMapSchema = z
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
- * `kind` defaults to `'positioned'` when absent, the same shape `resourceSchema`
+ * `kind` defaults to `'positioned'` when absent, the same shape `resourceFrontmatterSchema`
  * uses — here it is for hand-authoring rather than back-compat, so a Map can
  * be written as just an id, a title, and its positions.
  */

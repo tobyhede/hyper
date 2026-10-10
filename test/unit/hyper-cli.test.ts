@@ -75,7 +75,7 @@ const writeSingleSpaceAggregate = (id: UUID = SPACE_ID, title = 'Imported talk')
     {
       name: id,
       spaceFile: JSON.stringify({ version: 1, id, title }),
-      resources: { 'opening.md': '---\ntitle: Opening\n---\nHello.\n' },
+      resources: { 'opening.md': '---\ntitle: Opening\nkind: markdown\n---\nHello.\n' },
     },
   ]);
 
@@ -920,7 +920,9 @@ describe('runHyper', () => {
             },
           ],
         }),
-        resources: { 'opening.md': `---\nid: ${RESOURCE_ID}\ntitle: Opening\n---\nHello.\n` },
+        resources: {
+          'opening.md': `---\nid: ${RESOURCE_ID}\ntitle: Opening\nkind: markdown\n---\nHello.\n`,
+        },
       },
     ]);
     const output = captureIo();

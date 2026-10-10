@@ -1,6 +1,7 @@
 ---
 id: 00000000-0000-4000-8000-000000000045
 title: The data model
+kind: markdown
 ---
 
 Two small pieces, imported from `space.json` and the resource Markdown files:

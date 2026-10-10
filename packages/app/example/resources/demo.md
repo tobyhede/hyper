@@ -1,6 +1,7 @@
 ---
 id: 00000000-0000-4000-8000-000000000041
 title: Try it
+kind: markdown
 ---
 
 1. Pick a Graph in the toolbar — every Graph stays drawn, and yours is emphasised

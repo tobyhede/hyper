@@ -121,12 +121,12 @@ Futures are **lazy**.
 
 A Resource's identity is its frontmatter `id`, never its file name. Exporting writes every Resource as `resources/<id>.md`, whatever its file was called before.
 
-Every Resource has `id`, `title` and `kind`. The Title must have at least one non-blank line, and may run to several. Unlike `space.json`, frontmatter is not strict: a key the kind does not declare is accepted and dropped, so a misspelt optional key is lost without a word. The rest depends on the kind:
+Every Resource has `id`, `title` and `kind`. The Title must have at least one non-blank line, and may run to several. Frontmatter is strict, as `space.json` is: a key the kind does not declare is refused, naming the key and the file, so a misspelt key fails loudly. Keys another editor adds, such as `tags` or `aliases`, are refused too ([ADR 0127](adr/0127-resource-file-frontmatter-is-strict-and-a-missing-kind-is-ur.md)). The rest depends on the kind:
 
 | `kind` | Further frontmatter | After the frontmatter |
 | --- | --- | --- |
-| `markdown` (the default when `kind` is absent) | — | The content, as Markdown. |
-| `ur` | — | Nothing. An Ur Resource is its Title alone. |
+| `markdown` | — | The content, as Markdown. |
+| `ur` (the default when `kind` is absent) | — | Nothing. An Ur Resource is its Title alone, so a file with no `kind` and a body is refused: add `kind: markdown` to keep the body. |
 | `image` | `url`: `https:` or `http:`, or `/images/<content-id>` for a picture in `images/`. Optional `naturalSize: { width, height }` in pixels. | Nothing. The Title is the image's text alternative. |
 | `reference` | `target`: the Id of another Resource **in the same Space**, not itself and not another Reference Resource. | Nothing. It shows its Target's content, read-only. |
 | `space` | `spaceId`, `map`, `graph`: the target Space and the Map and Graph it shows. Optional `framing: { centreX, centreY, zoom }`. | Nothing. |

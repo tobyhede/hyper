@@ -241,7 +241,7 @@ describe('readAggregate', () => {
     await mkdir(join(directory, 'resources'));
     await writeFile(
       join(directory, 'resources', 'opening.md'),
-      '---\ntitle: Opening\n---\nHello.\n',
+      '---\ntitle: Opening\nkind: markdown\n---\nHello.\n',
     );
 
     const aggregate = await readAggregate(root, countingIds());
@@ -303,7 +303,7 @@ describe('readAggregate', () => {
         // the only draws and the expectation below readable.
         await writeFile(
           join(directory, 'resources', `resource-${suffix}.md`),
-          `---\nid: 44444444-4444-4444-8444-${suffix}\ntitle: Resource ${index}\n---\nBody.\n`,
+          `---\nid: 44444444-4444-4444-8444-${suffix}\ntitle: Resource ${index}\nkind: markdown\n---\nBody.\n`,
         );
       }
     }
@@ -382,7 +382,7 @@ describe('readAggregate', () => {
     await mkdir(join(unidentified, 'resources'));
     await writeFile(
       join(unidentified, 'resources', 'opening.md'),
-      '---\ntitle: Opening\n---\nHello.\n',
+      '---\ntitle: Opening\nkind: markdown\n---\nHello.\n',
     );
 
     const thrown = await captureError(() =>

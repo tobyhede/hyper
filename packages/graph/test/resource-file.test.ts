@@ -12,7 +12,7 @@ describe('parseResourceFile: CRLF', () => {
     // usual resource is its title.
     const parsed = parseResourceFile({
       path: 'a.md',
-      text: '---\r\nid: 00000000-0000-4000-8000-000000000002\r\ntitle: A\r\n---\r\n\r\nBody\r\n',
+      text: '---\r\nid: 00000000-0000-4000-8000-000000000002\r\nkind: markdown\r\ntitle: A\r\n---\r\n\r\nBody\r\n',
     });
 
     expect(parsed.ok).toBe(true);
@@ -59,20 +59,16 @@ describe('parseResourceFile', () => {
     ).toBe(false);
   });
 
-  it('reads kind-owned content without carrying a shared Description', () => {
+  it('refuses a shared Description, naming the key, rather than dropping it', () => {
     const result = parseResourceFile({
       path: 'resources/a.md',
-      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\ndescription: Where every graph begins\n---\n\nResource **A** is the entry point.\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\nkind: markdown\ndescription: Where every graph begins\n---\n\nResource **A** is the entry point.\n',
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.resource).toEqual({
-      id: '00000000-0000-4000-8000-000000000002',
-      title: 'A',
-      kind: 'markdown',
-      body: 'Resource **A** is the entry point.\n',
-    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.map(({ kind }) => kind)).toEqual(['invalid-frontmatter']);
+    expect(result.errors[0]?.message).toContain("'description'");
   });
 
   it('reads a reference resource, which has no body (ADR 0009)', () => {
@@ -118,7 +114,7 @@ describe('parseResourceFile', () => {
   it('reads a resource whose file ends at the closing fence, with no trailing newline', () => {
     const result = parseResourceFile({
       path: 'resources/a.md',
-      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\nkind: markdown\n---',
     });
 
     expect(result.ok).toBe(true);
@@ -134,7 +130,7 @@ describe('parseResourceFile', () => {
   it('keeps a body that opens with a heading, which is now just a heading (ADR 0020)', () => {
     const result = parseResourceFile({
       path: 'resources/a.md',
-      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---\n\n# A\n\nProse under the heading.\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\nkind: markdown\n---\n\n# A\n\nProse under the heading.\n',
     });
 
     expect(result.ok).toBe(true);
@@ -147,7 +143,7 @@ describe('parseResourceFile', () => {
   it('keeps a horizontal rule in the body, because only the first fence closes', () => {
     const result = parseResourceFile({
       path: 'resources/a.md',
-      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---\n\nAbove.\n\n---\n\nBelow.\n',
+      text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\nkind: markdown\n---\n\nAbove.\n\n---\n\nBelow.\n',
     });
 
     expect(result.ok).toBe(true);
@@ -163,7 +159,7 @@ describe('parseResourceFile', () => {
     // Quoting changes the YAML type but does not turn a number into UUID identity.
     const result = parseResourceFile({
       path: 'resources/2024.md',
-      text: '---\nid: 2024\ntitle: A\n---\n',
+      text: '---\nid: 2024\ntitle: A\nkind: markdown\n---\n',
     });
 
     expect(result.ok).toBe(false);
@@ -225,7 +221,8 @@ describe('parseResourceFile', () => {
     // `core.autocrlf` makes every resource in the repository start `---\r\n`, and a
     // LF-only fence check called all of them frontmatter-less — so the space
     // failed to load at all rather than failing to look right.
-    const lf = '---\nid: 00000000-0000-4000-8000-000000000027\ntitle: T\n---\n\nBody line.\n';
+    const lf =
+      '---\nid: 00000000-0000-4000-8000-000000000027\ntitle: T\nkind: markdown\n---\n\nBody line.\n';
     const crlf = lf.replace(/\n/g, '\r\n');
 
     const result = parseResourceFile({ path: 'a.md', text: crlf });
@@ -233,5 +230,79 @@ describe('parseResourceFile', () => {
     if (!result.ok) return;
     expect(result.resource.id).toBe('00000000-0000-4000-8000-000000000027');
     expect(result.resource.kind === 'markdown' && result.resource.body.trim()).toBe('Body line.');
+  });
+});
+
+describe('resource file intake refuses a frontmatter key no kind declares', () => {
+  it('refuses a misspelt Space Resource key, naming the key and the file', () => {
+    const text = [
+      '---',
+      `id: ${RESOURCE_A}`,
+      'title: Inner',
+      'kind: space',
+      `spaceId: ${RESOURCE_A}`,
+      `map: ${RESOURCE_A}`,
+      `graph: ${RESOURCE_A}`,
+      'framng:',
+      '  centreX: 0',
+      '  centreY: 0',
+      '  zoom: 1',
+      '---',
+      '',
+    ].join('\n');
+
+    for (const result of [
+      parseResourceFile({ path: 'resources/inner.md', text }),
+      parseImportResourceFile({ path: 'resources/inner.md', text }),
+    ]) {
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.errors.map(({ kind }) => kind)).toEqual(['invalid-frontmatter']);
+      expect(result.errors[0]?.message).toContain('resources/inner.md');
+      expect(result.errors[0]?.message).toContain("'framng'");
+    }
+  });
+
+  it('refuses a misspelt Markdown Resource key rather than dropping it', () => {
+    const text = `---\nid: ${RESOURCE_A}\ntitle: A\nkind: markdown\ntilte: A\n---\n\nProse.\n`;
+
+    for (const result of [
+      parseResourceFile({ path: 'resources/a.md', text }),
+      parseImportResourceFile({ path: 'resources/a.md', text }),
+    ]) {
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.errors[0]?.message).toContain('resources/a.md');
+      expect(result.errors[0]?.message).toContain("'tilte'");
+    }
+  });
+});
+
+describe('a resource file that declares no kind is an Ur Resource', () => {
+  it('reads frontmatter with no kind and no body as an Ur Resource', () => {
+    expect(
+      parseResourceFile({
+        path: 'resources/node.md',
+        text: `---\nid: ${RESOURCE_A}\ntitle: Node\n---\n`,
+      }),
+    ).toEqual({ ok: true, resource: { id: RESOURCE_A, title: 'Node', kind: 'ur' } });
+    expect(
+      parseImportResourceFile({ path: 'resources/node.md', text: '---\ntitle: Node\n---\n' }),
+    ).toEqual({ ok: true, resource: { document: { title: 'Node', kind: 'ur' } } });
+  });
+
+  it('refuses a body under frontmatter with no kind, telling the author to declare Markdown', () => {
+    const text = `---\nid: ${RESOURCE_A}\ntitle: A\n---\n\nProse.\n`;
+
+    for (const result of [
+      parseResourceFile({ path: 'resources/a.md', text }),
+      parseImportResourceFile({ path: 'resources/a.md', text }),
+    ]) {
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.errors.map(({ kind }) => kind)).toEqual(['invalid-frontmatter']);
+      expect(result.errors[0]?.message).toContain('resources/a.md');
+      expect(result.errors[0]?.message).toContain('kind: markdown');
+    }
   });
 });

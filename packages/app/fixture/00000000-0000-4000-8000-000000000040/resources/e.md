@@ -1,6 +1,7 @@
 ---
 id: 00000000-0000-4000-8000-000000000008
 title: E
+kind: markdown
 ---
 
 Resource E is the entry point of the Echo collection.

@@ -4,6 +4,7 @@ title: |-
   T
   a subtitle line
   a caption line
+kind: markdown
 ---
 
 Resource T is the fixture's one multiline Title (ADR 0083) — a line of each role, so
