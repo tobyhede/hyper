@@ -39,7 +39,7 @@ A child directory without a `space.json` is not a Space and is left alone.
 
 ### The rules that make Spaces an aggregate
 
-- The Meta Space is the root. Every **ordinary** Space must be reached by some Space Resource in another Space; one that nothing reaches is refused (`ordinary-space-unreferenced`).
+- The Meta Space is the root. Every **ordinary** Space must be reached by some Space Resource in another Space; one that nothing reaches is refused: `Space <id> is not the Meta Space and no Space Resource points at it`.
 - A Space Resource's `map` and `graph` must name a Map of its target Space and a Graph that Map owns.
 - Space Resources may converge on one Space but may not form a cycle, and a Space Resource may not target its own Space.
 - Resource Ids are unique across the whole aggregate, not just within a Space.
@@ -98,8 +98,8 @@ Every object here is **strict**: a key the format does not declare is refused ra
 | `maps[].id`, `.title` | The Map's Id and name. Map Ids are unique within the Space. |
 | `maps[].kind` | `"positioned"`, the only kind. May be omitted. |
 | `maps[].positions` | Resource Id → placement. **The keys are the Map's membership**: a Map may leave Resources out, and may not name one the Space does not hold. A placement is `{ "x", "y" }`, with an optional `open`, `size` and `shape`. `open` is `true` or `false`; absent means Closed, and an Ur Resource may not be Open. `size` is `{ "width", "height" }`, no smaller than the Closed Size (260×146) on either axis; absent means the Closed Size, Open or Closed. `shape` is one of `rectangle`, `pill`, `ellipse` or `diamond`; absent means `rectangle`, and only an Ur Resource may take another. |
-| `maps[].graphs` | The Graphs this Map owns, in order, **at least one**. A Graph Id is unique across the whole Space, not just the Map ([ADR 0108](adr/0108-graph-identity-is-unique-within-the-space.md)). `color` is any CSS colour and `headShape` is one of `arrow`, `vee`, `dot`, `diamond`; both are optional. |
-| `maps[].graphs[].edges` | Directed `{ "from", "to" }` Edges between Resources **this Map places**. Forks, merges, cycles and self-edges are allowed; an exact duplicate in one Graph is not. An Edge may carry a one-line `title`, and `"titleHidden": true` beside it. The list may be empty. |
+| `maps[].graphs` | The Graphs this Map owns, in order, **at least one**. A Graph Id is unique across the whole Space, not just the Map ([ADR 0108](adr/0108-graph-identity-is-unique-within-the-space.md)). `color` is a non-empty string used as the Graph's CSS colour, which is not checked as a colour, and `headShape` is one of `arrow`, `vee`, `dot`, `diamond`; both are optional. |
+| `maps[].graphs[].edges` | Directed `{ "from", "to" }` Edges between Resources **this Map places**. Forks, merges, cycles and self-edges are allowed; an exact duplicate in one Graph is not. An Edge may carry a `title` that is one line with no leading or trailing whitespace, and `"titleHidden": true` beside it. The list may be empty. |
 | `maps[].activeGraph` | Which Graph is active when the Map opens. Absent means the first. |
 | `defaultMap` | The Map the Space opens on. If absent, opening the Space records its first Map here. |
 
@@ -121,7 +121,7 @@ Futures are **lazy**.
 
 A Resource's identity is its frontmatter `id`, never its file name. Exporting writes every Resource as `resources/<id>.md`, whatever its file was called before.
 
-Every Resource has `id`, `title` and `kind`. The Title must have at least one non-blank line, and may run to several. The rest depends on the kind:
+Every Resource has `id`, `title` and `kind`. The Title must have at least one non-blank line, and may run to several. Unlike `space.json`, frontmatter is not strict: a key the kind does not declare is accepted and dropped, so a misspelt optional key is lost without a word. The rest depends on the kind:
 
 | `kind` | Further frontmatter | After the frontmatter |
 | --- | --- | --- |

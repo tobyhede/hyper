@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { encodeRunCommand } from '../../src/cli/run-launcher';
 
 // SAFETY: `JSON.parse` returns `any`; this repo's own root `package.json` is
 // what's being read, so it is trusted to hold the `scripts` map this file
@@ -74,6 +76,37 @@ describe('commands in the Hyper getting-started and authoring skills', () => {
 
     expect(named).toContain('hyper');
     expect(named.filter((script) => !availableScripts.has(script))).toEqual([]);
+  });
+});
+
+// The command line `pgrep -f` reads for a run on `directory`: the launcher
+// spawns node with `run-process.ts` and `encodeRunCommand`'s arguments.
+const runProcessCommandLine = (directory: string): string =>
+  [
+    process.execPath,
+    fileURLToPath(new URL('../../src/cli/run-process.ts', import.meta.url)),
+    ...encodeRunCommand({ verb: 'run', directory, port: undefined, open: false }),
+  ].join(' ');
+
+describe('the hyper-authoring check that nothing is serving the directory', () => {
+  const skill = readFileSync(
+    new URL('../../.agents/skills/hyper-authoring/SKILL.md', import.meta.url),
+    'utf8',
+  );
+  const documented = /pgrep -fl "([^"]+)"/.exec(skill)?.[1];
+  const patternFor = (directory: string): RegExp => {
+    if (documented === undefined) throw new Error('hyper-authoring names no pgrep pattern');
+    return new RegExp(documented.replace('<dir>', directory));
+  };
+
+  it('matches the run process serving the directory', () => {
+    expect(runProcessCommandLine('/talks/rust-async')).toMatch(patternFor('/talks/rust-async'));
+  });
+
+  it('does not match a run on a sibling directory sharing its prefix', () => {
+    expect(runProcessCommandLine('/talks/rust-async-2')).not.toMatch(
+      patternFor('/talks/rust-async'),
+    );
   });
 });
 

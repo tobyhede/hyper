@@ -332,28 +332,30 @@ export const GRAPH_HEAD_SHAPES = ['arrow', 'vee', 'dot', 'diamond'] as const;
 
 export const graphHeadShapeSchema = z.enum(GRAPH_HEAD_SHAPES);
 
-export const graphSchema = z.object({
-  id: idSchema,
-  title: z.string().min(1),
-  // Optional CSS color for this graph's edges; falls back to a palette by order.
-  color: z.string().min(1).optional(),
-  /**
-   * Optional, as `color` is: every creation gesture writes `arrow`, and a
-   * Graph with none stored draws as `arrow` (`graphHeadShape`).
-   */
-  headShape: graphHeadShapeSchema.optional(),
-  /**
-   * Possibly none. A Graph *is* its Edges, but it is not minted by drawing
-   * one: creating a Map creates its initial empty Active Graph in the same
-   * Edit, and Add Map produces exactly that — one fresh Graph holding no
-   * Edges. Deleting a Graph's last Edge leaves the same shape, and Graph
-   * management may not delete the Graph itself to avoid it.
-   *
-   * A Resource may appear as the `from` of several Edges (a fork) and the `to` of
-   * several (a merge); nothing here constrains that.
-   */
-  edges: z.array(graphEdgeSchema),
-});
+export const graphSchema = z
+  .object({
+    id: idSchema,
+    title: z.string().min(1),
+    // Optional CSS color for this graph's edges; falls back to a palette by order.
+    color: z.string().min(1).optional(),
+    /**
+     * Optional, as `color` is: every creation gesture writes `arrow`, and a
+     * Graph with none stored draws as `arrow` (`graphHeadShape`).
+     */
+    headShape: graphHeadShapeSchema.optional(),
+    /**
+     * Possibly none. A Graph *is* its Edges, but it is not minted by drawing
+     * one: creating a Map creates its initial empty Active Graph in the same
+     * Edit, and Add Map produces exactly that — one fresh Graph holding no
+     * Edges. Deleting a Graph's last Edge leaves the same shape, and Graph
+     * management may not delete the Graph itself to avoid it.
+     *
+     * A Resource may appear as the `from` of several Edges (a fork) and the `to` of
+     * several (a merge); nothing here constrains that.
+     */
+    edges: z.array(graphEdgeSchema),
+  })
+  .strict();
 
 /**
  * Where a positioned Map puts a Resource, in the Map's own coordinate space.
@@ -370,10 +372,12 @@ export const mapPositionSchema = z.object({
  * that is the one floor for every kind, Open or Closed, and content adapts to
  * the rect it is given.
  */
-const resourceSizeSchema = z.object({
-  width: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.width),
-  height: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.height),
-});
+const resourceSizeSchema = z
+  .object({
+    width: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.width),
+    height: z.number().finite().min(COLLAPSED_RESOURCE_SIZE.height),
+  })
+  .strict();
 
 /**
  * The outline an Ur Resource is drawn in on a Map (ADR 0121), Open or Closed.

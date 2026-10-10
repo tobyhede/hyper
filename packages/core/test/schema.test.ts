@@ -278,6 +278,11 @@ describe('space file schema', () => {
     }
   });
 
+  it('refuses a Graph carrying a key the format does not declare, rather than stripping it', () => {
+    expect(graphSchema.safeParse({ ...MAIN, colour: 'red' }).success).toBe(false);
+    expect(spaceFileSchema.safeParse(withGraphs([{ ...MAIN, colour: 'red' }])).success).toBe(false);
+  });
+
   it('rejects an edge missing an endpoint', () => {
     for (const edge of [
       { from: '00000000-0000-4000-8000-000000000002' },
@@ -632,6 +637,22 @@ describe('space file maps', () => {
       expect(
         parseEntry({ x: 0, y: 0, open: false, openSize: { width: 400, height: 300 } }).success,
       ).toBe(false);
+    });
+
+    it('refuses a size carrying a key the format does not declare, rather than stripping it', () => {
+      const result = spaceFileSchema.safeParse({
+        ...validSpaceFile,
+        maps: [
+          {
+            ...working,
+            positions: {
+              ...working.positions,
+              [A]: { x: 0, y: 0, size: { width: 400, height: 300, depth: 3 } },
+            },
+          },
+        ],
+      });
+      expect(result.success).toBe(false);
     });
   });
 
