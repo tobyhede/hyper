@@ -15,8 +15,8 @@ Every `complete(completion)` call answers exactly one **completion outcome** —
 `completed`, `unchanged` or `refused` (`CONTEXT.md`, ADR 0042/0057;
 architecture and rationale live in `docs/agents/editing-and-persistence.md`'s
 "Space Authoring's completed-edit lifecycle" section, not here). It gets there
-by running an ordered cascade: two guards common to every action, then that
-action's own ordered checks. First failure wins; nothing past it runs.
+by running an ordered cascade: one guard common to every action but two, then
+that action's own ordered checks. First failure wins; nothing past it runs.
 `edgeEligibility`/`connectRefusal` ask the identical checks before commit,
 while a drag or connect gesture is still live in the author's hand, so the
 preview and the committed Edit can never disagree.

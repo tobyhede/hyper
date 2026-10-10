@@ -30,7 +30,7 @@ Or it touches any of these paths:
 - `packages/app/src/space-authoring.ts`, for `created-map`, `added-graph`, and which Edit target records `defaultMap`
 - `packages/app/src/snapshot.ts` `updatePositionedMap`
 
-Neighbouring topics this contract does **not** cover keep their existing guides: what a Graph may contain (cycles, self-Edges, duplicate Edges) is in [editing-and-persistence.md](editing-and-persistence.md); Edge anchors, lanes and head shapes are in [rendering.md](rendering.md); Space Resource selection and framing, beyond relocation when a Map or Graph is deleted, is in `AGENTS.md`'s "Decided" entries.
+Neighbouring topics this contract does **not** cover keep their existing guides: what a Graph may contain (cycles, self-Edges, duplicate Edges) is in [editing-and-persistence.md](editing-and-persistence.md); Edge anchors, lanes and head shapes are in [rendering.md](rendering.md); Space Resource selection and framing, beyond relocation when a Map or Graph is deleted, is in [editing-and-persistence.md](editing-and-persistence.md).
 
 ## Orientation
 
@@ -192,7 +192,7 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R41 | §6 | [0093], [0122] |
 | R42 | §6 | [0084], [0093], [0122] |
 | R43 | §6 | [0084] |
-| R44 | §6; Accepted, not built | [0122] |
+| R44 | §6 | [0122] |
 | R45, R47, R49 | §7 | [0121] (R47 also [0105]; R49 also [0122]) |
 | R46 | §7 | [0121], [0113] |
 | R48 | §7 | [0121], [0110] |

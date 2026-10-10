@@ -92,12 +92,14 @@ export default {
   coverageAnalysis: 'perTest',
 
   /*
-   * The sandbox is a plain directory copy made with `fs.copyFile`, and
-   * `.claude/skills/shadcn` and `.claude/skills/shadcn-first-ui` are
-   * git-tracked symlinks to *directories* (deliberately — CLAUDE.md tracks both
-   * harnesses' skill paths). Copying a directory symlink that way fails on
-   * macOS with `ENOTSUP: operation not supported on socket, copyfile`, which
-   * kills the run before any mutant is tested.
+   * The sandbox is a plain directory copy made with `fs.copyFile`, and every
+   * entry in `.claude/skills/` (`hyper-authoring`, `hyper-getting-started`,
+   * `shadcn`, `shadcn-first-ui`) is a git-tracked symlink to a *directory*
+   * under `.agents/skills/` (deliberately — CLAUDE.md tracks both harnesses'
+   * skill paths; `test/unit/agent-skill-symlinks.test.ts` holds the mirror).
+   * Copying a directory symlink that way fails on macOS with `ENOTSUP:
+   * operation not supported on socket, copyfile`, which kills the run before
+   * any mutant is tested.
    *
    * `.worktrees/**` is load-bearing for a different reason: a git worktree is a
    * full checkout, so without it every branch checked out beside this one is

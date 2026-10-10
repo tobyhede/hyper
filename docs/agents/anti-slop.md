@@ -31,7 +31,7 @@ Do not weaken either to reduce the overlap. ADR 0062's reasoning is that a `SAFE
 
 ### The suppressions baseline
 
-`eslint-suppressions.json` at the repository root records the 79 narrowing assertions that predate the rule, across 36 files. A committed list of violations invites two wrong readings, and both are wrong:
+`eslint-suppressions.json` at the repository root records the narrowing assertions that predate the rule, counted per file; the file itself is the count. A committed list of violations invites two wrong readings, and both are wrong:
 
 - **It is not evidence the rule is decorative.** Those sites were examined in a reviewed pass (`.scratch/anti-slop/` issue 07) under exactly the test the rule applies, and none was found to be a missing type boundary. The file is the record of what review already accepted. A new assertion fails lint even in a file the baseline lists — and adding one to a listed file reports *every* assertion in that file, because a count-based baseline cannot tell which is new. That is the intended pressure.
 - **It is not a backlog to schedule.** ADR 0062 rejected the cleanup on the evidence. `--prune-suppressions` runs in the `lint` that `verify` performs, so the file shrinks on its own as assertions go for other reasons, and the ceiling never rises. A project to empty it is the cleanup the ADR rejected, arriving under another name.
@@ -44,9 +44,9 @@ The one gap left, recorded so nobody assumes otherwise: the baseline counts per 
 
 ### Proving the gates still bite
 
-`tools/typing-fixtures/` holds one small file per construct — seven that must be rejected and four that must survive — and `test/unit/typing-fixtures.test.ts` runs `tsc`, `eslint` and `oxlint` over them for real. **A `must-fail` fixture that passes is a gap in enforcement and a finding**, not a fixture to relax. The `must-pass` half is what catches a rule over-reaching; without it, rejecting everything would score full marks.
+`tools/typing-fixtures/` holds one small file per construct, in a `must-fail/` half that must be rejected and a `must-pass/` half that must survive, and `test/unit/typing-fixtures.test.ts` runs `tsc`, `eslint` and `oxlint` over them for real. **A `must-fail` fixture that passes is a gap in enforcement and a finding**, not a fixture to relax. The `must-pass` half is what catches a rule over-reaching; without it, rejecting everything would score full marks.
 
-One limit on that half is worth knowing before relying on it. `must-pass/unknown-at-parse-boundary.ts` takes the same three boundary exemptions `packages/persistence/src/http-protocol.ts` takes (`no-unknown-parameters`, `no-runtime-typeof`, `no-unsafe-dictionary-type`), because a fixture claiming a genuine parse boundary survives has to be declared the way this repository declares one. It therefore **cannot** detect those three over-reaching. The exemption is scoped to that one file, so the other three `must-pass` fixtures still face every rule.
+One limit on that half is worth knowing before relying on it. `must-pass/unknown-at-parse-boundary.ts` takes the same three boundary exemptions `packages/persistence/src/http-protocol.ts` takes (`no-unknown-parameters`, `no-runtime-typeof`, `no-unsafe-dictionary-type`), because a fixture claiming a genuine parse boundary survives has to be declared the way this repository declares one. It therefore **cannot** detect those three over-reaching. The exemption is scoped to that one file, so every other `must-pass` fixture still faces every rule.
 
 The fixtures are excluded from lint, format and the root program on purpose. ESLint and oxlint exclusion are pinned by tests; the root program is pinned only by the shape of `tsconfig.json`'s `include`, and Prettier exclusion is not pinned at all — a leak there would show up as a confusing `verify` failure rather than a silent pass.
 
@@ -61,6 +61,14 @@ The fixtures are excluded from lint, format and the root program on purpose. ESL
 - `no-reflect-apply`: call typed functions directly or put dynamic dispatch behind a named interface.
 - `no-reflect-get`: use typed property access or parse dynamic input into a named type before reading it.
 - `no-conditional-empty-object-spread`: build the object, then add an optional property in a separate statement. Preserve omission semantics; assigning `undefined` is not equivalent under `exactOptionalPropertyTypes`.
+
+## Nondeterminism is injected at composition, never mocked (ADR 0109)
+
+A module that mints identities, reads time or otherwise depends on a nondeterministic in-process function receives that function when it is composed, so a test can supply a deterministic one. Its operational interface then stays in domain language and does not repeat the dependency on every call.
+
+- **`newId` is required, with no default.** `createSpaceAuthoring` takes it exactly as it takes `reportObserverError`, and mints the Resource, Map and Graph ids of a completed Edit from it. `packages/app/src/compose-app.ts` supplies it explicitly, so every authored identity has one visible source. `createOpenSpaces` takes the same `newId`, also required with no default, and supplies it to every `composeApp` call it makes, alongside its `reportObserverError`: omitting either lets `composeApp`'s own defaults reinstate the ambient generator and `console.error` behind the one owner's back.
+- **Do not answer a test's need for a known id with `vi.spyOn(crypto, 'randomUUID')`.** ADR 0109 rejects it on the grounds ADR 0016 gave for `loadSpace`: a constant collides across a property test's cases, so it needs a counter, at which point a generator exists anyway; `randomUUID` is an unseedable CSPRNG, so controlling it means owning it; and the mock stops working in silence the day the implementation moves to UUID v7 and reads the clock as well as the entropy pool. A spy also hides a miscount: a spy naming two ids for an Edit that mints three lets the third come from the real generator unnoticed. Tests name the ids they assert on through `packages/app/test/minting.ts`.
+- **Do not manufacture a port or adapter for a dependency with one in-process implementation**, and do not hide nondeterminism behind global mocking. Deterministic rules stay uninjected: `titles.ts` mints `Resource N`, `Map N` and `Graph N` through three named operations with the `<Prefix> N` arithmetic private, because nothing there is worth replacing in a test.
 
 ## Sources of truth
 

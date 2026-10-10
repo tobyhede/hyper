@@ -117,10 +117,10 @@ type ResourceNodeCommonData = {
    */
   open?: boolean;
   /**
-   * Resizing this Open Resource, absent on one that may not be resized.
+   * Resizing this Resource, Open or Closed, absent on one that may not be resized.
    *
    * Presence is the capability and it carries its own floor, for the same reason
-   * `titleEditor` above carries its own completions: the collapsed size is
+   * `titleEditor` above carries its own completions: the floor is the Closed Size,
    * `RESOURCE_SIZE`, which belongs to the composition and not to this package —
    * an adapter that hardcoded a minimum would be a second opinion about a
    * constant `app` already owns.

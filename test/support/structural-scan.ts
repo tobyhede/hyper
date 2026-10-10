@@ -37,7 +37,7 @@ const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 const REGULAR_FILE_MODES = new Set(['100644', '100755']);
 
 /** The repository's tracked regular files, repo-root-relative. */
-const trackedFiles = (): readonly string[] =>
+export const trackedFiles = (): readonly string[] =>
   execFileSync('git', ['ls-files', '--stage', '-z'], { cwd: repoRoot, encoding: 'utf8' })
     .split('\0')
     .flatMap((entry) => {

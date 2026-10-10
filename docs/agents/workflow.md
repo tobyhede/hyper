@@ -2,16 +2,16 @@
 
 How work moves from a question to committed code in this repo.
 
-The skills that drive this are **tracked** (see _Skills_ below), so a fresh clone or worktree has them. The process is still written down here rather than only existing inside them: they are a vendored third-party set, and the loop is ours whether or not a given skill is installed or has drifted upstream.
+The repository's skills are **tracked** (see _Skills_ below), so a fresh clone or worktree has them. None of them carries this loop, so the process is written down here.
 
 ## The loop
 
-1. **Survey** — `/improve-codebase-architecture` reads `CONTEXT.md`, the ADRs and the code, and proposes candidate changes. Pick one.
-2. **Grill** — `/grilling` walks the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. **No code until it is.**
+1. **Survey** — read `CONTEXT.md`, the ADRs and the code, and propose candidate changes. Pick one.
+2. **Grill** — walk the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. **No code until it is.**
 3. **Record** — decisions that firm up language go into `CONTEXT.md`; decisions that lock a trade-off become an ADR, and the topic's current contract is updated in the same change (see _Current contracts_). This is not a phase. It fires mid-conversation, the moment something settles.
 4. **Implement** — code and tests together.
 5. **Verify** — see the bar below.
-6. **Capture** — resolve the ticket with an `## Answer`, and fix any doc that described the old state. AGENTS.md and README both carried the ELK port-id collision as a known bug; both needed editing when it was fixed.
+6. **Capture** — resolve the ticket with an `## Answer`, and fix any doc that described the old state. AGENTS.md went on calling the ADR 0122 resize control unbuilt after its ticket resolved, because the change that built it left that entry alone.
 
 Anything not being worked on right now is parked in the tracker (`docs/agents/issue-tracker.md`), never left in conversation. A session ends; the tracker doesn't.
 
@@ -80,7 +80,7 @@ Topics with a contract so far (this is the one list; add to it when a topic migr
 
 - **Maps and Graphs:** [`maps-and-graphs.md`](maps-and-graphs.md).
 
-Every other topic is read as before: `AGENTS.md`'s "Decided" entries, the scoped guide for the area, and the ADR catalogue.
+Every other topic is read through `AGENTS.md`'s "Decided" pointers, the scoped guide for the area, and the ADR catalogue.
 
 **Reading order.** `AGENTS.md`, then `CONTEXT.md` for terms, then the owning contract. Open a source ADR for the full argument, a rejected alternative or the history.
 
@@ -228,11 +228,31 @@ This one goes. In `packages/graph/src/snapshot-edits.ts`, the module summary:
 
 ## Skills
 
-Vendored skills are tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads. `skills-lock.json` records the upstream path and content hash of each, and is tracked with them; without it the vendored copies have no recorded revision and the installer can't tell what's drifted.
+Skills are tracked, so every clone and worktree has them. The files live under `.agents/skills/` — the repo-wide location Codex reads — and `.claude/skills/` holds a symlink per skill, which is where Claude Code reads (`test/unit/agent-skill-symlinks.test.ts` holds the mirror).
 
-Tracking both paths is deliberate. An ordinary `git worktree add` populates only tracked files, so while these were ignored every worktree ran agents with no skills at all — and tracking just one of the two locations fixes just one of the two harnesses.
+Tracking both paths is deliberate. An ordinary `git worktree add` populates only tracked files, so an ignored skill is missing from every worktree — and tracking just one of the two locations fixes just one of the two harnesses.
 
-The set is deliberately small: `shadcn` (from `shadcn/ui`) and the repo-owned
-`shadcn-first-ui` production workflow are vendored.
+There are four, and only one is vendored:
 
-The [`mattpocock/skills`](https://github.com/mattpocock/skills) pack was vendored here previously and has been removed. Most of its names (`codebase-design`, `diagnosing-bugs`, `domain-modeling`, `grilling`, `prototype`, `research`, `resolving-merge-conflicts`, `tdd`, `wizard`, `writing-for-agents`, and more) collided with Claude Code's built-in skills of the same name, and a vendored skill of that name shadows the built-in rather than sitting beside it — the same problem `code-review` hit earlier. Don't reinstall it; if a specific skill from that pack is wanted again, vendor it individually under a name that doesn't collide with a built-in.
+- **`shadcn`** is vendored from `shadcn/ui` and pinned by `skills-lock.json`, which records its upstream path and the content hash of the files as they stand here. It is **patched locally**, so the hash is not upstream's.
+- **`shadcn-first-ui`**, **`hyper-authoring`** and **`hyper-getting-started`** are owned here. They are reviewed like any other repository document, and the lock does not pin them.
+
+### The `shadcn` patch
+
+The vendored files differ from upstream in three ways:
+
+- Every `shadcn@` invocation, in every `.md` and `.yml` file of the skill, names the version in `SKILL.md`'s own `allowed-tools` frontmatter rather than `@latest`. `test/unit/agent-skill-commands.test.ts` holds this.
+- `SKILL.md`'s opening note tells the agent to run the CLI through the project's package runner at that version, and `mcp.md`'s setup runs `pnpm dlx shadcn@<version>` rather than a bare `shadcn`. No test holds these.
+- `registry.md` warns that a workflow, template or MCP registry item changes what an agent does, and that it is previewed with `--dry-run`, `--diff` or `--view` before it is applied. `agent-skill-commands` holds the preview flags.
+
+An upstream update overwrites all three. After one, re-apply them (`git log -p -- .agents/skills/shadcn` shows the edits as made), run `agent-skill-commands`, then re-record the hash. The hash is SHA-256 over the skill directory's git-tracked files, sorted by relative path with `localeCompare`, feeding each file's relative path and then its bytes. Upstream `skills` walks the working tree instead, so the two agree on a clean checkout; hashing the tracked set keeps an untracked file in the directory out of the result, so `git add` any file the update brings before hashing:
+
+```sh
+node -e "const{createHash}=require('node:crypto'),fs=require('node:fs'),{execFileSync}=require('node:child_process');const d='.agents/skills/shadcn/',h=createHash('sha256');for(const f of execFileSync('git',['ls-files','-z','--',d],{encoding:'utf8'}).split('\0').filter(Boolean).map(f=>f.slice(d.length)).sort((a,b)=>a.localeCompare(b))){h.update(f);h.update(fs.readFileSync(d+f))}console.log(h.digest('hex'))"
+```
+
+Write the result into `skills-lock.json`'s `computedHash`.
+
+### Skills that are not vendored here
+
+The [`mattpocock/skills`](https://github.com/mattpocock/skills) pack is not vendored. Most of its names (`codebase-design`, `diagnosing-bugs`, `domain-modeling`, `grilling`, `prototype`, `research`, `resolving-merge-conflicts`, `tdd`, `wizard`, `writing-for-agents`, and more) collide with Claude Code's built-in skills of the same name, and a vendored skill of that name shadows the built-in rather than sitting beside it, as `code-review` would. If a specific skill from that pack is wanted, vendor it individually under a name that does not collide with a built-in.
