@@ -183,7 +183,7 @@ The directory itself, and each Space directory in it, is never renamed or recrea
 
 Two layers:
 
-- **Shape.** Zod schemas in `@project/core` check `hyper.json`, each `space.json` and each Resource's frontmatter.
+- **Shape.** Zod schemas in `@project/core` check `hyper.json`, each `space.json` and each Resource's frontmatter. The same shapes for `hyper.json` and `space.json` are published as JSON Schema in [`docs/schema/`](schema/README.md).
 - **References.** `@project/graph` checks that every Edge, placement, `activeGraph`, `defaultMap` and Reference Resource `target` resolves inside its Space, that there are no duplicate Ids or duplicate Edges, and then the aggregate rules above across Spaces.
 
 `pnpm hyper run` and `pnpm hyper import` print what they refuse and exit non-zero. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.

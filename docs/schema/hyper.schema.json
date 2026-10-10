@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tobyhede/hyper/blob/main/docs/schema/hyper.schema.json",
+  "title": "Hyper aggregate file",
+  "description": "hyper.json, the root of an Aggregate directory. It carries the one fact the directory cannot say for itself, which Space is Meta (ADR 0078). There is no list of Spaces: a Space is in the aggregate because its directory is there. Strict: no other key is allowed.",
+  "type": "object",
+  "required": ["version", "metaSpaceId"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "The aggregate file's own version, versioned apart from space.json. Any other value is refused, not migrated.",
+      "const": 1
+    },
+    "metaSpaceId": {
+      "description": "The Meta Space's Id. Intake checks that a Space directory of that name exists.",
+      "$ref": "resource/resource.schema.json#/$defs/id"
+    }
+  }
+}
