@@ -39,6 +39,8 @@ When your output names a domain concept (in an issue title, a refactor proposal,
 
 **Map shares its spelling with a builtin and an Array method, so code follows ADR 0101's conventions.** No domain value is bound to a local named `map` — a callback's domain initial is `(m)`, and a longer-lived local takes a descriptive name. A `…Map` suffix on one of our identifiers means the entity, never a lookup table (say `…ById`, `…ByKind`). `.map(`, `.flatMap(`, `ReadonlyMap`, `WeakMap`, `MiniMap`, Prisma's `@@map` and a dependency's own names (Zod's `optionsMap`) are foreign and stay as they are.
 
+**Graph is the name for what older records call Route (ADR 0041).** Schemas, code, tests and fixtures say Graph, Graph navigation and Traversal history; Route and Walk survive only in historical records and in qualified HTTP or graph-layout routing prose. Unqualified `Graph` and `GraphEdge` name the domain; a strategy's and the renderer's intermediates are `LayoutStrategyGraph` and `GraphRenderEdge`; the canvas is `SpaceCanvas`. Do not add a Route-named alias.
+
 If the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap to record during domain review.
 
 A superseded ADR lives in `docs/adr/superseded/`, so the top-level listing is the live set; `docs/adr/README.md` states each accepted decision in one line. Check an ADR's `Status:` before relying on it — a superseded one is history, not a rule. Its `Refines`/`Refined by` links point at the decisions that narrowed it. Never edit an accepted ADR; see `docs/agents/workflow.md`.

@@ -30,7 +30,7 @@ Or it touches any of these paths:
 - `packages/app/src/space-authoring.ts`, for `created-map`, `added-graph`, and which Edit target records `defaultMap`
 - `packages/app/src/snapshot.ts` `updatePositionedMap`
 
-Neighbouring topics this contract does **not** cover keep their existing guides: what a Graph may contain (cycles, self-Edges, duplicate Edges) is in [editing-and-persistence.md](editing-and-persistence.md); Edge anchors, lanes and head shapes are in [rendering.md](rendering.md); Space Resource selection and framing, beyond relocation when a Map or Graph is deleted, is in `AGENTS.md`'s "Decided" entries.
+Neighbouring topics this contract does **not** cover keep their existing guides: what a Graph may contain (cycles, self-Edges, duplicate Edges) is in [editing-and-persistence.md](editing-and-persistence.md); Edge anchors, lanes and head shapes are in [rendering.md](rendering.md); Space Resource selection and framing, beyond relocation when a Map or Graph is deleted, is in [editing-and-persistence.md](editing-and-persistence.md).
 
 ## Orientation
 

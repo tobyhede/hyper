@@ -80,7 +80,7 @@ Topics with a contract so far (this is the one list; add to it when a topic migr
 
 - **Maps and Graphs:** [`maps-and-graphs.md`](maps-and-graphs.md).
 
-Every other topic is read as before: `AGENTS.md`'s "Decided" entries, the scoped guide for the area, and the ADR catalogue.
+Every other topic is read through `AGENTS.md`'s "Decided" pointers, the scoped guide for the area, and the ADR catalogue.
 
 **Reading order.** `AGENTS.md`, then `CONTEXT.md` for terms, then the owning contract. Open a source ADR for the full argument, a rejected alternative or the history.
 
