@@ -153,7 +153,7 @@ describe('the hyper-authoring check that nothing is serving the directory', () =
   // A symlink gives a directory two spellings. The run holds the one `runHyper`
   // resolved: the physical `INIT_CWD` pnpm records for a relative `<dir>`, or
   // the path as typed for an absolute one. The person may name either.
-  const spellingsOf = (name: string): { readonly physical: string; readonly linked: string } => {
+  const spellingsOf = (name: string) => {
     const physical = join(realpathSync(parent), name);
     const linked = join(parent, `${name}-link`);
     mkdirSync(physical, { recursive: true });

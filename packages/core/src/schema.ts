@@ -199,7 +199,7 @@ export const urResourceFrontmatterSchema = z.object({
 
 const frontmatterRecordSchema = z.record(z.unknown());
 
-const frontmatterRecord = (value: unknown): Record<string, unknown> | undefined => {
+const frontmatterRecord = (value: unknown) => {
   const record = frontmatterRecordSchema.safeParse(value);
   return record.success ? record.data : undefined;
 };
