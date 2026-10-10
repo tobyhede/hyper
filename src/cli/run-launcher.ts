@@ -63,17 +63,23 @@ export const decodeRunCommand = (args: readonly string[]): RunCommand | undefine
   };
 };
 
+/**
+ * The run process's own arguments, after node's: `run-process.ts` and the
+ * encoded command. The process's command line ends with these, which is what
+ * the `hyper-authoring` skill's check reads to find a run on a directory.
+ */
+export const runProcessArguments = (command: RunCommand): readonly string[] => [
+  RUN,
+  ...encodeRunCommand(command),
+];
+
 /** Start the run and forward it the author's signals, answering its exit code. */
 export const launchRun = (command: RunCommand): Promise<number> =>
   new Promise((resolve) => {
-    const child = spawn(
-      process.execPath,
-      [...process.execArgv, RUN, ...encodeRunCommand(command)],
-      {
-        detached: true,
-        stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
-      },
-    );
+    const child = spawn(process.execPath, [...process.execArgv, ...runProcessArguments(command)], {
+      detached: true,
+      stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+    });
     let handling = false;
     const held: NodeJS.Signals[] = [];
     child.on('message', (message) => {

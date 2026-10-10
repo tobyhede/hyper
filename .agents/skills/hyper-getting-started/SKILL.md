@@ -23,8 +23,8 @@ Work from the root of the Hyper clone. Each step ends on its completion criterio
 
    Done when you know the absolute path and `<dir>/hyper.json` exists.
 
-4. **Git.** Make the directory a git repository if it is not in one: `git -C <dir> init`. Do it before the first run, so git is the undo before the first edit; it can also be done before `init`.
-   Done when `git -C <dir> rev-parse --show-toplevel` succeeds.
+4. **Git.** Make the directory a git repository if it is not in one: `git -C <dir> init`; it can also be done before `init`. Then commit what is there before the first run: `git -C <dir> add -A && git -C <dir> commit -m "Before Hyper"`. A repository with no commit has nothing to restore, and the first write rewrites existing files into Hyper's own form (every Resource becomes `resources/<id>.md`), so the commit is what makes git the undo for that first edit. If `git -C <dir> status --porcelain` already prints nothing, there is nothing to commit.
+   Done when `git -C <dir> rev-parse --show-toplevel` succeeds and `git -C <dir> status --porcelain` prints nothing.
 
 5. **Start.** For the person, in their terminal: `pnpm hyper run <dir>`. It prints the address it serves (port 4173, or the next free port) and opens their browser. Add `--port <port>` to choose the port, which fails if that port is taken rather than moving on, and `--no-open` to leave the browser alone.
    If you start it yourself, use `pnpm hyper run <dir> --no-open`, read the printed `Running <dir> at <url>` line for the address, and stop it with SIGINT to the process group you started, so its last write lands. A stop that wrote everything prints `Stopped; <dir> holds every edit.` and exits zero; one that prints `Stopped, but the last edits were not written:` and exits 1 has lost those edits, so tell the person what it printed rather than treating the directory as written. A missing or empty directory is refused with the `pnpm hyper init` command that creates one, so go back to step 3. Any other refused directory exits non-zero and prints its problems; fix those (the `hyper-authoring` skill covers the format) and start again.

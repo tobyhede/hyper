@@ -1,7 +1,9 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
-import { encodeRunCommand } from '../../src/cli/run-launcher';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+import { runProcessArguments } from '../../src/cli/run-launcher';
 
 // SAFETY: `JSON.parse` returns `any`; this repo's own root `package.json` is
 // what's being read, so it is trusted to hold the `scripts` map this file
@@ -12,15 +14,12 @@ const rootPackage = JSON.parse(
   readonly scripts?: Readonly<Record<string, string>>;
 };
 
-const shadcnFirstUi = readFileSync(
-  new URL('../../.agents/skills/shadcn-first-ui/SKILL.md', import.meta.url),
-  'utf8',
-);
+const readSkill = (name: string): string =>
+  readFileSync(new URL(`../../.agents/skills/${name}/SKILL.md`, import.meta.url), 'utf8');
 
-const shadcnSkill = readFileSync(
-  new URL('../../.agents/skills/shadcn/SKILL.md', import.meta.url),
-  'utf8',
-);
+const shadcnFirstUi = readSkill('shadcn-first-ui');
+
+const shadcnSkill = readSkill('shadcn');
 
 const shadcnRegistry = readFileSync(
   new URL('../../.agents/skills/shadcn/registry.md', import.meta.url),
@@ -67,11 +66,7 @@ const HYPER_SKILLS = ['hyper-getting-started', 'hyper-authoring'] as const;
 
 describe('commands in the Hyper getting-started and authoring skills', () => {
   it.each(HYPER_SKILLS)('%s names only root scripts the repository can run', (name) => {
-    const skill = readFileSync(
-      new URL(`../../.agents/skills/${name}/SKILL.md`, import.meta.url),
-      'utf8',
-    );
-    const named = namedRootScripts(skill);
+    const named = namedRootScripts(readSkill(name));
     const availableScripts = new Set(Object.keys(rootPackage.scripts ?? {}));
 
     expect(named).toContain('hyper');
@@ -79,34 +74,68 @@ describe('commands in the Hyper getting-started and authoring skills', () => {
   });
 });
 
-// The command line `pgrep -f` reads for a run on `directory`: the launcher
-// spawns node with `run-process.ts` and `encodeRunCommand`'s arguments.
-const runProcessCommandLine = (directory: string): string =>
-  [
-    process.execPath,
-    fileURLToPath(new URL('../../src/cli/run-process.ts', import.meta.url)),
-    ...encodeRunCommand({ verb: 'run', directory, port: undefined, open: false }),
-  ].join(' ');
-
+// The documented check, run as written by `sh` against a live process whose
+// arguments are the run's. `<dir>` is spelled through `$HYPER_DIR`, so the
+// shell's own command line never holds the directory and cannot match itself.
 describe('the hyper-authoring check that nothing is serving the directory', () => {
-  const skill = readFileSync(
-    new URL('../../.agents/skills/hyper-authoring/SKILL.md', import.meta.url),
-    'utf8',
-  );
-  const documented = /pgrep -fl "([^"]+)"/.exec(skill)?.[1];
-  const patternFor = (directory: string): RegExp => {
-    if (documented === undefined) throw new Error('hyper-authoring names no pgrep pattern');
-    return new RegExp(documented.replace('<dir>', directory));
-  };
+  const documented = /`([^`]*run-process\.ts[^`]*)`/.exec(readSkill('hyper-authoring'))?.[1];
+  const parent = mkdtempSync(join(tmpdir(), 'hyper-check-'));
+  const decoys: ChildProcess[] = [];
 
-  it('matches the run process serving the directory', () => {
-    expect(runProcessCommandLine('/talks/rust-async')).toMatch(patternFor('/talks/rust-async'));
+  afterAll(() => {
+    for (const decoy of decoys) decoy.kill('SIGKILL');
+    rmSync(parent, { recursive: true, force: true });
   });
 
-  it('does not match a run on a sibling directory sharing its prefix', () => {
-    expect(runProcessCommandLine('/talks/rust-async-2')).not.toMatch(
-      patternFor('/talks/rust-async'),
+  // `runHyper` resolves `<dir>` before the launcher sees it; the process holds the resolved path.
+  const startRunOn = (directory: string): ChildProcess => {
+    mkdirSync(directory, { recursive: true });
+    const decoy = spawn(
+      process.execPath,
+      [
+        '-e',
+        'setInterval(() => {}, 1000)',
+        ...runProcessArguments({
+          verb: 'run',
+          directory: resolve(directory),
+          port: undefined,
+          open: false,
+        }),
+      ],
+      { stdio: 'ignore' },
     );
+    decoys.push(decoy);
+    return decoy;
+  };
+
+  const check = (spelling: string): string => {
+    if (documented === undefined) throw new Error('hyper-authoring names no check command');
+    return spawnSync('sh', ['-c', documented.replaceAll('<dir>', '${HYPER_DIR}')], {
+      env: { ...process.env, HYPER_DIR: spelling },
+      encoding: 'utf8',
+    }).stdout;
+  };
+
+  it.each(['c++-intro', 'notes (draft)', 'what?', 'drafts[1]'])(
+    'sees the run on a directory named %s',
+    (name) => {
+      const directory = join(parent, name);
+      const decoy = startRunOn(directory);
+      expect(check(directory)).toContain(String(decoy.pid));
+    },
+  );
+
+  it('sees the run when the directory is written with a trailing slash', () => {
+    const directory = join(parent, 'rust-async');
+    const decoy = startRunOn(directory);
+    expect(check(`${directory}/`)).toContain(String(decoy.pid));
+  });
+
+  it('does not see a run on a sibling directory sharing its prefix', () => {
+    const directory = join(parent, 'go-async');
+    mkdirSync(directory);
+    const sibling = startRunOn(`${directory}-2`);
+    expect(check(directory)).not.toContain(String(sibling.pid));
   });
 });
 
