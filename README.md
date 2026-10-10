@@ -14,11 +14,14 @@ You need Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install
 git clone https://github.com/tobyhede/hyper.git
 cd hyper
 pnpm install
+git init ~/talks/rust-async
 pnpm hyper init ~/talks/rust-async
+git -C ~/talks/rust-async add -A
+git -C ~/talks/rust-async commit -m "New talk"
 pnpm hyper run ~/talks/rust-async
 ```
 
-`init` writes a new aggregate to `~/talks/rust-async`, which must be missing or empty, and prints the command that runs it. `run` prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
+`init` writes a new aggregate to `~/talks/rust-async`, which must be empty apart from dot-entries such as `.git`, and prints the command that runs it. Committing what it wrote before the first run gives git a revision to restore. `run` prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
 
 1. Edit. Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go.
 2. Press **Present** to traverse the Graph: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the Map.
@@ -27,7 +30,6 @@ pnpm hyper run ~/talks/rust-async
 
    ```sh
    cd ~/talks/rust-async
-   git init        # the first time only
    git add -A
    git commit -m "First draft"
    ```

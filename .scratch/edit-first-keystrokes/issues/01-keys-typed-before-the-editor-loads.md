@@ -17,7 +17,8 @@ Options:
 Also check whether any canvas or global shortcut reacts to letters or Space while focus sits on the body during the wait.
 
 - [ ] A decision is recorded (ADR or UI guide).
-- [ ] If behaviour changes, the delayed-chunk spec is restored and passes.
+- [ ] If an option that keeps the keys is chosen (1), the delayed-chunk spec is restored and passes.
+- [ ] If an option that loses them is chosen (2 on a cold load, 3 or 4), the decision says what a key typed during the wait does, and the spec is restored asserting that instead of the typed text appearing.
 
 ## Reproduction spec
 

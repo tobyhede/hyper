@@ -2,7 +2,7 @@
 
 **What to build:** an agent reading the top of AGENTS.md meets the rules most often broken before any of the long entries. Those rules are:
 - start production UI work with `shadcn-first-ui`;
-- never start or kill a dev server;
+- never start a `pnpm dev*` host, and never stop or kill a server you did not start; a `pnpm hyper run --no-open` on a temp directory of your own stays allowed;
 - mint ids through the injected `newId`, never by mocking `crypto`;
 - use extensionless relative imports, and `import type` for type-only imports;
 - the suppressions file only shrinks;
