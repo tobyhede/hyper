@@ -2,7 +2,7 @@
 
 `SpaceBackend`/`SpaceSession`, Space Authoring's completed-edit lifecycle, and the resource and space file format. The Map and Graph rules — Map lifecycle, `defaultMap`, Graph ownership and order, membership, displacement, first working load and the strategy contract — are owned by [`maps-and-graphs.md`](maps-and-graphs.md). Read before touching `packages/persistence`, `packages/graph`, `space-authoring.ts` in `packages/app`, `migrations/**`, or `src/prisma/**`.
 
-**ADR 0070 refinement:** an existing Reference Resource Target is immutable. `edited-resource` may rename a Reference Resource but refuses a changed Target with `reference-target-immutable`; the existing-Reference metadata pane and its retargeting surface are removed. References below to Reference Resource retargeting describe the superseded surface.
+**ADR 0070:** a Reference Resource's Target is immutable. `edited-resource` may rename a Reference Resource but refuses a changed Target with `reference-target-immutable`, and no surface offers a Target to an existing Reference Resource.
 
 ## PostgreSQL & the document contract
 

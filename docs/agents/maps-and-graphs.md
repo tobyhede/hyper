@@ -192,7 +192,7 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R41 | §6 | [0093], [0122] |
 | R42 | §6 | [0084], [0093], [0122] |
 | R43 | §6 | [0084] |
-| R44 | §6; Accepted, not built | [0122] |
+| R44 | §6 | [0122] |
 | R45, R47, R49 | §7 | [0121] (R47 also [0105]; R49 also [0122]) |
 | R46 | §7 | [0121], [0113] |
 | R48 | §7 | [0121], [0110] |

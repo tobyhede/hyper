@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 Findings from the pre-release audit, still open after the release fixes:
 
@@ -22,6 +22,26 @@ Findings from the pre-release audit, still open after the release fixes:
 - The ADR index's lines use retired vocabulary (Card, Layout, Thing, Diagram, Alias, View) with no translation note.
 - Two source comments still state the superseded fixed Closed size or resize-only-when-Open: the header of the app's `resource` module and the "Resizing this Open Resource" comment in the adapter's projection.
 
-- [ ] Every item above is corrected or recorded as refuted with its evidence.
-- [ ] No prose in the agent docs states a suppression, fixture or coverage count.
-- [ ] `docs-agents-citation-accuracy`, `current-domain-vocabulary` and prettier pass.
+- [x] Every item above is corrected or recorded as refuted with its evidence.
+- [x] No prose in the agent docs states a suppression, fixture or coverage count.
+- [x] `docs-agents-citation-accuracy`, `current-domain-vocabulary` and prettier pass.
+
+## Answer
+
+Every finding held when checked against the tree on 2026-10-10; none is refuted. Two were wider than the audit stated, and the fix follows the tree.
+
+- **ADR 0064.** No open ticket delivers it: of the `.scratch` files citing 0064 with an open status, `resource-aria-description/issues/01` is about aria descriptions, the two specs (`resource-has-no-front`, `size-independent-of-open`) have every issue resolved, and `expanded-cards/issues/03` is `implemented` (the cross-fade). Close-disabled-while-editing is asserted in `packages/app/e2e/overview.spec.ts`, `packages/app/e2e/image-resource.spec.ts` and `packages/app/ladle-e2e/resource-open.spec.ts`. AGENTS.md now says built.
+- **React Flow boundary.** `eslint.config.js` bans `@xyflow/react` from `core`, `graph`, `http`, `persistence` and `ui` (the `http` zone too, which the audit's list omits). AGENTS.md states it once, in the hard rules, and the package bullet no longer says "the ONLY place".
+- **Counts.** `eslint-suppressions.json` held 46 suppressions across 24 files; `tools/typing-fixtures/` holds eight `must-fail` and four `must-pass`; `vitest.config.ts` gates `core`, `graph`, `http` and `persistence`. AGENTS.md, `docs/agents/anti-slop.md` and `tools/typing-fixtures/README.md` now point at those files and state no number.
+- **Workflow loop.** The Survey and Grill steps name no skill. The Capture example is the ADR 0122 resize-control drift.
+- **Rendering.** Structural deletion is Delete from Space in the Resource's Actions menu (`resource-rail-actions.tsx`, `resource-deletion.ts`, `ladle-e2e/delete-confirmation.spec.ts`); the dangling ADR 0040 pointer is gone.
+- **UI guide.** The `#subpath` example is `components/card.tsx` (`#lib/utils`).
+- **Refusal cascade.** One guard, `map-not-found`, asked by every action but `created-map` and `renamed-space`.
+- **Maps and Graphs.** R44's provenance row no longer says "Accepted, not built"; the contract's "Accepted, not built" list already omitted it.
+- **Editing and persistence.** The preamble states Target immutability and no longer refers to text below it.
+- **Triage labels.** The table's column names the canonical role, and the template line is gone.
+- **Repo-meta test.** AGENTS.md names the scans that shell out to `git ls-files`: `current-domain-vocabulary`, `conflict-markers`, `docs-agents-citation-accuracy`, and those reading through `test/support/structural-scan.ts`, which the audit's list omits.
+- **ADR index.** `docs/adr/README.md` carries a translation table for Card, Thing, Layout, Diagram, View, Alias and Reference Thing; the historical lines are unchanged.
+- **Source comments.** `packages/app/src/resource.ts`'s header describes the Closed Size as the default and floor of an authored size, independent of Open; `packages/react-flow-adapter/src/projection.ts`'s `resize` doc says Open or Closed.
+
+Checks: `pnpm exec vitest run test/unit` (81 files passed), `pnpm exec prettier --check` on the changed files, `pnpm exec eslint` on the two source files.

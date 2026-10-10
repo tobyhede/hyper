@@ -1,20 +1,20 @@
 /**
- * The shape of a resource in the graph, read from `COLLAPSED_RESOURCE_SIZE` in
- * `@project/core` and handed to the stylesheet.
+ * The Closed Size, read from `COLLAPSED_RESOURCE_SIZE` in `@project/core` and
+ * handed to the stylesheet.
  *
- * A closed resource draws its title (ADR 0064), so its content is bounded and every closed resource is
- * the same shape. That makes the size a design constant rather than something
- * measured: content adapts to the resource, not the resource to the content. It is why
- * a measured DOM size never decides placement here, the way it must in a layout
- * whose nodes are content-sized.
+ * It is the size of a Resource whose Map entry authors none, and the floor every
+ * authored size keeps (`resourceSize` in `@project/core`). A Resource's size is
+ * authored and independent of Open: Resize changes it, Open and Close do not
+ * (ADR 0122). So a measured DOM size never decides placement here, the way it
+ * must in a layout whose nodes are content-sized: content adapts to the
+ * Resource, not the Resource to its content.
  *
  * Only the proportion is a design decision. The base width is arbitrary:
  * placement is authored in its own coordinate space, and React Flow's zoom maps
  * it to the viewport.
  *
- * **16:9, matching the presentation surface.** A resource in the graph and the same
- * resource being presented are one object, so they share a silhouette — click a resource,
- * present it, and the shape does not change. The ratio is chosen for the medium a
+ * **16:9, matching the presentation surface.** A Resource at the Closed Size and
+ * the same Resource being presented share a silhouette. The ratio is chosen for the medium a
  * presentation actually lands on: projectors and external displays are
  * overwhelmingly 16:9, and that is the worst case to letterbox.
  *

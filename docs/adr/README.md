@@ -23,6 +23,18 @@ its contract where one exists.
   an ADR body describes an arrangement of controls, the tests and `CONTEXT.md`
   are what hold, not the prose.
 
+**The lines below keep the vocabulary of the ADR they describe**, so an older
+line names an entity by a word `CONTEXT.md` has since retired. Read them in
+current words:
+
+| Written | Read as |
+| --- | --- |
+| Card, Thing | Resource |
+| Layout, Diagram, View | Map |
+| Alias, Reference Thing | Reference Resource |
+
+`CONTEXT.md`'s _Avoid_ entries name the ADR that retired each word.
+
 `test/unit/adr-status-blocks.test.ts` holds the status blocks to their
 convention: one-word `Status:`, reciprocal `Refines`/`Refined by` and
 `Supersedes`/`Superseded by`, one superseder per ADR, and a superseded ADR filed

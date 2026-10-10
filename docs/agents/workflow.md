@@ -6,12 +6,12 @@ The skills that drive this are **tracked** (see _Skills_ below), so a fresh clon
 
 ## The loop
 
-1. **Survey** — `/improve-codebase-architecture` reads `CONTEXT.md`, the ADRs and the code, and proposes candidate changes. Pick one.
-2. **Grill** — `/grilling` walks the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. **No code until it is.**
+1. **Survey** — read `CONTEXT.md`, the ADRs and the code, and propose candidate changes. Pick one.
+2. **Grill** — walk the decision tree on that candidate: one question at a time, each carrying a recommendation, until shared understanding is explicitly confirmed. **No code until it is.**
 3. **Record** — decisions that firm up language go into `CONTEXT.md`; decisions that lock a trade-off become an ADR, and the topic's current contract is updated in the same change (see _Current contracts_). This is not a phase. It fires mid-conversation, the moment something settles.
 4. **Implement** — code and tests together.
 5. **Verify** — see the bar below.
-6. **Capture** — resolve the ticket with an `## Answer`, and fix any doc that described the old state. AGENTS.md and README both carried the ELK port-id collision as a known bug; both needed editing when it was fixed.
+6. **Capture** — resolve the ticket with an `## Answer`, and fix any doc that described the old state. AGENTS.md went on calling the ADR 0122 resize control unbuilt after its ticket resolved, because the change that built it left that entry alone.
 
 Anything not being worked on right now is parked in the tracker (`docs/agents/issue-tracker.md`), never left in conversation. A session ends; the tracker doesn't.
 
