@@ -93,7 +93,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 
 - **R37. Size and Open/Closed are authored on the Map, independently.** A Map entry is `{ x, y, open?, size?, shape? }`. Open, Close and Resize are Edits and survive reload and export. Both fields are optional with an application default, as `shape` is (R47): an entry with no `open` is Closed and one with no `size` is the Closed Size (260×146); every reader resolves them through `resourceOpen` and `resourceSize` in `@project/core`. Add Resource and Add to Map write no size. Coupling the two made a bigger Resource a two-step gesture that also changed what it drew and moved its neighbours (A17). ([0064], [0122])
 - **R38. Only Resize changes a size, and Open and Close change only `open`.** Opening or Closing changes what is drawn inside the Resource's rect — its Title, or its content — and never its size or any position. Edit on a Closed Resource still Opens it before placing the caret, changing no size. A Resize back to the Closed Size is an ordinary Resize and leaves an Open Resource Open; there is no magnetic Close (A26). ([0122], [0064])
-- **R39. Open is offered only by a kind with content to show** — Markdown, Image, Space and Reference. An Ur Resource has none (ADR 0113), so it offers no Open or Close — reversing ADR 0113's rejection of a kind that cannot be Opened, which rested on Open being how a size was authored — the Open Edit refuses it, and intake refuses an entry storing it Open, both as `open-requires-content` (A25). ([0122], [0113])
+- **R39. Open is offered only by a kind with content to show** — Markdown, Image, Space and Reference. An Ur Resource has none (ADR 0113), so it offers no Open or Close — reversing ADR 0113's rejection of a kind that cannot be Opened, which rested on Open being how a size was authored — the Open Edit refuses it, and intake refuses an entry storing it Open, both as `open-requires-content` (A25). ([0122], [0113], [0128])
 - **R40. The Closed Size is the one floor for every kind, Open or Closed, and only a Resize displaces.** No kind has its own minimum and no kind chooses a first-Open size: content adapts to the rect it is given — a small Open document scrolls, a picture scales down, an embedded Map fits (A24). A Resize moves the Resources its growth passes, once, writing their positions into the Map. Between Edits a drawn position *is* the authored one: a drop lands where it was dropped, with no conversion and no `move` draft, and a resize preview shows only the resizing Resource. `Placement.drawn` and `authoredPoint` must not return. Render-derived displacement coupled every position to every size, jumped, and needed a non-total inverse that misplaced drops (A13). ([0122], [0084])
 - **R41. A Resource makes room on at most one axis, decided against the subject's rect before the Resize.** The change is the new size less the old one, per axis, negative for a shrink. At or past the old right edge, a Resource takes the width change only. Otherwise, at or past the old bottom edge, it takes the height change only. Otherwise it does not move. One axis is enough to stay clear; `x` first keeps a Resource beside the subject from moving vertically; touching counts as clear. Cost: a grid no longer scales uniformly, and a Resource below the subject but not clear on `x` moves down however far left it sits (A15, A16). ([0093], [0122])
 - **R42. A Resize is memoryless.** It reads the Map as it is now and never records which Resources it pushed (A14). A grow then the shrink back restores every position, because the grow carries each clear Resource clear of the grown rect, which the shrink measures from. The other order is stated, not clamped: a Resource overlapping the larger rect but clear of the smaller one is not moved by a shrink, and the grow back pushes it. ([0084], [0093], [0122])
@@ -105,7 +105,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 ## 7. Shape
 
 - **R45. A Resource's Shape is authored on the Map.** It is one of a closed set: rectangle, pill, ellipse, diamond. It is stored in the Map's entry beside position, Open/Closed state and size, never on the Resource, so the same Resource may take different Shapes in different Maps. A Shape is the diagram's notation, and notation belongs to the diagram (A19). ([0121])
-- **R46. Only an Ur Resource takes a Shape.** A Shape is diagram notation, and an Ur Resource is the kind a diagram is drawn with; a Markdown, Image, Space or Reference Resource is always the rectangle. The Shape choice is offered on an Ur Resource alone, a Shape Edit on any other kind is refused (`shape-requires-ur-resource`), and intake refuses a Map entry giving any other kind a Shape but the rectangle with the same code. ([0121], [0113])
+- **R46. Only an Ur Resource takes a Shape.** A Shape is diagram notation, and an Ur Resource is the kind a diagram is drawn with; a Markdown, Image, Space or Reference Resource is always the rectangle. The Shape choice is offered on an Ur Resource alone, a Shape Edit on any other kind is refused (`shape-requires-ur-resource`), and intake refuses a Map entry giving any other kind a Shape but the rectangle with the same code. ([0121], [0113], [0128])
 - **R47. The Shape is optional, and the application's default is the rectangle.** An entry with no `shape` stored draws as the rectangle, as a Graph with no `headShape` draws the arrow; every reader resolves it through `resourceShape` in `@project/core`. Add Resource and Add to Map write no Shape. Choosing a Shape writes the one chosen, the rectangle included, and choosing the Shape a Resource already draws as is `unchanged`, so the rectangle is `unchanged` on an entry storing none. Every other Edit that rewrites an entry keeps what it stores. Remove from Map forgets it with the rest of the entry (A23). ([0121], [0105])
 - **R48. A Shape changes no rect.** It is drawn at the Resource's rect — its size — so Resize, displacement (R37–R44) and Edge attachment are unchanged. Ellipse and diamond fill the rect proportionally, and a pill's ends stay half-circles at any size. Every Shape in the set touches the midpoint of each side of its rect at every size, where Edges attach; a Shape that does not is not admitted (A21, A22). The Title lays out centred in the rectangle inscribed in the Shape, with no kind glyph — an Ur Resource's Shape says what it is, so it draws none in any Shape, Open or Closed — and every Shape draws the Title Lines, clamped as the rectangle's are to the lines its inscribed rectangle holds at the Closed Size, so resizing wider is how a long Title is given room. The selection ring follows the outline. ([0121], [0110])
 - **R49. A Shape is drawn at every size.** Resizing an Ur Resource gives the same Shape at its new size; an Ur Resource is never Open (R39), so nothing it draws changes with Open. The resize control stays at the rect's bottom-right corner, on the border a selected Shape draws around its rect (R44). The Shape choice is on the rail at every size. A presented Resource is drawn by the presented surface and is the rectangle. ([0121], [0122])
@@ -148,6 +148,7 @@ Every rule above is built except these:
 
 - **Auto-arrange** (R6), with any returning automatic strategy (R7). Delivery: [`.scratch/auto-arrange/issues/01-auto-arrange-a-map.md`](../../.scratch/auto-arrange/issues/01-auto-arrange-a-map.md), which also holds the two open questions: whether the Edit records which strategy produced the positions, and whether it asks for confirmation before rewriting a whole Map while undo does not exist.
 - **Manual Graph reordering** (R25). Delivery: [`.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md`](../../.scratch/graph-reordering/issues/01-reorder-a-maps-graphs.md).
+- **Never-Open and Shape as the Ur module's flags** (R39, R46). Under [0128] no Map rule names a kind: whether a kind can be Open and whether it takes a Shape become capabilities the Ur module declares and the core reads, and R39 and R46 are reworded to read those flags. The rules a reader meets do not change. Delivery: [`.scratch/resource-kind-modules/issues/02-the-kind-registry-and-the-ur-module.md`](../../.scratch/resource-kind-modules/issues/02-the-kind-registry-and-the-ur-module.md).
 
 Remove an entry here in the change that verifies its implementation.
 
@@ -187,14 +188,14 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R33, R34, R36 | §5 | [0040] |
 | R35 | §5 | [0122] |
 | R37, R38 | §6 | [0064], [0122] |
-| R39 | §6 | [0122], [0113] (reversing its rejected option) |
+| R39 | §6; Accepted, not built | [0122], [0113] (reversing its rejected option), [0128] |
 | R40 | §6 | [0122], [0084] |
 | R41 | §6 | [0093], [0122] |
 | R42 | §6 | [0084], [0093], [0122] |
 | R43 | §6 | [0084] |
 | R44 | §6 | [0122] |
 | R45, R47, R49 | §7 | [0121] (R47 also [0105]; R49 also [0122]) |
-| R46 | §7 | [0121], [0113] |
+| R46 | §7; Accepted, not built | [0121], [0113], [0128] |
 | R48 | §7 | [0121], [0110] |
 | R50 | §7 | [0121], [0112] |
 | A1–A26 | Rejected alternatives | Cited in each row |
@@ -235,5 +236,6 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0113]: ../adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md
 [0121]: ../adr/0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md
 [0122]: ../adr/0122-a-resources-size-is-independent-of-open.md
+[0128]: ../adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md
 [0106]: ../adr/0106-an-image-resource-owns-a-url-not-bytes.md
 [0114]: ../adr/0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md

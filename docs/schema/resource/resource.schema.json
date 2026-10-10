@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/tobyhede/hyper/blob/main/docs/schema/resource/resource.schema.json",
   "title": "Hyper Resource file",
-  "description": "One Resource, as the file resources/<id>.json in a Space directory (ADR 0128). The envelope is the core's; content belongs to the kind and is validated by that kind's schema. Strict at both levels: the core refuses a top-level key it does not own, and the kind refuses a key inside content it does not declare.",
+  "description": "One Resource, as the file resources/<id>.json in a Space directory (ADR 0128). This schema composes the core's envelope with the built-in kinds' schemas, as a build registers them; the envelope's own rules name no kind, and content belongs to the kind and is validated by that kind's schema. Strict at both levels: the core refuses a top-level key it does not own, and the kind refuses a key inside content it does not declare.",
   "type": "object",
   "required": ["id", "title", "kind", "content"],
   "additionalProperties": false,
@@ -17,23 +17,23 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "kind": { "const": "ur" } } },
+      "if": { "required": ["kind"], "properties": { "kind": { "const": "ur" } } },
       "then": { "properties": { "content": { "$ref": "kinds/ur.schema.json" } } }
     },
     {
-      "if": { "properties": { "kind": { "const": "markdown" } } },
+      "if": { "required": ["kind"], "properties": { "kind": { "const": "markdown" } } },
       "then": { "properties": { "content": { "$ref": "kinds/markdown.schema.json" } } }
     },
     {
-      "if": { "properties": { "kind": { "const": "image" } } },
+      "if": { "required": ["kind"], "properties": { "kind": { "const": "image" } } },
       "then": { "properties": { "content": { "$ref": "kinds/image.schema.json" } } }
     },
     {
-      "if": { "properties": { "kind": { "const": "reference" } } },
+      "if": { "required": ["kind"], "properties": { "kind": { "const": "reference" } } },
       "then": { "properties": { "content": { "$ref": "kinds/reference.schema.json" } } }
     },
     {
-      "if": { "properties": { "kind": { "const": "space" } } },
+      "if": { "required": ["kind"], "properties": { "kind": { "const": "space" } } },
       "then": { "properties": { "content": { "$ref": "kinds/space.schema.json" } } }
     }
   ],
@@ -41,7 +41,6 @@
     "id": {
       "description": "A durable UUID. A Resource's identity is this field, never its file name.",
       "type": "string",
-      "format": "uuid",
       "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
     },
     "title": {

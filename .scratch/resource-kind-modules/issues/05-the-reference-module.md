@@ -6,4 +6,4 @@ Status: ready-for-agent
 
 **Depends on:** 02, and 03 and 04 so every Target kind is a module.
 
-**Acceptance:** the existing refusals for a dangling Target and a Reference-to-Reference keep their codes and wording; no code outside the Reference module names `'reference'`.
+**Acceptance:** the existing refusals for a dangling Target and a Reference-to-Reference keep their codes and wording; no non-test source outside the Reference module names `'reference'`, and CSS selectors on `data-kind='reference'` or `data-content-kind='reference'` move with the module's view half (ADR 0120).

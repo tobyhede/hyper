@@ -6,4 +6,4 @@ Status: ready-for-agent
 
 **Depends on:** 02.
 
-**Acceptance:** no code outside the Markdown module names `'markdown'`; the E2E and Ladle specs that exercise Markdown Resources pass unchanged.
+**Acceptance:** no non-test source outside the Markdown module names `'markdown'`, and CSS selectors on `data-kind='markdown'` or `data-content-kind='markdown'` move with the module's view half (ADR 0120); the E2E and Ladle specs that exercise Markdown Resources pass unchanged.

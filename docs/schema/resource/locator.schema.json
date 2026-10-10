@@ -8,6 +8,7 @@
     {
       "required": ["path", "mediaType"],
       "properties": {
+        "url": false,
         "path": {
           "description": "A relative POSIX path inside the Resource file's directory: no leading slash, no backslash, no . or .. segment.",
           "type": "string",
@@ -21,12 +22,10 @@
     {
       "required": ["url"],
       "properties": {
+        "path": false,
         "url": {
           "type": "string",
           "minLength": 1
-        },
-        "mediaType": {
-          "$ref": "#/$defs/mediaType"
         }
       }
     }

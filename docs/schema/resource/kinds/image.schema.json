@@ -10,16 +10,15 @@
     "url": {
       "type": "string",
       "anyOf": [
-        { "pattern": "^https?://" },
+        {
+          "description": "An external URL. The pattern refuses only what intake refuses: an http: or https: scheme in any case, after the leading C0 controls and spaces and the tabs and newlines a WHATWG URL parser discards. Intake also requires the whole string to parse as a WHATWG URL.",
+          "pattern": "^[\\u0000- ]*[hH][\\t\\n\\r]*[tT][\\t\\n\\r]*[tT][\\t\\n\\r]*[pP][\\t\\n\\r]*([sS][\\t\\n\\r]*)?:"
+        },
         {
           "description": "A stored image's content id: the SHA-256 of its bytes as unpadded base64url, 43 characters in canonical spelling (ADR 0106).",
           "pattern": "^/images/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
         }
       ]
-    },
-    "mediaType": {
-      "description": "Optional, as the URL alone may not say. The host stores these four.",
-      "enum": ["image/png", "image/jpeg", "image/webp", "image/gif"]
     },
     "naturalSize": {
       "description": "The picture's size in pixels, measured when the URL was set; absent when it did not load.",

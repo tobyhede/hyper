@@ -8,6 +8,8 @@ Status: ready-for-agent
 - **View half:** how it draws Open and presented, its icon, its content actions (`KindOperations`, ADR 0125). Registered in the application only, so nothing outside it imports a view.
 - `content` becomes unknown to the core and is parsed by the kind's schema. A kind nothing registers is refused at intake (ADR 0120).
 
-Ur first because it has no content and no actions: it proves the seam with the least behaviour. Its Shape (ADR 0121) and never-Open (ADR 0122) rules become its flags; `docs/agents/maps-and-graphs.md` is the contract that states those rules and is updated in the same change to say they are read from the flags.
+Ur first because it has no content and no actions: it proves the seam with the least behaviour. Its Shape (ADR 0121) and never-Open (ADR 0122) rules become its flags. In the same change, `docs/agents/maps-and-graphs.md` rewords R39 and R46 to say those rules are read from the flags, and removes its "Accepted, not built" entry for them.
 
-**Acceptance:** no code outside the Ur module names `'ur'`; Map rules for Shape and Open read the flags; the other four kinds still work through their existing branches.
+**Depends on:** 01.
+
+**Acceptance:** no non-test source outside the Ur module names `'ur'`, except the Resource-file codec's missing-kind default (`defaultUrKind` in `packages/core/src/schema.ts`), which `07` deletes when `kind` becomes required; the CSS selectors on `data-kind='ur'` and `data-content-kind='ur'` (`packages/ui/src/canvas-resource.css`, `packages/ui/src/stage.css`) are the module's view half (ADR 0120) and move with it; Map rules for Shape and Open read the flags; the other four kinds still work through their existing branches.

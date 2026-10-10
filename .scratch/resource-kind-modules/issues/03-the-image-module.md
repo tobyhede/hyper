@@ -6,4 +6,4 @@ Status: ready-for-agent
 
 **Depends on:** 02.
 
-**Acceptance:** no code outside the Image module names `'image'`; the E2E and Ladle specs that exercise Image Resources pass unchanged.
+**Acceptance:** no non-test source outside the Image module names `'image'`, and CSS selectors on `data-kind='image'` or `data-content-kind='image'` move with the module's view half (ADR 0120); the E2E and Ladle specs that exercise Image Resources pass unchanged.

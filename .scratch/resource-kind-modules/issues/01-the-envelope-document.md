@@ -6,7 +6,7 @@ Status: ready-for-agent
 
 Resource files do not change in this step: the frontmatter codec in `packages/graph/src/resource-file.ts` maps flat frontmatter to and from the envelope, and Export writes byte-identical files.
 
-**Roll forward in the same change (ADR 0054):** every stored-document fixture, seed and test that builds a Resource document. The SQL `document` column is jsonb and keeps its type; the repository's revision handling is untouched.
+**Roll forward in the same change (ADR 0054):** every stored-document fixture, seed and test that builds a Resource document, and `docs/agents/editing-and-persistence.md`'s sentence that `body` is the field and `content` the domain word and that neither is renamed into the other: `content` becomes the envelope's field, and a Markdown Resource's source is `content.source`. The SQL `document` column is jsonb and keeps its type; the repository's revision handling is untouched.
 
 **Acceptance:**
 
