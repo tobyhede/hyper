@@ -324,9 +324,7 @@ const createSpaceResource = (
   const document: ResourceDocument = {
     title: input.title,
     kind: 'space',
-    spaceId: targetSpaceId,
-    map: selection.map,
-    graph: selection.graph,
+    content: { spaceId: targetSpaceId, map: selection.map, graph: selection.graph },
   };
   const created = SnapshotEdit.createInMap(
     source,
@@ -439,7 +437,8 @@ const recoveryBlockedBy = (
 const spaceResourceEdges = (snapshot: SpaceSnapshot): ReadonlyMap<UUID, UUID> => {
   const edges = new Map<UUID, UUID>();
   for (const candidate of snapshot.resources) {
-    if (candidate.document.kind === 'space') edges.set(candidate.id, candidate.document.spaceId);
+    if (candidate.document.kind === 'space')
+      edges.set(candidate.id, candidate.document.content.spaceId);
   }
   return edges;
 };
@@ -512,7 +511,11 @@ export const planDelete = (
   if (deletion.kind !== 'completed') {
     throw new Error(`Space Resource deletion through SnapshotEdit answered '${deletion.kind}'`);
   }
-  const deleted = cascadeDeletion(view.aggregate, deletion.snapshot, resource.document.spaceId);
+  const deleted = cascadeDeletion(
+    view.aggregate,
+    deletion.snapshot,
+    resource.document.content.spaceId,
+  );
   for (const id of deleted) {
     const recovery = recoveryRefusal(view.recovery, id);
     if (recovery !== undefined) return recovery;
@@ -587,12 +590,13 @@ const replaceSpaceResourceSelection = (
   resources: snapshot.resources.map((resource) => {
     if (
       resource.document.kind !== 'space' ||
-      resource.document.spaceId !== targetSpaceId ||
+      resource.document.content.spaceId !== targetSpaceId ||
       !matches(resource.document)
     )
       return resource;
-    const document = { ...resource.document, map: selection.map, graph: selection.graph };
-    if (resetFraming) delete document.framing;
+    const content = { ...resource.document.content, map: selection.map, graph: selection.graph };
+    if (resetFraming) delete content.framing;
+    const document = { ...resource.document, content };
     return { ...resource, document };
   }),
 });
@@ -639,10 +643,10 @@ export const planContextDeletion = (
 
   const selectsDeletedContext = (document: ResourceDocument): boolean =>
     document.kind === 'space' &&
-    document.spaceId === input.targetSpaceId &&
+    document.content.spaceId === input.targetSpaceId &&
     (deletingMap
-      ? document.map === input.mapId
-      : document.map === input.mapId && document.graph === input.graphId);
+      ? document.content.map === input.mapId
+      : document.content.map === input.mapId && document.content.graph === input.graphId);
   const affectedBy = (snapshot: SpaceSnapshot): boolean =>
     snapshot.resources.some(({ document }) => selectsDeletedContext(document));
   const affected = view.aggregate.spaces.map(({ snapshot }) => snapshot).filter(affectedBy);

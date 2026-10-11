@@ -27,16 +27,14 @@ const resource = (id: Resource['id'], title: string): Resource => ({
   id,
   title,
   kind: 'markdown',
-  body: '',
+  content: { source: '' },
 });
 
 const spaceResource = (id: typeof PLACED_RESOURCE_ID, title: string): Resource => ({
   id,
   title,
   kind: 'space',
-  spaceId: TARGET_SPACE_ID,
-  map: TARGET_MAP_ID,
-  graph: TARGET_GRAPH_ID,
+  content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
 });
 
 const referenceResource = (
@@ -47,7 +45,7 @@ const referenceResource = (
   id,
   title,
   kind: 'reference',
-  target,
+  content: { target },
 });
 
 const build = (

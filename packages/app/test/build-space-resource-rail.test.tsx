@@ -57,9 +57,7 @@ const documentOf = (
 ): Extract<ResourceDocument, { kind: 'space' }> => ({
   title: 'Elsewhere',
   kind: 'space',
-  spaceId: TARGET_ID,
-  map: mapId,
-  graph,
+  content: { spaceId: TARGET_ID, map: mapId, graph },
 });
 
 const mountRail = (rail: ReturnType<typeof buildSpaceResourceRail>) =>

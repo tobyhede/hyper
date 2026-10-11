@@ -12,7 +12,7 @@ import { MemorySpaceRepository } from '../../src/persistence/memory-space-reposi
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 
 const spaceResourceTargets = (resources: readonly Resource[]): readonly UUID[] =>
-  resources.flatMap((resource) => (resource.kind === 'space' ? [resource.spaceId] : []));
+  resources.flatMap((resource) => (resource.kind === 'space' ? [resource.content.spaceId] : []));
 
 /**
  * Longest Space-Resource path from Meta, and every ordinary Space that path reaches.
@@ -99,7 +99,7 @@ describe('tracked fixture aggregate', () => {
       for (const resource of space.resources) {
         if (resource.kind !== 'markdown') continue;
         expect(titleName(resource.title).length).toBeGreaterThan(1);
-        expect(resource.body.trim().length).toBeGreaterThan(0);
+        expect(resource.content.source.trim().length).toBeGreaterThan(0);
       }
     }
   });
@@ -135,9 +135,9 @@ describe('tracked fixture images', () => {
     const opened = loaded.aggregate.spaces.flatMap(({ snapshot }) =>
       snapshot.resources.flatMap(({ id, document }) =>
         document.kind === 'image' &&
-        document.url.startsWith(STORED_IMAGE_PREFIX) &&
+        document.content.url.startsWith(STORED_IMAGE_PREFIX) &&
         (snapshot.document.maps ?? []).some((m) => m.positions[id]?.open === true)
-          ? [document.url]
+          ? [document.content.url]
           : [],
       ),
     );

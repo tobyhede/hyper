@@ -15,21 +15,19 @@ import { resourceDeletionWords } from '../src/resource-deletion';
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
 const RESOURCES: readonly Resource[] = [
-  { id: id('000000000001'), title: 'Zulu', kind: 'markdown', body: '' },
+  { id: id('000000000001'), title: 'Zulu', kind: 'markdown', content: { source: '' } },
   {
     id: id('000000000002'),
     title: 'Alpha',
     kind: 'space',
-    spaceId: id('000000000012'),
-    map: id('000000000013'),
-    graph: id('000000000014'),
+    content: { spaceId: id('000000000012'), map: id('000000000013'), graph: id('000000000014') },
   },
-  { id: id('000000000003'), title: 'Alpha', kind: 'markdown', body: '' },
+  { id: id('000000000003'), title: 'Alpha', kind: 'markdown', content: { source: '' } },
   {
     id: id('000000000004'),
     title: 'Constraints',
     kind: 'reference',
-    target: id('000000000003'),
+    content: { target: id('000000000003') },
   },
 ];
 
@@ -321,7 +319,12 @@ describe('ResourcesPopover', () => {
    */
   it('adds a Resource by name and finds it by any line of its Title', async () => {
     const laddered: readonly Resource[] = [
-      { id: id('000000000005'), title: 'Auth\nHow a session begins', kind: 'markdown', body: '' },
+      {
+        id: id('000000000005'),
+        title: 'Auth\nHow a session begins',
+        kind: 'markdown',
+        content: { source: '' },
+      },
       ...RESOURCES,
     ];
     render(<Fixture resources={laddered} allResources={laddered} />);
@@ -587,12 +590,17 @@ describe('ResourcesPopover', () => {
    */
   it('finds a Reference Resource by a later line of its Target’s Title', async () => {
     const laddered: readonly Resource[] = [
-      { id: id('000000000003'), title: 'Alpha\nHow a session begins', kind: 'markdown', body: '' },
+      {
+        id: id('000000000003'),
+        title: 'Alpha\nHow a session begins',
+        kind: 'markdown',
+        content: { source: '' },
+      },
       {
         id: id('000000000004'),
         title: 'Constraints',
         kind: 'reference',
-        target: id('000000000003'),
+        content: { target: id('000000000003') },
       },
     ];
     render(<Fixture resources={laddered} allResources={laddered} />);
@@ -711,7 +719,7 @@ describe('ResourcesPopover', () => {
   });
 
   it('counts and filters Ur Resources under their own glyph', async () => {
-    const ur: Resource = { id: id('000000000005'), title: 'Gateway', kind: 'ur' };
+    const ur: Resource = { id: id('000000000005'), title: 'Gateway', kind: 'ur', content: {} };
     const resources = [...RESOURCES, ur];
     render(<Fixture resources={resources} allResources={resources} />);
     await openList();
@@ -1121,7 +1129,12 @@ describe('ResourcesPopover', () => {
 
   it('lists a Reference Resource whose Target is absent from allResources', async () => {
     const dangling: readonly Resource[] = [
-      { id: id('000000000005'), title: 'Stray', kind: 'reference', target: id('000000000009') },
+      {
+        id: id('000000000005'),
+        title: 'Stray',
+        kind: 'reference',
+        content: { target: id('000000000009') },
+      },
     ];
     render(<Fixture resources={dangling} allResources={dangling} />);
     await openList();

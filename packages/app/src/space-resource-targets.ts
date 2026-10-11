@@ -20,7 +20,7 @@ export const NO_SPACE_RESOURCE_TARGETS: SpaceResourceTargets = new Map();
 /** The distinct Spaces the Space Resources of one Space reference, in authored order. */
 const referencedSpaceIds = (resources: readonly Resource[]): readonly UUID[] => [
   ...new Set(
-    resources.flatMap((resource) => (resource.kind === 'space' ? [resource.spaceId] : [])),
+    resources.flatMap((resource) => (resource.kind === 'space' ? [resource.content.spaceId] : [])),
   ),
 ];
 
@@ -168,7 +168,9 @@ export const useSpaceResourceTargets = (
     const live = new Map(targets);
     for (const entry of entries) {
       if (
-        resources.some((resource) => resource.kind === 'space' && resource.spaceId === entry.id)
+        resources.some(
+          (resource) => resource.kind === 'space' && resource.content.spaceId === entry.id,
+        )
       ) {
         live.set(entry.id, spaceResourceTarget(entry.app.currentSpace()));
       }

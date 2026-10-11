@@ -74,13 +74,14 @@ export const markdownResourceFrontmatterSchema = z.object({
 });
 
 /** The frontmatter of a reference resource file — a pointer to the resource whose content it shows. */
-export const referenceResourceFrontmatterSchema = z.object({
-  id: idSchema,
-  title: resourceTitleSchema,
-  kind: z.literal('reference'),
+export const referenceResourceContentSchema = z.object({
   /** The id of the resource this reference shows. Referential checks live in `@project/graph`. */
   target: idSchema,
 });
+
+export const referenceResourceFrontmatterSchema = z
+  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal('reference') })
+  .extend(referenceResourceContentSchema.shape);
 
 /**
  * A Resource that shows one selected view of another independently stored Space
@@ -111,15 +112,16 @@ const spaceResourceFramingSchema = z.object({
   zoom: z.number().positive().finite(),
 });
 
-export const spaceResourceFrontmatterSchema = z.object({
-  id: idSchema,
-  title: resourceTitleSchema,
-  kind: z.literal('space'),
+export const spaceResourceContentSchema = z.object({
   spaceId: idSchema,
   map: uuidSchema,
   graph: idSchema,
   framing: spaceResourceFramingSchema.optional(),
 });
+
+export const spaceResourceFrontmatterSchema = z
+  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal('space') })
+  .extend(spaceResourceContentSchema.shape);
 
 /** The refusal code for an image URL an Image Resource may not hold; the application owns the wording. */
 export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
@@ -179,13 +181,14 @@ export const imageNaturalSizeSchema = z.object({
  * not the bytes, so nothing here says where the picture is stored; the natural
  * size is absent when the picture did not load when its URL was set.
  */
-export const imageResourceFrontmatterSchema = z.object({
-  id: idSchema,
-  title: resourceTitleSchema,
-  kind: z.literal('image'),
+export const imageResourceContentSchema = z.object({
   url: imageUrlSchema,
   naturalSize: imageNaturalSizeSchema.optional(),
 });
+
+export const imageResourceFrontmatterSchema = z
+  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal('image') })
+  .extend(imageResourceContentSchema.shape);
 
 /**
  * A Resource with no content: a Title and every capability every Resource has
@@ -282,22 +285,51 @@ export const importResourceFrontmatterSchema = z.preprocess(
   ]),
 );
 
+/** A Markdown Resource's content: the source its author wrote, which its file holds as the body. */
+export const markdownResourceContentSchema = z.object({ source: z.string() });
+
+/** An Ur Resource's content, which is nothing (ADR 0113). */
+export const urResourceContentSchema = z.object({});
+
+/**
+ * A Resource is an envelope (ADR 0128): the core owns `id`, `title` and
+ * `kind`, and everything a kind adds sits under `content`. A Resource file's
+ * frontmatter is still flat; the codec in `@project/graph` maps between the two.
+ * The envelope takes its `kind` from the frontmatter, so the two share one
+ * instance of that rule as they share the Title's.
+ */
+const resourceEnvelope = <K extends z.ZodTypeAny, C extends z.ZodTypeAny>(kind: K, content: C) =>
+  z.object({ id: idSchema, title: resourceTitleSchema, kind, content });
+
 /** A resource written directly by the author; the body of its file is its content. */
-export const markdownResourceSchema = markdownResourceFrontmatterSchema.extend({
-  body: z.string(),
-});
+export const markdownResourceSchema = resourceEnvelope(
+  markdownResourceFrontmatterSchema.shape.kind,
+  markdownResourceContentSchema,
+);
 
 /** A resource that shows its target's content at a second position (ADR 0009). */
-export const referenceResourceSchema = referenceResourceFrontmatterSchema;
+export const referenceResourceSchema = resourceEnvelope(
+  referenceResourceFrontmatterSchema.shape.kind,
+  referenceResourceContentSchema,
+);
 
 /** A resource that embeds one selected view of another Space (ADR 0068). */
-export const spaceResourceSchema = spaceResourceFrontmatterSchema;
+export const spaceResourceSchema = resourceEnvelope(
+  spaceResourceFrontmatterSchema.shape.kind,
+  spaceResourceContentSchema,
+);
 
 /** A resource that shows a picture from its URL (ADR 0106). */
-export const imageResourceSchema = imageResourceFrontmatterSchema;
+export const imageResourceSchema = resourceEnvelope(
+  imageResourceFrontmatterSchema.shape.kind,
+  imageResourceContentSchema,
+);
 
 /** A resource with no content (ADR 0113). */
-export const urResourceSchema = urResourceFrontmatterSchema;
+export const urResourceSchema = resourceEnvelope(
+  urResourceFrontmatterSchema.shape.kind,
+  urResourceContentSchema,
+);
 
 /**
  * A resource parsed from its file (ADR 0020). A markdown resource carries the file body

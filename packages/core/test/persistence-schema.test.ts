@@ -27,8 +27,14 @@ const identified = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown' as const, body: 'A' } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown' as const, body: 'B' } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'A', kind: 'markdown' as const, content: { source: 'A' } },
+    },
+    {
+      id: RESOURCE_B,
+      document: { title: 'B', kind: 'markdown' as const, content: { source: 'B' } },
+    },
   ],
 };
 
@@ -86,7 +92,7 @@ describe('import space schema', () => {
       },
       resources: [
         ...identified.resources,
-        { document: { title: 'New', kind: 'markdown', body: '' } },
+        { document: { title: 'New', kind: 'markdown', content: { source: '' } } },
       ],
     };
 

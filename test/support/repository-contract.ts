@@ -74,7 +74,7 @@ const FOURTH_GRAPH_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000025')
 
 const resource = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, body: title },
+  document: { title, kind: 'markdown' as const, content: { source: title } },
 });
 
 /**
@@ -92,7 +92,11 @@ const spaceResource = (
   selection: { readonly map: UUID; readonly graph: UUID },
 ) => ({
   id,
-  document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
+  document: {
+    title: `Open ${target}`,
+    kind: 'space' as const,
+    content: { spaceId: target, ...selection },
+  },
 });
 
 /**
@@ -668,7 +672,7 @@ export const spaceRepositoryContract = (
         resources: [
           {
             id: RESOURCE_ID,
-            document: { title: 'Resource', kind: 'markdown', body: 'Body' },
+            document: { title: 'Resource', kind: 'markdown', content: { source: 'Body' } },
           },
         ],
       };
@@ -678,7 +682,7 @@ export const spaceRepositoryContract = (
         resources: [
           {
             id: RESOURCE_ID,
-            document: { body: 'Body', kind: 'markdown', title: 'Resource' },
+            document: { content: { source: 'Body' }, kind: 'markdown', title: 'Resource' },
           },
         ],
       };
@@ -983,8 +987,10 @@ export const spaceRepositoryContract = (
         document: {
           title: 'Figure',
           kind: 'image' as const,
-          url: 'https://example.com/figure.png',
-          naturalSize: { width: 640, height: 480.5 },
+          content: {
+            url: 'https://example.com/figure.png',
+            naturalSize: { width: 640, height: 480.5 },
+          },
         },
       };
       const first: SpaceSnapshot = {
@@ -1003,7 +1009,7 @@ export const spaceRepositoryContract = (
             document: {
               title: 'Figure',
               kind: 'image',
-              url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+              content: { url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
             },
           },
         ],
@@ -1029,10 +1035,10 @@ export const spaceRepositoryContract = (
       const first: SpaceSnapshot = {
         ...space(SPACE_ID, 'Diagram', [RESOURCE_ID]),
         resources: [
-          { id: RESOURCE_ID, document: { title: 'Node', kind: 'ur' } },
+          { id: RESOURCE_ID, document: { title: 'Node', kind: 'ur', content: {} } },
           {
             id: SECOND_RESOURCE_ID,
-            document: { title: 'Node, again', kind: 'reference', target: RESOURCE_ID },
+            document: { title: 'Node, again', kind: 'reference', content: { target: RESOURCE_ID } },
           },
         ],
       };
@@ -1042,7 +1048,7 @@ export const spaceRepositoryContract = (
       const renamed: SpaceSnapshot = {
         ...first,
         resources: [
-          { id: RESOURCE_ID, document: { title: 'Renamed node', kind: 'ur' } },
+          { id: RESOURCE_ID, document: { title: 'Renamed node', kind: 'ur', content: {} } },
           ...first.resources.slice(1),
         ],
       };
@@ -1140,7 +1146,7 @@ export const spaceRepositoryContract = (
           // Only an Ur Resource takes a Shape (ADR 0121).
           resources: base.resources.map(({ id, document }) => ({
             id,
-            document: { title: document.title, kind: 'ur' },
+            document: { title: document.title, kind: 'ur', content: {} },
           })),
           document: {
             ...base.document,
@@ -1181,7 +1187,7 @@ export const spaceRepositoryContract = (
           // Only an Ur Resource takes a Shape (ADR 0121).
           resources: base.resources.map(({ id, document }) => ({
             id,
-            document: { title: document.title, kind: 'ur' },
+            document: { title: document.title, kind: 'ur', content: {} },
           })),
           document: {
             ...base.document,

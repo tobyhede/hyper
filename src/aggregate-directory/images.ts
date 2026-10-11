@@ -142,7 +142,7 @@ export const loadReferencedImages = async (
   const ids = new Set(
     spaces.flatMap(({ resources }) =>
       resources.flatMap(({ document }) => {
-        const id = document.kind === 'image' ? storedImageId(document.url) : undefined;
+        const id = document.kind === 'image' ? storedImageId(document.content.url) : undefined;
         return id === undefined ? [] : [id];
       }),
     ),

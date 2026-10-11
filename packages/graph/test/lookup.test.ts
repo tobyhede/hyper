@@ -24,20 +24,29 @@ function everyKind(): Space {
     id: uuid('00000000-0000-4000-8000-000000000001'),
     document: { version: 1, title: 'Every kind' },
     resources: [
-      { id: MARKDOWN, document: { title: 'Notes', kind: 'markdown', body: 'Some notes.\n' } },
+      {
+        id: MARKDOWN,
+        document: { title: 'Notes', kind: 'markdown', content: { source: 'Some notes.\n' } },
+      },
       {
         id: IMAGE,
-        document: { title: 'Harbour', kind: 'image', url: 'https://example.com/harbour.png' },
+        document: {
+          title: 'Harbour',
+          kind: 'image',
+          content: { url: 'https://example.com/harbour.png' },
+        },
       },
       {
         id: FRAMED_SPACE,
         document: {
           title: 'Framed',
           kind: 'space',
-          spaceId: TARGET_SPACE,
-          map: TARGET_MAP,
-          graph: TARGET_GRAPH,
-          framing: FRAMING,
+          content: {
+            spaceId: TARGET_SPACE,
+            map: TARGET_MAP,
+            graph: TARGET_GRAPH,
+            framing: FRAMING,
+          },
         },
       },
       {
@@ -45,19 +54,23 @@ function everyKind(): Space {
         document: {
           title: 'Unframed',
           kind: 'space',
-          spaceId: TARGET_SPACE,
-          map: TARGET_MAP,
-          graph: TARGET_GRAPH,
+          content: { spaceId: TARGET_SPACE, map: TARGET_MAP, graph: TARGET_GRAPH },
         },
       },
-      { id: UR, document: { title: 'Node', kind: 'ur' } },
-      { id: TO_MARKDOWN, document: { title: 'Notes, again', kind: 'reference', target: MARKDOWN } },
-      { id: TO_IMAGE, document: { title: 'Harbour, again', kind: 'reference', target: IMAGE } },
+      { id: UR, document: { title: 'Node', kind: 'ur', content: {} } },
+      {
+        id: TO_MARKDOWN,
+        document: { title: 'Notes, again', kind: 'reference', content: { target: MARKDOWN } },
+      },
+      {
+        id: TO_IMAGE,
+        document: { title: 'Harbour, again', kind: 'reference', content: { target: IMAGE } },
+      },
       {
         id: TO_SPACE,
-        document: { title: 'Framed, again', kind: 'reference', target: FRAMED_SPACE },
+        document: { title: 'Framed, again', kind: 'reference', content: { target: FRAMED_SPACE } },
       },
-      { id: TO_UR, document: { title: 'Node, again', kind: 'reference', target: UR } },
+      { id: TO_UR, document: { title: 'Node, again', kind: 'reference', content: { target: UR } } },
     ],
   });
   if (!result.ok) throw new Error('fixture should load');

@@ -76,8 +76,14 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
-    { id: OTHER_RESOURCE_ID, document: { title: 'B', kind: 'markdown', body: 'B source' } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { source: 'A source' } },
+    },
+    {
+      id: OTHER_RESOURCE_ID,
+      document: { title: 'B', kind: 'markdown', content: { source: 'B source' } },
+    },
   ],
 });
 
@@ -107,10 +113,13 @@ const twiceReferenced: SpaceSnapshot = spaceSnapshotSchema.parse({
   },
   resources: [
     ...snapshot.resources,
-    { id: REFERENCE_ID, document: { title: 'A again', kind: 'reference', target: RESOURCE_ID } },
+    {
+      id: REFERENCE_ID,
+      document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_ID } },
+    },
     {
       id: SECOND_REFERENCE_ID,
-      document: { title: 'A once more', kind: 'reference', target: RESOURCE_ID },
+      document: { title: 'A once more', kind: 'reference', content: { target: RESOURCE_ID } },
     },
   ],
 });
@@ -195,7 +204,7 @@ const bodyOf = (session: SpaceSession, resourceId: string): string | undefined =
   const document = session
     .getState()
     .working.resources.find((resource) => resource.id === resourceId)?.document;
-  return document?.kind === 'markdown' ? document.body : undefined;
+  return document?.kind === 'markdown' ? document.content.source : undefined;
 };
 
 /**
@@ -518,7 +527,7 @@ describe('authoring an opened Resource', () => {
           document: {
             title: 'A again',
             kind: 'reference',
-            target: RESOURCE_ID,
+            content: { target: RESOURCE_ID },
           },
         },
       ],
@@ -707,7 +716,7 @@ describe('authoring an opened Resource', () => {
     createResource('Ur Resource');
 
     const created = session.getState().working.resources.at(-1);
-    expect(created?.document).toEqual({ title: 'Resource 1', kind: 'ur' });
+    expect(created?.document).toEqual({ title: 'Resource 1', kind: 'ur', content: {} });
     const title = await screen.findByRole('textbox', { name: 'Resource title' });
     expect(title).toHaveValue('Resource 1');
     expect(title).toHaveFocus();

@@ -419,9 +419,7 @@ describe('readAggregate', () => {
     expect(resource?.id).toBe(RESOURCE_ID);
     expect(resource?.document).toMatchObject({
       kind: 'space',
-      spaceId: OTHER_SPACE_ID,
-      map: META_SPACE_ID,
-      graph: OTHER_SPACE_ID,
+      content: { spaceId: OTHER_SPACE_ID, map: META_SPACE_ID, graph: OTHER_SPACE_ID },
     });
   });
 });

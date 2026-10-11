@@ -4,7 +4,10 @@ import {
   resourceSchema,
   importResourceFrontmatterSchema,
   type Resource,
+  type ResourceDocument,
   type ImportResource,
+  type ImportResourceFrontmatter,
+  type UUID,
 } from '@project/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { splitFrontmatter } from './frontmatter';
@@ -31,17 +34,7 @@ export type ParseImportResourceFileResult =
   { ok: true; resource: ImportResource } | { ok: false; errors: ResourceFileError[] };
 
 type ResourceFileFailure = { ok: false; errors: ResourceFileError[] };
-type Frontmatter =
-  | { kind: 'markdown' }
-  | { kind: 'reference' }
-  | { kind: 'space' }
-  | { kind: 'image' }
-  | { kind: 'ur' };
-type DecodedCandidate<T extends Frontmatter> = T extends { kind: 'markdown' }
-  ? T & { body: string }
-  : T;
-
-interface FrontmatterSchema<T extends Frontmatter> {
+interface FrontmatterSchema<T extends ImportResourceFrontmatter> {
   safeParse(value: unknown):
     | { success: true; data: T }
     | {
@@ -62,7 +55,8 @@ export function parseResourceFile(file: ResourceFile): ParseResourceFileResult {
   const decoded = decodeResourceFile(file, resourceFrontmatterSchema);
   if (!decoded.ok) return decoded;
 
-  const resource = resourceSchema.safeParse(decoded.candidate);
+  const { id, document } = envelope(decoded.frontmatter, decoded.body);
+  const resource = resourceSchema.safeParse({ id, ...document });
   if (!resource.success) {
     return {
       ok: false,
@@ -81,16 +75,52 @@ export function parseImportResourceFile(file: ResourceFile): ParseImportResource
   const decoded = decodeResourceFile(file, importResourceFrontmatterSchema);
   if (!decoded.ok) return decoded;
 
-  const { id, ...document } = decoded.candidate;
+  const { id, document } = envelope(decoded.frontmatter, decoded.body);
   const resource: ImportResource = { document };
   if (id !== undefined) resource.id = id;
   return { ok: true, resource };
 }
 
-function decodeResourceFile<T extends Frontmatter>(
+/**
+ * A Resource file's frontmatter is flat and a Resource is an envelope
+ * (ADR 0128): the frontmatter's id, title and kind are the envelope's, and its
+ * other keys are the kind's content. A Markdown Resource's content is the
+ * file's body.
+ */
+interface DecodedResource {
+  readonly id: UUID | undefined;
+  readonly document: ResourceDocument;
+}
+
+function envelope(frontmatter: ImportResourceFrontmatter, body: string): DecodedResource {
+  switch (frontmatter.kind) {
+    case 'markdown': {
+      const { id, title, kind } = frontmatter;
+      return { id, document: { title, kind, content: { source: body } } };
+    }
+    case 'reference': {
+      const { id, title, kind, ...content } = frontmatter;
+      return { id, document: { title, kind, content } };
+    }
+    case 'space': {
+      const { id, title, kind, ...content } = frontmatter;
+      return { id, document: { title, kind, content } };
+    }
+    case 'image': {
+      const { id, title, kind, ...content } = frontmatter;
+      return { id, document: { title, kind, content } };
+    }
+    case 'ur': {
+      const { id, title, kind } = frontmatter;
+      return { id, document: { title, kind, content: {} } };
+    }
+  }
+}
+
+function decodeResourceFile<T extends ImportResourceFrontmatter>(
   file: ResourceFile,
   schema: FrontmatterSchema<T>,
-): { ok: true; candidate: DecodedCandidate<T> } | ResourceFileFailure {
+): { ok: true; frontmatter: T; body: string } | ResourceFileFailure {
   const fail = (kind: ResourceFileErrorKind, message: string): ResourceFileFailure => ({
     ok: false,
     errors: [{ kind, path: file.path, message: `${file.path}: ${message}` }],
@@ -143,14 +173,7 @@ function decodeResourceFile<T extends Frontmatter>(
     );
   }
 
-  const candidate =
-    parsed.data.kind === 'markdown' ? { ...parsed.data, body: split.body } : parsed.data;
-  // SAFETY: the ternary above already adds `body` exactly when `kind` is
-  // `'markdown'` and leaves the value alone otherwise — precisely what
-  // `DecodedCandidate<T>` demands. TypeScript cannot verify this itself
-  // because a conditional type keyed on a generic `T` isn't narrowed by a
-  // runtime check on a *value* of that generic type, only on a concrete union.
-  return { ok: true, candidate: candidate as DecodedCandidate<T> };
+  return { ok: true, frontmatter: parsed.data, body: split.body };
 }
 
 /**
@@ -169,12 +192,11 @@ function decodeResourceFile<T extends Frontmatter>(
  * the default.
  */
 export function serializeResourceFile(resource: Resource): string {
-  if (resource.kind !== 'markdown') {
-    return `${FENCE}${stringifyYaml(resource)}${FENCE}\n`;
+  const { content, ...frontmatter } = resource;
+  if (resource.kind === 'markdown') {
+    return `${FENCE}${stringifyYaml(frontmatter)}${FENCE}\n${resource.content.source}`;
   }
-
-  const { body, ...frontmatter } = resource;
-  return `${FENCE}${stringifyYaml(frontmatter)}${FENCE}\n${body}`;
+  return `${FENCE}${stringifyYaml({ ...frontmatter, ...content })}${FENCE}\n`;
 }
 
 /** YAML's own errors are multi-line and end in a source excerpt; the first line says what broke. */

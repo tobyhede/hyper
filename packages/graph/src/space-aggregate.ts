@@ -125,12 +125,12 @@ export function loadSpaceAggregate({
   }
   for (const space of spaces) {
     for (const resource of space.resources) {
-      if (resource.kind !== 'space' || byId.has(resource.spaceId)) continue;
+      if (resource.kind !== 'space' || byId.has(resource.content.spaceId)) continue;
       errors.push({
         kind: 'space-resource-target-missing',
         spaceId: space.id,
         resourceId: resource.id,
-        targetSpaceId: resource.spaceId,
+        targetSpaceId: resource.content.spaceId,
       });
     }
   }
@@ -139,13 +139,13 @@ export function loadSpaceAggregate({
   for (const space of spaces) {
     for (const resource of space.resources) {
       if (resource.kind !== 'space') continue;
-      const target = byId.get(resource.spaceId);
+      const target = byId.get(resource.content.spaceId);
       if (target === undefined) continue;
       // The Resource's own stored id, with no fallback to the target's
       // `defaultMap` (ADR 0079). A Space Resource selects a Map from the
       // moment it exists, so a `map` that resolves to nothing is a dangling
       // reference to a deleted Map rather than an unmade choice.
-      const mapId = resource.map;
+      const mapId = resource.content.map;
       const resolvedMap = target.lookup.map(mapId);
       if (resolvedMap === undefined) {
         errors.push({
@@ -157,25 +157,25 @@ export function loadSpaceAggregate({
         });
         continue;
       }
-      if (target.lookup.graph(resource.graph) === undefined) {
+      if (target.lookup.graph(resource.content.graph) === undefined) {
         errors.push({
           kind: 'space-resource-graph-missing',
           spaceId: space.id,
           resourceId: resource.id,
           targetSpaceId: target.id,
-          graphId: resource.graph,
+          graphId: resource.content.graph,
         });
         continue;
       }
       const subjectGraphs = resolvedMap.map.graphs;
-      if (!subjectGraphs.some((graph) => graph.id === resource.graph)) {
+      if (!subjectGraphs.some((graph) => graph.id === resource.content.graph)) {
         errors.push({
           kind: 'space-resource-graph-outside-map',
           spaceId: space.id,
           resourceId: resource.id,
           targetSpaceId: target.id,
           mapId,
-          graphId: resource.graph,
+          graphId: resource.content.graph,
         });
       }
     }
@@ -187,7 +187,7 @@ export function loadSpaceAggregate({
     visitState.set(space.id, 'visiting');
     for (const resource of space.resources) {
       if (resource.kind !== 'space') continue;
-      const target = byId.get(resource.spaceId);
+      const target = byId.get(resource.content.spaceId);
       // Missing targets were returned above, so this branch only preserves the
       // type-level boundary between Map lookup and the validated topology.
       if (target === undefined) continue;
@@ -214,7 +214,7 @@ export function loadSpaceAggregate({
   const referencedSpaceIds = new Set<UUID>();
   for (const space of spaces) {
     for (const resource of space.resources) {
-      if (resource.kind === 'space') referencedSpaceIds.add(resource.spaceId);
+      if (resource.kind === 'space') referencedSpaceIds.add(resource.content.spaceId);
     }
   }
   for (const space of spaces) {

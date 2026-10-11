@@ -162,7 +162,7 @@ describe.each([
     // 0009); every markdown resource carries one.
     for (const resource of result.space.resources) {
       if (resource.kind !== 'markdown') expect('body' in resource).toBe(false);
-      else expect(resource.body.trim().length).toBeGreaterThan(0);
+      else expect(resource.content.source.trim().length).toBeGreaterThan(0);
     }
   });
 });

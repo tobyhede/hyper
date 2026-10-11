@@ -70,7 +70,10 @@ const targetSpace = (
     defaultMap: mapId,
   },
   resources: [
-    { id: resourceId, document: { title: `${title} resource`, kind: 'markdown', body: 'Body.' } },
+    {
+      id: resourceId,
+      document: { title: `${title} resource`, kind: 'markdown', content: { source: 'Body.' } },
+    },
   ],
 });
 
@@ -111,16 +114,18 @@ const metaSpace = (): SpaceSnapshot => ({
   resources: [
     {
       id: MARKDOWN_RESOURCE_ID,
-      document: { title: 'Opening', kind: 'markdown', body: '# Opening\n\nHello.\n' },
+      document: {
+        title: 'Opening',
+        kind: 'markdown',
+        content: { source: '# Opening\n\nHello.\n' },
+      },
     },
     {
       id: FIRST_LINK_ID,
       document: {
         title: 'To target',
         kind: 'space',
-        spaceId: TARGET_SPACE_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
     {
@@ -128,9 +133,7 @@ const metaSpace = (): SpaceSnapshot => ({
       document: {
         title: 'To target again',
         kind: 'space',
-        spaceId: TARGET_SPACE_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
     {
@@ -138,9 +141,7 @@ const metaSpace = (): SpaceSnapshot => ({
       document: {
         title: 'To second',
         kind: 'space',
-        spaceId: SECOND_TARGET_ID,
-        map: SECOND_MAP_ID,
-        graph: SECOND_GRAPH_ID,
+        content: { spaceId: SECOND_TARGET_ID, map: SECOND_MAP_ID, graph: SECOND_GRAPH_ID },
       },
     },
   ],
@@ -237,7 +238,7 @@ describe('exporting and importing one complete aggregate', () => {
     const meta = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
     const converging = meta?.resources.filter(
       (resource) =>
-        resource.document.kind === 'space' && resource.document.spaceId === TARGET_SPACE_ID,
+        resource.document.kind === 'space' && resource.document.content.spaceId === TARGET_SPACE_ID,
     );
     expect(converging?.map(({ id }) => id).sort()).toEqual(
       [FIRST_LINK_ID, CONVERGING_LINK_ID].sort(),
@@ -254,9 +255,7 @@ describe('exporting and importing one complete aggregate', () => {
     expect(meta?.resources.find(({ id }) => id === SECOND_LINK_ID)?.document).toEqual({
       title: 'To second',
       kind: 'space',
-      spaceId: SECOND_TARGET_ID,
-      map: SECOND_MAP_ID,
-      graph: SECOND_GRAPH_ID,
+      content: { spaceId: SECOND_TARGET_ID, map: SECOND_MAP_ID, graph: SECOND_GRAPH_ID },
     });
     expect(meta?.document.defaultMap).toBe(META_MAP_ID);
     expect(meta?.document.maps?.[0]?.activeGraph).toBe(META_GRAPH_ID);
@@ -351,8 +350,8 @@ describe('exporting and importing one complete aggregate', () => {
       },
       resources: [
         ...meta.resources,
-        { id: CLOSED_UR_ID, document: { title: 'Decision', kind: 'ur' } },
-        { id: RESIZED_UR_ID, document: { title: 'Step', kind: 'ur' } },
+        { id: CLOSED_UR_ID, document: { title: 'Decision', kind: 'ur', content: {} } },
+        { id: RESIZED_UR_ID, document: { title: 'Step', kind: 'ur', content: {} } },
       ],
     };
 
@@ -393,8 +392,10 @@ describe('exporting and importing one complete aggregate', () => {
         document: {
           title: 'Figure',
           kind: 'image' as const,
-          url: 'https://example.com/figure.png',
-          naturalSize: { width: 640, height: 480 },
+          content: {
+            url: 'https://example.com/figure.png',
+            naturalSize: { width: 640, height: 480 },
+          },
         },
       },
       {
@@ -402,7 +403,7 @@ describe('exporting and importing one complete aggregate', () => {
         document: {
           title: 'Stored',
           kind: 'image' as const,
-          url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+          content: { url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU' },
         },
       },
     ];
@@ -437,10 +438,10 @@ url: /images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU
     const UR_ID = uuidSchema.parse('14141414-1414-4414-8414-141414141414');
     const TO_UR_ID = uuidSchema.parse('15151515-1515-4515-8515-151515151515');
     const added = [
-      { id: UR_ID, document: { title: 'Node', kind: 'ur' as const } },
+      { id: UR_ID, document: { title: 'Node', kind: 'ur' as const, content: {} } },
       {
         id: TO_UR_ID,
-        document: { title: 'Node, again', kind: 'reference' as const, target: UR_ID },
+        document: { title: 'Node, again', kind: 'reference' as const, content: { target: UR_ID } },
       },
     ];
     const [meta, ...targets] = completeAggregate();
@@ -570,7 +571,7 @@ describe('a mapless Space', () => {
     resources: [
       {
         id: MARKDOWN_RESOURCE_ID,
-        document: { title: 'Opening', kind: 'markdown', body: 'Hello.\n' },
+        document: { title: 'Opening', kind: 'markdown', content: { source: 'Hello.\n' } },
       },
     ],
   };

@@ -55,7 +55,7 @@ export const resources: readonly Resource[] = [
     id: resourceIds.opening,
     kind: 'markdown',
     title: 'Opening',
-    body: '# Opening\n\nWhere the traversal begins.',
+    content: { source: '# Opening\n\nWhere the traversal begins.' },
   },
   {
     id: resourceIds.problem,
@@ -63,31 +63,33 @@ export const resources: readonly Resource[] = [
     // `text-wrap: balance` and the three-line clamp are there to survive.
     title: 'Why authored placement beats a layout engine that reshuffles on every edit',
     kind: 'markdown',
-    body: '# Placement\n\nThree spike increments each reshuffled the existing resources.',
+    content: {
+      source: '# Placement\n\nThree spike increments each reshuffled the existing resources.',
+    },
   },
   {
     id: resourceIds.strategies,
     title: 'Strategies',
     kind: 'markdown',
-    body: '# Strategies\n\nNo strategy is privileged.',
+    content: { source: '# Strategies\n\nNo strategy is privileged.' },
   },
   {
     id: resourceIds.traversal,
     title: 'Traversal',
     kind: 'markdown',
-    body: '# Traversal\n\nPresenting draws on its own Stage.',
+    content: { source: '# Traversal\n\nPresenting draws on its own Stage.' },
   },
   {
     id: resourceIds.openingReference,
     title: 'Strategy overview',
     kind: 'reference',
-    target: resourceIds.strategies,
+    content: { target: resourceIds.strategies },
   },
   {
     id: resourceIds.closing,
     title: 'Closing',
     kind: 'markdown',
-    body: '# Closing\n',
+    content: { source: '# Closing\n' },
   },
 ];
 

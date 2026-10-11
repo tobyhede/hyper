@@ -32,7 +32,12 @@ function composition() {
         },
       ],
     },
-    resources: [{ id: RESOURCE, document: { title: 'Resource 1', kind: 'markdown', body: '' } }],
+    resources: [
+      {
+        id: RESOURCE,
+        document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      },
+    ],
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);

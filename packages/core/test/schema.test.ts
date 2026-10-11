@@ -340,10 +340,11 @@ describe('resource frontmatter schema', () => {
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'reference',
-      target: '00000000-0000-4000-8000-000000000002',
+      content: { target: '00000000-0000-4000-8000-000000000002' },
     });
 
     expect('body' in reference).toBe(false);
+    expect('body' in reference.content).toBe(false);
   });
 
   it('parses a Space Resource that names both the Map and the Graph it selects', () => {
@@ -418,10 +419,11 @@ describe('resource frontmatter schema', () => {
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
       kind: 'markdown',
-      body: '',
+      content: { source: '', description: 'What A is' },
       description: 'What A is',
     });
     expect('description' in resource).toBe(false);
+    expect('description' in resource.content).toBe(false);
   });
 });
 
@@ -902,7 +904,10 @@ describe('an Image Resource', () => {
     'http://example.com/figure.png',
     `/images/${STORED_ID}`,
   ])('parses an image URL it accepts: %s', (url) => {
-    expect(resourceSchema.parse({ ...IMAGE, url })).toEqual({ ...IMAGE, url });
+    expect(resourceSchema.parse({ ...IMAGE, content: { url } })).toEqual({
+      ...IMAGE,
+      content: { url },
+    });
     expect(resourceFrontmatterSchema.parse({ ...IMAGE, url })).toEqual({ ...IMAGE, url });
   });
 
@@ -921,20 +926,23 @@ describe('an Image Resource', () => {
     `/images/${STORED_ID}=`,
     '',
   ])('refuses an image URL it does not accept, naming the rule: %j', (url) => {
-    const result = resourceSchema.safeParse({ ...IMAGE, url });
+    const result = resourceSchema.safeParse({ ...IMAGE, content: { url } });
     expect(result.success).toBe(false);
     expect(refusesUrl(result.error?.issues ?? [])).toBe(true);
   });
 
   it('refuses an Image Resource with no URL', () => {
     expect(resourceSchema.safeParse(IMAGE).success).toBe(false);
+    expect(resourceSchema.safeParse({ ...IMAGE, content: {} }).success).toBe(false);
   });
 
   it('records a natural size when one is given, and none otherwise', () => {
     const url = 'https://example.com/figure.png';
-    const measured = { ...IMAGE, url, naturalSize: { width: 640, height: 480.5 } };
+    const measured = { ...IMAGE, content: { url, naturalSize: { width: 640, height: 480.5 } } };
     expect(resourceSchema.parse(measured)).toEqual(measured);
-    expect(resourceSchema.parse({ ...IMAGE, url })).not.toHaveProperty('naturalSize');
+    expect(resourceSchema.parse({ ...IMAGE, content: { url } }).content).not.toHaveProperty(
+      'naturalSize',
+    );
   });
 
   it.each([0, -1, Number.POSITIVE_INFINITY, Number.NaN])(
@@ -945,14 +953,21 @@ describe('an Image Resource', () => {
         { width: dimension, height: 480 },
         { width: 640, height: dimension },
       ]) {
-        expect(resourceSchema.safeParse({ ...IMAGE, url, naturalSize }).success).toBe(false);
+        expect(resourceSchema.safeParse({ ...IMAGE, content: { url, naturalSize } }).success).toBe(
+          false,
+        );
       }
     },
   );
 
   it('gives an Image Resource no body — it owns its URL, not its bytes', () => {
-    const image = resourceSchema.parse({ ...IMAGE, url: 'https://example.com/a.png', body: 'x' });
+    const image = resourceSchema.parse({
+      ...IMAGE,
+      content: { url: 'https://example.com/a.png', body: 'x' },
+      body: 'x',
+    });
     expect('body' in image).toBe(false);
+    expect('body' in image.content).toBe(false);
   });
 });
 
@@ -963,20 +978,23 @@ describe('an Ur Resource', () => {
     kind: 'ur',
   };
 
-  it('is an id, a Title and its kind, at every door', () => {
+  it('is an id, a Title and its kind in a file, and empty content as a Resource', () => {
     expect(resourceFrontmatterSchema.parse(UR)).toEqual(UR);
-    expect(resourceSchema.parse(UR)).toEqual(UR);
-    const { id: _id, ...document } = UR;
+    const { id: _id, ...frontmatter } = UR;
+    expect(importResourceFrontmatterSchema.parse(frontmatter)).toEqual(frontmatter);
+    const resource = { ...UR, content: {} };
+    expect(resourceSchema.parse(resource)).toEqual(resource);
+    const { id: _resourceId, ...document } = resource;
     expect(resourceDocumentSchema.parse(document)).toEqual(document);
-    expect(importResourceFrontmatterSchema.parse(document)).toEqual(document);
   });
 
   it('gives an Ur Resource no body — it has no content', () => {
-    const ur = resourceSchema.parse({ ...UR, body: 'x' });
+    const ur = resourceSchema.parse({ ...UR, content: { body: 'x' }, body: 'x' });
     expect('body' in ur).toBe(false);
+    expect(ur.content).toEqual({});
   });
 
   it('refuses an Ur Resource with no Title', () => {
-    expect(resourceSchema.safeParse({ ...UR, title: '  ' }).success).toBe(false);
+    expect(resourceSchema.safeParse({ ...UR, content: {}, title: '  ' }).success).toBe(false);
   });
 });

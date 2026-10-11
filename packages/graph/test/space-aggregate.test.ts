@@ -18,7 +18,7 @@ type StoredResource = SpaceSnapshot['resources'][number];
 
 const markdown = (id: UUID, title = id): StoredResource => ({
   id,
-  document: { title, kind: 'markdown', body: '' },
+  document: { title, kind: 'markdown', content: { source: '' } },
 });
 
 /**
@@ -33,7 +33,7 @@ const spaceResource = (
   selection: { readonly map: UUID; readonly graph: UUID },
 ): StoredResource => ({
   id,
-  document: { title: id, kind: 'space', spaceId: target, ...selection },
+  document: { title: id, kind: 'space', content: { spaceId: target, ...selection } },
 });
 
 /** The selection every Space Resource whose target was built with `map: true` names. */
@@ -339,13 +339,11 @@ describe('loadSpaceAggregate', () => {
     const meta = result.aggregate.lookup.space(META);
     expect(meta?.lookup.resource(META_RESOURCE)).toMatchObject({
       kind: 'space',
-      map: MAP,
-      graph: GRAPH,
+      content: { map: MAP, graph: GRAPH },
     });
     expect(meta?.lookup.resource(SECOND_META_RESOURCE)).toMatchObject({
       kind: 'space',
-      map: SECOND_MAP,
-      graph: SECOND_GRAPH,
+      content: { map: SECOND_MAP, graph: SECOND_GRAPH },
     });
   });
 });

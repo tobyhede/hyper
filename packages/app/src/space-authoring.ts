@@ -104,9 +104,9 @@ export interface CreatedImage {
 
 /** An Image Resource's document: its Title, its URL, and its natural size when the picture loaded. */
 const imageDocument = (title: string, { url, naturalSize }: CreatedImage): ResourceDocument => {
-  const document: ResourceDocument = { title, kind: 'image', url };
-  if (naturalSize !== undefined) document.naturalSize = naturalSize;
-  return document;
+  const content: Extract<ResourceDocument, { kind: 'image' }>['content'] = { url };
+  if (naturalSize !== undefined) content.naturalSize = naturalSize;
+  return { title, kind: 'image', content };
 };
 
 /** The gap between Image Resources a single gesture creates side by side. */
@@ -1208,14 +1208,14 @@ export function createSpaceAuthoring({
       if (
         resource.document.kind === 'reference' &&
         completion.document.kind === 'reference' &&
-        resource.document.target !== completion.document.target
+        resource.document.content.target !== completion.document.content.target
       ) {
         return refuse({ code: 'reference-target-immutable' });
       }
       if (
         resource.document.kind === 'space' &&
         completion.document.kind === 'space' &&
-        resource.document.spaceId !== completion.document.spaceId
+        resource.document.content.spaceId !== completion.document.content.spaceId
       ) {
         return refuse({ code: 'space-resource-target-immutable' });
       }
@@ -1239,7 +1239,7 @@ export function createSpaceAuthoring({
       const resource = snapshot.resources[resourceIndex];
       if (resource === undefined) return refuse({ code: 'resource-not-found' });
       if (resource.document.kind !== 'image') return refuse({ code: 'resource-kind-immutable' });
-      if (completion.url === resource.document.url) return UNCHANGED;
+      if (completion.url === resource.document.content.url) return UNCHANGED;
       // A URL the schema will not hold is refused before intake, which answers
       // it by throwing, and an author's URL may not throw
       // (`image-replacement.test.ts`, "refuses a URL an Image Resource may not
@@ -1274,8 +1274,8 @@ export function createSpaceAuthoring({
       const title = nextResourceTitle(snapshot);
       const created = createResource(
         completion.resourceKind === 'ur'
-          ? { title, kind: 'ur' }
-          : { title, kind: 'markdown', body: '' },
+          ? { title, kind: 'ur', content: {} }
+          : { title, kind: 'markdown', content: { source: '' } },
         completion.anchor,
         'avoidingOverlap',
       );
@@ -1317,7 +1317,7 @@ export function createSpaceAuthoring({
       const document: ResourceDocument = {
         title: entered ?? nextResourceTitle(snapshot),
         kind: 'reference',
-        target: completion.target,
+        content: { target: completion.target },
       };
       const created = createResource(document, completion.anchor, 'avoidingOverlap');
       if ('kind' in created) return created;
@@ -1373,7 +1373,7 @@ export function createSpaceAuthoring({
       const newResource: ResourceDocument = {
         title: nextResourceTitle(snapshot),
         kind: 'markdown',
-        body: '',
+        content: { source: '' },
       };
       const created =
         completion.position === 'beside-source'

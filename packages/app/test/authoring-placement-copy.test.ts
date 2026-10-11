@@ -58,7 +58,10 @@ describe('Map delete draws the right geometry', () => {
       ],
     },
     resources: [
-      { id: SHARED_RESOURCE_ID, document: { title: 'Shared', kind: 'markdown', body: '' } },
+      {
+        id: SHARED_RESOURCE_ID,
+        document: { title: 'Shared', kind: 'markdown', content: { source: '' } },
+      },
     ],
   };
 
@@ -133,7 +136,10 @@ describe('Entering draws the entered Map’s geometry', () => {
       ],
     },
     resources: [
-      { id: META_RESOURCE_ID, document: { title: 'Meta Resource', kind: 'markdown', body: '' } },
+      {
+        id: META_RESOURCE_ID,
+        document: { title: 'Meta Resource', kind: 'markdown', content: { source: '' } },
+      },
     ],
   };
 
@@ -166,7 +172,10 @@ describe('Entering draws the entered Map’s geometry', () => {
       ],
     },
     resources: [
-      { id: SHARED_RESOURCE_ID, document: { title: 'Shared', kind: 'markdown', body: '' } },
+      {
+        id: SHARED_RESOURCE_ID,
+        document: { title: 'Shared', kind: 'markdown', content: { source: '' } },
+      },
     ],
   };
 
@@ -236,8 +245,14 @@ describe('An embedded Edit in an unselected Map leaves no stale member', () => {
       ],
     },
     resources: [
-      { id: TOP_RESOURCE_ID, document: { title: 'Top Resource', kind: 'markdown', body: '' } },
-      { id: OTHER_RESOURCE_ID, document: { title: 'Other Resource', kind: 'markdown', body: '' } },
+      {
+        id: TOP_RESOURCE_ID,
+        document: { title: 'Top Resource', kind: 'markdown', content: { source: '' } },
+      },
+      {
+        id: OTHER_RESOURCE_ID,
+        document: { title: 'Other Resource', kind: 'markdown', content: { source: '' } },
+      },
     ],
   };
 
@@ -318,8 +333,8 @@ describe('A queued drag holds its drop point', () => {
       ],
     },
     resources: [
-      { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: '' } },
-      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: '' } },
+      { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: '' } } },
     ],
   };
 

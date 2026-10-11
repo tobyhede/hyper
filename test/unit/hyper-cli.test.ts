@@ -42,7 +42,11 @@ const storedSpace: LoadedSpace = {
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: 'Stored resource', kind: 'markdown', body: 'Stored body.\n' },
+        document: {
+          title: 'Stored resource',
+          kind: 'markdown',
+          content: { source: 'Stored body.\n' },
+        },
       },
     ],
   },
@@ -517,7 +521,7 @@ describe('runHyper', () => {
           document: {
             title: 'Reference Resource: opening',
             kind: 'reference',
-            target: RESOURCE_ID,
+            content: { target: RESOURCE_ID },
           },
         },
         {
@@ -525,7 +529,7 @@ describe('runHyper', () => {
           document: {
             title: 'Opening: why',
             kind: 'markdown',
-            body: '# Opening\n\nHello.\n',
+            content: { source: '# Opening\n\nHello.\n' },
           },
         },
       ],
@@ -565,7 +569,7 @@ describe('runHyper', () => {
             id: RESOURCE_ID,
             document: {
               kind: 'markdown',
-              body: 'Stored body.\n',
+              content: { source: 'Stored body.\n' },
               title: 'Stored resource',
             },
           },
@@ -600,7 +604,7 @@ describe('runHyper', () => {
             document: {
               title: 'Stored resource',
               kind: 'markdown',
-              body: 'First\r\nSecond\rThird\n',
+              content: { source: 'First\r\nSecond\rThird\n' },
             },
           },
         ],

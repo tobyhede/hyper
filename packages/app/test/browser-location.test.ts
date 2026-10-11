@@ -67,8 +67,8 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
   ],
 };
 
@@ -89,7 +89,9 @@ const selfEdge: SpaceSnapshot = {
     ],
     defaultMap: MAP_ID,
   },
-  resources: [{ id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+  ],
 };
 
 const compose = (opened: SpaceSnapshot = snapshot, images: ImageSources = unusedImageSources) => {
@@ -119,7 +121,11 @@ const composeReplacing = () => {
         ...snapshot.resources,
         {
           id: IMAGE_ID,
-          document: { title: 'Figure', kind: 'image', url: 'https://example.com/figure.png' },
+          document: {
+            title: 'Figure',
+            kind: 'image',
+            content: { url: 'https://example.com/figure.png' },
+          },
         },
       ],
     },

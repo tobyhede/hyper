@@ -49,14 +49,13 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: MARKDOWN, document: { title: 'Notes', kind: 'markdown', body: '' } },
+    { id: MARKDOWN, document: { title: 'Notes', kind: 'markdown', content: { source: '' } } },
     {
       id: IMAGE,
       document: {
         title: 'Figure',
         kind: 'image',
-        url: OLD_URL,
-        naturalSize: { width: 400, height: 300 },
+        content: { url: OLD_URL, naturalSize: { width: 400, height: 300 } },
       },
     },
   ],
@@ -146,7 +145,10 @@ const remote: SpaceSnapshot = {
   ...snapshot,
   resources: snapshot.resources.map((resource) =>
     resource.id === IMAGE
-      ? { ...resource, document: { title: 'Remote figure', kind: 'image' as const, url: NEW_URL } }
+      ? {
+          ...resource,
+          document: { title: 'Remote figure', kind: 'image' as const, content: { url: NEW_URL } },
+        }
       : resource,
   ),
 };
@@ -208,8 +210,7 @@ describe('one replacement at a time', () => {
     expect(imageOf(session.getState().working)).toEqual({
       title: 'Figure',
       kind: 'image',
-      url: STORED,
-      naturalSize: { width: 3, height: 2 },
+      content: { url: STORED, naturalSize: { width: 3, height: 2 } },
     });
   });
 
@@ -224,7 +225,7 @@ describe('one replacement at a time', () => {
     ).resolves.toEqual({ kind: 'already-replacing' });
     expect(stages.measured).toEqual([NEW_URL]);
     expect(imageReplacement.getState()).toBe(true);
-    expect(imageOf(session.getState().working)).toMatchObject({ url: OLD_URL });
+    expect(imageOf(session.getState().working)).toMatchObject({ content: { url: OLD_URL } });
 
     stages.measuring.resolve(undefined);
     await expect(first).resolves.toEqual({ kind: 'completed' });
@@ -244,7 +245,7 @@ describe('one replacement at a time', () => {
     const busyWhenApplied: boolean[] = [];
     authoring.subscribe(() => {
       const image = imageOf(authoring.getState().session.working);
-      if (image?.kind === 'image' && image.url === NEW_URL) {
+      if (image?.kind === 'image' && image.content.url === NEW_URL) {
         busyWhenApplied.push(imageReplacement.getState());
       }
     });
@@ -256,7 +257,7 @@ describe('one replacement at a time', () => {
     expect(busyWhenApplied[0]).toBe(true);
     expect(imageReplacement.getState()).toBe(false);
     expect(session.getState().persistence.kind).toBe('pending');
-    expect(imageOf(session.getState().working)).toMatchObject({ url: NEW_URL });
+    expect(imageOf(session.getState().working)).toMatchObject({ content: { url: NEW_URL } });
     releaseCommit();
     await expect.poll(() => session.getState().persistence.kind).toBe('settled');
   });
@@ -277,8 +278,7 @@ describe('replacing an Image Resource’s image', () => {
     expect(imageOf(after)).toEqual({
       title: 'Figure',
       kind: 'image',
-      url: NEW_URL,
-      naturalSize: { width: 640, height: 480 },
+      content: { url: NEW_URL, naturalSize: { width: 640, height: 480 } },
     });
     // Identity, placement, remembered Open Size, Edges and every other Resource are kept.
     expect(after.document).toEqual(before.document);
@@ -294,7 +294,7 @@ describe('replacing an Image Resource’s image', () => {
     expect(imageOf(session.getState().working)).toEqual({
       title: 'Figure',
       kind: 'image',
-      url: NEW_URL,
+      content: { url: NEW_URL },
     });
   });
 
@@ -310,7 +310,7 @@ describe('replacing an Image Resource’s image', () => {
     const [attempt] = control.attempts;
     expect(attempt?.expectedRevision).toBe(0n);
     expect(attempt === undefined ? undefined : imageOf(attempt.snapshot)).toMatchObject({
-      url: NEW_URL,
+      content: { url: NEW_URL },
     });
   });
 
@@ -328,8 +328,7 @@ describe('replacing an Image Resource’s image', () => {
     expect(imageOf(session.getState().working)).toEqual({
       title: 'Figure',
       kind: 'image',
-      url: STORED,
-      naturalSize: { width: 3, height: 2 },
+      content: { url: STORED, naturalSize: { width: 3, height: 2 } },
     });
     expect(busy).toEqual([true, false]);
   });
@@ -532,7 +531,10 @@ describe('a replacement whose Space was replaced', () => {
 
       await expect(pending).resolves.toEqual({ kind: 'discarded' });
       expect(session.getState().working).toBe(accepted);
-      expect(imageOf(accepted)).toMatchObject({ url: NEW_URL, title: 'Remote figure' });
+      expect(imageOf(accepted)).toMatchObject({
+        title: 'Remote figure',
+        content: { url: NEW_URL },
+      });
       expect(imageReplacement.getState()).toBe(false);
     },
   );
@@ -553,8 +555,8 @@ describe('a replacement whose Space was replaced', () => {
       imageReplacement.replace(IMAGE, { kind: 'url', url: 'https://example.com/b.png' }),
     ).resolves.toEqual({ kind: 'discarded' });
     expect(imageOf(session.getState().working)).toMatchObject({
-      url: NEW_URL,
       title: 'Remote figure',
+      content: { url: NEW_URL },
     });
     expect(imageReplacement.getState()).toBe(false);
   });

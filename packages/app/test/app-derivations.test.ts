@@ -216,7 +216,7 @@ describe('resourceRailGroups', () => {
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
   /** The one kind that takes a Shape, which its rail offers rather than this menu (ADR 0121). */
-  const ur: Resource = { id: OUTSIDE, title: 'Gateway', kind: 'ur' };
+  const ur: Resource = { id: OUTSIDE, title: 'Gateway', kind: 'ur', content: {} };
 
   it('leads with Create Reference and ends with the commands that leave the Resource', () => {
     expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
@@ -234,19 +234,15 @@ describe('resourceRailGroups', () => {
       id: OUTSIDE,
       title: 'Figure',
       kind: 'image',
-      url: 'https://example.com/figure.png',
-      naturalSize: { width: 400, height: 300 },
+      content: { url: 'https://example.com/figure.png', naturalSize: { width: 400, height: 300 } },
     },
     {
       id: OUTSIDE,
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: SPACE_ID,
-      map: MAP_ID,
-      graph: GRAPH_ID,
-      framing: undefined,
+      content: { spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID, framing: undefined },
     },
-    { id: OUTSIDE, title: 'A reference', kind: 'reference', target: PLACED_A },
+    { id: OUTSIDE, title: 'A reference', kind: 'reference', content: { target: PLACED_A } },
   ])('offers no Shape choice in the menu of a $kind Resource', (subject) => {
     expect(
       resourceRailGroups(subject, addresses, connect, everything)
@@ -273,10 +269,7 @@ describe('resourceRailGroups', () => {
       id: OUTSIDE,
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: SPACE_ID,
-      map: MAP_ID,
-      graph: GRAPH_ID,
-      framing: undefined,
+      content: { spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID, framing: undefined },
     };
     const held = resourceRailGroups(target, addresses, connect, {
       ...everything,
@@ -296,7 +289,7 @@ describe('resourceRailGroups', () => {
       id: OUTSIDE,
       title: 'A reference',
       kind: 'reference',
-      target: PLACED_A,
+      content: { target: PLACED_A },
     };
     const row = resourceRailGroups(reference, addresses, connect, everything)[0]?.[0];
     expect(row).toMatchObject({

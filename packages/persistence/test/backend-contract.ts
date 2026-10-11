@@ -27,7 +27,12 @@ export const contractLoaded: LoadedSpace = {
         },
       ],
     },
-    resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
+    resources: [
+      {
+        id: RESOURCE_ID,
+        document: { title: 'A', kind: 'markdown', content: { source: 'Original' } },
+      },
+    ],
   },
   revision: 9_007_199_254_740_993n,
   exportedRevision: 9_007_199_254_740_992n,

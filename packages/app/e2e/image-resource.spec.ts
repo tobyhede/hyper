@@ -81,8 +81,7 @@ async function openPictures(
         document: {
           title,
           kind: 'image',
-          url: FIGURE_URL,
-          naturalSize,
+          content: { url: FIGURE_URL, naturalSize },
         },
       },
     ],
@@ -480,8 +479,10 @@ test('choosing a file from the Dock creates an Image Resource titled Resource N 
   const [created] = await storedImages(page, spaceId);
   expect(created?.document).toMatchObject({
     kind: 'image',
-    url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
-    naturalSize: FIRST_PICTURE.size,
+    content: {
+      url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
+      naturalSize: FIRST_PICTURE.size,
+    },
   });
   expect(created?.document.title).toMatch(/^Resource \d+$/u);
 });
@@ -539,7 +540,7 @@ test('dropping three images creates three Resources in one Edit, numbered in ord
   // Titled with three successive numbers, in the order the files were dropped.
   const numbers = created.map(({ document }) => titleNumber(document.title));
   expect(numbers).toEqual([numbers[0], (numbers[0] ?? 0) + 1, (numbers[0] ?? 0) + 2]);
-  expect(created.map(({ document }) => document.naturalSize)).toEqual(
+  expect(created.map(({ document }) => document.content.naturalSize)).toEqual(
     PICTURES.map(({ size }) => size),
   );
   // In a row from the drop point: one height, rising left to right.
@@ -642,7 +643,7 @@ test('a picture dropped on a Resource, or on the Map an Open Space Resource draw
   await expect.poll(async () => (await storedImages(page, spaceId)).length).toBe(1);
   expect(uploads).toHaveLength(1);
   const [created] = await storedImages(page, spaceId);
-  expect(created?.document.naturalSize).toEqual(square.size);
+  expect(created?.document.content.naturalSize).toEqual(square.size);
   // Each refusal still claims the drag, so the browser does not open the file.
   expect(refusals).toEqual([
     { taken: true, dropEffect: 'none' },
@@ -685,8 +686,7 @@ test('pasting an image URL on the canvas creates an Image Resource holding it, t
   const [created] = await storedImages(page, spaceId);
   expect(created?.document).toMatchObject({
     kind: 'image',
-    url: 'https://example.com/a.png',
-    naturalSize: FIRST_PICTURE.size,
+    content: { url: 'https://example.com/a.png', naturalSize: FIRST_PICTURE.size },
   });
   expect(created?.document.title).toMatch(/^Resource \d+$/u);
 });
@@ -705,7 +705,7 @@ test('pasting an unreachable image URL still creates the Resource, with no recor
   expect(created?.document).toEqual({
     title: expect.stringMatching(/^Resource \d+$/u),
     kind: 'image',
-    url: 'https://example.com/gone.png',
+    content: { url: 'https://example.com/gone.png' },
   });
 });
 
@@ -918,8 +918,10 @@ test(
     expect(after.figure).toEqual({
       title: 'Figure',
       kind: 'image',
-      url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
-      naturalSize: FIRST_PICTURE.size,
+      content: {
+        url: expect.stringMatching(/^\/images\/[A-Za-z0-9_-]{43}$/u),
+        naturalSize: FIRST_PICTURE.size,
+      },
     });
     // Placement, size and Edges are the Map's, and the Map is untouched.
     expect(after.maps).toEqual(before.maps);
@@ -1022,8 +1024,7 @@ test('entering a new URL replaces the image in one Edit; a data: URL is refused 
   expect((await storedFigure(page, spaceId)).figure).toEqual({
     title: 'Figure',
     kind: 'image',
-    url: 'https://example.com/new.png',
-    naturalSize: FIRST_PICTURE.size,
+    content: { url: 'https://example.com/new.png', naturalSize: FIRST_PICTURE.size },
   });
   expect(commits.count()).toBe(1);
 });
@@ -1322,8 +1323,7 @@ async function seedPresentationFigure(page: Page): Promise<void> {
                 document: {
                   title: 'Figure',
                   kind: 'image',
-                  url: FIGURE_URL,
-                  naturalSize: HARBOUR_SIZE,
+                  content: { url: FIGURE_URL, naturalSize: HARBOUR_SIZE },
                 },
               },
             ],
@@ -1581,7 +1581,7 @@ test('keeping local work during a held replacement re-commits it, and the replac
   await expect(target).toHaveCount(0);
   await expect(status).toHaveAttribute('data-revision', (revision + 2n).toString());
   const { figure } = await storedFigure(page, spaceId);
-  expect(figure?.kind === 'image' ? figure.url : undefined).not.toBe(FIGURE_URL);
+  expect(figure?.kind === 'image' ? figure.content.url : undefined).not.toBe(FIGURE_URL);
 });
 
 test('Reload is withheld while a replacement is held and offered again once it answers', async ({
@@ -1697,7 +1697,11 @@ test(
     const stored = decodeLoadedSpace(await response.json()).snapshot.resources.find(
       ({ id }) => id === referenceId,
     );
-    expect(stored?.document).toEqual({ title: 'Figure', kind: 'reference', target: IMAGE_ID });
+    expect(stored?.document).toEqual({
+      title: 'Figure',
+      kind: 'reference',
+      content: { target: IMAGE_ID },
+    });
 
     const reference = page.locator(`.react-flow__node[data-id="${referenceId}"]`);
     await openResource(reference, 'Figure');
@@ -1829,7 +1833,7 @@ test('replacing an image in an only-drawn Space holds Back and Forward and edits
         ({ id }) => id === HARBOUR_ID,
       )?.document;
     })
-    .toMatchObject({ kind: 'image', url: FIGURE_URL });
+    .toMatchObject({ kind: 'image', content: { url: FIGURE_URL } });
   await expect(page.getByRole('button', { name: 'Spaces. 1 open.' })).toBeVisible();
 });
 
@@ -1861,7 +1865,7 @@ test('drop and paste create in an edited embedded Map and an inert drop or paste
     ({ document }) => document.kind === 'space' && document.title === title,
   );
   if (frame?.document.kind !== 'space') throw new Error('Space Resource was not created');
-  const targetId = frame.document.spaceId;
+  const targetId = frame.document.content.spaceId;
   const drawing = page.locator(`.react-flow__node[data-id="${frame.id}"]`);
   await drawing.focus();
   await drawing.press('Enter');
@@ -1933,7 +1937,7 @@ async function openSpaceResource(
   await expect(
     page.locator(`.react-flow__node[data-id^="embedded:${frame.id}:"]`).first(),
   ).toBeVisible();
-  return { drawing, id: frame.id, title, targetId: frame.document.spaceId };
+  return { drawing, id: frame.id, title, targetId: frame.document.content.spaceId };
 }
 
 test('a drop or paste on the Map a Reference Resource draws is refused as read-only', async ({
@@ -1953,7 +1957,7 @@ test('a drop or paste on the Map a Reference Resource draws is refused as read-o
   await settled(page);
   const rootRead = await page.request.get(`/api/spaces/${rootId}`);
   const reference = decodeLoadedSpace(await rootRead.json()).snapshot.resources.find(
-    ({ document }) => document.kind === 'reference' && document.target === id,
+    ({ document }) => document.kind === 'reference' && document.content.target === id,
   );
   if (reference === undefined) throw new Error('Reference Resource was not created');
   const referenceNode = page.locator(`.react-flow__node[data-id="${reference.id}"]`);

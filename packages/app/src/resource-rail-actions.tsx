@@ -247,10 +247,10 @@ export function useResourceRailActions(
                       'space-enter',
                       async () =>
                         spaces.enter(
-                          resource.spaceId,
-                          resource.map,
-                          resource.graph,
-                          resource.framing,
+                          resource.content.spaceId,
+                          resource.content.map,
+                          resource.content.graph,
+                          resource.content.framing,
                           space.id,
                         ),
                       { subject: titleName(resource.title) },

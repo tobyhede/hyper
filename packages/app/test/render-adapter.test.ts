@@ -159,15 +159,15 @@ function sparsePositionedAdapter(newId?: () => UUID) {
     resources: [
       {
         id: uuidSchema.parse(RESOURCE_A),
-        document: { title: 'A', kind: 'markdown', body: 'A' },
+        document: { title: 'A', kind: 'markdown', content: { source: 'A' } },
       },
       {
         id: uuidSchema.parse(RESOURCE_B),
-        document: { title: 'B', kind: 'markdown', body: 'B' },
+        document: { title: 'B', kind: 'markdown', content: { source: 'B' } },
       },
       {
         id: uuidSchema.parse(RESOURCE_C),
-        document: { title: 'C', kind: 'markdown', body: 'C' },
+        document: { title: 'C', kind: 'markdown', content: { source: 'C' } },
       },
     ],
   };
@@ -202,8 +202,14 @@ function storedSpaceAdapter() {
       defaultMap: MAP_ID,
     },
     resources: [
-      { id: uuidSchema.parse(RESOURCE_A), document: { title: 'A', kind: 'markdown', body: 'A' } },
-      { id: uuidSchema.parse(RESOURCE_B), document: { title: 'B', kind: 'markdown', body: 'B' } },
+      {
+        id: uuidSchema.parse(RESOURCE_A),
+        document: { title: 'A', kind: 'markdown', content: { source: 'A' } },
+      },
+      {
+        id: uuidSchema.parse(RESOURCE_B),
+        document: { title: 'B', kind: 'markdown', content: { source: 'B' } },
+      },
     ],
   };
   const stored: SpaceSnapshot = {

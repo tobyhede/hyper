@@ -55,7 +55,7 @@ export function spaceResourceContextCommands(
   const mapAuthoring = embeddedMapAuthoringCommands(embedded);
   const graphAuthoring = embeddedGraphAuthoringCommands(embedded);
   const location = spaces.browserLocation;
-  const { map: mapId, graph: graphId } = document;
+  const { map: mapId, graph: graphId } = document.content;
   const space = entry.app.currentSpace();
   const targetMap = space.maps.find((each) => each.id === mapId);
   const graph = targetMap?.graphs.find((each) => each.id === graphId);

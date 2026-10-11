@@ -25,7 +25,7 @@ export const admitted = async (bytes: Uint8Array<ArrayBuffer>): Promise<StoredIm
 export const showing = (image: StoredImage, title = 'Picture') => ({
   title,
   kind: 'image' as const,
-  url: imagePath(image.id),
+  content: { url: imagePath(image.id) },
 });
 
 /**

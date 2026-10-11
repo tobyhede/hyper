@@ -28,8 +28,11 @@ const storedSpace = (bodyB = 'B body.\n'): LoadedSpace => ({
     id: SPACE_ID,
     document: { version: 1, title: 'Stored talk' },
     resources: [
-      { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: bodyB } },
+      {
+        id: RESOURCE_A,
+        document: { title: 'A', kind: 'markdown', content: { source: 'A body.\n' } },
+      },
+      { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: bodyB } } },
     ],
   },
   revision: 7n,

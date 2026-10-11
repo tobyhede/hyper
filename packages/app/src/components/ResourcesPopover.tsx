@@ -288,7 +288,7 @@ const FilterToggle = ToggleGroupItem<ResourcesFilter>;
 
 /** A Reference Resource's Target title, `''` for the intake-guaranteed-unreachable case a Target does not resolve — the same convention `ResourceNode` draws (ADR 0009). */
 const targetTitle = (resource: Resource, titleById: ReadonlyMap<ResourceId, string>): string =>
-  resource.kind === 'reference' ? (titleById.get(resource.target) ?? '') : '';
+  resource.kind === 'reference' ? (titleById.get(resource.content.target) ?? '') : '';
 
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 const NO_SPACES: readonly ResourcesPopoverSpace[] = [];
@@ -415,7 +415,7 @@ const searchableText = (
 ): string => {
   if (resource.kind === 'reference') return `${resource.title} ${targetTitle(resource, titleById)}`;
   if (resource.kind === 'space')
-    return `${resource.title} ${spaceTitleById.get(resource.spaceId) ?? ''}`;
+    return `${resource.title} ${spaceTitleById.get(resource.content.spaceId) ?? ''}`;
   return resource.title;
 };
 

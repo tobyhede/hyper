@@ -168,9 +168,9 @@ const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot):
     if (previous?.document.kind !== resource.document.kind) return false;
     if (resource.document.kind !== 'space' || previous.document.kind !== 'space') return true;
     return (
-      previous.document.spaceId === resource.document.spaceId &&
-      previous.document.map === resource.document.map &&
-      previous.document.graph === resource.document.graph
+      previous.document.content.spaceId === resource.document.content.spaceId &&
+      previous.document.content.map === resource.document.content.map &&
+      previous.document.content.graph === resource.document.content.graph
     );
   });
 };

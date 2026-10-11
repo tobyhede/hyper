@@ -37,8 +37,8 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
   ],
 };
 
@@ -46,9 +46,7 @@ const spaceResource: Resource = {
   id: SPACE_RESOURCE,
   title: 'Linked',
   kind: 'space',
-  spaceId: TARGET_SPACE,
-  map: TARGET_MAP,
-  graph: TARGET_GRAPH,
+  content: { spaceId: TARGET_SPACE, map: TARGET_MAP, graph: TARGET_GRAPH },
 };
 
 function open(stored: SpaceSnapshot = snapshot) {
@@ -161,7 +159,11 @@ describe('deleting', () => {
         snapshot.resources[0]!,
         {
           id: RESOURCE_B,
-          document: { title: 'Reference Resource of A', kind: 'reference', target: RESOURCE_A },
+          document: {
+            title: 'Reference Resource of A',
+            kind: 'reference',
+            content: { target: RESOURCE_A },
+          },
         },
       ],
     };

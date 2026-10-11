@@ -72,7 +72,7 @@ describe('loadSpace', () => {
       id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
-      body: 'Body of A.\n',
+      content: { source: 'Body of A.\n' },
     });
   });
 

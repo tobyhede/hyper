@@ -101,22 +101,29 @@ const canonicalResource = (
     title: document.title,
   };
   if (document.kind === 'reference')
-    return { ...common, kind: 'reference', target: document.target };
+    return { ...common, kind: 'reference', content: { target: document.content.target } };
   if (document.kind === 'space')
     return {
       ...common,
       kind: 'space',
-      spaceId: document.spaceId,
-      map: document.map,
-      graph: document.graph,
+      content: {
+        spaceId: document.content.spaceId,
+        map: document.content.map,
+        graph: document.content.graph,
+      },
     };
   if (document.kind === 'image') {
-    const image: Resource = { ...common, kind: 'image', url: document.url };
-    if (document.naturalSize !== undefined) image.naturalSize = document.naturalSize;
-    return image;
+    const content: Extract<Resource, { kind: 'image' }>['content'] = { url: document.content.url };
+    if (document.content.naturalSize !== undefined)
+      content.naturalSize = document.content.naturalSize;
+    return { ...common, kind: 'image', content };
   }
-  if (document.kind === 'ur') return { ...common, kind: 'ur' };
-  return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
+  if (document.kind === 'ur') return { ...common, kind: 'ur', content: {} };
+  return {
+    ...common,
+    kind: 'markdown',
+    content: { source: document.content.source.replace(/\r\n?/g, '\n') },
+  };
 };
 
 /**

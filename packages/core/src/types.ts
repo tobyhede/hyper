@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type {
   resourceFrontmatterSchema,
+  importResourceFrontmatterSchema,
   resourcePlacementSchema,
   resourceShapeSchema,
   resourceDocumentSchema,
@@ -40,6 +41,8 @@ export type ImportSpace = z.infer<typeof importSpaceSchema>;
  * complete because its content resolves through `target` (ADR 0009).
  */
 export type ResourceFrontmatter = z.infer<typeof resourceFrontmatterSchema>;
+/** {@link ResourceFrontmatter} as import reads it, with `id` optional. */
+export type ImportResourceFrontmatter = z.infer<typeof importResourceFrontmatterSchema>;
 /**
  * One `{ from, to }` connection a graph is made of (ADR 0032). The authored
  * element — distinct from `@project/graph`'s `GraphRenderEdge`, which is this plus the

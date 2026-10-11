@@ -778,9 +778,11 @@ const ARCHITECTURE: Resource = {
   id: ARCHITECTURE_ID,
   title: 'Architecture',
   kind: 'space',
-  spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000020'),
-  map: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
-  graph: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
+  content: {
+    spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000020'),
+    map: uuidSchema.parse('00000000-0000-4000-8000-000000000021'),
+    graph: uuidSchema.parse('00000000-0000-4000-8000-000000000022'),
+  },
 };
 const CONTAINING_MAP: Map = {
   id: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),

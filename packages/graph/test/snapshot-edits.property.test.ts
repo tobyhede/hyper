@@ -49,7 +49,7 @@ const titleArb = fc
 const markdownDocument = (title: string): ResourceDocument => ({
   title,
   kind: 'markdown',
-  body: '',
+  content: { source: '' },
 });
 
 /** A chain Edge through every consecutive pair, so an interior Resource carries incident Edges on both sides. */
@@ -65,7 +65,7 @@ const chainEdges = (ids: readonly UUID[]): GraphEdge[] => {
 
 /** One Map owning one Graph over every generated Resource, at the given positions. */
 /** An Ur Resource's document, the one kind a Map may draw in any Shape (ADR 0121). */
-const urDocument = (title: string): ResourceDocument => ({ title, kind: 'ur' });
+const urDocument = (title: string): ResourceDocument => ({ title, kind: 'ur', content: {} });
 
 const baseSnapshot = (
   ids: readonly UUID[],
@@ -167,7 +167,11 @@ describe('SnapshotEdit.deleteFromSpace properties', () => {
               ...base.resources,
               {
                 id: referenceId,
-                document: { title: referenceTitle, kind: 'reference', target: subject },
+                document: {
+                  title: referenceTitle,
+                  kind: 'reference',
+                  content: { target: subject },
+                },
               },
             ],
           };
@@ -304,7 +308,7 @@ describe('SnapshotEdit.createInMap properties', () => {
   const referenceTo = (target: UUID): ResourceDocument => ({
     title: 'Reference',
     kind: 'reference',
-    target,
+    content: { target },
   });
 
   it('refuses a Reference Resource whose Target is missing or is itself a Reference Resource', () => {
@@ -367,12 +371,14 @@ describe('SnapshotEdit.createInMap properties', () => {
         return {
           title: 'Nested',
           kind: 'space',
-          spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
-          map: MAP_ID,
-          graph: GRAPH_ID,
+          content: {
+            spaceId: uuid('00000000-0000-4000-8000-0000000000aa'),
+            map: MAP_ID,
+            graph: GRAPH_ID,
+          },
         };
       case 'ur':
-        return { title: 'Node', kind: 'ur' };
+        return { title: 'Node', kind: 'ur', content: {} };
     }
   };
 
@@ -428,7 +434,7 @@ describe('SnapshotEdit.createInMap properties', () => {
       fc.property(idsArb, coordsArb, fc.uuid().map(uuid), (ids, coords, newResourceId) => {
         fc.pre(!ids.includes(newResourceId));
         const base = baseSnapshot(ids, Placement.toPositions(closedPlacement(ids, coords)));
-        const document: ResourceDocument = { title: 'Node', kind: 'ur' };
+        const document: ResourceDocument = { title: 'Node', kind: 'ur', content: {} };
 
         const created = SnapshotEdit.createInMap(
           base,
@@ -1200,7 +1206,7 @@ describe('SnapshotEdit across two Maps: addToMap, removeFromMap and deleteFromSp
               ...base.resources,
               {
                 id: referenceId,
-                document: { title: 'Reference', kind: 'reference', target: subject },
+                document: { title: 'Reference', kind: 'reference', content: { target: subject } },
               },
             ],
           };

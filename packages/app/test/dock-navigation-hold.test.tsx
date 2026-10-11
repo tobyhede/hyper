@@ -51,15 +51,16 @@ const meta: SpaceSnapshot = {
     ],
   },
   resources: [
-    { id: META_RESOURCE_ID, document: { title: 'Resource', kind: 'markdown', body: '' } },
+    {
+      id: META_RESOURCE_ID,
+      document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: META_SPACE_RESOURCE_ID,
       document: {
         title: 'Other',
         kind: 'space',
-        spaceId: OTHER_ID,
-        map: OTHER_MAP_ID,
-        graph: OTHER_GRAPH_ID,
+        content: { spaceId: OTHER_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
       },
     },
   ],
@@ -83,10 +84,17 @@ const other: SpaceSnapshot = {
     ],
   },
   resources: [
-    { id: OTHER_RESOURCE_ID, document: { title: 'Resource', kind: 'markdown', body: '' } },
+    {
+      id: OTHER_RESOURCE_ID,
+      document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: OTHER_IMAGE_ID,
-      document: { title: 'Figure', kind: 'image', url: 'https://example.com/figure.png' },
+      document: {
+        title: 'Figure',
+        kind: 'image',
+        content: { url: 'https://example.com/figure.png' },
+      },
     },
   ],
 };

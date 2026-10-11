@@ -51,14 +51,17 @@ const closed = (x: number, y: number) => ({ x, y, open: false as const });
 
 const markdown = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, body: `# ${title}` },
+  document: { title, kind: 'markdown' as const, content: { source: `# ${title}` } },
 });
 
-const ur = (id: UUID, title: string) => ({ id, document: { title, kind: 'ur' as const } });
+const ur = (id: UUID, title: string) => ({
+  id,
+  document: { title, kind: 'ur' as const, content: {} },
+});
 
 const spaceLink = (id: UUID, spaceId: UUID, mapId: UUID, graph: UUID) => ({
   id,
-  document: { title: 'Link', kind: 'space' as const, spaceId, map: mapId, graph },
+  document: { title: 'Link', kind: 'space' as const, content: { spaceId, map: mapId, graph } },
 });
 
 const [R0, R1, R2, R3] = T_RESOURCES;

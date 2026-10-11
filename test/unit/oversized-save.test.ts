@@ -48,21 +48,23 @@ const withBody = (body: string): SpaceSnapshot => ({
       },
     ],
   },
-  resources: [{ id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', body } }],
+  resources: [
+    { id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', content: { source: body } } },
+  ],
 });
 
 const reduced = (space: SpaceSnapshot, body: string): SpaceSnapshot => ({
   ...space,
   resources: space.resources.map((resource) =>
     resource.id === RESOURCE_ID
-      ? { ...resource, document: { title: 'Notes', kind: 'markdown', body } }
+      ? { ...resource, document: { title: 'Notes', kind: 'markdown', content: { source: body } } }
       : resource,
   ),
 });
 
 const bodyOf = (space: SpaceSnapshot): string | undefined => {
   const document = space.resources.find(({ id }) => id === RESOURCE_ID)?.document;
-  return document?.kind === 'markdown' ? document.body : undefined;
+  return document?.kind === 'markdown' ? document.content.source : undefined;
 };
 
 const requestBytes = (request: SpaceCommit): number =>

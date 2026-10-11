@@ -56,8 +56,8 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: TARGET_MAP_ID,
   },
   resources: [
-    { id: INTAKE, document: { title: 'Intake', kind: 'markdown', body: '' } },
-    { id: STORAGE, document: { title: 'Storage', kind: 'markdown', body: '' } },
+    { id: INTAKE, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
+    { id: STORAGE, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
   ],
 });
 
@@ -90,9 +90,7 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
   ],
@@ -123,9 +121,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Home',
         kind: 'space',
-        spaceId: HOME_ID,
-        map: HOME_MAP_ID,
-        graph: HOME_GRAPH_ID,
+        content: { spaceId: HOME_ID, map: HOME_MAP_ID, graph: HOME_GRAPH_ID },
       },
     },
     {
@@ -133,9 +129,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
   ],

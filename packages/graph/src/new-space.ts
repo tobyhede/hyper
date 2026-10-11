@@ -88,7 +88,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
     id: resourceId,
     title: FIRST_RESOURCE_TITLE,
     kind: 'markdown',
-    body: '',
+    content: { source: '' },
   };
 
   return {

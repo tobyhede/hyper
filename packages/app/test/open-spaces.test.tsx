@@ -115,7 +115,10 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
     },
     resources: meta
       ? [
-          { id: resourceId, document: { title: 'Resource', kind: 'markdown', body: '' } },
+          {
+            id: resourceId,
+            document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+          },
           {
             id: META_SPACE_RESOURCE_ID,
             // The Map `Other` opens on and that Map's Active Graph —
@@ -124,14 +127,15 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
             document: {
               title: 'Other',
               kind: 'space',
-              spaceId: OTHER_ID,
-              map: MAP_ID,
-              graph: GRAPH_ONE,
+              content: { spaceId: OTHER_ID, map: MAP_ID, graph: GRAPH_ONE },
             },
           },
         ]
       : [
-          { id: resourceId, document: { title: 'Resource', kind: 'markdown', body: '' } },
+          {
+            id: resourceId,
+            document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+          },
           ...(id === OTHER_ID
             ? [
                 {
@@ -139,7 +143,7 @@ const snapshot = (id: UUID, title: string): SpaceSnapshot => {
                   document: {
                     title: 'Figure',
                     kind: 'image' as const,
-                    url: 'https://example.com/figure.png',
+                    content: { url: 'https://example.com/figure.png' },
                   },
                 },
               ]

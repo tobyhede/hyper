@@ -51,7 +51,10 @@ const snapshot = (
   id,
   document: { version: 1, title },
   resources: [
-    { id: resourceId, document: { title: 'Start here', kind: 'markdown', body: 'Stored body' } },
+    {
+      id: resourceId,
+      document: { title: 'Start here', kind: 'markdown', content: { source: 'Stored body' } },
+    },
   ],
 });
 
@@ -64,9 +67,7 @@ const metaReferencingOther = (): SpaceSnapshot => ({
       document: {
         title: 'Other space',
         kind: 'space',
-        spaceId: OTHER_SPACE_ID,
-        map: OTHER_MAP_ID,
-        graph: OTHER_GRAPH_ID,
+        content: { spaceId: OTHER_SPACE_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
       },
     },
   ],
@@ -313,7 +314,7 @@ describe('HTTP space startup composition', () => {
           ...snapshot().resources,
           {
             id: OTHER_RESOURCE_ID,
-            document: { title: 'Next', kind: 'markdown' as const, body: '' },
+            document: { title: 'Next', kind: 'markdown' as const, content: { source: '' } },
           },
         ],
         document: {
@@ -435,7 +436,7 @@ describe('HTTP space startup composition', () => {
           ...snapshot().resources,
           {
             id: omittedId,
-            document: { title: 'Omitted', kind: 'markdown' as const, body: '' },
+            document: { title: 'Omitted', kind: 'markdown' as const, content: { source: '' } },
           },
         ],
       },

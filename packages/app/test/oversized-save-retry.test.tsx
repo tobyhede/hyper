@@ -47,7 +47,9 @@ const withNotes = (body: string): SpaceSnapshot => ({
       },
     ],
   },
-  resources: [{ id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', body } }],
+  resources: [
+    { id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', content: { source: body } } },
+  ],
 });
 
 const requestBytes = (request: SpaceCommit): number =>
@@ -91,14 +93,14 @@ const notesBody = (space: OpenSpace): string | undefined => {
   const document = space.session
     .getState()
     .working.resources.find(({ id }) => id === RESOURCE_ID)?.document;
-  return document?.kind === 'markdown' ? document.body : undefined;
+  return document?.kind === 'markdown' ? document.content.source : undefined;
 };
 
 const storedNotes = async (backend: MemorySpaceBackend): Promise<string | undefined> => {
   const document = (await backend.loadSpace(META_ID))?.snapshot.resources.find(
     ({ id }) => id === RESOURCE_ID,
   )?.document;
-  return document?.kind === 'markdown' ? document.body : undefined;
+  return document?.kind === 'markdown' ? document.content.source : undefined;
 };
 
 /** Complete the Edit an author makes by writing `body` into Notes. */
@@ -107,7 +109,7 @@ const writeNotes = (space: OpenSpace, body: string): void => {
     const result = space.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: RESOURCE_ID,
-      document: { title: 'Notes', kind: 'markdown', body },
+      document: { title: 'Notes', kind: 'markdown', content: { source: body } },
     });
     if (result.kind !== 'completed') throw new Error('The Notes Edit did not complete');
   });

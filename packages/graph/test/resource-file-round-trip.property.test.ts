@@ -59,15 +59,15 @@ const resourceArb: fc.Arbitrary<Resource> = fc.oneof(
       id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
       title: line,
       kind: fc.constant('markdown' as const),
-      body: bodyArb,
+      content: fc.record({ source: bodyArb }),
     },
-    { requiredKeys: ['id', 'title', 'kind', 'body'] },
+    { requiredKeys: ['id', 'title', 'kind', 'content'] },
   ),
   fc.record({
     id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
     title: line,
     kind: fc.constant('reference' as const),
-    target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+    content: fc.record({ target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)) }),
   }),
   // Every field of a Space Resource is always written, its selection included: a
   // Space Resource names a Map of its target and a Graph that Map owns
@@ -77,24 +77,32 @@ const resourceArb: fc.Arbitrary<Resource> = fc.oneof(
     id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
     title: line,
     kind: fc.constant('space' as const),
-    spaceId: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-    map: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-    graph: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+    content: fc.record({
+      spaceId: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+      map: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+      graph: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
+    }),
   }),
   fc.record(
     {
       id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
       title: line,
       kind: fc.constant('image' as const),
-      url: imageUrlArb,
-      naturalSize: fc.record({ width: dimensionArb, height: dimensionArb }),
+      content: fc.record(
+        {
+          url: imageUrlArb,
+          naturalSize: fc.record({ width: dimensionArb, height: dimensionArb }),
+        },
+        { requiredKeys: ['url'] },
+      ),
     },
-    { requiredKeys: ['id', 'title', 'kind', 'url'] },
+    { requiredKeys: ['id', 'title', 'kind', 'content'] },
   ),
   fc.record({
     id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
     title: line,
     kind: fc.constant('ur' as const),
+    content: fc.constant({}),
   }),
 );
 

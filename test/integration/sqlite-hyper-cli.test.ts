@@ -52,16 +52,18 @@ const metaSpace: SpaceSnapshot = {
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'Opening', kind: 'markdown', body: 'Durable SQLite body.\n' },
+      document: {
+        title: 'Opening',
+        kind: 'markdown',
+        content: { source: 'Durable SQLite body.\n' },
+      },
     },
     {
       id: LINK_RESOURCE_ID,
       document: {
         title: 'To the target',
         kind: 'space',
-        spaceId: TARGET_SPACE_ID,
-        map: MAP_ID,
-        graph: GRAPH_ID,
+        content: { spaceId: TARGET_SPACE_ID, map: MAP_ID, graph: GRAPH_ID },
       },
     },
   ],

@@ -49,11 +49,6 @@
       "count": 2
     }
   },
-  "packages/graph/src/resource-file.ts": {
-    "@typescript-eslint/no-unsafe-type-assertion": {
-      "count": 1
-    }
-  },
   "packages/graph/src/space.ts": {
     "@typescript-eslint/no-unsafe-type-assertion": {
       "count": 1

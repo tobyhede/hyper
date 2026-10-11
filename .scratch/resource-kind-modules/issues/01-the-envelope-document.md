@@ -1,6 +1,6 @@
 # 01 — A Resource document is an envelope
 
-Status: ready-for-agent
+Status: resolved
 
 **What to build:** ADR 0128's document shape, with no change in behaviour. `resourceDocumentSchema`, `resourceSchema` and the snapshot, HTTP and import schemas built from them (`packages/core/src/schema.ts`) become `{ id, title, kind, content }`, where `content` holds what each kind holds today: Markdown `{ source }` (today's `body`), Image `{ url, naturalSize? }`, Reference `{ target }`, Space `{ spaceId, map, graph, framing? }`, Ur `{}`. The discriminated union stays for now, discriminated on `kind`, with each arm's `content` typed; the registry in `02` is what makes `content` unknown to the core.
 
@@ -13,3 +13,7 @@ Resource files do not change in this step: the frontmatter codec in `packages/gr
 - Every tracked fixture imports and exports byte-identical Resource files.
 - `pnpm verify`, `pnpm e2e` and `pnpm e2e:ladle` are green, and so are CI's PostgreSQL and SQLite jobs, which read stored documents.
 - No reader outside `core` touches a kind field except through `content`.
+
+## Answer
+
+Built. `resourceSchema` and `resourceDocumentSchema` are envelopes built by one `resourceEnvelope` in `packages/core/src/schema.ts`, sharing the frontmatter's `title` and `kind` rule instances; each kind's fields are a `*ResourceContentSchema` the flat frontmatter schemas extend. The codec in `packages/graph/src/resource-file.ts` maps frontmatter to the envelope (`envelope`) and back (`serializeResourceFile`), so Resource files are unchanged; `packages/core/test/resource-envelope.test.ts` holds the shape, and the tracked-fixture and round-trip tests hold the files.

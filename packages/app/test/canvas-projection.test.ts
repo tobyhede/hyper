@@ -280,7 +280,7 @@ describe('canvasProjection', () => {
     // Only an Ur Resource takes a Shape (ADR 0121).
     const urResources = [RESOURCE_A, RESOURCE_B].map((id) => ({
       path: `resources/${id}.md`,
-      text: serializeResourceFile({ id, title: id, kind: 'ur' }),
+      text: serializeResourceFile({ id, title: id, kind: 'ur', content: {} }),
     }));
     const { nodes } = await projectThrough(
       spaceWith({ maps: [diamondMap] }, urResources),

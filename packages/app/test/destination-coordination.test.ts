@@ -64,9 +64,9 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
     ],
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: '' } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: '' } },
-    { id: RESOURCE_OFF_MAP, document: { title: 'C', kind: 'markdown', body: '' } },
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: '' } } },
+    { id: RESOURCE_OFF_MAP, document: { title: 'C', kind: 'markdown', content: { source: '' } } },
   ],
 });
 

@@ -35,8 +35,11 @@ const snapshot = spaceSnapshotSchema.parse({
   // asserted to round-trip this array exactly, and `Next` sorts ahead of
   // `Resource`.
   resources: [
-    { id: RESOURCE_B, document: { title: 'Next', kind: 'markdown', body: 'More' } },
-    { id: RESOURCE_A, document: { title: 'Resource', kind: 'markdown', body: 'Body' } },
+    { id: RESOURCE_B, document: { title: 'Next', kind: 'markdown', content: { source: 'More' } } },
+    {
+      id: RESOURCE_A,
+      document: { title: 'Resource', kind: 'markdown', content: { source: 'Body' } },
+    },
   ],
 });
 

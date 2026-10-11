@@ -49,9 +49,12 @@ const snapshot = spaceSnapshotSchema.parse({
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: OTHER_RESOURCE_ID, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: REFERENCE_ID, document: { title: 'A again', kind: 'reference', target: RESOURCE_ID } },
+    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    { id: OTHER_RESOURCE_ID, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: REFERENCE_ID,
+      document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_ID } },
+    },
   ],
 });
 

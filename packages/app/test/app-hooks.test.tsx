@@ -564,9 +564,7 @@ describe('useSpaceResourceTargetTitles', () => {
         id: CREATED,
         title: 'Frame',
         kind: 'space',
-        spaceId: TARGET_SPACE,
-        map: MAP_ID,
-        graph: GRAPH_ID,
+        content: { spaceId: TARGET_SPACE, map: MAP_ID, graph: GRAPH_ID },
       },
     ];
     const source = {

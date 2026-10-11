@@ -138,7 +138,7 @@ function createInMap(
     return { kind: 'refused', refusal: { code: 'map-not-found' } };
   }
   if (document.kind === 'reference') {
-    const targetId = document.target;
+    const targetId = document.content.target;
     const resolved = snapshot.resources.find((resource) => resource.id === targetId);
     if (resolved === undefined) return refused({ code: 'reference-target-not-found', targetId });
     if (resolved.document.kind === 'reference') {
@@ -189,7 +189,8 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
     return { kind: 'refused', refusal: { code: 'resource-not-found' } };
   }
   const incoming = snapshot.resources.filter(
-    (resource) => resource.document.kind === 'reference' && resource.document.target === resourceId,
+    (resource) =>
+      resource.document.kind === 'reference' && resource.document.content.target === resourceId,
   );
   if (incoming.length > 0) {
     return {

@@ -262,17 +262,22 @@ function contentOwner(id: UUID, index: number, kind: Exclude<ContentKind, 'refer
   const title = `Resource ${index}`;
   switch (kind) {
     case 'markdown':
-      return { id, title, kind, body: index % 3 === 0 ? '' : `Body ${index}\n` };
+      return { id, title, kind, content: { source: index % 3 === 0 ? '' : `Body ${index}\n` } };
     case 'image':
-      return { id, title, kind, url: `https://example.com/${index}.png` };
+      return { id, title, kind, content: { url: `https://example.com/${index}.png` } };
     case 'space': {
       const view = { spaceId: OTHER_SPACE, map: mapId(index), graph: graphId(index) };
       return index % 2 === 0
-        ? { id, title, kind, ...view, framing: { centreX: index, centreY: -index, zoom: 1 } }
-        : { id, title, kind, ...view };
+        ? {
+            id,
+            title,
+            kind,
+            content: { ...view, framing: { centreX: index, centreY: -index, zoom: 1 } },
+          }
+        : { id, title, kind, content: view };
     }
     case 'ur':
-      return { id, title, kind };
+      return { id, title, kind, content: {} };
   }
 }
 
@@ -296,7 +301,7 @@ function withKinds(
       const target = owners.length === 0 ? undefined : owners[pick % owners.length];
       if (chosen === 'reference') {
         if (target !== undefined) {
-          return { id, title: `Resource ${index}`, kind: 'reference', target };
+          return { id, title: `Resource ${index}`, kind: 'reference', content: { target } };
         }
         owners.push(id);
         return contentOwner(id, index, 'markdown');
@@ -351,7 +356,7 @@ describe('resolved content, over generated Spaces of every kind', () => {
         const space = acceptedWithKinds(maps, kinds, targets);
         for (const resource of space.resources) {
           if (resource.kind !== 'reference') continue;
-          const target = space.lookup.resource(resource.target);
+          const target = space.lookup.resource(resource.content.target);
           if (target === undefined) throw new Error('intake accepted a missing Target');
           expect(resolveResourceContent(space, resource)).toStrictEqual({
             ...resolveResourceContent(space, target),

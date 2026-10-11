@@ -49,7 +49,10 @@ const loaded = {
     id: SPACE_ID,
     document: { version: 1 as const, title: 'Space' },
     resources: [
-      { id: RESOURCE_ID, document: { title: 'Resource', kind: 'markdown' as const, body: '' } },
+      {
+        id: RESOURCE_ID,
+        document: { title: 'Resource', kind: 'markdown' as const, content: { source: '' } },
+      },
     ],
   },
   revision: 3n,
@@ -63,10 +66,12 @@ describe('Space session registry', () => {
       document: {
         title: 'Target',
         kind: 'space' as const,
-        spaceId: TARGET_ID,
-        map: SECOND_MAP,
-        graph: SECOND_GRAPH,
-        framing: { centreX: 120, centreY: 80, zoom: 1.5 },
+        content: {
+          spaceId: TARGET_ID,
+          map: SECOND_MAP,
+          graph: SECOND_GRAPH,
+          framing: { centreX: 120, centreY: 80, zoom: 1.5 },
+        },
       },
     });
     const source = {
@@ -80,9 +85,7 @@ describe('Space session registry', () => {
             document: {
               title: 'Other',
               kind: 'space' as const,
-              spaceId: OTHER_ID,
-              map: OTHER_MAP,
-              graph: OTHER_GRAPH,
+              content: { spaceId: OTHER_ID, map: OTHER_MAP, graph: OTHER_GRAPH },
             },
           },
         ],
@@ -161,10 +164,9 @@ describe('Space session registry', () => {
     for (const id of [SPACE_ID, OTHER_ID]) {
       const stored = await backend.loadSpace(id);
       expect(stored?.snapshot.resources[0]?.document).toMatchObject({
-        map: FIRST_MAP,
-        graph: FIRST_GRAPH,
+        content: { map: FIRST_MAP, graph: FIRST_GRAPH },
       });
-      expect(stored?.snapshot.resources[0]?.document).not.toHaveProperty('framing');
+      expect(stored?.snapshot.resources[0]?.document.content).not.toHaveProperty('framing');
     }
   });
 
@@ -179,10 +181,12 @@ describe('Space session registry', () => {
             document: {
               title: 'Target',
               kind: 'space' as const,
-              spaceId: TARGET_ID,
-              map: FIRST_MAP,
-              graph: SECOND_GRAPH,
-              framing: { centreX: 120, centreY: 80, zoom: 1.5 },
+              content: {
+                spaceId: TARGET_ID,
+                map: FIRST_MAP,
+                graph: SECOND_GRAPH,
+                framing: { centreX: 120, centreY: 80, zoom: 1.5 },
+              },
             },
           },
         ],
@@ -237,9 +241,11 @@ describe('Space session registry', () => {
       1,
     );
     expect((await backend.loadSpace(SPACE_ID))?.snapshot.resources[0]?.document).toMatchObject({
-      map: FIRST_MAP,
-      graph: FIRST_GRAPH,
-      framing: { centreX: 120, centreY: 80, zoom: 1.5 },
+      content: {
+        map: FIRST_MAP,
+        graph: FIRST_GRAPH,
+        framing: { centreX: 120, centreY: 80, zoom: 1.5 },
+      },
     });
   });
 
@@ -497,9 +503,7 @@ describe('Space session registry', () => {
             document: {
               title: 'Target',
               kind: 'space' as const,
-              spaceId: TARGET_ID,
-              map: MAP_TO_DELETE,
-              graph: TARGET_GRAPH_TO_DELETE,
+              content: { spaceId: TARGET_ID, map: MAP_TO_DELETE, graph: TARGET_GRAPH_TO_DELETE },
             },
           },
           {
@@ -507,9 +511,7 @@ describe('Space session registry', () => {
             document: {
               title: 'Affected B',
               kind: 'space' as const,
-              spaceId: AFFECTED_B_ID,
-              map: AFFECTED_B_MAP,
-              graph: AFFECTED_B_GRAPH,
+              content: { spaceId: AFFECTED_B_ID, map: AFFECTED_B_MAP, graph: AFFECTED_B_GRAPH },
             },
           },
         ],
@@ -540,9 +542,7 @@ describe('Space session registry', () => {
             document: {
               title: 'Target',
               kind: 'space' as const,
-              spaceId: TARGET_ID,
-              map: MAP_TO_DELETE,
-              graph: TARGET_GRAPH_TO_DELETE,
+              content: { spaceId: TARGET_ID, map: MAP_TO_DELETE, graph: TARGET_GRAPH_TO_DELETE },
             },
           },
         ],
@@ -629,9 +629,7 @@ describe('Space session registry', () => {
             document: {
               title: 'Target',
               kind: 'space' as const,
-              spaceId: TARGET_ID,
-              map: FIRST_MAP,
-              graph: FIRST_GRAPH,
+              content: { spaceId: TARGET_ID, map: FIRST_MAP, graph: FIRST_GRAPH },
             },
           },
         ],
@@ -671,7 +669,7 @@ describe('Space session registry', () => {
         resources: [
           {
             id: SIBLING_RESOURCE_ID,
-            document: { title: 'Sibling', kind: 'markdown' as const, body: '' },
+            document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
           },
         ],
         document: { version: 1 as const, title: 'Sibling' },
@@ -694,9 +692,7 @@ describe('Space session registry', () => {
           document: {
             title: 'Target',
             kind: 'space' as const,
-            spaceId: TARGET_ID,
-            map: FIRST_MAP,
-            graph: FIRST_GRAPH,
+            content: { spaceId: TARGET_ID, map: FIRST_MAP, graph: FIRST_GRAPH },
           },
         },
       ],
@@ -741,9 +737,7 @@ describe('Space session registry', () => {
             document: {
               title: 'Target',
               kind: 'space' as const,
-              spaceId: TARGET_ID,
-              map: FIRST_MAP,
-              graph: FIRST_GRAPH,
+              content: { spaceId: TARGET_ID, map: FIRST_MAP, graph: FIRST_GRAPH },
             },
           },
         ],
@@ -783,16 +777,14 @@ describe('Space session registry', () => {
         resources: [
           {
             id: SIBLING_RESOURCE_ID,
-            document: { title: 'Sibling', kind: 'markdown' as const, body: '' },
+            document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
           },
           {
             id: SIBLING_LINK_ID,
             document: {
               title: 'Target',
               kind: 'space' as const,
-              spaceId: TARGET_ID,
-              map: FIRST_MAP,
-              graph: FIRST_GRAPH,
+              content: { spaceId: TARGET_ID, map: FIRST_MAP, graph: FIRST_GRAPH },
             },
           },
         ],
@@ -816,16 +808,14 @@ describe('Space session registry', () => {
       resources: [
         {
           id: SIBLING_RESOURCE_ID,
-          document: { title: 'Sibling', kind: 'markdown' as const, body: '' },
+          document: { title: 'Sibling', kind: 'markdown' as const, content: { source: '' } },
         },
         {
           id: SIBLING_LINK_ID,
           document: {
             title: 'Target',
             kind: 'space' as const,
-            spaceId: TARGET_ID,
-            map: FIRST_MAP,
-            graph: SECOND_GRAPH,
+            content: { spaceId: TARGET_ID, map: FIRST_MAP, graph: SECOND_GRAPH },
           },
         },
       ],
@@ -963,14 +953,16 @@ describe('Space session registry', () => {
               document: {
                 title: 'Target',
                 kind: 'space' as const,
-                spaceId: DELETE_TARGET_ID,
-                map: DELETE_TARGET_MAP,
-                graph: DELETE_TARGET_GRAPH,
+                content: {
+                  spaceId: DELETE_TARGET_ID,
+                  map: DELETE_TARGET_MAP,
+                  graph: DELETE_TARGET_GRAPH,
+                },
               },
             },
             {
               id: DISPLACED_RESOURCE_ID,
-              document: { title: 'Displaced', kind: 'markdown' as const, body: '' },
+              document: { title: 'Displaced', kind: 'markdown' as const, content: { source: '' } },
             },
           ],
         },
@@ -1050,9 +1042,11 @@ describe('Space session registry', () => {
               document: {
                 title: 'Target',
                 kind: 'space' as const,
-                spaceId: REFERENCE_TARGET_SPACE_ID,
-                map: REFERENCE_TARGET_MAP,
-                graph: REFERENCE_TARGET_GRAPH,
+                content: {
+                  spaceId: REFERENCE_TARGET_SPACE_ID,
+                  map: REFERENCE_TARGET_MAP,
+                  graph: REFERENCE_TARGET_GRAPH,
+                },
               },
             },
             {
@@ -1060,7 +1054,7 @@ describe('Space session registry', () => {
               document: {
                 title: 'Reference Resource of Target',
                 kind: 'reference' as const,
-                target: REFERENCED_SPACE_RESOURCE_ID,
+                content: { target: REFERENCED_SPACE_RESOURCE_ID },
               },
             },
           ],
@@ -1158,9 +1152,11 @@ describe('Space session registry', () => {
                 document: {
                   title: 'Target',
                   kind: 'space' as const,
-                  spaceId: REFERENCE_TARGET_SPACE_ID,
-                  map: REFERENCE_TARGET_MAP,
-                  graph: REFERENCE_TARGET_GRAPH,
+                  content: {
+                    spaceId: REFERENCE_TARGET_SPACE_ID,
+                    map: REFERENCE_TARGET_MAP,
+                    graph: REFERENCE_TARGET_GRAPH,
+                  },
                 },
               },
             ],
@@ -1223,7 +1219,7 @@ describe('Space session registry', () => {
                   document: {
                     title: 'Late Reference Resource of Target',
                     kind: 'reference' as const,
-                    target: REFERENCED_SPACE_RESOURCE_ID,
+                    content: { target: REFERENCED_SPACE_RESOURCE_ID },
                   },
                 },
               ],
@@ -1340,9 +1336,7 @@ describe('Space session registry', () => {
                 document: {
                   title: 'Target',
                   kind: 'space' as const,
-                  spaceId: TARGET_SPACE_ID,
-                  map: TARGET_MAP,
-                  graph: TARGET_GRAPH,
+                  content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP, graph: TARGET_GRAPH },
                 },
               },
               {
@@ -1350,9 +1344,7 @@ describe('Space session registry', () => {
                 document: {
                   title: 'Other',
                   kind: 'space' as const,
-                  spaceId: OTHER_SPACE_ID,
-                  map: OTHER_MAP,
-                  graph: OTHER_GRAPH,
+                  content: { spaceId: OTHER_SPACE_ID, map: OTHER_MAP, graph: OTHER_GRAPH },
                 },
               },
             ],
@@ -1444,9 +1436,11 @@ describe('Space session registry', () => {
                         document: {
                           title: 'Late reference to Target',
                           kind: 'space' as const,
-                          spaceId: TARGET_SPACE_ID,
-                          map: TARGET_MAP,
-                          graph: TARGET_GRAPH,
+                          content: {
+                            spaceId: TARGET_SPACE_ID,
+                            map: TARGET_MAP,
+                            graph: TARGET_GRAPH,
+                          },
                         },
                       },
                     ],
@@ -1537,7 +1531,7 @@ describe('Space session registry', () => {
           resources: [
             {
               id: OCCUPYING_RESOURCE_ID,
-              document: { title: 'Occupying', kind: 'markdown' as const, body: '' },
+              document: { title: 'Occupying', kind: 'markdown' as const, content: { source: '' } },
             },
           ],
         },

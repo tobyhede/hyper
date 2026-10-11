@@ -114,7 +114,10 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: FIRST_MAP_ID,
   },
   resources: [
-    { id: TARGET_RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
+    {
+      id: TARGET_RESOURCE_ID,
+      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 
@@ -147,7 +150,10 @@ const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): Spac
       defaultMap: HOME_MAP_ID,
     },
     resources: [
-      { id: HOME_RESOURCE_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+      {
+        id: HOME_RESOURCE_ID,
+        document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      },
       { id: SPACE_RESOURCE_ID, document: spaceResource },
     ],
   });
@@ -164,9 +170,7 @@ const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): Spac
 const created = home({
   title: 'Elsewhere',
   kind: 'space',
-  spaceId: TARGET_ID,
-  map: FIRST_MAP_ID,
-  graph: FIRST_GRAPH_ID,
+  content: { spaceId: TARGET_ID, map: FIRST_MAP_ID, graph: FIRST_GRAPH_ID },
 });
 
 /**
@@ -194,15 +198,16 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: META_MAP_ID,
   },
   resources: [
-    { id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
+    {
+      id: META_RESOURCE_ID,
+      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: META_TO_HOME_ID,
       document: {
         title: 'Home',
         kind: 'space',
-        spaceId: HOME_ID,
-        map: HOME_MAP_ID,
-        graph: HOME_GRAPH_ID,
+        content: { spaceId: HOME_ID, map: HOME_MAP_ID, graph: HOME_GRAPH_ID },
       },
     },
     {
@@ -210,9 +215,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: FIRST_MAP_ID,
-        graph: FIRST_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: FIRST_MAP_ID, graph: FIRST_GRAPH_ID },
       },
     },
   ],
@@ -350,9 +353,7 @@ describe('an Open Space Resource', () => {
       expect(spaceResourceDocument(session)).toEqual({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SECOND_MAP_ID,
-        graph: THIRD_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SECOND_MAP_ID, graph: THIRD_GRAPH_ID },
       }),
     );
     await settled(session);
@@ -374,8 +375,7 @@ describe('an Open Space Resource', () => {
 
     await waitFor(() =>
       expect(spaceResourceDocument(session)).toMatchObject({
-        map: THIRD_MAP_ID,
-        graph: FIFTH_GRAPH_ID,
+        content: { map: THIRD_MAP_ID, graph: FIFTH_GRAPH_ID },
       }),
     );
     await settled(session);
@@ -386,9 +386,7 @@ describe('an Open Space Resource', () => {
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: FIRST_MAP_ID,
-        graph: FIRST_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: FIRST_MAP_ID, graph: FIRST_GRAPH_ID },
       }),
     );
     await openSpaceResource();
@@ -397,8 +395,7 @@ describe('an Open Space Resource', () => {
 
     await waitFor(() =>
       expect(spaceResourceDocument(session)).toMatchObject({
-        map: FIRST_MAP_ID,
-        graph: SECOND_GRAPH_ID,
+        content: { map: FIRST_MAP_ID, graph: SECOND_GRAPH_ID },
       }),
     );
     await settled(session);
@@ -417,8 +414,7 @@ describe('an Open Space Resource', () => {
     choose('space-resource-map', 'Collection 2');
     await waitFor(() =>
       expect(spaceResourceDocument(session)).toMatchObject({
-        map: SECOND_MAP_ID,
-        graph: THIRD_GRAPH_ID,
+        content: { map: SECOND_MAP_ID, graph: THIRD_GRAPH_ID },
       }),
     );
     await settled(session);

@@ -45,7 +45,9 @@ function composition(newId?: () => ReturnType<typeof id>) {
         },
       ],
     },
-    resources: [{ id: RESOURCE, document: { title: 'Resource', kind: 'markdown', body: '' } }],
+    resources: [
+      { id: RESOURCE, document: { title: 'Resource', kind: 'markdown', content: { source: '' } } },
+    ],
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);

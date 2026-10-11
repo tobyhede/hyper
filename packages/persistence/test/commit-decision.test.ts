@@ -103,9 +103,7 @@ const linkedMeta = (
       document: {
         title: 'Target',
         kind: 'space',
-        spaceId: targetId,
-        map: mapId,
-        graph: graphId,
+        content: { spaceId: targetId, map: mapId, graph: graphId },
       },
     },
   ],

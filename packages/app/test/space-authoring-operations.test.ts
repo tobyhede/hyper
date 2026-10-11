@@ -71,8 +71,8 @@ const automaticSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Space' },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
   ],
 };
 
@@ -188,7 +188,7 @@ describe('Add Resource', () => {
 
     expect(session.getState().working.resources[2]).toEqual({
       id: MINTED,
-      document: { title: 'Resource 1', kind: 'markdown', body: '' },
+      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
     });
     expect(mapOf(session.getState().working, MAP_ID)?.positions).toEqual({
       [RESOURCE_A]: { x: 10, y: 20, open: false },
@@ -276,7 +276,7 @@ describe('Create Ur Resource', () => {
     // A Title and nothing else: the kind carries no content (ADR 0113).
     expect(session.getState().working.resources[2]).toEqual({
       id: MINTED,
-      document: { title: 'Resource 1', kind: 'ur' },
+      document: { title: 'Resource 1', kind: 'ur', content: {} },
     });
     expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual(CENTRE);
     expect(graphsOf(session.getState().working)).toEqual([MAIN_GRAPH]);
@@ -306,6 +306,7 @@ describe('Create Ur Resource', () => {
     });
     expect(reopened.currentSpace().lookup.resource(MINTED)).toMatchObject({
       kind: 'ur',
+      content: {},
       title: 'Resource 1',
     });
   });
@@ -332,8 +333,7 @@ describe('Create Image Resources', () => {
       document: {
         title: 'Resource 1',
         kind: 'image',
-        url: STORED,
-        naturalSize: { width: 640, height: 480 },
+        content: { url: STORED, naturalSize: { width: 640, height: 480 } },
       },
     });
     expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual(CENTRE);
@@ -352,7 +352,7 @@ describe('Create Image Resources', () => {
     expect(session.getState().working.resources[2]?.document).toEqual({
       title: 'Resource 1',
       kind: 'image',
-      url: 'https://example.com/a.png',
+      content: { url: 'https://example.com/a.png' },
     });
   });
 
@@ -422,7 +422,7 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: '', kind: 'markdown', body: 'A' },
+        document: { title: '', kind: 'markdown', content: { source: 'A' } },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-title-required' } });
     expect(session.getState().working).toBe(before);
@@ -438,7 +438,7 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: '   ', kind: 'markdown', body: 'A' },
+        document: { title: '   ', kind: 'markdown', content: { source: 'A' } },
       }),
     ).toEqual({ kind: 'refused', refusal: { code: 'resource-title-required' } });
     expect(session.getState().working).toBe(before);
@@ -454,7 +454,7 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', body: 'A' },
+        document: { title: 'Renamed  \nA subtitle   ', kind: 'markdown', content: { source: 'A' } },
       }),
     ).toEqual({ kind: 'completed' });
     expect(session.getState().working.resources[0]?.document.title).toBe('Renamed\nA subtitle');
@@ -465,7 +465,7 @@ describe('Edit Resource', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', body: 'A' },
+        document: { title: 'Renamed\nA subtitle\n', kind: 'markdown', content: { source: 'A' } },
       }),
     ).toEqual({ kind: 'unchanged' });
   });
@@ -544,7 +544,7 @@ describe('Resource size and Open', () => {
       ...positionedSnapshot,
       resources: positionedSnapshot.resources.map((resource) =>
         resource.id === RESOURCE_A
-          ? { id: RESOURCE_A, document: { title: 'A', kind: 'ur' } }
+          ? { id: RESOURCE_A, document: { title: 'A', kind: 'ur', content: {} } }
           : resource,
       ),
     });
@@ -599,7 +599,7 @@ describe('Change Shape', () => {
     ),
   });
   /** Only an Ur Resource takes a Shape (ADR 0121), so A is one here. */
-  const urSnapshot = withA({ title: 'A', kind: 'ur' });
+  const urSnapshot = withA({ title: 'A', kind: 'ur', content: {} });
   it('draws one Resource in another Shape on this Map, as one Edit that moves nothing else', () => {
     const { authoring, session } = open(urSnapshot);
     const before = session.getState().working;
@@ -795,14 +795,16 @@ describe('Change Shape', () => {
   });
 
   it.each([
-    ['Markdown', withA({ title: 'A', kind: 'markdown', body: 'A' })],
+    ['Markdown', withA({ title: 'A', kind: 'markdown', content: { source: 'A' } })],
     [
       'Image',
       withA({
         title: 'A',
         kind: 'image',
-        url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
-        naturalSize: { width: 640, height: 480 },
+        content: {
+          url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+          naturalSize: { width: 640, height: 480 },
+        },
       }),
     ],
     [
@@ -810,12 +812,14 @@ describe('Change Shape', () => {
       withA({
         title: 'A',
         kind: 'space',
-        spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000095'),
-        map: UNLOADED_MAP,
-        graph: UNLOADED_GRAPH,
+        content: {
+          spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000095'),
+          map: UNLOADED_MAP,
+          graph: UNLOADED_GRAPH,
+        },
       }),
     ],
-    ['Reference', withA({ title: 'A', kind: 'reference', target: RESOURCE_B })],
+    ['Reference', withA({ title: 'A', kind: 'reference', content: { target: RESOURCE_B } })],
   ])('refuses any Shape on a %s Resource, Open or Closed, changing nothing', (_kind, snapshot) => {
     const { authoring, session } = open(snapshot);
     const refusal = { kind: 'refused', refusal: { code: 'shape-requires-ur-resource' } };
@@ -871,7 +875,7 @@ describe('Add Reference Resource', () => {
     // named after its Target gave the Space two Resources with one name by default.
     expect(session.getState().working.resources[2]).toEqual({
       id: MINTED,
-      document: { title: 'Resource 1', kind: 'reference', target: RESOURCE_A },
+      document: { title: 'Resource 1', kind: 'reference', content: { target: RESOURCE_A } },
     });
     expect(mapOf(session.getState().working, MAP_ID)?.positions[MINTED]).toEqual(CENTRE);
   });
@@ -898,7 +902,7 @@ describe('Add Reference Resource', () => {
     expect(session.getState().working.resources[2]?.document).toEqual({
       title: '  Recap\n  the week',
       kind: 'reference',
-      target: RESOURCE_A,
+      content: { target: RESOURCE_A },
     });
   });
 
@@ -907,7 +911,10 @@ describe('Add Reference Resource', () => {
       ...positionedSnapshot,
       resources: [
         positionedSnapshot.resources[0]!,
-        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
+        {
+          id: RESOURCE_B,
+          document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_A } },
+        },
       ],
     };
     const { authoring, session } = open(referenced);
@@ -1447,7 +1454,7 @@ describe('Edge Title', () => {
     ...positionedSnapshot,
     resources: [
       ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
     ],
     document: {
       ...positionedSnapshot.document,
@@ -1795,7 +1802,7 @@ describe('Edge eligibility', () => {
       ...positionedSnapshot,
       resources: [
         ...positionedSnapshot.resources,
-        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+        { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
       ],
     };
     const { authoring } = open(sparse);
@@ -1839,7 +1846,7 @@ describe('Map membership', () => {
     ...positionedSnapshot,
     resources: [
       ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', body: 'C' } },
+      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown', content: { source: 'C' } } },
     ],
   };
 
@@ -1904,7 +1911,10 @@ describe('Delete Resource from Space', () => {
       ...positionedSnapshot,
       resources: [
         positionedSnapshot.resources[0]!,
-        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
+        {
+          id: RESOURCE_B,
+          document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_A } },
+        },
       ],
     };
     const { authoring, session } = open(referenced);
@@ -1940,9 +1950,7 @@ describe('Delete Resource from Space', () => {
           document: {
             title: 'Nested Space',
             kind: 'space',
-            spaceId: UNKNOWN_RESOURCE,
-            map: UNLOADED_MAP,
-            graph: UNLOADED_GRAPH,
+            content: { spaceId: UNKNOWN_RESOURCE, map: UNLOADED_MAP, graph: UNLOADED_GRAPH },
           },
         },
       ],
@@ -1970,12 +1978,13 @@ describe('Delete Resource from Space', () => {
           document: {
             title: 'Nested Space',
             kind: 'space',
-            spaceId: UNKNOWN_RESOURCE,
-            map: UNLOADED_MAP,
-            graph: UNLOADED_GRAPH,
+            content: { spaceId: UNKNOWN_RESOURCE, map: UNLOADED_MAP, graph: UNLOADED_GRAPH },
           },
         },
-        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
+        {
+          id: RESOURCE_B,
+          document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_A } },
+        },
       ],
     };
     const { authoring, session } = open(referencedSpace);
@@ -1995,7 +2004,10 @@ describe('Delete Resource from Space', () => {
       ...positionedSnapshot,
       resources: [
         positionedSnapshot.resources[0]!,
-        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
+        {
+          id: RESOURCE_B,
+          document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_A } },
+        },
       ],
     };
     const { authoring, session } = open(referenced);
@@ -2013,7 +2025,10 @@ describe('Delete Resource from Space', () => {
       ...positionedSnapshot,
       resources: [
         positionedSnapshot.resources[0]!,
-        { id: RESOURCE_B, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
+        {
+          id: RESOURCE_B,
+          document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_A } },
+        },
       ],
     };
     const { authoring, session } = open(referenced);
@@ -2133,7 +2148,10 @@ describe('connecting Resources on an embedded Map', () => {
     },
     resources: [
       ...positionedSnapshot.resources,
-      { id: RESOURCE_C, document: { title: 'C', kind: 'markdown' as const, body: 'C' } },
+      {
+        id: RESOURCE_C,
+        document: { title: 'C', kind: 'markdown' as const, content: { source: 'C' } },
+      },
     ],
   };
   it('refuses a drawing whose Graph no longer belongs to its Map without changing the Space', () => {

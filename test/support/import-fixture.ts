@@ -71,8 +71,8 @@ const uncarriedImageUrls = (
   spaces.flatMap(({ resources }) =>
     resources.flatMap(({ document }) => {
       if (document.kind !== 'image') return [];
-      const id = storedImageId(document.url);
-      return id === undefined || carried.has(id) ? [] : [document.url];
+      const id = storedImageId(document.content.url);
+      return id === undefined || carried.has(id) ? [] : [document.content.url];
     }),
   );
 

@@ -78,7 +78,7 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: resourceTitle, kind: 'markdown', body: resourceTitle },
+        document: { title: resourceTitle, kind: 'markdown', content: { source: resourceTitle } },
       },
     ],
   });
@@ -1477,7 +1477,7 @@ describe('Space app Resources list', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', body: '' },
+          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
         },
       ],
     };
@@ -1696,7 +1696,7 @@ describe('Space app Resources list drop', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', body: '' },
+          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
         },
       ],
     };
@@ -1773,11 +1773,11 @@ describe('Space app Map reading', () => {
         ...base.resources,
         {
           id: OUTSIDE_RESOURCE_ID,
-          document: { title: 'Outside resource', kind: 'markdown', body: '' },
+          document: { title: 'Outside resource', kind: 'markdown', content: { source: '' } },
         },
         {
           id: UNPLACED_RESOURCE_ID,
-          document: { title: 'Unplaced resource', kind: 'markdown', body: '' },
+          document: { title: 'Unplaced resource', kind: 'markdown', content: { source: '' } },
         },
       ],
       document: {

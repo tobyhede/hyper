@@ -112,22 +112,21 @@ const meta = (target: SpaceSnapshot): SpaceSnapshot => {
             document: {
               title: 'Other',
               kind: 'space',
-              spaceId: OTHER_ID,
-              map: OTHER_MAP_ID,
-              graph: OTHER_GRAPH_ID,
+              content: { spaceId: OTHER_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
             },
           },
         ];
   const resources = [
-    { id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
+    {
+      id: META_RESOURCE_ID,
+      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: META_TO_HOME_ID,
       document: {
         title: 'Home',
         kind: 'space',
-        spaceId: HOME_ID,
-        map: HOME_MAP_ID,
-        graph: HOME_GRAPH_ID,
+        content: { spaceId: HOME_ID, map: HOME_MAP_ID, graph: HOME_GRAPH_ID },
       },
     },
     ...toOther,
@@ -186,8 +185,14 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: HOME_MAP_ID,
   },
   resources: [
-    { id: HOME_RESOURCE_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
-    { id: HOME_NEXT_RESOURCE_ID, document: { title: 'And then', kind: 'markdown', body: '' } },
+    {
+      id: HOME_RESOURCE_ID,
+      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+    },
+    {
+      id: HOME_NEXT_RESOURCE_ID,
+      document: { title: 'And then', kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 
@@ -223,7 +228,10 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: OTHER_MAP_ID,
   },
   resources: [
-    { id: OTHER_RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
+    {
+      id: OTHER_RESOURCE_ID,
+      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 
@@ -235,7 +243,10 @@ const maplessOther: SpaceSnapshot = spaceSnapshotSchema.parse({
   id: OTHER_ID,
   document: { version: 1, title: 'Other Space' },
   resources: [
-    { id: OTHER_RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
+    {
+      id: OTHER_RESOURCE_ID,
+      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 
@@ -255,9 +266,7 @@ const otherReferencingHome: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Home',
         kind: 'space',
-        spaceId: HOME_ID,
-        map: HOME_MAP_ID,
-        graph: HOME_GRAPH_ID,
+        content: { spaceId: HOME_ID, map: HOME_MAP_ID, graph: HOME_GRAPH_ID },
       },
     },
   ],
@@ -451,11 +460,11 @@ describe('Create Space Resource', () => {
     const created = spaceResourcesOf(session);
     expect(created[0]?.document.title).toBe('Space 1');
 
-    const targetId = created[0]!.document.spaceId;
+    const targetId = created[0]!.document.content.spaceId;
     const target = await backend.loadSpace(targetId);
     expect(target?.snapshot.document.title).toBe('Space 1');
     expect(target?.snapshot.resources.map((resource) => resource.document)).toEqual([
-      { title: 'Resource 1', kind: 'markdown', body: '' },
+      { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
     ]);
     await settled(session);
   });
@@ -561,7 +570,7 @@ describe('Create Space Resource', () => {
     const { backend, session } = mount();
     await createSpaceResource();
     await waitFor(() => expect(spaceResourcesOf(session)).toHaveLength(1));
-    const targetId = spaceResourcesOf(session)[0]!.document.spaceId;
+    const targetId = spaceResourcesOf(session)[0]!.document.content.spaceId;
 
     const editor = await screen.findByRole('textbox', { name: 'Resource title' });
     fireEvent.change(editor, { target: { value: 'The architecture' } });
@@ -720,9 +729,7 @@ describe('referencing an existing Space', () => {
         {
           title: 'Other Space',
           kind: 'space',
-          spaceId: OTHER_ID,
-          map: OTHER_MAP_ID,
-          graph: OTHER_GRAPH_ID,
+          content: { spaceId: OTHER_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
         },
       ]),
     );
@@ -747,8 +754,7 @@ describe('referencing an existing Space', () => {
 
     await waitFor(() => expect(spaceResourcesOf(session)).toHaveLength(1));
     expect(spaceResourcesOf(session)[0]?.document).toMatchObject({
-      map: OTHER_MAP_ID,
-      graph: OTHER_GRAPH_ID,
+      content: { map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
     });
     const stored = await backend.loadSpace(OTHER_ID);
     expect(stored?.snapshot.document).toEqual(other.document);
@@ -778,9 +784,7 @@ describe('referencing an existing Space', () => {
       document: {
         title: 'Other Space',
         kind: 'space',
-        spaceId: OTHER_ID,
-        map: MINTED_MAP_ID,
-        graph: MINTED_GRAPH_ID,
+        content: { spaceId: OTHER_ID, map: MINTED_MAP_ID, graph: MINTED_GRAPH_ID },
       },
     });
     const stored = await backend.loadSpace(OTHER_ID);
@@ -868,18 +872,21 @@ describe('referencing an existing Space', () => {
     await addExistingSpace('Other Space');
     await waitFor(() => expect(spaceResourcesOf(session)).toHaveLength(2));
 
-    expect(spaceResourcesOf(session).map((resource) => resource.document.spaceId)).toEqual([
+    expect(spaceResourcesOf(session).map((resource) => resource.document.content.spaceId)).toEqual([
       OTHER_ID,
       OTHER_ID,
     ]);
     // Both begin at what the Space itself opens on, because the selection is
     // read off the target rather than proposed by the author (ADR 0079).
-    expect(spaceResourcesOf(session).map(({ document }) => [document.map, document.graph])).toEqual(
-      [
-        [OTHER_MAP_ID, OTHER_GRAPH_ID],
-        [OTHER_MAP_ID, OTHER_GRAPH_ID],
-      ],
-    );
+    expect(
+      spaceResourcesOf(session).map(({ document }) => [
+        document.content.map,
+        document.content.graph,
+      ]),
+    ).toEqual([
+      [OTHER_MAP_ID, OTHER_GRAPH_ID],
+      [OTHER_MAP_ID, OTHER_GRAPH_ID],
+    ]);
     expect(await backend.listSpaces()).toHaveLength(3);
     await settled(session);
   });
@@ -941,7 +948,10 @@ describe('referencing an existing Space', () => {
 
     await waitFor(() =>
       expect(
-        spaceResourcesOf(session).map(({ document }) => [document.map, document.graph]),
+        spaceResourcesOf(session).map(({ document }) => [
+          document.content.map,
+          document.content.graph,
+        ]),
       ).toEqual([
         [OTHER_SECOND_MAP_ID, OTHER_SECOND_GRAPH_ID],
         [OTHER_MAP_ID, OTHER_GRAPH_ID],

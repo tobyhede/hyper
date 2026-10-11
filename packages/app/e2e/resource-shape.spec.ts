@@ -140,7 +140,7 @@ async function seedResizedUr(page: Page): Promise<Locator> {
     () => ({
       [RESIZED_UR]: { x: 0, y: 0, open: false, size: { width: RESIZED[0], height: RESIZED[1] } },
     }),
-    [{ id: RESIZED_UR, document: { title: UR, kind: 'ur' } }],
+    [{ id: RESIZED_UR, document: { title: UR, kind: 'ur', content: {} } }],
   );
   await page.goto(`/spaces/${encodeCompactUuid(seeded.snapshot.id)}`);
   await expect(selectedCanvas(page)).toContainText('Shapes');

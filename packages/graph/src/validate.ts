@@ -278,7 +278,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
 
   for (const resource of space.resources) {
     if (resource.kind !== 'reference') continue;
-    if (resource.target === resource.id) {
+    if (resource.content.target === resource.id) {
       errors.push({
         kind: 'reference-targets-self',
         ref: resource.id,
@@ -286,31 +286,31 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
       });
       continue;
     }
-    const target = resourceById.get(resource.target);
+    const target = resourceById.get(resource.content.target);
     if (!target) {
       errors.push({
         kind: 'unresolved-reference-target',
-        ref: resource.target,
-        message: `Reference Resource "${resource.id}" targets missing resource "${resource.target}"`,
+        ref: resource.content.target,
+        message: `Reference Resource "${resource.id}" targets missing resource "${resource.content.target}"`,
       });
       continue;
     }
     if (target.kind === 'reference') {
       errors.push({
         kind: 'reference-targets-reference',
-        ref: resource.target,
-        message: `Reference Resource "${resource.id}" targets reference "${resource.target}"; referencing is a single hop`,
+        ref: resource.content.target,
+        message: `Reference Resource "${resource.id}" targets reference "${resource.content.target}"; referencing is a single hop`,
       });
       continue;
     }
   }
 
   for (const resource of space.resources) {
-    if (resource.kind !== 'space' || resource.spaceId !== space.id) continue;
+    if (resource.kind !== 'space' || resource.content.spaceId !== space.id) continue;
     errors.push({
       kind: 'space-resource-reference-cycle',
-      ref: resource.spaceId,
-      message: `Space Resource "${resource.id}" targets its own Space "${resource.spaceId}"`,
+      ref: resource.content.spaceId,
+      message: `Space Resource "${resource.id}" targets its own Space "${resource.content.spaceId}"`,
     });
   }
 

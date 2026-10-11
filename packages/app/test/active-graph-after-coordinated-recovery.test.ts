@@ -89,8 +89,14 @@ const targetSnapshot: SpaceSnapshot = {
     ],
   },
   resources: [
-    { id: TARGET_RESOURCE_ID, document: { title: 'Architecture', kind: 'markdown', body: '' } },
-    { id: TARGET_RESOURCE_TWO, document: { title: 'Second', kind: 'markdown', body: '' } },
+    {
+      id: TARGET_RESOURCE_ID,
+      document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+    },
+    {
+      id: TARGET_RESOURCE_TWO,
+      document: { title: 'Second', kind: 'markdown', content: { source: '' } },
+    },
   ],
 };
 
@@ -115,15 +121,16 @@ const metaSnapshot: SpaceSnapshot = {
     ],
   },
   resources: [
-    { id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
+    {
+      id: META_RESOURCE_ID,
+      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: SPACE_RESOURCE_ID,
       document: {
         title: 'Target',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
   ],

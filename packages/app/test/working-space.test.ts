@@ -38,11 +38,11 @@ const snapshot = (title: string): SpaceSnapshot =>
     resources: [
       {
         id: '00000000-0000-4000-8000-000000000002',
-        document: { title: 'Resource', kind: 'markdown', body: 'Body' },
+        document: { title: 'Resource', kind: 'markdown', content: { source: 'Body' } },
       },
       {
         id: '00000000-0000-4000-8000-000000000003',
-        document: { title: 'Next', kind: 'markdown', body: 'More' },
+        document: { title: 'Next', kind: 'markdown', content: { source: 'More' } },
       },
     ],
   });

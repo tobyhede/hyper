@@ -41,10 +41,10 @@ type Caret =
   | null;
 
 const spaceDocumentIdentity = (document: Extract<ResourceDocument, { kind: 'space' }>): string => {
-  const framing = document.framing;
+  const framing = document.content.framing;
   const framingKey =
     framing === undefined ? '' : `${framing.centreX}:${framing.centreY}:${framing.zoom}`;
-  return `${document.spaceId}:${document.map}:${document.graph}:${document.title}:${framingKey}`;
+  return `${document.content.spaceId}:${document.content.map}:${document.content.graph}:${document.title}:${framingKey}`;
 };
 
 const spaceDocumentsOf = (
@@ -305,7 +305,10 @@ export function useCanvasResourceAuthoring({
         .getState()
         .working.resources.find((resource) => resource.id === resourceId);
       if (stored?.document.kind !== 'markdown') return 'retained';
-      const parsed = resourceDocumentSchema.safeParse({ ...stored.document, body });
+      const parsed = resourceDocumentSchema.safeParse({
+        ...stored.document,
+        content: { ...stored.document.content, source: body },
+      });
       if (!parsed.success) return 'retained';
       const result = authoring.complete({
         kind: 'edited-resource',
@@ -409,10 +412,9 @@ export function useCanvasResourceAuthoring({
         (document) => {
           const next: Extract<ResourceDocument, { kind: 'space' }> = {
             ...document,
-            map: targetMap.id,
-            graph: graphId,
+            content: { ...document.content, map: targetMap.id, graph: graphId },
           };
-          if (document.map !== targetMap.id) delete next.framing;
+          if (document.content.map !== targetMap.id) delete next.content.framing;
           return next;
         },
         'The selection is invalid.',
@@ -426,7 +428,7 @@ export function useCanvasResourceAuthoring({
         authoring,
         spaceSession,
         resourceId,
-        (document) => ({ ...document, framing }),
+        (document) => ({ ...document, content: { ...document.content, framing } }),
         'The framing is invalid.',
       ),
     [authoring, spaceSession],

@@ -116,10 +116,13 @@ describe('import decoding', () => {
         ],
       },
       resources: [
-        { id: RESOURCE_ID, document: { title: title(4, 'One'), kind: 'markdown', body: '' } },
+        {
+          id: RESOURCE_ID,
+          document: { title: title(4, 'One'), kind: 'markdown', content: { source: '' } },
+        },
         {
           id: SECOND_RESOURCE_ID,
-          document: { title: title(5, 'Two'), kind: 'markdown', body: '' },
+          document: { title: title(5, 'Two'), kind: 'markdown', content: { source: '' } },
         },
       ],
     };
@@ -208,7 +211,9 @@ describe('import decoding', () => {
     const blankLine: ImportSpace = {
       id: SPACE_ID,
       document: { version: 1, title: 'Space' },
-      resources: [{ id: RESOURCE_ID, document: { title: '   ', kind: 'markdown', body: '' } }],
+      resources: [
+        { id: RESOURCE_ID, document: { title: '   ', kind: 'markdown', content: { source: '' } } },
+      ],
     };
 
     expect(cliMessage(blankLine)).toBe(
@@ -242,7 +247,9 @@ describe('import decoding', () => {
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
-        resources: [{ id: 'nope', document: { title: 'C', kind: 'markdown', body: '' } }],
+        resources: [
+          { id: 'nope', document: { title: 'C', kind: 'markdown', content: { source: '' } } },
+        ],
       },
       {
         id: SPACE_ID,
@@ -272,7 +279,9 @@ describe('import decoding', () => {
       {
         id: SPACE_ID,
         document: { version: 1, title: 'T' },
-        resources: [{ id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
+        resources: [
+          { id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', content: { source: '' } } },
+        ],
       },
       {
         id: SPACE_ID,
@@ -331,7 +340,9 @@ describe('import decoding', () => {
     const parsed = spaceSnapshotSchema.safeParse({
       id: SPACE_ID,
       document: { version: 1, title: 'T' },
-      resources: [{ id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', body: '' } }],
+      resources: [
+        { id: RESOURCE_ID, document: { title: 'C', kind: 'Nope', content: { source: '' } } },
+      ],
     });
     if (parsed.success) throw new Error('Expected an unknown resource kind to be refused');
     const summary = describeSchemaFailure(parsed.error.issues, 'identified space');

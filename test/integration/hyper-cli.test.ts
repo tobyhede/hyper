@@ -76,9 +76,7 @@ const metaSpaceSnapshot: SpaceSnapshot = {
       document: {
         title: 'To the target',
         kind: 'space',
-        spaceId: TARGET_SPACE_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
   ],
@@ -200,7 +198,7 @@ describe('hyper CLI', () => {
     expect(stored?.snapshot.resources[0]?.document).toEqual({
       title: 'Opening',
       kind: 'markdown',
-      body: 'Durable CLI body.\n',
+      content: { source: 'Durable CLI body.\n' },
     });
 
     // The aggregate file named Meta and the repository stored what it named. Nothing
@@ -293,7 +291,7 @@ describe('hyper CLI', () => {
           document: {
             title: 'Exported resource',
             kind: 'markdown',
-            body: 'Canonical export.\n',
+            content: { source: 'Canonical export.\n' },
           },
         },
       ],

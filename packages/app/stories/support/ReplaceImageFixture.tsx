@@ -70,18 +70,19 @@ export const picturesSnapshot: SpaceSnapshot = {
       document: {
         title: 'Figure',
         kind: 'image',
-        url: REPLACE_FIGURE_URL,
-        naturalSize: { width: 400, height: 300 },
+        content: { url: REPLACE_FIGURE_URL, naturalSize: { width: 400, height: 300 } },
       },
     },
-    { id: MISSING, document: { title: 'Missing', kind: 'image', url: REPLACE_MISSING_URL } },
+    {
+      id: MISSING,
+      document: { title: 'Missing', kind: 'image', content: { url: REPLACE_MISSING_URL } },
+    },
     {
       id: THUMBNAIL,
       document: {
         title: 'Thumbnail',
         kind: 'image',
-        url: REPLACE_THUMBNAIL_URL,
-        naturalSize: { width: 64, height: 64 },
+        content: { url: REPLACE_THUMBNAIL_URL, naturalSize: { width: 64, height: 64 } },
       },
     },
   ],
@@ -140,7 +141,7 @@ function RevisionEvidence({ session }: { readonly session: SpaceSession }) {
       hidden
       data-testid="replacement-revision"
       data-persistence={state.persistence.kind}
-      data-url={figure?.kind === 'image' ? figure.url : undefined}
+      data-url={figure?.kind === 'image' ? figure.content.url : undefined}
     >
       {state.acknowledgedRevision.toString()}
     </output>

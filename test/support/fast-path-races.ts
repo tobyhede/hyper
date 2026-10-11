@@ -120,12 +120,12 @@ const B_FIRST = idAt(60);
 
 const markdown = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, body: title },
+  document: { title, kind: 'markdown' as const, content: { source: title } },
 });
 
 const link = (id: UUID, spaceId: UUID, mapId: UUID, graph: UUID) => ({
   id,
-  document: { title: 'Link', kind: 'space' as const, spaceId, map: mapId, graph },
+  document: { title: 'Link', kind: 'space' as const, content: { spaceId, map: mapId, graph } },
 });
 
 const meta = (links: readonly ReturnType<typeof link>[]): SpaceSnapshot => ({

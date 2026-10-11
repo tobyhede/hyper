@@ -101,15 +101,27 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     const unordered: SpaceSnapshot = {
       ...snapshot(),
       resources: [
-        { id: RESOURCE_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
-        { id: RESOURCE_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+        {
+          id: RESOURCE_TWO_ID,
+          document: { title: 'Two', kind: 'markdown', content: { source: 'Two' } },
+        },
+        {
+          id: RESOURCE_ONE_ID,
+          document: { title: 'One', kind: 'markdown', content: { source: 'One' } },
+        },
       ],
     };
     const ordered: SpaceSnapshot = {
       ...unordered,
       resources: [
-        { id: RESOURCE_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
-        { id: RESOURCE_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+        {
+          id: RESOURCE_ONE_ID,
+          document: { title: 'One', kind: 'markdown', content: { source: 'One' } },
+        },
+        {
+          id: RESOURCE_TWO_ID,
+          document: { title: 'Two', kind: 'markdown', content: { source: 'Two' } },
+        },
       ],
     };
     const backend = new MemorySpaceBackend(META_ID, [
@@ -140,15 +152,27 @@ describe('MemorySpaceBackend aggregate persistence', () => {
     const unordered: SpaceSnapshot = {
       ...snapshot(),
       resources: [
-        { id: RESOURCE_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
-        { id: RESOURCE_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
+        {
+          id: RESOURCE_TWO_ID,
+          document: { title: 'Two', kind: 'markdown', content: { source: 'Two' } },
+        },
+        {
+          id: RESOURCE_ONE_ID,
+          document: { title: 'One', kind: 'markdown', content: { source: 'One' } },
+        },
       ],
     };
     const ordered: SpaceSnapshot = {
       ...unordered,
       resources: [
-        { id: RESOURCE_ONE_ID, document: { title: 'One', kind: 'markdown', body: 'One' } },
-        { id: RESOURCE_TWO_ID, document: { title: 'Two', kind: 'markdown', body: 'Two' } },
+        {
+          id: RESOURCE_ONE_ID,
+          document: { title: 'One', kind: 'markdown', content: { source: 'One' } },
+        },
+        {
+          id: RESOURCE_TWO_ID,
+          document: { title: 'Two', kind: 'markdown', content: { source: 'Two' } },
+        },
       ],
     };
     const backend = new MemorySpaceBackend(META_ID, [
@@ -260,9 +284,7 @@ describe('MemorySpaceBackend aggregate persistence', () => {
           document: {
             title: 'Other',
             kind: 'space',
-            spaceId: OTHER_ID,
-            map: OTHER_MAP_ID,
-            graph: OTHER_GRAPH_ID,
+            content: { spaceId: OTHER_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
           },
         },
       ],
@@ -323,9 +345,7 @@ describe('MemorySpaceBackend aggregate persistence', () => {
           document: {
             title: 'Other',
             kind: 'space',
-            spaceId: OTHER_ID,
-            map: OTHER_MAP_ID,
-            graph: OTHER_GRAPH_ID,
+            content: { spaceId: OTHER_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
           },
         },
       ],
@@ -385,9 +405,7 @@ describe('MemorySpaceBackend aggregate persistence', () => {
           document: {
             title: 'Other',
             kind: 'space',
-            spaceId: OTHER_ID,
-            map: OTHER_MAP_ID,
-            graph: OTHER_GRAPH_ID,
+            content: { spaceId: OTHER_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
           },
         },
       ],

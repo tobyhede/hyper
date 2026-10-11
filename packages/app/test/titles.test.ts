@@ -28,7 +28,7 @@ const spaceOf = (...titles: readonly string[]): SpaceSnapshot =>
       // Distinct ids, minted from the index rather than a generator: nothing
       // here reads one, and a title is what every assertion is about.
       id: uuidSchema.parse(`00000000-0000-4000-8000-1000000000${String(index).padStart(2, '0')}`),
-      document: { title, kind: 'markdown', body: '' },
+      document: { title, kind: 'markdown', content: { source: '' } },
     })),
   });
 

@@ -146,25 +146,32 @@ describe('an Image Resource is held to one rule at every door', () => {
   it('shares one instance of every rule but the id across document, resource and import', () => {
     const resourceFieldSchemas: ZodRawShape = imageResourceSchema.shape;
     const importFieldSchemas: ZodRawShape = importImageResourceFrontmatterSchema.shape;
+    // The import frontmatter is flat; the Resource is an envelope whose
+    // content holds the kind's fields (ADR 0128).
+    const { content, ...envelopeFieldSchemas } = imageResourceSchema.shape;
+    const flatResourceFieldSchemas: ZodRawShape = { ...envelopeFieldSchemas, ...content.shape };
     expect(Object.keys(imageResourceDocumentSchema.shape).sort()).toEqual(
       Object.keys(imageResourceSchema.shape)
         .filter((key) => key !== 'id')
         .sort(),
     );
     expect(Object.keys(importFieldSchemas).sort()).toEqual(
-      Object.keys(resourceFieldSchemas).sort(),
+      Object.keys(flatResourceFieldSchemas).sort(),
     );
     for (const [field, schema] of Object.entries(imageResourceDocumentSchema.shape)) {
       expect(schema, `the document's "${field}" is not the resource's`).toBe(
         resourceFieldSchemas[field],
       );
-      if (field === 'naturalSize') continue;
+    }
+    for (const [field, schema] of Object.entries(importFieldSchemas)) {
+      if (field === 'id' || field === 'naturalSize') continue;
       expect(schema, `the import's "${field}" is not the resource's`).toBe(
-        importFieldSchemas[field],
+        flatResourceFieldSchemas[field],
       );
     }
 
-    const resourceSizeRules: ZodRawShape = imageResourceSchema.shape.naturalSize.unwrap().shape;
+    const resourceSizeRules: ZodRawShape =
+      imageResourceSchema.shape.content.shape.naturalSize.unwrap().shape;
     const importSizeRules: ZodRawShape =
       importImageResourceFrontmatterSchema.shape.naturalSize.unwrap().shape;
     expect(Object.keys(importSizeRules).sort()).toEqual(Object.keys(resourceSizeRules).sort());
@@ -179,10 +186,15 @@ describe('an Image Resource is held to one rule at every door', () => {
     const document = {
       title: 'A',
       kind: 'image',
-      url: 'https://example.com/a.png',
-      naturalSize: { width: 1, height: 2, widht: 3 },
+      content: { url: 'https://example.com/a.png', naturalSize: { width: 1, height: 2, widht: 3 } },
     };
-    expect(importImageResourceFrontmatterSchema.safeParse(document).success).toBe(false);
+    expect(
+      importImageResourceFrontmatterSchema.safeParse({
+        title: 'A',
+        kind: 'image',
+        ...document.content,
+      }).success,
+    ).toBe(false);
     expect(imageResourceSchema.safeParse({ ...document, id: RESOURCE_ID }).success).toBe(true);
   });
 
@@ -192,9 +204,11 @@ describe('an Image Resource is held to one rule at every door', () => {
     ['data:image/png;base64,AA==', false],
     ['a.png', false],
   ])('answers %j the same way at every door', (url, accepted) => {
-    const document = { title: 'A', kind: 'image', url };
+    const document = { title: 'A', kind: 'image', content: { url } };
     expect(imageResourceDocumentSchema.safeParse(document).success).toBe(accepted);
     expect(imageResourceSchema.safeParse({ ...document, id: RESOURCE_ID }).success).toBe(accepted);
-    expect(importImageResourceFrontmatterSchema.safeParse(document).success).toBe(accepted);
+    expect(
+      importImageResourceFrontmatterSchema.safeParse({ title: 'A', kind: 'image', url }).success,
+    ).toBe(accepted);
   });
 });

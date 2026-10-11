@@ -223,21 +223,23 @@ function withKinds(
     const target = owners[index % Math.max(owners.length, 1)];
     const resource: Resource =
       chosen === 'reference' && target !== undefined
-        ? { id, title, kind: 'reference', target }
+        ? { id, title, kind: 'reference', content: { target } }
         : chosen === 'image'
-          ? { id, title, kind: 'image', url: `https://example.com/${index}.png` }
+          ? { id, title, kind: 'image', content: { url: `https://example.com/${index}.png` } }
           : chosen === 'space'
             ? {
                 id,
                 title,
                 kind: 'space',
-                spaceId: uuidSchema.parse(uuidFrom(900)),
-                map: uuidSchema.parse(uuidFrom(901)),
-                graph: uuidSchema.parse(uuidFrom(902)),
+                content: {
+                  spaceId: uuidSchema.parse(uuidFrom(900)),
+                  map: uuidSchema.parse(uuidFrom(901)),
+                  graph: uuidSchema.parse(uuidFrom(902)),
+                },
               }
             : chosen === 'ur'
-              ? { id, title, kind: 'ur' }
-              : { id, title, kind: 'markdown', body: `Body ${index}\n` };
+              ? { id, title, kind: 'ur', content: {} }
+              : { id, title, kind: 'markdown', content: { source: `Body ${index}\n` } };
     if (resource.kind !== 'reference') owners.push(id);
     return { path: file.path, text: serializeResourceFile(resource) };
   });

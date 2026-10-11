@@ -93,7 +93,12 @@ const snapshot = (
       ],
       defaultMap: MAP_ID,
     },
-    resources: [{ id: RESOURCE_ID, document: { title: resourceTitle, kind: 'markdown', body } }],
+    resources: [
+      {
+        id: RESOURCE_ID,
+        document: { title: resourceTitle, kind: 'markdown', content: { source: body } },
+      },
+    ],
   });
 
 const LOCAL = snapshot('Local space', 'Local map', 'Local resource', 'Local source', 10, 20);

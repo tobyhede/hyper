@@ -6,17 +6,17 @@ type ContentOwner = Exclude<ResourceDocument, { kind: 'reference' }>;
 function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent {
   switch (resource.kind) {
     case 'markdown':
-      return { kind: 'markdown', source: resource.body, via };
+      return { kind: 'markdown', source: resource.content.source, via };
     case 'image':
-      return { kind: 'image', url: resource.url, via };
+      return { kind: 'image', url: resource.content.url, via };
     case 'space':
       return {
         kind: 'space',
         view: {
-          spaceId: resource.spaceId,
-          map: resource.map,
-          graph: resource.graph,
-          framing: resource.framing,
+          spaceId: resource.content.spaceId,
+          map: resource.content.map,
+          graph: resource.content.graph,
+          framing: resource.content.framing,
         },
         via,
       };
@@ -32,7 +32,7 @@ export function resolveDocumentContent(
 ): ResourceContent {
   if (document === undefined) return { kind: 'unresolved', via: 'reference' };
   if (document.kind !== 'reference') return ownedContent(document, 'self');
-  const target = documentOf(document.target);
+  const target = documentOf(document.content.target);
   if (target === undefined || target.kind === 'reference') {
     return { kind: 'unresolved', via: 'reference' };
   }

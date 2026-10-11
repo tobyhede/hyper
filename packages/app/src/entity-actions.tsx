@@ -281,7 +281,7 @@ export function spaceEntityActions({
             copy(
               COPY_SPACE_LINK_ACTION_ID,
               COPY_SPACE_LINK,
-              { kind: 'space', spaceId: resource.spaceId },
+              { kind: 'space', spaceId: resource.content.spaceId },
               onCopy,
             ),
             ...(onOpenIndependently === null
@@ -295,7 +295,7 @@ export function spaceEntityActions({
                     // Sync on purpose: `window.open` spends the click's user
                     // gesture, and an `await` here would yield and lose it.
                     onSelect: (): EntityActionOutcome =>
-                      onOpenIndependently({ kind: 'space', spaceId: resource.spaceId })
+                      onOpenIndependently({ kind: 'space', spaceId: resource.content.spaceId })
                         ? 'done'
                         : 'failed',
                   },
@@ -317,7 +317,7 @@ export function spaceEntityActions({
             copy(
               COPY_LINK_TO_TARGET_ACTION_ID,
               COPY_LINK_TO_TARGET,
-              { kind: 'resource', spaceId, resourceId: resource.target },
+              { kind: 'resource', spaceId, resourceId: resource.content.target },
               onCopy,
             ),
           ];

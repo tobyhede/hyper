@@ -28,8 +28,8 @@ const snapshot: SpaceSnapshot = {
     ],
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'Body A' } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'Body B' } },
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'Body A' } } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'Body B' } } },
   ],
 };
 
@@ -108,7 +108,9 @@ describe('loadSpaceSnapshot', () => {
   it('locates an invalid shape in prose rather than dumping Zod', () => {
     const result = loadSpaceSnapshot({
       ...snapshot,
-      resources: [{ id: RESOURCE_A, document: { kind: 'markdown', body: 'Body A' } }],
+      resources: [
+        { id: RESOURCE_A, document: { kind: 'markdown', content: { source: 'Body A' } } },
+      ],
     });
 
     expect(result.ok).toBe(false);
@@ -130,7 +132,7 @@ describe('loadSpaceSnapshot', () => {
     if (!result.ok) return;
     expect(result.space.id).toBe(SPACE_ID);
     const resource = result.space.lookup.resource(RESOURCE_A);
-    expect(resource?.kind === 'markdown' && resource.body).toBe('Body A');
+    expect(resource?.kind === 'markdown' && resource.content.source).toBe('Body A');
     expect(result.space.lookup.graph(GRAPH_ID)?.graph.title).toBe('Main');
   });
 

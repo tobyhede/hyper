@@ -20,7 +20,10 @@ const space = (id: UUID, resourceId: UUID, title: string): SpaceSnapshot => ({
   id,
   document: { version: 1, title },
   resources: [
-    { id: resourceId, document: { title: `${title} resource`, kind: 'markdown', body: '' } },
+    {
+      id: resourceId,
+      document: { title: `${title} resource`, kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 
@@ -52,9 +55,7 @@ describe('MemorySpaceRepository', () => {
               document: {
                 title: 'Second',
                 kind: 'space',
-                spaceId: OTHER_SPACE_ID,
-                map: MAP_ID,
-                graph: GRAPH_ID,
+                content: { spaceId: OTHER_SPACE_ID, map: MAP_ID, graph: GRAPH_ID },
               },
             },
           ],
@@ -92,7 +93,11 @@ describe('MemorySpaceRepository', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: 'Claimed resource', kind: 'markdown' as const, body: '' },
+          document: {
+            title: 'Claimed resource',
+            kind: 'markdown' as const,
+            content: { source: '' },
+          },
         },
       ],
     };

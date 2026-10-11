@@ -18,7 +18,11 @@ describe('Prisma Next PostgreSQL contract', () => {
     try {
       const resource = await resources.create({
         spaceId: space.id,
-        document: { title: 'Typed resource', kind: 'markdown', body: 'Database-backed content' },
+        document: {
+          title: 'Typed resource',
+          kind: 'markdown',
+          content: { source: 'Database-backed content' },
+        },
       });
 
       const stored = await resources.first({ id: resource.id });
@@ -32,7 +36,7 @@ describe('Prisma Next PostgreSQL contract', () => {
         document: {
           title: 'Typed resource',
           kind: 'markdown',
-          body: 'Database-backed content',
+          content: { source: 'Database-backed content' },
         },
       });
     } finally {

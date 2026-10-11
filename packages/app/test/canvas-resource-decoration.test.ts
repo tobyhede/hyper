@@ -82,9 +82,7 @@ function ofKind<K extends ResourceFlowNode['data']['kind']>(
 const spaceDocument = {
   title: 'Architecture',
   kind: 'space' as const,
-  spaceId: TARGET_SPACE_ID,
-  map: TARGET_MAP_ID,
-  graph: TARGET_GRAPH_ID,
+  content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
 };
 
 /**
@@ -238,7 +236,11 @@ describe('decorateSharedResourceNode', () => {
         { id: SPACE_RESOURCE_ID, document: spaceDocument },
         {
           id: REFERENCE_ID,
-          document: { title: 'Reference', kind: 'reference', target: SPACE_RESOURCE_ID },
+          document: {
+            title: 'Reference',
+            kind: 'reference',
+            content: { target: SPACE_RESOURCE_ID },
+          },
         },
       ],
     } satisfies SpaceSnapshot);

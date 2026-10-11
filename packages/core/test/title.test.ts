@@ -38,15 +38,19 @@ type ResourceTitleSchema = ZodType<unknown, ZodTypeDef, unknown>;
  * A Resource frontmatter as it arrives at a schema, before one has read it: every
  * field a Resource of any kind declares is written down, and all of them are text.
  */
-type ResourceFrontmatterDraft = Readonly<Record<string, string>>;
+type ResourceFrontmatterDraft = Readonly<Record<string, string | Readonly<Record<string, string>>>>;
 
 const markdownFrontmatter = (title: string) => ({
   id: RESOURCE_ID,
   title,
   kind: 'markdown',
 });
-/** A Markdown Resource as the stored doors read it, its body beside its frontmatter. */
-const markdownResource = (title: string) => ({ ...markdownFrontmatter(title), body: '' });
+/** A Resource as the stored doors read it: an envelope with the kind's fields under `content`. */
+const envelope =
+  (frontmatter: (title: string) => Readonly<Record<string, string>>) => (title: string) => {
+    const { id, kind, title: _title, ...content } = frontmatter(title);
+    return { id: id ?? '', title, kind: kind ?? '', content };
+  };
 const referenceFrontmatter = (title: string) => ({
   id: RESOURCE_ID,
   title,
@@ -105,23 +109,22 @@ const kindSchemas: readonly {
  * how each is handed a Markdown Resource: file intake refuses a `body` key,
  * because the body is the file's, and the stored doors require one.
  */
+const FLAT = [markdownFrontmatter, referenceFrontmatter, spaceFrontmatter];
+const ENVELOPED = [
+  (title: string) => ({ ...envelope(markdownFrontmatter)(title), content: { source: '' } }),
+  envelope(referenceFrontmatter),
+  envelope(spaceFrontmatter),
+];
+
 const unionSchemas: readonly {
   readonly label: string;
   readonly schema: ResourceTitleSchema;
-  readonly markdown: (title: string) => ResourceFrontmatterDraft;
+  readonly drafts: readonly ((title: string) => ResourceFrontmatterDraft)[];
 }[] = [
-  {
-    label: 'resource frontmatter',
-    schema: resourceFrontmatterSchema,
-    markdown: markdownFrontmatter,
-  },
-  { label: 'resource', schema: resourceSchema, markdown: markdownResource },
-  { label: 'resource document', schema: resourceDocumentSchema, markdown: markdownResource },
-  {
-    label: 'imported resource frontmatter',
-    schema: importResourceFrontmatterSchema,
-    markdown: markdownFrontmatter,
-  },
+  { label: 'resource frontmatter', schema: resourceFrontmatterSchema, drafts: FLAT },
+  { label: 'resource', schema: resourceSchema, drafts: ENVELOPED },
+  { label: 'resource document', schema: resourceDocumentSchema, drafts: ENVELOPED },
+  { label: 'imported resource frontmatter', schema: importResourceFrontmatterSchema, drafts: FLAT },
 ];
 
 /**
@@ -144,8 +147,8 @@ const titleCases = (
     schema,
     value: frontmatter(title),
   })),
-  ...unionSchemas.flatMap(({ label, schema, markdown }) =>
-    [markdown, referenceFrontmatter, spaceFrontmatter].map((frontmatter) => ({
+  ...unionSchemas.flatMap(({ label, schema, drafts }) =>
+    drafts.map((frontmatter) => ({
       label,
       schema,
       value: frontmatter(title),
