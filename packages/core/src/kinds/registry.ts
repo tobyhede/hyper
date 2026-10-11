@@ -1,3 +1,4 @@
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { KindFlags } from './kind-module';
 import { imageKind } from './image';
 import { urKind } from './ur';
