@@ -8,4 +8,4 @@ Status: ready-for-agent
 
 **Depends on:** 02, 05.
 
-**Acceptance:** the existing aggregate refusals keep their codes; no non-test source outside a module names a kind id, and a scan in `test/unit` (in the idiom of `current-domain-vocabulary.test.ts`) holds that. CSS selectors on a kind's `data-kind` or `data-content-kind` belong to that module's view half (ADR 0120) and move with it rather than being exempted. The scan exempts by name only the Resource-file codec's missing-kind default (`defaultUrKind` in `packages/core/src/schema.ts`), until `07` deletes it.
+**Acceptance:** the existing aggregate refusals keep their codes; no non-test source outside a module names a kind id, and a scan in `test/unit` (in the idiom of `current-domain-vocabulary.test.ts`) holds that. CSS selectors on a kind's `data-kind` or `data-content-kind` belong to that module's view half (ADR 0120) and move with it rather than being exempted. The scan exempts by name only the missing-kind default `spec.md` names.
