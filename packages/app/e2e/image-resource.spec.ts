@@ -857,7 +857,7 @@ test(
     );
     await settled(page);
     expect((await storedFigure(page, spaceId)).figure).toMatchObject({
-      url: 'https://example.com/new.png',
+      content: { url: 'https://example.com/new.png' },
     });
   },
 );
@@ -1734,7 +1734,7 @@ test(
     await expectPictureLoaded(picture, HARBOUR_SIZE.width);
     await expect(article.getByText('Image did not load')).toHaveCount(0);
     await settled(page);
-    expect((await storedFigure(page, spaceId)).figure).toMatchObject({ url: NEW_URL });
+    expect((await storedFigure(page, spaceId)).figure).toMatchObject({ content: { url: NEW_URL } });
   },
 );
 
