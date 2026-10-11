@@ -185,14 +185,14 @@ describe('tracked fixture images', () => {
   });
 });
 
-/** Every file under `root`, keyed by its path relative to `root`, as text. */
-const filesUnder = async (root: string): Promise<Record<string, string>> => {
+/** Every file under `root`, keyed by its path relative to `root`, as bytes. */
+const filesUnder = async (root: string): Promise<Record<string, Buffer>> => {
   const entries = await readdir(root, { recursive: true, withFileTypes: true });
-  const files: Record<string, string> = {};
+  const files: Record<string, Buffer> = {};
   for (const entry of entries) {
     if (!entry.isFile()) continue;
     const path = join(entry.parentPath, entry.name);
-    files[relative(root, path)] = await readFile(path, 'utf8');
+    files[relative(root, path)] = await readFile(path);
   }
   return files;
 };

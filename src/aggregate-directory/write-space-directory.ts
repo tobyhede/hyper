@@ -97,7 +97,8 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
  * A stored document as the Resource its file is written from, whole, with a
  * Markdown source's line endings made `\n`. Parsing through `resourceSchema`
  * puts every key in the schema's order, so a file's bytes do not depend on
- * the order a document's keys were inserted in.
+ * the order a document's keys were inserted in
+ * (`test/unit/space-directory-files.test.ts`).
  */
 const canonicalResource = (
   id: UUID,
