@@ -4,6 +4,7 @@ import {
   SPACE_FILE_VERSION,
   type GraphEdge,
   type SpaceFile,
+  resourceSchema,
   type Resource,
   type UUID,
 } from '@project/core';
@@ -93,21 +94,20 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
 };
 
 /**
- * A stored document as the Resource its file is written from: the document's
- * content is the Resource's, whole, with a Markdown source's line endings made
- * `\n`.
+ * A stored document as the Resource its file is written from, whole, with a
+ * Markdown source's line endings made `\n`. Parsing through `resourceSchema`
+ * puts every key in the schema's order, so a file's bytes do not depend on
+ * the order a document's keys were inserted in.
  */
 const canonicalResource = (
   id: UUID,
   document: LoadedSpace['snapshot']['resources'][number]['document'],
-): Resource => {
-  if (document.kind !== 'markdown') return { id, ...document };
-  return {
-    id,
-    ...document,
-    content: { source: document.content.source.replace(/\r\n?/g, '\n') },
-  };
-};
+): Resource =>
+  resourceSchema.parse(
+    document.kind === 'markdown'
+      ? { id, ...document, content: { source: document.content.source.replace(/\r\n?/g, '\n') } }
+      : { id, ...document },
+  );
 
 /**
  * One Space's canonical files, by path relative to its Space directory:
