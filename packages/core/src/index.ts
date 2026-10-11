@@ -7,3 +7,5 @@ export * from './graph-head-shape';
 export * from './resource-shape';
 export * from './resource-size';
 export * from './resource-content';
+export * from './kinds/kind-module';
+export * from './kinds/ur';

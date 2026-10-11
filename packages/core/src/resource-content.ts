@@ -1,3 +1,4 @@
+import { urKind, type UrContent } from './kinds/ur';
 import type { Resource } from './types';
 
 /** Whether content is the Resource's own or reached through a Reference Resource (ADR 0070). */
@@ -28,12 +29,13 @@ export type ResourceContent =
   | { readonly kind: 'markdown'; readonly source: string; readonly via: ContentVia }
   | { readonly kind: 'image'; readonly url: string; readonly via: ContentVia }
   | { readonly kind: 'space'; readonly view: SpaceView; readonly via: ContentVia }
-  | { readonly kind: 'ur'; readonly via: ContentVia }
+  | UrContent
   | { readonly kind: 'unresolved'; readonly via: 'reference' };
 
 export type ContentAction = 'none' | 'edit-markdown' | 'replace-image' | 'author-space-view';
 
-interface ContentFacts {
+/** What a kind's content lets an author do and how it is laid out (ADR 0114). */
+export interface ContentFacts {
   readonly action: ContentAction;
   readonly embedsMap: boolean;
   readonly drawsContentArea: boolean;
@@ -43,7 +45,7 @@ const CONTENT_FACTS = {
   markdown: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
   image: { action: 'replace-image', embedsMap: false, drawsContentArea: true },
   space: { action: 'author-space-view', embedsMap: true, drawsContentArea: false },
-  ur: { action: 'none', embedsMap: false, drawsContentArea: false },
+  [urKind.id]: urKind.facts,
   unresolved: { action: 'none', embedsMap: false, drawsContentArea: true },
 } satisfies Record<ResourceContent['kind'], ContentFacts>;
 

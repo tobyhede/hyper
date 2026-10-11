@@ -18,4 +18,4 @@ Each step is its own PR and leaves `main` green. The envelope comes first becaus
 3. `03`–`06` — one kind per step: Image, Markdown, Reference, Space. Each deletes that kind's branches outside its module.
 4. `07` — JSON Resource files, the Markdown sidecar and the shared locator on disk; `kind` required.
 
-When `06` lands, no non-test source outside a module names a kind id, bar the Resource-file codec's missing-kind default (`defaultUrKind` in `packages/core/src/schema.ts`), which writes `'ur'` until `07` makes `kind` required and deletes it; `test/unit` gains a scan that holds that (see `06`).
+When `06` lands, no non-test source outside a module names a kind id. A module is a `kinds/` directory in each package the kind reaches; `test/unit/kind-ids-in-modules.test.ts` holds each moved kind to that, and each step adds its kind to the scan. The Resource-file codec's missing-kind default (`defaultUrKind` in `packages/core/src/schema.ts`) writes `urKind.id` until `07` makes `kind` required and deletes it.

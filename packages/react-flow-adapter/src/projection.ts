@@ -7,6 +7,7 @@ import {
   DEFAULT_RESOURCE_SHAPE,
   contentAction,
   embedsMap,
+  urKind,
   type Resource,
   type ResourceId,
   type ResourceShape,
@@ -220,7 +221,7 @@ export function bareKindData(kind: Resource['kind']): ResourceKindData {
       return { kind, kindOperations: { kind } };
     case 'image':
       return { kind, kindOperations: { kind } };
-    case 'ur':
+    case urKind.id:
       return { kind, kindOperations: { kind } };
     case 'space':
       return { kind, kindOperations: { kind } };

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { titleName, type ResourceContent } from '@project/core';
+import { titleName, urKind, type ResourceContent } from '@project/core';
 import { ResourceImage } from './ResourceImage';
 import { UnresolvedContent } from './UnresolvedContent';
 
@@ -90,7 +90,7 @@ function PresentedContent({
     case 'image':
       return <ResourceImage key={content.url} url={content.url} name={name} />;
     case 'space':
-    case 'ur':
+    case urKind.id:
       return null;
     case 'unresolved':
       return <UnresolvedContent />;
