@@ -3,6 +3,9 @@ import { relative } from 'node:path';
 import {
   SPACE_FILE_VERSION,
   type GraphEdge,
+  imageResourceContentSchema,
+  referenceResourceContentSchema,
+  spaceResourceContentSchema,
   type SpaceFile,
   type Resource,
   type UUID,
@@ -92,15 +95,28 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     : { ...withMaps, defaultMap: snapshot.document.defaultMap };
 };
 
-type SpaceResourceContent = Extract<Resource, { kind: 'space' }>['content'];
-type ImageResourceContent = Extract<Resource, { kind: 'image' }>['content'];
+/** What the content schemas share for this file's purpose: a parse that may fail. */
+interface ContentSchema<T> {
+  safeParse: (value: T) => { success: true; data: T } | { success: false };
+}
 
 /**
- * A stored document as the Resource its file is written from, built key by key
- * so a file's bytes do not depend on the order a document's keys were
- * inserted in (`test/unit/space-directory-files.test.ts`), with a Markdown
- * source's line endings made `\n`. It copies rather than parses, so it cannot
- * throw: a document that would not read back is Export's refusal to make.
+ * A kind's content with its keys in the content schema's order, every key the
+ * schema declares kept. A content the schema refuses is returned as stored,
+ * so this cannot throw: a document that would not read back is Export's
+ * refusal to make.
+ */
+const inSchemaOrder = <T>(schema: ContentSchema<T>, content: T): T => {
+  const parsed = schema.safeParse(content);
+  return parsed.success ? parsed.data : content;
+};
+
+/**
+ * A stored document as the Resource its file is written from. Its content is
+ * put in its kind's schema order, so a file's bytes do not depend on the order
+ * a document's keys were inserted in (`test/unit/space-directory-files.test.ts`),
+ * and a Markdown source's line endings are made `\n`. The Title is written as
+ * stored.
  */
 const canonicalResource = (
   id: UUID,
@@ -109,25 +125,26 @@ const canonicalResource = (
   const { title } = document;
   switch (document.kind) {
     case 'reference':
-      return { id, title, kind: 'reference', content: { target: document.content.target } };
-    case 'space': {
-      const { spaceId, graph, framing } = document.content;
-      const content: SpaceResourceContent = { spaceId, map: document.content.map, graph };
-      if (framing !== undefined) {
-        const { centreX, centreY, zoom } = framing;
-        content.framing = { centreX, centreY, zoom };
-      }
-      return { id, title, kind: 'space', content };
-    }
-    case 'image': {
-      const { url, naturalSize } = document.content;
-      const content: ImageResourceContent = { url };
-      if (naturalSize !== undefined) {
-        const { width, height } = naturalSize;
-        content.naturalSize = { width, height };
-      }
-      return { id, title, kind: 'image', content };
-    }
+      return {
+        id,
+        title,
+        kind: 'reference',
+        content: inSchemaOrder(referenceResourceContentSchema, document.content),
+      };
+    case 'space':
+      return {
+        id,
+        title,
+        kind: 'space',
+        content: inSchemaOrder(spaceResourceContentSchema, document.content),
+      };
+    case 'image':
+      return {
+        id,
+        title,
+        kind: 'image',
+        content: inSchemaOrder(imageResourceContentSchema, document.content),
+      };
     case 'ur':
       return { id, title, kind: 'ur', content: {} };
     case 'markdown':

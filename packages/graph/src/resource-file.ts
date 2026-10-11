@@ -99,23 +99,40 @@ function decodeEnvelope(frontmatter: ImportResourceFrontmatter, body: string): D
       const { id, title, kind } = frontmatter;
       return { id, document: { title, kind, content: { source: body } } };
     }
-    case 'reference': {
-      const { id, title, kind, ...content } = frontmatter;
-      return { id, document: { title, kind, content } };
-    }
-    case 'space': {
-      const { id, title, kind, ...content } = frontmatter;
-      return { id, document: { title, kind, content } };
-    }
-    case 'image': {
-      const { id, title, kind, ...content } = frontmatter;
-      return { id, document: { title, kind, content } };
-    }
+    case 'reference':
+      return contentFromRest(frontmatter);
+    case 'space':
+      return contentFromRest(frontmatter);
+    case 'image':
+      return contentFromRest(frontmatter);
     case 'ur': {
       const { id, title, kind } = frontmatter;
       return { id, document: { title, kind, content: {} } };
     }
   }
+}
+
+/** The frontmatter keys every kind shares: the envelope's. */
+interface EnvelopeFrontmatter {
+  readonly id?: UUID | undefined;
+  readonly title: string;
+  readonly kind: string;
+}
+
+/** A Resource decoded from one kind's frontmatter, its `content` the frontmatter's other keys. */
+interface DecodedKindResource<F extends EnvelopeFrontmatter> {
+  readonly id: UUID | undefined;
+  readonly document: {
+    readonly title: string;
+    readonly kind: F['kind'];
+    readonly content: Omit<F, keyof EnvelopeFrontmatter>;
+  };
+}
+
+/** One kind's frontmatter with every key but the envelope's moved under `content`. */
+function contentFromRest<F extends EnvelopeFrontmatter>(frontmatter: F): DecodedKindResource<F> {
+  const { id, title, kind, ...content } = frontmatter;
+  return { id, document: { title, kind, content } };
 }
 
 function decodeResourceFile<T extends ImportResourceFrontmatter>(
