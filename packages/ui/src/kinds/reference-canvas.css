@@ -1,0 +1,14 @@
+/* The Reference kind's frame on a Map (ADR 0070, ADR 0120): a dotted border at
+   rest, solid while active. `CanvasResource` imports it after
+   `canvas-resource.css`, whose solid border it overrides. */
+.canvas-resource[data-kind='reference'] {
+  border-style: dotted;
+}
+
+.canvas-resource[data-kind='reference']:is(
+    :hover,
+    :has(~ .rf-resource-node__authoring-handle:hover),
+    :not([data-state='rest'])
+  ) {
+  border-style: solid;
+}

@@ -1,6 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import {
+  referenceKind,
   markdownKind,
   SPACE_FILE_VERSION,
   type GraphEdge,
@@ -127,11 +128,11 @@ const canonicalResource = (
 ): Resource => {
   const { title } = document;
   switch (document.kind) {
-    case 'reference':
+    case referenceKind.id:
       return {
         id,
         title,
-        kind: 'reference',
+        kind: referenceKind.id,
         content: inSchemaOrder(referenceResourceContentSchema, document.content),
       };
     case 'space':

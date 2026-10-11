@@ -1,6 +1,7 @@
-import { markdownKind, imageKind, urKind, type Resource } from '@project/core';
+import { referenceKind, markdownKind, imageKind, urKind, type Resource } from '@project/core';
 import { imageView } from './kinds/image';
 import { markdownView } from './kinds/markdown';
+import { referenceView } from './kinds/reference';
 import { urView } from './kinds/ur';
 import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
 
@@ -19,7 +20,7 @@ import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
 
 const KIND_NAMES = {
   [markdownKind.id]: markdownView.name,
-  reference: 'Reference Resource',
+  [referenceKind.id]: referenceView.name,
   space: 'Space Resource',
   [imageKind.id]: imageView.name,
   [urKind.id]: urView.name,
@@ -92,7 +93,7 @@ function KindGlyph({ kind, referenceOf, size }: ResourceKindIconProps) {
   // default by destructuring, and a destructuring default is what `undefined`
   // selects — so passing it through preserves omission rather than overriding
   // it, and no conditional spread is needed to say so.
-  if (kind === 'reference')
+  if (kind === referenceKind.id)
     return <ReferenceIcon base={referenceOf ?? markdownKind.id} size={size} />;
   const Base = BASE_GLYPHS[kind];
   return <Base size={size} />;
@@ -128,13 +129,13 @@ export function ResourceKindIcon({
         className="inline-flex flex-none items-center text-muted-foreground"
         aria-hidden="true"
         data-resource-kind={kind}
-        data-reference-of={kind === 'reference' ? referenceOf : undefined}
+        data-reference-of={kind === referenceKind.id ? referenceOf : undefined}
       >
         <KindGlyph kind={kind} referenceOf={referenceOf} size={size} />
       </span>
     );
   const name =
-    kind === 'reference' && referenceOf !== undefined
+    kind === referenceKind.id && referenceOf !== undefined
       ? REFERENCE_NAMES[referenceOf]
       : KIND_NAMES[kind];
   return (
@@ -144,7 +145,7 @@ export function ResourceKindIcon({
       aria-label={name}
       title={name}
       data-resource-kind={kind}
-      data-reference-of={kind === 'reference' ? referenceOf : undefined}
+      data-reference-of={kind === referenceKind.id ? referenceOf : undefined}
     >
       <KindGlyph kind={kind} referenceOf={referenceOf} size={size} />
     </span>

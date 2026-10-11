@@ -1,4 +1,5 @@
 import {
+  referenceKind,
   markdownKind,
   declaresResourceKind,
   resourceFrontmatterSchema,
@@ -102,7 +103,7 @@ function decodeEnvelope(frontmatter: ImportResourceFrontmatter, body: string): D
       const { id, title, kind } = frontmatter;
       return { id, document: { title, kind, content: { source: body } } };
     }
-    case 'reference':
+    case referenceKind.id:
       return contentFromRest(frontmatter);
     case 'space':
       return contentFromRest(frontmatter);

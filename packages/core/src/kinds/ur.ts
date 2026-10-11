@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
-import type { KindModule } from './kind-module';
+import type { ContentOwnerKindModule } from './kind-module';
 
 /** What an Ur Resource's content resolves to: nothing, reached one way or the other. */
 export interface UrContent {
@@ -19,10 +19,10 @@ const urContentSchema = z.object({});
 export const urKind = {
   id: 'ur',
   contentSchema: urContentSchema,
-  flags: { takesResourceShape: true, canOpen: false },
+  flags: { takesResourceShape: true, canOpen: false, mayBeTarget: true },
   facts: { action: 'none', embedsMap: false, drawsContentArea: false },
   resolveContent: (_content, via) => ({ kind: 'ur', via }),
-} as const satisfies KindModule<'ur', z.infer<typeof urContentSchema>, UrContent>;
+} as const satisfies ContentOwnerKindModule<'ur', z.infer<typeof urContentSchema>, UrContent>;
 
 /** The Ur kind's id. */
 export type UrKindId = typeof urKind.id;

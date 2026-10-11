@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  referenceKind,
   markdownKind,
   imageKind,
   titleName,
@@ -105,7 +106,7 @@ const FILTERS = everyFilter([
   markdownKind.id,
   imageKind.id,
   urKind.id,
-  'reference',
+  referenceKind.id,
   'space',
   'spaces',
 ]);
@@ -142,7 +143,7 @@ const FILTER_GLYPHS = {
   [markdownKind.id]: MarkdownIcon,
   [imageKind.id]: ImageIcon,
   [urKind.id]: UrIcon,
-  reference: ReferenceIcon,
+  [referenceKind.id]: ReferenceIcon,
   space: SpaceResourceIcon,
   spaces: ParentIcon,
 } satisfies Record<ResourcesFilter, ComponentType>;
@@ -303,7 +304,7 @@ const FilterToggle = ToggleGroupItem<ResourcesFilter>;
 
 /** A Reference Resource's Target title, `''` for the intake-guaranteed-unreachable case a Target does not resolve — the same convention `ResourceNode` draws (ADR 0009). */
 const targetTitle = (resource: Resource, titleById: ReadonlyMap<ResourceId, string>): string =>
-  resource.kind === 'reference' ? (titleById.get(resource.content.target) ?? '') : '';
+  resource.kind === referenceKind.id ? (titleById.get(resource.content.target) ?? '') : '';
 
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 const NO_SPACES: readonly ResourcesPopoverSpace[] = [];
@@ -428,7 +429,8 @@ const searchableText = (
   titleById: ReadonlyMap<ResourceId, string>,
   spaceTitleById: ReadonlyMap<UUID, string>,
 ): string => {
-  if (resource.kind === 'reference') return `${resource.title} ${targetTitle(resource, titleById)}`;
+  if (resource.kind === referenceKind.id)
+    return `${resource.title} ${targetTitle(resource, titleById)}`;
   if (resource.kind === 'space')
     return `${resource.title} ${spaceTitleById.get(resource.content.spaceId) ?? ''}`;
   return resource.title;
@@ -685,7 +687,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
       [markdownKind.id]: ofKind(markdownKind.id),
       [imageKind.id]: ofKind(imageKind.id),
       [urKind.id]: ofKind(urKind.id),
-      reference: ofKind('reference'),
+      [referenceKind.id]: ofKind(referenceKind.id),
       space: ofKind('space'),
       spaces: spaces.filter((space) => matched(space.title)).length,
     } satisfies Record<ResourcesFilter, number>;

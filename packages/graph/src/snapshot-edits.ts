@@ -1,4 +1,6 @@
 import {
+  mayBeTarget,
+  resourceReferences,
   titleName,
   resourceOpen,
   resourceShape,
@@ -137,11 +139,10 @@ function createInMap(
   if (target === undefined) {
     return { kind: 'refused', refusal: { code: 'map-not-found' } };
   }
-  if (document.kind === 'reference') {
-    const targetId = document.content.target;
+  for (const targetId of resourceReferences(document)) {
     const resolved = snapshot.resources.find((resource) => resource.id === targetId);
     if (resolved === undefined) return refused({ code: 'reference-target-not-found', targetId });
-    if (resolved.document.kind === 'reference') {
+    if (!mayBeTarget(resolved.document.kind)) {
       return refused({ code: 'reference-target-must-own-content', targetId });
     }
   }
@@ -188,9 +189,8 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
   if (!snapshot.resources.some((resource) => resource.id === resourceId)) {
     return { kind: 'refused', refusal: { code: 'resource-not-found' } };
   }
-  const incoming = snapshot.resources.filter(
-    (resource) =>
-      resource.document.kind === 'reference' && resource.document.content.target === resourceId,
+  const incoming = snapshot.resources.filter((resource) =>
+    resourceReferences(resource.document).includes(resourceId),
   );
   if (incoming.length > 0) {
     return {

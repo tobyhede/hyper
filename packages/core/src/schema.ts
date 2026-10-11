@@ -3,9 +3,13 @@ import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
 import { imageKind, imageNaturalSizeSchema, imageResourceContentSchema } from './kinds/image';
 import { markdownKind, markdownResourceContentSchema } from './kinds/markdown';
+import { referenceKind, referenceResourceContentSchema } from './kinds/reference';
 import { kindFlags } from './kinds/registry';
 import { urKind } from './kinds/ur';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
+import { uuidSchema } from './uuid';
+
+export { newUuid, uuidSchema } from './uuid';
 
 /**
  * Zod schemas for the space file (`space.json`).
@@ -16,25 +20,7 @@ import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
  * a Space — `loadSpace` adds the reference check and the index (ADR 0010).
  */
 
-/** The single durable identity used by every referenceable Hyper entity. */
-export const uuidSchema = z.string().uuid().brand<'UUID'>();
-
 const idSchema = uuidSchema;
-
-/**
- * Mint a durable identity. The one place a UUID is generated.
- *
- * **Mint, not allocate.** Nothing reserves an id from a registry, and in
- * particular PostgreSQL does not hand them out: a Space's id comes from its
- * column default, and every other id — Resource, Graph, Map — is generated here,
- * in whichever process is doing the work.
- *
- * The `crypto` global rather than `node:crypto`, so `core` and the packages
- * above it stay browser-safe. Browsers expose `randomUUID` only in a secure
- * context (HTTPS or localhost). Generation lives here so a fallback, if one is
- * ever needed, has exactly one home. Don't add one speculatively.
- */
-export const newUuid = () => uuidSchema.parse(crypto.randomUUID());
 
 /**
  * A Resource's Title: one or more Title Lines, normalized here (ADR 0083).
@@ -77,15 +63,9 @@ export const markdownResourceFrontmatterSchema = z.object({
   kind: z.literal(markdownKind.id),
 });
 
-/** A Reference Resource's content: a pointer to the resource whose content it shows. */
-export const referenceResourceContentSchema = z.object({
-  /** The id of the resource this reference shows. Referential checks live in `@project/graph`. */
-  target: idSchema,
-});
-
 /** The frontmatter of a reference resource file: the envelope's fields beside its content's. */
 export const referenceResourceFrontmatterSchema = z
-  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal('reference') })
+  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal(referenceKind.id) })
   .extend(referenceResourceContentSchema.shape);
 
 /**

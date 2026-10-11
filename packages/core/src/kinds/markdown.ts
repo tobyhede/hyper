@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
-import type { KindModule } from './kind-module';
+import type { ContentOwnerKindModule } from './kind-module';
 
 /** A Markdown Resource's content: the source its author wrote, which its file holds as the body. */
 export const markdownResourceContentSchema = z.object({ source: z.string() });
@@ -19,10 +19,10 @@ export interface MarkdownContent {
 export const markdownKind = {
   id: 'markdown',
   contentSchema: markdownResourceContentSchema,
-  flags: { takesResourceShape: false, canOpen: true },
+  flags: { takesResourceShape: false, canOpen: true, mayBeTarget: true },
   facts: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
   resolveContent: (content, via) => ({ kind: 'markdown', source: content.source, via }),
-} as const satisfies KindModule<
+} as const satisfies ContentOwnerKindModule<
   'markdown',
   z.infer<typeof markdownResourceContentSchema>,
   MarkdownContent

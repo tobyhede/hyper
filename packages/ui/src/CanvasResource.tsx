@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  referenceKind,
   markdownKind,
   COLLAPSED_RESOURCE_SIZE,
   DEFAULT_RESOURCE_SHAPE,
@@ -26,6 +27,7 @@ import {
 import { Button } from './Button';
 import { isImageOperations, type ImageOperations } from './kinds/image';
 import type { MarkdownOperations } from './kinds/markdown';
+import type { ReferenceOperations } from './kinds/reference';
 import { isUrOperations, type UrOperations } from './kinds/ur';
 import {
   ResourceRailAction,
@@ -53,6 +55,7 @@ import {
   type MarkdownResourceBodyProps,
 } from './MarkdownResourceBody';
 import './canvas-resource.css';
+import './kinds/reference-canvas.css';
 import './kinds/ur-canvas.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
@@ -75,9 +78,7 @@ import {
  */
 export type KindOperations =
   | MarkdownOperations
-  | {
-      readonly kind: 'reference';
-    }
+  | ReferenceOperations
   | ImageOperations
   | UrOperations
   | {
@@ -307,7 +308,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
       case imageKind.id:
         return { kind, url: text, via };
       case 'unresolved':
-        return { kind, via: 'reference' };
+        return { kind, via: referenceKind.id };
       case 'space':
       case urKind.id:
       case undefined:
