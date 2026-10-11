@@ -73,12 +73,13 @@ export const markdownResourceFrontmatterSchema = z.object({
   kind: z.literal('markdown'),
 });
 
-/** The frontmatter of a reference resource file — a pointer to the resource whose content it shows. */
+/** A Reference Resource's content: a pointer to the resource whose content it shows. */
 export const referenceResourceContentSchema = z.object({
   /** The id of the resource this reference shows. Referential checks live in `@project/graph`. */
   target: idSchema,
 });
 
+/** The frontmatter of a reference resource file: the envelope's fields beside its content's. */
 export const referenceResourceFrontmatterSchema = z
   .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal('reference') })
   .extend(referenceResourceContentSchema.shape);
@@ -236,8 +237,9 @@ const defaultUrKind = (value: unknown): unknown => {
  * `naturalSize`, so no authored key is dropped on intake (ADR 0127). Only
  * file intake is strict. The per-kind objects stay non-strict because the
  * content schemas they extend are the stored document's, HTTP's and the
- * domain's too, and those read what Hyper's own code wrote. `.strict()` keeps the shape it is given, so the
- * strict nested objects hold the same field rules as the shared ones
+ * domain's too, and those read what Hyper's own code wrote. `.strict()` keeps
+ * the shape it is given, so the strict nested objects hold the same field
+ * rules as the shared ones
  * (`packages/core/test/resource-document-equality.test.ts`).
  */
 const fileSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({

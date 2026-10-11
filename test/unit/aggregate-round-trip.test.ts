@@ -28,6 +28,8 @@ const SECOND_RESOURCE_ID = uuidSchema.parse('ffffffff-ffff-4fff-8fff-fffffffffff
 const CLOSED_UR_ID = uuidSchema.parse('12121212-1212-4121-8121-121212121212');
 const RESIZED_UR_ID = uuidSchema.parse('13131313-1313-4131-8131-131313131313');
 
+const SECOND_FRAMING = { centreX: 120, centreY: -40, zoom: 0.8 };
+
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
@@ -141,7 +143,12 @@ const metaSpace = (): SpaceSnapshot => ({
       document: {
         title: 'To second',
         kind: 'space',
-        content: { spaceId: SECOND_TARGET_ID, map: SECOND_MAP_ID, graph: SECOND_GRAPH_ID },
+        content: {
+          spaceId: SECOND_TARGET_ID,
+          map: SECOND_MAP_ID,
+          graph: SECOND_GRAPH_ID,
+          framing: SECOND_FRAMING,
+        },
       },
     },
   ],
@@ -245,7 +252,7 @@ describe('exporting and importing one complete aggregate', () => {
     );
   });
 
-  it('preserves every selected Map and Graph on a Space Resource', async () => {
+  it('preserves every selected Map and Graph, and the framing, on a Space Resource', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
 
     await exportTo(repositoryHolding(completeAggregate()), destination);
@@ -255,7 +262,12 @@ describe('exporting and importing one complete aggregate', () => {
     expect(meta?.resources.find(({ id }) => id === SECOND_LINK_ID)?.document).toEqual({
       title: 'To second',
       kind: 'space',
-      content: { spaceId: SECOND_TARGET_ID, map: SECOND_MAP_ID, graph: SECOND_GRAPH_ID },
+      content: {
+        spaceId: SECOND_TARGET_ID,
+        map: SECOND_MAP_ID,
+        graph: SECOND_GRAPH_ID,
+        framing: SECOND_FRAMING,
+      },
     });
     expect(meta?.document.defaultMap).toBe(META_MAP_ID);
     expect(meta?.document.maps?.[0]?.activeGraph).toBe(META_GRAPH_ID);

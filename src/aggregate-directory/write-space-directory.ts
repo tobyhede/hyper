@@ -92,36 +92,19 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     : { ...withMaps, defaultMap: snapshot.document.defaultMap };
 };
 
+/**
+ * A stored document as the Resource its file is written from: the document's
+ * content is the Resource's, whole, with a Markdown source's line endings made
+ * `\n`.
+ */
 const canonicalResource = (
   id: UUID,
   document: LoadedSpace['snapshot']['resources'][number]['document'],
 ): Resource => {
-  const common = {
-    id,
-    title: document.title,
-  };
-  if (document.kind === 'reference')
-    return { ...common, kind: 'reference', content: { target: document.content.target } };
-  if (document.kind === 'space')
-    return {
-      ...common,
-      kind: 'space',
-      content: {
-        spaceId: document.content.spaceId,
-        map: document.content.map,
-        graph: document.content.graph,
-      },
-    };
-  if (document.kind === 'image') {
-    const content: Extract<Resource, { kind: 'image' }>['content'] = { url: document.content.url };
-    if (document.content.naturalSize !== undefined)
-      content.naturalSize = document.content.naturalSize;
-    return { ...common, kind: 'image', content };
-  }
-  if (document.kind === 'ur') return { ...common, kind: 'ur', content: {} };
+  if (document.kind !== 'markdown') return { id, ...document };
   return {
-    ...common,
-    kind: 'markdown',
+    id,
+    ...document,
     content: { source: document.content.source.replace(/\r\n?/g, '\n') },
   };
 };
