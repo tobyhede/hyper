@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  type SpaceKindId,
+  spaceKind,
   referenceKind,
   markdownKind,
   COLLAPSED_RESOURCE_SIZE,
@@ -28,6 +30,7 @@ import { Button } from './Button';
 import { isImageOperations, type ImageOperations } from './kinds/image';
 import type { MarkdownOperations } from './kinds/markdown';
 import type { ReferenceOperations } from './kinds/reference';
+import type { SpaceOperations } from './kinds/space';
 import { isUrOperations, type UrOperations } from './kinds/ur';
 import {
   ResourceRailAction,
@@ -56,6 +59,7 @@ import {
 } from './MarkdownResourceBody';
 import './canvas-resource.css';
 import './kinds/reference-canvas.css';
+import './kinds/space-canvas.css';
 import './kinds/ur-canvas.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
@@ -77,38 +81,14 @@ import {
  * draws, and whether it is Open, is the display's.
  */
 export type KindOperations =
-  | MarkdownOperations
-  | ReferenceOperations
-  | ImageOperations
-  | UrOperations
-  | {
-      readonly kind: 'space';
-      /**
-       * Map and Graph clusters, assembled by the application and inserted
-       * at the head of this Resource's rail. Absent while the Resource is closed, the
-       * surface is read-only, or the target Space has not been read yet.
-       */
-      readonly spaceRail?: ReactNode;
-      /**
-       * The Read/Edit boundary for the embedded target canvas.
-       *
-       * Absent means this surface does not offer one — a Closed Resource, an unread
-       * target, or a composition that has not wired the portal. Present on an Open
-       * Space Resource: Read leaves the embedding inert so dragging moves this Resource;
-       * Edit activates the target canvas and replaces the control with Done.
-       */
-      readonly portal?: {
-        readonly editing: boolean;
-        readonly onEditingChange: (editing: boolean) => void;
-      };
-    };
+  MarkdownOperations | ReferenceOperations | ImageOperations | UrOperations | SpaceOperations;
 
 /**
  * What the content area below the Title draws. A Space Resource's content is
  * its embedded Map, which the canvas draws as sibling nodes, and an Ur
  * Resource has no content, so neither has an arm.
  */
-type AreaContent = Exclude<ResourceContent, { readonly kind: 'space' } | UrContent>;
+type AreaContent = Exclude<ResourceContent, { readonly kind: SpaceKindId } | UrContent>;
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
@@ -309,7 +289,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
         return { kind, url: text, via };
       case 'unresolved':
         return { kind, via: referenceKind.id };
-      case 'space':
+      case spaceKind.id:
       case urKind.id:
       case undefined:
         return null;
@@ -365,7 +345,7 @@ export function CanvasResource(props: CanvasResourceProps) {
     !readOnly &&
     content !== null &&
     contentAction(content) === 'author-space-view' &&
-    kindOperations.kind === 'space'
+    kindOperations.kind === spaceKind.id
       ? kindOperations
       : undefined;
   const areaContent = useAreaContent(content);

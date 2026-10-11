@@ -1,4 +1,5 @@
 import {
+  spaceKind,
   referenceKind,
   imageKind,
   markdownKind,
@@ -44,7 +45,7 @@ const DELETION_DESCRIPTIONS = {
   [referenceKind.id]: DELETES_THE_RESOURCE,
   [imageKind.id]: DELETES_THE_RESOURCE,
   [urKind.id]: DELETES_THE_RESOURCE,
-  space: `${DELETES_THE_RESOURCE} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`,
+  [spaceKind.id]: `${DELETES_THE_RESOURCE} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`,
 } satisfies Record<Resource['kind'], string>;
 
 /**
@@ -106,7 +107,7 @@ export function createResourceDeletion({
   spaceResources,
 }: ResourceDeletionDependencies): ResourceDeletion {
   const execute = async (resource: Resource): Promise<void> => {
-    if (resource.kind === 'space') {
+    if (resource.kind === spaceKind.id) {
       await commandOutcomes.run('space-resource-delete', async () => {
         if (spaceResources === undefined) {
           throw new Error('Space Resource deletion requires Space Resource authoring');

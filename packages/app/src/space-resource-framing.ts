@@ -1,9 +1,9 @@
-import type { MapPosition, ResourceDocument } from '@project/core';
+import type { SpaceKindId, MapPosition, ResourceDocument } from '@project/core';
 import type { EmbeddedBounds } from './embedded-map';
 
 /** The Map-coordinate centre and scale a Space Resource stores for its window. */
 export type SpaceResourceFraming = NonNullable<
-  Extract<ResourceDocument, { kind: 'space' }>['content']['framing']
+  Extract<ResourceDocument, { kind: SpaceKindId }>['content']['framing']
 >;
 
 /**

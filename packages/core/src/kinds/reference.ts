@@ -16,7 +16,12 @@ export const referenceResourceContentSchema = z.object({
 export const referenceKind = {
   id: 'reference',
   contentSchema: referenceResourceContentSchema,
-  flags: { takesResourceShape: false, canOpen: true, mayBeTarget: false },
+  flags: {
+    takesResourceShape: false,
+    canOpen: true,
+    mayBeTarget: false,
+    ownsReferencedSpaces: false,
+  },
   resourceReferences: (content) => [content.target],
   contentTarget: (content) => content.target,
 } as const satisfies TargetingKindModule<

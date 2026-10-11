@@ -5,6 +5,7 @@ import { imageKind, imageNaturalSizeSchema, imageResourceContentSchema } from '.
 import { markdownKind, markdownResourceContentSchema } from './kinds/markdown';
 import { referenceKind, referenceResourceContentSchema } from './kinds/reference';
 import { kindFlags } from './kinds/registry';
+import { spaceKind, spaceResourceContentSchema, spaceResourceFramingSchema } from './kinds/space';
 import { urKind } from './kinds/ur';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 import { uuidSchema } from './uuid';
@@ -68,44 +69,8 @@ export const referenceResourceFrontmatterSchema = z
   .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal(referenceKind.id) })
   .extend(referenceResourceContentSchema.shape);
 
-/**
- * A Resource that shows one selected view of another independently stored Space
- * (ADR 0068).
- *
- * **The selection is part of the Resource, not an option on it (ADR 0079).** A
- * Space Resource names a Map of its target and a Graph that Map owns, and
- * it names them from the moment it exists: the lifecycle that creates one
- * initializes a mapless target before completing and stores what
- * initialization minted, so there is no valid Space Resource with nothing selected
- * and no surface that has to draw one. Both ids are resolved against the target
- * by aggregate intake rather than here — this file knows the shape and
- * `@project/graph` knows the Spaces.
- *
- * Do not fall back to the target's `defaultMap` when the field is missing: one
- * Resource's selection would then follow another Space's opening choice.
- * Requiring the field keeps two Space Resources on one target differing by what
- * they store and by nothing else.
- *
- * Framing is the Map-coordinate centre and scale saved for this particular
- * window onto the target. It is absent until the view has been framed, in which
- * case the renderer fits the selected Map. It belongs here rather than on
- * the Map because two Space Resources may show the same Map differently.
- */
-const spaceResourceFramingSchema = z.object({
-  centreX: z.number().finite(),
-  centreY: z.number().finite(),
-  zoom: z.number().positive().finite(),
-});
-
-export const spaceResourceContentSchema = z.object({
-  spaceId: idSchema,
-  map: uuidSchema,
-  graph: idSchema,
-  framing: spaceResourceFramingSchema.optional(),
-});
-
 export const spaceResourceFrontmatterSchema = z
-  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal('space') })
+  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal(spaceKind.id) })
   .extend(spaceResourceContentSchema.shape);
 
 export const imageResourceFrontmatterSchema = z

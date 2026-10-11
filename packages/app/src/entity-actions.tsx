@@ -1,4 +1,5 @@
 import {
+  spaceKind,
   referenceKind,
   type Resource,
   type Graph,
@@ -282,7 +283,7 @@ export function spaceEntityActions({
      * Space to address.
      */
     const targetSpaceAddress: readonly EntityAction[] =
-      resource.kind !== 'space'
+      resource.kind !== spaceKind.id
         ? []
         : [
             copy(

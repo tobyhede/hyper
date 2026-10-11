@@ -19,7 +19,12 @@ export interface MarkdownContent {
 export const markdownKind = {
   id: 'markdown',
   contentSchema: markdownResourceContentSchema,
-  flags: { takesResourceShape: false, canOpen: true, mayBeTarget: true },
+  flags: {
+    takesResourceShape: false,
+    canOpen: true,
+    mayBeTarget: true,
+    ownsReferencedSpaces: false,
+  },
   facts: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
   resolveContent: (content, via) => ({ kind: 'markdown', source: content.source, via }),
 } as const satisfies ContentOwnerKindModule<

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  spaceKind,
   referenceKind,
   markdownKind,
   imageKind,
@@ -107,7 +108,7 @@ const FILTERS = everyFilter([
   imageKind.id,
   urKind.id,
   referenceKind.id,
-  'space',
+  spaceKind.id,
   'spaces',
 ]);
 
@@ -144,7 +145,7 @@ const FILTER_GLYPHS = {
   [imageKind.id]: ImageIcon,
   [urKind.id]: UrIcon,
   [referenceKind.id]: ReferenceIcon,
-  space: SpaceResourceIcon,
+  [spaceKind.id]: SpaceResourceIcon,
   spaces: ParentIcon,
 } satisfies Record<ResourcesFilter, ComponentType>;
 
@@ -431,7 +432,7 @@ const searchableText = (
 ): string => {
   if (resource.kind === referenceKind.id)
     return `${resource.title} ${targetTitle(resource, titleById)}`;
-  if (resource.kind === 'space')
+  if (resource.kind === spaceKind.id)
     return `${resource.title} ${spaceTitleById.get(resource.content.spaceId) ?? ''}`;
   return resource.title;
 };
@@ -688,7 +689,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
       [imageKind.id]: ofKind(imageKind.id),
       [urKind.id]: ofKind(urKind.id),
       [referenceKind.id]: ofKind(referenceKind.id),
-      space: ofKind('space'),
+      [spaceKind.id]: ofKind(spaceKind.id),
       spaces: spaces.filter((space) => matched(space.title)).length,
     } satisfies Record<ResourcesFilter, number>;
   }, [resources, spaces, titleById, spaceTitles, needle]);

@@ -1,4 +1,5 @@
 import {
+  spaceKind,
   referenceKind,
   type MarkdownKindId,
   markdownKind,
@@ -1220,8 +1221,8 @@ export function createSpaceAuthoring({
         return refuse({ code: 'reference-target-immutable' });
       }
       if (
-        resource.document.kind === 'space' &&
-        completion.document.kind === 'space' &&
+        resource.document.kind === spaceKind.id &&
+        completion.document.kind === spaceKind.id &&
         resource.document.content.spaceId !== completion.document.content.spaceId
       ) {
         return refuse({ code: 'space-resource-target-immutable' });
@@ -1361,7 +1362,7 @@ export function createSpaceAuthoring({
       // the Resource already gone from the working state.
       // Decided before the module, so a Space Resource a Reference Resource
       // targets still answers this rather than `resource-has-references`.
-      if (deleted.kind === 'space') {
+      if (deleted.kind === spaceKind.id) {
         return refuse({ code: 'space-resource-deletion-unsupported' });
       }
       // Everything else — a Reference Resource still targeting it, and the

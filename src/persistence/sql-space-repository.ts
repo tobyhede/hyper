@@ -1,4 +1,10 @@
-import { spaceDocumentSchema, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
+import {
+  spaceKind,
+  spaceDocumentSchema,
+  uuidSchema,
+  type SpaceSnapshot,
+  type UUID,
+} from '@project/core';
 import { loadSpaceAggregate, loadSpaceSnapshot } from '@project/graph';
 import {
   AggregateInvariantError,
@@ -166,7 +172,8 @@ const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot):
   return next.resources.every((resource) => {
     const previous = currentById.get(resource.id);
     if (previous?.document.kind !== resource.document.kind) return false;
-    if (resource.document.kind !== 'space' || previous.document.kind !== 'space') return true;
+    if (resource.document.kind !== spaceKind.id || previous.document.kind !== spaceKind.id)
+      return true;
     return (
       previous.document.content.spaceId === resource.document.content.spaceId &&
       previous.document.content.map === resource.document.content.map &&

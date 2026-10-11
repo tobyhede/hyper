@@ -10,7 +10,10 @@
  * plan out (`session-registry.ts`).
  */
 import {
+  type SpaceKindId,
+  spaceKind,
   SPACE_FILE_VERSION,
+  lifetimeSpaceReferences,
   type Map,
   type MapPosition,
   type ResourceDocument,
@@ -323,7 +326,7 @@ const createSpaceResource = (
 ): SpaceResourceRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
   const document: ResourceDocument = {
     title: input.title,
-    kind: 'space',
+    kind: spaceKind.id,
     content: { spaceId: targetSpaceId, map: selection.map, graph: selection.graph },
   };
   const created = SnapshotEdit.createInMap(
@@ -434,14 +437,9 @@ const recoveryBlockedBy = (
   return undefined;
 };
 
-const spaceResourceEdges = (snapshot: SpaceSnapshot): ReadonlyMap<UUID, UUID> => {
-  const edges = new Map<UUID, UUID>();
-  for (const candidate of snapshot.resources) {
-    if (candidate.document.kind === 'space')
-      edges.set(candidate.id, candidate.document.content.spaceId);
-  }
-  return edges;
-};
+/** The Spaces a Space's Resources hold the lifetime of, once per reference (ADR 0074, ADR 0128). */
+const heldSpaces = (snapshot: SpaceSnapshot): readonly UUID[] =>
+  snapshot.resources.flatMap(({ document }) => lifetimeSpaceReferences(document));
 
 /**
  * The Spaces a Space Resource deletion cascades to, in deletion order: the
@@ -458,14 +456,14 @@ export const cascadeDeletion = (
   edited: SpaceSnapshot,
   targetSpaceId: UUID,
 ): readonly UUID[] => {
-  const edgesById = new Map<UUID, ReadonlyMap<UUID, UUID>>(
-    aggregate.spaces.map(({ snapshot }) => [snapshot.id, spaceResourceEdges(snapshot)]),
+  const edgesById = new Map<UUID, readonly UUID[]>(
+    aggregate.spaces.map(({ snapshot }) => [snapshot.id, heldSpaces(snapshot)]),
   );
-  edgesById.set(edited.id, spaceResourceEdges(edited));
+  edgesById.set(edited.id, heldSpaces(edited));
   const inbound = new Map<UUID, number>();
   for (const id of edgesById.keys()) inbound.set(id, 0);
   for (const edges of edgesById.values())
-    for (const childSpaceId of edges.values())
+    for (const childSpaceId of edges)
       inbound.set(childSpaceId, (inbound.get(childSpaceId) ?? 0) + 1);
   const deleted: UUID[] = [];
   const pending: UUID[] =
@@ -477,7 +475,7 @@ export const cascadeDeletion = (
     const edges = edgesById.get(id);
     if (edges === undefined) continue;
     deleted.push(id);
-    for (const childSpaceId of edges.values()) {
+    for (const childSpaceId of edges) {
       const count = (inbound.get(childSpaceId) ?? 0) - 1;
       inbound.set(childSpaceId, count);
       if (childSpaceId !== aggregate.metaSpaceId && count === 0) pending.push(childSpaceId);
@@ -496,7 +494,7 @@ export const planDelete = (
 ): SpaceResourcePlanOutcome => {
   const source = containingSpace(view, input.containingSpaceId);
   const resource = source.resources.find(({ id }) => id === input.resourceId);
-  if (resource?.document.kind !== 'space') {
+  if (resource?.document.kind !== spaceKind.id) {
     return refused({ code: 'space-resource-not-found', resourceId: input.resourceId });
   }
   // `resource-not-found` cannot occur for an id `source.resources` was just
@@ -524,8 +522,7 @@ export const planDelete = (
   const blocked = recoveryBlockedBy(
     view,
     new Set([input.containingSpaceId, ...deleted]),
-    (snapshot) =>
-      [...spaceResourceEdges(snapshot).values()].some((targetId) => deletedIds.has(targetId)),
+    (snapshot) => heldSpaces(snapshot).some((targetId) => deletedIds.has(targetId)),
   );
   if (blocked !== undefined) return blocked;
   return {
@@ -582,14 +579,14 @@ export const precheckContextDeletion = (
 const replaceSpaceResourceSelection = (
   snapshot: SpaceSnapshot,
   targetSpaceId: UUID,
-  matches: (document: Extract<ResourceDocument, { kind: 'space' }>) => boolean,
+  matches: (document: Extract<ResourceDocument, { kind: SpaceKindId }>) => boolean,
   selection: SpaceResourceSelection,
   resetFraming: boolean,
 ): SpaceSnapshot => ({
   ...snapshot,
   resources: snapshot.resources.map((resource) => {
     if (
-      resource.document.kind !== 'space' ||
+      resource.document.kind !== spaceKind.id ||
       resource.document.content.spaceId !== targetSpaceId ||
       !matches(resource.document)
     )
@@ -642,7 +639,7 @@ export const planContextDeletion = (
   if (replacementMap === undefined || replacementGraph === undefined) return { kind: 'unchanged' };
 
   const selectsDeletedContext = (document: ResourceDocument): boolean =>
-    document.kind === 'space' &&
+    document.kind === spaceKind.id &&
     document.content.spaceId === input.targetSpaceId &&
     (deletingMap
       ? document.content.map === input.mapId

@@ -1,5 +1,7 @@
 import type { Continuation } from './continuation';
 import {
+  type SpaceKindId,
+  spaceKind,
   type MarkdownKindId,
   markdownKind,
   takesOpen,
@@ -42,10 +44,10 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 type MarkdownOperations = Mutable<KindOperationsOf<MarkdownKindId>>;
 type ImageOperations = Mutable<KindOperationsOf<ImageKindId>>;
 type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
-type SpaceOperations = Mutable<KindOperationsOf<'space'>>;
+type SpaceOperations = Mutable<KindOperationsOf<SpaceKindId>>;
 type MarkdownDecoration = Mutable<KindDecoration<MarkdownKindId>>;
 type ImageDecoration = Mutable<KindDecoration<ImageKindId>>;
-type SpaceDecoration = Mutable<KindDecoration<'space'>>;
+type SpaceDecoration = Mutable<KindDecoration<SpaceKindId>>;
 
 /** What the shared decoration adds to a Resource of any kind. */
 export type CanvasResourceDataPatch = Partial<
@@ -104,7 +106,10 @@ export interface CanvasResourceDecorationContext {
     ((resourceId: ResourceId, resourceShape: ResourceShape) => void) | undefined;
   readonly continuation: Continuation;
   readonly containingSpaceId: UUID;
-  readonly spaceDocuments: ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: 'space' }>>;
+  readonly spaceDocuments: ReadonlyMap<
+    ResourceId,
+    Extract<ResourceDocument, { kind: SpaceKindId }>
+  >;
   readonly spaceResourceTargets: SpaceResourceTargets;
   readonly spaces: OpenSpaces | null;
   readonly commandOutcomes: CommandOutcomes | undefined;
@@ -371,10 +376,10 @@ export function decorateUrResourceNode(
 }
 
 export function decorateSpaceResourceNode(
-  node: ResourceFlowNodeOf<'space'>,
+  node: ResourceFlowNodeOf<SpaceKindId>,
   context: SpaceResourceDecorationContext,
-): KindDecoration<'space'> {
-  const kindOperations: SpaceOperations = { kind: 'space' };
+): KindDecoration<SpaceKindId> {
+  const kindOperations: SpaceOperations = { kind: spaceKind.id };
   const decoration: SpaceDecoration = { kindOperations };
   if (node.data.contentAction !== 'author-space-view') return decoration;
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);

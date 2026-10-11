@@ -2,6 +2,7 @@ import {
   contentTarget,
   mayBeTarget,
   referenceKind,
+  spaceKind,
   markdownKind,
   imageKind,
   urKind,
@@ -22,17 +23,8 @@ function ownedContent(resource: ResourceDocument, via: ContentVia): ResourceCont
       return markdownKind.resolveContent(resource.content, via);
     case imageKind.id:
       return imageKind.resolveContent(resource.content, via);
-    case 'space':
-      return {
-        kind: 'space',
-        view: {
-          spaceId: resource.content.spaceId,
-          map: resource.content.map,
-          graph: resource.content.graph,
-          framing: resource.content.framing,
-        },
-        via,
-      };
+    case spaceKind.id:
+      return spaceKind.resolveContent(resource.content, via);
     case urKind.id:
       return urKind.resolveContent(resource.content, via);
   }
