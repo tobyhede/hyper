@@ -5,7 +5,8 @@ import { lineAt, maskedCssSource, maskedTsSource, trackedFiles } from '../suppor
  * ADR 0128: every Resource kind is a module, and no rule outside it names the
  * kind. A kind is named, as a quoted id in source or a CSS attribute selector,
  * only under a `kinds/` directory; everything else reaches it through the
- * module's exports.
+ * module's exports. The scan reads quoted ids only: an unquoted object key or a
+ * branch that tests a kind through a module's id is not caught here.
  */
 const KINDS = ['ur', 'image', 'markdown', 'reference', 'space'] as const;
 

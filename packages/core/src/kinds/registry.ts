@@ -1,6 +1,6 @@
-/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { Resource, ResourceDocument, UUID } from '../types';
 import type { KindFlags } from './kind-module';
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { imageKind } from './image';
 import { markdownKind } from './markdown';
 import { referenceKind } from './reference';

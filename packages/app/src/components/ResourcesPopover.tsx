@@ -129,8 +129,8 @@ const FILTER_NAMES = {
   [markdownKind.id]: 'Markdown Resources',
   [imageKind.id]: 'Image Resources',
   [urKind.id]: 'Ur Resources',
-  reference: 'Reference Resources',
-  space: 'Space Resources in this Space',
+  [referenceKind.id]: 'Reference Resources',
+  [spaceKind.id]: 'Space Resources in this Space',
   spaces: 'Spaces in this Meta Space',
 } as const satisfies Record<ResourcesFilter, string>;
 

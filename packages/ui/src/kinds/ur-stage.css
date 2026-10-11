@@ -1,4 +1,5 @@
-/* The Ur kind's frame when presented (ADR 0120), imported by `Stage`. */
+/* The Ur kind's frame when presented (ADR 0120), imported by `Stage` after `stage.css`,
+   an order `test/unit/kind-stylesheet-order.test.ts` holds. */
 
 /* A Resource with no content below its name — an Ur Resource — is a title
    slide: the name alone, centred in the frame. */
