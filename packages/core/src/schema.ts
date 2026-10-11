@@ -1,16 +1,16 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
-import { imageKind, imageNaturalSizeSchema, imageResourceContentSchema } from './kinds/image';
 import {
-  markdownFileContentSchema,
-  markdownKind,
-  markdownResourceContentSchema,
-} from './kinds/markdown';
-import { referenceKind, referenceResourceContentSchema } from './kinds/reference';
-import { kindFlags } from './kinds/registry';
-import { spaceKind, spaceResourceContentSchema, spaceResourceFramingSchema } from './kinds/space';
-import { urKind, urResourceContentSchema } from './kinds/ur';
+  contentParser,
+  fileContentParser,
+  isRegisteredKind,
+  kindFlags,
+  type KindId,
+  type Resource,
+  type ResourceDocument,
+  type ResourceFileDocument,
+} from './kinds/registry';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 import { uuidSchema } from './uuid';
 
@@ -60,68 +60,58 @@ const resourceTitleSchema = z
 
 /**
  * A Resource is an envelope (ADR 0128): the core owns `id`, `title` and
- * `kind`, and everything a kind adds sits under `content`. A Resource file
- * holds the same envelope, with a content kind's content replaced by the
- * locator its file codec reads (`@project/graph`'s `resource-file.ts`).
+ * `kind`, and everything a kind adds sits under `content`, which the core does
+ * not read. The registered kind's module is the one parser of its content, so
+ * a kind's shape is declared in its module and nowhere here; a kind no module
+ * registers is refused.
  */
-const resourceEnvelope = <K extends z.ZodTypeAny, C extends z.ZodTypeAny>(kind: K, content: C) =>
-  z.object({ id: idSchema, title: resourceTitleSchema, kind, content });
+const kinded = <Envelope extends object, Kinded>(
+  envelope: Envelope,
+  kind: string,
+  content: unknown,
+  parserOf: (kind: KindId) => z.ZodType<Kinded, z.ZodTypeDef, unknown>,
+  ctx: z.RefinementCtx,
+) => {
+  if (!isRegisteredKind(kind)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['kind'],
+      // Not echoing the kind: a summary that folds case would misquote it.
+      message: 'names no kind this build registers',
+    });
+    return z.NEVER;
+  }
+  const parsed = parserOf(kind).safeParse(content);
+  if (!parsed.success) {
+    for (const issue of parsed.error.issues) {
+      ctx.addIssue({ ...issue, path: ['content', ...issue.path] });
+    }
+    return z.NEVER;
+  }
+  return { ...envelope, ...parsed.data };
+};
 
-/** A resource written directly by the author; its sidecar holds its source. */
-export const markdownResourceSchema = resourceEnvelope(
-  z.literal(markdownKind.id),
-  markdownResourceContentSchema,
-);
-
-/** A resource that shows its target's content at a second position (ADR 0009). */
-export const referenceResourceSchema = resourceEnvelope(
-  z.literal(referenceKind.id),
-  referenceResourceContentSchema,
-);
-
-/** A resource that embeds one selected view of another Space (ADR 0068). */
-export const spaceResourceSchema = resourceEnvelope(
-  z.literal(spaceKind.id),
-  spaceResourceContentSchema,
-);
-
-/** A resource that shows a picture from its URL (ADR 0106). */
-export const imageResourceSchema = resourceEnvelope(
-  z.literal(imageKind.id),
-  imageResourceContentSchema,
-);
-
-/** A resource with no content (ADR 0113). */
-export const urResourceSchema = resourceEnvelope(z.literal(urKind.id), urResourceContentSchema);
-
-/**
- * A Resource: the envelope with each kind's content (ADR 0128). A Markdown
- * Resource carries its source; a Reference Resource only the pointer to its
- * Target's content (ADR 0009).
- */
-export const resourceSchema = z.discriminatedUnion('kind', [
-  markdownResourceSchema,
-  referenceResourceSchema,
-  spaceResourceSchema,
-  imageResourceSchema,
-  urResourceSchema,
-]);
+/** A Resource: the envelope, and the content its kind's module parses. */
+export const resourceSchema = z
+  .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
+  .transform(({ kind, content, ...envelope }, ctx): Resource =>
+    kinded(envelope, kind, content, contentParser, ctx),
+  );
 
 /**
  * A Resource file, `resources/<id>.json` (ADR 0128), as
- * `docs/schema/resource/` specifies it: strict at both levels, so a key no
- * kind declares is refused, naming the key, and so is one inside a nested
- * object, `framing` or `naturalSize`, so no authored key is dropped on intake
- * (ADR 0127). `kind` is required. Only file intake is strict: the stored
- * document's content schemas read what Hyper's own code wrote. `.strict()`
- * keeps the shape it is given, so the strict nested objects hold the same
- * field rules as the shared ones
- * (`packages/core/test/resource-document-equality.test.ts`).
+ * `docs/schema/resource/` specifies it: the envelope is strict, and so is
+ * every kind's content schema, so a key no kind declares is refused, naming
+ * it, and no authored key is dropped on intake (ADR 0127). `kind` is
+ * required, and the content is the kind's file content, which its file codec
+ * maps to the document's.
  */
-const resourceFileEnvelope = <K extends z.ZodTypeAny, C extends z.ZodTypeAny>(
-  kind: K,
-  content: C,
-) => z.object({ id: idSchema, title: resourceTitleSchema, kind, content }).strict();
+export const resourceFileSchema = z
+  .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
+  .strict()
+  .transform(({ kind, content, ...envelope }, ctx): ResourceFileDocument =>
+    kinded(envelope, kind, content, fileContentParser, ctx),
+  );
 
 const declaredKindSchema = z.object({ kind: z.string() });
 const declaredIdSchema = z.object({ id: z.string() });
@@ -137,24 +127,6 @@ export const declaredKind = (json: unknown): string | undefined => {
   const parsed = declaredKindSchema.safeParse(json);
   return parsed.success ? parsed.data.kind : undefined;
 };
-
-export const resourceFileSchema = z.discriminatedUnion('kind', [
-  resourceFileEnvelope(z.literal(markdownKind.id), markdownFileContentSchema),
-  resourceFileEnvelope(z.literal(referenceKind.id), referenceResourceContentSchema.strict()),
-  resourceFileEnvelope(
-    z.literal(spaceKind.id),
-    spaceResourceContentSchema
-      .extend({ framing: spaceResourceFramingSchema.strict().optional() })
-      .strict(),
-  ),
-  resourceFileEnvelope(
-    z.literal(imageKind.id),
-    imageResourceContentSchema
-      .extend({ naturalSize: imageNaturalSizeSchema.strict().optional() })
-      .strict(),
-  ),
-  resourceFileEnvelope(z.literal(urKind.id), urResourceContentSchema.strict()),
-]);
 
 /** The refusal code for a multi-line Edge Title; the application owns the wording. */
 export const EDGE_TITLE_ONE_LINE = 'edge-title-one-line';
@@ -272,12 +244,10 @@ export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
  * Whether a Resource of this kind takes a Shape other than the rectangle (ADR
  * 0121), as its kind declares.
  */
-export const takesResourceShape = (kind: z.infer<typeof resourceSchema>['kind']): boolean =>
-  kindFlags(kind).takesResourceShape;
+export const takesResourceShape = (kind: KindId): boolean => kindFlags(kind).takesResourceShape;
 
 /** Whether a Resource of this kind may be Open, as its kind declares (ADR 0122). */
-export const takesOpen = (kind: z.infer<typeof resourceSchema>['kind']): boolean =>
-  kindFlags(kind).canOpen;
+export const takesOpen = (kind: KindId): boolean => kindFlags(kind).canOpen;
 
 /**
  * What a Map stores for one Resource: its origin, and optionally whether it is
@@ -425,19 +395,12 @@ export const spaceFileSchema = spaceFileObjectSchema;
 /** The JSONB document stored beside a space's relational UUID. */
 export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 
-/** The JSONB document stored beside a resource's relational UUID. */
-export const markdownResourceDocumentSchema = markdownResourceSchema.omit({ id: true });
-export const referenceResourceDocumentSchema = referenceResourceSchema.omit({ id: true });
-export const spaceResourceDocumentSchema = spaceResourceSchema.omit({ id: true });
-export const imageResourceDocumentSchema = imageResourceSchema.omit({ id: true });
-export const urResourceDocumentSchema = urResourceSchema.omit({ id: true });
-export const resourceDocumentSchema = z.discriminatedUnion('kind', [
-  markdownResourceDocumentSchema,
-  referenceResourceDocumentSchema,
-  spaceResourceDocumentSchema,
-  imageResourceDocumentSchema,
-  urResourceDocumentSchema,
-]);
+/** The JSONB document stored beside a resource's relational UUID: the Resource less its id. */
+export const resourceDocumentSchema = z
+  .object({ title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
+  .transform(({ kind, content, ...envelope }, ctx): ResourceDocument =>
+    kinded(envelope, kind, content, contentParser, ctx),
+  );
 
 /** A complete, fully identified snapshot of one Space, exchanged at persistence seams. */
 export const spaceSnapshotSchema = z.object({

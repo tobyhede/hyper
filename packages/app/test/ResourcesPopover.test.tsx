@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { resourceSchema, uuidSchema, type Resource, type UUID } from '@project/core';
+import { KIND_IDS, uuidSchema, type Resource, type UUID } from '@project/core';
 import {
   ResourcesPopover,
   RESOURCE_DRAG_TYPE,
@@ -1007,9 +1007,9 @@ describe('ResourcesPopover', () => {
     render(<Fixture />);
     await openList();
 
-    // The discriminator map, keyed by `kind`, so the kinds come off the schema
-    // itself rather than off a list written beside it.
-    const kinds = [...resourceSchema.optionsMap.keys()];
+    // The registry's kinds, so the kinds come off the one list of them rather
+    // than off a list written beside it.
+    const kinds = [...KIND_IDS];
     const drawn = screen
       .getAllByRole('button', { pressed: true })
       .map((toggle) => toggle.getAttribute('title'));
@@ -1210,7 +1210,7 @@ describe('ResourcesPopover as a Connect list', () => {
     const toggles = screen
       .getAllByRole('button', { pressed: true })
       .map((toggle) => toggle.getAttribute('title'));
-    expect(toggles).toHaveLength(resourceSchema.optionsMap.size);
+    expect(toggles).toHaveLength(KIND_IDS.length);
     expect(toggles).not.toContain('Spaces in this Meta Space');
   });
 

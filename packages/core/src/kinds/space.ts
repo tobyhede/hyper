@@ -28,18 +28,22 @@ import { defineKind } from './kind-module';
  * case the renderer fits the selected Map. It belongs here rather than on
  * the Map because two Space Resources may show the same Map differently.
  */
-export const spaceResourceFramingSchema = z.object({
-  centreX: z.number().finite(),
-  centreY: z.number().finite(),
-  zoom: z.number().positive().finite(),
-});
+export const spaceResourceFramingSchema = z
+  .object({
+    centreX: z.number().finite(),
+    centreY: z.number().finite(),
+    zoom: z.number().positive().finite(),
+  })
+  .strict();
 
-export const spaceResourceContentSchema = z.object({
-  spaceId: uuidSchema,
-  map: uuidSchema,
-  graph: uuidSchema,
-  framing: spaceResourceFramingSchema.optional(),
-});
+export const spaceResourceContentSchema = z
+  .object({
+    spaceId: uuidSchema,
+    map: uuidSchema,
+    graph: uuidSchema,
+    framing: spaceResourceFramingSchema.optional(),
+  })
+  .strict();
 type SpaceResourceContent = z.infer<typeof spaceResourceContentSchema>;
 
 /**

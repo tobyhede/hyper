@@ -4,7 +4,7 @@ import type { ContentVia } from '../resource-content';
 import { defineKind, type KindFileCodec } from './kind-module';
 
 /** A Markdown Resource's content: the source its author wrote, which its file holds as the body. */
-export const markdownResourceContentSchema = z.object({ source: z.string() });
+export const markdownResourceContentSchema = z.object({ source: z.string() }).strict();
 type MarkdownResourceContent = z.infer<typeof markdownResourceContentSchema>;
 
 /** What a Markdown Resource's content resolves to: the source it shows. */
@@ -40,6 +40,7 @@ const markdownFile: KindFileCodec<
   MarkdownResourceContent,
   z.infer<typeof markdownFileContentSchema>
 > = {
+  contentSchema: markdownFileContentSchema,
   sidecarNames: (id) => [markdownSidecarPath(id)],
   encode: (id, content) => {
     const path = markdownSidecarPath(id);

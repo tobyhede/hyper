@@ -68,8 +68,6 @@ const namings = (kind: string): readonly string[] =>
  * either routed or counted.
  */
 const ONE_KIND_FEATURES = new Map<string, number>([
-  // The closed union `content` is still typed by (ADR 0128, "bar content's type").
-  ['packages/core/src/schema.ts', 10],
   // A Space Resource's selection, framing and portal; a Markdown body's completion.
   ['packages/app/src/canvas-resource-authoring.ts', 4],
   // An Image Resource's Create opens the file picker first (ADR 0106).

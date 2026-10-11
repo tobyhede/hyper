@@ -10,7 +10,7 @@ export interface UrContent {
 }
 
 /** An Ur Resource's content, which is nothing (ADR 0113). */
-export const urResourceContentSchema = z.object({});
+export const urResourceContentSchema = z.object({}).strict();
 
 /**
  * The Ur kind (ADR 0113): a Resource with no content, the one every capability

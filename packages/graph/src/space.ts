@@ -254,15 +254,9 @@ export function loadSpaceSnapshot(input: unknown): LoadSpaceSnapshotResult {
   }
 
   const { id, document, resources: storedResources } = parsed.data;
-  // SAFETY: `resourceDocument` is `resourceDocumentSchema`'s output, which is exactly
-  // `resourceSchema.omit({ id: true })` per resource kind — re-adding the `id` this
-  // schema stores alongside it reconstructs precisely a `Resource`. TypeScript
-  // can't confirm that itself: spreading a discriminated union plus one field
-  // doesn't re-infer back to the original union.
-  const resources = storedResources.map(({ id: resourceId, document: resourceDocument }) => ({
-    id: resourceId,
-    ...resourceDocument,
-  })) as Resource[];
+  const resources: Resource[] = storedResources.map(
+    ({ id: resourceId, document: resourceDocument }) => ({ id: resourceId, ...resourceDocument }),
+  );
   const loaded = buildSpace({
     id,
     title: document.title,

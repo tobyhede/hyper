@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ajv2020 } from 'ajv/dist/2020';
 import {
+  KIND_IDS,
   aggregateFileSchema,
   importSpaceFileSchema,
   isAcceptedImageUrl,
@@ -245,13 +246,15 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
 describe('the Resource file JSON Schema', () => {
   const examples = join(repoRoot, 'docs/schema/resource/examples');
 
-  it.each(['markdown', 'reference', 'space', 'image', 'ur'])(
-    'accepts the published %s example',
-    (kind) => {
-      const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
-      expect(resourceFileSchema(example), JSON.stringify(resourceFileSchema.errors)).toBe(true);
-    },
-  );
+  it.each(KIND_IDS)('specifies the registered %s kind beside the others', (kind) => {
+    expect(existsSync(join(repoRoot, `docs/schema/resource/kinds/${kind}.schema.json`))).toBe(true);
+    expect(existsSync(join(examples, `${kind}.json`))).toBe(true);
+  });
+
+  it.each(KIND_IDS)('accepts the published %s example', (kind) => {
+    const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
+    expect(resourceFileSchema(example), JSON.stringify(resourceFileSchema.errors)).toBe(true);
+  });
 
   it.each([
     ['a vendor kind with any content', envelope('vnd.acme.chart', { series: [1, 2] })],
@@ -330,22 +333,19 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
     return !loadSpaceAggregate({ metaSpaceId: space, snapshots: [snapshot] }).ok;
   };
 
-  it.each(['markdown', 'reference', 'space', 'image', 'ur'])(
-    "decodes the published %s example through its kind's file codec",
-    (kind) => {
-      const text = readFileSync(join(examples, `${kind}.json`), 'utf8');
-      const example: unknown = JSON.parse(text);
-      expect(resourceFileSchema(example)).toBe(true);
-      const sidecars = (kind === 'markdown' ? ['0b9e4f3a-1c2d-4e5f-8a6b-7c8d9e0f1a2b.md'] : []).map(
-        (name) => ({
-          path: `resources/${name}`,
-          text: readFileSync(join(examples, name), 'utf8'),
-        }),
-      );
-      const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }, ...sidecars]);
-      expect(decoded.ok, JSON.stringify(decoded)).toBe(true);
-    },
-  );
+  it.each(KIND_IDS)("decodes the published %s example through its kind's file codec", (kind) => {
+    const text = readFileSync(join(examples, `${kind}.json`), 'utf8');
+    const example: unknown = JSON.parse(text);
+    expect(resourceFileSchema(example)).toBe(true);
+    const sidecars = (kind === 'markdown' ? ['0b9e4f3a-1c2d-4e5f-8a6b-7c8d9e0f1a2b.md'] : []).map(
+      (name) => ({
+        path: `resources/${name}`,
+        text: readFileSync(join(examples, name), 'utf8'),
+      }),
+    );
+    const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }, ...sidecars]);
+    expect(decoded.ok, JSON.stringify(decoded)).toBe(true);
+  });
 
   it('admits a valid Resource file through the whole of intake', () => {
     expect(intakeRefuses(filesOf(envelope('ur', {})))).toBe(false);

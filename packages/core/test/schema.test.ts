@@ -468,16 +468,23 @@ describe('resource file schema', () => {
     ).toBe(false);
   });
 
-  it('keeps the stored Resource schema non-strict, because Hyper wrote what it reads', () => {
+  it("strips a key beside the stored envelope, and refuses one its kind's content does not declare", () => {
     const resource = resourceSchema.parse({
       id: A,
       title: 'A',
       kind: 'markdown',
-      content: { source: '', description: 'What A is' },
+      content: { source: '' },
       description: 'What A is',
     });
     expect('description' in resource).toBe(false);
-    expect('description' in resource.content).toBe(false);
+    expect(
+      resourceSchema.safeParse({
+        id: A,
+        title: 'A',
+        kind: 'markdown',
+        content: { source: '', description: 'What A is' },
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -1020,11 +1027,16 @@ describe('an Image Resource', () => {
   it('gives an Image Resource no body — it owns its URL, not its bytes', () => {
     const image = resourceSchema.parse({
       ...IMAGE,
-      content: { url: 'https://example.com/a.png', body: 'x' },
+      content: { url: 'https://example.com/a.png' },
       body: 'x',
     });
     expect('body' in image).toBe(false);
-    expect('body' in image.content).toBe(false);
+    expect(
+      resourceSchema.safeParse({
+        ...IMAGE,
+        content: { url: 'https://example.com/a.png', body: 'x' },
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -1044,9 +1056,10 @@ describe('an Ur Resource', () => {
   });
 
   it('gives an Ur Resource no body — it has no content', () => {
-    const ur = resourceSchema.parse({ ...UR, content: { body: 'x' }, body: 'x' });
+    const ur = resourceSchema.parse({ ...UR, content: {}, body: 'x' });
     expect('body' in ur).toBe(false);
     expect(ur.content).toEqual({});
+    expect(resourceSchema.safeParse({ ...UR, content: { body: 'x' } }).success).toBe(false);
   });
 
   it('refuses an Ur Resource with no Title', () => {

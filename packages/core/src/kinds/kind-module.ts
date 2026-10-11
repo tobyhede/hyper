@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { ContentFacts, ContentVia, ResourceContent } from '../resource-content';
+import type { ContentFacts, ContentVia } from '../resource-content';
 import type { SpaceResourceTarget, SpaceSelectionProblem } from './space';
 import type { UUID } from '../types';
 
@@ -38,6 +38,8 @@ export type FileContentDecoding =
  * (ADR 0128): the content the file holds, and the sidecars beside it.
  */
 export interface KindFileCodec<Content, FileContent> {
+  /** The content a Resource file of this kind holds, strict, so a key the kind does not declare is refused. */
+  readonly contentSchema: z.ZodType<FileContent, z.ZodTypeDef, unknown>;
   /** The sidecars a Resource of this kind with this id may name, so a refused file still claims them. */
   readonly sidecarNames: (id: string) => readonly string[];
   readonly encode: (
@@ -52,18 +54,33 @@ export interface KindFileCodec<Content, FileContent> {
   ) => FileContentDecoding;
 }
 
+/** What a kind's content resolves to: tagged with a kind, and reached `via` its own Resource or a Reference. */
+export interface KindResolvedContent {
+  readonly kind: string;
+  readonly via: ContentVia;
+}
+
 /**
  * A Resource kind (ADR 0120, ADR 0128): its id, the schema its `content` is
  * parsed by, and every rule it declares. The core reads these and names no
  * kind; a kind with nothing to say about a rule takes `defineKind`'s answer.
  * The view half is the application's.
  */
-export interface KindModule<K extends string, Content, FileContent = Content> {
+export interface KindModule<
+  K extends string,
+  Content,
+  FileContent = Content,
+  Resolved extends KindResolvedContent = KindResolvedContent,
+> {
   readonly id: K;
+  /**
+   * The one parser of this kind's `content`, strict, for a stored document and
+   * a Resource file alike: the envelope parses `content` through it (ADR 0128).
+   */
   readonly contentSchema: z.ZodType<Content, z.ZodTypeDef, unknown>;
   readonly flags: KindFlags;
   /** What this kind's content resolves to, reached `via` its own Resource or a Reference. */
-  readonly resolveContent: (content: Content, via: ContentVia) => ResourceContent;
+  readonly resolveContent: (content: Content, via: ContentVia) => Resolved;
   /** The Resources this content references, which intake resolves. */
   readonly resourceReferences: (content: Content) => readonly UUID[];
   /** The Resource whose content this one shows, when it shows another's (ADR 0070). */
@@ -85,11 +102,21 @@ export interface KindModule<K extends string, Content, FileContent = Content> {
 }
 
 /** What a kind must declare; the rest takes {@link defineKind}'s answer. */
-type KindDeclaration<K extends string, Content, FileContent> = Pick<
-  KindModule<K, Content, FileContent>,
+type KindDeclaration<
+  K extends string,
+  Content,
+  FileContent,
+  Resolved extends KindResolvedContent,
+> = Pick<
+  KindModule<K, Content, FileContent, Resolved>,
   'id' | 'contentSchema' | 'flags' | 'resolveContent'
 > &
-  Partial<Omit<KindModule<K, Content, FileContent>, 'id' | 'contentSchema' | 'flags'>>;
+  Partial<
+    Omit<
+      KindModule<K, Content, FileContent, Resolved>,
+      'id' | 'contentSchema' | 'flags' | 'resolveContent'
+    >
+  >;
 
 /** The content in its schema's key order, or as given when the schema refuses it, so this never throws. */
 const inSchemaOrder =
@@ -99,8 +126,11 @@ const inSchemaOrder =
     return parsed.success ? parsed.data : content;
   };
 
-/** A file codec that writes content as it is and names no sidecar. */
-const asWritten = <Content>(): KindFileCodec<Content, Content> => ({
+/** A file codec that writes content as it is, parsed by the kind's own schema, and names no sidecar. */
+const asWritten = <Content>(
+  contentSchema: z.ZodType<Content, z.ZodTypeDef, unknown>,
+): KindFileCodec<Content, Content> => ({
+  contentSchema,
   sidecarNames: () => [],
   encode: (_id, content) => ({ content, sidecars: [] }),
   decode: (_id, content) => ({ ok: true, content }),
@@ -111,24 +141,29 @@ const asWritten = <Content>(): KindFileCodec<Content, Content> => ({
  * references nothing, has no content of its own to author, writes its content
  * as it is, and puts it in its schema's key order on Export.
  */
-export function defineKind<const K extends string, Content>(
-  declaration: KindDeclaration<K, Content, Content>,
-): KindModule<K, Content>;
-export function defineKind<const K extends string, Content, FileContent>(
-  declaration: KindDeclaration<K, Content, FileContent> & {
+export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
+  declaration: KindDeclaration<K, Content, Content, Resolved>,
+): KindModule<K, Content, Content, Resolved>;
+export function defineKind<
+  const K extends string,
+  Content,
+  FileContent,
+  Resolved extends KindResolvedContent,
+>(
+  declaration: KindDeclaration<K, Content, FileContent, Resolved> & {
     readonly file: KindFileCodec<Content, FileContent>;
   },
-): KindModule<K, Content, FileContent>;
-export function defineKind<K extends string, Content>(
-  declaration: KindDeclaration<K, Content, unknown>,
-): KindModule<K, Content, unknown> {
+): KindModule<K, Content, FileContent, Resolved>;
+export function defineKind<K extends string, Content, Resolved extends KindResolvedContent>(
+  declaration: KindDeclaration<K, Content, unknown, Resolved>,
+): KindModule<K, Content, unknown, Resolved> {
   return {
     resourceReferences: () => [],
     contentTarget: () => undefined,
     spaceReferences: () => [],
     selectionProblem: () => undefined,
     canonicalContent: inSchemaOrder(declaration.contentSchema),
-    file: asWritten<unknown>(),
+    file: asWritten<unknown>(declaration.contentSchema),
     ...declaration,
   };
 }

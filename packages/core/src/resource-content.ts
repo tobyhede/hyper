@@ -1,21 +1,10 @@
-import type { ImageContent } from './kinds/image';
-import type { MarkdownContent } from './kinds/markdown';
 import type { ReferenceKindId } from './kinds/reference';
-import { contentFacts } from './kinds/registry';
-import type { SpaceContent } from './kinds/space';
-import type { UrContent } from './kinds/ur';
+import { contentFacts, type ResourceContent } from './kinds/registry';
+
+export type { ResourceContent } from './kinds/registry';
 
 /** Whether content is the Resource's own or reached through a Reference Resource (ADR 0070). */
 export type ContentVia = 'self' | ReferenceKindId;
-
-/**
- * What a Resource's content is. `''` is a genuinely empty body; `ur` is no
- * content at all, which is what an Ur Resource has (ADR 0113). `unresolved`
- * answers only states intake refuses: a Reference Resource whose Target is
- * missing or is itself a Reference Resource.
- */
-export type ResourceContent =
-  MarkdownContent | ImageContent | SpaceContent | UrContent | ReferenceContentUnresolved;
 
 /** No content: what a Reference Resource shows when its Target is missing or is itself a Reference. */
 export interface ReferenceContentUnresolved {
