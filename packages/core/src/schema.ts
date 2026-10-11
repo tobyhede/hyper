@@ -235,8 +235,8 @@ const defaultUrKind = (value: unknown): unknown => {
  * naming the key, and so is one inside a nested object, `framing` or
  * `naturalSize`, so no authored key is dropped on intake (ADR 0127). Only
  * file intake is strict. The per-kind objects stay non-strict because the
- * stored document, HTTP and domain schemas are built from them, and those read
- * what Hyper's own code wrote. `.strict()` keeps the shape it is given, so the
+ * content schemas they extend are the stored document's, HTTP's and the
+ * domain's too, and those read what Hyper's own code wrote. `.strict()` keeps the shape it is given, so the
  * strict nested objects hold the same field rules as the shared ones
  * (`packages/core/test/resource-document-equality.test.ts`).
  */
@@ -294,7 +294,7 @@ export const urResourceContentSchema = z.object({});
 /**
  * A Resource is an envelope (ADR 0128): the core owns `id`, `title` and
  * `kind`, and everything a kind adds sits under `content`. A Resource file's
- * frontmatter is still flat; the codec in `@project/graph` maps between the two.
+ * frontmatter is flat; the codec in `@project/graph` maps between the two.
  * The envelope takes its `kind` from the frontmatter, so the two share one
  * instance of that rule as they share the Title's.
  */

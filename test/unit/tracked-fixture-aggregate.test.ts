@@ -1,12 +1,13 @@
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { titleName, uuidSchema, type Resource, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import { isImageId } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
+import { exportAggregate } from '../../src/export/export-aggregate';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
@@ -181,5 +182,35 @@ describe('tracked fixture images', () => {
     const repository = new MemorySpaceRepository();
     await expect(importFixture(repository, { directory: copy })).rejects.toThrow('notes.txt');
     await expect(repository.listSpaces()).resolves.toEqual([]);
+  });
+});
+
+/** Every file under `root`, keyed by its path relative to `root`, as text. */
+const filesUnder = async (root: string): Promise<Record<string, string>> => {
+  const entries = await readdir(root, { recursive: true, withFileTypes: true });
+  const files: Record<string, string> = {};
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const path = join(entry.parentPath, entry.name);
+    files[relative(root, path)] = await readFile(path, 'utf8');
+  }
+  return files;
+};
+
+describe('tracked fixture export', () => {
+  it('exports the files it imports from its own export, byte for byte', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hyper-fixture-export-'));
+    temporaryDirectories.push(root);
+    const exportOf = async (directory: string, destination: string) => {
+      const repository = new MemorySpaceRepository();
+      await importFixture(repository, { directory });
+      await exportAggregate(repository, destination);
+      return filesUnder(destination);
+    };
+
+    const first = await exportOf(trackedFixture, join(root, 'first'));
+    const second = await exportOf(join(root, 'first'), join(root, 'second'));
+    expect(Object.keys(first).filter((path) => path.endsWith('.md')).length).toBeGreaterThan(0);
+    expect(second).toEqual(first);
   });
 });

@@ -55,7 +55,7 @@ export function parseResourceFile(file: ResourceFile): ParseResourceFileResult {
   const decoded = decodeResourceFile(file, resourceFrontmatterSchema);
   if (!decoded.ok) return decoded;
 
-  const { id, document } = envelope(decoded.frontmatter, decoded.body);
+  const { id, document } = decodeEnvelope(decoded.frontmatter, decoded.body);
   const resource = resourceSchema.safeParse({ id, ...document });
   if (!resource.success) {
     return {
@@ -75,10 +75,16 @@ export function parseImportResourceFile(file: ResourceFile): ParseImportResource
   const decoded = decodeResourceFile(file, importResourceFrontmatterSchema);
   if (!decoded.ok) return decoded;
 
-  const { id, document } = envelope(decoded.frontmatter, decoded.body);
+  const { id, document } = decodeEnvelope(decoded.frontmatter, decoded.body);
   const resource: ImportResource = { document };
   if (id !== undefined) resource.id = id;
   return { ok: true, resource };
+}
+
+/** A Resource decoded from its file: the id the file declares, if any, and its document. */
+interface DecodedResource {
+  readonly id: UUID | undefined;
+  readonly document: ResourceDocument;
 }
 
 /**
@@ -87,12 +93,7 @@ export function parseImportResourceFile(file: ResourceFile): ParseImportResource
  * other keys are the kind's content. A Markdown Resource's content is the
  * file's body.
  */
-interface DecodedResource {
-  readonly id: UUID | undefined;
-  readonly document: ResourceDocument;
-}
-
-function envelope(frontmatter: ImportResourceFrontmatter, body: string): DecodedResource {
+function decodeEnvelope(frontmatter: ImportResourceFrontmatter, body: string): DecodedResource {
   switch (frontmatter.kind) {
     case 'markdown': {
       const { id, title, kind } = frontmatter;
@@ -192,10 +193,11 @@ function decodeResourceFile<T extends ImportResourceFrontmatter>(
  * the default.
  */
 export function serializeResourceFile(resource: Resource): string {
-  const { content, ...frontmatter } = resource;
   if (resource.kind === 'markdown') {
-    return `${FENCE}${stringifyYaml(frontmatter)}${FENCE}\n${resource.content.source}`;
+    const { content, ...frontmatter } = resource;
+    return `${FENCE}${stringifyYaml(frontmatter)}${FENCE}\n${content.source}`;
   }
+  const { content, ...frontmatter } = resource;
   return `${FENCE}${stringifyYaml({ ...frontmatter, ...content })}${FENCE}\n`;
 }
 
