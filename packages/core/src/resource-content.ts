@@ -1,3 +1,4 @@
+import { imageKind, type ImageContent } from './kinds/image';
 import { urKind, type UrContent } from './kinds/ur';
 import type { Resource } from './types';
 
@@ -27,7 +28,7 @@ export interface SpaceView {
  */
 export type ResourceContent =
   | { readonly kind: 'markdown'; readonly source: string; readonly via: ContentVia }
-  | { readonly kind: 'image'; readonly url: string; readonly via: ContentVia }
+  | ImageContent
   | { readonly kind: 'space'; readonly view: SpaceView; readonly via: ContentVia }
   | UrContent
   | { readonly kind: 'unresolved'; readonly via: 'reference' };
@@ -43,7 +44,7 @@ export interface ContentFacts {
 
 const CONTENT_FACTS = {
   markdown: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
-  image: { action: 'replace-image', embedsMap: false, drawsContentArea: true },
+  [imageKind.id]: imageKind.facts,
   space: { action: 'author-space-view', embedsMap: true, drawsContentArea: false },
   [urKind.id]: urKind.facts,
   unresolved: { action: 'none', embedsMap: false, drawsContentArea: true },

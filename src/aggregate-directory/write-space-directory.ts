@@ -6,6 +6,7 @@ import {
   imageResourceContentSchema,
   referenceResourceContentSchema,
   spaceResourceContentSchema,
+  imageKind,
   urKind,
   type SpaceFile,
   type Resource,
@@ -139,11 +140,11 @@ const canonicalResource = (
         kind: 'space',
         content: inSchemaOrder(spaceResourceContentSchema, document.content),
       };
-    case 'image':
+    case imageKind.id:
       return {
         id,
         title,
-        kind: 'image',
+        kind: imageKind.id,
         content: inSchemaOrder(imageResourceContentSchema, document.content),
       };
     case urKind.id:

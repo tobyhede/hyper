@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { titleName, urKind, type ResourceContent } from '@project/core';
+import { imageKind, titleName, urKind, type ResourceContent } from '@project/core';
 import { ResourceImage } from './ResourceImage';
 import { UnresolvedContent } from './UnresolvedContent';
 
@@ -87,7 +87,7 @@ function PresentedContent({
   switch (content.kind) {
     case 'markdown':
       return <RenderedMarkdown className="resource__body" markdown={content.source} />;
-    case 'image':
+    case imageKind.id:
       return <ResourceImage key={content.url} url={content.url} name={name} />;
     case 'space':
     case urKind.id:

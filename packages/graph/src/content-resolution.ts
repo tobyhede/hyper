@@ -1,4 +1,5 @@
 import {
+  imageKind,
   urKind,
   type ContentVia,
   type ResourceContent,
@@ -13,8 +14,8 @@ function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent 
   switch (resource.kind) {
     case 'markdown':
       return { kind: 'markdown', source: resource.content.source, via };
-    case 'image':
-      return { kind: 'image', url: resource.content.url, via };
+    case imageKind.id:
+      return imageKind.resolveContent(resource.content, via);
     case 'space':
       return {
         kind: 'space',

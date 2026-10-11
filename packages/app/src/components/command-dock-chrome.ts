@@ -12,9 +12,10 @@ import type {
   Resource,
   ResourceId,
   UUID,
+  ImageKindId,
   UrKindId,
 } from '@project/core';
-import { urKind } from '@project/core';
+import { imageKind, urKind } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { FocusFallback } from '../delete-confirmation';
 import type { ExitOutcome } from '../dock-model';
@@ -376,7 +377,7 @@ export interface DockGraph {
  * the gesture is a row in that Resource's own command menu and there is
  * nothing here for it to be a peer of.
  */
-export const RESOURCE_KINDS = ['markdown', 'space', 'image', urKind.id] as const;
+export const RESOURCE_KINDS = ['markdown', 'space', imageKind.id, urKind.id] as const;
 
 /**
  * A kind the Create cluster draws a control for.
@@ -396,7 +397,7 @@ export type DockResourceKind = (typeof RESOURCE_KINDS)[number];
 export type DockCreation =
   | { readonly kind: 'markdown' }
   | { readonly kind: 'space' }
-  | { readonly kind: 'image'; readonly files: readonly File[] }
+  | { readonly kind: ImageKindId; readonly files: readonly File[] }
   | { readonly kind: UrKindId };
 
 /**

@@ -8,6 +8,7 @@ import {
   type ImportResource,
   type ImportResourceFrontmatter,
   type UUID,
+  imageKind,
   urKind,
 } from '@project/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
@@ -104,7 +105,7 @@ function decodeEnvelope(frontmatter: ImportResourceFrontmatter, body: string): D
       return contentFromRest(frontmatter);
     case 'space':
       return contentFromRest(frontmatter);
-    case 'image':
+    case imageKind.id:
       return contentFromRest(frontmatter);
     case urKind.id:
       return contentFromRest(frontmatter);

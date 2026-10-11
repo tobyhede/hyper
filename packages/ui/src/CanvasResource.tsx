@@ -12,6 +12,7 @@ import {
   DEFAULT_RESOURCE_SHAPE,
   contentAction,
   drawsContentArea,
+  imageKind,
   takesResourceShape,
   titleLines,
   titleName,
@@ -22,6 +23,7 @@ import {
   urKind,
 } from '@project/core';
 import { Button } from './Button';
+import { isImageOperations, type ImageOperations } from './kinds/image';
 import { isUrOperations, type UrOperations } from './kinds/ur';
 import {
   ResourceRailAction,
@@ -78,11 +80,7 @@ export type KindOperations =
   | {
       readonly kind: 'reference';
     }
-  | {
-      readonly kind: 'image';
-      /** Begin replacing the image: the image kind's counterpart to a Markdown edit. */
-      readonly onBeginEdit?: () => void;
-    }
+  | ImageOperations
   | UrOperations
   | {
       readonly kind: 'space';
@@ -298,13 +296,17 @@ const opacityTransitionMs = (element: HTMLElement): number => {
 function useAreaContent(content: ResourceContent | null): AreaContent | null {
   const kind = content?.kind;
   const text =
-    content?.kind === 'markdown' ? content.source : content?.kind === 'image' ? content.url : '';
+    content?.kind === 'markdown'
+      ? content.source
+      : content?.kind === imageKind.id
+        ? content.url
+        : '';
   const via: ContentVia = content?.via ?? 'self';
   return useMemo<AreaContent | null>(() => {
     switch (kind) {
       case 'markdown':
         return { kind, source: text, via };
-      case 'image':
+      case imageKind.id:
         return { kind, url: text, via };
       case 'unresolved':
         return { kind, via: 'reference' };
@@ -458,7 +460,7 @@ export function CanvasResource(props: CanvasResourceProps) {
             />
           </ResourceContentEditProvider>
         );
-      case 'image':
+      case imageKind.id:
         return runningReplacer !== undefined ? (
           <ResourceContentEditProvider value={setContentEdit}>
             <ImageReplaceTarget name={name} editor={runningReplacer} />
@@ -548,13 +550,13 @@ export function CanvasResource(props: CanvasResourceProps) {
           <ResourceRailAction
             ref={editControl}
             aria-label={
-              kindOperations.kind === 'image'
+              isImageOperations(kindOperations)
                 ? `Replace image of Resource ${name}`
                 : `Edit Resource ${name}`
             }
             onClick={beginContentEdit}
           >
-            {kindOperations.kind === 'image' ? (
+            {isImageOperations(kindOperations) ? (
               <ReplaceImageIcon data-icon="inline-start" />
             ) : (
               <EditIcon data-icon="inline-start" />

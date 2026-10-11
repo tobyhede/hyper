@@ -14,13 +14,13 @@ import type {
   graphEdgeSchema,
   graphHeadShapeSchema,
   graphSchema,
-  imageNaturalSizeSchema,
   spaceFileSchema,
   spaceDocumentSchema,
   spaceSnapshotSchema,
   aggregateFileSchema,
   uuidSchema,
 } from './schema';
+import type { imageNaturalSizeSchema } from './kinds/image';
 
 /** Domain types are derived from the Zod schemas so they can never drift apart. */
 
