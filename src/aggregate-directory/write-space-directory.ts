@@ -6,6 +6,7 @@ import {
   imageResourceContentSchema,
   referenceResourceContentSchema,
   spaceResourceContentSchema,
+  urKind,
   type SpaceFile,
   type Resource,
   type UUID,
@@ -145,8 +146,8 @@ const canonicalResource = (
         kind: 'image',
         content: inSchemaOrder(imageResourceContentSchema, document.content),
       };
-    case 'ur':
-      return { id, title, kind: 'ur', content: {} };
+    case urKind.id:
+      return { id, title, kind: urKind.id, content: {} };
     case 'markdown':
       return {
         id,

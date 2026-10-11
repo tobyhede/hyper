@@ -6,6 +6,8 @@ import {
   type ResourceId,
   type ResourceShape,
   type UUID,
+  urKind,
+  type UrKindId,
 } from '@project/core';
 import type {
   KindOperationsOf,
@@ -35,7 +37,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 /** Each kind's operations and decoration, built by assigning what a gate allows. */
 type MarkdownOperations = Mutable<KindOperationsOf<'markdown'>>;
 type ImageOperations = Mutable<KindOperationsOf<'image'>>;
-type UrOperations = Mutable<KindOperationsOf<'ur'>>;
+type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
 type SpaceOperations = Mutable<KindOperationsOf<'space'>>;
 type MarkdownDecoration = Mutable<KindDecoration<'markdown'>>;
 type ImageDecoration = Mutable<KindDecoration<'image'>>;
@@ -348,10 +350,10 @@ export function decorateImageResourceNode(
 
 /** An Ur Resource's Shape choice, offered Open and Closed alike (ADR 0121). */
 export function decorateUrResourceNode(
-  node: ResourceFlowNodeOf<'ur'>,
+  node: ResourceFlowNodeOf<UrKindId>,
   context: UrResourceDecorationContext,
-): KindDecoration<'ur'> {
-  const kindOperations: UrOperations = { kind: 'ur' };
+): KindDecoration<UrKindId> {
+  const kindOperations: UrOperations = { kind: urKind.id };
   const changeResourceShape = context.changeResourceShape;
   if (
     context.editableResourceIds.has(node.data.resourceId) &&

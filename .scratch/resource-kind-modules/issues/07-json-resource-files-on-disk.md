@@ -11,7 +11,7 @@ Each kind's file codec maps the locator to and from the document's `content`. Di
 
 A kind id is checked at intake as ADR 0128 fixes it: a bare id or `vnd.<owner>.<name>`, each part ASCII letters, digits and hyphens.
 
-**Delete the missing-kind default:** `defaultUrKind` in `packages/core/src/schema.ts` goes, since `kind` is required, and with it the kind-id scan's exemption for it (see `06`), so the scan exempts nothing.
+**Delete the missing-kind default:** `defaultUrKind` in `packages/core/src/schema.ts` goes, since `kind` is required.
 
 **Roll forward in the same change (ADR 0054):** every tracked Resource file under `packages/app/fixture/` and `packages/app/example/`, the Export and Import tests, `docs/aggregate-directory.md`, the `hyper-authoring` skill and `docs/agents/editing-and-persistence.md`'s file-format section, which carries the "accepted, not built" note until this lands. Mark AGENTS.md's ADR 0128 entry built, and drop `docs/schema/resource/README.md`'s "not yet built" sentence.
 

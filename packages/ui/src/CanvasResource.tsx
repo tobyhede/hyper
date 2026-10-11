@@ -12,13 +12,17 @@ import {
   DEFAULT_RESOURCE_SHAPE,
   contentAction,
   drawsContentArea,
+  takesResourceShape,
   titleLines,
   titleName,
   type ContentVia,
   type ResourceContent,
   type ResourceShape,
+  type UrContent,
+  urKind,
 } from '@project/core';
 import { Button } from './Button';
+import { isUrOperations, type UrOperations } from './kinds/ur';
 import {
   ResourceRailAction,
   ResourceRailActions,
@@ -45,6 +49,7 @@ import {
   type MarkdownResourceBodyProps,
 } from './MarkdownResourceBody';
 import './canvas-resource.css';
+import './kinds/ur-canvas.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
 import { ResourceImage } from './ResourceImage';
@@ -78,14 +83,7 @@ export type KindOperations =
       /** Begin replacing the image: the image kind's counterpart to a Markdown edit. */
       readonly onBeginEdit?: () => void;
     }
-  | {
-      readonly kind: 'ur';
-      /**
-       * Draw this Resource in another Shape on its Map (ADR 0121), chosen from
-       * its rail Open and Closed alike. Absent where the Map may not be authored.
-       */
-      readonly onResourceShapeChange?: (resourceShape: ResourceShape) => void;
-    }
+  | UrOperations
   | {
       readonly kind: 'space';
       /**
@@ -113,7 +111,7 @@ export type KindOperations =
  * its embedded Map, which the canvas draws as sibling nodes, and an Ur
  * Resource has no content, so neither has an arm.
  */
-type AreaContent = Exclude<ResourceContent, { readonly kind: 'space' | 'ur' }>;
+type AreaContent = Exclude<ResourceContent, { readonly kind: 'space' } | UrContent>;
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
@@ -311,7 +309,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
       case 'unresolved':
         return { kind, via: 'reference' };
       case 'space':
-      case 'ur':
+      case urKind.id:
       case undefined:
         return null;
     }
@@ -406,7 +404,7 @@ export function CanvasResource(props: CanvasResourceProps) {
   const actionableEntityActions =
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const onResourceShapeChange =
-    !readOnly && kindOperations.kind === 'ur' ? kindOperations.onResourceShapeChange : undefined;
+    !readOnly && isUrOperations(kindOperations) ? kindOperations.onResourceShapeChange : undefined;
   const contextNotice = props.contextNotice ?? null;
   const spaceRail = spaceOperations?.spaceRail;
   const portal = spaceOperations?.portal;
@@ -509,7 +507,7 @@ export function CanvasResource(props: CanvasResourceProps) {
 
   // An Open Resource's content already says what it is, and an Ur Resource's
   // Shape does (ADR 0121), so neither draws its kind.
-  const kindMark = open || kind === 'ur' ? null : <ResourceRailKind kind={kind} />;
+  const kindMark = open || takesResourceShape(kind) ? null : <ResourceRailKind kind={kind} />;
   const toolbar = showActions ? (
     // ADR 0073. One tab stop for the whole rail, arrows between its
     // controls: a canvas carries many Resources and a Resource's rail carries

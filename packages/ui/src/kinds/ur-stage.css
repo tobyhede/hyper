@@ -1,0 +1,14 @@
+/* The Ur kind's frame when presented (ADR 0120), imported by `Stage`. */
+
+/* A Resource with no content below its name — an Ur Resource — is a title
+   slide: the name alone, centred in the frame. */
+.stage__body .resource--full[data-content-kind='ur'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.stage__body .resource--full[data-content-kind='ur'] .resource__title {
+  margin: 0;
+}

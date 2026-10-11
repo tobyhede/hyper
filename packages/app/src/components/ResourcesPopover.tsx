@@ -9,7 +9,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { titleName, type Resource, type ResourceId, type UUID } from '@project/core';
+import { titleName, urKind, type Resource, type ResourceId, type UUID } from '@project/core';
 import { describeSpaceResourceBreak, type SpaceResourceBreak } from '../authoring-refusal';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
 import type { FocusFallback } from '../delete-confirmation';
@@ -93,7 +93,7 @@ const everyFilter = <const T extends readonly ResourcesFilter[]>(
   filters: T & (ResourcesFilter extends T[number] ? unknown : never),
 ): T => filters;
 
-const FILTERS = everyFilter(['markdown', 'image', 'ur', 'reference', 'space', 'spaces']);
+const FILTERS = everyFilter(['markdown', 'image', urKind.id, 'reference', 'space', 'spaces']);
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
 const RESOURCE_FILTERS = FILTERS.filter(
@@ -111,7 +111,7 @@ const ALL_FILTERS: readonly ResourcesFilter[] = FILTERS;
 const FILTER_NAMES = {
   markdown: 'Markdown Resources',
   image: 'Image Resources',
-  ur: 'Ur Resources',
+  [urKind.id]: 'Ur Resources',
   reference: 'Reference Resources',
   space: 'Space Resources in this Space',
   spaces: 'Spaces in this Meta Space',
@@ -126,7 +126,7 @@ const FILTER_NAMES = {
 const FILTER_GLYPHS = {
   markdown: MarkdownIcon,
   image: ImageIcon,
-  ur: UrIcon,
+  [urKind.id]: UrIcon,
   reference: ReferenceIcon,
   space: SpaceResourceIcon,
   spaces: ParentIcon,
@@ -669,7 +669,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
     return {
       markdown: ofKind('markdown'),
       image: ofKind('image'),
-      ur: ofKind('ur'),
+      [urKind.id]: ofKind(urKind.id),
       reference: ofKind('reference'),
       space: ofKind('space'),
       spaces: spaces.filter((space) => matched(space.title)).length,

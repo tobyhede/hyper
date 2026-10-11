@@ -1,4 +1,10 @@
-import type { ContentVia, ResourceContent, ResourceDocument, UUID } from '@project/core';
+import {
+  urKind,
+  type ContentVia,
+  type ResourceContent,
+  type ResourceDocument,
+  type UUID,
+} from '@project/core';
 
 /** A Resource that owns its content: every kind but a Reference Resource. */
 type ContentOwner = Exclude<ResourceDocument, { kind: 'reference' }>;
@@ -20,8 +26,8 @@ function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent 
         },
         via,
       };
-    case 'ur':
-      return { kind: 'ur', via };
+    case urKind.id:
+      return urKind.resolveContent(resource.content, via);
   }
 }
 

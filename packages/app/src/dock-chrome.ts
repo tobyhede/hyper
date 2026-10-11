@@ -8,6 +8,7 @@ import {
   type Resource,
   type ResourceId,
   type UUID,
+  urKind,
 } from '@project/core';
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSessionState } from '@project/persistence';
@@ -432,8 +433,8 @@ export function useDockChrome(
           case 'image':
             placement.createImagesFromFiles(creation.files);
             return;
-          case 'ur':
-            placement.createResource('ur');
+          case urKind.id:
+            placement.createResource(urKind.id);
             return;
         }
       },
@@ -441,7 +442,7 @@ export function useDockChrome(
         markdown: !availability.addResource,
         space: !availability.createSpaceResource,
         image: !availability.addResource,
-        ur: !availability.addResource,
+        [urKind.id]: !availability.addResource,
       } satisfies Record<DockResourceKind, boolean>,
     },
     persistence: {

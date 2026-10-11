@@ -22,6 +22,8 @@ import {
   normalizeTitle,
   type SpaceSnapshot,
   type UUID,
+  urKind,
+  type UrKindId,
 } from '@project/core';
 import {
   graphColorsByGraphId,
@@ -94,7 +96,7 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
 };
 
 /** The Resource kinds created from nothing but a press: no Target, no Space, no file. */
-export type InputFreeResourceKind = 'markdown' | 'ur';
+export type InputFreeResourceKind = 'markdown' | UrKindId;
 
 /** One picture an Image Resource is created for: its URL, and its size when it loaded. */
 export interface CreatedImage {
@@ -1273,8 +1275,8 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'created-resource') {
       const title = nextResourceTitle(snapshot);
       const created = createResource(
-        completion.resourceKind === 'ur'
-          ? { title, kind: 'ur', content: {} }
+        completion.resourceKind === urKind.id
+          ? { title, kind: urKind.id, content: {} }
           : { title, kind: 'markdown', content: { source: '' } },
         completion.anchor,
         'avoidingOverlap',

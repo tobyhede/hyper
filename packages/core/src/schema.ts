@@ -1,6 +1,8 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
+import { kindFlags } from './kinds/registry';
+import { urKind } from './kinds/ur';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 
 /**
@@ -198,7 +200,7 @@ export const imageResourceFrontmatterSchema = z
 export const urResourceFrontmatterSchema = z.object({
   id: idSchema,
   title: resourceTitleSchema,
-  kind: z.literal('ur'),
+  kind: z.literal(urKind.id),
 });
 
 const frontmatterRecordSchema = z.record(z.unknown());
@@ -223,7 +225,9 @@ export const declaresResourceKind = (frontmatter: unknown): boolean => {
  */
 const defaultUrKind = (value: unknown): unknown => {
   const record = frontmatterRecord(value);
-  return record === undefined || declaresResourceKind(record) ? value : { ...record, kind: 'ur' };
+  return record === undefined || declaresResourceKind(record)
+    ? value
+    : { ...record, kind: urKind.id };
 };
 
 /**
@@ -291,7 +295,7 @@ export const importResourceFrontmatterSchema = z.preprocess(
 export const markdownResourceContentSchema = z.object({ source: z.string() });
 
 /** An Ur Resource's content, which is nothing (ADR 0113). */
-export const urResourceContentSchema = z.object({});
+export const urResourceContentSchema = urKind.contentSchema;
 
 /**
  * A Resource is an envelope (ADR 0128): the core owns `id`, `title` and
@@ -461,16 +465,14 @@ export const resourceShapeSchema = z.enum(RESOURCE_SHAPES);
 
 /**
  * Whether a Resource of this kind takes a Shape other than the rectangle (ADR
- * 0121). Only an Ur Resource does; every other kind is the rectangle.
+ * 0121), as its kind declares.
  */
 export const takesResourceShape = (kind: z.infer<typeof resourceSchema>['kind']): boolean =>
-  kind === 'ur';
+  kindFlags(kind).takesResourceShape;
 
-/**
- * Whether a Resource of this kind may be Open. An Ur Resource has no content to
- * show, so it is always Closed; every other kind may be either.
- */
-export const takesOpen = (kind: z.infer<typeof resourceSchema>['kind']): boolean => kind !== 'ur';
+/** Whether a Resource of this kind may be Open, as its kind declares (ADR 0122). */
+export const takesOpen = (kind: z.infer<typeof resourceSchema>['kind']): boolean =>
+  kindFlags(kind).canOpen;
 
 /**
  * What a Map stores for one Resource: its origin, and optionally whether it is
