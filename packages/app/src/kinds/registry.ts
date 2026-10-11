@@ -1,7 +1,11 @@
 import { useMemo } from 'react';
 import { imageKind, markdownKind, spaceKind, urKind } from '@project/core';
-import { isResourceNodeOf, type ResourceFlowNode } from '@project/react-flow-adapter';
-import { applyKindDecoration } from '../canvas-resource-decoration';
+import {
+  isResourceNodeOf,
+  type ResourceFlowNode,
+  type ResourceFlowNodeOf,
+} from '@project/react-flow-adapter';
+import { applyKindDecoration, type KindDecoration } from '../canvas-resource-decoration';
 import { decorateImageResourceNode, type ImageResourceDecorationContext } from './image';
 import { decorateMarkdownResourceNode, type MarkdownResourceDecorationContext } from './markdown';
 import { decorateSpaceResourceNode, type SpaceResourceDecorationContext } from './space';
@@ -13,18 +17,22 @@ export type KindDecorationContext = MarkdownResourceDecorationContext &
   UrResourceDecorationContext &
   SpaceResourceDecorationContext;
 
-/** Each node of one kind decorated with that kind's operations, by node id. */
-const decoratedOfKind = (
+/** Each node of one kind decorated from that kind's own context, by node id. */
+const useDecoratedOfKind = <K extends ResourceFlowNode['data']['kind'], Context>(
   nodes: readonly ResourceFlowNode[],
-  decorate: (node: ResourceFlowNode) => ResourceFlowNode | undefined,
-): ReadonlyMap<string, ResourceFlowNode> => {
-  const next = new Map<string, ResourceFlowNode>();
-  for (const node of nodes) {
-    const decorated = decorate(node);
-    if (decorated !== undefined) next.set(node.id, decorated);
-  }
-  return next;
-};
+  kind: K,
+  decorate: (node: ResourceFlowNodeOf<K>, context: Context) => KindDecoration<K>,
+  context: Context,
+): ReadonlyMap<string, ResourceFlowNode> =>
+  useMemo(() => {
+    const next = new Map<string, ResourceFlowNode>();
+    for (const node of nodes) {
+      if (isResourceNodeOf(node, kind)) {
+        next.set(node.id, applyKindDecoration(node, decorate(node, context)));
+      }
+    }
+    return next;
+  }, [nodes, kind, decorate, context]);
 
 /**
  * Every Resource node with its kind's operations (ADR 0128): the app half of
@@ -148,52 +156,29 @@ export function useKindDecoratedNodes(
       onContextReport,
     ],
   );
-  const markdownDecorated = useMemo(
-    () =>
-      decoratedOfKind(nodes, (node) =>
-        isResourceNodeOf(node, markdownKind.id)
-          ? applyKindDecoration(node, decorateMarkdownResourceNode(node, markdownContext))
-          : undefined,
-      ),
-    [nodes, markdownContext],
+  const markdownDecorated = useDecoratedOfKind(
+    nodes,
+    markdownKind.id,
+    decorateMarkdownResourceNode,
+    markdownContext,
   );
-  const imageDecorated = useMemo(
-    () =>
-      decoratedOfKind(nodes, (node) =>
-        isResourceNodeOf(node, imageKind.id)
-          ? applyKindDecoration(node, decorateImageResourceNode(node, imageContext))
-          : undefined,
-      ),
-    [nodes, imageContext],
+  const imageDecorated = useDecoratedOfKind(
+    nodes,
+    imageKind.id,
+    decorateImageResourceNode,
+    imageContext,
   );
-  const urDecorated = useMemo(
-    () =>
-      decoratedOfKind(nodes, (node) =>
-        isResourceNodeOf(node, urKind.id)
-          ? applyKindDecoration(node, decorateUrResourceNode(node, urContext))
-          : undefined,
-      ),
-    [nodes, urContext],
+  const urDecorated = useDecoratedOfKind(nodes, urKind.id, decorateUrResourceNode, urContext);
+  const spaceDecorated = useDecoratedOfKind(
+    nodes,
+    spaceKind.id,
+    decorateSpaceResourceNode,
+    spaceContext,
   );
-  const spaceDecorated = useMemo(
-    () =>
-      decoratedOfKind(nodes, (node) =>
-        isResourceNodeOf(node, spaceKind.id)
-          ? applyKindDecoration(node, decorateSpaceResourceNode(node, spaceContext))
-          : undefined,
-      ),
-    [nodes, spaceContext],
-  );
-  return useMemo(
-    () =>
-      nodes.map(
-        (node) =>
-          markdownDecorated.get(node.id) ??
-          imageDecorated.get(node.id) ??
-          urDecorated.get(node.id) ??
-          spaceDecorated.get(node.id) ??
-          node,
-      ),
-    [nodes, markdownDecorated, imageDecorated, urDecorated, spaceDecorated],
-  );
+  return useMemo(() => {
+    const decorated = new Map(
+      [markdownDecorated, imageDecorated, urDecorated, spaceDecorated].flatMap((byId) => [...byId]),
+    );
+    return nodes.map((node) => decorated.get(node.id) ?? node);
+  }, [nodes, markdownDecorated, imageDecorated, urDecorated, spaceDecorated]);
 }

@@ -4,6 +4,7 @@ import type { ContentVia } from '../resource-content';
 import type { UUID } from '../types';
 import { uuidSchema } from '../uuid';
 import { defineKind } from './kind-module';
+import type { ResourceDocument } from './registry';
 
 /**
  * A Resource that shows one selected view of another independently stored Space
@@ -59,9 +60,12 @@ export interface SpaceView {
   readonly framing: SpaceResourceContent['framing'] | undefined;
 }
 
+/** The Space kind's id, declared before its module because the content it resolves to names it. */
+const SPACE_KIND_ID = 'space';
+
 /** What a Space Resource's content resolves to: the view of its target it shows. */
 export interface SpaceContent {
-  readonly kind: 'space';
+  readonly kind: typeof SPACE_KIND_ID;
   readonly view: SpaceView;
   readonly via: ContentVia;
 }
@@ -117,7 +121,7 @@ const selectionProblem = (
  * declaration, and the module checks only its own selection.
  */
 export const spaceKind = defineKind({
-  id: 'space',
+  id: SPACE_KIND_ID,
   contentSchema: spaceResourceContentSchema,
   flags: {
     takesResourceShape: false,
@@ -127,7 +131,7 @@ export const spaceKind = defineKind({
   },
   facts: { action: 'author-space-view', embedsMap: true, drawsContentArea: false },
   resolveContent: (content, via): SpaceContent => ({
-    kind: 'space',
+    kind: SPACE_KIND_ID,
     view: {
       spaceId: content.spaceId,
       map: content.map,
@@ -142,3 +146,6 @@ export const spaceKind = defineKind({
 
 /** The Space kind's id. */
 export type SpaceKindId = typeof spaceKind.id;
+
+/** A stored Space Resource document: a Resource document of the Space kind. */
+export type SpaceResourceDocument = Extract<ResourceDocument, { kind: SpaceKindId }>;

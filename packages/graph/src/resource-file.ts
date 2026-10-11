@@ -4,7 +4,6 @@ import {
   decodeFileContent,
   encodeFileContent,
   isKindId,
-  isRegisteredKind,
   resourceFileSchema,
   sidecarNames,
   resourceSchema,
@@ -59,9 +58,10 @@ type FileDecoding =
     };
 
 /**
- * A Resource file's JSON, refused as ADR 0128 fixes it: a `kind` is required,
- * is a kind id, and names a kind this build registers; then the envelope and
- * the kind's content are each strict.
+ * A Resource file's JSON, refused as ADR 0128 fixes it: a `kind` is required
+ * and is a kind id; then the file's schema refuses a kind this build does not
+ * register, naming those it does, and holds the envelope and the kind's content
+ * each strict.
  */
 function decodeFile(file: ResourceFile): FileDecoding {
   let json: unknown;
@@ -98,9 +98,6 @@ function decodeFile(file: ResourceFile): FileDecoding {
       'invalid-resource-file',
       `kind: "${kind}" is not a kind id — a bare id or vnd.<owner>.<name>, each part ASCII letters, digits and hyphens`,
     );
-  }
-  if (!isRegisteredKind(kind)) {
-    return fail('invalid-resource-file', `kind: "${kind}" is not a kind this build registers`);
   }
 
   const parsed = resourceFileSchema.safeParse(json);

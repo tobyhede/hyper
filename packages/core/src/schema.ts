@@ -5,6 +5,7 @@ import {
   contentParser,
   fileContentParser,
   isRegisteredKind,
+  KIND_IDS,
   kindFlags,
   type KindId,
   type Resource,
@@ -58,45 +59,65 @@ const resourceTitleSchema = z
     params: { code: RESOURCE_TITLE_REQUIRED },
   });
 
+/** The kind and content a Resource declares, read whatever else its envelope fails. */
+const declaredKindAndContentSchema = z.object({ kind: z.string(), content: z.unknown() });
+
 /**
- * A Resource is an envelope (ADR 0128): the core owns `id`, `title` and
- * `kind`, and everything a kind adds sits under `content`, which the core does
- * not read. The registered kind's module is the one parser of its content, so
- * a kind's shape is declared in its module and nowhere here; a kind no module
- * registers is refused.
+ * The content a Resource's kind parses, tagged with its kind, or `undefined`
+ * with each issue added to `ctx`: a kind no module registers is refused, and
+ * the registered kind's module is the one parser of its content.
  */
-const kinded = <Envelope extends object, Kinded>(
-  envelope: Envelope,
+const kindedContent = <Kinded>(
   kind: string,
   content: unknown,
   parserOf: (kind: KindId) => z.ZodType<Kinded, z.ZodTypeDef, unknown>,
   ctx: z.RefinementCtx,
-) => {
+): Kinded | undefined => {
   if (!isRegisteredKind(kind)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['kind'],
       // Not echoing the kind: a summary that folds case would misquote it.
-      message: 'names no kind this build registers',
+      // The registered ids are lower case, so the fold leaves them intact.
+      message: `names no kind this build registers (${KIND_IDS.join(', ')})`,
     });
-    return z.NEVER;
+    return undefined;
   }
   const parsed = parserOf(kind).safeParse(content);
-  if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      ctx.addIssue({ ...issue, path: ['content', ...issue.path] });
-    }
-    return z.NEVER;
+  if (parsed.success) return parsed.data;
+  for (const issue of parsed.error.issues) {
+    ctx.addIssue({ ...issue, path: ['content', ...issue.path] });
   }
-  return { ...envelope, ...parsed.data };
+  return undefined;
 };
 
+/**
+ * A Resource is an envelope (ADR 0128): the core owns `id`, `title` and
+ * `kind`, and everything a kind adds sits under `content`, which the core does
+ * not read. The envelope and the kind's content are each checked whatever the
+ * other answers, so a Resource failing both is refused with every issue at
+ * once: the check runs in a transform over `unknown`, whose base never fails.
+ */
+const enveloped = <Envelope extends object, Kinded>(
+  envelopeSchema: z.ZodType<Envelope, z.ZodTypeDef, unknown>,
+  parserOf: (kind: KindId) => z.ZodType<Kinded, z.ZodTypeDef, unknown>,
+) =>
+  z.unknown().transform((input, ctx) => {
+    const envelope = envelopeSchema.safeParse(input);
+    if (!envelope.success) for (const issue of envelope.error.issues) ctx.addIssue(issue);
+    const declared = declaredKindAndContentSchema.safeParse(input);
+    const kinded = declared.success
+      ? kindedContent(declared.data.kind, declared.data.content, parserOf, ctx)
+      : undefined;
+    if (!envelope.success || kinded === undefined) return z.NEVER;
+    return { ...envelope.data, ...kinded };
+  });
+
 /** A Resource: the envelope, and the content its kind's module parses. */
-export const resourceSchema = z
-  .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
-  .transform(({ kind, content, ...envelope }, ctx): Resource =>
-    kinded(envelope, kind, content, contentParser, ctx),
-  );
+export const resourceSchema: z.ZodType<Resource, z.ZodTypeDef, unknown> = enveloped(
+  z.object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() }),
+  contentParser,
+);
 
 /**
  * A Resource file, `resources/<id>.json` (ADR 0128), as
@@ -106,12 +127,12 @@ export const resourceSchema = z
  * required, and the content is the kind's file content, which its file codec
  * maps to the document's.
  */
-export const resourceFileSchema = z
-  .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
-  .strict()
-  .transform(({ kind, content, ...envelope }, ctx): ResourceFileDocument =>
-    kinded(envelope, kind, content, fileContentParser, ctx),
-  );
+export const resourceFileSchema: z.ZodType<ResourceFileDocument, z.ZodTypeDef, unknown> = enveloped(
+  z
+    .object({ id: idSchema, title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
+    .strict(),
+  fileContentParser,
+);
 
 const declaredKindSchema = z.object({ kind: z.string() });
 const declaredIdSchema = z.object({ id: z.string() });
@@ -396,11 +417,10 @@ export const spaceFileSchema = spaceFileObjectSchema;
 export const spaceDocumentSchema = spaceFileObjectSchema.omit({ id: true });
 
 /** The JSONB document stored beside a resource's relational UUID: the Resource less its id. */
-export const resourceDocumentSchema = z
-  .object({ title: resourceTitleSchema, kind: z.string(), content: z.unknown() })
-  .transform(({ kind, content, ...envelope }, ctx): ResourceDocument =>
-    kinded(envelope, kind, content, contentParser, ctx),
-  );
+export const resourceDocumentSchema: z.ZodType<ResourceDocument, z.ZodTypeDef, unknown> = enveloped(
+  z.object({ title: resourceTitleSchema, kind: z.string(), content: z.unknown() }),
+  contentParser,
+);
 
 /** A complete, fully identified snapshot of one Space, exchanged at persistence seams. */
 export const spaceSnapshotSchema = z.object({

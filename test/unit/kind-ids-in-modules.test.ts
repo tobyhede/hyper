@@ -76,8 +76,10 @@ const ONE_KIND_FEATURES = new Map<string, number>([
   ['packages/app/src/components/CommandDockSpaces.tsx', 2],
   // The kinds the Create cluster offers, in its order (ADR 0089).
   ['packages/app/src/components/command-dock-chrome.ts', 4],
-  // A Space Resource's Create runs the Space Resource lifecycle (ADR 0074).
-  ['packages/app/src/dock-chrome.ts', 1],
+  // A Space Resource's Create runs, and is available with, the Space Resource lifecycle (ADR 0074).
+  ['packages/app/src/dock-chrome.ts', 2],
+  // A Space Resource's Delete runs the Space Resource lifecycle (ADR 0074).
+  ['packages/app/src/resource-deletion.ts', 1],
   // Replace is an Image Resource's (ADR 0106).
   ['packages/app/src/image-replacement.ts', 1],
   // Create Reference's glyph, and a Space Resource's Enter and menu.

@@ -2,10 +2,9 @@ import type { Continuation } from './continuation';
 import {
   takesOpen,
   type GraphId,
-  type ResourceDocument,
   type ResourceId,
   type ResourceShape,
-  type SpaceKindId,
+  type SpaceResourceDocument,
   type UUID,
 } from '@project/core';
 import type {
@@ -83,10 +82,7 @@ export interface CanvasResourceDecorationContext {
     ((resourceId: ResourceId, resourceShape: ResourceShape) => void) | undefined;
   readonly continuation: Continuation;
   readonly containingSpaceId: UUID;
-  readonly spaceDocuments: ReadonlyMap<
-    ResourceId,
-    Extract<ResourceDocument, { kind: SpaceKindId }>
-  >;
+  readonly spaceDocuments: ReadonlyMap<ResourceId, SpaceResourceDocument>;
   readonly spaceResourceTargets: SpaceResourceTargets;
   readonly spaces: OpenSpaces | null;
   readonly commandOutcomes: CommandOutcomes | undefined;
@@ -157,7 +153,7 @@ export function decorateSharedResourceNode(
     >
   > = {};
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && takesOpen(node.data.kind)) {
-    // An Ur Resource has no content to show, so it offers no Open or Close.
+    // A kind that declares no Open offers no Open or Close.
     patch.onOpenChange = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
   } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {

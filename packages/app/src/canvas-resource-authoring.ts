@@ -1,7 +1,7 @@
 import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  type SpaceKindId,
+  type SpaceResourceDocument,
   spaceKind,
   markdownKind,
   RESOURCE_TITLE_REQUIRED,
@@ -36,9 +36,7 @@ type Caret =
   | { readonly resourceId: string; readonly field: 'body'; readonly openObserved: boolean }
   | null;
 
-const spaceDocumentIdentity = (
-  document: Extract<ResourceDocument, { kind: SpaceKindId }>,
-): string => {
+const spaceDocumentIdentity = (document: SpaceResourceDocument): string => {
   const framing = document.content.framing;
   const framingKey =
     framing === undefined ? '' : `${framing.centreX}:${framing.centreY}:${framing.zoom}`;
@@ -47,8 +45,8 @@ const spaceDocumentIdentity = (
 
 const spaceDocumentsOf = (
   resources: readonly { readonly id: ResourceId; readonly document: ResourceDocument }[],
-): ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: SpaceKindId }>> => {
-  const next = new Map<ResourceId, Extract<ResourceDocument, { kind: SpaceKindId }>>();
+): ReadonlyMap<ResourceId, SpaceResourceDocument> => {
+  const next = new Map<ResourceId, SpaceResourceDocument>();
   for (const resource of resources) {
     if (resource.document.kind === spaceKind.id) next.set(resource.id, resource.document);
   }
@@ -76,7 +74,7 @@ const completeEditedSpaceResource = (
   authoring: Pick<SurfaceAuthoring, 'complete'>,
   spaceSession: SpaceSession,
   resourceId: ResourceId,
-  nextDocument: (document: Extract<ResourceDocument, { kind: SpaceKindId }>) => ResourceDocument,
+  nextDocument: (document: SpaceResourceDocument) => ResourceDocument,
   invalidMessage: string,
 ): string | null => {
   const stored = spaceSession
@@ -408,7 +406,7 @@ export function useCanvasResourceAuthoring({
         spaceSession,
         resourceId,
         (document) => {
-          const next: Extract<ResourceDocument, { kind: SpaceKindId }> = {
+          const next: SpaceResourceDocument = {
             ...document,
             content: { ...document.content, map: targetMap.id, graph: graphId },
           };

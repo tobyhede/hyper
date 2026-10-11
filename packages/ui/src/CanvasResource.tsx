@@ -14,6 +14,7 @@ import {
   takesResourceShape,
   titleLines,
   titleName,
+  UNRESOLVED_CONTENT,
   type ResourceContent,
   type ResourceShape,
 } from '@project/core';
@@ -374,7 +375,7 @@ export function CanvasResource(props: CanvasResourceProps) {
   };
   /** The content area: unresolved content, or what its kind's view half draws. */
   const drawAreaContent = (value: ResourceContent): ReactNode =>
-    value.kind === 'unresolved' ? (
+    value.kind === UNRESOLVED_CONTENT.kind ? (
       <UnresolvedContent />
     ) : (
       canvasContent(value, {

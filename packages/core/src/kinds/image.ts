@@ -70,9 +70,12 @@ export const imageResourceContentSchema = z
   })
   .strict();
 
+/** The Image kind's id, declared before its module because the content it resolves to names it. */
+const IMAGE_KIND_ID = 'image';
+
 /** What an Image Resource's content resolves to: the URL its picture is shown from. */
 export interface ImageContent {
-  readonly kind: 'image';
+  readonly kind: typeof IMAGE_KIND_ID;
   readonly url: string;
   readonly via: ContentVia;
 }
@@ -82,7 +85,7 @@ export interface ImageContent {
  * from its URL. Its content action is Replace.
  */
 export const imageKind = defineKind({
-  id: 'image',
+  id: IMAGE_KIND_ID,
   contentSchema: imageResourceContentSchema,
   flags: {
     takesResourceShape: false,
@@ -91,7 +94,7 @@ export const imageKind = defineKind({
     ownsReferencedSpaces: false,
   },
   facts: { action: 'replace-image', embedsMap: false, drawsContentArea: true },
-  resolveContent: (content, via): ImageContent => ({ kind: 'image', url: content.url, via }),
+  resolveContent: (content, via): ImageContent => ({ kind: IMAGE_KIND_ID, url: content.url, via }),
 });
 
 /** The Image kind's id. */

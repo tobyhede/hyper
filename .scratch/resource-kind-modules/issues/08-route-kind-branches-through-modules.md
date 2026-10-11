@@ -2,7 +2,7 @@
 
 Status: resolved
 
-**Why:** tickets 02 to 06 asked for each kind's rules to live in its module and be named nowhere else. The code outside `kinds/` instead tests a kind through its module's id (`case referenceKind.id:`, `resource.kind === spaceKind.id`, `[urKind.id]: …` tables). The id is no longer quoted, so `test/unit/kind-ids-in-modules.test.ts` passes, but the rule still lives at the call site and adding a kind still means editing every one of them. The code review of #359 and #360 found this; `/mnt/project-files/reviews/359-360-code-review.md` has the findings.
+**Why:** tickets 02 to 06 asked for each kind's rules to live in its module and be named nowhere else. The code outside `kinds/` instead tests a kind through its module's id (`case referenceKind.id:`, `resource.kind === spaceKind.id`, `[urKind.id]: …` tables). The id is no longer quoted, so `test/unit/kind-ids-in-modules.test.ts` passes, but the rule still lives at the call site and adding a kind still means editing every one of them. The code review of #359 and #360 found this.
 
 **What to build:** move each branch into the module it belongs to, as a flag, a declared operation or a view-half entry, so a call site asks the registry rather than switching on a kind. The sites outside `kinds/` that test a kind through its id when this was filed:
 

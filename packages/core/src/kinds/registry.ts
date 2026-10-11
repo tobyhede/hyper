@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { ContentFacts, ContentVia } from '../resource-content';
-import type { uuidSchema } from '../uuid';
+import type { UUID } from '../types';
 import type { FileContentDecoding, KindFlags, KindModule, KindSidecar } from './kind-module';
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { imageKind } from './image';
@@ -10,9 +10,7 @@ import type { SpaceResourceTarget, SpaceSelectionProblem } from './space';
 import { spaceKind } from './space';
 import { urKind } from './ur';
 
-type UUID = z.output<typeof uuidSchema>;
-
-/** The kinds, every one a module (ADR 0128), registered with every build: the one place each is named. */
+/** The kinds, every one a module, registered with every build: the one place each is registered. */
 const REGISTERED = {
   [urKind.id]: urKind,
   [imageKind.id]: imageKind,
@@ -52,23 +50,38 @@ type KindedFile<K extends KindId> = {
 /** The parser of a kinded value's content, answering it with its kind. */
 type KindedParser<T> = z.ZodType<T, z.ZodTypeDef, unknown>;
 
-const contentParserOf = <K extends KindId>(kind: K): KindedParser<Kinded<K>> =>
-  KIND_MODULES[kind].contentSchema.transform((content) => ({ kind, content }));
+/** A kind's parsers: of a Resource's content, and of its Resource file's content. */
+interface KindParsers<K extends KindId> {
+  readonly content: KindedParser<Kinded<K>>;
+  readonly file: KindedParser<KindedFile<K>>;
+}
 
-/** The one parser of a Resource's `content` (ADR 0128): its kind's module's schema. */
-export const contentParser = (kind: KindId): KindedParser<Kinded<KindId>> => contentParserOf(kind);
+const parsersOf = <K extends KindId>(kind: K): KindParsers<K> => ({
+  content: KIND_MODULES[kind].contentSchema.transform((content) => ({ kind, content })),
+  file: KIND_MODULES[kind].file.contentSchema.transform((content) => ({ kind, content })),
+});
 
-const fileContentParserOf = <K extends KindId>(kind: K): KindedParser<KindedFile<K>> =>
-  KIND_MODULES[kind].file.contentSchema.transform((content) => ({ kind, content }));
+/** Each registered kind's parsers, built once; the type refuses a registered kind left out. */
+const KIND_PARSERS = {
+  [urKind.id]: parsersOf(urKind.id),
+  [imageKind.id]: parsersOf(imageKind.id),
+  [markdownKind.id]: parsersOf(markdownKind.id),
+  [referenceKind.id]: parsersOf(referenceKind.id),
+  [spaceKind.id]: parsersOf(spaceKind.id),
+} satisfies { readonly [K in KindId]: KindParsers<K> };
+
+/** The one parser of a Resource's `content`: its kind's module's schema. */
+export const contentParser = (kind: KindId): KindedParser<Kinded<KindId>> =>
+  KIND_PARSERS[kind].content;
 
 /** The parser of a Resource file's `content`: its kind's file codec's schema. */
 export const fileContentParser = (kind: KindId): KindedParser<KindedFile<KindId>> =>
-  fileContentParserOf(kind);
+  KIND_PARSERS[kind].file;
 
 /**
- * A Resource (ADR 0128): the core's envelope, `id`, `title` and `kind`, and
+ * A Resource: the core's envelope, `id`, `title` and `kind`, and
  * the content its kind's module parses. Typed from the registry, so a kind is
- * declared in its module and listed once above, and nowhere else.
+ * declared in its module and listed in this file, and nowhere else.
  */
 export type Resource = {
   [K in KindId]: { id: UUID; title: string; kind: K; content: ContentByKind[K] };
@@ -79,7 +92,7 @@ export type ResourceDocument = {
   [K in KindId]: { title: string; kind: K; content: ContentByKind[K] };
 }[KindId];
 
-/** A Resource file as intake reads it (ADR 0128): the envelope, with its kind's file content. */
+/** A Resource file as intake reads it: the envelope, with its kind's file content. */
 export type ResourceFileDocument = {
   [K in KindId]: { id: UUID; title: string; kind: K; content: FileContentByKind[K] };
 }[KindId];
@@ -98,21 +111,8 @@ export const KIND_IDS: readonly KindId[] = Object.values(KIND_MODULES).map(({ id
 export const isRegisteredKind = (kind: string): kind is KindId =>
   KIND_IDS.some((registered) => registered === kind);
 
-/**
- * The flags of a kind no module registers: every Resource kind is registered,
- * so intake has refused such a Resource before a rule asks, and this answers
- * as the most constrained kind would.
- */
-const UNREGISTERED_KIND_FLAGS: KindFlags = {
-  takesResourceShape: false,
-  canOpen: false,
-  mayBeTarget: false,
-  ownsReferencedSpaces: false,
-};
-
 /** The rules a kind declares for every Resource of it. */
-export const kindFlags = (kind: string): KindFlags =>
-  isRegisteredKind(kind) ? KIND_MODULES[kind].flags : UNREGISTERED_KIND_FLAGS;
+export const kindFlags = (kind: KindId): KindFlags => KIND_MODULES[kind].flags;
 
 /** A Resource, stored or not: what its kind's declarations are read from. */
 type KindedResource = Kinded<KindId>;
@@ -120,7 +120,7 @@ type KindedResource = Kinded<KindId>;
 const resourceReferencesOf = <K extends KindId>(resource: Kinded<K>) =>
   KIND_MODULES[resource.kind].resourceReferences(resource.content);
 
-/** The Resources this Resource's content references, which intake resolves (ADR 0128). */
+/** The Resources this Resource's content references, which intake resolves. */
 export const resourceReferences = (resource: KindedResource): readonly UUID[] =>
   resourceReferencesOf(resource);
 
@@ -132,12 +132,12 @@ export const contentTarget = (resource: KindedResource): UUID | undefined =>
   contentTargetOf(resource);
 
 /** Whether a Resource of this kind may be another's Target (ADR 0113). */
-export const mayBeTarget = (kind: string): boolean => kindFlags(kind).mayBeTarget;
+export const mayBeTarget = (kind: KindId): boolean => kindFlags(kind).mayBeTarget;
 
 const spaceReferencesOf = <K extends KindId>(resource: Kinded<K>) =>
   KIND_MODULES[resource.kind].spaceReferences(resource.content);
 
-/** The Spaces this Resource's content references, from which the core enforces cycles and lifetime (ADR 0128). */
+/** The Spaces this Resource's content references, from which the core enforces cycles and lifetime. */
 export const spaceReferences = (resource: KindedResource): readonly UUID[] =>
   spaceReferencesOf(resource);
 
@@ -221,7 +221,7 @@ export const newResourceDocument = (kind: KindId, title: string): ResourceDocume
 const encodeFileContentOf = <K extends KindId>(id: string, resource: Kinded<K>) =>
   KIND_MODULES[resource.kind].file.encode(id, resource.content);
 
-/** The content a Resource's file holds, and the sidecars beside it, by its kind's file codec (ADR 0128). */
+/** The content a Resource's file holds, and the sidecars beside it, by its kind's file codec. */
 export const encodeFileContent = (
   resource: Resource,
 ): { readonly content: unknown; readonly sidecars: readonly KindSidecar[] } =>

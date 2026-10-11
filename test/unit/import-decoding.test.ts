@@ -1,5 +1,6 @@
 import {
   importSpaceSchema,
+  KIND_IDS,
   spaceSnapshotSchema,
   uuidSchema,
   type ImportSpace,
@@ -345,5 +346,24 @@ describe('import decoding', () => {
     const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
 
     expect(summary).toContain('resources.0.document.kind names no kind this build registers');
+  });
+
+  /**
+   * A client that sent a kind this build does not register learns which kinds
+   * it does, so a miscased `Markdown` points at `markdown`. The registered ids
+   * are lower case, so the summary's fold quotes them intact.
+   */
+  it('names every registered kind when it refuses an unregistered one', () => {
+    const parsed = spaceSnapshotSchema.safeParse({
+      id: SPACE_ID,
+      document: { version: 1, title: 'T' },
+      resources: [
+        { id: RESOURCE_ID, document: { title: 'C', kind: 'Markdown', content: { source: '' } } },
+      ],
+    });
+    if (parsed.success) throw new Error('Expected an unregistered resource kind to be refused');
+    const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
+
+    for (const kind of KIND_IDS) expect(summary).toContain(kind);
   });
 });

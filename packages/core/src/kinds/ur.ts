@@ -3,9 +3,12 @@ import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
 import { defineKind } from './kind-module';
 
+/** The Ur kind's id, declared before its module because the content it resolves to names it. */
+const UR_KIND_ID = 'ur';
+
 /** What an Ur Resource's content resolves to: nothing, reached one way or the other. */
 export interface UrContent {
-  readonly kind: 'ur';
+  readonly kind: typeof UR_KIND_ID;
   readonly via: ContentVia;
 }
 
@@ -18,7 +21,7 @@ export const urResourceContentSchema = z.object({}).strict();
  * Open, having nothing to show (ADR 0122).
  */
 export const urKind = defineKind({
-  id: 'ur',
+  id: UR_KIND_ID,
   contentSchema: urResourceContentSchema,
   flags: {
     takesResourceShape: true,
@@ -27,7 +30,7 @@ export const urKind = defineKind({
     ownsReferencedSpaces: false,
   },
   facts: { action: 'none', embedsMap: false, drawsContentArea: false },
-  resolveContent: (_content, via): UrContent => ({ kind: 'ur', via }),
+  resolveContent: (_content, via): UrContent => ({ kind: UR_KIND_ID, via }),
   newContent: {},
 });
 

@@ -1,4 +1,4 @@
-import type { SpaceKindId, GraphId, ResourceDocument } from '@project/core';
+import type { SpaceResourceDocument, GraphId } from '@project/core';
 import { SpaceResourceSelectors, type SpaceResourceSelectorsProps } from '@project/ui';
 import {
   spaceResourceContextCommands,
@@ -20,7 +20,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  */
 export interface BuildSpaceResourceRailInput {
   readonly target: SpaceResourceTarget;
-  readonly document: Extract<ResourceDocument, { kind: SpaceKindId }> | undefined;
+  readonly document: SpaceResourceDocument | undefined;
   readonly disabled: boolean;
   readonly complete: (
     targetMap: Pick<SpaceResourceTargetMap, 'id'>,

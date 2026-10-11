@@ -1,4 +1,4 @@
-import { kindFlags, shortTitle, type Resource } from '@project/core';
+import { kindFlags, shortTitle, spaceKind, type Resource } from '@project/core';
 import {
   deletionReach,
   graphColorsByGraphId,
@@ -95,7 +95,7 @@ export function createResourceDeletion({
   spaceResources,
 }: ResourceDeletionDependencies): ResourceDeletion {
   const execute = async (resource: Resource): Promise<void> => {
-    if (kindFlags(resource.kind).ownsReferencedSpaces) {
+    if (resource.kind === spaceKind.id) {
       await commandOutcomes.run('space-resource-delete', async () => {
         if (spaceResources === undefined) {
           throw new Error('Space Resource deletion requires Space Resource authoring');

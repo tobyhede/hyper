@@ -7,9 +7,12 @@ import { defineKind, type KindFileCodec } from './kind-module';
 export const markdownResourceContentSchema = z.object({ source: z.string() }).strict();
 type MarkdownResourceContent = z.infer<typeof markdownResourceContentSchema>;
 
+/** The Markdown kind's id, declared before its module because the content it resolves to names it. */
+const MARKDOWN_KIND_ID = 'markdown';
+
 /** What a Markdown Resource's content resolves to: the source it shows. */
 export interface MarkdownContent {
-  readonly kind: 'markdown';
+  readonly kind: typeof MARKDOWN_KIND_ID;
   readonly source: string;
   readonly via: ContentVia;
 }
@@ -78,7 +81,7 @@ export const EMPTY_MARKDOWN: MarkdownResourceContent = { source: '' };
  * line endings.
  */
 export const markdownKind = defineKind({
-  id: 'markdown',
+  id: MARKDOWN_KIND_ID,
   contentSchema: markdownResourceContentSchema,
   flags: {
     takesResourceShape: false,
@@ -88,7 +91,7 @@ export const markdownKind = defineKind({
   },
   facts: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
   resolveContent: (content, via): MarkdownContent => ({
-    kind: 'markdown',
+    kind: MARKDOWN_KIND_ID,
     source: content.source,
     via,
   }),

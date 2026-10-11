@@ -37,11 +37,10 @@ interface SchemaIssue {
  * one — but only while no message carries a word whose case is information.
  * None does: Zod 3 writes `Invalid uuid`, no reachable message echoes the input
  * back, and every literal `@project/core` declares is already lower case, so
- * the kinds a discriminator quotes survive intact. It costs exactly one concession,
- * the capital on the second sentence of that discriminator message. The test
- * scans real failures from both schemas for an acronym or a capitalised quoted
- * identifier, so the day Zod or a literal grows one, this stops being safe out
- * loud rather than quietly.
+ * the registered kind ids the unregistered-kind refusal lists survive intact.
+ * The test scans real failures from both schemas for an acronym or a
+ * capitalised quoted identifier, so the day Zod or a literal grows one, this
+ * stops being safe out loud rather than quietly.
  *
  * `issues` is never empty. A failed `safeParse` goes through Zod's
  * `handleResult`, which throws `Validation failed but no issues detected.`

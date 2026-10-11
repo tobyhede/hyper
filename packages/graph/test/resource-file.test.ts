@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Resource } from '@project/core';
+import { KIND_IDS, type Resource } from '@project/core';
 import {
   parseResourceFiles,
   serializeResource,
@@ -202,11 +202,13 @@ describe('parseResourceFiles refuses a file that is not a Resource file', () => 
     }
   });
 
-  it('refuses a well-formed kind id this build does not register', () => {
+  it('refuses a well-formed kind id this build does not register, naming those it does', () => {
     for (const kind of ['video', 'Markdown', 'vnd.acme.widget']) {
       const files = [json({ id: RESOURCE_A, title: 'A', kind, content: {} })];
       expect(errorKinds(files)).toEqual(['invalid-resource-file']);
-      expect(messages(files)[0]).toContain(`"${kind}" is not a kind this build registers`);
+      expect(messages(files)[0]).toContain(
+        `kind: names no kind this build registers (${KIND_IDS.join(', ')})`,
+      );
     }
   });
 

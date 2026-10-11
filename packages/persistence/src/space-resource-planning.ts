@@ -10,7 +10,7 @@
  * plan out (`session-registry.ts`).
  */
 import {
-  type SpaceKindId,
+  type SpaceResourceDocument,
   spaceKind,
   SPACE_FILE_VERSION,
   lifetimeSpaceReferences,
@@ -579,7 +579,7 @@ export const precheckContextDeletion = (
 const replaceSpaceResourceSelection = (
   snapshot: SpaceSnapshot,
   targetSpaceId: UUID,
-  matches: (document: Extract<ResourceDocument, { kind: SpaceKindId }>) => boolean,
+  matches: (document: SpaceResourceDocument) => boolean,
   selection: SpaceResourceSelection,
   resetFraming: boolean,
 ): SpaceSnapshot => ({

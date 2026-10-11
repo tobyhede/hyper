@@ -1,4 +1,4 @@
-import { titleName, type ResourceContent } from '@project/core';
+import { titleName, UNRESOLVED_CONTENT, type ResourceContent } from '@project/core';
 import { presentedContent } from './kinds/registry';
 import { UnresolvedContent } from './UnresolvedContent';
 
@@ -35,7 +35,7 @@ export function PresentedResource({ title, content }: PresentedResourceProps) {
 
 /**
  * The content below a presented Resource's name, drawn by its kind's view half
- * (`kinds/registry.tsx`). A presented image is never replaced, its own or a
+ * (`kinds/registry.ts`). A presented image is never replaced, its own or a
  * Target's, so no view offers Replace. A Space Resource draws its name alone:
  * what presenting one should draw is `resource-content/07`'s open question. An
  * Ur Resource has no content (ADR 0113), so it draws its name alone. The
@@ -49,5 +49,9 @@ function PresentedContent({
   readonly name: string;
   readonly content: ResourceContent;
 }) {
-  return content.kind === 'unresolved' ? <UnresolvedContent /> : presentedContent(name, content);
+  return content.kind === UNRESOLVED_CONTENT.kind ? (
+    <UnresolvedContent />
+  ) : (
+    presentedContent(name, content)
+  );
 }

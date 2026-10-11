@@ -6,6 +6,7 @@ import {
   spaceKind,
   urKind,
   type KindId,
+  type ReferenceContentUnresolved,
   type ResourceContent,
 } from '@project/core';
 import { imageView, type ImageOperations } from './image';
@@ -76,7 +77,7 @@ const presentedOf = <K extends KindId>(
 /** What a presented Resource draws below its name, as its content's kind draws it. */
 export const presentedContent = (
   name: string,
-  content: Exclude<ResourceContent, { readonly kind: 'unresolved' }>,
+  content: Exclude<ResourceContent, ReferenceContentUnresolved>,
 ): ReactNode => presentedOf(name, content.kind, content);
 
 const canvasOf = <K extends KindId>(
@@ -87,6 +88,6 @@ const canvasOf = <K extends KindId>(
 
 /** What an Open Resource draws in its content area on a Map, as its content's kind draws it. */
 export const canvasContent = (
-  content: Exclude<ResourceContent, { readonly kind: 'unresolved' }>,
+  content: Exclude<ResourceContent, ReferenceContentUnresolved>,
   area: CanvasArea,
 ): ReactNode => canvasOf(content.kind, content, area);
