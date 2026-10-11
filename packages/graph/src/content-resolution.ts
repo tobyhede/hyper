@@ -1,4 +1,5 @@
 import {
+  markdownKind,
   imageKind,
   urKind,
   type ContentVia,
@@ -12,8 +13,8 @@ type ContentOwner = Exclude<ResourceDocument, { kind: 'reference' }>;
 
 function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent {
   switch (resource.kind) {
-    case 'markdown':
-      return { kind: 'markdown', source: resource.content.source, via };
+    case markdownKind.id:
+      return markdownKind.resolveContent(resource.content, via);
     case imageKind.id:
       return imageKind.resolveContent(resource.content, via);
     case 'space':

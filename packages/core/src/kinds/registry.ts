@@ -1,5 +1,6 @@
 import type { KindFlags } from './kind-module';
 import { imageKind } from './image';
+import { markdownKind } from './markdown';
 import { urKind } from './ur';
 
 /**
@@ -10,6 +11,7 @@ import { urKind } from './ur';
 const KIND_FLAGS: ReadonlyMap<string, KindFlags> = new Map<string, KindFlags>([
   [urKind.id, urKind.flags],
   [imageKind.id, imageKind.flags],
+  [markdownKind.id, markdownKind.flags],
 ]);
 
 const UNMOVED_KIND_FLAGS: KindFlags = { takesResourceShape: false, canOpen: true };

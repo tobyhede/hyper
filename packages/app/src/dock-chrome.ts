@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  markdownKind,
   graphHeadShape,
   type Graph,
   type GraphHeadShape,
@@ -425,8 +426,8 @@ export function useDockChrome(
       // inherit another kind's press in silence.
       onCreate: (creation) => {
         switch (creation.kind) {
-          case 'markdown':
-            placement.createResource('markdown');
+          case markdownKind.id:
+            placement.createResource(markdownKind.id);
             return;
           case 'space':
             placement.createSpaceResource();
@@ -440,7 +441,7 @@ export function useDockChrome(
         }
       },
       createDisabled: {
-        markdown: !availability.addResource,
+        [markdownKind.id]: !availability.addResource,
         space: !availability.createSpaceResource,
         [imageKind.id]: !availability.addResource,
         [urKind.id]: !availability.addResource,

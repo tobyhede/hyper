@@ -1,4 +1,5 @@
 import {
+  markdownKind,
   DEFAULT_GRAPH_HEAD_SHAPE,
   SPACE_FILE_VERSION,
   type Graph,
@@ -87,7 +88,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
   const resource: Resource = {
     id: resourceId,
     title: FIRST_RESOURCE_TITLE,
-    kind: 'markdown',
+    kind: markdownKind.id,
     content: { source: '' },
   };
 

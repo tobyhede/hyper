@@ -4,7 +4,7 @@
  * {@link ResourcesControl}.
  */
 import { useContext, useEffect, useId, useRef } from 'react';
-import { imageKind } from '@project/core';
+import { markdownKind, imageKind } from '@project/core';
 import {
   ImageFilePicker,
   ResourceKindIcon,
@@ -109,7 +109,7 @@ function ResourcesTrigger() {
        expand arrows: beside a Space, a Map and a Graph's colour, the icon
        slot names what the cluster is about, and "expand" named a gesture this
        cluster does not have. */
-    <SetTrigger icon={<ResourceKindIcon kind="markdown" />}>Resources</SetTrigger>
+    <SetTrigger icon={<ResourceKindIcon kind={markdownKind.id} />}>Resources</SetTrigger>
   );
 }
 

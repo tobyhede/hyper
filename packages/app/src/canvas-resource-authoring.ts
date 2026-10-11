@@ -1,6 +1,7 @@
 import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
+  markdownKind,
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
   takesOpen,
@@ -306,7 +307,7 @@ export function useCanvasResourceAuthoring({
       const stored = spaceSession
         .getState()
         .working.resources.find((resource) => resource.id === resourceId);
-      if (stored?.document.kind !== 'markdown') return 'retained';
+      if (stored?.document.kind !== markdownKind.id) return 'retained';
       const parsed = resourceDocumentSchema.safeParse({
         ...stored.document,
         content: { ...stored.document.content, source: body },
@@ -609,7 +610,7 @@ export function useCanvasResourceAuthoring({
   const markdownDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (isResourceNodeOf(node, 'markdown')) {
+      if (isResourceNodeOf(node, markdownKind.id)) {
         next.set(
           node.id,
           applyKindDecoration(node, decorateMarkdownResourceNode(node, markdownContext)),

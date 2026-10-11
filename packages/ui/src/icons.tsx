@@ -30,7 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
-import { imageKind, urKind, type Resource } from '@project/core';
+import { markdownKind, imageKind, urKind, type Resource } from '@project/core';
 
 type ResourceActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
@@ -276,7 +276,7 @@ interface BaseGlyphProps {
 
 /** The silhouette each Resource kind that owns one draws. */
 export const BASE_GLYPHS = {
-  markdown: MarkdownIcon,
+  [markdownKind.id]: MarkdownIcon,
   space: SpaceResourceIcon,
   [imageKind.id]: ImageIcon,
   [urKind.id]: UrIcon,
@@ -305,7 +305,7 @@ export const BASE_GLYPHS = {
  * weight does not.
  */
 export function ReferenceIcon({
-  base = 'markdown',
+  base = markdownKind.id,
   size = 14,
 }: {
   /** The kind of the Target. Absent, a Reference Resource draws over the Markdown base. */

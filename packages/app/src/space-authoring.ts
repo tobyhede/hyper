@@ -1,4 +1,6 @@
 import {
+  type MarkdownKindId,
+  markdownKind,
   type ResourceDocument,
   type ResourceId,
   type Graph,
@@ -98,7 +100,7 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
 };
 
 /** The Resource kinds created from nothing but a press: no Target, no Space, no file. */
-export type InputFreeResourceKind = 'markdown' | UrKindId;
+export type InputFreeResourceKind = MarkdownKindId | UrKindId;
 
 /** One picture an Image Resource is created for: its URL, and its size when it loaded. */
 export interface CreatedImage {
@@ -1280,7 +1282,7 @@ export function createSpaceAuthoring({
       const created = createResource(
         completion.resourceKind === urKind.id
           ? { title, kind: urKind.id, content: {} }
-          : { title, kind: 'markdown', content: { source: '' } },
+          : { title, kind: markdownKind.id, content: { source: '' } },
         completion.anchor,
         'avoidingOverlap',
       );
@@ -1377,7 +1379,7 @@ export function createSpaceAuthoring({
       if (source === undefined) return refuse({ code: 'edge-resource-outside-map' });
       const newResource: ResourceDocument = {
         title: nextResourceTitle(snapshot),
-        kind: 'markdown',
+        kind: markdownKind.id,
         content: { source: '' },
       };
       const created =

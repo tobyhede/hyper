@@ -1,4 +1,5 @@
 import {
+  markdownKind,
   declaresResourceKind,
   resourceFrontmatterSchema,
   resourceSchema,
@@ -97,7 +98,7 @@ interface DecodedResource {
  */
 function decodeEnvelope(frontmatter: ImportResourceFrontmatter, body: string): DecodedResource {
   switch (frontmatter.kind) {
-    case 'markdown': {
+    case markdownKind.id: {
       const { id, title, kind } = frontmatter;
       return { id, document: { title, kind, content: { source: body } } };
     }
@@ -182,7 +183,7 @@ function decodeResourceFile<T extends ImportResourceFrontmatter>(
   // constructing the domain value: the other schemas would otherwise strip a
   // body as an unknown key and silently discard authored prose. Blank lines
   // after the fence are not a body.
-  if (parsed.data.kind !== 'markdown' && split.body.trim() !== '') {
+  if (parsed.data.kind !== markdownKind.id && split.body.trim() !== '') {
     return fail(
       'invalid-frontmatter',
       declaresResourceKind(yaml)
@@ -210,7 +211,7 @@ function decodeResourceFile<T extends ImportResourceFrontmatter>(
  * the default.
  */
 export function serializeResourceFile(resource: Resource): string {
-  if (resource.kind === 'markdown') {
+  if (resource.kind === markdownKind.id) {
     const { content, ...frontmatter } = resource;
     return `${FENCE}${stringifyYaml(frontmatter)}${FENCE}\n${content.source}`;
   }

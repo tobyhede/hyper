@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  markdownKind,
   COLLAPSED_RESOURCE_SIZE,
   DEFAULT_RESOURCE_SHAPE,
   contentAction,
@@ -24,6 +25,7 @@ import {
 } from '@project/core';
 import { Button } from './Button';
 import { isImageOperations, type ImageOperations } from './kinds/image';
+import type { MarkdownOperations } from './kinds/markdown';
 import { isUrOperations, type UrOperations } from './kinds/ur';
 import {
   ResourceRailAction,
@@ -72,11 +74,7 @@ import {
  * draws, and whether it is Open, is the display's.
  */
 export type KindOperations =
-  | {
-      readonly kind: 'markdown';
-      /** Put a caret in this Resource's Markdown source. */
-      readonly onBeginEdit?: () => void;
-    }
+  | MarkdownOperations
   | {
       readonly kind: 'reference';
     }
@@ -296,7 +294,7 @@ const opacityTransitionMs = (element: HTMLElement): number => {
 function useAreaContent(content: ResourceContent | null): AreaContent | null {
   const kind = content?.kind;
   const text =
-    content?.kind === 'markdown'
+    content?.kind === markdownKind.id
       ? content.source
       : content?.kind === imageKind.id
         ? content.url
@@ -304,7 +302,7 @@ function useAreaContent(content: ResourceContent | null): AreaContent | null {
   const via: ContentVia = content?.via ?? 'self';
   return useMemo<AreaContent | null>(() => {
     switch (kind) {
-      case 'markdown':
+      case markdownKind.id:
         return { kind, source: text, via };
       case imageKind.id:
         return { kind, url: text, via };
@@ -450,7 +448,7 @@ export function CanvasResource(props: CanvasResourceProps) {
   /** The content area's one switch over what it draws. */
   const drawAreaContent = (value: AreaContent): ReactNode => {
     switch (value.kind) {
-      case 'markdown':
+      case markdownKind.id:
         return (
           <ResourceContentEditProvider value={setContentEdit}>
             <MarkdownResourceBody

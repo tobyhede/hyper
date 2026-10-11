@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  markdownKind,
   imageKind,
   titleName,
   urKind,
@@ -100,7 +101,14 @@ const everyFilter = <const T extends readonly ResourcesFilter[]>(
   filters: T & (ResourcesFilter extends T[number] ? unknown : never),
 ): T => filters;
 
-const FILTERS = everyFilter(['markdown', imageKind.id, urKind.id, 'reference', 'space', 'spaces']);
+const FILTERS = everyFilter([
+  markdownKind.id,
+  imageKind.id,
+  urKind.id,
+  'reference',
+  'space',
+  'spaces',
+]);
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
 const RESOURCE_FILTERS = FILTERS.filter(
@@ -116,7 +124,7 @@ const RESOURCE_FILTERS = FILTERS.filter(
 const ALL_FILTERS: readonly ResourcesFilter[] = FILTERS;
 
 const FILTER_NAMES = {
-  markdown: 'Markdown Resources',
+  [markdownKind.id]: 'Markdown Resources',
   [imageKind.id]: 'Image Resources',
   [urKind.id]: 'Ur Resources',
   reference: 'Reference Resources',
@@ -131,7 +139,7 @@ const FILTER_NAMES = {
  * compile error where the record is written. Same idiom as `ResourceKindIcon`.
  */
 const FILTER_GLYPHS = {
-  markdown: MarkdownIcon,
+  [markdownKind.id]: MarkdownIcon,
   [imageKind.id]: ImageIcon,
   [urKind.id]: UrIcon,
   reference: ReferenceIcon,
@@ -674,7 +682,7 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
           resource.kind === kind && matched(searchableText(resource, titleById, spaceTitles)),
       ).length;
     return {
-      markdown: ofKind('markdown'),
+      [markdownKind.id]: ofKind(markdownKind.id),
       [imageKind.id]: ofKind(imageKind.id),
       [urKind.id]: ofKind(urKind.id),
       reference: ofKind('reference'),
