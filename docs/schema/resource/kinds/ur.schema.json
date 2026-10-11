@@ -4,5 +4,5 @@
   "title": "Ur content",
   "description": "An Ur Resource has no content (ADR 0113), so its content is the empty object.",
   "type": "object",
-  "maxProperties": 0
+  "additionalProperties": false
 }

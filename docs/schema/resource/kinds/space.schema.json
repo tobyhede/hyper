@@ -7,9 +7,9 @@
   "required": ["spaceId", "map", "graph"],
   "additionalProperties": false,
   "properties": {
-    "spaceId": { "$ref": "../resource.schema.json#/$defs/id" },
-    "map": { "$ref": "../resource.schema.json#/$defs/id" },
-    "graph": { "$ref": "../resource.schema.json#/$defs/id" },
+    "spaceId": { "$ref": "../../id.schema.json" },
+    "map": { "$ref": "../../id.schema.json" },
+    "graph": { "$ref": "../../id.schema.json" },
     "framing": {
       "description": "The Map-coordinate centre and scale saved for this view; absent until framed, when the selected Map is fitted.",
       "type": "object",

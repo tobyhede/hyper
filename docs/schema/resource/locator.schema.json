@@ -10,9 +10,9 @@
       "properties": {
         "url": false,
         "path": {
-          "description": "A relative POSIX path inside the Resource file's directory: no leading slash, no backslash, no . or .. segment.",
+          "description": "A relative POSIX path inside the Resource file's directory: one or more non-empty segments joined by single slashes, no leading or trailing slash, no backslash or NUL, and no . or .. segment.",
           "type": "string",
-          "pattern": "^(?!/)(?![\\s\\S]*\\\\)(?!([\\s\\S]*/)?\\.{1,2}(/|$))[^\\u0000]+$"
+          "pattern": "^(?!([^/]*/)*\\.{1,2}(/|$))[^/\\\\\\u0000]+(/[^/\\\\\\u0000]+)*$"
         },
         "mediaType": {
           "$ref": "#/$defs/mediaType"
@@ -32,9 +32,9 @@
   ],
   "$defs": {
     "mediaType": {
-      "description": "An RFC 6838 media type, type/subtype, without parameters.",
+      "description": "An RFC 6838 media type, type/subtype, without parameters. Media types compare case-insensitively, so either case is accepted.",
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*$"
     }
   }
 }
