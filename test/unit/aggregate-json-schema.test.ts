@@ -154,3 +154,21 @@ describe('the aggregate JSON Schemas agree with intake', () => {
     expect(importSpaceFileSchema.safeParse(spaceExample).success).toBe(true);
   });
 });
+
+/**
+ * The Resource file schema is specified ahead of intake (ADR 0128), so nothing
+ * yet holds it to an intake; this holds it to compiling under strict mode and
+ * to accepting the example its README publishes for each kind.
+ */
+describe('the Resource file JSON Schema', () => {
+  const examples = join(repoRoot, 'docs/schema/resource/examples');
+
+  it.each(['markdown', 'reference', 'space', 'image', 'ur'])(
+    'accepts the published %s example',
+    (kind) => {
+      const resourceFileSchema = validator('resource/resource.schema.json');
+      const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
+      expect(resourceFileSchema(example), JSON.stringify(resourceFileSchema.errors)).toBe(true);
+    },
+  );
+});
