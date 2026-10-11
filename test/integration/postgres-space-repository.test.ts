@@ -133,7 +133,7 @@ const snapshot: SpaceSnapshot = {
       document: {
         title: 'Stored resource',
         kind: 'markdown',
-        body: 'Stored through the repository.',
+        content: { source: 'Stored through the repository.' },
       },
     },
     {
@@ -141,7 +141,7 @@ const snapshot: SpaceSnapshot = {
       document: {
         title: 'Resource to remove',
         kind: 'markdown',
-        body: 'Runtime commits are authoritative.',
+        content: { source: 'Runtime commits are authoritative.' },
       },
     },
   ],
@@ -178,7 +178,7 @@ const otherSnapshot: SpaceSnapshot = {
       document: {
         title: 'Other resource',
         kind: 'markdown',
-        body: 'Owned by the other space.',
+        content: { source: 'Owned by the other space.' },
       },
     },
   ],
@@ -196,7 +196,7 @@ const concurrentSnapshot: SpaceSnapshot = {
       document: {
         title: 'Concurrent resource',
         kind: 'markdown',
-        body: 'Owned by the concurrent space.',
+        content: { source: 'Owned by the concurrent space.' },
       },
     },
   ],
@@ -224,9 +224,7 @@ const linkedSnapshot: SpaceSnapshot = {
       document: {
         title: 'Other Space',
         kind: 'space',
-        spaceId: OTHER_SPACE_ID,
-        map: OTHER_SPACE_MAP_ID,
-        graph: OTHER_SPACE_GRAPH_ID,
+        content: { spaceId: OTHER_SPACE_ID, map: OTHER_SPACE_MAP_ID, graph: OTHER_SPACE_GRAPH_ID },
       },
     },
   ],
@@ -386,7 +384,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       await orm.public.Resource.create({
         id: RESOURCE_ID,
         spaceId: SPACE_ID,
-        document: { title: 'Shared', kind: 'markdown', body: 'Winner' },
+        document: { title: 'Shared', kind: 'markdown', content: { source: 'Winner' } },
       });
       await orm.public.RepositoryState.create({ singletonId: 1, metaSpaceId: SPACE_ID });
       winnerReady.resolve(undefined);
@@ -400,7 +398,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
       resources: [
         {
           id: RESOURCE_ID,
-          document: { title: 'Shared', kind: 'markdown', body: 'Loser' },
+          document: { title: 'Shared', kind: 'markdown', content: { source: 'Loser' } },
         },
       ],
     };
@@ -614,9 +612,11 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
           document: {
             title: 'To the race child',
             kind: 'space',
-            spaceId: RACE_CHILD_SPACE_ID,
-            map: RACE_CHILD_MAP_ID,
-            graph: RACE_CHILD_GRAPH_ID,
+            content: {
+              spaceId: RACE_CHILD_SPACE_ID,
+              map: RACE_CHILD_MAP_ID,
+              graph: RACE_CHILD_GRAPH_ID,
+            },
           },
         },
       ],
@@ -995,9 +995,11 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
           document: {
             title: 'First link',
             kind: 'space',
-            spaceId: OTHER_SPACE_ID,
-            map: OTHER_SPACE_MAP_ID,
-            graph: OTHER_SPACE_GRAPH_ID,
+            content: {
+              spaceId: OTHER_SPACE_ID,
+              map: OTHER_SPACE_MAP_ID,
+              graph: OTHER_SPACE_GRAPH_ID,
+            },
           },
         },
       ],
@@ -1011,9 +1013,11 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
           document: {
             title: 'Second link',
             kind: 'space',
-            spaceId: CONCURRENT_SPACE_ID,
-            map: CONCURRENT_MAP_ID,
-            graph: CONCURRENT_GRAPH_ID,
+            content: {
+              spaceId: CONCURRENT_SPACE_ID,
+              map: CONCURRENT_MAP_ID,
+              graph: CONCURRENT_GRAPH_ID,
+            },
           },
         },
       ],

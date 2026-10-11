@@ -84,10 +84,16 @@ const storedSpace: LoadedSpace = {
     },
     resources: [
       // B and E are drawn in Shapes, which only an Ur Resource takes (ADR 0121).
-      { id: RESOURCE_B, document: { title: 'B', kind: 'ur' } },
-      { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-      { id: RESOURCE_F, document: { title: 'F', kind: 'markdown', body: 'F body.\n' } },
-      { id: RESOURCE_E, document: { title: 'E', kind: 'ur' } },
+      { id: RESOURCE_B, document: { title: 'B', kind: 'ur', content: {} } },
+      {
+        id: RESOURCE_A,
+        document: { title: 'A', kind: 'markdown', content: { source: 'A body.\n' } },
+      },
+      {
+        id: RESOURCE_F,
+        document: { title: 'F', kind: 'markdown', content: { source: 'F body.\n' } },
+      },
+      { id: RESOURCE_E, document: { title: 'E', kind: 'ur', content: {} } },
     ],
   },
   revision: 7n,
@@ -191,10 +197,16 @@ describe('canonical export', () => {
     exportedRevision: null,
     snapshot: {
       resources: [
-        { id: RESOURCE_A, document: { kind: 'markdown', body: 'A body.\n', title: 'A' } },
-        { id: RESOURCE_E, document: { title: 'E', kind: 'ur' } },
-        { id: RESOURCE_B, document: { kind: 'ur', title: 'B' } },
-        { id: RESOURCE_F, document: { kind: 'markdown', title: 'F', body: 'F body.\n' } },
+        {
+          id: RESOURCE_A,
+          document: { kind: 'markdown', content: { source: 'A body.\n' }, title: 'A' },
+        },
+        { id: RESOURCE_E, document: { title: 'E', kind: 'ur', content: {} } },
+        { id: RESOURCE_B, document: { kind: 'ur', content: {}, title: 'B' } },
+        {
+          id: RESOURCE_F,
+          document: { kind: 'markdown', title: 'F', content: { source: 'F body.\n' } },
+        },
       ],
       id: SPACE_ID,
       document: {
@@ -282,8 +294,14 @@ describe('canonical export', () => {
         ],
       },
       resources: [
-        { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A body.\n' } },
-        { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B body.\n' } },
+        {
+          id: RESOURCE_A,
+          document: { title: 'A', kind: 'markdown', content: { source: 'A body.\n' } },
+        },
+        {
+          id: RESOURCE_B,
+          document: { title: 'B', kind: 'markdown', content: { source: 'B body.\n' } },
+        },
       ],
     },
     revision: 7n,
@@ -519,7 +537,7 @@ describe('stored image bytes', () => {
         { id: PICTURE_ID, document: showing(missing) },
         {
           id: LINKED_ID,
-          document: { ...showing(missing), url: 'https://example.com/figure.png' },
+          document: { ...showing(missing), content: { url: 'https://example.com/figure.png' } },
         },
       ),
       [],

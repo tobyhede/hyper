@@ -57,19 +57,23 @@ const snapshot = spaceSnapshotSchema.parse({
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
-    { id: REFERENCE_ID, document: { title: 'Return', kind: 'reference', target: RESOURCE_ID } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { source: 'A source' } },
+    },
+    {
+      id: REFERENCE_ID,
+      document: { title: 'Return', kind: 'reference', content: { target: RESOURCE_ID } },
+    },
     {
       id: SPACE_RESOURCE_ID,
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_SPACE_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
-    { id: UR_ID, document: { title: 'Gateway', kind: 'ur' } },
+    { id: UR_ID, document: { title: 'Gateway', kind: 'ur', content: {} } },
   ],
 });
 
@@ -703,19 +707,23 @@ describe('canvas Resource authoring decoration identity', () => {
       id: snapshot.id,
       document: snapshot.document,
       resources: [
-        { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'Edited source' } },
-        { id: REFERENCE_ID, document: { title: 'Return', kind: 'reference', target: RESOURCE_ID } },
+        {
+          id: RESOURCE_ID,
+          document: { title: 'A', kind: 'markdown', content: { source: 'Edited source' } },
+        },
+        {
+          id: REFERENCE_ID,
+          document: { title: 'Return', kind: 'reference', content: { target: RESOURCE_ID } },
+        },
         {
           id: SPACE_RESOURCE_ID,
           document: {
             title: 'Architecture',
             kind: 'space',
-            spaceId: TARGET_SPACE_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
-        { id: UR_ID, document: { title: 'Gateway', kind: 'ur' } },
+        { id: UR_ID, document: { title: 'Gateway', kind: 'ur', content: {} } },
       ],
     });
 
@@ -851,7 +859,9 @@ describe('canvas Resource authoring, replacing an image', () => {
       ],
       defaultMap: MAP_ID,
     },
-    resources: [{ id: IMAGE_ID, document: { title: 'Figure', kind: 'image', url: OLD_URL } }],
+    resources: [
+      { id: IMAGE_ID, document: { title: 'Figure', kind: 'image', content: { url: OLD_URL } } },
+    ],
   });
   const imageNode: ResourceFlowNode = {
     id: IMAGE_ID,
@@ -983,7 +993,7 @@ describe('canvas Resource authoring, replacing an image', () => {
     expect(spaceSession.getState().working.resources[0]?.document).toEqual({
       title: 'Figure',
       kind: 'image',
-      url: 'https://example.com/new.png',
+      content: { url: 'https://example.com/new.png' },
     });
     act(() => replacer?.onEnd());
     expect(replacerOf(onlyNode(result.current.nodes))).toBeUndefined();

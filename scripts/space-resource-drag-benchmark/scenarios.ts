@@ -34,7 +34,11 @@ const id = (value: number): UUID =>
 
 const markdown = (resourceId: UUID, title: string) => ({
   id: resourceId,
-  document: { title, kind: 'markdown' as const, body: `# ${title}\n\nBenchmark content.` },
+  document: {
+    title,
+    kind: 'markdown' as const,
+    content: { source: `# ${title}\n\nBenchmark content.` },
+  },
 });
 
 export interface BenchmarkScenario {
@@ -152,9 +156,7 @@ export function benchmarkScenario(
         document: {
           title: 'Nested Space Resource',
           kind: 'space',
-          spaceId: leafId,
-          map: leafMap,
-          graph: leafGraph,
+          content: { spaceId: leafId, map: leafMap, graph: leafGraph },
         },
       },
     ],
@@ -192,9 +194,7 @@ export function benchmarkScenario(
         document: {
           title: `Parent ${index + 1}`,
           kind: 'space' as const,
-          spaceId: targetId,
-          map: targetMap,
-          graph: targetGraph,
+          content: { spaceId: targetId, map: targetMap, graph: targetGraph },
         },
       })),
     ],

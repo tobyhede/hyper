@@ -25,7 +25,7 @@ const ask = (
 
 describe('the question Delete from Space asks', () => {
   it('names the Resource, says what deleting does, and answers with Delete', () => {
-    ask({ id: id('000000000001'), title: 'Auth', kind: 'markdown', body: '' });
+    ask({ id: id('000000000001'), title: 'Auth', kind: 'markdown', content: { source: '' } });
 
     const question = screen.getByRole('alertdialog', { name: 'Delete Auth From Space?' });
     expect(question).toHaveTextContent(
@@ -40,7 +40,7 @@ describe('the question Delete from Space asks', () => {
       id: id('000000000002'),
       title: 'Resource Title\nThat\nSpans\nLines',
       kind: 'markdown',
-      body: '',
+      content: { source: '' },
     });
 
     expect(
@@ -49,7 +49,12 @@ describe('the question Delete from Space asks', () => {
   });
 
   describe('what the deletion reaches', () => {
-    const subject: Resource = { id: id('000000000010'), title: 'Auth', kind: 'markdown', body: '' };
+    const subject: Resource = {
+      id: id('000000000010'),
+      title: 'Auth',
+      kind: 'markdown',
+      content: { source: '' },
+    };
     const other = id('000000000011');
     const graph = (suffix: string, title: string, touching: boolean): Graph => ({
       id: id(suffix),
@@ -152,9 +157,11 @@ describe('the question Delete from Space asks', () => {
         id: subject.id,
         title: 'Nested',
         kind: 'space',
-        spaceId: id('000000000040'),
-        map: id('000000000041'),
-        graph: id('000000000042'),
+        content: {
+          spaceId: id('000000000040'),
+          map: id('000000000041'),
+          graph: id('000000000042'),
+        },
       };
       ask(
         spaceResource,

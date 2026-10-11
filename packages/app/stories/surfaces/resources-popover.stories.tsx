@@ -18,22 +18,25 @@ export default { title: 'Surfaces/Resources Popover' };
 const id = (suffix: string) => uuidSchema.parse(`00000000-0000-4000-8000-${suffix}`);
 
 const RESOURCES: readonly Resource[] = [
-  { id: id('000000000001'), title: 'API boundaries', kind: 'markdown', body: '' },
-  { id: id('000000000002'), title: 'Architecture', kind: 'markdown', body: '' },
-  { id: id('000000000003'), title: 'Design constraints', kind: 'markdown', body: '' },
+  { id: id('000000000001'), title: 'API boundaries', kind: 'markdown', content: { source: '' } },
+  { id: id('000000000002'), title: 'Architecture', kind: 'markdown', content: { source: '' } },
+  {
+    id: id('000000000003'),
+    title: 'Design constraints',
+    kind: 'markdown',
+    content: { source: '' },
+  },
   {
     id: id('000000000004'),
     title: 'Constraints',
     kind: 'reference',
-    target: id('000000000003'),
+    content: { target: id('000000000003') },
   },
   {
     id: id('000000000005'),
     title: 'Demo flow',
     kind: 'space',
-    spaceId: id('000000000010'),
-    map: id('000000000011'),
-    graph: id('000000000012'),
+    content: { spaceId: id('000000000010'), map: id('000000000011'), graph: id('000000000012') },
   },
 ];
 
@@ -41,7 +44,7 @@ const LONG_RESOURCES: readonly Resource[] = Array.from({ length: 18 }, (_, index
   id: id(String(index + 100).padStart(12, '0')),
   title: `Reference ${String(index + 1).padStart(2, '0')}`,
   kind: 'markdown' as const,
-  body: '',
+  content: { source: '' },
 }));
 
 /** Spaces of the Meta Space, which are not Resources and are in no Map. */

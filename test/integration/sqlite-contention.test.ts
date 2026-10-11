@@ -55,7 +55,7 @@ const RELEASE_CLOCK_TOLERANCE_MS = 100;
 
 const markdown = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, body: title },
+  document: { title, kind: 'markdown' as const, content: { source: title } },
 });
 
 const child: SpaceSnapshot = {
@@ -88,9 +88,7 @@ const meta: SpaceSnapshot = {
       document: {
         title: 'Open child',
         kind: 'space',
-        spaceId: CHILD_ID,
-        map: MAP_ID,
-        graph: GRAPH_ID,
+        content: { spaceId: CHILD_ID, map: MAP_ID, graph: GRAPH_ID },
       },
     },
   ],
@@ -154,9 +152,7 @@ const metaLinkingNewChild = (linkResourceId: UUID): SpaceSnapshot => ({
       document: {
         title: 'Open new child',
         kind: 'space' as const,
-        spaceId: NEW_CHILD_ID,
-        map: NEW_CHILD_MAP_ID,
-        graph: NEW_CHILD_GRAPH_ID,
+        content: { spaceId: NEW_CHILD_ID, map: NEW_CHILD_MAP_ID, graph: NEW_CHILD_GRAPH_ID },
       },
     },
   ],

@@ -36,7 +36,7 @@ export function imageFile(id: string, title: string, url: string): ResourceFile 
  */
 
 export function resource(id: string, title = defaultTitle(id), body = ''): Resource {
-  return { id: uuid(id), title, kind: 'markdown', body };
+  return { id: uuid(id), title, kind: 'markdown', content: { source: body } };
 }
 
 export const uuid = (value: string): UUID => uuidSchema.parse(value);
@@ -53,5 +53,5 @@ function defaultTitle(id: string): string {
 }
 
 export function reference(id: string, title: string, target: string): Resource {
-  return { id: uuid(id), title, kind: 'reference', target: uuid(target) };
+  return { id: uuid(id), title, kind: 'reference', content: { target: uuid(target) } };
 }

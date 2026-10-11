@@ -25,7 +25,11 @@ async function openPicturesAndElsewhere(page: Page): Promise<void> {
     [
       {
         id: IMAGE_ID,
-        document: { title: 'Figure', kind: 'image', url: FIGURE_URL, naturalSize: HARBOUR_SIZE },
+        document: {
+          title: 'Figure',
+          kind: 'image',
+          content: { url: FIGURE_URL, naturalSize: HARBOUR_SIZE },
+        },
       },
     ],
   );

@@ -44,7 +44,9 @@ const snapshot = spaceSnapshotSchema.parse({
     ],
     defaultMap: MAP_ID,
   },
-  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  resources: [
+    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+  ],
 });
 
 function unused(): never {

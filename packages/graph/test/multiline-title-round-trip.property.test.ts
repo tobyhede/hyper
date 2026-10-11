@@ -40,15 +40,15 @@ const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', '
 function resourceOf(kind: ResourceKind, title: string): Resource {
   switch (kind) {
     case 'markdown':
-      return { id: ID, title, kind, body: 'The body, which is not the Title.\n' };
+      return { id: ID, title, kind, content: { source: 'The body, which is not the Title.\n' } };
     case 'reference':
-      return { id: ID, title, kind, target: TARGET };
+      return { id: ID, title, kind, content: { target: TARGET } };
     case 'space':
-      return { id: ID, title, kind, spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID };
+      return { id: ID, title, kind, content: { spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID } };
     case 'image':
-      return { id: ID, title, kind, url: 'https://example.com/figure.png' };
+      return { id: ID, title, kind, content: { url: 'https://example.com/figure.png' } };
     case 'ur':
-      return { id: ID, title, kind };
+      return { id: ID, title, kind, content: {} };
   }
 }
 

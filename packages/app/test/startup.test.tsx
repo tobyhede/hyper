@@ -21,7 +21,7 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
   resources: [
     {
       id: RESOURCE_ID,
-      document: { title: 'Start here', kind: 'markdown', body: 'Stored body' },
+      document: { title: 'Start here', kind: 'markdown', content: { source: 'Stored body' } },
     },
   ],
 });

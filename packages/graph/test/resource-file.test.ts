@@ -34,7 +34,7 @@ describe('parseResourceFile', () => {
     expect(parseImportResourceFile(file)).toEqual({
       ok: true,
       resource: {
-        document: { title: 'New resource', kind: 'markdown', body: 'New body\n' },
+        document: { title: 'New resource', kind: 'markdown', content: { source: 'New body\n' } },
       },
     });
   });
@@ -48,7 +48,11 @@ describe('parseResourceFile', () => {
     ).toEqual({
       ok: true,
       resource: {
-        document: { title: 'Reference Resource', kind: 'reference', target: RESOURCE_A },
+        document: {
+          title: 'Reference Resource',
+          kind: 'reference',
+          content: { target: RESOURCE_A },
+        },
       },
     });
     expect(
@@ -83,7 +87,7 @@ describe('parseResourceFile', () => {
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A′',
       kind: 'reference',
-      target: '00000000-0000-4000-8000-000000000002',
+      content: { target: '00000000-0000-4000-8000-000000000002' },
     });
   });
 
@@ -91,14 +95,14 @@ describe('parseResourceFile', () => {
     const text = `---\nid: ${RESOURCE_A}\ntitle: Node\nkind: ur\n---\n`;
     expect(parseResourceFile({ path: 'resources/node.md', text })).toEqual({
       ok: true,
-      resource: { id: RESOURCE_A, title: 'Node', kind: 'ur' },
+      resource: { id: RESOURCE_A, title: 'Node', kind: 'ur', content: {} },
     });
     expect(
       parseImportResourceFile({
         path: 'resources/node.md',
         text: '---\ntitle: Node\nkind: ur\n---\n',
       }),
-    ).toEqual({ ok: true, resource: { document: { title: 'Node', kind: 'ur' } } });
+    ).toEqual({ ok: true, resource: { document: { title: 'Node', kind: 'ur', content: {} } } });
   });
 
   it('refuses an Ur Resource carrying a body rather than discarding it', () => {
@@ -123,7 +127,7 @@ describe('parseResourceFile', () => {
       id: '00000000-0000-4000-8000-000000000002',
       title: 'A',
       kind: 'markdown',
-      body: '',
+      content: { source: '' },
     });
   });
 
@@ -135,7 +139,7 @@ describe('parseResourceFile', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.resource.kind === 'markdown' && result.resource.body).toBe(
+    expect(result.resource.kind === 'markdown' && result.resource.content.source).toBe(
       '# A\n\nProse under the heading.\n',
     );
   });
@@ -149,7 +153,7 @@ describe('parseResourceFile', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.resource.id).toBe('00000000-0000-4000-8000-000000000002');
-    expect(result.resource.kind === 'markdown' && result.resource.body).toBe(
+    expect(result.resource.kind === 'markdown' && result.resource.content.source).toBe(
       'Above.\n\n---\n\nBelow.\n',
     );
   });
@@ -229,7 +233,9 @@ describe('parseResourceFile', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.resource.id).toBe('00000000-0000-4000-8000-000000000027');
-    expect(result.resource.kind === 'markdown' && result.resource.body.trim()).toBe('Body line.');
+    expect(result.resource.kind === 'markdown' && result.resource.content.source.trim()).toBe(
+      'Body line.',
+    );
   });
 });
 
@@ -285,10 +291,10 @@ describe('a resource file that declares no kind is an Ur Resource', () => {
         path: 'resources/node.md',
         text: `---\nid: ${RESOURCE_A}\ntitle: Node\n---\n`,
       }),
-    ).toEqual({ ok: true, resource: { id: RESOURCE_A, title: 'Node', kind: 'ur' } });
+    ).toEqual({ ok: true, resource: { id: RESOURCE_A, title: 'Node', kind: 'ur', content: {} } });
     expect(
       parseImportResourceFile({ path: 'resources/node.md', text: '---\ntitle: Node\n---\n' }),
-    ).toEqual({ ok: true, resource: { document: { title: 'Node', kind: 'ur' } } });
+    ).toEqual({ ok: true, resource: { document: { title: 'Node', kind: 'ur', content: {} } } });
   });
 
   it('refuses a body under frontmatter with no kind, telling the author to declare Markdown', () => {
@@ -370,7 +376,7 @@ describe('a blank body is no body', () => {
     ]) {
       expect(parseResourceFile({ path: 'resources/node.md', text })).toEqual({
         ok: true,
-        resource: { id: RESOURCE_A, title: 'Node', kind: 'ur' },
+        resource: { id: RESOURCE_A, title: 'Node', kind: 'ur', content: {} },
       });
     }
   });

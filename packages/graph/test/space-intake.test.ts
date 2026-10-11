@@ -55,15 +55,15 @@ const viaFiles: Loader = ({ resources, ...structure }) =>
     { version: 1, id: SPACE, title: 'Test space', ...structure },
     resources.map((resource) =>
       resource.kind === 'reference'
-        ? referenceFile(resource.id, resource.title, resource.target)
+        ? referenceFile(resource.id, resource.title, resource.content.target)
         : resource.kind === 'space'
           ? {
               path: `resources/${resource.id}.md`,
-              text: `---\nid: ${resource.id}\ntitle: ${resource.title}\nkind: space\nspaceId: ${resource.spaceId}\nmap: ${resource.map}\ngraph: ${resource.graph}\n---\n`,
+              text: `---\nid: ${resource.id}\ntitle: ${resource.title}\nkind: space\nspaceId: ${resource.content.spaceId}\nmap: ${resource.content.map}\ngraph: ${resource.content.graph}\n---\n`,
             }
           : resource.kind === 'image' || resource.kind === 'ur'
             ? { path: `resources/${resource.id}.md`, text: serializeResourceFile(resource) }
-            : resourceFile(resource.id, resource.title, resource.body),
+            : resourceFile(resource.id, resource.title, resource.content.source),
     ),
   );
 
@@ -81,14 +81,14 @@ const markdown = (id: string, title = id): Resource => ({
   id: uuid(id),
   title,
   kind: 'markdown',
-  body: '',
+  content: { source: '' },
 });
 
 const referenceTo = (id: string, target: string): Resource => ({
   id: uuid(id),
   title: `reference ${id}`,
   kind: 'reference',
-  target: uuid(target),
+  content: { target: uuid(target) },
 });
 
 /**
@@ -105,9 +105,7 @@ const spaceResource = (id: string, spaceId: string): Resource => ({
   id: uuid(id),
   title: `Space ${spaceId}`,
   kind: 'space',
-  spaceId: uuid(spaceId),
-  map: TARGET_MAP,
-  graph: TARGET_GRAPH,
+  content: { spaceId: uuid(spaceId), map: TARGET_MAP, graph: TARGET_GRAPH },
 });
 
 /** An Edge as a space file writes it. */
@@ -275,8 +273,10 @@ describe.each([
         id: A,
         title: 'Figure',
         kind: 'image',
-        url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
-        naturalSize: { width: 640, height: 480 },
+        content: {
+          url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+          naturalSize: { width: 640, height: 480 },
+        },
       };
       const space = loaded(
         load({
@@ -290,7 +290,7 @@ describe.each([
     });
 
     it('keeps an Ur Resource whole, placed and connected like any other (ADR 0113)', () => {
-      const ur: Resource = { id: A, title: 'Node', kind: 'ur' };
+      const ur: Resource = { id: A, title: 'Node', kind: 'ur', content: {} };
       const space = loaded(
         load({
           resources: [ur, markdown(B, 'B')],
@@ -693,7 +693,7 @@ describe.each([
     });
 
     it('accepts a reference resource whose target is an Ur Resource (ADR 0113)', () => {
-      const ur: Resource = { id: A, title: 'Node', kind: 'ur' };
+      const ur: Resource = { id: A, title: 'Node', kind: 'ur', content: {} };
       expect(load({ resources: [ur, referenceTo(B, A)], maps: [] }).ok).toBe(true);
     });
 
@@ -709,15 +709,17 @@ describe.each([
       id: A,
       title: 'Figure',
       kind: 'image',
-      url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
-      naturalSize: { width: 640, height: 480 },
+      content: {
+        url: '/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU',
+        naturalSize: { width: 640, height: 480 },
+      },
     };
     const everyKind: readonly (readonly [string, readonly Resource[]])[] = [
       ['markdown', [markdown(A, 'A')]],
       ['image', [IMAGE]],
       ['space', [spaceResource(A, ABSENT)]],
       ['reference', [referenceTo(A, B), markdown(B, 'B')]],
-      ['ur', [{ id: A, title: 'Node', kind: 'ur' }]],
+      ['ur', [{ id: A, title: 'Node', kind: 'ur', content: {} }]],
     ];
     const placedIn = (resources: readonly Resource[], resourceShape: ResourcePlacement['shape']) =>
       load({
@@ -748,10 +750,10 @@ describe.each([
     it.each(['rectangle', 'pill', 'ellipse', 'diamond'] as const)(
       'loads an Ur Resource in the %s, at the Closed Size or resized',
       (resourceShape) => {
-        const ur: Resource = { id: A, title: 'Node', kind: 'ur' };
+        const ur: Resource = { id: A, title: 'Node', kind: 'ur', content: {} };
         const space = loaded(
           load({
-            resources: [ur, { id: B, title: 'Other', kind: 'ur' }],
+            resources: [ur, { id: B, title: 'Other', kind: 'ur', content: {} }],
             maps: [
               positionedMap(
                 WORKING,
@@ -793,7 +795,7 @@ describe.each([
     it('loads an entry with neither open nor size stored', () => {
       const space = loaded(
         load({
-          resources: [{ id: A, title: 'Node', kind: 'ur' }],
+          resources: [{ id: A, title: 'Node', kind: 'ur', content: {} }],
           maps: [positionedMap(WORKING, { [A]: { x: 0, y: 0 } }, [graph(MAIN, 'Main')])],
         }),
       );
@@ -808,12 +810,12 @@ describe.each([
     );
 
     it('refuses an Ur Resource stored Open, which has no content to show', () => {
-      expect(refused(openIn([{ id: A, title: 'Node', kind: 'ur' }], true))).toEqual([
+      expect(refused(openIn([{ id: A, title: 'Node', kind: 'ur', content: {} }], true))).toEqual([
         expect.objectContaining({ kind: 'open-requires-content', ref: A }),
       ]);
-      expect(loaded(openIn([{ id: A, title: 'Node', kind: 'ur' }], false)).resources).toHaveLength(
-        1,
-      );
+      expect(
+        loaded(openIn([{ id: A, title: 'Node', kind: 'ur', content: {} }], false)).resources,
+      ).toHaveLength(1);
     });
   });
 

@@ -76,9 +76,7 @@ const space = (
     document: {
       title: `Space ${j}`,
       kind: 'space' as const,
-      spaceId: spaceOf(j),
-      map: mapOf(j),
-      graph: graphOf(j),
+      content: { spaceId: spaceOf(j), map: mapOf(j), graph: graphOf(j) },
     },
   })),
 });
@@ -215,7 +213,10 @@ describe('planCreate', () => {
         resources: [
           {
             id: linkOf(0, 5),
-            document: { kind: 'space', spaceId: spaceOf(5), map: mapOf(5), graph: graphOf(5) },
+            document: {
+              kind: 'space',
+              content: { spaceId: spaceOf(5), map: mapOf(5), graph: graphOf(5) },
+            },
           },
         ],
       },
@@ -253,7 +254,7 @@ describe('planLink', () => {
     if (outcome.kind !== 'changes') throw new Error('expected changes');
     expect(outcome.changes).toHaveLength(1);
     expect(outcome.changes[0]).toMatchObject({
-      snapshot: { resources: [{ document: { map: mapOf(1), graph: graphOf(1) } }] },
+      snapshot: { resources: [{ document: { content: { map: mapOf(1), graph: graphOf(1) } } }] },
     });
   });
 
@@ -376,7 +377,7 @@ const lifecycleAggregates = fc.integer({ min: 2, max: 7 }).chain((count) =>
 
 const spaceResourceTargets = (snapshot: SpaceSnapshot): UUID[] =>
   snapshot.resources.flatMap(({ document }) =>
-    document.kind === 'space' ? [document.spaceId] : [],
+    document.kind === 'space' ? [document.content.spaceId] : [],
   );
 
 describe('planDelete over any lifecycle-built aggregate', () => {
@@ -444,12 +445,16 @@ describe('planContextDeletion', () => {
         {
           kind: 'update',
           spaceId: META,
-          snapshot: { resources: [{ document: { map: secondMapOf(1), graph: uuid(0x401) } }] },
+          snapshot: {
+            resources: [{ document: { content: { map: secondMapOf(1), graph: uuid(0x401) } } }],
+          },
         },
         {
           kind: 'update',
           spaceId: spaceOf(2),
-          snapshot: { resources: [{ document: { map: secondMapOf(1), graph: uuid(0x401) } }] },
+          snapshot: {
+            resources: [{ document: { content: { map: secondMapOf(1), graph: uuid(0x401) } } }],
+          },
         },
       ],
     });
@@ -491,7 +496,10 @@ describe('planContextDeletion', () => {
             },
           },
         },
-        { spaceId: META, snapshot: { resources: [{ document: { graph: secondGraphOf(1) } }] } },
+        {
+          spaceId: META,
+          snapshot: { resources: [{ document: { content: { graph: secondGraphOf(1) } } }] },
+        },
       ],
     });
     // Only the Graph goes: the Map keeps its positions, and the target its Resources.

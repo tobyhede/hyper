@@ -78,9 +78,13 @@ describe('resource file round-trip', () => {
 
         expect(result.ok).toBe(true);
         if (!result.ok) return;
-        expect(result.resource).toEqual(
-          frontmatter.kind === 'markdown' ? { ...frontmatter, body } : frontmatter,
-        );
+        const { id, title, kind, ...content } = frontmatter;
+        expect(result.resource).toEqual({
+          id,
+          title,
+          kind,
+          content: kind === 'markdown' ? { source: body } : content,
+        });
       }),
     );
   });

@@ -82,7 +82,7 @@ const resolveTarget = (
   const { replacementEpoch: epoch, session } = authoring.getState();
   const stored = session.working.resources.find((resource) => resource.id === resourceId);
   if (stored?.document.kind !== 'image') return undefined;
-  return { resourceId, heldUrl: stored.document.url, epoch };
+  return { resourceId, heldUrl: stored.document.content.url, epoch };
 };
 
 /**

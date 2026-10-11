@@ -41,8 +41,14 @@ function composition() {
       ],
     },
     resources: [
-      { id: RESOURCE, document: { title: 'Canvas Resource', kind: 'markdown', body: '' } },
-      { id: OTHER_RESOURCE, document: { title: 'Drawn Resource', kind: 'markdown', body: '' } },
+      {
+        id: RESOURCE,
+        document: { title: 'Canvas Resource', kind: 'markdown', content: { source: '' } },
+      },
+      {
+        id: OTHER_RESOURCE,
+        document: { title: 'Drawn Resource', kind: 'markdown', content: { source: '' } },
+      },
     ],
   };
   const loaded = { snapshot, revision: 0n, exportedRevision: null };

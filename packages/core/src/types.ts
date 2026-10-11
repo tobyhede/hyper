@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type {
   resourceFrontmatterSchema,
+  importResourceFrontmatterSchema,
   resourcePlacementSchema,
   resourceShapeSchema,
   resourceDocumentSchema,
@@ -35,11 +36,14 @@ export type ImportSpaceFile = z.infer<typeof importSpaceFileSchema>;
 export type ImportSpace = z.infer<typeof importSpaceSchema>;
 
 /**
- * The kind-specific fields stored before a resource file's closing frontmatter
- * fence (ADR 0020). A markdown `Resource` adds its body; a reference resource `Resource` is already
- * complete because its content resolves through `target` (ADR 0009).
+ * The fields stored before a resource file's closing frontmatter fence
+ * (ADR 0020), flat: a Resource's `id`, `title` and `kind` beside its kind's
+ * content keys. A markdown Resource's `content.source` is the file's body
+ * instead (ADR 0128).
  */
 export type ResourceFrontmatter = z.infer<typeof resourceFrontmatterSchema>;
+/** {@link ResourceFrontmatter} as import reads it, with `id` optional. */
+export type ImportResourceFrontmatter = z.infer<typeof importResourceFrontmatterSchema>;
 /**
  * One `{ from, to }` connection a graph is made of (ADR 0032). The authored
  * element — distinct from `@project/graph`'s `GraphRenderEdge`, which is this plus the

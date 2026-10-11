@@ -43,8 +43,8 @@ const snapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
   ],
 };
 
@@ -75,7 +75,7 @@ describe('the composed working Space', () => {
       authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE_A,
-        document: { title: 'Renamed', kind: 'markdown', body: 'A' },
+        document: { title: 'Renamed', kind: 'markdown', content: { source: 'A' } },
       }),
     ).toMatchObject({ kind: 'completed' });
 

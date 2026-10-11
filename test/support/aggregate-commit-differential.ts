@@ -115,9 +115,7 @@ const spaceResource = (id: UUID, title: string, spaceId: UUID, seed: number, off
   document: {
     title,
     kind: 'space' as const,
-    spaceId,
-    map: mapIdAt(seed, offset),
-    graph: graphIdAt(seed, offset),
+    content: { spaceId, map: mapIdAt(seed, offset), graph: graphIdAt(seed, offset) },
   },
 });
 

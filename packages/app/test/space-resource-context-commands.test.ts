@@ -27,9 +27,7 @@ const OTHER_META_GRAPH = id('12');
 const document: Extract<ResourceDocument, { kind: 'space' }> = {
   kind: 'space',
   title: 'Target',
-  spaceId: TARGET,
-  map: SECOND_MAP,
-  graph: SECOND_GRAPH,
+  content: { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH },
 };
 const meta: SpaceSnapshot = {
   id: META,
@@ -117,7 +115,7 @@ async function setup(available = true) {
       const result = source.app.authoring.complete(CANVAS, {
         kind: 'edited-resource',
         resourceId: RESOURCE,
-        document: { ...document, map: m.id, graph },
+        document: { ...document, content: { ...document.content, map: m.id, graph } },
       });
       return result.kind === 'refused' ? result.refusal.code : null;
     },

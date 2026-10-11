@@ -36,7 +36,9 @@ const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  resources: [
+    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+  ],
 };
 const loaded = { snapshot, revision: 0n, exportedRevision: null };
 
@@ -91,7 +93,10 @@ const OVERSIZED_DETAIL = `Send a request body no larger than ${MAX_COMMIT_BODY_B
 const oversizedSnapshot: SpaceSnapshot = {
   ...snapshot,
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(1_048_576) } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { source: 'x'.repeat(1_048_576) } },
+    },
   ],
 };
 
@@ -332,7 +337,10 @@ describe('commit wire policy', () => {
     const padded = (length: number): SpaceSnapshot => ({
       ...snapshot,
       resources: [
-        { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'x'.repeat(length) } },
+        {
+          id: RESOURCE_ID,
+          document: { title: 'A', kind: 'markdown', content: { source: 'x'.repeat(length) } },
+        },
       ],
     });
     const overhead = commitBody(padded(0)).length;

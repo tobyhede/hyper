@@ -35,7 +35,12 @@ const snapshot: SpaceSnapshot = {
     ],
     defaultMap: MAP_ID,
   },
-  resources: [{ id: RESOURCE_A, document: { title: 'Resource 1', kind: 'markdown', body: '' } }],
+  resources: [
+    {
+      id: RESOURCE_A,
+      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+    },
+  ],
 };
 
 const open = (...ids: Parameters<typeof mintingIds>) => {
@@ -120,11 +125,10 @@ describe('creating Image Resources from files', () => {
         document: {
           title: 'Resource 2',
           kind: 'image',
-          url: STORED_A,
-          naturalSize: { width: 640, height: 480 },
+          content: { url: STORED_A, naturalSize: { width: 640, height: 480 } },
         },
       },
-      { id: SECOND, document: { title: 'Resource 3', kind: 'image', url: STORED_B } },
+      { id: SECOND, document: { title: 'Resource 3', kind: 'image', content: { url: STORED_B } } },
     ]);
   });
 
@@ -381,8 +385,7 @@ describe('creating an Image Resource from a URL', () => {
     expect(session.getState().working.resources[1]?.document).toEqual({
       title: 'Resource 2',
       kind: 'image',
-      url,
-      naturalSize: { width: 32, height: 16 },
+      content: { url, naturalSize: { width: 32, height: 16 } },
     });
   });
 
@@ -399,7 +402,7 @@ describe('creating an Image Resource from a URL', () => {
     expect(session.getState().working.resources[1]?.document).toEqual({
       title: 'Resource 2',
       kind: 'image',
-      url,
+      content: { url },
     });
   });
 });

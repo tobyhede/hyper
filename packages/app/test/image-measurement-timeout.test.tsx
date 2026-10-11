@@ -13,7 +13,9 @@ const IMAGE_URL = 'https://example.test/never-answers.png';
 const snapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'Measurement' },
-  resources: [{ id: RESOURCE_ID, document: { kind: 'markdown', title: 'Notes', body: '' } }],
+  resources: [
+    { id: RESOURCE_ID, document: { kind: 'markdown', title: 'Notes', content: { source: '' } } },
+  ],
 };
 
 /** Browser image events are held while the real startup supplies its image sources. */
@@ -59,7 +61,7 @@ async function browserMeasurement() {
       .getState()
       .working.resources.find(({ id }) => id === result.createdResourceId);
     if (created?.document.kind !== 'image') throw new Error('No Image Resource was created.');
-    return created.document.naturalSize;
+    return created.document.content.naturalSize;
   };
   return { picture, measure };
 }

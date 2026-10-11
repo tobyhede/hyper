@@ -31,7 +31,7 @@ describe('newSpace', () => {
     const resource = result.space.resources[0]!;
     expect(resource.kind).toBe('markdown');
     expect(resource.title).toBe('Resource 1');
-    expect(resource.kind === 'markdown' && resource.body).toBe('');
+    expect(resource.kind === 'markdown' && resource.content.source).toBe('');
   });
 
   it('starts complete with its first Resource at the canonical centred position', () => {
@@ -90,7 +90,9 @@ describe('initializeSpace', () => {
     expect(result.space).toMatchObject({
       id: SPACE_ID,
       title: 'Architecture',
-      resources: [{ id: RESOURCE_ID, title: 'Resource 1', kind: 'markdown', body: '' }],
+      resources: [
+        { id: RESOURCE_ID, title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+      ],
     });
     expect(result.space.maps).toEqual([
       {

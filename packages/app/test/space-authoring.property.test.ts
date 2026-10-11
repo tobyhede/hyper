@@ -95,9 +95,12 @@ const start: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: RESOURCE_C, document: { title: 'A again', kind: 'reference', target: RESOURCE_A } },
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    { id: RESOURCE_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    {
+      id: RESOURCE_C,
+      document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_A } },
+    },
   ],
 };
 
@@ -192,7 +195,7 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
             resource.id === RESOURCE_C
               ? {
                   id: RESOURCE_C,
-                  document: { title: 'Reference Resource', kind: 'reference', target },
+                  document: { title: 'Reference Resource', kind: 'reference', content: { target } },
                 }
               : resource,
           ),
@@ -209,7 +212,7 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
           authoring.complete(CANVAS, {
             kind: 'edited-resource',
             resourceId: RESOURCE_C,
-            document: { title: proposedTitle, kind: 'reference', target },
+            document: { title: proposedTitle, kind: 'reference', content: { target } },
           }),
         ).toEqual(
           normalizeTitle(proposedTitle) === 'Reference Resource'
@@ -218,7 +221,11 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
         );
         expect(session.getState().working.resources).toContainEqual({
           id: RESOURCE_C,
-          document: { title: normalizeTitle(proposedTitle), kind: 'reference', target },
+          document: {
+            title: normalizeTitle(proposedTitle),
+            kind: 'reference',
+            content: { target },
+          },
         });
 
         const beforeRetarget = session.getState().working;
@@ -226,7 +233,11 @@ it('keeps an existing Reference Resource Target immutable while accepting Title 
           authoring.complete(CANVAS, {
             kind: 'edited-resource',
             resourceId: RESOURCE_C,
-            document: { title: proposedTitle, kind: 'reference', target: alternativeTarget },
+            document: {
+              title: proposedTitle,
+              kind: 'reference',
+              content: { target: alternativeTarget },
+            },
           }),
         ).toEqual({ kind: 'refused', refusal: { code: 'reference-target-immutable' } });
         expect(session.getState().working).toBe(beforeRetarget);
@@ -300,7 +311,7 @@ function resolve(
         return {
           kind: 'edited-resource',
           resourceId,
-          document: { title: generated.title, kind: 'markdown', body: '' },
+          document: { title: generated.title, kind: 'markdown', content: { source: '' } },
         };
       }
       const { id: _id, ...document } = resource;
@@ -316,7 +327,10 @@ function resolve(
             ? {
                 ...document,
                 title: generated.title,
-                target: uuidSchema.parse(proposedTarget?.id ?? document.target),
+                content: {
+                  ...document.content,
+                  target: uuidSchema.parse(proposedTarget?.id ?? document.content.target),
+                },
               }
             : { ...document, title: generated.title },
       };

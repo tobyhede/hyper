@@ -3,6 +3,9 @@ import { relative } from 'node:path';
 import {
   SPACE_FILE_VERSION,
   type GraphEdge,
+  imageResourceContentSchema,
+  referenceResourceContentSchema,
+  spaceResourceContentSchema,
   type SpaceFile,
   type Resource,
   type UUID,
@@ -92,31 +95,66 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     : { ...withMaps, defaultMap: snapshot.document.defaultMap };
 };
 
+/** What the content schemas share for this file's purpose: a parse that may fail. */
+interface ContentSchema<T> {
+  safeParse: (value: T) => { success: true; data: T } | { success: false };
+}
+
+/**
+ * A kind's content with its keys in the content schema's order, every key the
+ * schema declares kept. A content the schema refuses is returned as stored,
+ * so this cannot throw: a document that would not read back is Export's
+ * refusal to make.
+ */
+const inSchemaOrder = <T>(schema: ContentSchema<T>, content: T): T => {
+  const parsed = schema.safeParse(content);
+  return parsed.success ? parsed.data : content;
+};
+
+/**
+ * A stored document as the Resource its file is written from. Its content is
+ * put in its kind's schema order, so a file's bytes do not depend on the order
+ * a document's keys were inserted in (`test/unit/space-directory-files.test.ts`),
+ * and a Markdown source's line endings are made `\n`. The Title is written as
+ * stored.
+ */
 const canonicalResource = (
   id: UUID,
   document: LoadedSpace['snapshot']['resources'][number]['document'],
 ): Resource => {
-  const common = {
-    id,
-    title: document.title,
-  };
-  if (document.kind === 'reference')
-    return { ...common, kind: 'reference', target: document.target };
-  if (document.kind === 'space')
-    return {
-      ...common,
-      kind: 'space',
-      spaceId: document.spaceId,
-      map: document.map,
-      graph: document.graph,
-    };
-  if (document.kind === 'image') {
-    const image: Resource = { ...common, kind: 'image', url: document.url };
-    if (document.naturalSize !== undefined) image.naturalSize = document.naturalSize;
-    return image;
+  const { title } = document;
+  switch (document.kind) {
+    case 'reference':
+      return {
+        id,
+        title,
+        kind: 'reference',
+        content: inSchemaOrder(referenceResourceContentSchema, document.content),
+      };
+    case 'space':
+      return {
+        id,
+        title,
+        kind: 'space',
+        content: inSchemaOrder(spaceResourceContentSchema, document.content),
+      };
+    case 'image':
+      return {
+        id,
+        title,
+        kind: 'image',
+        content: inSchemaOrder(imageResourceContentSchema, document.content),
+      };
+    case 'ur':
+      return { id, title, kind: 'ur', content: {} };
+    case 'markdown':
+      return {
+        id,
+        title,
+        kind: 'markdown',
+        content: { source: document.content.source.replace(/\r\n?/g, '\n') },
+      };
   }
-  if (document.kind === 'ur') return { ...common, kind: 'ur' };
-  return { ...common, kind: 'markdown', body: document.body.replace(/\r\n?/g, '\n') };
 };
 
 /**

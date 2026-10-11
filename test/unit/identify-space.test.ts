@@ -53,9 +53,15 @@ describe('identifySpace', () => {
         ],
       },
       resources: [
-        { id: RESOURCE_ID, document: { title: 'First', kind: 'markdown', body: 'One' } },
-        { id: SECOND_RESOURCE_ID, document: { title: 'Second', kind: 'markdown', body: 'Two' } },
-        { document: { title: 'Minted', kind: 'markdown', body: 'Three' } },
+        {
+          id: RESOURCE_ID,
+          document: { title: 'First', kind: 'markdown', content: { source: 'One' } },
+        },
+        {
+          id: SECOND_RESOURCE_ID,
+          document: { title: 'Second', kind: 'markdown', content: { source: 'Two' } },
+        },
+        { document: { title: 'Minted', kind: 'markdown', content: { source: 'Three' } } },
       ],
     };
 

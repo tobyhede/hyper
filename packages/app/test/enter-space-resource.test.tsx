@@ -74,9 +74,12 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: OTHER_MAP_ID,
   },
   resources: [
-    { id: DRAWN_A, document: { title: 'Intake', kind: 'markdown', body: '' } },
-    { id: DRAWN_B, document: { title: 'Storage', kind: 'markdown', body: '' } },
-    { id: UNPLACED, document: { title: 'Elsewhere entirely', kind: 'markdown', body: '' } },
+    { id: DRAWN_A, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
+    { id: DRAWN_B, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
+    {
+      id: UNPLACED,
+      document: { title: 'Elsewhere entirely', kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 
@@ -100,15 +103,16 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: HOME_MAP_ID,
   },
   resources: [
-    { id: HOME_RESOURCE_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+    {
+      id: HOME_RESOURCE_ID,
+      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: SPACE_RESOURCE_ID,
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       },
     },
   ],
@@ -135,15 +139,16 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: META_MAP_ID,
   },
   resources: [
-    { id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
+    {
+      id: META_RESOURCE_ID,
+      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: META_TO_HOME_ID,
       document: {
         title: 'Home',
         kind: 'space',
-        spaceId: HOME_ID,
-        map: HOME_MAP_ID,
-        graph: HOME_GRAPH_ID,
+        content: { spaceId: HOME_ID, map: HOME_MAP_ID, graph: HOME_GRAPH_ID },
       },
     },
     {
@@ -151,9 +156,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: OTHER_MAP_ID,
-        graph: OTHER_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
       },
     },
   ],
@@ -288,8 +291,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     });
     expect(spaceResourceDocument(spaces)).toMatchObject({
       kind: 'space',
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     expect(opened?.session.getState().working.document.defaultMap).toBe(OTHER_MAP_ID);
 

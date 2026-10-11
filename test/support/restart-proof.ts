@@ -47,7 +47,7 @@ export const restartProofFixture = (input: {
   resources: [
     {
       id: input.resourceId,
-      document: { title: 'Restart resource', kind: 'markdown', body: 'Durable.' },
+      document: { title: 'Restart resource', kind: 'markdown', content: { source: 'Durable.' } },
     },
   ],
 });

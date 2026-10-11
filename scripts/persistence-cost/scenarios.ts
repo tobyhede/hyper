@@ -95,7 +95,7 @@ const ordinarySpace = (
       document: {
         title: `Resource ${index + 1}`,
         kind: 'markdown',
-        body: body(`Resource ${index + 1}`, bodyLength),
+        content: { source: body(`Resource ${index + 1}`, bodyLength) },
       },
     })),
   });
@@ -152,9 +152,7 @@ export const scenario = (workload: Workload): Scenario => {
         document: {
           title: target.document.title,
           kind: 'space',
-          spaceId: target.id,
-          map: positioned.id,
-          graph: graph.id,
+          content: { spaceId: target.id, map: positioned.id, graph: graph.id },
         },
       };
     }),
@@ -266,7 +264,7 @@ export const applyEdit = (
                 ...resource,
                 document: {
                   ...resource.document,
-                  body: `${resource.document.body}\n\nEdit ${sample}.`,
+                  content: { source: `${resource.document.content.source}\n\nEdit ${sample}.` },
                 },
               };
         }),
@@ -336,7 +334,11 @@ export const applyEdit = (
           ...withResource.resources,
           {
             id: added,
-            document: { title: `Added ${sample}`, kind: 'markdown', body: `# Added ${sample}` },
+            document: {
+              title: `Added ${sample}`,
+              kind: 'markdown',
+              content: { source: `# Added ${sample}` },
+            },
           },
         ],
       };

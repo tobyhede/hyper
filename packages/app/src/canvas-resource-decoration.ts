@@ -375,7 +375,7 @@ export function decorateSpaceResourceNode(
   const spaceDocument = context.spaceDocuments.get(node.data.resourceId);
   const target =
     spaceDocument !== undefined
-      ? context.spaceResourceTargets.get(spaceDocument.spaceId)
+      ? context.spaceResourceTargets.get(spaceDocument.content.spaceId)
       : undefined;
   // Closed, read-only, and unread omit the rail. Withdrawn authoring still
   // draws it, disabled: an absent rail is how the Resource says the target has
@@ -390,7 +390,7 @@ export function decorateSpaceResourceNode(
       context.deleteConfirmation !== undefined &&
       spaceDocument !== undefined
     ) {
-      const entry = context.spaces.entry(spaceDocument.spaceId);
+      const entry = context.spaces.entry(spaceDocument.content.spaceId);
       if (entry !== undefined) {
         railContext = {
           entry,

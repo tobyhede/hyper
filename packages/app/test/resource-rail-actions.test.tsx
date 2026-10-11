@@ -76,8 +76,14 @@ const snapshot: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'A source' } },
-    { id: OTHER_RESOURCE_ID, document: { title: 'B', kind: 'markdown', body: 'B source' } },
+    {
+      id: RESOURCE_ID,
+      document: { title: 'A', kind: 'markdown', content: { source: 'A source' } },
+    },
+    {
+      id: OTHER_RESOURCE_ID,
+      document: { title: 'B', kind: 'markdown', content: { source: 'B source' } },
+    },
   ],
 });
 
@@ -100,7 +106,7 @@ const withReference: SpaceSnapshot = spaceSnapshotSchema.parse({
     ...snapshot.resources,
     {
       id: REFERENCE_ID,
-      document: { title: 'A reference', kind: 'reference', target: RESOURCE_ID },
+      document: { title: 'A reference', kind: 'reference', content: { target: RESOURCE_ID } },
     },
   ],
 });
@@ -127,8 +133,10 @@ const withImage: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Harbour',
         kind: 'image',
-        url: 'https://example.com/harbour.png',
-        naturalSize: { width: 400, height: 300 },
+        content: {
+          url: 'https://example.com/harbour.png',
+          naturalSize: { width: 400, height: 300 },
+        },
       },
     },
   ],
@@ -154,7 +162,10 @@ const withUr: SpaceSnapshot = spaceSnapshotSchema.parse({
       },
     ],
   },
-  resources: [...snapshot.resources, { id: UR_ID, document: { title: 'Gateway', kind: 'ur' } }],
+  resources: [
+    ...snapshot.resources,
+    { id: UR_ID, document: { title: 'Gateway', kind: 'ur', content: {} } },
+  ],
 });
 
 /** A Space Resource with a target that the test backend also stores. */
@@ -179,9 +190,7 @@ const withSpaceResource: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'A space',
         kind: 'space',
-        spaceId: TARGET_SPACE_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
   ],
@@ -554,7 +563,11 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     await waitFor(() => expect(resourceIds(session)).toHaveLength(3));
     const created = session.getState().working.resources[2];
-    expect(created?.document).toEqual({ title: 'A', kind: 'reference', target: RESOURCE_ID });
+    expect(created?.document).toEqual({
+      title: 'A',
+      kind: 'reference',
+      content: { target: RESOURCE_ID },
+    });
     await settled(session);
   });
 
@@ -859,7 +872,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expect(session.getState().working.resources.at(-1)?.document).toEqual({
       title: 'Harbour',
       kind: 'reference',
-      target: IMAGE_ID,
+      content: { target: IMAGE_ID },
     });
     const editor = await screen.findByRole('textbox', { name: 'Resource title' });
     expect(editor).toHaveValue('Harbour');
@@ -964,7 +977,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expect(session.getState().working.resources.at(-1)?.document).toEqual({
       title: 'Gateway',
       kind: 'reference',
-      target: UR_ID,
+      content: { target: UR_ID },
     });
     await settled(session);
   });
@@ -1123,7 +1136,10 @@ describe('Connect to Resource in a Resource’s Actions menu', () => {
     ...snapshot,
     resources: [
       ...snapshot.resources,
-      { id: REFERENCE_ID, document: { title: 'C', kind: 'markdown', body: 'C source' } },
+      {
+        id: REFERENCE_ID,
+        document: { title: 'C', kind: 'markdown', content: { source: 'C source' } },
+      },
     ],
   });
 

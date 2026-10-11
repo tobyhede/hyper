@@ -1,18 +1,19 @@
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { titleName, uuidSchema, type Resource, type UUID } from '@project/core';
 import { loadSpaceAggregate } from '@project/graph';
 import { isImageId } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
+import { exportAggregate } from '../../src/export/export-aggregate';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 
 const spaceResourceTargets = (resources: readonly Resource[]): readonly UUID[] =>
-  resources.flatMap((resource) => (resource.kind === 'space' ? [resource.spaceId] : []));
+  resources.flatMap((resource) => (resource.kind === 'space' ? [resource.content.spaceId] : []));
 
 /**
  * Longest Space-Resource path from Meta, and every ordinary Space that path reaches.
@@ -99,7 +100,7 @@ describe('tracked fixture aggregate', () => {
       for (const resource of space.resources) {
         if (resource.kind !== 'markdown') continue;
         expect(titleName(resource.title).length).toBeGreaterThan(1);
-        expect(resource.body.trim().length).toBeGreaterThan(0);
+        expect(resource.content.source.trim().length).toBeGreaterThan(0);
       }
     }
   });
@@ -135,9 +136,9 @@ describe('tracked fixture images', () => {
     const opened = loaded.aggregate.spaces.flatMap(({ snapshot }) =>
       snapshot.resources.flatMap(({ id, document }) =>
         document.kind === 'image' &&
-        document.url.startsWith(STORED_IMAGE_PREFIX) &&
+        document.content.url.startsWith(STORED_IMAGE_PREFIX) &&
         (snapshot.document.maps ?? []).some((m) => m.positions[id]?.open === true)
-          ? [document.url]
+          ? [document.content.url]
           : [],
       ),
     );
@@ -181,5 +182,35 @@ describe('tracked fixture images', () => {
     const repository = new MemorySpaceRepository();
     await expect(importFixture(repository, { directory: copy })).rejects.toThrow('notes.txt');
     await expect(repository.listSpaces()).resolves.toEqual([]);
+  });
+});
+
+/** Every file under `root`, keyed by its path relative to `root`, as bytes. */
+const filesUnder = async (root: string): Promise<Record<string, Buffer>> => {
+  const entries = await readdir(root, { recursive: true, withFileTypes: true });
+  const files: Record<string, Buffer> = {};
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const path = join(entry.parentPath, entry.name);
+    files[relative(root, path)] = await readFile(path);
+  }
+  return files;
+};
+
+describe('tracked fixture export', () => {
+  it('exports the files it imports from its own export, byte for byte', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hyper-fixture-export-'));
+    temporaryDirectories.push(root);
+    const exportOf = async (directory: string, destination: string) => {
+      const repository = new MemorySpaceRepository();
+      await importFixture(repository, { directory });
+      await exportAggregate(repository, destination);
+      return filesUnder(destination);
+    };
+
+    const first = await exportOf(trackedFixture, join(root, 'first'));
+    const second = await exportOf(join(root, 'first'), join(root, 'second'));
+    expect(Object.keys(first).filter((path) => path.endsWith('.md')).length).toBeGreaterThan(0);
+    expect(second).toEqual(first);
   });
 });

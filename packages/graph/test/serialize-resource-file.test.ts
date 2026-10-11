@@ -9,7 +9,7 @@ describe('serializeResourceFile', () => {
       id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
-      body: 'Resource **A**.\n',
+      content: { source: 'Resource **A**.\n' },
     };
 
     expect(serializeResourceFile(resource)).toBe(
@@ -24,7 +24,7 @@ describe('serializeResourceFile', () => {
       id: uuid('00000000-0000-4000-8000-000000000034'),
       title: 'Recap: the data model',
       kind: 'markdown',
-      body: '',
+      content: { source: '' },
     };
     const parsed = parseResourceFile({
       path: 'resources/r.md',
@@ -41,7 +41,7 @@ describe('serializeResourceFile', () => {
       id: uuid('00000000-0000-4000-8000-00000000000c'),
       title: 'A′',
       kind: 'reference',
-      target: uuid('00000000-0000-4000-8000-000000000002'),
+      content: { target: uuid('00000000-0000-4000-8000-000000000002') },
     };
 
     expect(serializeResourceFile(resource)).toBe(
@@ -54,9 +54,11 @@ describe('serializeResourceFile', () => {
       id: uuid('00000000-0000-4000-8000-00000000000d'),
       title: 'Nested space',
       kind: 'space',
-      spaceId: uuid('00000000-0000-4000-8000-000000000010'),
-      map: uuid('00000000-0000-4000-8000-000000000011'),
-      graph: uuid('00000000-0000-4000-8000-000000000012'),
+      content: {
+        spaceId: uuid('00000000-0000-4000-8000-000000000010'),
+        map: uuid('00000000-0000-4000-8000-000000000011'),
+        graph: uuid('00000000-0000-4000-8000-000000000012'),
+      },
     };
 
     const parsed = parseResourceFile({
@@ -75,7 +77,7 @@ describe('serializeResourceFile', () => {
       id: uuid('00000000-0000-4000-8000-000000000002'),
       title: 'A',
       kind: 'markdown',
-      body: '',
+      content: { source: '' },
     };
     expect(serializeResourceFile(resource)).not.toContain('description');
   });

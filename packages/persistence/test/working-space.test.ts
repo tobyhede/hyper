@@ -15,7 +15,9 @@ const GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
 const mapless: SpaceSnapshot = {
   id: SPACE,
   document: { version: 1, title: 'Imported' },
-  resources: [{ id: RESOURCE, document: { title: 'A', kind: 'markdown', body: '' } }],
+  resources: [
+    { id: RESOURCE, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+  ],
 };
 
 const loadWorkingSpace = (

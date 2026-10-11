@@ -40,7 +40,7 @@ export function buildSpaceResourceRail({
   onReport,
   context,
 }: BuildSpaceResourceRailInput) {
-  const selectedMap = target.maps.find((m) => m.id === document?.map);
+  const selectedMap = target.maps.find((m) => m.id === document?.content.map);
   const mapOf = (id: string): SpaceResourceTargetMap | undefined =>
     target.maps.find((m) => m.id === id);
   const commands =
@@ -62,8 +62,8 @@ export function buildSpaceResourceRail({
       graphs={selectedMap?.graphs ?? []}
       mapId={selectedMap?.id ?? null}
       graphId={
-        selectedMap?.graphs.some((graph) => graph.id === document?.graph)
-          ? (document?.graph ?? null)
+        selectedMap?.graphs.some((graph) => graph.id === document?.content.graph)
+          ? (document?.content.graph ?? null)
           : null
       }
       onMapChange={(id) => {

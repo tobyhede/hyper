@@ -32,8 +32,14 @@ const loaded: LoadedSpace = {
       ],
     },
     resources: [
-      { id: RESOURCE_ID, document: { title: 'Resource', kind: 'markdown', body: '' } },
-      { id: OTHER_RESOURCE_ID, document: { title: 'Other', kind: 'markdown', body: '' } },
+      {
+        id: RESOURCE_ID,
+        document: { title: 'Resource', kind: 'markdown', content: { source: '' } },
+      },
+      {
+        id: OTHER_RESOURCE_ID,
+        document: { title: 'Other', kind: 'markdown', content: { source: '' } },
+      },
     ],
   }),
   revision: 7n,
@@ -197,7 +203,10 @@ describe('product destinations', () => {
           resources: isStored
             ? [
                 ...loaded.snapshot.resources,
-                { id: resourceId, document: { title: 'Outside', kind: 'markdown', body: '' } },
+                {
+                  id: resourceId,
+                  document: { title: 'Outside', kind: 'markdown', content: { source: '' } },
+                },
               ]
             : loaded.snapshot.resources,
         },
@@ -264,7 +273,10 @@ describe('product destinations', () => {
         ...loaded.snapshot,
         resources: [
           ...loaded.snapshot.resources,
-          { id: omitted, document: { title: 'Omitted', kind: 'markdown', body: '' } },
+          {
+            id: omitted,
+            document: { title: 'Omitted', kind: 'markdown', content: { source: '' } },
+          },
         ],
       },
     };

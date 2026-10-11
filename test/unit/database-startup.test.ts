@@ -57,7 +57,7 @@ const storedSpace = (
     resources: [
       {
         id: resourceId,
-        document: { title: 'Existing resource', kind: 'markdown', body: '' },
+        document: { title: 'Existing resource', kind: 'markdown', content: { source: '' } },
       },
     ],
   },
@@ -98,7 +98,10 @@ describe('defaultContentAggregate', () => {
             ],
           },
           resources: [
-            { id: RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
+            {
+              id: RESOURCE_ID,
+              document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+            },
           ],
         },
       ],

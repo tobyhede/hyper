@@ -58,9 +58,15 @@ async function projection(open = false) {
         ],
       },
       resources: [
-        { id: A, document: { kind: 'markdown', title: 'A', body: 'Target content' } },
-        { id: B, document: { kind: 'markdown', title: 'B', body: '' } },
-        { id: REFERENCE, document: { kind: 'reference', title: 'Reference Resource', target: A } },
+        {
+          id: A,
+          document: { kind: 'markdown', title: 'A', content: { source: 'Target content' } },
+        },
+        { id: B, document: { kind: 'markdown', title: 'B', content: { source: '' } } },
+        {
+          id: REFERENCE,
+          document: { kind: 'reference', title: 'Reference Resource', content: { target: A } },
+        },
       ],
     }),
   );

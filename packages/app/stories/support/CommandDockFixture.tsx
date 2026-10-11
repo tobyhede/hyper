@@ -120,7 +120,7 @@ const blockSave = async (
     .getState()
     .working.resources.find(({ id }) => id === created.resourceId);
   if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created.');
-  const { entry: target } = await spaces.hold(resource.document.spaceId);
+  const { entry: target } = await spaces.hold(resource.document.content.spaceId);
   const stored = target.session.getState().working;
   const targetMap = stored.document.defaultMap;
   if (targetMap === undefined) throw new Error('The blocking Space has no Map.');
@@ -177,7 +177,11 @@ const withHeldImage = (snapshot: SpaceSnapshot): SpaceSnapshot => ({
     ...snapshot.resources,
     {
       id: HELD_IMAGE,
-      document: { title: 'Figure', kind: 'image', url: 'https://example.com/figure.png' },
+      document: {
+        title: 'Figure',
+        kind: 'image',
+        content: { url: 'https://example.com/figure.png' },
+      },
     },
   ],
 });
@@ -287,7 +291,10 @@ export async function openDockStory(scenario: DockScenario) {
       resourceId: resource.id,
       document:
         resource.document.kind === 'markdown'
-          ? { ...resource.document, body: `${resource.document.body}\nStory edit` }
+          ? {
+              ...resource.document,
+              content: { source: `${resource.document.content.source}\nStory edit` },
+            }
           : { ...resource.document, title: `${resource.document.title} edited` },
     });
     if (result.kind !== 'completed')

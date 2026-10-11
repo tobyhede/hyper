@@ -37,7 +37,9 @@ const metaSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  resources: [{ id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', body: '' } }],
+  resources: [
+    { id: RESOURCE_ID, document: { title: 'Notes', kind: 'markdown', content: { source: '' } } },
+  ],
 };
 
 /** Distinct ids for the two coordinations, each of which mints several. */
@@ -47,7 +49,7 @@ const countingIds = (): (() => UUID) => {
 };
 
 const EDITED = 'Notes edited while blocked';
-const notes = { title: 'Notes', kind: 'markdown', body: '' } as const;
+const notes = { title: 'Notes', kind: 'markdown', content: { source: '' } } as const;
 
 /** Meta with its one Resource retitled: the Edit a blocked save keeps. */
 const withNotesTitled = (space: SpaceSnapshot, title: string): SpaceSnapshot => ({
@@ -73,7 +75,7 @@ const targetOf = (containing: OpenSpace, resourceId: UUID): UUID => {
     .getState()
     .working.resources.find(({ id }) => id === resourceId);
   if (resource?.document.kind !== 'space') throw new Error('No Space Resource was created');
-  return resource.document.spaceId;
+  return resource.document.content.spaceId;
 };
 
 const liveSession = (openSpaces: OpenSpaces, spaceId: UUID): OpenSpace['session'] => {

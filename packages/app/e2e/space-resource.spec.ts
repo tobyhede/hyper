@@ -1092,9 +1092,11 @@ test('a connection between Resources of two different drawings is refused with w
         document: {
           title: 'Deep dive, again',
           kind: 'space',
-          spaceId: DEEP_DIVE_SPACE_ID,
-          map: DEEP_DIVE_MAP_ID,
-          graph: DEEP_DIVE_GRAPH_ID,
+          content: {
+            spaceId: DEEP_DIVE_SPACE_ID,
+            map: DEEP_DIVE_MAP_ID,
+            graph: DEEP_DIVE_GRAPH_ID,
+          },
         },
       },
     ],

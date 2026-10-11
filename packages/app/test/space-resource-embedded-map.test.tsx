@@ -117,9 +117,12 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: OTHER_MAP_ID,
   },
   resources: [
-    { id: DRAWN_A, document: { title: 'Intake', kind: 'markdown', body: '' } },
-    { id: DRAWN_B, document: { title: 'Storage', kind: 'markdown', body: '' } },
-    { id: UNPLACED, document: { title: 'Elsewhere entirely', kind: 'markdown', body: '' } },
+    { id: DRAWN_A, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
+    { id: DRAWN_B, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
+    {
+      id: UNPLACED,
+      document: { title: 'Elsewhere entirely', kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 
@@ -150,7 +153,10 @@ const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): Spac
       defaultMap: HOME_MAP_ID,
     },
     resources: [
-      { id: HOME_RESOURCE_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+      {
+        id: HOME_RESOURCE_ID,
+        document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+      },
       { id: SPACE_RESOURCE_ID, document: spaceResource },
     ],
   });
@@ -176,15 +182,16 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: META_MAP_ID,
   },
   resources: [
-    { id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
+    {
+      id: META_RESOURCE_ID,
+      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: META_TO_HOME_ID,
       document: {
         title: 'Home',
         kind: 'space',
-        spaceId: HOME_ID,
-        map: HOME_MAP_ID,
-        graph: HOME_GRAPH_ID,
+        content: { spaceId: HOME_ID, map: HOME_MAP_ID, graph: HOME_GRAPH_ID },
       },
     },
     {
@@ -192,9 +199,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: OTHER_MAP_ID,
-        graph: OTHER_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
       },
     },
   ],
@@ -327,7 +332,10 @@ async function mountNested(): Promise<OpenSpaces> {
       ],
     },
     resources: [
-      { id: THIRD_RESOURCE_ID, document: { title: 'Nested content', kind: 'markdown', body: '' } },
+      {
+        id: THIRD_RESOURCE_ID,
+        document: { title: 'Nested content', kind: 'markdown', content: { source: '' } },
+      },
     ],
   });
   const nestedTarget = spaceSnapshotSchema.parse({
@@ -339,9 +347,7 @@ async function mountNested(): Promise<OpenSpaces> {
             document: {
               title: 'Deeper',
               kind: 'space',
-              spaceId: THIRD_ID,
-              map: THIRD_MAP_ID,
-              graph: THIRD_GRAPH_ID,
+              content: { spaceId: THIRD_ID, map: THIRD_MAP_ID, graph: THIRD_GRAPH_ID },
             },
           }
         : resource,
@@ -364,9 +370,7 @@ async function mountNested(): Promise<OpenSpaces> {
   const value = home({
     title: 'Elsewhere',
     kind: 'space',
-    spaceId: TARGET_ID,
-    map: SELECTED_MAP_ID,
-    graph: SELECTED_GRAPH_ID,
+    content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
   });
   const backend = new MemorySpaceBackend(
     META_ID,
@@ -407,9 +411,7 @@ describe('the Map an Open Space Resource draws', () => {
       const value = home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       });
       const control = new MemorySpaceBackendTestControl();
       const backend = new MemorySpaceBackend(
@@ -496,9 +498,7 @@ describe('the Map an Open Space Resource draws', () => {
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       }),
     );
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -534,9 +534,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const otherMapId = uuidSchema.parse('00000000-0000-4000-8000-0000000000f1');
     const firstMap = value.document.maps?.[0];
@@ -607,9 +605,7 @@ describe('the Map an Open Space Resource draws', () => {
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       }),
     );
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -649,9 +645,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const { spaces } = await mountOpenSpaces(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -673,9 +667,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     await mount(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -703,9 +695,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const { spaces } = await mountOpenSpaces(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -730,9 +720,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const session = await mount(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -752,7 +740,7 @@ describe('the Map an Open Space Resource draws', () => {
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
     if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
-    expect(resource.document.framing?.zoom).toBe(1.1);
+    expect(resource.document.content.framing?.zoom).toBe(1.1);
   });
 
   /**
@@ -763,9 +751,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const session = await mount({
       ...value,
@@ -797,16 +783,14 @@ describe('the Map an Open Space Resource draws', () => {
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
     if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
-    expect(resource.document.framing).toBeUndefined();
+    expect(resource.document.content.framing).toBeUndefined();
   });
 
   it('does not author portal framing from wheel during a chrome Space rename', async () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const session = await mount(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -827,7 +811,7 @@ describe('the Map an Open Space Resource draws', () => {
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
     if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
-    expect(resource.document.framing).toBeUndefined();
+    expect(resource.document.content.framing).toBeUndefined();
   });
 
   /**
@@ -840,9 +824,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     await mount(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -871,9 +853,7 @@ describe('the Map an Open Space Resource draws', () => {
     const spaceResource: Extract<ResourceDocument, { kind: 'space' }> = {
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     };
     const value = home(spaceResource);
     const session = await mount({
@@ -918,7 +898,7 @@ describe('the Map an Open Space Resource draws', () => {
         .getState()
         .working.resources.find((candidate) => candidate.id === resourceId);
       if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
-      return resource.document.framing?.zoom;
+      return resource.document.content.framing?.zoom;
     };
     expect(authoredZoom(SPACE_RESOURCE_ID)).toBe(1.1);
     expect(authoredZoom(HOME_RESOURCE_ID)).toBe(1.1);
@@ -932,9 +912,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const backend = new MemorySpaceBackend(
       META_ID,
@@ -964,16 +942,14 @@ describe('the Map an Open Space Resource draws', () => {
       .getState()
       .working.resources.find((candidate) => candidate.id === SPACE_RESOURCE_ID);
     if (resource?.document.kind !== 'space') throw new Error('Space Resource missing');
-    expect(resource.document.framing?.zoom).toBe(1.1);
+    expect(resource.document.content.framing?.zoom).toBe(1.1);
   });
 
   it('keeps an embedded draft safe from containing controls and sibling editors', async () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     await mount({
       ...value,
@@ -1025,9 +1001,7 @@ describe('the Map an Open Space Resource draws', () => {
     const document: ResourceDocument = {
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     };
     const value = home(document);
     await mount({
@@ -1095,9 +1069,7 @@ describe('the Map an Open Space Resource draws', () => {
     const spaceResource: ResourceDocument = {
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     };
     const value = home(spaceResource);
     await mount({
@@ -1177,9 +1149,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const backend = new MemorySpaceBackend(
       META_ID,
@@ -1220,9 +1190,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const backend = new MemorySpaceBackend(
       META_ID,
@@ -1345,9 +1313,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     await mount(value);
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -1368,9 +1334,7 @@ describe('the Map an Open Space Resource draws', () => {
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       }),
     );
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -1429,7 +1393,10 @@ describe('the Map an Open Space Resource draws', () => {
         ],
       },
       resources: [
-        { id: thirdResource, document: { title: 'Nested content', kind: 'markdown', body: '' } },
+        {
+          id: thirdResource,
+          document: { title: 'Nested content', kind: 'markdown', content: { source: '' } },
+        },
       ],
     });
     const nestedTarget = spaceSnapshotSchema.parse({
@@ -1441,9 +1408,7 @@ describe('the Map an Open Space Resource draws', () => {
               document: {
                 title: 'Deeper',
                 kind: 'space',
-                spaceId: thirdId,
-                map: thirdMap,
-                graph: thirdGraph,
+                content: { spaceId: thirdId, map: thirdMap, graph: thirdGraph },
               },
             }
           : resource,
@@ -1466,9 +1431,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const backend = new MemorySpaceBackend(
       META_ID,
@@ -1546,9 +1509,7 @@ describe('the Map an Open Space Resource draws', () => {
               document: {
                 title: 'Back to Home',
                 kind: 'space',
-                spaceId: HOME_ID,
-                map: HOME_MAP_ID,
-                graph: HOME_GRAPH_ID,
+                content: { spaceId: HOME_ID, map: HOME_MAP_ID, graph: HOME_GRAPH_ID },
               },
             }
           : resource,
@@ -1571,9 +1532,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const backend = new MemorySpaceBackend(
       META_ID,
@@ -1614,9 +1573,7 @@ describe('the Map an Open Space Resource draws', () => {
     const value = home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     });
     const backend = new MemorySpaceBackend(
       META_ID,
@@ -1666,9 +1623,7 @@ describe('the Map an Open Space Resource draws', () => {
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       }),
     );
 
@@ -1693,9 +1648,7 @@ describe('the Map an Open Space Resource draws', () => {
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       }),
     );
 
@@ -1719,9 +1672,7 @@ describe('the Map an Open Space Resource draws', () => {
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       }),
     );
 
@@ -1765,9 +1716,7 @@ describe('the Map an Open Space Resource draws', () => {
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: DELETED_MAP_ID,
-        graph: DELETED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: DELETED_MAP_ID, graph: DELETED_GRAPH_ID },
       }),
     );
 
@@ -1819,7 +1768,10 @@ describe('the Map an Open Space Resource draws', () => {
         defaultMap: HOME_MAP_ID,
       },
       resources: [
-        { id: HOME_RESOURCE_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+        {
+          id: HOME_RESOURCE_ID,
+          document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+        },
         {
           id: GONE_A_RESOURCE_ID,
           document: {
@@ -1827,9 +1779,7 @@ describe('the Map an Open Space Resource draws', () => {
             // it names the Resource by rather than for the whole Title (ADR 0083).
             title: 'First gone\nA Space that left',
             kind: 'space',
-            spaceId: GONE_A_ID,
-            map: GONE_MAP_ID,
-            graph: GONE_GRAPH_ID,
+            content: { spaceId: GONE_A_ID, map: GONE_MAP_ID, graph: GONE_GRAPH_ID },
           },
         },
         {
@@ -1837,9 +1787,7 @@ describe('the Map an Open Space Resource draws', () => {
           document: {
             title: 'Second gone',
             kind: 'space',
-            spaceId: GONE_B_ID,
-            map: GONE_MAP_ID,
-            graph: GONE_GRAPH_ID,
+            content: { spaceId: GONE_B_ID, map: GONE_MAP_ID, graph: GONE_GRAPH_ID },
           },
         },
         {
@@ -1847,9 +1795,7 @@ describe('the Map an Open Space Resource draws', () => {
           document: {
             title: 'Elsewhere',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: SELECTED_MAP_ID,
-            graph: SELECTED_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
           },
         },
       ],
@@ -1944,7 +1890,7 @@ describe('the Map an Open Space Resource draws', () => {
         initial.app.authoring.complete(CANVAS, {
           kind: 'edited-resource',
           resourceId: HOME_RESOURCE_ID,
-          document: { title: `Start here ${edit}`, kind: 'markdown', body: '' },
+          document: { title: `Start here ${edit}`, kind: 'markdown', content: { source: '' } },
         });
       });
       await act(async () => {
@@ -1960,9 +1906,7 @@ it('offers the full entity menu while editing a drawn Map and creates its Refere
     home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     }),
   );
   await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -1983,7 +1927,10 @@ it('offers the full entity menu while editing a drawn Map and creates its Refere
       ?.session.getState()
       .working.resources.filter(({ document }) => document.kind === 'reference');
     expect(references).toHaveLength(1);
-    expect(references?.[0]?.document).toMatchObject({ kind: 'reference', target: DRAWN_A });
+    expect(references?.[0]?.document).toMatchObject({
+      kind: 'reference',
+      content: { target: DRAWN_A },
+    });
   });
   expect(
     spaces
@@ -1998,9 +1945,7 @@ it('selects and deletes an embedded Edge, then Connect offers only that drawn Ma
     home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     }),
   );
   await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -2047,9 +1992,7 @@ it('deletes a selected embedded Edge with the Delete key through the same confir
     home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     }),
   );
   await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -2086,9 +2029,7 @@ it('reports and dismisses a drawn Space Resource menu clipboard refusal', async 
       home({
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: SELECTED_MAP_ID,
-        graph: SELECTED_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
       }),
     );
     await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -2116,7 +2057,9 @@ it('reports and dismisses a drawn Space Resource menu clipboard refusal', async 
 const targetWithUrIntake: SpaceSnapshot = {
   ...target,
   resources: target.resources.map((resource) =>
-    resource.id === DRAWN_A ? { id: DRAWN_A, document: { title: 'Intake', kind: 'ur' } } : resource,
+    resource.id === DRAWN_A
+      ? { id: DRAWN_A, document: { title: 'Intake', kind: 'ur', content: {} } }
+      : resource,
   ),
 };
 
@@ -2125,9 +2068,7 @@ it('offers no Shape choice on a Markdown Resource inside a drawn Map', async () 
     home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     }),
   );
   await waitFor(() => expect(queryEmbeddedNode(DRAWN_A)).not.toBeNull());
@@ -2144,9 +2085,7 @@ it('chooses a Shape inside a drawn Map, writing that Space’s Map and drawing i
     home({
       title: 'Elsewhere',
       kind: 'space',
-      spaceId: TARGET_ID,
-      map: SELECTED_MAP_ID,
-      graph: SELECTED_GRAPH_ID,
+      content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },
     }),
     targetWithUrIntake,
   );

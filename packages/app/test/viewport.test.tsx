@@ -51,7 +51,7 @@ const snapshot = (title: string, resourceTitle: string, x: number, y: number): S
     resources: [
       {
         id: RESOURCE_ID,
-        document: { title: resourceTitle, kind: 'markdown', body: resourceTitle },
+        document: { title: resourceTitle, kind: 'markdown', content: { source: resourceTitle } },
       },
     ],
   });

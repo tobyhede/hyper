@@ -56,7 +56,12 @@ const metaSnapshot: SpaceSnapshot = {
       },
     ],
   },
-  resources: [{ id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } }],
+  resources: [
+    {
+      id: META_RESOURCE_ID,
+      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+    },
+  ],
 };
 
 const targetSnapshot: SpaceSnapshot = {
@@ -77,7 +82,10 @@ const targetSnapshot: SpaceSnapshot = {
     ],
   },
   resources: [
-    { id: TARGET_RESOURCE_ID, document: { title: 'Architecture', kind: 'markdown', body: '' } },
+    {
+      id: TARGET_RESOURCE_ID,
+      document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+    },
   ],
 };
 

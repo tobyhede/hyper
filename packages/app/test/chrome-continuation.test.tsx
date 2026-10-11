@@ -30,7 +30,9 @@ const snapshot: SpaceSnapshot = {
     ],
     defaultMap: MAP_ID,
   },
-  resources: [{ id: RESOURCE_A, document: { title: 'A', kind: 'markdown', body: 'A' } }],
+  resources: [
+    { id: RESOURCE_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+  ],
 };
 
 function open(): ComposedApp['continuation'] {

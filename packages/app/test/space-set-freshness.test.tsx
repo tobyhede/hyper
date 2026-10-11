@@ -60,15 +60,16 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: META_MAP_ID,
   },
   resources: [
-    { id: META_RESOURCE_ID, document: { title: 'Meta', kind: 'markdown', body: '' } },
+    {
+      id: META_RESOURCE_ID,
+      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: META_TO_HOME_ID,
       document: {
         title: 'Home',
         kind: 'space',
-        spaceId: HOME_ID,
-        map: HOME_MAP_ID,
-        graph: HOME_GRAPH_ID,
+        content: { spaceId: HOME_ID, map: HOME_MAP_ID, graph: HOME_GRAPH_ID },
       },
     },
     {
@@ -76,9 +77,7 @@ const meta: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'Other',
         kind: 'space',
-        spaceId: OTHER_ID,
-        map: OTHER_MAP_ID,
-        graph: OTHER_GRAPH_ID,
+        content: { spaceId: OTHER_ID, map: OTHER_MAP_ID, graph: OTHER_GRAPH_ID },
       },
     },
   ],
@@ -101,7 +100,10 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: HOME_MAP_ID,
   },
   resources: [
-    { id: HOME_RESOURCE_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+    {
+      id: HOME_RESOURCE_ID,
+      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 
@@ -122,7 +124,10 @@ const other: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: OTHER_MAP_ID,
   },
   resources: [
-    { id: OTHER_RESOURCE_ID, document: { title: 'Resource 1', kind: 'markdown', body: '' } },
+    {
+      id: OTHER_RESOURCE_ID,
+      document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
+    },
   ],
 });
 

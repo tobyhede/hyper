@@ -47,9 +47,9 @@ export const derivationSnapshot: SpaceSnapshot = {
     defaultMap: MAP_ID,
   },
   resources: [
-    { id: PLACED_A, document: { title: 'A', kind: 'markdown', body: 'A' } },
-    { id: PLACED_B, document: { title: 'B', kind: 'markdown', body: 'B' } },
-    { id: OUTSIDE, document: { title: 'Outside', kind: 'markdown', body: 'C' } },
+    { id: PLACED_A, document: { title: 'A', kind: 'markdown', content: { source: 'A' } } },
+    { id: PLACED_B, document: { title: 'B', kind: 'markdown', content: { source: 'B' } } },
+    { id: OUTSIDE, document: { title: 'Outside', kind: 'markdown', content: { source: 'C' } } },
   ],
 };
 

@@ -81,9 +81,9 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: TARGET_MAP_ID,
   },
   resources: [
-    { id: INTAKE_ID, document: { title: 'Intake', kind: 'markdown', body: '' } },
-    { id: STORAGE_ID, document: { title: 'Storage', kind: 'markdown', body: '' } },
-    { id: REVIEW_ID, document: { title: 'Review', kind: 'markdown', body: '' } },
+    { id: INTAKE_ID, document: { title: 'Intake', kind: 'markdown', content: { source: '' } } },
+    { id: STORAGE_ID, document: { title: 'Storage', kind: 'markdown', content: { source: '' } } },
+    { id: REVIEW_ID, document: { title: 'Review', kind: 'markdown', content: { source: '' } } },
   ],
 });
 
@@ -129,15 +129,16 @@ const home: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: HOME_MAP_ID,
   },
   resources: [
-    { id: HOME_RESOURCE_ID, document: { title: 'Start here', kind: 'markdown', body: '' } },
+    {
+      id: HOME_RESOURCE_ID,
+      document: { title: 'Start here', kind: 'markdown', content: { source: '' } },
+    },
     {
       id: SPACE_RESOURCE_ID,
       document: {
         title: 'Elsewhere',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     },
   ],
@@ -237,9 +238,15 @@ const pairTarget: SpaceSnapshot = spaceSnapshotSchema.parse({
     defaultMap: PAIR_OVERVIEW_MAP_ID,
   },
   resources: [
-    { id: PAIR_INTAKE_ID, document: { title: 'Intake', kind: 'markdown', body: '' } },
-    { id: PAIR_STORAGE_ID, document: { title: 'Storage', kind: 'markdown', body: '' } },
-    { id: PAIR_INDEX_ID, document: { title: 'Index', kind: 'markdown', body: '' } },
+    {
+      id: PAIR_INTAKE_ID,
+      document: { title: 'Intake', kind: 'markdown', content: { source: '' } },
+    },
+    {
+      id: PAIR_STORAGE_ID,
+      document: { title: 'Storage', kind: 'markdown', content: { source: '' } },
+    },
+    { id: PAIR_INDEX_ID, document: { title: 'Index', kind: 'markdown', content: { source: '' } } },
   ],
 });
 
@@ -292,9 +299,11 @@ const pairHome: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'The overview',
         kind: 'space',
-        spaceId: PAIR_TARGET_ID,
-        map: PAIR_OVERVIEW_MAP_ID,
-        graph: PAIR_OVERVIEW_GRAPH_ID,
+        content: {
+          spaceId: PAIR_TARGET_ID,
+          map: PAIR_OVERVIEW_MAP_ID,
+          graph: PAIR_OVERVIEW_GRAPH_ID,
+        },
       },
     },
     {
@@ -302,9 +311,7 @@ const pairHome: SpaceSnapshot = spaceSnapshotSchema.parse({
       document: {
         title: 'The detail',
         kind: 'space',
-        spaceId: PAIR_TARGET_ID,
-        map: PAIR_DETAIL_MAP_ID,
-        graph: PAIR_DETAIL_GRAPH_ID,
+        content: { spaceId: PAIR_TARGET_ID, map: PAIR_DETAIL_MAP_ID, graph: PAIR_DETAIL_GRAPH_ID },
       },
     },
   ],

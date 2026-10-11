@@ -57,7 +57,7 @@ const metaSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: META_RESOURCE_ID,
-      document: { title: 'Meta', kind: 'markdown', body: '' },
+      document: { title: 'Meta', kind: 'markdown', content: { source: '' } },
     },
   ],
 };
@@ -103,7 +103,7 @@ const targetSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: TARGET_RESOURCE_ID,
-      document: { title: 'Architecture', kind: 'markdown', body: '' },
+      document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
     },
   ],
 };
@@ -123,9 +123,7 @@ describe('Space Resource lifecycle', () => {
                   document: {
                     title: 'Existing target',
                     kind: 'space',
-                    spaceId: TARGET_ID,
-                    map: TARGET_MAP_ID,
-                    graph: TARGET_GRAPH_ID,
+                    content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
                   },
                 },
               ],
@@ -209,9 +207,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -327,7 +323,10 @@ describe('Space Resource lifecycle', () => {
         ],
       },
       resources: [
-        { id: CHILD_RESOURCE_ID, document: { title: 'Child', kind: 'markdown', body: '' } },
+        {
+          id: CHILD_RESOURCE_ID,
+          document: { title: 'Child', kind: 'markdown', content: { source: '' } },
+        },
       ],
     };
     const backend = new MemorySpaceBackend(META_ID, [
@@ -354,9 +353,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Unsaved child',
             kind: 'space',
-            spaceId: DANGLING_TARGET_ID,
-            map: CHILD_MAP_ID,
-            graph: CHILD_GRAPH_ID,
+            content: { spaceId: DANGLING_TARGET_ID, map: CHILD_MAP_ID, graph: CHILD_GRAPH_ID },
           },
         },
       ],
@@ -491,9 +488,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -564,9 +559,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -1187,13 +1180,7 @@ describe('Space Resource lifecycle', () => {
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        // The Map and Graph initialization minted for the target it just
-        // made, kept rather than discarded (ADR 0079). A created Space Resource
-        // stores a selection from the moment it exists, and the only Map in
-        // existence for a Space one Edit old is the one that Edit authored.
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     });
     expect(storedMeta?.snapshot.document.maps?.[0]?.positions[SPACE_RESOURCE_ID]).toEqual({
@@ -1235,7 +1222,7 @@ describe('Space Resource lifecycle', () => {
             // neutral `Resource 1` every new Space's first Resource takes, because the
             // two are independent from the moment they exist (ADR 0068).
             id: TARGET_RESOURCE_ID,
-            document: { title: 'Resource 1', kind: 'markdown', body: '' },
+            document: { title: 'Resource 1', kind: 'markdown', content: { source: '' } },
           },
         ],
       },
@@ -1252,9 +1239,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'First link',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -1278,9 +1263,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Child',
             kind: 'space',
-            spaceId: CHILD_ID,
-            map: CHILD_MAP_ID,
-            graph: CHILD_GRAPH_ID,
+            content: { spaceId: CHILD_ID, map: CHILD_MAP_ID, graph: CHILD_GRAPH_ID },
           },
         },
       ],
@@ -1305,7 +1288,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Child', kind: 'markdown', body: '' },
+          document: { title: 'Child', kind: 'markdown', content: { source: '' } },
         },
       ],
     };
@@ -1374,9 +1357,7 @@ describe('Space Resource lifecycle', () => {
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     });
     // Read, never written. Linking is an Edit on the Space doing the pointing,
@@ -1396,7 +1377,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: TARGET_RESOURCE_ID,
-          document: { title: 'Architecture', kind: 'markdown', body: '' },
+          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
         },
       ],
     };
@@ -1468,9 +1449,7 @@ describe('Space Resource lifecycle', () => {
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     });
   });
@@ -1522,9 +1501,7 @@ describe('Space Resource lifecycle', () => {
       document: {
         title: 'Architecture',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: TARGET_MAP_ID,
-        graph: SECOND_TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: SECOND_TARGET_GRAPH_ID },
       },
     });
   });
@@ -1536,7 +1513,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: TARGET_RESOURCE_ID,
-          document: { title: 'Architecture', kind: 'markdown', body: '' },
+          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
         },
       ],
     };
@@ -1616,9 +1593,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Back to Meta',
             kind: 'space',
-            spaceId: META_ID,
-            map: META_MAP_ID,
-            graph: META_GRAPH_ID,
+            content: { spaceId: META_ID, map: META_MAP_ID, graph: META_GRAPH_ID },
           },
         },
       ],
@@ -1758,7 +1733,10 @@ describe('Space Resource lifecycle', () => {
         ],
       },
       resources: [
-        { id: TARGET_RESOURCE_ID, document: { title: 'Architecture', kind: 'markdown', body: '' } },
+        {
+          id: TARGET_RESOURCE_ID,
+          document: { title: 'Architecture', kind: 'markdown', content: { source: '' } },
+        },
       ],
     };
     const control = new MemorySpaceBackendTestControl();
@@ -1818,9 +1796,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
         {
@@ -1828,9 +1804,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Sibling',
             kind: 'space',
-            spaceId: CHILD_ID,
-            map: CHILD_MAP_ID,
-            graph: CHILD_GRAPH_ID,
+            content: { spaceId: CHILD_ID, map: CHILD_MAP_ID, graph: CHILD_GRAPH_ID },
           },
         },
       ],
@@ -1855,7 +1829,7 @@ describe('Space Resource lifecycle', () => {
       resources: [
         {
           id: CHILD_RESOURCE_ID,
-          document: { title: 'Sibling', kind: 'markdown', body: '' },
+          document: { title: 'Sibling', kind: 'markdown', content: { source: '' } },
         },
       ],
     };
@@ -1890,9 +1864,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -2032,9 +2004,7 @@ describe('Space Resource lifecycle', () => {
       document: {
         title: 'Link',
         kind: 'space',
-        spaceId: TARGET_ID,
-        map: TARGET_MAP_ID,
-        graph: TARGET_GRAPH_ID,
+        content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
       },
     });
     // The queued Graph never got a chance to commit during this turn — it
@@ -2114,9 +2084,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -2152,15 +2120,16 @@ describe('Space Resource lifecycle', () => {
         ],
       },
       resources: [
-        { id: CHILD_RESOURCE_ID, document: { title: 'Sibling', kind: 'markdown', body: '' } },
+        {
+          id: CHILD_RESOURCE_ID,
+          document: { title: 'Sibling', kind: 'markdown', content: { source: '' } },
+        },
         {
           id: CHILD_LINK_ID,
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -2223,9 +2192,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -2244,7 +2211,10 @@ describe('Space Resource lifecycle', () => {
       id: CHILD_ID,
       document: { version: 1, title: 'Unrelated' },
       resources: [
-        { id: CHILD_RESOURCE_ID, document: { title: 'Unrelated', kind: 'markdown', body: '' } },
+        {
+          id: CHILD_RESOURCE_ID,
+          document: { title: 'Unrelated', kind: 'markdown', content: { source: '' } },
+        },
       ],
     };
     const control = new MemorySpaceBackendTestControl();
@@ -2298,7 +2268,10 @@ describe('Space Resource lifecycle', () => {
         ],
       },
       resources: [
-        { id: CHILD_RESOURCE_ID, document: { title: 'Orphan', kind: 'markdown', body: '' } },
+        {
+          id: CHILD_RESOURCE_ID,
+          document: { title: 'Orphan', kind: 'markdown', content: { source: '' } },
+        },
       ],
     };
     const backend = new MemorySpaceBackend(META_ID, [
@@ -2340,9 +2313,7 @@ describe('Space Resource lifecycle', () => {
           document: {
             title: 'Target',
             kind: 'space',
-            spaceId: TARGET_ID,
-            map: TARGET_MAP_ID,
-            graph: TARGET_GRAPH_ID,
+            content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
           },
         },
       ],
@@ -2387,9 +2358,7 @@ describe('Space Resource coordination paths', () => {
         document: {
           title: 'Target',
           kind: 'space',
-          spaceId: TARGET_ID,
-          map: TARGET_MAP_ID,
-          graph: TARGET_GRAPH_ID,
+          content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
         },
       },
     ],
@@ -3355,13 +3324,13 @@ describe('A coordinated save over the request size limit', () => {
     ...space,
     resources: space.resources.map((resource) =>
       resource.id === META_RESOURCE_ID
-        ? { ...resource, document: { title: 'Meta', kind: 'markdown', body } }
+        ? { ...resource, document: { title: 'Meta', kind: 'markdown', content: { source: body } } }
         : resource,
     ),
   });
   const metaBody = (space: SpaceSnapshot): string | undefined => {
     const document = space.resources.find(({ id }) => id === META_RESOURCE_ID)?.document;
-    return document?.kind === 'markdown' ? document.body : undefined;
+    return document?.kind === 'markdown' ? document.content.source : undefined;
   };
 
   it('refuses the total request, keeps every Edit, and saves once a reduction fits', async () => {

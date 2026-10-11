@@ -12,10 +12,10 @@ type SpaceResource = Extract<Resource, { kind: 'space' }>;
  * whole rather than by a conditional spread.
  */
 export interface SpaceView {
-  readonly spaceId: SpaceResource['spaceId'];
-  readonly map: SpaceResource['map'];
-  readonly graph: SpaceResource['graph'];
-  readonly framing: SpaceResource['framing'] | undefined;
+  readonly spaceId: SpaceResource['content']['spaceId'];
+  readonly map: SpaceResource['content']['map'];
+  readonly graph: SpaceResource['content']['graph'];
+  readonly framing: SpaceResource['content']['framing'] | undefined;
 }
 
 /**

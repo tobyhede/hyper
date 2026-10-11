@@ -13,5 +13,7 @@ export const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-00000000000
 export const oneResourceSnapshot: SpaceSnapshot = {
   id: SPACE_ID,
   document: { version: 1, title: 'One' },
-  resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: '' } }],
+  resources: [
+    { id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', content: { source: '' } } },
+  ],
 };

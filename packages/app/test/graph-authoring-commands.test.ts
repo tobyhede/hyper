@@ -46,9 +46,7 @@ const OTHER_COLOR = '#00aa00';
 const document: Extract<ResourceDocument, { kind: 'space' }> = {
   kind: 'space',
   title: 'Target',
-  spaceId: TARGET,
-  map: SECOND_MAP,
-  graph: SECOND_GRAPH,
+  content: { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH },
 };
 const meta: SpaceSnapshot = {
   id: META,
@@ -129,14 +127,16 @@ const selectOn =
     const result = source.app.authoring.complete(CANVAS, {
       kind: 'edited-resource',
       resourceId: RESOURCE,
-      document: { ...document, map: mapId, graph: graphId },
+      document: { ...document, content: { ...document.content, map: mapId, graph: graphId } },
     });
     return result.kind === 'refused' ? result.refusal.code : null;
   };
 
 const storedSelection = (source: OpenSpace) => {
   const stored = source.session.getState().working.resources[0]?.document;
-  return stored?.kind === 'space' ? { map: stored.map, graph: stored.graph } : undefined;
+  return stored?.kind === 'space'
+    ? { map: stored.content.map, graph: stored.content.graph }
+    : undefined;
 };
 
 const graphsOf = (space: OpenSpace, mapId: MapId): readonly GraphId[] =>
@@ -239,8 +239,8 @@ const contexts: readonly {
         addressSelected: () => undefined,
         authored,
         outcomes: source.app.commandOutcomes,
-        mapId: document.map,
-        graphId: document.graph,
+        mapId: document.content.map,
+        graphId: document.content.graph,
         commands: embeddedGraphAuthoringCommands({
           target: authored,
           spaces,

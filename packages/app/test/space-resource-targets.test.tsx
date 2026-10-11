@@ -46,9 +46,7 @@ const resources = (): readonly Resource[] => [
     id: SPACE_RESOURCE_ID,
     title: 'Nested',
     kind: 'space',
-    spaceId: TARGET_ID,
-    map: TARGET_MAP_ID,
-    graph: TARGET_GRAPH_ID,
+    content: { spaceId: TARGET_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID },
   },
 ];
 
@@ -59,9 +57,7 @@ const twoResources = (): readonly Resource[] => [
     id: OTHER_SPACE_RESOURCE_ID,
     title: 'Also nested',
     kind: 'space',
-    spaceId: OTHER_TARGET_ID,
-    map: OTHER_TARGET_MAP_ID,
-    graph: OTHER_TARGET_GRAPH_ID,
+    content: { spaceId: OTHER_TARGET_ID, map: OTHER_TARGET_MAP_ID, graph: OTHER_TARGET_GRAPH_ID },
   },
 ];
 

@@ -76,7 +76,7 @@ export const spaceResourceDocument = (
   target: SpaceSnapshot,
 ): SpaceSnapshot['resources'][number]['document'] => {
   const { map: mapId, graph } = opensOn(target);
-  return { title, kind: 'space', spaceId: target.id, map: mapId, graph };
+  return { title, kind: 'space', content: { spaceId: target.id, map: mapId, graph } };
 };
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -168,7 +168,7 @@ export const authoredSnapshot: SpaceSnapshot = {
   },
   resources: SPINE.map((id, index) => ({
     id,
-    document: { title: `Resource ${index + 1}`, kind: 'markdown', body: '' },
+    document: { title: `Resource ${index + 1}`, kind: 'markdown', content: { source: '' } },
   })),
 };
 
@@ -380,7 +380,10 @@ const traversalPositions = (ids: readonly ResourceId[]): Record<string, Resource
 const traversalResources = (
   titled: readonly (readonly [ResourceId, string])[],
 ): SpaceSnapshot['resources'] =>
-  titled.map(([id, title]) => ({ id, document: { title, kind: 'markdown', body: '' } }));
+  titled.map(([id, title]) => ({
+    id,
+    document: { title, kind: 'markdown', content: { source: '' } },
+  }));
 
 const TRAVERSAL_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000060');
 const TRAVERSAL_RESOURCES = [
@@ -522,6 +525,7 @@ const DOCK_PLACED = [
     id: dockId(0x11),
     title: 'Why authored placement beats a layout engine that reshuffles on every edit',
     kind: 'ur',
+    content: {},
   },
   { id: dockId(0x12), title: 'Strategies', kind: 'image' },
   { id: dockId(0x13), title: 'Design system', kind: 'space' },
@@ -558,7 +562,7 @@ const DOCK_UNPLACED = [
   { title: 'Entry points', kind: 'markdown' },
   { title: 'Unreachable Resources', kind: 'markdown' },
   { title: 'Fork ranking', kind: 'markdown' },
-  { title: 'Vocabulary', kind: 'ur' },
+  { title: 'Vocabulary', kind: 'ur', content: {} },
   { title: 'Add vs Create', kind: 'markdown' },
   { title: 'Layout strategies', kind: 'space' },
   { title: 'Grid', kind: 'markdown' },
@@ -640,11 +644,15 @@ const dockResourceDocument = (
   index: number,
 ): SpaceSnapshot['resources'][number]['document'] => {
   if (kind === 'space') return spaceResourceDocument(title, dockTargetSpace(index));
-  if (kind === 'reference') return { title, kind, target: dockReferenceTarget(title) };
+  if (kind === 'reference') return { title, kind, content: { target: dockReferenceTarget(title) } };
   if (kind === 'image')
-    return { title, kind, url: DOCK_IMAGE_URL, naturalSize: { width: 400, height: 300 } };
-  if (kind === 'ur') return { title, kind };
-  return { title, kind, body: '' };
+    return {
+      title,
+      kind,
+      content: { url: DOCK_IMAGE_URL, naturalSize: { width: 400, height: 300 } },
+    };
+  if (kind === 'ur') return { title, kind, content: {} };
+  return { title, kind, content: { source: '' } };
 };
 
 const DOCK_RESOURCES: SpaceSnapshot['resources'] = [
@@ -979,7 +987,7 @@ export const edgeToolbarSnapshot: SpaceSnapshot = {
   },
   resources: [EDGE_R1, EDGE_R2, EDGE_R3, EDGE_R4, EDGE_R5, EDGE_R6].map((id, index) => ({
     id,
-    document: { title: `Resource ${index + 1}`, kind: 'markdown', body: '' },
+    document: { title: `Resource ${index + 1}`, kind: 'markdown', content: { source: '' } },
   })),
 };
 
@@ -1042,21 +1050,28 @@ export const imageReferenceSnapshot: SpaceSnapshot = {
       document: {
         title: 'Harbour',
         kind: 'image',
-        url: IMAGE_REFERENCE_HARBOUR_URL,
-        naturalSize: { width: 400, height: 300 },
+        content: { url: IMAGE_REFERENCE_HARBOUR_URL, naturalSize: { width: 400, height: 300 } },
       },
     },
     {
       id: imageReferenceIds.harbourReference,
-      document: { title: 'Harbour, again', kind: 'reference', target: imageReferenceIds.harbour },
+      document: {
+        title: 'Harbour, again',
+        kind: 'reference',
+        content: { target: imageReferenceIds.harbour },
+      },
     },
     {
       id: imageReferenceIds.missing,
-      document: { title: 'Missing', kind: 'image', url: IMAGE_REFERENCE_MISSING_URL },
+      document: { title: 'Missing', kind: 'image', content: { url: IMAGE_REFERENCE_MISSING_URL } },
     },
     {
       id: imageReferenceIds.missingReference,
-      document: { title: 'Missing, again', kind: 'reference', target: imageReferenceIds.missing },
+      document: {
+        title: 'Missing, again',
+        kind: 'reference',
+        content: { target: imageReferenceIds.missing },
+      },
     },
   ],
 };
@@ -1126,13 +1141,13 @@ export const stageSnapshot: SpaceSnapshot = {
   resources: [
     {
       id: stageIds.longRead,
-      document: { title: 'Long read', kind: 'markdown', body: LONG_READ_BODY },
+      document: { title: 'Long read', kind: 'markdown', content: { source: LONG_READ_BODY } },
     },
     {
       id: stageIds.picture,
-      document: { title: 'Picture', kind: 'image', url: STAGE_PICTURE_URL },
+      document: { title: 'Picture', kind: 'image', content: { url: STAGE_PICTURE_URL } },
     },
-    { id: stageIds.titleSlide, document: { title: 'Title slide', kind: 'ur' } },
+    { id: stageIds.titleSlide, document: { title: 'Title slide', kind: 'ur', content: {} } },
   ],
 };
 

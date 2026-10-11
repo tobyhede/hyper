@@ -85,12 +85,12 @@ describe('readSingleSpace', () => {
         // Sorted globally by relative path, so the two files inside the
         // inventory directory precede `root.md`: `resources/` sorts before
         // `root`.
-        { document: { title: 'A', kind: 'markdown', body: 'A body\n' } },
-        { document: { title: 'Detail', kind: 'markdown', body: 'Detail body\n' } },
-        { document: { title: 'Z', kind: 'markdown', body: 'Z body\n' } },
+        { document: { title: 'A', kind: 'markdown', content: { source: 'A body\n' } } },
+        { document: { title: 'Detail', kind: 'markdown', content: { source: 'Detail body\n' } } },
+        { document: { title: 'Z', kind: 'markdown', content: { source: 'Z body\n' } } },
         {
           id: ROOT_RESOURCE_ID,
-          document: { title: 'Root', kind: 'markdown', body: 'Root body\n' },
+          document: { title: 'Root', kind: 'markdown', content: { source: 'Root body\n' } },
         },
       ],
     };

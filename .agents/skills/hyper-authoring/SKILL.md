@@ -21,7 +21,7 @@ An **Aggregate directory** is Hyper's on-disk form: `hyper.json` naming the Meta
    - A Map's `positions` keys are its membership, and an Edge may only join Resources its Map positions.
    - Every Map owns at least one Graph.
    - Resource Ids are unique across the whole aggregate, not just within a Space.
-   - Every ordinary Space must be reached by a Space Resource (`kind: space`, with `spaceId`, `map` and `graph`) somewhere else in the aggregate, so it needs a Map and a Graph for that Space Resource to name. Only the Meta Space may be written without Maps.
+   - Every ordinary Space must be reached by a Space Resource (`kind: space`, with `spaceId`, `map` and `graph`, and an optional `framing` of `centreX`, `centreY` and `zoom` that Export writes for a framed one; keep it) somewhere else in the aggregate, so it needs a Map and a Graph for that Space Resource to name. Only the Meta Space may be written without Maps.
    - Every object in `space.json` and every Resource's frontmatter is strict: an unknown or misspelt key is refused, naming the key and the file.
    - Declare every Resource's `kind`. A file with no `kind` is an Ur Resource, which has no body, so a Markdown file that leaves `kind: markdown` out is refused.
    - A picture is `images/<content-id>.<ext>`, named by the SHA-256 of its bytes; the reference shows the command. The Resource's `url` is `/images/<content-id>`.

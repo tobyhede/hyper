@@ -89,7 +89,7 @@ const LINK_RESOURCE_ID = uuidSchema.parse('c0000000-0000-4000-8000-000000000013'
 
 const resource = (id: UUID, title: string) => ({
   id,
-  document: { title, kind: 'markdown' as const, body: title },
+  document: { title, kind: 'markdown' as const, content: { source: title } },
 });
 
 const space = (id: UUID, title: string, resourceIds: readonly UUID[]): SpaceSnapshot => ({
@@ -104,7 +104,11 @@ const spaceResource = (
   selection: { readonly map: UUID; readonly graph: UUID },
 ) => ({
   id,
-  document: { title: `Open ${target}`, kind: 'space' as const, spaceId: target, ...selection },
+  document: {
+    title: `Open ${target}`,
+    kind: 'space' as const,
+    content: { spaceId: target, ...selection },
+  },
 });
 
 const targetSpace = (id: UUID, title: string, resourceIds: readonly UUID[]): SpaceSnapshot => ({

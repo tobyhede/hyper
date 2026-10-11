@@ -3,7 +3,7 @@ import type { EmbeddedBounds } from './embedded-map';
 
 /** The Map-coordinate centre and scale a Space Resource stores for its window. */
 export type SpaceResourceFraming = NonNullable<
-  Extract<ResourceDocument, { kind: 'space' }>['framing']
+  Extract<ResourceDocument, { kind: 'space' }>['content']['framing']
 >;
 
 /**

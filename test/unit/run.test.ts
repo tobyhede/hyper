@@ -338,7 +338,10 @@ describe('Running an Aggregate directory', () => {
             ...loaded.snapshot,
             resources: [
               ...loaded.snapshot.resources,
-              { id: resourceId, document: { title: 'Uploaded', kind: 'image', url: stored.url } },
+              {
+                id: resourceId,
+                document: { title: 'Uploaded', kind: 'image', content: { url: stored.url } },
+              },
             ],
           },
           expectedRevision: loaded.revision,

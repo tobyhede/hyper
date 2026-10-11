@@ -14,7 +14,12 @@ const loaded: LoadedSpace = {
   snapshot: {
     id: SPACE_ID,
     document: { version: 1, title: 'One' },
-    resources: [{ id: RESOURCE_ID, document: { title: 'A', kind: 'markdown', body: 'Original' } }],
+    resources: [
+      {
+        id: RESOURCE_ID,
+        document: { title: 'A', kind: 'markdown', content: { source: 'Original' } },
+      },
+    ],
   },
   revision: 3n,
   exportedRevision: 2n,
@@ -1149,12 +1154,12 @@ describe('a save over the request size limit', () => {
     ...loaded.snapshot,
     resources: loaded.snapshot.resources.map((resource) => ({
       ...resource,
-      document: { title: 'A', kind: 'markdown', body },
+      document: { title: 'A', kind: 'markdown', content: { source: body } },
     })),
   });
   const bodyOf = (snapshot: LoadedSpace['snapshot']) => {
     const document = snapshot.resources[0]?.document;
-    return document?.kind === 'markdown' ? document.body : undefined;
+    return document?.kind === 'markdown' ? document.content.source : undefined;
   };
   const sizeLimited = () => {
     const backend = new SizeLimitedBackend(SPACE_ID, [loaded]);
@@ -1204,7 +1209,7 @@ describe('a save over the request size limit', () => {
     expect(bodyOf(stillOver.working)).toBe('x'.repeat(300));
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
       revision: 3n,
-      snapshot: { resources: [{ document: { body: 'Original' } }] },
+      snapshot: { resources: [{ document: { content: { source: 'Original' } } }] },
     });
 
     session.submit(withBody('x'.repeat(80)));
@@ -1212,7 +1217,7 @@ describe('a save over the request size limit', () => {
     expect(settled.acknowledgedRevision).toBe(4n);
     await expect(backend.loadSpace(SPACE_ID)).resolves.toMatchObject({
       revision: 4n,
-      snapshot: { resources: [{ document: { body: 'x'.repeat(80) } }] },
+      snapshot: { resources: [{ document: { content: { source: 'x'.repeat(80) } } }] },
     });
   });
 
