@@ -10,7 +10,7 @@ import {
 import { referenceKind, referenceResourceContentSchema } from './kinds/reference';
 import { kindFlags } from './kinds/registry';
 import { spaceKind, spaceResourceContentSchema, spaceResourceFramingSchema } from './kinds/space';
-import { urKind } from './kinds/ur';
+import { urKind, urResourceContentSchema } from './kinds/ur';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
 import { uuidSchema } from './uuid';
 
@@ -57,9 +57,6 @@ const resourceTitleSchema = z
     message: 'A title must have at least one line with something in it',
     params: { code: RESOURCE_TITLE_REQUIRED },
   });
-
-/** An Ur Resource's content, which is nothing (ADR 0113). */
-export const urResourceContentSchema = urKind.contentSchema;
 
 /**
  * A Resource is an envelope (ADR 0128): the core owns `id`, `title` and

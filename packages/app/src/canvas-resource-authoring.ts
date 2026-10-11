@@ -12,11 +12,9 @@ import {
   type ResourceId,
   type ResourceShape,
   type GraphId,
-  imageKind,
-  urKind,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
-import { isResourceNodeOf, type ResourceFlowNode } from '@project/react-flow-adapter';
+import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { EntityActionGroup, ImageReplacement } from '@project/ui';
 import { PICKED_IMAGE_TYPES } from './image-creation';
 import { describeImageReplacement, type ImageReplacements } from './image-replacement';
@@ -30,15 +28,8 @@ import type { CommandOutcomes } from './command-outcomes';
 import type { DeleteConfirmation } from './delete-confirmation';
 import { NO_SPACE_RESOURCE_TARGETS, type SpaceResourceTargets } from './space-resource-targets';
 import type { SpaceResourceFraming } from './space-resource-framing';
-import {
-  applyKindDecoration,
-  applyResourceDataPatch,
-  decorateImageResourceNode,
-  decorateMarkdownResourceNode,
-  decorateSharedResourceNode,
-  decorateSpaceResourceNode,
-  decorateUrResourceNode,
-} from './canvas-resource-decoration';
+import { applyResourceDataPatch, decorateSharedResourceNode } from './canvas-resource-decoration';
+import { useKindDecoratedNodes } from './kinds/registry';
 
 type Caret =
   | { readonly resourceId: string; readonly field: 'title' }
@@ -518,92 +509,6 @@ export function useCanvasResourceAuthoring({
       resourceEntityActions,
     ],
   );
-  const urContext = useMemo(
-    () => ({
-      authorOnCanvas: availability.authorOnCanvas,
-      editableResourceIds,
-      changeResourceShape,
-    }),
-    [availability.authorOnCanvas, editableResourceIds, changeResourceShape],
-  );
-  const markdownContext = useMemo(
-    () => ({
-      authorOnCanvas: availability.authorOnCanvas,
-      bodyEditing,
-      editableResourceIds,
-      beginBodyEditing,
-      bodyEditorResourceId,
-      completeResourceBody,
-      clearCaret,
-    }),
-    [
-      availability.authorOnCanvas,
-      bodyEditing,
-      editableResourceIds,
-      beginBodyEditing,
-      bodyEditorResourceId,
-      completeResourceBody,
-      clearCaret,
-    ],
-  );
-  const imageContext = useMemo(
-    () => ({
-      authorOnCanvas: availability.authorOnCanvas,
-      bodyEditing,
-      editableResourceIds,
-      beginBodyEditing,
-      bodyEditorResourceId,
-      replaceResourceImage,
-      imageAccept: PICKED_IMAGE_TYPES,
-      clearCaret,
-    }),
-    [
-      availability.authorOnCanvas,
-      bodyEditing,
-      editableResourceIds,
-      beginBodyEditing,
-      bodyEditorResourceId,
-      replaceResourceImage,
-      clearCaret,
-    ],
-  );
-  const spaceContext = useMemo(
-    () => ({
-      authorOnCanvas: availability.authorOnCanvas,
-      editableResourceIds,
-      containingSpaceId: working.id,
-      spaceDocuments,
-      spaceResourceTargets,
-      spaces,
-      continuation,
-      commandOutcomes,
-      deleteConfirmation,
-      completeSpaceResourceSelection,
-      portalEditing,
-      onPortalEditingChange,
-      contextNotices,
-      onContextEditingChange,
-      onContextReport,
-    }),
-    [
-      availability.authorOnCanvas,
-      editableResourceIds,
-      working.id,
-      spaceDocuments,
-      spaceResourceTargets,
-      spaces,
-      continuation,
-      commandOutcomes,
-      deleteConfirmation,
-      completeSpaceResourceSelection,
-      portalEditing,
-      onPortalEditingChange,
-      contextNotices,
-      onContextEditingChange,
-      onContextReport,
-    ],
-  );
-
   const withShared = useMemo(
     () =>
       nodes.map((node) =>
@@ -611,57 +516,31 @@ export function useCanvasResourceAuthoring({
       ),
     [nodes, sharedContext],
   );
-  const markdownDecorated = useMemo(() => {
-    const next = new Map<string, ResourceFlowNode>();
-    for (const node of withShared) {
-      if (isResourceNodeOf(node, markdownKind.id)) {
-        next.set(
-          node.id,
-          applyKindDecoration(node, decorateMarkdownResourceNode(node, markdownContext)),
-        );
-      }
-    }
-    return next;
-  }, [withShared, markdownContext]);
-  const imageDecorated = useMemo(() => {
-    const next = new Map<string, ResourceFlowNode>();
-    for (const node of withShared) {
-      if (isResourceNodeOf(node, imageKind.id)) {
-        next.set(node.id, applyKindDecoration(node, decorateImageResourceNode(node, imageContext)));
-      }
-    }
-    return next;
-  }, [withShared, imageContext]);
-  const urDecorated = useMemo(() => {
-    const next = new Map<string, ResourceFlowNode>();
-    for (const node of withShared) {
-      if (isResourceNodeOf(node, urKind.id)) {
-        next.set(node.id, applyKindDecoration(node, decorateUrResourceNode(node, urContext)));
-      }
-    }
-    return next;
-  }, [withShared, urContext]);
-  const spaceDecorated = useMemo(() => {
-    const next = new Map<string, ResourceFlowNode>();
-    for (const node of withShared) {
-      if (isResourceNodeOf(node, spaceKind.id)) {
-        next.set(node.id, applyKindDecoration(node, decorateSpaceResourceNode(node, spaceContext)));
-      }
-    }
-    return next;
-  }, [withShared, spaceContext]);
-  const decoratedNodes = useMemo(
-    () =>
-      withShared.map(
-        (node) =>
-          markdownDecorated.get(node.id) ??
-          imageDecorated.get(node.id) ??
-          urDecorated.get(node.id) ??
-          spaceDecorated.get(node.id) ??
-          node,
-      ),
-    [withShared, markdownDecorated, imageDecorated, urDecorated, spaceDecorated],
-  );
+  const decoratedNodes = useKindDecoratedNodes(withShared, {
+    authorOnCanvas: availability.authorOnCanvas,
+    bodyEditing,
+    editableResourceIds,
+    beginBodyEditing,
+    bodyEditorResourceId,
+    completeResourceBody,
+    clearCaret,
+    replaceResourceImage,
+    imageAccept: PICKED_IMAGE_TYPES,
+    changeResourceShape,
+    continuation,
+    containingSpaceId: working.id,
+    spaceDocuments,
+    spaceResourceTargets,
+    spaces,
+    commandOutcomes,
+    deleteConfirmation,
+    completeSpaceResourceSelection,
+    portalEditing,
+    onPortalEditingChange,
+    contextNotices,
+    onContextEditingChange,
+    onContextReport,
+  });
 
   return {
     nodes: decoratedNodes,

@@ -1,6 +1,6 @@
 import {
-  spaceKind,
-  referenceKind,
+  contentTarget,
+  spaceReferences,
   type Resource,
   type Graph,
   type GraphId,
@@ -279,36 +279,35 @@ export function spaceEntityActions({
      * Copy link to Resource in Map and Copy link to Resource still name the
      * Resource. Independently opening the target is a third destination: no
      * containing Map, no presentation, and not this Space (ADR 0068, ADR
-     * 0069). Offered only on a Space Resource — a Markdown Resource has no target
-     * Space to address.
+     * 0069). Offered only on a Resource whose kind references a Space — a
+     * Markdown Resource has no target Space to address.
      */
-    const targetSpaceAddress: readonly EntityAction[] =
-      resource.kind !== spaceKind.id
-        ? []
-        : [
-            copy(
-              COPY_SPACE_LINK_ACTION_ID,
-              COPY_SPACE_LINK,
-              { kind: 'space', spaceId: resource.content.spaceId },
-              onCopy,
-            ),
-            ...(onOpenIndependently === null
-              ? []
-              : [
-                  {
-                    id: OPEN_INDEPENDENTLY_ACTION_ID,
-                    label: OPEN_INDEPENDENTLY,
-                    report: { done: 'Sent', failed: NOT_SENT },
-                    icon: <OpenIndependentlyIcon />,
-                    // Sync on purpose: `window.open` spends the click's user
-                    // gesture, and an `await` here would yield and lose it.
-                    onSelect: (): EntityActionOutcome =>
-                      onOpenIndependently({ kind: 'space', spaceId: resource.content.spaceId })
-                        ? 'done'
-                        : 'failed',
-                  },
-                ]),
-          ];
+    const targetSpaceAddress: readonly EntityAction[] = spaceReferences(resource).flatMap(
+      (targetSpaceId) => [
+        copy(
+          COPY_SPACE_LINK_ACTION_ID,
+          COPY_SPACE_LINK,
+          { kind: 'space', spaceId: targetSpaceId },
+          onCopy,
+        ),
+        ...(onOpenIndependently === null
+          ? []
+          : [
+              {
+                id: OPEN_INDEPENDENTLY_ACTION_ID,
+                label: OPEN_INDEPENDENTLY,
+                report: { done: 'Sent', failed: NOT_SENT },
+                icon: <OpenIndependentlyIcon />,
+                // Sync on purpose: `window.open` spends the click's user
+                // gesture, and an `await` here would yield and lose it.
+                onSelect: (): EntityActionOutcome =>
+                  onOpenIndependently({ kind: 'space', spaceId: targetSpaceId })
+                    ? 'done'
+                    : 'failed',
+              },
+            ]),
+      ],
+    );
     /**
      * The Target a Reference Resource shows, at that Target's own Resource address.
      *
@@ -318,14 +317,15 @@ export function spaceEntityActions({
      * itself and does have one when placed here. Offered only on a Reference
      * Resource (ADR 0092); a Markdown or Space Resource has no Target to address.
      */
+    const target = contentTarget(resource);
     const targetResourceAddress: readonly EntityAction[] =
-      resource.kind !== referenceKind.id
+      target === undefined
         ? []
         : [
             copy(
               COPY_LINK_TO_TARGET_ACTION_ID,
               COPY_LINK_TO_TARGET,
-              { kind: 'resource', spaceId, resourceId: resource.content.target },
+              { kind: 'resource', spaceId, resourceId: target },
               onCopy,
             ),
           ];

@@ -1,7 +1,7 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
-import type { ContentOwnerKindModule } from './kind-module';
+import { defineKind } from './kind-module';
 
 /** What an Ur Resource's content resolves to: nothing, reached one way or the other. */
 export interface UrContent {
@@ -10,16 +10,16 @@ export interface UrContent {
 }
 
 /** An Ur Resource's content, which is nothing (ADR 0113). */
-const urContentSchema = z.object({});
+export const urResourceContentSchema = z.object({});
 
 /**
  * The Ur kind (ADR 0113): a Resource with no content, the one every capability
  * belongs to. It is the only kind that takes a Shape (ADR 0121) and it is never
  * Open, having nothing to show (ADR 0122).
  */
-export const urKind = {
+export const urKind = defineKind({
   id: 'ur',
-  contentSchema: urContentSchema,
+  contentSchema: urResourceContentSchema,
   flags: {
     takesResourceShape: true,
     canOpen: false,
@@ -27,8 +27,9 @@ export const urKind = {
     ownsReferencedSpaces: false,
   },
   facts: { action: 'none', embedsMap: false, drawsContentArea: false },
-  resolveContent: (_content, via) => ({ kind: 'ur', via }),
-} as const satisfies ContentOwnerKindModule<'ur', z.infer<typeof urContentSchema>, UrContent>;
+  resolveContent: (_content, via): UrContent => ({ kind: 'ur', via }),
+  newContent: {},
+});
 
 /** The Ur kind's id. */
 export type UrKindId = typeof urKind.id;

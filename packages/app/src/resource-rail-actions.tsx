@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import {
-  spaceKind,
+  kindFlags,
   referenceKind,
+  spaceKind,
   titleName,
   type Map as SpaceMap,
   type Resource,
@@ -71,7 +72,9 @@ export function resourceRailGroups(
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
   const { createReference, removeFromMap, deleteFromSpace, enter } = commands;
-  const terminal = resource.kind === referenceKind.id ? REFERENCE_TERMINAL : null;
+  // A Resource no other may reference as its Target offers Create Reference
+  // disabled, saying why, so referencing stays a single hop (ADR 0113).
+  const terminal = kindFlags(resource.kind).mayBeTarget ? null : REFERENCE_TERMINAL;
   const reference: readonly EntityActionGroup[] =
     createReference === null
       ? []

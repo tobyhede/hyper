@@ -1,12 +1,12 @@
 import {
-  MARKDOWN_MEDIA_TYPE,
   declaredId,
   declaredKind,
+  decodeFileContent,
+  encodeFileContent,
   isKindId,
   isRegisteredKind,
-  markdownKind,
-  markdownSidecarPath,
   resourceFileSchema,
+  sidecarNames,
   resourceSchema,
   type Resource,
   type ResourceFileDocument,
@@ -44,14 +44,18 @@ const isResourceFile = (path: string): boolean => path.endsWith('.json');
 /** The directory part of a path, with its trailing `/`, or `''` for a bare name. */
 const directoryOf = (path: string): string => path.slice(0, path.lastIndexOf('/') + 1);
 
+/** The sidecars a Resource with this id could name, by path beside its Resource file. */
+const ownSidecars = (file: ResourceFile, id: string): readonly string[] =>
+  sidecarNames(id).map((name) => `${directoryOf(file.path)}${name}`);
+
 /** A Resource file's fields, the envelope's and its content's, decoded from JSON. */
 type FileDecoding =
   | { readonly ok: true; readonly file: ResourceFileDocument }
   | {
       readonly ok: false;
       readonly errors: ResourceFileError[];
-      /** The `<id>.md` a refused file names by its id, so it is not reported again as unclaimed. */
-      readonly ownSidecar?: string;
+      /** The sidecars a refused file could name by its id, so none is reported again as unclaimed. */
+      readonly ownSidecars: readonly string[];
     };
 
 /**
@@ -73,13 +77,15 @@ function decodeFile(file: ResourceFile): FileDecoding {
           message: `${file.path}: is not valid JSON — ${String(error)}`,
         },
       ],
+      ownSidecars: [],
     };
   }
   const id = declaredId(json);
-  const refused = (errors: ResourceFileError[]): FileDecoding =>
-    id === undefined
-      ? { ok: false, errors }
-      : { ok: false, errors, ownSidecar: `${directoryOf(file.path)}${markdownSidecarPath(id)}` };
+  const refused = (errors: ResourceFileError[]): FileDecoding => ({
+    ok: false,
+    errors,
+    ownSidecars: id === undefined ? [] : ownSidecars(file, id),
+  });
   const fail = (kind: ResourceFileErrorKind, message: string): FileDecoding =>
     refused([{ kind, path: file.path, message: `${file.path}: ${message}` }]);
 
@@ -132,13 +138,22 @@ export function parseResourceFiles(files: readonly ResourceFile[]): ParseResourc
     const decoded = decodeFile(file);
     if (!decoded.ok) {
       errors.push(...decoded.errors);
-      if (decoded.ownSidecar !== undefined) claimed.add(decoded.ownSidecar);
+      for (const path of decoded.ownSidecars) claimed.add(path);
       continue;
     }
-    const content = contentOf(file, decoded.file, sidecars, claimed);
+    const content = decodeFileContent(decoded.file, (name) => {
+      const path = `${directoryOf(file.path)}${name}`;
+      const text = sidecars.get(path);
+      if (text !== undefined) claimed.add(path);
+      return text;
+    });
     if (!content.ok) {
-      errors.push(...content.errors);
-      claimed.add(`${directoryOf(file.path)}${markdownSidecarPath(decoded.file.id)}`);
+      errors.push({
+        kind: content.kind,
+        path: file.path,
+        message: `${file.path}: ${content.message}`,
+      });
+      for (const path of ownSidecars(file, decoded.file.id)) claimed.add(path);
       continue;
     }
     const { id, title, kind } = decoded.file;
@@ -168,42 +183,6 @@ export function parseResourceFiles(files: readonly ResourceFile[]): ParseResourc
   return errors.length > 0 ? { ok: false, errors } : { ok: true, resources };
 }
 
-type ContentDecoding =
-  | { readonly ok: true; readonly content: unknown }
-  | { readonly ok: false; readonly errors: ResourceFileError[] };
-
-/**
- * A Resource file's content as the document's: each kind's file codec maps
- * one to the other, and the document's schema then parses it. Only
- * Markdown's differs, reading its source from the sidecar its locator names.
- */
-function contentOf(
-  file: ResourceFile,
-  decoded: ResourceFileDocument,
-  sidecars: ReadonlyMap<string, string>,
-  claimed: Set<string>,
-): ContentDecoding {
-  const fail = (kind: ResourceFileErrorKind, message: string): ContentDecoding => ({
-    ok: false,
-    errors: [{ kind, path: file.path, message: `${file.path}: ${message}` }],
-  });
-  if (decoded.kind !== markdownKind.id) return { ok: true, content: decoded.content };
-  const own = markdownSidecarPath(decoded.id);
-  if (decoded.content.path !== own) {
-    return fail(
-      'invalid-resource-file',
-      `content.path: a Markdown Resource's sidecar is its own "${own}", not "${decoded.content.path}"`,
-    );
-  }
-  const sidecarPath = `${directoryOf(file.path)}${own}`;
-  const source = sidecars.get(sidecarPath);
-  if (source === undefined) {
-    return fail('missing-sidecar', `content.path: the sidecar "${own}" it names does not exist`);
-  }
-  claimed.add(sidecarPath);
-  return { ok: true, content: { source } };
-}
-
 /**
  * A Resource as its files, by path relative to the Space directory: its
  * Resource file `resources/<id>.json`, and a Markdown Resource's sidecar
@@ -215,15 +194,13 @@ function contentOf(
  * examples do.
  */
 export function serializeResource(resource: Resource): readonly ResourceFile[] {
-  const { id, title } = resource;
-  const resourceFile = (content: unknown): ResourceFile => ({
-    path: `resources/${id}.json`,
-    text: `${JSON.stringify({ id, title, kind: resource.kind, content }, null, 2)}\n`,
-  });
-  if (resource.kind !== markdownKind.id) return [resourceFile(resource.content)];
-  const path = markdownSidecarPath(id);
+  const { id, title, kind } = resource;
+  const { content, sidecars } = encodeFileContent(resource);
   return [
-    resourceFile({ path, mediaType: MARKDOWN_MEDIA_TYPE }),
-    { path: `resources/${path}`, text: resource.content.source },
+    {
+      path: `resources/${id}.json`,
+      text: `${JSON.stringify({ id, title, kind, content }, null, 2)}\n`,
+    },
+    ...sidecars.map(({ name, text }) => ({ path: `resources/${name}`, text })),
   ];
 }

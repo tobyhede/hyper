@@ -3,19 +3,15 @@ import {
   useMemo,
   useRef,
   useState,
-  type ComponentType,
   type DragEvent,
   type SyntheticEvent,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import {
-  spaceKind,
-  referenceKind,
-  markdownKind,
-  imageKind,
+  contentTarget,
+  spaceReferences,
   titleName,
-  urKind,
   type Resource,
   type ResourceId,
   type UUID,
@@ -43,22 +39,20 @@ import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-  ImageIcon,
-  MarkdownIcon,
   ParentIcon,
   PlusIcon,
   Popover,
   PopoverContent,
   PopoverTrigger,
   SearchIcon,
-  SpaceResourceIcon,
   SpaceIcon,
   ToggleGroup,
   ToggleGroupItem,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  UrIcon,
+  VIEW_KIND_IDS,
+  kindNaming,
 } from '@project/ui';
 import './resources-popover.css';
 
@@ -85,37 +79,15 @@ type Activation = 'keyboard' | 'pointer';
 export type ResourcesFilter = Resource['kind'] | 'spaces';
 
 /**
- * Every filter exactly once, in the order they are drawn — **coverage**, not
- * membership.
- *
- * `as const satisfies readonly ResourcesFilter[]` says each entry *is* a filter and
- * says nothing about any being absent, so a kind added to `Resource` and left out
- * here would compile and its Resources would simply not appear in this list. The
- * intersection makes the omission a `TS2345` where the array is written: with
- * every member present `ResourcesFilter extends T[number]` holds and the parameter
- * is `T`, and with one missing it is `never`, which no array satisfies.
- *
- * The `if`/`return` cascade a filter's glyph would otherwise use is why this is
- * needed rather than left to lint: `switch-exhaustiveness-check` never sees a
- * cascade, and `FILTER_GLYPHS` below closes the same hole the same way.
+ * Every filter exactly once, in the order they are drawn: each kind's, in the
+ * order the kinds' view halves are registered (ADR 0128), then `spaces`. The
+ * registry types a view half for every kind, so a kind added to `Resource` has
+ * a filter, a name and a glyph here before the application compiles.
  */
-const everyFilter = <const T extends readonly ResourcesFilter[]>(
-  filters: T & (ResourcesFilter extends T[number] ? unknown : never),
-): T => filters;
-
-const FILTERS = everyFilter([
-  markdownKind.id,
-  imageKind.id,
-  urKind.id,
-  referenceKind.id,
-  spaceKind.id,
-  'spaces',
-]);
+const FILTERS: readonly ResourcesFilter[] = [...VIEW_KIND_IDS, 'spaces'];
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
-const RESOURCE_FILTERS = FILTERS.filter(
-  (filter): filter is Resource['kind'] => filter !== 'spaces',
-);
+const RESOURCE_FILTERS = VIEW_KIND_IDS;
 
 /**
  * Everything on, because the list's job is to show what is *not* on the canvas
@@ -125,33 +97,19 @@ const RESOURCE_FILTERS = FILTERS.filter(
  */
 const ALL_FILTERS: readonly ResourcesFilter[] = FILTERS;
 
-const FILTER_NAMES = {
-  [markdownKind.id]: 'Markdown Resources',
-  [imageKind.id]: 'Image Resources',
-  [urKind.id]: 'Ur Resources',
-  [referenceKind.id]: 'Reference Resources',
-  [spaceKind.id]: 'Space Resources in this Space',
-  spaces: 'Spaces in this Meta Space',
-} as const satisfies Record<ResourcesFilter, string>;
+/** What a filter's toggle is called: its kind's Resources, or the Meta Space's Spaces. */
+const filterName = (filter: ResourcesFilter): string =>
+  filter === 'spaces' ? 'Spaces in this Meta Space' : kindNaming(filter).listName;
 
 /**
- * A record rather than a cascade, for the reason `everyFilter` exists: a
- * fall-through `return <SpaceIcon />` absorbs every unhandled filter, so a new
- * one would silently draw a Space cube. Keyed by the union, a miss is a
- * compile error where the record is written. Same idiom as `ResourceKindIcon`.
+ * A filter's glyph: its kind's own, or, for a kind that draws its Target's
+ * with a badge, the badge over the default base; the Meta Space's Spaces draw
+ * the Opener mark.
  */
-const FILTER_GLYPHS = {
-  [markdownKind.id]: MarkdownIcon,
-  [imageKind.id]: ImageIcon,
-  [urKind.id]: UrIcon,
-  [referenceKind.id]: ReferenceIcon,
-  [spaceKind.id]: SpaceResourceIcon,
-  spaces: ParentIcon,
-} satisfies Record<ResourcesFilter, ComponentType>;
-
 const FilterGlyph = ({ filter }: { readonly filter: ResourcesFilter }) => {
-  const Glyph = FILTER_GLYPHS[filter];
-  return <Glyph />;
+  if (filter === 'spaces') return <ParentIcon />;
+  const { Glyph } = kindNaming(filter);
+  return Glyph === undefined ? <ReferenceIcon /> : <Glyph />;
 };
 
 /**
@@ -303,10 +261,6 @@ export type ResourcesPopoverProps = ResourcesPlacingProps | ResourcesConnectingP
  */
 const FilterToggle = ToggleGroupItem<ResourcesFilter>;
 
-/** A Reference Resource's Target title, `''` for the intake-guaranteed-unreachable case a Target does not resolve — the same convention `ResourceNode` draws (ADR 0009). */
-const targetTitle = (resource: Resource, titleById: ReadonlyMap<ResourceId, string>): string =>
-  resource.kind === referenceKind.id ? (titleById.get(resource.content.target) ?? '') : '';
-
 const NO_SPACE_TITLES: ReadonlyMap<UUID, string> = new Map();
 const NO_SPACES: readonly ResourcesPopoverSpace[] = [];
 const NO_MEMBERSHIPS: MapMemberships = new Map();
@@ -430,11 +384,14 @@ const searchableText = (
   titleById: ReadonlyMap<ResourceId, string>,
   spaceTitleById: ReadonlyMap<UUID, string>,
 ): string => {
-  if (resource.kind === referenceKind.id)
-    return `${resource.title} ${targetTitle(resource, titleById)}`;
-  if (resource.kind === spaceKind.id)
-    return `${resource.title} ${spaceTitleById.get(resource.content.spaceId) ?? ''}`;
-  return resource.title;
+  // A Target's title is `''` for the intake-guaranteed-unreachable case a
+  // Target does not resolve, the same convention `ResourceNode` draws (ADR 0009).
+  const target = contentTarget(resource);
+  return [
+    resource.title,
+    ...(target === undefined ? [] : [titleById.get(target) ?? '']),
+    ...spaceReferences(resource).map((spaceId) => spaceTitleById.get(spaceId) ?? ''),
+  ].join(' ');
 };
 
 /**
@@ -684,14 +641,10 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
         (resource) =>
           resource.kind === kind && matched(searchableText(resource, titleById, spaceTitles)),
       ).length;
-    return {
-      [markdownKind.id]: ofKind(markdownKind.id),
-      [imageKind.id]: ofKind(imageKind.id),
-      [urKind.id]: ofKind(urKind.id),
-      [referenceKind.id]: ofKind(referenceKind.id),
-      [spaceKind.id]: ofKind(spaceKind.id),
-      spaces: spaces.filter((space) => matched(space.title)).length,
-    } satisfies Record<ResourcesFilter, number>;
+    return new Map<ResourcesFilter, number>([
+      ...VIEW_KIND_IDS.map((kind) => [kind, ofKind(kind)] as const),
+      ['spaces', spaces.filter((space) => matched(space.title)).length],
+    ]);
   }, [resources, spaces, titleById, spaceTitles, needle]);
 
   /**
@@ -919,13 +872,13 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                   // badge with a bare number in it contributes nothing to a
                   // control that carries its own label, so a screen reader would
                   // be told which kinds there are and never how many.
-                  aria-label={`${FILTER_NAMES[filter]}, ${String(counts[filter])}`}
-                  title={FILTER_NAMES[filter]}
+                  aria-label={`${filterName(filter)}, ${String(counts.get(filter) ?? 0)}`}
+                  title={filterName(filter)}
                   className="resources-popover__toggle"
                 >
                   <FilterGlyph filter={filter} />
                   <span className="resources-popover__count" aria-hidden="true">
-                    {counts[filter]}
+                    {counts.get(filter) ?? 0}
                   </span>
                 </FilterToggle>
               ))}

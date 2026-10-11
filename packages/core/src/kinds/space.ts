@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
 import type { UUID } from '../types';
 import { uuidSchema } from '../uuid';
-import type { SpaceReferencingKindModule } from './kind-module';
+import { defineKind } from './kind-module';
 
 /**
  * A Resource that shows one selected view of another independently stored Space
@@ -112,7 +112,7 @@ const selectionProblem = (
  * holds (ADR 0074); the core enforces cycles, lifetime and rooting from that
  * declaration, and the module checks only its own selection.
  */
-export const spaceKind = {
+export const spaceKind = defineKind({
   id: 'space',
   contentSchema: spaceResourceContentSchema,
   flags: {
@@ -122,7 +122,7 @@ export const spaceKind = {
     ownsReferencedSpaces: true,
   },
   facts: { action: 'author-space-view', embedsMap: true, drawsContentArea: false },
-  resolveContent: (content, via) => ({
+  resolveContent: (content, via): SpaceContent => ({
     kind: 'space',
     view: {
       spaceId: content.spaceId,
@@ -134,7 +134,7 @@ export const spaceKind = {
   }),
   spaceReferences: (content) => [content.spaceId],
   selectionProblem,
-} as const satisfies SpaceReferencingKindModule<'space', SpaceResourceContent, SpaceContent>;
+});
 
 /** The Space kind's id. */
 export type SpaceKindId = typeof spaceKind.id;

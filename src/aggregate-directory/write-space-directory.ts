@@ -1,19 +1,10 @@
 import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import {
-  spaceKind,
-  referenceKind,
-  markdownKind,
   SPACE_FILE_VERSION,
+  canonicalResource,
   type GraphEdge,
-  imageResourceContentSchema,
-  referenceResourceContentSchema,
-  spaceResourceContentSchema,
-  imageKind,
-  urKind,
   type SpaceFile,
-  type Resource,
-  type UUID,
 } from '@project/core';
 import { Placement, serializeResource } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
@@ -100,68 +91,6 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     : { ...withMaps, defaultMap: snapshot.document.defaultMap };
 };
 
-/** What the content schemas share for this file's purpose: a parse that may fail. */
-interface ContentSchema<T> {
-  safeParse: (value: T) => { success: true; data: T } | { success: false };
-}
-
-/**
- * A kind's content with its keys in the content schema's order, every key the
- * schema declares kept. A content the schema refuses is returned as stored,
- * so this cannot throw: a document that would not read back is Export's
- * refusal to make.
- */
-const inSchemaOrder = <T>(schema: ContentSchema<T>, content: T): T => {
-  const parsed = schema.safeParse(content);
-  return parsed.success ? parsed.data : content;
-};
-
-/**
- * A stored document as the Resource its file is written from. Its content is
- * put in its kind's schema order, so a file's bytes do not depend on the order
- * a document's keys were inserted in (`test/unit/space-directory-files.test.ts`),
- * and a Markdown source's line endings are made `\n`. The Title is written as
- * stored.
- */
-const canonicalResource = (
-  id: UUID,
-  document: LoadedSpace['snapshot']['resources'][number]['document'],
-): Resource => {
-  const { title } = document;
-  switch (document.kind) {
-    case referenceKind.id:
-      return {
-        id,
-        title,
-        kind: referenceKind.id,
-        content: inSchemaOrder(referenceResourceContentSchema, document.content),
-      };
-    case spaceKind.id:
-      return {
-        id,
-        title,
-        kind: spaceKind.id,
-        content: inSchemaOrder(spaceResourceContentSchema, document.content),
-      };
-    case imageKind.id:
-      return {
-        id,
-        title,
-        kind: imageKind.id,
-        content: inSchemaOrder(imageResourceContentSchema, document.content),
-      };
-    case urKind.id:
-      return { id, title, kind: urKind.id, content: {} };
-    case markdownKind.id:
-      return {
-        id,
-        title,
-        kind: markdownKind.id,
-        content: { source: document.content.source.replace(/\r\n?/g, '\n') },
-      };
-  }
-};
-
 /**
  * One Space's canonical files, by path relative to its Space directory:
  * `space.json`, one `resources/<id>.json` per Resource, and a Markdown
@@ -174,7 +103,13 @@ export const spaceDirectoryFiles = (stored: LoadedSpace): ReadonlyMap<string, st
   for (const resource of [...stored.snapshot.resources].sort((left, right) =>
     compareOrdinal(left.id, right.id),
   )) {
-    for (const file of serializeResource(canonicalResource(resource.id, resource.document))) {
+    // Each kind puts its own content as Export writes it, so a file's bytes do
+    // not depend on the order a document's keys were inserted in
+    // (`test/unit/space-directory-files.test.ts`).
+    for (const file of serializeResource({
+      ...canonicalResource(resource.document),
+      id: resource.id,
+    })) {
       files.set(file.path, file.text);
     }
   }

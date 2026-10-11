@@ -29,7 +29,7 @@ import {
   useStore,
 } from '@xyflow/react';
 import {
-  markdownKind,
+  DEFAULT_KIND,
   isAcceptedImageUrl,
   titleName,
   uuidSchema,
@@ -325,7 +325,7 @@ export function SpaceCanvas({
   const mapTitle = view.selectedMap.map.title;
   const spaceTitle = view.space.title;
   const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
-  const addCanvasResource = useCallback(() => createResource(markdownKind.id), [createResource]);
+  const addCanvasResource = useCallback(() => createResource(DEFAULT_KIND), [createResource]);
   const { screenToFlowPosition } = useReactFlow();
 
   const spaces = useOpenSpaces();
@@ -698,7 +698,7 @@ export function SpaceCanvas({
       },
       ...liveEmbeddings.map((value) => ({
         id: value.surface.occurrence(),
-        addResource: () => value.placement.createResource(markdownKind.id),
+        addResource: () => value.placement.createResource(DEFAULT_KIND),
         nodes: value.nodes,
         authoring: value.surface.authoring,
         availability: value.availability,

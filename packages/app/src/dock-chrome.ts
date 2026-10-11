@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  spaceKind,
-  markdownKind,
   graphHeadShape,
+  kindFlags,
+  spaceKind,
   type Graph,
   type GraphHeadShape,
   type GraphId,
@@ -10,8 +10,6 @@ import {
   type Resource,
   type ResourceId,
   type UUID,
-  imageKind,
-  urKind,
 } from '@project/core';
 import type { Space } from '@project/graph';
 import type { ObserverErrorReporter, SpaceSessionState } from '@project/persistence';
@@ -22,7 +20,6 @@ import type { BrowserLocation } from './browser-location';
 import type { PendingCanvasProjection } from './canvas-projection';
 import type {
   DockChrome,
-  DockResourceKind,
   DockResourcesList,
   SpaceExitReport,
 } from './components/command-dock-chrome';
@@ -422,31 +419,18 @@ export function useDockChrome(
         onDragEnd: placement.endDrag,
       },
       // Every kind completes its Edit on the press, an Image Resource once its
-      // file is chosen (ADR 0089, ADR 0106). An exhaustive switch rather than
-      // one arm and a fall-through, so a kind added to the cluster cannot
-      // inherit another kind's press in silence.
+      // file is chosen (ADR 0089, ADR 0106), and a kind that owns the Space it
+      // references through the Space Resource lifecycle, which creates that
+      // Space with it (ADR 0074).
       onCreate: (creation) => {
-        switch (creation.kind) {
-          case markdownKind.id:
-            placement.createResource(markdownKind.id);
-            return;
-          case spaceKind.id:
-            placement.createSpaceResource();
-            return;
-          case imageKind.id:
-            placement.createImagesFromFiles(creation.files);
-            return;
-          case urKind.id:
-            placement.createResource(urKind.id);
-            return;
-        }
+        if ('files' in creation) placement.createImagesFromFiles(creation.files);
+        else if (creation.kind === spaceKind.id) placement.createSpaceResource();
+        else placement.createResource(creation.kind);
       },
-      createDisabled: {
-        [markdownKind.id]: !availability.addResource,
-        [spaceKind.id]: !availability.createSpaceResource,
-        [imageKind.id]: !availability.addResource,
-        [urKind.id]: !availability.addResource,
-      } satisfies Record<DockResourceKind, boolean>,
+      createDisabled: (kind) =>
+        kindFlags(kind).ownsReferencedSpaces
+          ? !availability.createSpaceResource
+          : !availability.addResource,
     },
     persistence: {
       state: persistence,

@@ -169,7 +169,7 @@ describe('the public icon facade', () => {
           <ReferenceIcon />
         </span>
         <span data-testid="reference-of-space">
-          <ReferenceIcon base="space" />
+          <ReferenceIcon Base={SpaceResourceIcon} />
         </span>
       </>,
     );

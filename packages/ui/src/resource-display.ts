@@ -1,14 +1,4 @@
-import {
-  spaceKind,
-  type MarkdownKindId,
-  markdownKind,
-  contentAction,
-  imageKind,
-  type ContentVia,
-  type ImageKindId,
-  type ResourceContent,
-  type SpaceView,
-} from '@project/core';
+import type { ImageKindId, MarkdownKindId, ResourceContent } from '@project/core';
 import type { ImageReplaceEditor } from './ImageReplaceTarget';
 import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
 
@@ -50,46 +40,6 @@ export const CLOSED_DISPLAY: Extract<ResourceDisplay, { readonly shown: 'closed'
   shown: 'closed',
 };
 
-/**
- * Edit a Resource's Markdown body. Answers `display` itself unless it is Open
- * with the Resource's own Markdown, so a caret that lands before the Open
- * display draws nothing until it arrives.
- */
-export function beginEditing<D extends ResourceDisplay>(
-  display: D,
-  editor: MarkdownResourceBodyEditor,
-  autoFocus: boolean,
-): D | Extract<ResourceDisplay, { readonly shown: 'editing' }> {
-  if (display.shown !== 'open') return display;
-  const content = display.content;
-  if (contentAction(content) !== 'edit-markdown' || content.kind !== markdownKind.id)
-    return display;
-  return {
-    shown: 'editing',
-    content: { ...content, via: 'self' },
-    editor,
-    autoFocus,
-  };
-}
-
-/**
- * Replace an Image Resource's image. Answers `display` itself unless it is Open
- * with the Resource's own image.
- */
-export function beginReplacing<D extends ResourceDisplay>(
-  display: D,
-  replacer: ImageReplaceEditor,
-): D | Extract<ResourceDisplay, { readonly shown: 'replacing' }> {
-  if (display.shown !== 'open') return display;
-  const content = display.content;
-  if (contentAction(content) !== 'replace-image' || content.kind !== imageKind.id) return display;
-  return {
-    shown: 'replacing',
-    content: { ...content, via: 'self' },
-    replacer,
-  };
-}
-
 type Running = { readonly shown: 'editing' | 'replacing' };
 
 /** The display with no edit or replacement running: `open`, with the same content. */
@@ -101,25 +51,5 @@ export function atRest(display: ResourceDisplay): Exclude<ResourceDisplay, Runni
     case 'closed':
     case 'open':
       return display;
-  }
-}
-
-/**
- * The Space view an Open Resource shows, and whether it is the
- * Resource's own or its Target's. A Space reached through a Reference Resource
- * is drawn read-only (ADR 0070). A Closed display shows no Space.
- */
-export function spaceViewOf(
-  display: ResourceDisplay,
-): { readonly view: SpaceView; readonly via: ContentVia } | undefined {
-  switch (display.shown) {
-    case 'open':
-      return display.content.kind === spaceKind.id
-        ? { view: display.content.view, via: display.content.via }
-        : undefined;
-    case 'closed':
-    case 'editing':
-    case 'replacing':
-      return undefined;
   }
 }

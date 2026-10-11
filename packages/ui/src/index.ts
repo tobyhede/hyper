@@ -13,13 +13,10 @@ export type { PresentedResourceProps } from './PresentedResource';
 export { Stage } from './Stage';
 export type { StageProps } from './Stage';
 export { CanvasResource, CANVAS_RESOURCE_DRAG_TILT_DEGREES } from './CanvasResource';
-export {
-  atRest,
-  beginEditing,
-  beginReplacing,
-  CLOSED_DISPLAY,
-  spaceViewOf,
-} from './resource-display';
+export { atRest, CLOSED_DISPLAY } from './resource-display';
+export { beginEditing } from './kinds/markdown';
+export { beginReplacing } from './kinds/image';
+export { isSpaceOperations, spaceViewOf } from './kinds/space';
 export type { OwnContent, ResourceDisplay } from './resource-display';
 export { InlineTitleEditor } from './InlineTitleEditor';
 export type { InlineTitleEditorProps, InlineTitleEditorVariant } from './InlineTitleEditor';
@@ -80,6 +77,8 @@ export type {
   ChoiceMenuTriggerProps,
 } from './ChoiceMenu';
 export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
+export { bareOperations, kindNaming, VIEW_KIND_IDS } from './kinds/registry';
+export type { KindNaming, KindOperationsByKind } from './kinds/registry';
 export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';
 export type { ResourceChoice, ResourceSearchComboboxProps } from './ResourceSearchCombobox';

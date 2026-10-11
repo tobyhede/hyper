@@ -1,8 +1,11 @@
 import {
-  spaceKind,
+  kindFlags,
+  newDefaultResourceDocument,
+  newResourceDocument,
   referenceKind,
+  resourceReferences,
+  spaceReferences,
   type MarkdownKindId,
-  markdownKind,
   type ResourceDocument,
   type ResourceId,
   type Graph,
@@ -27,7 +30,6 @@ import {
   type SpaceSnapshot,
   type UUID,
   imageKind,
-  urKind,
   type ImageKindId,
   type UrKindId,
 } from '@project/core';
@@ -1213,18 +1215,14 @@ export function createSpaceAuthoring({
       if (resource.document.kind !== completion.document.kind) {
         return refuse({ code: 'resource-kind-immutable' });
       }
+      // What a Resource references is fixed for its lifetime too: a Reference
+      // Resource's Target (ADR 0070) and a Space Resource's target Space.
       if (
-        resource.document.kind === referenceKind.id &&
-        completion.document.kind === referenceKind.id &&
-        resource.document.content.target !== completion.document.content.target
+        !sameValue(resourceReferences(resource.document), resourceReferences(completion.document))
       ) {
         return refuse({ code: 'reference-target-immutable' });
       }
-      if (
-        resource.document.kind === spaceKind.id &&
-        completion.document.kind === spaceKind.id &&
-        resource.document.content.spaceId !== completion.document.content.spaceId
-      ) {
+      if (!sameValue(spaceReferences(resource.document), spaceReferences(completion.document))) {
         return refuse({ code: 'space-resource-target-immutable' });
       }
       // Normalized and refused *here* rather than only at the surface that
@@ -1281,13 +1279,13 @@ export function createSpaceAuthoring({
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'created-resource') {
       const title = nextResourceTitle(snapshot);
-      const created = createResource(
-        completion.resourceKind === urKind.id
-          ? { title, kind: urKind.id, content: {} }
-          : { title, kind: markdownKind.id, content: { source: '' } },
-        completion.anchor,
-        'avoidingOverlap',
-      );
+      const document = newResourceDocument(completion.resourceKind, title);
+      if (document === undefined) {
+        throw new Error(
+          `A ${completion.resourceKind} Resource has no empty content to start with.`,
+        );
+      }
+      const created = createResource(document, completion.anchor, 'avoidingOverlap');
       if ('kind' in created) return created;
       createdResourceId = created.id;
     } else if (completion.kind === 'created-images') {
@@ -1362,7 +1360,7 @@ export function createSpaceAuthoring({
       // the Resource already gone from the working state.
       // Decided before the module, so a Space Resource a Reference Resource
       // targets still answers this rather than `resource-has-references`.
-      if (deleted.kind === spaceKind.id) {
+      if (kindFlags(deleted.kind).ownsReferencedSpaces) {
         return refuse({ code: 'space-resource-deletion-unsupported' });
       }
       // Everything else — a Reference Resource still targeting it, and the
@@ -1379,11 +1377,7 @@ export function createSpaceAuthoring({
       // source placed; the refusal below only satisfies the compiler.
       const source = placement.get(completion.from);
       if (source === undefined) return refuse({ code: 'edge-resource-outside-map' });
-      const newResource: ResourceDocument = {
-        title: nextResourceTitle(snapshot),
-        kind: markdownKind.id,
-        content: { source: '' },
-      };
+      const newResource = newDefaultResourceDocument(nextResourceTitle(snapshot));
       const created =
         completion.position === 'beside-source'
           ? createResource(newResource, besideSource(source), 'avoidingOverlap')

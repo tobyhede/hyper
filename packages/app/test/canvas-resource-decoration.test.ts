@@ -9,13 +9,13 @@ import {
 } from '@project/react-flow-adapter';
 import { loadSpaceSnapshot } from '@project/graph';
 import {
-  decorateImageResourceNode,
-  decorateMarkdownResourceNode,
   decorateSharedResourceNode,
-  decorateSpaceResourceNode,
-  decorateUrResourceNode,
   type CanvasResourceDecorationContext,
 } from '../src/canvas-resource-decoration';
+import { decorateImageResourceNode } from '../src/kinds/image';
+import { decorateMarkdownResourceNode } from '../src/kinds/markdown';
+import { decorateSpaceResourceNode } from '../src/kinds/space';
+import { decorateUrResourceNode } from '../src/kinds/ur';
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';

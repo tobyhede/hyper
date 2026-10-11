@@ -1,12 +1,4 @@
-import {
-  spaceKind,
-  referenceKind,
-  imageKind,
-  markdownKind,
-  shortTitle,
-  urKind,
-  type Resource,
-} from '@project/core';
+import { kindFlags, shortTitle, type Resource } from '@project/core';
 import {
   deletionReach,
   graphColorsByGraphId,
@@ -35,18 +27,14 @@ const DELETES_THE_RESOURCE =
   'Permanently deletes the Resource from the Space and all Maps and Graphs.';
 
 /**
- * Exhaustive over the kinds rather than a default plus one exception, so a new
- * kind has to decide what its deletion destroys before it compiles. A Space
- * Resource owns its target's lifetime together with every other reference to
- * it, so its deletion can reach Spaces that are not on screen (ADR 0074).
+ * What deleting a Resource destroys, as its kind declares: a kind that owns the
+ * Spaces it references owns their lifetime together with every other reference
+ * to them, so its deletion can reach Spaces that are not on screen (ADR 0074).
  */
-const DELETION_DESCRIPTIONS = {
-  [markdownKind.id]: DELETES_THE_RESOURCE,
-  [referenceKind.id]: DELETES_THE_RESOURCE,
-  [imageKind.id]: DELETES_THE_RESOURCE,
-  [urKind.id]: DELETES_THE_RESOURCE,
-  [spaceKind.id]: `${DELETES_THE_RESOURCE} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`,
-} satisfies Record<Resource['kind'], string>;
+const deletionDescription = (kind: Resource['kind']): string =>
+  kindFlags(kind).ownsReferencedSpaces
+    ? `${DELETES_THE_RESOURCE} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`
+    : DELETES_THE_RESOURCE;
 
 /**
  * What Delete from Space asks about a Resource. The short Title names it on one
@@ -66,7 +54,7 @@ export const resourceDeletionWords = (
 ): DeleteQuestionWords => ({
   subject: { kind: 'resource', name: shortTitle(resource.title) },
   from: 'Space',
-  description: DELETION_DESCRIPTIONS[resource.kind],
+  description: deletionDescription(resource.kind),
   reach: reach.maps.map((m) => ({
     key: m.id,
     title: shortTitle(m.title),
@@ -107,7 +95,7 @@ export function createResourceDeletion({
   spaceResources,
 }: ResourceDeletionDependencies): ResourceDeletion {
   const execute = async (resource: Resource): Promise<void> => {
-    if (resource.kind === spaceKind.id) {
+    if (kindFlags(resource.kind).ownsReferencedSpaces) {
       await commandOutcomes.run('space-resource-delete', async () => {
         if (spaceResources === undefined) {
           throw new Error('Space Resource deletion requires Space Resource authoring');

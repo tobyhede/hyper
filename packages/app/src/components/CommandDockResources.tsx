@@ -4,7 +4,7 @@
  * {@link ResourcesControl}.
  */
 import { useContext, useEffect, useId, useRef } from 'react';
-import { markdownKind, imageKind } from '@project/core';
+import { DEFAULT_KIND, imageKind } from '@project/core';
 import {
   ImageFilePicker,
   ResourceKindIcon,
@@ -56,7 +56,7 @@ function CreatePeers({
   disabled,
 }: {
   readonly onCreate: (creation: DockCreation) => void;
-  readonly disabled: Readonly<Record<DockResourceKind, boolean>>;
+  readonly disabled: (kind: DockResourceKind) => boolean;
 }) {
   /* The browser's own file picker, behind the Image Resource's peer, which is
      an ordinary toolbar button that opens it. A cancelled picker creates
@@ -83,7 +83,7 @@ function CreatePeers({
           className="nokey"
           aria-label={`Create ${resourceKindName(kind)}`}
           title={`Create ${resourceKindName(kind)}`}
-          disabled={disabled[kind]}
+          disabled={disabled(kind)}
           onClick={() => press(kind)}
         >
           {/* Decorative here and nowhere else in the Dock: this button already
@@ -109,7 +109,7 @@ function ResourcesTrigger() {
        expand arrows: beside a Space, a Map and a Graph's colour, the icon
        slot names what the cluster is about, and "expand" named a gesture this
        cluster does not have. */
-    <SetTrigger icon={<ResourceKindIcon kind={markdownKind.id} />}>Resources</SetTrigger>
+    <SetTrigger icon={<ResourceKindIcon kind={DEFAULT_KIND} />}>Resources</SetTrigger>
   );
 }
 

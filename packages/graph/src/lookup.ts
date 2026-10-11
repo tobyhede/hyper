@@ -1,14 +1,14 @@
-import type {
-  Resource,
-  ResourceContent,
-  ResourceId,
-  Graph,
-  GraphId,
-  Map,
-  UUID,
+import {
+  resolveContent,
+  type Resource,
+  type ResourceContent,
+  type ResourceId,
+  type Graph,
+  type GraphId,
+  type Map,
+  type UUID,
 } from '@project/core';
 import type { Space } from './space';
-import { resolveDocumentContent } from './content-resolution';
 
 /**
  * Contextual entity resolution over a validated Space.
@@ -73,7 +73,7 @@ export interface SpaceLookup {
  * Reference Resource.
  */
 export function resolveResourceContent(space: Space, resource: Resource): ResourceContent {
-  return resolveDocumentContent(resource, (id) => space.lookup.resource(id));
+  return resolveContent(resource, (id) => space.lookup.resource(id));
 }
 
 /**
