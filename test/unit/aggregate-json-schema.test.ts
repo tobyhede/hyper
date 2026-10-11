@@ -156,19 +156,43 @@ describe('the aggregate JSON Schemas agree with intake', () => {
 });
 
 /**
- * The Resource file schema is specified ahead of intake (ADR 0128), so nothing
- * yet holds it to an intake; this holds it to compiling under strict mode and
- * to accepting the example its README publishes for each kind.
+ * No intake reads the Resource file format yet; issue 07 holds this schema to
+ * one. Until then it is held to compiling under strict mode, to accepting the
+ * example its README publishes for each kind, and to refusing what ADR 0128
+ * names: a missing or unknown `kind`, an unknown key at either level, Ur content, and a
+ * locator form the kind does not take.
  */
 describe('the Resource file JSON Schema', () => {
   const examples = join(repoRoot, 'docs/schema/resource/examples');
+  const example = (kind: string): unknown =>
+    JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
+  const resourceFileSchema = () => validator('resource/resource.schema.json');
 
   it.each(['markdown', 'reference', 'space', 'image', 'ur'])(
     'accepts the published %s example',
     (kind) => {
-      const resourceFileSchema = validator('resource/resource.schema.json');
-      const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
-      expect(resourceFileSchema(example), JSON.stringify(resourceFileSchema.errors)).toBe(true);
+      const validate = resourceFileSchema();
+      expect(validate(example(kind)), JSON.stringify(validate.errors)).toBe(true);
     },
   );
+
+  const id = '6f1d6a2e-3b7c-4d2a-9c1e-0a5b7d9e1f20';
+  const envelope = (kind: string, content: Json) => ({ id, title: 'A', kind, content });
+  const refused: [string, Json][] = [
+    ['a Resource with no kind', { id, title: 'A', content: {} }],
+    ['a kind neither built in nor a vendor kind', envelope('video', {})],
+    [
+      'an unknown Markdown content key',
+      envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown', source: 'x' }),
+    ],
+    ['an unknown envelope key', { ...envelope('ur', {}), body: 'x' }],
+    ['an unknown content key', envelope('image', { url: 'https://example.com/a.png', alt: 'x' })],
+    ['Ur content', envelope('ur', { source: 'x' })],
+    ['Markdown content by URL', envelope('markdown', { url: 'https://example.com/a.md' })],
+    ['Image content by path', envelope('image', { path: `${id}.png`, mediaType: 'image/png' })],
+  ];
+
+  it.each(refused)('refuses %s', (_name, file) => {
+    expect(resourceFileSchema()(file)).toBe(false);
+  });
 });
