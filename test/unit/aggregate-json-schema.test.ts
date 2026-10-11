@@ -191,6 +191,10 @@ describe('the Resource file JSON Schema', () => {
   it.each([
     ['a vendor kind with any content', envelope('vnd.acme.chart', { series: [1, 2] })],
     ['a vendor kind in upper case', envelope('vnd.Acme.Chart', {})],
+    [
+      'a Markdown media type in another case',
+      envelope('markdown', { path: `${id}.md`, mediaType: 'Text/Markdown' }),
+    ],
   ])('accepts %s', (_name, file) => {
     expect(resourceFileSchema(file), JSON.stringify(resourceFileSchema.errors)).toBe(true);
   });
