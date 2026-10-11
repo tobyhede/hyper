@@ -1,3 +1,4 @@
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 
 /** The single durable identity used by every referenceable Hyper entity. */

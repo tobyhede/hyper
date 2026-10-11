@@ -1,3 +1,4 @@
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import { uuidSchema } from '../uuid';
 import type { TargetingKindModule } from './kind-module';
