@@ -164,15 +164,14 @@ describe('the aggregate JSON Schemas agree with intake', () => {
  */
 describe('the Resource file JSON Schema', () => {
   const examples = join(repoRoot, 'docs/schema/resource/examples');
-  const example = (kind: string): unknown =>
-    JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
   const resourceFileSchema = () => validator('resource/resource.schema.json');
 
   it.each(['markdown', 'reference', 'space', 'image', 'ur'])(
     'accepts the published %s example',
     (kind) => {
       const validate = resourceFileSchema();
-      expect(validate(example(kind)), JSON.stringify(validate.errors)).toBe(true);
+      const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
+      expect(validate(example), JSON.stringify(validate.errors)).toBe(true);
     },
   );
 
