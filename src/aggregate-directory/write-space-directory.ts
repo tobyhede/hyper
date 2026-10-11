@@ -4,7 +4,6 @@ import {
   SPACE_FILE_VERSION,
   type GraphEdge,
   type SpaceFile,
-  resourceSchema,
   type Resource,
   type UUID,
 } from '@project/core';
@@ -93,22 +92,53 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
     : { ...withMaps, defaultMap: snapshot.document.defaultMap };
 };
 
+type SpaceResourceContent = Extract<Resource, { kind: 'space' }>['content'];
+type ImageResourceContent = Extract<Resource, { kind: 'image' }>['content'];
+
 /**
- * A stored document as the Resource its file is written from, whole, with a
- * Markdown source's line endings made `\n`. Parsing through `resourceSchema`
- * puts every key in the schema's order, so a file's bytes do not depend on
- * the order a document's keys were inserted in
- * (`test/unit/space-directory-files.test.ts`).
+ * A stored document as the Resource its file is written from, built key by key
+ * so a file's bytes do not depend on the order a document's keys were
+ * inserted in (`test/unit/space-directory-files.test.ts`), with a Markdown
+ * source's line endings made `\n`. It copies rather than parses, so it cannot
+ * throw: a document that would not read back is Export's refusal to make.
  */
 const canonicalResource = (
   id: UUID,
   document: LoadedSpace['snapshot']['resources'][number]['document'],
-): Resource =>
-  resourceSchema.parse(
-    document.kind === 'markdown'
-      ? { id, ...document, content: { source: document.content.source.replace(/\r\n?/g, '\n') } }
-      : { id, ...document },
-  );
+): Resource => {
+  const { title } = document;
+  switch (document.kind) {
+    case 'reference':
+      return { id, title, kind: 'reference', content: { target: document.content.target } };
+    case 'space': {
+      const { spaceId, graph, framing } = document.content;
+      const content: SpaceResourceContent = { spaceId, map: document.content.map, graph };
+      if (framing !== undefined) {
+        const { centreX, centreY, zoom } = framing;
+        content.framing = { centreX, centreY, zoom };
+      }
+      return { id, title, kind: 'space', content };
+    }
+    case 'image': {
+      const { url, naturalSize } = document.content;
+      const content: ImageResourceContent = { url };
+      if (naturalSize !== undefined) {
+        const { width, height } = naturalSize;
+        content.naturalSize = { width, height };
+      }
+      return { id, title, kind: 'image', content };
+    }
+    case 'ur':
+      return { id, title, kind: 'ur', content: {} };
+    case 'markdown':
+      return {
+        id,
+        title,
+        kind: 'markdown',
+        content: { source: document.content.source.replace(/\r\n?/g, '\n') },
+      };
+  }
+};
 
 /**
  * One Space's canonical files, by path relative to its Space directory:
