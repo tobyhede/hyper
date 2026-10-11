@@ -2,55 +2,87 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/resource.schema.json",
   "title": "Hyper Resource file",
-  "description": "One Resource, as the file resources/<id>.json in a Space directory (ADR 0128). This schema composes the core's envelope with the built-in kinds' schemas, as a build registers them; the envelope's own rules name no kind, and content belongs to the kind and is validated by that kind's schema. Strict at both levels: the core refuses a top-level key it does not own, and the kind refuses a key inside content it does not declare.",
+  "description": "One Resource, as the file resources/<id>.json in a Space directory (ADR 0128): the core's envelope, composed with the built-in kinds' schemas as a build registers them. The envelope names no kind; builtInKinds is the registration, one entry per kind pairing its id with its content schema. A vendor kind's content is accepted as any object, because this schema cannot know which vendor kinds a build registers; any other kind id is refused. Strict at both levels: the envelope refuses a top-level key it does not own, and the kind refuses a key inside content it does not declare.",
   "type": "object",
-  "required": ["id", "title", "kind", "content"],
-  "additionalProperties": false,
-  "properties": {
-    "id": { "$ref": "#/$defs/id" },
-    "title": { "$ref": "#/$defs/title" },
-    "kind": { "$ref": "#/$defs/kind" },
-    "content": {
-      "type": "object",
-      "description": "The kind's own content, parsed only by the kind's module."
+  "$ref": "envelope.schema.json",
+  "if": {
+    "type": "object",
+    "required": ["kind"],
+    "properties": {
+      "kind": {
+        "type": "string",
+        "pattern": "^vnd\\."
+      }
     }
   },
-  "allOf": [
-    {
-      "if": { "required": ["kind"], "properties": { "kind": { "const": "ur" } } },
-      "then": { "properties": { "content": { "$ref": "kinds/ur.schema.json" } } }
-    },
-    {
-      "if": { "required": ["kind"], "properties": { "kind": { "const": "markdown" } } },
-      "then": { "properties": { "content": { "$ref": "kinds/markdown.schema.json" } } }
-    },
-    {
-      "if": { "required": ["kind"], "properties": { "kind": { "const": "image" } } },
-      "then": { "properties": { "content": { "$ref": "kinds/image.schema.json" } } }
-    },
-    {
-      "if": { "required": ["kind"], "properties": { "kind": { "const": "reference" } } },
-      "then": { "properties": { "content": { "$ref": "kinds/reference.schema.json" } } }
-    },
-    {
-      "if": { "required": ["kind"], "properties": { "kind": { "const": "space" } } },
-      "then": { "properties": { "content": { "$ref": "kinds/space.schema.json" } } }
-    }
-  ],
+  "else": {
+    "$ref": "#/$defs/builtInKinds"
+  },
   "$defs": {
-    "id": {
-      "description": "A durable UUID. A Resource's identity is this field, never its file name.",
-      "$ref": "../id.schema.json"
-    },
-    "title": {
-      "description": "One or more Title Lines separated by newlines; the first is the Resource's name. At least one line must have something in it. Intake normalizes it: CR and CRLF fold to LF, trailing whitespace on each line and leading and trailing blank lines are dropped, interior blank lines are kept (ADR 0083).",
-      "type": "string",
-      "pattern": "\\S"
-    },
-    "kind": {
-      "description": "Required (ADR 0128). A built-in kind's bare id, or a vendor kind's vnd.<owner>.<name> (ADR 0120), whose owner and name are any non-empty text without a dot or whitespace until an ADR fixes their characters. A kind the build does not register is refused at intake; this schema cannot know which vendor kinds are registered, so it validates their content only as an object.",
-      "type": "string",
-      "pattern": "^(ur|markdown|image|reference|space|vnd\\.[^.\\s]+\\.[^.\\s]+)$"
+    "builtInKinds": {
+      "description": "The built-in kinds, as the build registers them. Adding one is one entry here and one schema under kinds/.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "ur"
+            },
+            "content": {
+              "$ref": "kinds/ur.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "markdown"
+            },
+            "content": {
+              "$ref": "kinds/markdown.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "image"
+            },
+            "content": {
+              "$ref": "kinds/image.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "reference"
+            },
+            "content": {
+              "$ref": "kinds/reference.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "space"
+            },
+            "content": {
+              "$ref": "kinds/space.schema.json"
+            }
+          }
+        }
+      ]
     }
   }
 }

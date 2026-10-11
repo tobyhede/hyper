@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ajv2020 } from 'ajv/dist/2020';
-import { aggregateFileSchema, importSpaceFileSchema } from '@project/core';
+import { aggregateFileSchema, importSpaceFileSchema, isAcceptedImageUrl } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import hyperFileSchema from '../../docs/schema/hyper.schema.json';
 import idSchema from '../../docs/schema/id.schema.json';
+import envelopeSchema from '../../docs/schema/resource/envelope.schema.json';
 import imageSchema from '../../docs/schema/resource/kinds/image.schema.json';
 import markdownSchema from '../../docs/schema/resource/kinds/markdown.schema.json';
 import referenceSchema from '../../docs/schema/resource/kinds/reference.schema.json';
@@ -31,6 +32,7 @@ ajv.addSchema([
   hyperFileSchema,
   spaceFileSchema,
   locatorSchema,
+  envelopeSchema,
   urSchema,
   markdownSchema,
   imageSchema,
@@ -47,6 +49,8 @@ function validator(name: string) {
 
 const hyperSchema = validator('hyper.schema.json');
 const spaceSchema = validator('space.schema.json');
+const resourceFileSchema = validator('resource/resource.schema.json');
+const locator = validator('resource/locator.schema.json');
 
 /** A file's content as JSON states it, before any schema reads it. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
@@ -143,11 +147,18 @@ describe('the aggregate JSON Schemas agree with intake', () => {
 
   it("accepts docs/aggregate-directory.md's hyper.json and space.json examples", () => {
     const text = readFileSync(join(repoRoot, 'docs/aggregate-directory.md'), 'utf8');
-    const examples: unknown[] = [...text.matchAll(/```json\n([\s\S]*?)```/g)].map((match) => {
-      const parsed: unknown = JSON.parse(match[1] ?? '');
-      return parsed;
-    });
-    const [hyperExample, spaceExample] = examples;
+    const fences = [...text.matchAll(/```json\n([\s\S]*?)```/g)].map((match) => match[1] ?? '');
+    // Each example is found by the key only its file has, not by its place on the page.
+    const named = (key: string) =>
+      fences
+        .filter((fence) => fence.includes(`"${key}"`))
+        .map((fence) => {
+          const parsed: unknown = JSON.parse(fence);
+          return parsed;
+        });
+    const [hyperExample, ...otherHyper] = named('metaSpaceId');
+    const [spaceExample, ...otherSpace] = named('maps');
+    expect([otherHyper, otherSpace]).toEqual([[], []]);
     expect(hyperSchema(hyperExample)).toBe(true);
     expect(spaceSchema(spaceExample)).toBe(true);
     expect(aggregateFileSchema.safeParse(hyperExample).success).toBe(true);
@@ -158,40 +169,117 @@ describe('the aggregate JSON Schemas agree with intake', () => {
 /**
  * No intake reads the Resource file format yet; issue 07 holds this schema to
  * one. Until then it is held to compiling under strict mode, to accepting the
- * example its README publishes for each kind, and to refusing what ADR 0128
- * names: a missing or unknown `kind`, an unknown key at either level, Ur content, and a
- * locator form the kind does not take.
+ * example its README publishes for each kind, to refusing what ADR 0128 names
+ * at the place it names (a missing or malformed `kind`, a bare kind no build
+ * registers, an unknown key at either level, Ur content, and a locator form
+ * the kind does not take), and to accepting what only intake refuses.
  */
 describe('the Resource file JSON Schema', () => {
   const examples = join(repoRoot, 'docs/schema/resource/examples');
-  const resourceFileSchema = () => validator('resource/resource.schema.json');
 
   it.each(['markdown', 'reference', 'space', 'image', 'ur'])(
     'accepts the published %s example',
     (kind) => {
-      const validate = resourceFileSchema();
       const example: unknown = JSON.parse(readFileSync(join(examples, `${kind}.json`), 'utf8'));
-      expect(validate(example), JSON.stringify(validate.errors)).toBe(true);
+      expect(resourceFileSchema(example), JSON.stringify(resourceFileSchema.errors)).toBe(true);
     },
   );
 
   const id = '6f1d6a2e-3b7c-4d2a-9c1e-0a5b7d9e1f20';
   const envelope = (kind: string, content: Json) => ({ id, title: 'A', kind, content });
-  const refused: [string, Json][] = [
-    ['a Resource with no kind', { id, title: 'A', content: {} }],
-    ['a kind neither built in nor a vendor kind', envelope('video', {})],
+
+  it.each([
+    ['a vendor kind with any content', envelope('vnd.acme.chart', { series: [1, 2] })],
+    ['a vendor kind in upper case', envelope('vnd.Acme.Chart', {})],
+  ])('accepts %s', (_name, file) => {
+    expect(resourceFileSchema(file), JSON.stringify(resourceFileSchema.errors)).toBe(true);
+  });
+
+  const refused: [string, Json, { instancePath: string; keyword: string }][] = [
+    [
+      'a Resource with no kind',
+      { id, title: 'A', content: {} },
+      { instancePath: '', keyword: 'required' },
+    ],
+    [
+      'a bare kind no build registers',
+      envelope('video', {}),
+      { instancePath: '', keyword: 'oneOf' },
+    ],
+    [
+      'a media type as a vendor kind',
+      envelope('vnd.acme.image/png', {}),
+      { instancePath: '/kind', keyword: 'pattern' },
+    ],
+    [
+      'a vendor kind with no name',
+      envelope('vnd.acme', {}),
+      { instancePath: '/kind', keyword: 'pattern' },
+    ],
+    [
+      'a vendor kind with an empty owner',
+      envelope('vnd..chart', {}),
+      { instancePath: '/kind', keyword: 'pattern' },
+    ],
     [
       'an unknown Markdown content key',
       envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown', source: 'x' }),
+      { instancePath: '/content', keyword: 'unevaluatedProperties' },
     ],
-    ['an unknown envelope key', { ...envelope('ur', {}), body: 'x' }],
-    ['an unknown content key', envelope('image', { url: 'https://example.com/a.png', alt: 'x' })],
-    ['Ur content', envelope('ur', { source: 'x' })],
-    ['Markdown content by URL', envelope('markdown', { url: 'https://example.com/a.md' })],
-    ['Image content by path', envelope('image', { path: `${id}.png`, mediaType: 'image/png' })],
+    [
+      'an unknown envelope key',
+      { ...envelope('ur', {}), body: 'x' },
+      { instancePath: '', keyword: 'additionalProperties' },
+    ],
+    [
+      'an unknown content key',
+      envelope('image', { url: 'https://example.com/a.png', alt: 'x' }),
+      { instancePath: '/content', keyword: 'unevaluatedProperties' },
+    ],
+    [
+      'Ur content',
+      envelope('ur', { source: 'x' }),
+      { instancePath: '/content', keyword: 'additionalProperties' },
+    ],
+    [
+      'Markdown content by URL',
+      envelope('markdown', { url: 'https://example.com/a.md' }),
+      { instancePath: '/content', keyword: 'required' },
+    ],
+    [
+      'Image content by path',
+      envelope('image', { path: `${id}.png`, mediaType: 'image/png' }),
+      { instancePath: '/content', keyword: 'required' },
+    ],
   ];
 
-  it.each(refused)('refuses %s', (_name, file) => {
-    expect(resourceFileSchema()(file)).toBe(false);
+  it.each(refused)('refuses %s', (_name, file, error) => {
+    expect(resourceFileSchema(file)).toBe(false);
+    expect(resourceFileSchema.errors).toContainEqual(expect.objectContaining(error));
+  });
+
+  it.each(['http:', 'https://', 'https://exa mple.com/a.png'])(
+    'accepts the Image URL %j, which only intake refuses',
+    (url) => {
+      expect(resourceFileSchema(envelope('image', { url }))).toBe(true);
+      expect(isAcceptedImageUrl(url)).toBe(false);
+    },
+  );
+
+  it.each(['a.md', 'dir/a.md', 'a..b/c.md', '.hidden/a.md'])('locates by the path %j', (path) => {
+    expect(locator({ path, mediaType: 'text/markdown' }), JSON.stringify(locator.errors)).toBe(
+      true,
+    );
+  });
+
+  it.each(['/a.md', 'a//b.md', 'dir/', '../a.md', 'a/./b.md', 'a/..', 'a\\b.md', ''])(
+    'refuses the path %j',
+    (path) => {
+      expect(locator({ path, mediaType: 'text/markdown' })).toBe(false);
+    },
+  );
+
+  it("names a Markdown sidecar by the Id schema's own pattern", () => {
+    expect(markdownSchema.properties.path.pattern).toBe(`${idSchema.pattern.slice(0, -1)}\\.md$`);
   });
 });

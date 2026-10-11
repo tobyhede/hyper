@@ -7,6 +7,6 @@
   "required": ["target"],
   "additionalProperties": false,
   "properties": {
-    "target": { "$ref": "../resource.schema.json#/$defs/id" }
+    "target": { "$ref": "../../id.schema.json" }
   }
 }

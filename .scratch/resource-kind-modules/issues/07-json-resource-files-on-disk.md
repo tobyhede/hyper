@@ -7,7 +7,11 @@ Status: ready-for-agent
 - Markdown: `{ "path": "<id>.md", "mediaType": "text/markdown" }`, a plain Markdown sidecar with no frontmatter, beside its Resource file, written and removed with its Resource. A sidecar no Resource file names is refused at intake, so a stray `.md` is not silently ignored.
 - Image: `{ "url": … }` only, an external URL or `/images/<content-id>` for a stored image whose bytes travel in `images/` (ADR 0118); optional `naturalSize`.
 
-Each kind's file codec maps the locator to and from the document's `content`. Discovery reads `resources/*.json`; Export writes Resource files and sidecars in place (ADR 0119).
+Each kind's file codec maps the locator to and from the document's `content`. Discovery reads `resources/*.json`; Export writes Resource files and sidecars in place (ADR 0119). Discovery no longer reads `*.md` beside `space.json`: a `.md` there, or any `.md` under `resources/` that no Resource file names, is refused at intake naming the file, so a Resource written in the old format is never silently dropped.
+
+A kind id is checked at intake as ADR 0128 fixes it: a bare id or `vnd.<owner>.<name>`, each part ASCII letters, digits and hyphens.
+
+**Delete the missing-kind default:** `defaultUrKind` in `packages/core/src/schema.ts` goes, since `kind` is required, and with it the kind-id scan's exemption for it (see `06`), so the scan exempts nothing.
 
 **Roll forward in the same change (ADR 0054):** every tracked Resource file under `packages/app/fixture/` and `packages/app/example/`, the Export and Import tests, `docs/aggregate-directory.md`, the `hyper-authoring` skill and `docs/agents/editing-and-persistence.md`'s file-format section, which carries the "accepted, not built" note until this lands. Mark AGENTS.md's ADR 0128 entry built, and drop `docs/schema/resource/README.md`'s "not yet built" sentence.
 

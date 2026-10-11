@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/envelope.schema.json",
+  "title": "Resource envelope",
+  "description": "The core's half of a Resource file (ADR 0128): id, Title, the id of a kind, and content the core does not read. It names no kind; resource.schema.json composes it with the kinds a build registers.",
+  "type": "object",
+  "required": ["id", "title", "kind", "content"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "title": {
+      "$ref": "#/$defs/title"
+    },
+    "kind": {
+      "$ref": "#/$defs/kind"
+    },
+    "content": {
+      "type": "object",
+      "description": "The kind's own content, parsed only by the kind's module."
+    }
+  },
+  "$defs": {
+    "id": {
+      "description": "A durable UUID. A Resource's identity is this field, never its file name.",
+      "$ref": "../id.schema.json"
+    },
+    "title": {
+      "description": "One or more Title Lines separated by newlines; the first is the Resource's name. At least one line must have something in it. Intake normalizes it: CR and CRLF fold to LF, trailing whitespace on each line and leading and trailing blank lines are dropped, interior blank lines are kept (ADR 0083).",
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "kind": {
+      "description": "Required (ADR 0128). A kind id: a built-in kind's bare id, or a vendor kind's vnd.<owner>.<name> (ADR 0120). A bare id and each of owner and name are ASCII letters, digits and hyphens, starting with a letter or digit (ADR 0128), so a kind id never holds a dot outside the vnd. form, a slash or a parameter, and cannot be read as a media type. Whether the kind is registered is not the envelope's to say.",
+      "type": "string",
+      "pattern": "^([A-Za-z0-9][A-Za-z0-9-]*|vnd\\.[A-Za-z0-9][A-Za-z0-9-]*\\.[A-Za-z0-9][A-Za-z0-9-]*)$"
+    }
+  }
+}
