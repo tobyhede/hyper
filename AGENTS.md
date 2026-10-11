@@ -33,6 +33,7 @@ Accepted ADRs run ahead of the code. Read the guide that owns an area before tou
 - **ADR 0112 — a Map is drawn by one surface wherever it is drawn — built, bar Undo and Redo.** [`rendering.md`](docs/agents/rendering.md), "Every drawn Map uses `createMapSurface`"; delivery evidence under `.scratch/a-map-is-a-map/`.
 - **ADR 0069 / ADR 0079 — every entity has a durable product URL — built.** [`navigation.md`](docs/agents/navigation.md).
 - **ADR 0095 — both SQL databases share one Space repository — built.** [`editing-and-persistence.md`](docs/agents/editing-and-persistence.md), "The SQL repository". Open: `.scratch/database-persistence/issues/35`.
+- **ADR 0128 — every Resource kind is a module and a Resource file is JSON — not built.** Refines ADR 0120 and reverses ADR 0127's missing-kind default. The current code still matches on a closed union of five kinds and reads Markdown-with-frontmatter files; do not read it as the design. [`editing-and-persistence.md`](docs/agents/editing-and-persistence.md); delivery `.scratch/resource-kind-modules/`.
 - **ADR 0041 — Graph is the name for Route — built.** [`domain.md`](docs/agents/domain.md).
 
 ## Commands

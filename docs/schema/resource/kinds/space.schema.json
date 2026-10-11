@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/kinds/space.schema.json",
+  "title": "Space content",
+  "description": "A Space Resource's view of another Space (ADR 0068, ADR 0079). The module declares spaceId as one outgoing Space reference that holds that Space's lifetime; the core checks existence, no cycles, lifetime and rooting (ADR 0074, ADR 0128). The module's own check is that map names a Map of that Space and graph a Graph that Map owns.",
+  "type": "object",
+  "required": ["spaceId", "map", "graph"],
+  "additionalProperties": false,
+  "properties": {
+    "spaceId": { "$ref": "../../id.schema.json" },
+    "map": { "$ref": "../../id.schema.json" },
+    "graph": { "$ref": "../../id.schema.json" },
+    "framing": {
+      "description": "The Map-coordinate centre and scale saved for this view; absent until framed, when the selected Map is fitted.",
+      "type": "object",
+      "required": ["centreX", "centreY", "zoom"],
+      "additionalProperties": false,
+      "properties": {
+        "centreX": { "type": "number" },
+        "centreY": { "type": "number" },
+        "zoom": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}

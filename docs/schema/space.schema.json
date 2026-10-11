@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/space.schema.json",
+  "title": "Hyper space file",
+  "description": "space.json, in a Space directory named for the Space's Id. It holds structure and nothing else: Resources are their own files and Graphs belong to Maps (ADR 0020, ADR 0040). Every object is strict, so a misspelt key is refused rather than dropped. This is the file as intake reads it: the Space, Map and Graph ids that Export always writes may be omitted by a hand-written file, and intake mints the missing Map and Graph ids (ADR 0030).",
+  "type": "object",
+  "required": ["version", "title"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "description": "The space file's version. Any other value is refused by name, not migrated (ADR 0040).",
+      "const": 1
+    },
+    "id": {
+      "description": "The Space's Id. Optional, because the directory name carries it; when present, intake requires the two to agree.",
+      "$ref": "#/$defs/id"
+    },
+    "title": { "description": "The Space's name.", "$ref": "#/$defs/label" },
+    "maps": {
+      "description": "The Space's Maps, in order. Absent on a Space never opened; it is given one the first time it is (ADR 0079). Map ids are unique within the Space, which intake checks.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/map" }
+    },
+    "defaultMap": {
+      "description": "The Map the Space opens on; intake checks it names one of maps. Absent, opening records the first.",
+      "$ref": "#/$defs/id"
+    }
+  },
+  "$defs": {
+    "id": { "$ref": "id.schema.json" },
+    "label": {
+      "description": "A one-field name for a Space, Map or Graph: any non-empty string. Only a Resource's Title has Title Lines (ADR 0083).",
+      "type": "string",
+      "minLength": 1
+    },
+    "map": {
+      "description": "A positioned Map: the Resources it holds, where each sits, and the Graphs it owns.",
+      "type": "object",
+      "required": ["title", "positions", "graphs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Optional in a hand-written file; intake mints one.",
+          "$ref": "#/$defs/id"
+        },
+        "title": { "$ref": "#/$defs/label" },
+        "kind": { "description": "The only kind. May be omitted.", "const": "positioned" },
+        "positions": {
+          "description": "Resource Id to placement. The keys are the Map's membership; intake checks that each names a Resource the Space holds.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/id" },
+          "additionalProperties": { "$ref": "#/$defs/placement" }
+        },
+        "graphs": {
+          "description": "The Graphs this Map owns, in order, at least one. A Graph Id is unique across the whole Space (ADR 0108), which intake checks.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/graph" }
+        },
+        "activeGraph": {
+          "description": "The Graph active when the Map opens; intake checks this Map owns it. Absent, the first is.",
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "placement": {
+      "description": "One Resource's place on a Map. Open, size and Shape are the Map's, not the Resource's (ADR 0121, ADR 0122). That an Ur Resource is never Open and that only an Ur Resource takes a Shape other than the rectangle are intake's checks, because they need the Resource's kind.",
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "open": { "description": "Absent means Closed.", "type": "boolean" },
+        "size": {
+          "description": "Absent means the Closed Size, 260 by 146, which is also the floor on each axis.",
+          "type": "object",
+          "required": ["width", "height"],
+          "additionalProperties": false,
+          "properties": {
+            "width": { "type": "number", "minimum": 260 },
+            "height": { "type": "number", "minimum": 146 }
+          }
+        },
+        "shape": {
+          "description": "Absent means rectangle.",
+          "enum": ["rectangle", "pill", "ellipse", "diamond"]
+        }
+      }
+    },
+    "graph": {
+      "description": "A curated directed set of Edges over the Resources of the Map that owns it.",
+      "type": "object",
+      "required": ["title", "edges"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Optional in a hand-written file; intake mints one.",
+          "$ref": "#/$defs/id"
+        },
+        "title": { "$ref": "#/$defs/label" },
+        "color": {
+          "description": "The Graph's CSS colour. Not checked as a colour; absent, the palette chooses by order.",
+          "type": "string",
+          "minLength": 1
+        },
+        "headShape": {
+          "description": "What the Graph's Edges draw at their heads (ADR 0105). Absent means arrow.",
+          "enum": ["arrow", "vee", "dot", "diamond"]
+        },
+        "edges": {
+          "description": "May be empty. Forks, merges, cycles and self-Edges are allowed. That both ends are placed by this Map and that no exact Edge repeats are intake's checks.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/edge" }
+        }
+      }
+    },
+    "edge": {
+      "description": "A directed connection from one Resource (its tail) to another (its head) (ADR 0032).",
+      "type": "object",
+      "required": ["from", "to"],
+      "additionalProperties": false,
+      "dependentRequired": { "titleHidden": ["title"] },
+      "properties": {
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "title": {
+          "description": "One line, stored trimmed: no line break and no leading or trailing whitespace.",
+          "type": "string",
+          "pattern": "^\\S(?:[^\\r\\n]*\\S)?$"
+        },
+        "titleHidden": {
+          "description": "Only true is stored, and only beside a Title (ADR 0104).",
+          "const": true
+        }
+      }
+    }
+  }
+}

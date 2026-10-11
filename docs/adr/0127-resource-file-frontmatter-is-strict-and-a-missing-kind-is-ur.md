@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0020
+Refined by: 0128
 Related: 0054, 0104, 0113, 0120
 
 A Resource file's frontmatter is **strict**: a key no kind declares is refused at intake, and the refusal names the key and the file. And a Resource file that declares no `kind` is an **Ur Resource**: a file with no `kind` and a body is refused, and the refusal tells the author to add `kind: markdown`.

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/kinds/image.schema.json",
+  "title": "Image content",
+  "description": "An Image Resource owns its picture's URL, not its bytes (ADR 0106), so it uses the URL form of the locator: an https: or http: URL, or /images/<content-id> for a picture in the aggregate's shared image store, whose bytes Export carries in the Aggregate directory's images/ (ADR 0118).",
+  "type": "object",
+  "$ref": "../locator.schema.json",
+  "required": ["url"],
+  "properties": {
+    "url": {
+      "type": "string",
+      "anyOf": [
+        {
+          "description": "An external URL. The pattern refuses only what intake refuses: an http: or https: scheme in any case, after the leading C0 controls and spaces and the tabs and newlines a WHATWG URL parser discards. Intake also requires the whole string to parse as a WHATWG URL.",
+          "pattern": "^[\\u0000- ]*[hH][\\t\\n\\r]*[tT][\\t\\n\\r]*[tT][\\t\\n\\r]*[pP][\\t\\n\\r]*([sS][\\t\\n\\r]*)?:"
+        },
+        {
+          "description": "A stored image's content id: the SHA-256 of its bytes as unpadded base64url, 43 characters in canonical spelling (ADR 0106).",
+          "pattern": "^/images/[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+        }
+      ]
+    },
+    "naturalSize": {
+      "description": "The picture's size in pixels, measured when the URL was set; absent when it did not load.",
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  },
+  "unevaluatedProperties": false
+}

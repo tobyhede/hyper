@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/kinds/reference.schema.json",
+  "title": "Reference content",
+  "description": "A Reference Resource's immutable Target (ADR 0070). The module declares target as one outgoing Resource reference and flags its kind as unable to be a Target; the core checks that the Target exists and may be one, which keeps referencing a single hop (ADR 0128).",
+  "type": "object",
+  "required": ["target"],
+  "additionalProperties": false,
+  "properties": {
+    "target": { "$ref": "../../id.schema.json" }
+  }
+}

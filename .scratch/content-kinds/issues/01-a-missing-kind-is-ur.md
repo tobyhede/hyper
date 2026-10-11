@@ -1,6 +1,6 @@
 # 01 — A Resource with no kind is an Ur Resource
 
-Status: ready-for-agent
+Status: resolved
 
 **What to build:** ADR 0120's rule for a missing `kind`. Both frontmatter schemas default a missing `kind` to `ur` instead of `markdown`. In `packages/core/src/schema.ts`, `defaultMarkdownKind` (:200-203) is applied by `resourceFrontmatterSchema` (:211-212) and by `importResourceFrontmatterSchema` (:237-238); keep that preprocess on both, and make it supply `ur` (renamed to match). Do not remove it: the `z.discriminatedUnion('kind', …)` it wraps refuses a frontmatter with no `kind` at all. A Resource file with no `kind` and no body is an Ur Resource. One with no `kind` and a body is refused at intake, as an Ur Resource with a body already is: `parseResourceFile` refuses it with `invalid-frontmatter` (`packages/graph/src/resource-file.ts:129`).
 
@@ -19,6 +19,10 @@ Status: ready-for-agent
 - Every tracked Resource file loads, and every test that read a fixture's document still finds it.
 - Export of an Ur Resource round-trips through Import.
 - `docs/aggregate-directory.md` and the `hyper-authoring` skill state the new rule, and no comment in `schema.ts` or `resource-file.ts` still says `kind` defaults to `markdown`.
+
+## Answer
+
+Built by c3abbdc ("Refuse unknown keys in Resource file frontmatter and read a missing kind as ur"), recorded as ADR 0127: `defaultUrKind` in `packages/core/src/schema.ts` supplies `ur`. ADR 0128 later reverses the default: once Resource files are JSON, a missing `kind` is refused (`.scratch/resource-kind-modules/issues/07-json-resource-files-on-disk.md`).
 
 ## Comments
 

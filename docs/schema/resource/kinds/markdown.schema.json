@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/kinds/markdown.schema.json",
+  "title": "Markdown content",
+  "description": "A Markdown Resource's body is a sidecar: a plain Markdown file with no frontmatter, beside its Resource file, owned by the Resource and written and removed with it (ADR 0128). Its path is <id>.md, named for the Resource's own id; the schema holds the shape and intake checks that the id is the Resource's, which gives every sidecar exactly one owner.",
+  "type": "object",
+  "$ref": "../locator.schema.json",
+  "required": ["path", "mediaType"],
+  "properties": {
+    "path": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.md$"
+    },
+    "mediaType": {
+      "description": "text/markdown, in any case, since media types compare case-insensitively.",
+      "type": "string",
+      "pattern": "^[tT][eE][xX][tT]/[mM][aA][rR][kK][dD][oO][wW][nN]$"
+    }
+  },
+  "unevaluatedProperties": false
+}

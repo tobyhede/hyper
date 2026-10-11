@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/resource.schema.json",
+  "title": "Hyper Resource file",
+  "description": "One Resource, as the file resources/<id>.json in a Space directory (ADR 0128): the core's envelope, composed with the built-in kinds' schemas as a build registers them. The envelope names no kind; builtInKinds is the registration, one entry per kind pairing its id with its content schema. A vendor kind's content is accepted as any object, because this schema cannot know which vendor kinds a build registers; any other kind id is refused. Strict at both levels: the envelope refuses a top-level key it does not own, and the kind refuses a key inside content it does not declare.",
+  "type": "object",
+  "$ref": "envelope.schema.json",
+  "if": {
+    "type": "object",
+    "required": ["kind"],
+    "properties": {
+      "kind": {
+        "type": "string",
+        "pattern": "^vnd\\."
+      }
+    }
+  },
+  "else": {
+    "$ref": "#/$defs/builtInKinds"
+  },
+  "$defs": {
+    "builtInKinds": {
+      "description": "The built-in kinds, as the build registers them. Adding one is one entry here and one schema under kinds/.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "ur"
+            },
+            "content": {
+              "$ref": "kinds/ur.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "markdown"
+            },
+            "content": {
+              "$ref": "kinds/markdown.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "image"
+            },
+            "content": {
+              "$ref": "kinds/image.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "reference"
+            },
+            "content": {
+              "$ref": "kinds/reference.schema.json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "const": "space"
+            },
+            "content": {
+              "$ref": "kinds/space.schema.json"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
