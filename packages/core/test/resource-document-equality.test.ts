@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { ZodRawShape } from 'zod';
 import {
-  importImageResourceFrontmatterSchema,
   imageResourceDocumentSchema,
   imageResourceSchema,
+  markdownFileContentSchema,
+  markdownResourceContentSchema,
   markdownResourceDocumentSchema,
   markdownResourceSchema,
+  resourceFileSchema,
+  resourceSchema,
 } from '../src/index';
 
 /**
@@ -73,22 +76,22 @@ describe('a stored markdown document is the resource less its id', () => {
   /**
    * What sharing those instances buys, said in values rather than references.
    *
-   * The table is the edges of the Title and body rules and nothing else:
+   * The table is the edges of the Title and source rules and nothing else:
    * a Resource's Title normalizes and must keep one non-empty line, which is what
    * `min(1)` means, so a title of spaces is refused where a
-   * title with one is kept and trimmed; a body is required and may be empty.
+   * title with one is kept and trimmed; a source is required and may be empty.
    * Every combination is asserted both ways,
    * because a divergence in either direction is a document that round-trips
    * through storage and then cannot be completed.
    */
   const titles = ['', ' ', '   ', 'A', ' A '];
-  const bodies = [undefined, '', 'source'];
+  const sources = [undefined, '', 'source'];
   const kinds = [undefined, 'markdown', 'reference'];
 
-  /** One combination from the title/body/kind product, present only when drawn. */
+  /** One combination from the title/source/kind product, present only when drawn. */
   interface CandidateDocument {
     title: string;
-    body?: string;
+    content?: { source: string };
     kind?: string;
   }
 
@@ -96,10 +99,10 @@ describe('a stored markdown document is the resource less its id', () => {
     const disagreements: string[] = [];
     let examined = 0;
     for (const title of titles) {
-      for (const body of bodies) {
+      for (const source of sources) {
         for (const kind of kinds) {
           const document: CandidateDocument = { title };
-          if (body !== undefined) document.body = body;
+          if (source !== undefined) document.content = { source };
           if (kind !== undefined) document.kind = kind;
           examined += 1;
           const asDocument = markdownResourceDocumentSchema.safeParse(document);
@@ -131,71 +134,37 @@ describe('a stored markdown document is the resource less its id', () => {
 });
 
 /**
- * The Image Resource's URL rule is one rule at every door (ADR 0106): the stored
- * document, the Resource and the import variant each hold the same instance of
- * every field schema but the id, so a URL one refuses the others refuse too.
- *
- * `naturalSize` is the one field whose object differs: file intake makes it
- * strict (ADR 0127), so the import holds a strict copy of the shared object.
- * What it must still share is that object's field rules, `width` and
- * `height`, and that is what is asserted for it.
+ * The Image Resource's URL rule is one rule at every door (ADR 0106): the
+ * stored document, the Resource and its Resource file each refuse a URL the
+ * others refuse. The file's `naturalSize` is a strict copy of the shared object
+ * (ADR 0127), so an unknown key inside it is refused at the file alone.
  */
 describe('an Image Resource is held to one rule at every door', () => {
   const RESOURCE_ID = '00000000-0000-4000-8000-000000000002';
 
-  it('shares one instance of every rule but the id across document, resource and import', () => {
+  it('shares one instance of every rule but the id between document and resource', () => {
     const resourceFieldSchemas: ZodRawShape = imageResourceSchema.shape;
-    const importFieldSchemas: ZodRawShape = importImageResourceFrontmatterSchema.shape;
-    // The import frontmatter is flat; the Resource is an envelope whose
-    // content holds the kind's fields (ADR 0128).
-    const { content, ...envelopeFieldSchemas } = imageResourceSchema.shape;
-    const flatResourceFieldSchemas: ZodRawShape = { ...envelopeFieldSchemas, ...content.shape };
     expect(Object.keys(imageResourceDocumentSchema.shape).sort()).toEqual(
       Object.keys(imageResourceSchema.shape)
         .filter((key) => key !== 'id')
         .sort(),
-    );
-    expect(Object.keys(importFieldSchemas).sort()).toEqual(
-      Object.keys(flatResourceFieldSchemas).sort(),
     );
     for (const [field, schema] of Object.entries(imageResourceDocumentSchema.shape)) {
       expect(schema, `the document's "${field}" is not the resource's`).toBe(
         resourceFieldSchemas[field],
       );
     }
-    for (const [field, schema] of Object.entries(importFieldSchemas)) {
-      if (field === 'id' || field === 'naturalSize') continue;
-      expect(schema, `the import's "${field}" is not the resource's`).toBe(
-        flatResourceFieldSchemas[field],
-      );
-    }
-
-    const resourceSizeRules: ZodRawShape =
-      imageResourceSchema.shape.content.shape.naturalSize.unwrap().shape;
-    const importSizeRules: ZodRawShape =
-      importImageResourceFrontmatterSchema.shape.naturalSize.unwrap().shape;
-    expect(Object.keys(importSizeRules).sort()).toEqual(Object.keys(resourceSizeRules).sort());
-    for (const [field, schema] of Object.entries(resourceSizeRules)) {
-      expect(schema, `the import's "naturalSize.${field}" is not the resource's`).toBe(
-        importSizeRules[field],
-      );
-    }
   });
 
-  it('refuses an unknown naturalSize key at import and not at the non-strict resource', () => {
-    const document = {
+  it('refuses an unknown naturalSize key in a file and not at the non-strict resource', () => {
+    const resource = {
+      id: RESOURCE_ID,
       title: 'A',
       kind: 'image',
       content: { url: 'https://example.com/a.png', naturalSize: { width: 1, height: 2, widht: 3 } },
     };
-    expect(
-      importImageResourceFrontmatterSchema.safeParse({
-        title: 'A',
-        kind: 'image',
-        ...document.content,
-      }).success,
-    ).toBe(false);
-    expect(imageResourceSchema.safeParse({ ...document, id: RESOURCE_ID }).success).toBe(true);
+    expect(resourceFileSchema.safeParse(resource).success).toBe(false);
+    expect(imageResourceSchema.safeParse(resource).success).toBe(true);
   });
 
   it.each([
@@ -207,8 +176,93 @@ describe('an Image Resource is held to one rule at every door', () => {
     const document = { title: 'A', kind: 'image', content: { url } };
     expect(imageResourceDocumentSchema.safeParse(document).success).toBe(accepted);
     expect(imageResourceSchema.safeParse({ ...document, id: RESOURCE_ID }).success).toBe(accepted);
+    expect(resourceFileSchema.safeParse({ ...document, id: RESOURCE_ID }).success).toBe(accepted);
+  });
+});
+
+/** Each field, in order, that is not in both shapes or that `file` holds a different instance of. */
+const unshared = (file: ZodRawShape, resource: ZodRawShape): readonly string[] =>
+  [...new Set([...Object.keys(file), ...Object.keys(resource)])]
+    .filter((key) => file[key] === undefined || file[key] !== resource[key])
+    .sort();
+
+/**
+ * A Resource file is the Resource's envelope made strict (ADR 0128), and it
+ * holds the Resource's own instance of every rule it shares: the id, the
+ * Title, and each content field of every kind whose file holds its content.
+ * Where file intake makes a nested object strict, `framing` and `naturalSize`,
+ * the copy is a new object whose fields must still be the shared ones. A
+ * Markdown Resource's file holds a locator in place of its source, so its
+ * content is the one that is not shared.
+ *
+ * `.strict()` and `.extend()` copy field schemas by reference, which is what
+ * lets a stricter file schema share instances at all, and what a rule
+ * re-declared on either side cannot do without this seeing it.
+ */
+describe("a Resource file holds the Resource's rules", () => {
+  const [fileMarkdown, fileReference, fileSpace, fileImage, fileUr] = resourceFileSchema.options;
+  const [markdown, reference, space, image, ur] = resourceSchema.options;
+
+  it('declares the kinds the Resource does, in the same order', () => {
+    const kindsOf = (options: readonly { shape: { kind: { value: string } } }[]) =>
+      options.map((option) => option.shape.kind.value);
+    expect(kindsOf(resourceFileSchema.options)).toEqual(kindsOf(resourceSchema.options));
+    expect(resourceFileSchema.options).toHaveLength(5);
+  });
+
+  it("shares every kind's id and Title, differing only in its kind literal and content", () => {
+    const pairs = [
+      [fileMarkdown, markdown],
+      [fileReference, reference],
+      [fileSpace, space],
+      [fileImage, image],
+      [fileUr, ur],
+    ] as const;
+    for (const [file, resource] of pairs) {
+      expect(unshared(file.shape, resource.shape)).toEqual(['content', 'kind']);
+    }
+  });
+
+  it('shares every content rule of the kinds whose file holds their content', () => {
+    expect(unshared(fileReference.shape.content.shape, reference.shape.content.shape)).toEqual([]);
+    expect(unshared(fileUr.shape.content.shape, ur.shape.content.shape)).toEqual([]);
+    expect(unshared(fileSpace.shape.content.shape, space.shape.content.shape)).toEqual(['framing']);
     expect(
-      importImageResourceFrontmatterSchema.safeParse({ title: 'A', kind: 'image', url }).success,
-    ).toBe(accepted);
+      unshared(
+        fileSpace.shape.content.shape.framing.unwrap().shape,
+        space.shape.content.shape.framing.unwrap().shape,
+      ),
+    ).toEqual([]);
+    expect(unshared(fileImage.shape.content.shape, image.shape.content.shape)).toEqual([
+      'naturalSize',
+    ]);
+    expect(
+      unshared(
+        fileImage.shape.content.shape.naturalSize.unwrap().shape,
+        image.shape.content.shape.naturalSize.unwrap().shape,
+      ),
+    ).toEqual([]);
+  });
+
+  it("holds a Markdown Resource's sidecar locator in place of its source", () => {
+    expect(fileMarkdown.shape.content).toBe(markdownFileContentSchema);
+    expect(markdown.shape.content).toBe(markdownResourceContentSchema);
+  });
+
+  it('refuses a key the Resource would strip, inside the content and outside it', () => {
+    const resource = {
+      id: '00000000-0000-4000-8000-000000000002',
+      title: 'A',
+      kind: 'reference',
+      content: { target: '00000000-0000-4000-8000-000000000003' },
+    };
+    expect(resourceFileSchema.safeParse(resource).success).toBe(true);
+    for (const extended of [
+      { ...resource, extra: 1 },
+      { ...resource, content: { ...resource.content, extra: 1 } },
+    ]) {
+      expect(resourceFileSchema.safeParse(extended).success).toBe(false);
+      expect(resourceSchema.safeParse(extended).success).toBe(true);
+    }
   });
 });

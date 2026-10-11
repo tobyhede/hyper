@@ -2,23 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type { ZodIssue, ZodType, ZodTypeDef } from 'zod';
 import {
   RESOURCE_TITLE_REQUIRED,
-  referenceResourceFrontmatterSchema,
-  resourceDocumentSchema,
-  resourceFrontmatterSchema,
-  resourceSchema,
   graphSchema,
-  importReferenceResourceFrontmatterSchema,
-  importResourceFrontmatterSchema,
-  importMarkdownResourceFrontmatterSchema,
-  importSpaceResourceFrontmatterSchema,
-  markdownResourceFrontmatterSchema,
+  markdownResourceSchema,
   normalizeTitle,
   positionedMapSchema,
-  spaceResourceFrontmatterSchema,
+  referenceResourceSchema,
+  resourceDocumentSchema,
+  resourceFileSchema,
+  resourceSchema,
+  shortTitle,
   spaceFileSchema,
+  spaceResourceSchema,
   titleLines,
   titleName,
-  shortTitle,
 } from '../src/index';
 
 const RESOURCE_ID = '00000000-0000-4000-8000-000000000001';
@@ -35,103 +31,82 @@ const GRAPH_ID = '00000000-0000-4000-8000-000000000005';
 type ResourceTitleSchema = ZodType<unknown, ZodTypeDef, unknown>;
 
 /**
- * A Resource frontmatter as it arrives at a schema, before one has read it: every
- * field a Resource of any kind declares is written down, and all of them are text.
+ * A Resource as it arrives at a schema, before one has read it: the envelope,
+ * with the kind's fields under `content`, all of them text.
  */
-type ResourceFrontmatterDraft = Readonly<Record<string, string | Readonly<Record<string, string>>>>;
+interface ResourceDraft {
+  readonly id?: string;
+  readonly title: string;
+  readonly kind: string;
+  readonly content: Readonly<Record<string, string>>;
+}
 
-const markdownFrontmatter = (title: string) => ({
+const markdownResource = (title: string): ResourceDraft => ({
   id: RESOURCE_ID,
   title,
   kind: 'markdown',
+  content: { source: '' },
 });
-/** A Resource as the stored doors read it: an envelope with the kind's fields under `content`. */
-const envelope =
-  (frontmatter: (title: string) => Readonly<Record<string, string>>) => (title: string) => {
-    const { id, kind, title: _title, ...content } = frontmatter(title);
-    return { id: id ?? '', title, kind: kind ?? '', content };
-  };
-const referenceFrontmatter = (title: string) => ({
+/** The same Markdown Resource as its file holds it: a locator naming its sidecar. */
+const markdownFile = (title: string): ResourceDraft => ({
+  ...markdownResource(title),
+  content: { path: `${RESOURCE_ID}.md`, mediaType: 'text/markdown' },
+});
+const referenceResource = (title: string): ResourceDraft => ({
   id: RESOURCE_ID,
   title,
   kind: 'reference',
-  target: TARGET_ID,
+  content: { target: TARGET_ID },
 });
-const spaceFrontmatter = (title: string) => ({
+const spaceResource = (title: string): ResourceDraft => ({
   id: RESOURCE_ID,
   title,
   kind: 'space',
-  spaceId: SPACE_ID,
-  map: MAP_ID,
-  graph: GRAPH_ID,
+  content: { spaceId: SPACE_ID, map: MAP_ID, graph: GRAPH_ID },
 });
-
-/** The schemas that read one Resource kind, each beside the frontmatter it reads. */
-const kindSchemas: readonly {
-  readonly label: string;
-  readonly schema: ResourceTitleSchema;
-  readonly frontmatter: (title: string) => ResourceFrontmatterDraft;
-}[] = [
-  {
-    label: 'markdown resource',
-    schema: markdownResourceFrontmatterSchema,
-    frontmatter: markdownFrontmatter,
-  },
-  {
-    label: 'reference resource',
-    schema: referenceResourceFrontmatterSchema,
-    frontmatter: referenceFrontmatter,
-  },
-  {
-    label: 'space resource',
-    schema: spaceResourceFrontmatterSchema,
-    frontmatter: spaceFrontmatter,
-  },
-  {
-    label: 'imported markdown resource',
-    schema: importMarkdownResourceFrontmatterSchema,
-    frontmatter: markdownFrontmatter,
-  },
-  {
-    label: 'imported reference resource',
-    schema: importReferenceResourceFrontmatterSchema,
-    frontmatter: referenceFrontmatter,
-  },
-  {
-    label: 'imported space resource',
-    schema: importSpaceResourceFrontmatterSchema,
-    frontmatter: spaceFrontmatter,
-  },
-];
+/** A draft as the stored document holds it, which has no id. */
+const withoutId =
+  (draft: (title: string) => ResourceDraft) =>
+  (title: string): ResourceDraft => {
+    const { id: _id, ...document } = draft(title);
+    return document;
+  };
 
 /**
- * The unions and the stored document, each of which reads every kind, beside
- * how each is handed a Markdown Resource: file intake refuses a `body` key,
- * because the body is the file's, and the stored doors require one.
+ * Every schema a Resource's Title arrives through, beside the drafts it reads:
+ * each kind's own schema, the Resource union, the stored document and the
+ * Resource file, which holds a Markdown Resource's content as a locator.
  */
-const FLAT = [markdownFrontmatter, referenceFrontmatter, spaceFrontmatter];
-const ENVELOPED = [
-  (title: string) => ({ ...envelope(markdownFrontmatter)(title), content: { source: '' } }),
-  envelope(referenceFrontmatter),
-  envelope(spaceFrontmatter),
-];
-
-const unionSchemas: readonly {
+const doors: readonly {
   readonly label: string;
   readonly schema: ResourceTitleSchema;
-  readonly drafts: readonly ((title: string) => ResourceFrontmatterDraft)[];
+  readonly drafts: readonly ((title: string) => ResourceDraft)[];
 }[] = [
-  { label: 'resource frontmatter', schema: resourceFrontmatterSchema, drafts: FLAT },
-  { label: 'resource', schema: resourceSchema, drafts: ENVELOPED },
-  { label: 'resource document', schema: resourceDocumentSchema, drafts: ENVELOPED },
-  { label: 'imported resource frontmatter', schema: importResourceFrontmatterSchema, drafts: FLAT },
+  { label: 'markdown resource', schema: markdownResourceSchema, drafts: [markdownResource] },
+  { label: 'reference resource', schema: referenceResourceSchema, drafts: [referenceResource] },
+  { label: 'space resource', schema: spaceResourceSchema, drafts: [spaceResource] },
+  {
+    label: 'resource',
+    schema: resourceSchema,
+    drafts: [markdownResource, referenceResource, spaceResource],
+  },
+  {
+    label: 'resource document',
+    schema: resourceDocumentSchema,
+    drafts: [markdownResource, referenceResource, spaceResource].map(withoutId),
+  },
+  {
+    label: 'resource file',
+    schema: resourceFileSchema,
+    drafts: [markdownFile, referenceResource, spaceResource],
+  },
 ];
 
 /**
  * Every door a Resource's Title arrives through, carrying one Title.
  *
  * A rule that reaches only the per-kind schemas is visibly not the rule at
- * every door: the union, the stored document and the import variants have to
+ * every door: the union, the stored document and the Resource file have to
  * answer the same way, which is what makes a stored Title and an imported one
  * the same Title.
  */
@@ -140,21 +115,11 @@ const titleCases = (
 ): readonly {
   readonly label: string;
   readonly schema: ResourceTitleSchema;
-  readonly value: ResourceFrontmatterDraft;
-}[] => [
-  ...kindSchemas.map(({ label, schema, frontmatter }) => ({
-    label,
-    schema,
-    value: frontmatter(title),
-  })),
-  ...unionSchemas.flatMap(({ label, schema, drafts }) =>
-    drafts.map((frontmatter) => ({
-      label,
-      schema,
-      value: frontmatter(title),
-    })),
-  ),
-];
+  readonly value: ResourceDraft;
+}[] =>
+  doors.flatMap(({ label, schema, drafts }) =>
+    drafts.map((draft) => ({ label, schema, value: draft(title) })),
+  );
 
 /**
  * Whether a refusal carries the domain's stable identity for a Title with no

@@ -56,9 +56,9 @@ function loadFixture(): Space {
       ],
     },
     [
-      resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
-      resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
-      resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
+      ...resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
+      ...resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
+      ...resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
     ],
   );
   if (!result.ok) throw new Error('fixture should load');
@@ -186,8 +186,8 @@ describe('buildGraphRenderEdges', () => {
         ],
       },
       [
-        resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
-        resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
+        ...resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
+        ...resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
       ],
     );
     expect(shared.ok).toBe(true);
@@ -246,7 +246,7 @@ describe('buildGraphRenderEdges', () => {
           },
         ],
       },
-      [resourceFile(a), resourceFile(b), resourceFile(c)],
+      [...resourceFile(a), ...resourceFile(b), ...resourceFile(c)],
     );
     if (!titled.ok) throw new Error('fixture should load');
 
@@ -313,9 +313,9 @@ describe('buildGraphRenderEdges', () => {
         ],
       },
       [
-        resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
-        resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
-        resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
+        ...resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
+        ...resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
+        ...resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
       ],
     );
     if (!shortened.ok) throw new Error('fixture should load');
@@ -363,9 +363,9 @@ describe('buildGraphRenderEdges', () => {
         ],
       },
       [
-        resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
-        resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
-        resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
+        ...resourceFile(uuid('00000000-0000-4000-8000-000000000002')),
+        ...resourceFile(uuid('00000000-0000-4000-8000-000000000003')),
+        ...resourceFile(uuid('00000000-0000-4000-8000-000000000005')),
       ],
     );
     if (!forked.ok) throw new Error('fixture should load');

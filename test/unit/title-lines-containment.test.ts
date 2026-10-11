@@ -43,16 +43,6 @@ const LADDER_READERS: readonly string[] = [
 ];
 
 /**
- * A newline split that is not a Title's.
- *
- * A **file** exemption, because a `split` carries no shape saying what it is
- * splitting — the string is a `string` either way, which is the whole reason
- * this file exists. It is asserted below to still be earning itself, so
- * deleting the split deletes the exemption rather than leaving a hole.
- */
-const NOT_A_TITLE: readonly string[] = ['packages/graph/src/resource-file.ts'];
-
-/**
  * Reading a Title apart at a line break, however the break is found.
  *
  * `split` is the obvious spelling and it is not the only one. `indexOf` is what
@@ -127,9 +117,7 @@ describe('only the drawn Resource reads a Title’s later lines', () => {
   });
 
   it('reads a Title apart at a newline nowhere else', () => {
-    const splitting = reaching(sources, NEWLINE_READ).filter(
-      (file) => !isLadderReader(file) && !NOT_A_TITLE.includes(file),
-    );
+    const splitting = reaching(sources, NEWLINE_READ).filter((file) => !isLadderReader(file));
 
     expect(splitting).toEqual([]);
   });
@@ -141,23 +129,10 @@ describe('only the drawn Resource reads a Title’s later lines', () => {
   });
 
   /**
-   * An exemption outlives its reason silently, and the scan then covers less
-   * than it reads as covering.
-   */
-  it('keeps the not-a-Title exemption earning itself', () => {
-    for (const file of NOT_A_TITLE) {
-      expect(sources, `${file} is exempted but is not scanned`).toContain(file);
-      expect(
-        NEWLINE_READ.test(readFileSync(join(repoRoot, file), 'utf8')),
-        `${file} no longer needs its exemption`,
-      ).toBe(true);
-    }
-  });
-
-  /**
-   * A permission outlives its reason the way an exemption does. Holding each
-   * one to a file is what makes that checkable: a tree goes on being permitted
-   * on the strength of a reader that has left it.
+   * A permission outlives its reason silently, and the scan then covers less
+   * than it reads as covering. Holding each one to a file is what makes that
+   * checkable: a tree goes on being permitted on the strength of a reader that
+   * has left it.
    */
   it('keeps every ladder-reader permission earning itself', () => {
     const reads = (file: string): boolean => {

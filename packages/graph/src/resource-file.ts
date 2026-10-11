@@ -1,30 +1,25 @@
 import {
-  spaceKind,
-  referenceKind,
+  MARKDOWN_MEDIA_TYPE,
+  declaredId,
+  declaredKind,
+  isKindId,
+  isRegisteredKind,
   markdownKind,
-  declaresResourceKind,
-  resourceFrontmatterSchema,
+  markdownSidecarPath,
+  resourceFileSchema,
   resourceSchema,
-  importResourceFrontmatterSchema,
   type Resource,
-  type ResourceDocument,
-  type ImportResource,
-  type ImportResourceFrontmatter,
-  type UUID,
-  imageKind,
-  urKind,
+  type ResourceFileDocument,
 } from '@project/core';
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { splitFrontmatter } from './frontmatter';
 
-/** A resource file as read from disk: where it was found, and its bytes as text. */
+/** A file of a Space directory's `resources/`, as read from disk: where it was found, and its text. */
 export interface ResourceFile {
   readonly path: string;
   readonly text: string;
 }
 
 export type ResourceFileErrorKind =
-  'missing-frontmatter' | 'unterminated-frontmatter' | 'invalid-yaml' | 'invalid-frontmatter';
+  'invalid-json' | 'invalid-resource-file' | 'missing-sidecar' | 'unclaimed-sidecar';
 
 export interface ResourceFileError {
   kind: ResourceFileErrorKind;
@@ -33,196 +28,202 @@ export interface ResourceFileError {
   message: string;
 }
 
-export type ParseResourceFileResult =
-  { ok: true; resource: Resource } | { ok: false; errors: ResourceFileError[] };
-export type ParseImportResourceFileResult =
-  { ok: true; resource: ImportResource } | { ok: false; errors: ResourceFileError[] };
-
-type ResourceFileFailure = { ok: false; errors: ResourceFileError[] };
-interface FrontmatterSchema<T extends ImportResourceFrontmatter> {
-  safeParse(value: unknown):
-    | { success: true; data: T }
-    | {
-        success: false;
-        error: { issues: { code: string; path: PropertyKey[]; message: string }[] };
-      };
+/** A Resource and the Resource file it was read from. */
+export interface DecodedResourceFile {
+  readonly path: string;
+  readonly resource: Resource;
 }
 
-const FENCE = '---\n';
+export type ParseResourceFilesResult =
+  | { ok: true; resources: readonly DecodedResourceFile[] }
+  | { ok: false; errors: ResourceFileError[] };
+
+/** Whether a file is a Resource file, rather than a sidecar one names. */
+const isResourceFile = (path: string): boolean => path.endsWith('.json');
+
+/** The directory part of a path, with its trailing `/`, or `''` for a bare name. */
+const directoryOf = (path: string): string => path.slice(0, path.lastIndexOf('/') + 1);
+
+/** A Resource file's fields, the envelope's and its content's, decoded from JSON. */
+type FileDecoding =
+  | { readonly ok: true; readonly file: ResourceFileDocument }
+  | {
+      readonly ok: false;
+      readonly errors: ResourceFileError[];
+      /** The `<id>.md` a refused file names by its id, so it is not reported again as unclaimed. */
+      readonly ownSidecar?: string;
+    };
 
 /**
- * Split a resource file into its frontmatter and its body (ADR 0020).
- *
- * The fence is hand-rolled and the YAML is not. The byte-level split lives in
- * `./frontmatter`; schema validation and domain construction stay here.
+ * A Resource file's JSON, refused as ADR 0128 fixes it: a `kind` is required,
+ * is a kind id, and names a kind this build registers; then the envelope and
+ * the kind's content are each strict.
  */
-export function parseResourceFile(file: ResourceFile): ParseResourceFileResult {
-  const decoded = decodeResourceFile(file, resourceFrontmatterSchema);
-  if (!decoded.ok) return decoded;
-
-  const { id, document } = decodeEnvelope(decoded.frontmatter, decoded.body);
-  const resource = resourceSchema.safeParse({ id, ...document });
-  if (!resource.success) {
+function decodeFile(file: ResourceFile): FileDecoding {
+  let json: unknown;
+  try {
+    json = JSON.parse(file.text);
+  } catch (error) {
     return {
       ok: false,
-      errors: resource.error.issues.map((issue) => ({
-        kind: 'invalid-frontmatter',
+      errors: [
+        {
+          kind: 'invalid-json',
+          path: file.path,
+          message: `${file.path}: is not valid JSON — ${String(error)}`,
+        },
+      ],
+    };
+  }
+  const id = declaredId(json);
+  const refused = (errors: ResourceFileError[]): FileDecoding =>
+    id === undefined
+      ? { ok: false, errors }
+      : { ok: false, errors, ownSidecar: `${directoryOf(file.path)}${markdownSidecarPath(id)}` };
+  const fail = (kind: ResourceFileErrorKind, message: string): FileDecoding =>
+    refused([{ kind, path: file.path, message: `${file.path}: ${message}` }]);
+
+  const kind = declaredKind(json);
+  if (kind === undefined) {
+    return fail('invalid-resource-file', 'kind: a Resource file must declare its kind');
+  }
+  if (!isKindId(kind)) {
+    return fail(
+      'invalid-resource-file',
+      `kind: "${kind}" is not a kind id — a bare id or vnd.<owner>.<name>, each part ASCII letters, digits and hyphens`,
+    );
+  }
+  if (!isRegisteredKind(kind)) {
+    return fail('invalid-resource-file', `kind: "${kind}" is not a kind this build registers`);
+  }
+
+  const parsed = resourceFileSchema.safeParse(json);
+  if (!parsed.success) {
+    return refused(
+      parsed.error.issues.map((issue) => ({
+        kind: 'invalid-resource-file',
         path: file.path,
         message: `${file.path}: ${issue.path.join('.') || '(resource)'}: ${issue.message}`,
       })),
-    };
+    );
   }
-
-  return { ok: true, resource: resource.data };
-}
-
-export function parseImportResourceFile(file: ResourceFile): ParseImportResourceFileResult {
-  const decoded = decodeResourceFile(file, importResourceFrontmatterSchema);
-  if (!decoded.ok) return decoded;
-
-  const { id, document } = decodeEnvelope(decoded.frontmatter, decoded.body);
-  const resource: ImportResource = { document };
-  if (id !== undefined) resource.id = id;
-  return { ok: true, resource };
-}
-
-/** A Resource decoded from its file: the id the file declares, if any, and its document. */
-interface DecodedResource {
-  readonly id: UUID | undefined;
-  readonly document: ResourceDocument;
+  return { ok: true, file: parsed.data };
 }
 
 /**
- * A Resource file's frontmatter is flat and a Resource is an envelope
- * (ADR 0128): the frontmatter's id, title and kind are the envelope's, and its
- * other keys are the kind's content. A Markdown Resource's content is the
- * file's body.
+ * Read a Space directory's Resource files and the sidecars they name into
+ * Resources (ADR 0128). Each `*.json` is one Resource file; each kind's file
+ * codec maps its content to the document's. A Markdown Resource's source is
+ * its sidecar, which must be its own `<id>.md` beside its Resource file. A
+ * `.md` no Resource file names is refused, naming it, so a Resource written
+ * in an older format is never silently dropped. A refused Resource file's own
+ * `<id>.md` is not reported again: its refusal already names the problem.
  */
-function decodeEnvelope(frontmatter: ImportResourceFrontmatter, body: string): DecodedResource {
-  switch (frontmatter.kind) {
-    case markdownKind.id: {
-      const { id, title, kind } = frontmatter;
-      return { id, document: { title, kind, content: { source: body } } };
+export function parseResourceFiles(files: readonly ResourceFile[]): ParseResourceFilesResult {
+  const sidecars = new Map(
+    files.filter(({ path }) => !isResourceFile(path)).map((file) => [file.path, file.text]),
+  );
+  const claimed = new Set<string>();
+  const errors: ResourceFileError[] = [];
+  const resources: DecodedResourceFile[] = [];
+
+  for (const file of files) {
+    if (!isResourceFile(file.path)) continue;
+    const decoded = decodeFile(file);
+    if (!decoded.ok) {
+      errors.push(...decoded.errors);
+      if (decoded.ownSidecar !== undefined) claimed.add(decoded.ownSidecar);
+      continue;
     }
-    case referenceKind.id:
-      return contentFromRest(frontmatter);
-    case spaceKind.id:
-      return contentFromRest(frontmatter);
-    case imageKind.id:
-      return contentFromRest(frontmatter);
-    case urKind.id:
-      return contentFromRest(frontmatter);
+    const content = contentOf(file, decoded.file, sidecars, claimed);
+    if (!content.ok) {
+      errors.push(...content.errors);
+      claimed.add(`${directoryOf(file.path)}${markdownSidecarPath(decoded.file.id)}`);
+      continue;
+    }
+    const { id, title, kind } = decoded.file;
+    const resource = resourceSchema.safeParse({ id, title, kind, content: content.content });
+    if (!resource.success) {
+      errors.push(
+        ...resource.error.issues.map((issue) => ({
+          kind: 'invalid-resource-file' as const,
+          path: file.path,
+          message: `${file.path}: ${issue.path.join('.') || '(resource)'}: ${issue.message}`,
+        })),
+      );
+      continue;
+    }
+    resources.push({ path: file.path, resource: resource.data });
   }
+
+  for (const path of sidecars.keys()) {
+    if (claimed.has(path)) continue;
+    errors.push({
+      kind: 'unclaimed-sidecar',
+      path,
+      message: `${path}: no Resource file names this file; a Resource is resources/<id>.json, and a Markdown Resource's source is the <id>.md it names (ADR 0128)`,
+    });
+  }
+
+  return errors.length > 0 ? { ok: false, errors } : { ok: true, resources };
 }
 
-/** The frontmatter keys every kind shares: the envelope's. */
-interface EnvelopeFrontmatter {
-  readonly id?: UUID | undefined;
-  readonly title: string;
-  readonly kind: string;
-}
+type ContentDecoding =
+  | { readonly ok: true; readonly content: unknown }
+  | { readonly ok: false; readonly errors: ResourceFileError[] };
 
-/** A Resource decoded from one kind's frontmatter, its `content` the frontmatter's other keys. */
-interface DecodedKindResource<F extends EnvelopeFrontmatter> {
-  readonly id: UUID | undefined;
-  readonly document: {
-    readonly title: string;
-    readonly kind: F['kind'];
-    readonly content: Omit<F, keyof EnvelopeFrontmatter>;
-  };
-}
-
-/** One kind's frontmatter with every key but the envelope's moved under `content`. */
-function contentFromRest<F extends EnvelopeFrontmatter>(frontmatter: F): DecodedKindResource<F> {
-  const { id, title, kind, ...content } = frontmatter;
-  return { id, document: { title, kind, content } };
-}
-
-function decodeResourceFile<T extends ImportResourceFrontmatter>(
+/**
+ * A Resource file's content as the document's: each kind's file codec maps
+ * one to the other, and the document's schema then parses it. Only
+ * Markdown's differs, reading its source from the sidecar its locator names.
+ */
+function contentOf(
   file: ResourceFile,
-  schema: FrontmatterSchema<T>,
-): { ok: true; frontmatter: T; body: string } | ResourceFileFailure {
-  const fail = (kind: ResourceFileErrorKind, message: string): ResourceFileFailure => ({
+  decoded: ResourceFileDocument,
+  sidecars: ReadonlyMap<string, string>,
+  claimed: Set<string>,
+): ContentDecoding {
+  const fail = (kind: ResourceFileErrorKind, message: string): ContentDecoding => ({
     ok: false,
     errors: [{ kind, path: file.path, message: `${file.path}: ${message}` }],
   });
-
-  const split = splitFrontmatter(file.text);
-  if (split === 'missing-frontmatter') {
-    return fail('missing-frontmatter', 'does not open with a "---" frontmatter fence');
-  }
-  if (split === 'unterminated-frontmatter') {
-    return fail('unterminated-frontmatter', 'opens a "---" frontmatter fence that never closes');
-  }
-
-  let yaml: unknown;
-  try {
-    yaml = parseYaml(split.yaml);
-  } catch (error) {
-    return fail('invalid-yaml', `frontmatter is not valid YAML — ${describe(error)}`);
-  }
-
-  const parsed = schema.safeParse(yaml);
-  if (!parsed.success) {
-    // A kindless file is read as an Ur Resource, so another kind's key is
-    // refused as unknown; the message says why the key is unknown.
-    const kindless = declaresResourceKind(yaml)
-      ? ''
-      : '; the file declares no kind, so it is read as an Ur Resource — declare its "kind:" if it is another kind';
-    return {
-      ok: false,
-      errors: parsed.error.issues.map((issue) => ({
-        kind: 'invalid-frontmatter',
-        path: file.path,
-        message: `${file.path}: ${issue.path.join('.') || '(frontmatter)'}: ${issue.message}${
-          issue.code === 'unrecognized_keys' ? kindless : ''
-        }`,
-      })),
-    };
-  }
-
-  // Only a Markdown Resource owns the bytes after the frontmatter. Check before
-  // constructing the domain value: the other schemas would otherwise strip a
-  // body as an unknown key and silently discard authored prose. Blank lines
-  // after the fence are not a body.
-  if (parsed.data.kind !== markdownKind.id && split.body.trim() !== '') {
+  if (decoded.kind !== markdownKind.id) return { ok: true, content: decoded.content };
+  const own = markdownSidecarPath(decoded.id);
+  if (decoded.content.path !== own) {
     return fail(
-      'invalid-frontmatter',
-      declaresResourceKind(yaml)
-        ? `body: ${parsed.data.kind} resources may not have a body`
-        : 'body: a resource file with no kind is an Ur Resource, which has no body; add "kind: markdown" to its frontmatter to keep the body as Markdown',
+      'invalid-resource-file',
+      `content.path: a Markdown Resource's sidecar is its own "${own}", not "${decoded.content.path}"`,
     );
   }
-
-  return { ok: true, frontmatter: parsed.data, body: split.body };
+  const sidecarPath = `${directoryOf(file.path)}${own}`;
+  const source = sidecars.get(sidecarPath);
+  if (source === undefined) {
+    return fail('missing-sidecar', `content.path: the sidecar "${own}" it names does not exist`);
+  }
+  claimed.add(sidecarPath);
+  return { ok: true, content: { source } };
 }
 
 /**
- * Write a resource back out as one file: frontmatter, fence, body (ADR 0020). The
- * inverse of {@link parseResourceFile}, and held to that by a round-trip property.
+ * A Resource as its files, by path relative to the Space directory: its
+ * Resource file `resources/<id>.json`, and a Markdown Resource's sidecar
+ * `resources/<id>.md` beside it (ADR 0128). The inverse of
+ * {@link parseResourceFiles}, and held to that by a round-trip property.
  *
- * The YAML goes through `stringify` rather than a template, so a title carrying
- * a colon — `Recap: the data model`, which the example space really has — is
- * quoted rather than written as a nested mapping. Hand-rolling the emitting side
- * is the same mistake as hand-rolling the reading side, in the direction where
- * it silently produces a file that no longer parses.
- *
- * `kind` is written for every kind, `ur` included, even though the reader
- * defaults an absent one to `ur`. A file this produced is one a human then
- * edits, and a resource that says what kind it is can be read without knowing
- * the default.
+ * The JSON is pretty-printed with two spaces and a closing newline, keys in
+ * envelope order, so a file a human then edits reads the way the published
+ * examples do.
  */
-export function serializeResourceFile(resource: Resource): string {
-  if (resource.kind === markdownKind.id) {
-    const { content, ...frontmatter } = resource;
-    return `${FENCE}${stringifyYaml(frontmatter)}${FENCE}\n${content.source}`;
-  }
-  const { content, ...frontmatter } = resource;
-  return `${FENCE}${stringifyYaml({ ...frontmatter, ...content })}${FENCE}\n`;
-}
-
-/** YAML's own errors are multi-line and end in a source excerpt; the first line says what broke. */
-function describe(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.split('\n')[0] ?? message;
+export function serializeResource(resource: Resource): readonly ResourceFile[] {
+  const { id, title } = resource;
+  const resourceFile = (content: unknown): ResourceFile => ({
+    path: `resources/${id}.json`,
+    text: `${JSON.stringify({ id, title, kind: resource.kind, content }, null, 2)}\n`,
+  });
+  if (resource.kind !== markdownKind.id) return [resourceFile(resource.content)];
+  const path = markdownSidecarPath(id);
+  return [
+    resourceFile({ path, mediaType: MARKDOWN_MEDIA_TYPE }),
+    { path: `resources/${path}`, text: resource.content.source },
+  ];
 }

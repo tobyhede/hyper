@@ -20,7 +20,10 @@ const resourcesArb = fc
     }),
     { selector: (r) => r.id, minLength: 1, maxLength: 10 },
   )
-  .map((resources) => ({ resources, files: resources.map((r) => resourceFile(r.id, r.title)) }));
+  .map((resources) => ({
+    resources,
+    files: resources.flatMap((r) => resourceFile(r.id, r.title)),
+  }));
 
 // No maps, and so no graphs: these properties are about which resources a space
 // ends up with, and a map would only constrain them (ADR 0040).
@@ -55,14 +58,14 @@ describe('loadSpace over resource files', () => {
     // resulting order depend on scan order — the resource the sort exists to prevent.
     const same = (id: string) => resourceFile(id, 'Same title');
     const forwards = loadSpace(emptySpaceFile, [
-      same('00000000-0000-4000-8000-000000000005'),
-      same('00000000-0000-4000-8000-000000000002'),
-      same('00000000-0000-4000-8000-000000000003'),
+      ...same('00000000-0000-4000-8000-000000000005'),
+      ...same('00000000-0000-4000-8000-000000000002'),
+      ...same('00000000-0000-4000-8000-000000000003'),
     ]);
     const backwards = loadSpace(emptySpaceFile, [
-      same('00000000-0000-4000-8000-000000000003'),
-      same('00000000-0000-4000-8000-000000000002'),
-      same('00000000-0000-4000-8000-000000000005'),
+      ...same('00000000-0000-4000-8000-000000000003'),
+      ...same('00000000-0000-4000-8000-000000000002'),
+      ...same('00000000-0000-4000-8000-000000000005'),
     ]);
 
     expect(forwards.ok && backwards.ok).toBe(true);

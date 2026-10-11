@@ -15,11 +15,9 @@ import * as graphPackage from '@project/graph';
  * only callers are inside the package stays in its module, behind the form
  * consumers do call.
  *
- * Two whole modules are absent by that rule. `frontmatter` is how `resource-file`
- * reads a fence, and `parseResourceFile` is the intake it exists to serve.
- * `validate` runs inside `loadSpace`, which ADR 0010 makes the one intake — a
- * caller never checks references itself, so it never names the check, its input
- * or its errors. `SpaceReferenceError` is the edge: `ResourceFileError` sits beside
+ * One whole module is absent by that rule. `validate` runs inside `loadSpace`,
+ * which ADR 0010 makes the one intake — a caller never checks references itself,
+ * so it never names the check, its input or its errors. `SpaceReferenceError` is the edge: `ResourceFileError` sits beside
  * it in the same `SpaceError` union and is offered, so what separates them is
  * the module each belongs to and not how a consumer reaches it.
  *
@@ -51,19 +49,19 @@ const OFFERED_VALUES = [
   'newSpace',
   'nextGraphColor',
   'outgoingEdges',
-  'parseResourceFile',
-  'parseImportResourceFile',
+  'parseResourceFiles',
   'positionedStrategy',
   'repeatedGraphEdges',
   'resolveResourceContent',
   'graphResourceIds',
   'graphStartResource',
-  'serializeResourceFile',
+  'serializeResource',
   'SnapshotEdit',
   'deletionReach',
 ] as const;
 
 const OFFERED_TYPES = [
+  'DecodedResourceFile',
   'ResourceFile',
   'ResourceFileError',
   'ResourceFileErrorKind',
@@ -79,8 +77,7 @@ const OFFERED_TYPES = [
   'LoadSpaceAggregateResult',
   'LoadSpaceSnapshotResult',
   'NewSpace',
-  'ParseResourceFileResult',
-  'ParseImportResourceFileResult',
+  'ParseResourceFilesResult',
   'OwnedGraph',
   'ResolvedMap',
   'Space',
@@ -311,11 +308,11 @@ describe('reading a surface sees every way a name is offered', () => {
   });
 
   it('sees a whole module bound to one type-only name', () => {
-    expect(read("export type * as ns from './frontmatter';\n").unlisted).toEqual(['ns']);
+    expect(read("export type * as ns from './m';\n").unlisted).toEqual(['ns']);
   });
 
   it('sees a whole module bound to one name', () => {
-    expect(read("export * as ns from './frontmatter';\n").unlisted).toEqual(['ns']);
+    expect(read("export * as ns from './m';\n").unlisted).toEqual(['ns']);
   });
 
   it('sees a default export, which lists no name at all', () => {
@@ -349,9 +346,9 @@ describe('reading a surface sees every way a name is offered', () => {
   });
 
   it('still reads a bare star as a whole module rather than an unlisted name', () => {
-    const exports = read("export * from './frontmatter';\n");
+    const exports = read("export * from './m';\n");
 
-    expect(exports.wholeModules).toEqual(['./frontmatter']);
+    expect(exports.wholeModules).toEqual(['./m']);
     expect(exports.unlisted).toEqual([]);
   });
 

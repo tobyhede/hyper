@@ -8,9 +8,8 @@ import {
   RESOURCE_SHAPES,
   graphEdgeSchema,
   graphSchema,
-  importResourceFrontmatterSchema,
   resourceDocumentSchema,
-  resourceFrontmatterSchema,
+  resourceFileSchema,
   resourceSchema,
   resourceOpen,
   resourceShape,
@@ -297,42 +296,83 @@ describe('space file schema', () => {
   });
 });
 
-describe('resource frontmatter schema', () => {
+describe('resource file schema', () => {
+  const A = '00000000-0000-4000-8000-000000000002';
+  const MARKDOWN_FILE = {
+    id: A,
+    title: 'A',
+    kind: 'markdown',
+    content: { path: `${A}.md`, mediaType: 'text/markdown' },
+  };
+
+  /** The messages a refused file prints, in order. */
+  const messages = (result: ReturnType<typeof resourceFileSchema.safeParse>): readonly string[] =>
+    result.error?.issues.map(({ message }) => message) ?? [];
+
   it('rejects an empty resource id', () => {
-    expect(resourceFrontmatterSchema.safeParse({ id: '', title: 'A' }).success).toBe(false);
+    expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, id: '' }).success).toBe(false);
   });
 
-  it('reads a resource with no kind as an Ur Resource, which is its id and Title alone', () => {
-    for (const schema of [resourceFrontmatterSchema, importResourceFrontmatterSchema]) {
-      const resource = schema.parse({ id: '00000000-0000-4000-8000-000000000002', title: 'A' });
-      expect(resource.kind).toBe('ur');
-    }
+  it('requires an id — a Resource file names the Resource it holds', () => {
+    const { id: _id, ...unnamed } = MARKDOWN_FILE;
+    expect(resourceFileSchema.safeParse(unnamed).success).toBe(false);
   });
 
-  it('refuses a content key, naming it — the file the frontmatter sits in is the content', () => {
-    const parsed = resourceFrontmatterSchema.safeParse({
-      id: '00000000-0000-4000-8000-000000000002',
-      title: 'A',
-      kind: 'markdown',
-      content: 'resources/a.md',
+  it('requires a kind, defaulting none', () => {
+    const { kind: _kind, ...unkinded } = MARKDOWN_FILE;
+    expect(resourceFileSchema.safeParse(unkinded).success).toBe(false);
+    expect(resourceFileSchema.safeParse({ id: A, title: 'A', content: {} }).success).toBe(false);
+  });
+
+  it('refuses a kind no module registers', () => {
+    expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: 'a.b' }).success).toBe(false);
+    expect(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, kind: 'chart' }).success).toBe(false);
+  });
+
+  it('reads a Markdown Resource file as the locator of its sidecar', () => {
+    expect(resourceFileSchema.parse(MARKDOWN_FILE)).toEqual(MARKDOWN_FILE);
+  });
+
+  it('compares the Markdown media type case-insensitively, and refuses any other', () => {
+    const withMediaType = (mediaType: string) => ({
+      ...MARKDOWN_FILE,
+      content: { ...MARKDOWN_FILE.content, mediaType },
     });
-    expect(parsed.success).toBe(false);
-    expect(parsed.error?.issues.map(({ message }) => message)).toEqual([
-      "Unrecognized key(s) in object: 'content'",
-    ]);
+    expect(resourceFileSchema.safeParse(withMediaType('Text/Markdown')).success).toBe(true);
+    expect(resourceFileSchema.safeParse(withMediaType('text/plain')).success).toBe(false);
+  });
+
+  it('refuses a Markdown Resource file that carries its source rather than locating it', () => {
+    expect(
+      resourceFileSchema.safeParse({ ...MARKDOWN_FILE, content: { source: '# A' } }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a key the envelope does not declare, naming it', () => {
+    expect(
+      messages(resourceFileSchema.safeParse({ ...MARKDOWN_FILE, description: 'What A is' })),
+    ).toEqual(["Unrecognized key(s) in object: 'description'"]);
+  });
+
+  it('refuses a key the content does not declare, naming it', () => {
+    expect(
+      messages(
+        resourceFileSchema.safeParse({
+          ...MARKDOWN_FILE,
+          content: { ...MARKDOWN_FILE.content, description: 'x' },
+        }),
+      ),
+    ).toEqual(["Unrecognized key(s) in object: 'description'"]);
   });
 
   it('parses a reference resource, which points at a target instead of holding content', () => {
-    const reference = resourceFrontmatterSchema.parse({
+    const reference = resourceFileSchema.parse({
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'reference',
-      target: '00000000-0000-4000-8000-000000000002',
+      content: { target: A },
     });
-    expect(reference.kind).toBe('reference');
-    expect(reference.kind === 'reference' && reference.target).toBe(
-      '00000000-0000-4000-8000-000000000002',
-    );
+    expect(reference.kind === 'reference' && reference.content.target).toBe(A);
   });
 
   it('gives a reference resource no body field at all', () => {
@@ -340,7 +380,7 @@ describe('resource frontmatter schema', () => {
       id: '00000000-0000-4000-8000-000000000007',
       title: 'A, again',
       kind: 'reference',
-      content: { target: '00000000-0000-4000-8000-000000000002' },
+      content: { target: A },
     });
 
     expect('body' in reference).toBe(false);
@@ -348,20 +388,49 @@ describe('resource frontmatter schema', () => {
   });
 
   it('parses a Space Resource that names both the Map and the Graph it selects', () => {
-    const selected = resourceFrontmatterSchema.parse({
+    const selected = resourceFileSchema.parse({
       id: '00000000-0000-4000-8000-000000000006',
       title: 'Nested space',
       kind: 'space',
-      spaceId: '00000000-0000-4000-8000-000000000007',
-      map: '00000000-0000-4000-8000-000000000008',
-      graph: '00000000-0000-4000-8000-000000000009',
+      content: {
+        spaceId: '00000000-0000-4000-8000-000000000007',
+        map: '00000000-0000-4000-8000-000000000008',
+        graph: '00000000-0000-4000-8000-000000000009',
+      },
     });
 
     expect(selected).toMatchObject({
       kind: 'space',
+      content: {
+        map: '00000000-0000-4000-8000-000000000008',
+        graph: '00000000-0000-4000-8000-000000000009',
+      },
+    });
+  });
+
+  it("refuses an undeclared key inside a Space Resource file's framing", () => {
+    const space = {
+      id: '00000000-0000-4000-8000-000000000006',
+      title: 'Nested space',
+      kind: 'space',
+    };
+    const selection = {
+      spaceId: '00000000-0000-4000-8000-000000000007',
       map: '00000000-0000-4000-8000-000000000008',
       graph: '00000000-0000-4000-8000-000000000009',
-    });
+    };
+    const framing = { centreX: 0, centreY: 0, zoom: 1 };
+    expect(
+      resourceFileSchema.safeParse({ ...space, content: { ...selection, framing } }).success,
+    ).toBe(true);
+    expect(
+      messages(
+        resourceFileSchema.safeParse({
+          ...space,
+          content: { ...selection, framing: { ...framing, spin: 2 } },
+        }),
+      ),
+    ).toEqual(["Unrecognized key(s) in object: 'spin'"]);
   });
 
   /**
@@ -371,52 +440,37 @@ describe('resource frontmatter schema', () => {
    * target initializes that target first and stores what initialization mints,
    * and `spaceFileSchema` already guarantees every Map owns at least one
    * Graph, so there is always a pair to name. That leaves the schema with no
-   * shape for an unmade choice — an absent `map` or `graph` is malformed
-   * frontmatter rather than a Resource inheriting its target's opening selection.
+   * shape for an unmade choice — an absent `map` or `graph` is a malformed
+   * file rather than a Resource inheriting its target's opening selection.
    */
   it('rejects a Space Resource that leaves either half of its selection unwritten', () => {
     const nested = {
       id: '00000000-0000-4000-8000-000000000010',
       title: 'Nested space',
       kind: 'space',
-      spaceId: '00000000-0000-4000-8000-000000000007',
     };
+    const spaceId = '00000000-0000-4000-8000-000000000007';
     const mapId = '00000000-0000-4000-8000-000000000008';
     const graph = '00000000-0000-4000-8000-000000000009';
 
-    expect(resourceFrontmatterSchema.safeParse(nested).success).toBe(false);
-    expect(resourceFrontmatterSchema.safeParse({ ...nested, map: mapId }).success).toBe(false);
-    expect(resourceFrontmatterSchema.safeParse({ ...nested, graph }).success).toBe(false);
+    expect(resourceFileSchema.safeParse({ ...nested, content: { spaceId } }).success).toBe(false);
+    expect(
+      resourceFileSchema.safeParse({ ...nested, content: { spaceId, map: mapId } }).success,
+    ).toBe(false);
+    expect(resourceFileSchema.safeParse({ ...nested, content: { spaceId, graph } }).success).toBe(
+      false,
+    );
   });
 
   it('rejects a reference resource with no target', () => {
     expect(
-      resourceFrontmatterSchema.safeParse({
-        id: '00000000-0000-4000-8000-000000000002',
-        title: 'A',
-        kind: 'reference',
-      }).success,
+      resourceFileSchema.safeParse({ id: A, title: 'A', kind: 'reference', content: {} }).success,
     ).toBe(false);
-  });
-
-  it('refuses a Description, which is no part of the shared Resource contract', () => {
-    for (const schema of [resourceFrontmatterSchema, importResourceFrontmatterSchema]) {
-      const parsed = schema.safeParse({
-        id: '00000000-0000-4000-8000-000000000002',
-        title: 'A',
-        kind: 'markdown',
-        description: 'What A is',
-      });
-      expect(parsed.success).toBe(false);
-      expect(parsed.error?.issues.map(({ message }) => message)).toEqual([
-        "Unrecognized key(s) in object: 'description'",
-      ]);
-    }
   });
 
   it('keeps the stored Resource schema non-strict, because Hyper wrote what it reads', () => {
     const resource = resourceSchema.parse({
-      id: '00000000-0000-4000-8000-000000000002',
+      id: A,
       title: 'A',
       kind: 'markdown',
       content: { source: '', description: 'What A is' },
@@ -908,7 +962,10 @@ describe('an Image Resource', () => {
       ...IMAGE,
       content: { url },
     });
-    expect(resourceFrontmatterSchema.parse({ ...IMAGE, url })).toEqual({ ...IMAGE, url });
+    expect(resourceFileSchema.parse({ ...IMAGE, content: { url } })).toEqual({
+      ...IMAGE,
+      content: { url },
+    });
   });
 
   it.each([
@@ -978,11 +1035,9 @@ describe('an Ur Resource', () => {
     kind: 'ur',
   };
 
-  it('is an id, a Title and its kind in a file, and empty content as a Resource', () => {
-    expect(resourceFrontmatterSchema.parse(UR)).toEqual(UR);
-    const { id: _id, ...frontmatter } = UR;
-    expect(importResourceFrontmatterSchema.parse(frontmatter)).toEqual(frontmatter);
+  it('is an id, a Title, its kind and empty content, in a file and as a Resource', () => {
     const resource = { ...UR, content: {} };
+    expect(resourceFileSchema.parse(resource)).toEqual(resource);
     expect(resourceSchema.parse(resource)).toEqual(resource);
     const { id: _resourceId, ...document } = resource;
     expect(resourceDocumentSchema.parse(document)).toEqual(document);

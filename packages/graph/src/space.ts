@@ -8,7 +8,7 @@ import {
   type SpaceSnapshot,
   type UUID,
 } from '@project/core';
-import { parseResourceFile, type ResourceFile, type ResourceFileError } from './resource-file';
+import { parseResourceFiles, type ResourceFile, type ResourceFileError } from './resource-file';
 import { buildSpaceLookup, type SpaceLookup } from './lookup';
 import { validateReferences, type SpaceReferenceError } from './validate';
 
@@ -198,29 +198,26 @@ export function loadSpace(input: unknown, resourceFiles: readonly ResourceFile[]
   }
   const file = parsed.data;
 
+  const parsedResources = parseResourceFiles(resourceFiles);
+  if (!parsedResources.ok) return { ok: false, errors: parsedResources.errors };
   const resources: Resource[] = [];
   const pathById = new Map<string, string>();
   const resourceErrors: SpaceError[] = [];
-  for (const resourceFile of resourceFiles) {
-    const parsedResource = parseResourceFile(resourceFile);
-    if (!parsedResource.ok) {
-      resourceErrors.push(...parsedResource.errors);
-      continue;
-    }
+  for (const { path, resource } of parsedResources.resources) {
     // Which file you are editing must not depend on scan order, so a repeated
     // id is an error and not a silent winner. The message names both files —
     // "which two" is the only useful part of it.
-    const seen = pathById.get(parsedResource.resource.id);
+    const seen = pathById.get(resource.id);
     if (seen !== undefined) {
       resourceErrors.push({
         kind: 'duplicate-resource-id',
-        ref: parsedResource.resource.id,
-        message: `Duplicate resource id "${parsedResource.resource.id}" in ${seen} and ${resourceFile.path}`,
+        ref: resource.id,
+        message: `Duplicate resource id "${resource.id}" in ${seen} and ${path}`,
       });
       continue;
     }
-    pathById.set(parsedResource.resource.id, resourceFile.path);
-    resources.push(parsedResource.resource);
+    pathById.set(resource.id, path);
+    resources.push(resource);
   }
   if (resourceErrors.length > 0) return { ok: false, errors: resourceErrors };
 

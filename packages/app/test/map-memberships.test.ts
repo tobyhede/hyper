@@ -66,10 +66,10 @@ const loaded = loadSpace(
     ],
   },
   [
-    resourceFile(EVERYWHERE),
-    resourceFile(ELSEWHERE),
-    resourceFile(UNPLACED),
-    resourceFile(OFF_GRAPH),
+    ...resourceFile(EVERYWHERE),
+    ...resourceFile(ELSEWHERE),
+    ...resourceFile(UNPLACED),
+    ...resourceFile(OFF_GRAPH),
   ],
 );
 if (!loaded.ok) throw new Error(JSON.stringify(loaded.errors));

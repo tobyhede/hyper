@@ -13,7 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { newUuid, uuidSchema } from '@project/core';
+import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
@@ -356,8 +356,69 @@ describe('Running an Aggregate directory', () => {
 
     expect(new Uint8Array(await readFile(join(directory, 'images', `${id}.png`)))).toEqual(bytes);
     await expect(
-      readFile(join(directory, META_SPACE_ID, 'resources', `${resourceId}.md`), 'utf8'),
-    ).resolves.toContain(`url: /images/${id}`);
+      readFile(join(directory, META_SPACE_ID, 'resources', `${resourceId}.json`), 'utf8'),
+    ).resolves.toContain(`"url": "/images/${id}"`);
+    await run.stop();
+  });
+
+  /*
+   * A Markdown Resource is written as its Resource file and the sidecar it
+   * names (ADR 0128), and a Resource deleted during the run takes both with it.
+   */
+  it('writes a Markdown Resource as its Resource file and sidecar, and removes both on delete', async () => {
+    const directory = await fixtureCopy();
+    const { clock, start, nextEvent } = await started(directory);
+    const run = running(start);
+    const backend = backendFor(run);
+    const resources = join(directory, META_SPACE_ID, 'resources');
+    const before = (await readdir(resources)).sort();
+    const resourceId = newUuid();
+    /** Commit the Meta Space's Resources as `change` makes them, and wait for the write. */
+    const commitResources = async (
+      change: (current: SpaceSnapshot['resources']) => SpaceSnapshot['resources'],
+    ): Promise<void> => {
+      const loaded = await backend.loadSpace(META_SPACE_ID);
+      if (loaded === undefined) throw new Error('Expected the Meta Space');
+      const committed = await backend.commit({
+        changes: [
+          {
+            kind: 'update',
+            spaceId: META_SPACE_ID,
+            snapshot: { ...loaded.snapshot, resources: change(loaded.snapshot.resources) },
+            expectedRevision: loaded.revision,
+          },
+        ],
+      });
+      expect(committed.kind).toBe('committed');
+      const written = nextEvent();
+      clock.advance(RUN_QUIET_MILLISECONDS);
+      await written;
+    };
+
+    await commitResources((current) => [
+      ...current,
+      {
+        id: resourceId,
+        document: { title: 'Written', kind: 'markdown', content: { source: '# Written\n' } },
+      },
+    ]);
+
+    expect(JSON.parse(await readFile(join(resources, `${resourceId}.json`), 'utf8'))).toEqual({
+      id: resourceId,
+      title: 'Written',
+      kind: 'markdown',
+      content: { path: `${resourceId}.md`, mediaType: 'text/markdown' },
+    });
+    await expect(readFile(join(resources, `${resourceId}.md`), 'utf8')).resolves.toBe(
+      '# Written\n',
+    );
+    expect((await readdir(resources)).sort()).toEqual(
+      [...before, `${resourceId}.json`, `${resourceId}.md`].sort(),
+    );
+
+    await commitResources((current) => current.filter(({ id }) => id !== resourceId));
+
+    expect((await readdir(resources)).sort()).toEqual(before);
     await run.stop();
   });
 

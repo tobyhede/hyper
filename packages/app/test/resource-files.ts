@@ -1,19 +1,47 @@
 import type { ResourceFile } from '@project/graph';
 
 /**
- * A Markdown resource as it is authored: one file, frontmatter then body (ADR 0020).
+ * A Resource's files as an author writes them (ADR 0128): its Resource file
+ * `resources/<id>.json`, and for a Markdown Resource the `<id>.md` sidecar its
+ * locator names. Tests build these rather than resource objects, because that
+ * is what `loadSpace` takes. Each helper returns every file of one Resource, so
+ * a list of Resources is spread into one list of files.
  *
- * The title is written as a **quoted** scalar. JSON's own quoting is YAML's
- * double-quoted form, so it escapes what YAML would otherwise read as
- * structure — and a Title written on more than one line (ADR 0083) is exactly
- * that: interpolated bare, its second line parses as a second key and the whole
- * frontmatter stops being valid YAML.
+ * The JSON is written here with `JSON.stringify` rather than through
+ * `serializeResource`, so the tests exercise intake against files the codec
+ * under test did not produce.
  */
-export function resourceFile(id: string, title = defaultTitle(id), body = ''): ResourceFile {
+
+/** A value JSON can write; `undefined` is a key JSON leaves out. */
+export type Json =
+  string | number | boolean | null | readonly Json[] | { readonly [key: string]: Json | undefined };
+
+function file(id: string, title: string, kind: string, content: Json): ResourceFile {
   return {
-    path: `resources/${id}.md`,
-    text: `---\nid: ${id}\ntitle: ${JSON.stringify(title)}\nkind: markdown\n---\n\n${body}`,
+    path: `resources/${id}.json`,
+    text: `${JSON.stringify({ id, title, kind, content }, null, 2)}\n`,
   };
+}
+
+export function resourceFile(
+  id: string,
+  title = defaultTitle(id),
+  body = '',
+): readonly ResourceFile[] {
+  return [
+    file(id, title, 'markdown', { path: `${id}.md`, mediaType: 'text/markdown' }),
+    { path: `resources/${id}.md`, text: body },
+  ];
+}
+
+/** Any kind's Resource file, its content written as given. */
+export function jsonResourceFile(
+  id: string,
+  title: string,
+  kind: string,
+  content: Json,
+): readonly ResourceFile[] {
+  return [file(id, title, kind, content)];
 }
 
 const KNOWN_TITLES = new Map([

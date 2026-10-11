@@ -2,7 +2,7 @@
 
 An **Aggregate directory** is the on-disk form of everything Hyper holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm hyper init <dir>` creates one, `pnpm hyper run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), and `pnpm hyper import` and `pnpm hyper export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
 
-The directory is plain files meant for git: JSON in a fixed key order, one Markdown file per Resource, and pictures named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
+The directory is plain files meant for git: JSON in a fixed key order, one JSON Resource file per Resource with a Markdown Resource's source beside it, and pictures named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
 
 ```
 my-talk/
@@ -10,8 +10,9 @@ my-talk/
   2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c/          the Meta Space
     space.json
     resources/
-      a0000000-0000-4000-8000-000000000001.md
-      a0000000-0000-4000-8000-000000000002.md
+      a0000000-0000-4000-8000-000000000001.json
+      a0000000-0000-4000-8000-000000000001.md    its Markdown source
+      a0000000-0000-4000-8000-000000000002.json
   7e4f0d2a-3c1b-4a6e-8f9d-0a1b2c3d4e5f/          an ordinary Space
     space.json
     resources/…
@@ -103,33 +104,40 @@ Every object here is **strict**: a key the format does not declare is refused ra
 | `maps[].activeGraph` | Which Graph is active when the Map opens. Absent means the first. |
 | `defaultMap` | The Map the Space opens on. If absent, opening the Space records its first Map here. |
 
-There is no Space-level list of Resources or Graphs. Resources are the Markdown files; Graphs belong to Maps.
+There is no Space-level list of Resources or Graphs. Resources are the Resource files; Graphs belong to Maps.
 
 ## Resource files
 
-A Resource is **one Markdown file**: YAML frontmatter, then, for a Markdown Resource, its content ([ADR 0020](adr/0020-a-card-is-a-markdown-file-with-frontmatter.md)). Resource files are found by scanning two places in a Space directory, **not recursively**: `*.md` beside `space.json`, and `resources/*.md`.
+A Resource is **one JSON Resource file**, `resources/<id>.json`, holding `{ id, title, kind, content }` ([ADR 0128](adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md)). Resource files are found in `resources/` of a Space directory, **not recursively**. The format is published as JSON Schema in [`docs/schema/resource/`](schema/resource/README.md), with one example per kind.
+
+```json
+{
+  "id": "a0000000-0000-4000-8000-000000000001",
+  "title": "Why async?",
+  "kind": "markdown",
+  "content": { "path": "a0000000-0000-4000-8000-000000000001.md", "mediaType": "text/markdown" }
+}
+```
+
+A Markdown Resource's source is its **sidecar**: a plain Markdown file, with no frontmatter, beside its Resource file and named for its own Id, here `resources/a0000000-0000-4000-8000-000000000001.md`:
 
 ```markdown
----
-id: a0000000-0000-4000-8000-000000000001
-title: Why async?
-kind: markdown
----
-
 Futures are **lazy**.
 ```
 
-A Resource's identity is its frontmatter `id`, never its file name. Exporting writes every Resource as `resources/<id>.md`, whatever its file was called before.
+A Resource's identity is its `id`, never its file name. Exporting writes every Resource as `resources/<id>.json`, and a Markdown Resource's sidecar as `resources/<id>.md`, whatever they were called before.
 
-Every Resource has `id`, `title` and `kind`. The Title must have at least one non-blank line, and may run to several. Frontmatter is strict, as `space.json` is: a key the kind does not declare, at the top level or inside `framing` or `naturalSize`, is refused, naming the key and the file, so a misspelt key fails loudly. Keys another editor adds, such as `tags` or `aliases`, are refused too ([ADR 0127](adr/0127-resource-file-frontmatter-is-strict-and-a-missing-kind-is-ur.md)). The rest depends on the kind:
+Every Resource has `id`, `title`, `kind` and `content`, and none may be left out. The Title must have at least one non-blank line, and may run to several. `kind` is a kind's id; one this version of Hyper does not know is refused. A Resource file is strict, as `space.json` is: a key the envelope or the kind's `content` does not declare, at any depth, is refused, naming the key and the file, so a misspelt key fails loudly. `content` depends on the kind:
 
-| `kind` | Further frontmatter | After the frontmatter |
-| --- | --- | --- |
-| `markdown` | — | The content, as Markdown. |
-| `ur` (the default when `kind` is absent) | — | Nothing. An Ur Resource is its Title alone, so a file with no `kind` and a body is refused: add `kind: markdown` to keep the body. Blank lines after the frontmatter are not a body. |
-| `image` | `url`: `https:` or `http:`, or `/images/<content-id>` for a picture in `images/`. Optional `naturalSize: { width, height }` in pixels. | Nothing. The Title is the image's text alternative. |
-| `reference` | `target`: the Id of another Resource **in the same Space**, not itself and not another Reference Resource. | Nothing. It shows its Target's content, read-only. |
-| `space` | `spaceId`, `map`, `graph`: the target Space and the Map and Graph it shows. Optional `framing: { centreX, centreY, zoom }`. | Nothing. |
+| `kind` | `content` |
+| --- | --- |
+| `markdown` | `path`: the Resource's own `<id>.md`, which must exist beside its Resource file. `mediaType`: `text/markdown`. |
+| `ur` | `{}`. An Ur Resource is its Title alone. |
+| `image` | `url`: `https:` or `http:`, or `/images/<content-id>` for a picture in `images/`. Optional `naturalSize: { width, height }` in pixels. The Title is the image's text alternative. |
+| `reference` | `target`: the Id of another Resource **in the same Space**, not itself and not another Reference Resource. It shows its Target's content, read-only. |
+| `space` | `spaceId`, `map`, `graph`: the target Space and the Map and Graph it shows. Optional `framing: { centreX, centreY, zoom }`. |
+
+**A `.md` no Resource file names is refused**, naming it, whether it sits in `resources/` or beside `space.json`.
 
 ## `images/`
 
@@ -154,7 +162,6 @@ A hand-written directory may omit these, and Importing mints them:
 
 - a Space's `id` in `space.json` (the directory name supplies it);
 - a Map's `id`, and a Graph's `id`;
-- a Resource's frontmatter `id`.
 
 **A minted Id cannot be referred to**, because nothing in your files knows it. So write the Id of anything another file names: a Resource that a Map positions or an Edge joins, a Map named by `defaultMap` or a Space Resource's `map`, a Graph named by `activeGraph` or a Space Resource's `graph`. A reference to an Id nobody declares is refused.
 
@@ -164,26 +171,26 @@ The next Export writes every minted Id into the files.
 
 Exporting writes the directory **in place** ([ADR 0119](adr/0119-export-writes-in-place-and-git-answers-for-a-partial-write.md)). It owns exactly what Importing reads, and never reads, copies or touches anything else:
 
-- **Owned:** `hyper.json`; each Space directory's `space.json`, every `*.md` beside it and every `resources/*.md`; the image files in `images/`.
+- **Owned:** `hyper.json`; each Space directory's `space.json`, every `*.md` beside it, and every `resources/*.json` and `resources/*.md`; the image files in `images/`.
 - **Kept:** any other file or directory, at the root or inside a Space directory, such as `.git`, a `README.md` at the root, notes in a `notes/` directory or a `.gitignore`.
 
 One write goes like this:
 
 1. Every file the aggregate serialises to is computed in memory and checked the way Importing would read it. If it would not read back, nothing is written.
 2. A file whose bytes are already on disk is left alone, so an unchanged file keeps its timestamp. Every other file is written to a dot-prefixed temporary file beside it and renamed over it, so no file is ever half-written.
-3. Each owned file the aggregate no longer has is removed: a removed Resource's file, a `*.md` beside `space.json`, a picture no Resource shows, the files of a Space that is gone. A directory that removal leaves empty is removed too, so a gone Space's directory disappears unless it holds files of yours.
+3. Each owned file the aggregate no longer has is removed: a removed Resource's Resource file and its own sidecar, a `*.md` beside `space.json`, a picture no Resource shows, the files of a Space that is gone. A directory that removal leaves empty is removed too, so a gone Space's directory disappears unless it holds files of yours.
 
 The directory itself, and each Space directory in it, is never renamed or recreated, so a shell or editor open inside one keeps working. A missing directory is created. Exporting refuses to write or remove anything through a symbolic link.
 
 **There is no whole-write atomicity, backup or recovery copy.** A crash in the middle of a write can leave some files new and some old. Keep the directory under git: git restores it.
 
-**Markdown beside `space.json` is not kept.** A `README.md` or any other `*.md` in a Space directory or its `resources/` is read as a Resource file: it is either Imported as a Resource or, without valid frontmatter, refuses the directory. Either way the next Export removes it. Keep prose about a Space under a name or directory Hyper does not scan.
+**Markdown beside `space.json` is not kept.** A `README.md` or any other `*.md` in a Space directory or its `resources/` is read: unless it is a Markdown Resource's own sidecar, Importing refuses the directory naming it, and the next Export removes it. Keep prose about a Space under a name or directory Hyper does not scan.
 
 ## How a directory is checked
 
 Two layers:
 
-- **Shape.** Zod schemas in `@project/core` check `hyper.json`, each `space.json` and each Resource's frontmatter. The same shapes for `hyper.json` and `space.json` are published as JSON Schema in [`docs/schema/`](schema/README.md).
+- **Shape.** Zod schemas in `@project/core` check `hyper.json`, each `space.json` and each Resource file. The same shapes are published as JSON Schema in [`docs/schema/`](schema/README.md).
 - **References.** `@project/graph` checks that every Edge, placement, `activeGraph`, `defaultMap` and Reference Resource `target` resolves inside its Space, that there are no duplicate Ids or duplicate Edges, and then the aggregate rules above across Spaces.
 
 `pnpm hyper run` and `pnpm hyper import` print what they refuse and exit non-zero. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.

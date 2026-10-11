@@ -13,6 +13,7 @@ import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { postgresTestDatabase } from '../support/postgres-database';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { runHyperScript } from '../support/hyper-command';
+import { markdownResourceFiles } from '../support/aggregate-directory';
 import { admitted, pngBytes, showing } from '../support/stored-images';
 
 const IMPORTED_SPACE_ID = uuidSchema.parse('d1111111-1111-4111-8111-111111111111');
@@ -26,6 +27,7 @@ const TARGET_MAP_ID = uuidSchema.parse('d8888888-8888-4888-8888-888888888888');
 const TARGET_GRAPH_ID = uuidSchema.parse('d9999999-9999-4999-8999-999999999999');
 const LINK_RESOURCE_ID = uuidSchema.parse('dabababa-abab-4bab-8bab-abababababab');
 const PICTURE_ID = uuidSchema.parse('dcdcdcdc-dcdc-4cdc-8cdc-dcdcdcdcdcdc');
+const OPENING_ID = uuidSchema.parse('dededede-dede-4ede-8ede-dededededede');
 
 const runHyperCommand = (args: readonly string[]) => runHyperScript(args);
 
@@ -172,13 +174,13 @@ describe('hyper CLI', () => {
         resources: [],
       },
     ]);
-    // Written by hand rather than through `serializeResourceFile`, because the id
-    // is the point: a hand-authored aggregate may leave out a nested id nothing
-    // can reference, and import mints it. Every *Space* Id stays explicit.
-    await writeFile(
-      join(directory, IMPORTED_SPACE_ID, 'resources', 'opening.md'),
-      '---\ntitle: Opening\nkind: markdown\n---\nDurable CLI body.\n',
-    );
+    // Written by hand rather than through `serializeResource`, so the command
+    // reads a Resource file and sidecar the codec under test did not produce.
+    for (const [name, text] of Object.entries(
+      markdownResourceFiles(OPENING_ID, 'Opening', 'Durable CLI body.\n'),
+    )) {
+      await writeFile(join(directory, IMPORTED_SPACE_ID, 'resources', name), text);
+    }
 
     const result = await runHyperCommand(['import', directory]);
 
@@ -193,8 +195,7 @@ describe('hyper CLI', () => {
       version: 1,
       title: 'CLI imported talk',
     });
-    expect(stored?.snapshot.resources).toHaveLength(1);
-    expect(uuidSchema.safeParse(stored?.snapshot.resources[0]?.id).success).toBe(true);
+    expect(stored?.snapshot.resources.map(({ id }) => id)).toEqual([OPENING_ID]);
     expect(stored?.snapshot.resources[0]?.document).toEqual({
       title: 'Opening',
       kind: 'markdown',
@@ -328,10 +329,10 @@ describe('hyper CLI', () => {
     });
     await expect(
       readFile(
-        join(destination, IMPORTED_SPACE_ID, 'resources', `${EXPORTED_RESOURCE_ID}.md`),
+        join(destination, IMPORTED_SPACE_ID, 'resources', `${EXPORTED_RESOURCE_ID}.json`),
         'utf8',
       ),
-    ).resolves.toContain(`id: ${EXPORTED_RESOURCE_ID}`);
+    ).resolves.toContain(`"id": "${EXPORTED_RESOURCE_ID}"`);
     await expect(repository.loadSpace(IMPORTED_SPACE_ID)).resolves.toEqual({
       snapshot,
       revision: 0n,
@@ -418,8 +419,8 @@ describe('hyper CLI', () => {
         resources: [],
       },
     ]);
-    const resourcePath = join(directory, MALFORMED_SPACE_ID, 'resources', 'broken.md');
-    await writeFile(resourcePath, 'Missing frontmatter.\n');
+    const resourcePath = join(directory, MALFORMED_SPACE_ID, 'resources', 'broken.json');
+    await writeFile(resourcePath, '{ "title": "No kind" }\n');
 
     const result = await runHyperCommand(['import', directory]);
 

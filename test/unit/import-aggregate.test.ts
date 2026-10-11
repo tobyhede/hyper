@@ -20,7 +20,12 @@ import type {
   ReplaceAggregateResult,
   SpaceRepository,
 } from '../../src/persistence/space-repository';
-import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
+import {
+  markdownResourceFiles,
+  resourceFiles,
+  writeAggregateInto,
+  type SpaceDirectory,
+} from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 import { captureError } from '../support/capture-error';
 import { admitted, jpegBytes, pngBytes } from '../support/stored-images';
@@ -30,6 +35,8 @@ const OTHER_META_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const ORDINARY_SPACE_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const GRAPH_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const MAP_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const OPENING_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+const PICTURE_ID = uuidSchema.parse('77777777-7777-4777-8777-777777777777');
 
 /**
  * Which seam call an import made, in order, over the behavioural double behind
@@ -137,7 +144,7 @@ const writeMetaOnlyAggregate = (
     {
       name: metaSpaceId,
       spaceFile: JSON.stringify({ version: 1, id: metaSpaceId, title }),
-      resources: { 'opening.md': '---\ntitle: Opening\nkind: markdown\n---\nHello.\n' },
+      resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
     },
   ]);
 
@@ -469,7 +476,12 @@ describe('importing the images an Aggregate directory carries', () => {
       {
         name: META_SPACE_ID,
         spaceFile: JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Meta' }),
-        resources: { 'picture.md': `---\ntitle: Picture\nkind: image\nurl: ${url}\n---\n` },
+        resources: resourceFiles({
+          id: PICTURE_ID,
+          title: 'Picture',
+          kind: 'image',
+          content: { url },
+        }),
       },
     ]);
     await mkdir(join(root, 'images'));

@@ -11,6 +11,8 @@ import {
 } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { resourceSchema, type Resource } from '@project/core';
+import { serializeResource } from '@project/graph';
 
 /**
  * Rolls `.scratch/` up into one "where are we" view.
@@ -687,12 +689,16 @@ const stableRoadmapUuid = (name: string): string => {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
 
+/**
+ * One planned issue as a Markdown Resource. Its source links the issue by a
+ * path relative to `resources/`, where its sidecar is written.
+ */
 const markdownResource = (
   id: string,
   planned: PlannedReleaseIssue,
   resourcesDirectory: string,
   scratchRoot: string,
-): string => {
+): Resource => {
   const issuePath = relative(resourcesDirectory, join(scratchRoot, planned.issue.path)).replaceAll(
     sep,
     '/',
@@ -701,13 +707,7 @@ const markdownResource = (
     planned.issue.unmetBlockers.length === 0
       ? 'None'
       : planned.issue.unmetBlockers.map((blocker) => `\`${blocker}\``).join(', ');
-  return [
-    '---',
-    `id: ${id}`,
-    `title: ${JSON.stringify(`${planned.reference} — ${planned.issue.title}`)}`,
-    'kind: markdown',
-    '---',
-    '',
+  const source = [
     `# ${planned.issue.title}`,
     '',
     `- **Reference:** \`${planned.reference}\``,
@@ -718,6 +718,12 @@ const markdownResource = (
     `[Open issue](${issuePath})`,
     '',
   ].join('\n');
+  return resourceSchema.parse({
+    id,
+    title: `${planned.reference} — ${planned.issue.title}`,
+    kind: 'markdown',
+    content: { source },
+  });
 };
 
 /** Generate one ordinary Space that dogfoods the open release dependency graph. */
@@ -749,11 +755,18 @@ export const writeReleaseSpace = (
   const resourcesDirectory = join(destination, 'resources');
   rmSync(resourcesDirectory, { recursive: true, force: true });
   mkdirSync(resourcesDirectory, { recursive: true });
+  // Each issue as its Resource file and Markdown sidecar, at the paths
+  // `serializeResource` gives them relative to the Space directory (ADR 0128).
   for (const planned of issues) {
-    writeFileSync(
-      join(resourcesDirectory, `${planned.reference.replace('/', '-')}.md`),
-      markdownResource(resourceId(planned.reference), planned, resourcesDirectory, scratchRoot),
+    const resource = markdownResource(
+      resourceId(planned.reference),
+      planned,
+      resourcesDirectory,
+      scratchRoot,
     );
+    for (const file of serializeResource(resource)) {
+      writeFileSync(join(destination, file.path), file.text);
+    }
   }
 
   const criticalReferences = new Set(plan.criticalSubgraph.map(({ reference }) => reference));

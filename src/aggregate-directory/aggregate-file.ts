@@ -329,7 +329,8 @@ const textOf = (bytes: Uint8Array): string => Buffer.from(bytes).toString('utf8'
  * The files of an Aggregate directory's own layout, by path relative to it,
  * read the way `readAggregate` reads that directory once they are on disk:
  * `hyper.json`; each top-level directory holding `space.json`, with the
- * `*.md` beside it and `resources/*.md`; and the visible files in `images/`.
+ * `*.md` beside it, `resources/*.json` and `resources/*.md`; and the visible
+ * files in `images/`.
  * Each is parsed and admitted by the same functions the directory reader uses,
  * and failures are answered by the same policy, so Export can ask whether its
  * files would read back before it writes any of them. `directory` only names
@@ -366,7 +367,9 @@ export const readAggregateFiles = async (
           const isResource =
             owner === name &&
             ((rest.length === 1 && inside.endsWith('.md')) ||
-              (rest.length === 2 && rest[0] === 'resources' && inside.endsWith('.md')));
+              (rest.length === 2 &&
+                rest[0] === 'resources' &&
+                (inside.endsWith('.json') || inside.endsWith('.md'))));
           return isResource ? [inside] : [];
         })
         .sort(compareOrdinal)

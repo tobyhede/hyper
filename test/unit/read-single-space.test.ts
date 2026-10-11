@@ -1,15 +1,19 @@
 import { chmod, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
+import { uuidSchema } from '@project/core';
 import { loadSpace } from '@project/graph';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AggregateDirectoryError, readSingleSpace } from '../../src/aggregate-directory';
+import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
 
 const SPACE_ID = '00000000-0000-4000-8000-000000000001';
-const ROOT_RESOURCE_ID = '00000000-0000-4000-8000-000000000002';
+const ROOT_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const GRAPH_ID = '00000000-0000-4000-8000-000000000003';
 const MAP_ID = '00000000-0000-4000-8000-000000000004';
+const DETAIL_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
+const UR_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
 
 /**
  * The disposable pre-release shape: graphs declared beside the maps rather
@@ -62,18 +66,18 @@ describe('readSingleSpace', () => {
 
     const spaceFile = join(talkDirectory, 'space.json');
     await writeFile(spaceFile, JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }));
-    await writeFile(join(talkDirectory, 'a.md'), '---\ntitle: A\nkind: markdown\n---\nA body\n');
+    // Written out of path order, so the expectation shows the sort.
+    for (const [name, text] of Object.entries({
+      ...resourceFiles({ id: UR_RESOURCE_ID, title: 'Node', kind: 'ur', content: {} }),
+      ...markdownResourceFiles(ROOT_RESOURCE_ID, 'Root', 'Root body\n'),
+      ...markdownResourceFiles(DETAIL_RESOURCE_ID, 'Detail', 'Detail body\n'),
+    })) {
+      await writeFile(join(resourcesDirectory, name), text);
+    }
+    // Neither is discovered: discovery does not recurse.
     await writeFile(
-      join(resourcesDirectory, 'detail.md'),
-      '---\ntitle: Detail\nkind: markdown\n---\nDetail body\n',
-    );
-    await writeFile(
-      join(resourcesDirectory, 'z.md'),
-      '---\ntitle: Z\nkind: markdown\n---\nZ body\n',
-    );
-    await writeFile(
-      join(talkDirectory, 'root.md'),
-      `---\nid: ${ROOT_RESOURCE_ID}\ntitle: Root\nkind: markdown\n---\nRoot body\n`,
+      join(resourcesDirectory, 'nested', 'ignored.json'),
+      'not a discovered resource',
     );
     await writeFile(join(resourcesDirectory, 'nested', 'ignored.md'), 'not a discovered resource');
     await writeFile(join(talkDirectory, 'notes', 'ignored.md'), 'not a discovered resource');
@@ -82,16 +86,15 @@ describe('readSingleSpace', () => {
       id: SPACE_ID,
       document: { version: 1, title: 'Talk' },
       resources: [
-        // Sorted globally by relative path, so the two files inside the
-        // inventory directory precede `root.md`: `resources/` sorts before
-        // `root`.
-        { document: { title: 'A', kind: 'markdown', content: { source: 'A body\n' } } },
-        { document: { title: 'Detail', kind: 'markdown', content: { source: 'Detail body\n' } } },
-        { document: { title: 'Z', kind: 'markdown', content: { source: 'Z body\n' } } },
         {
           id: ROOT_RESOURCE_ID,
           document: { title: 'Root', kind: 'markdown', content: { source: 'Root body\n' } },
         },
+        {
+          id: DETAIL_RESOURCE_ID,
+          document: { title: 'Detail', kind: 'markdown', content: { source: 'Detail body\n' } },
+        },
+        { id: UR_RESOURCE_ID, document: { title: 'Node', kind: 'ur', content: {} } },
       ],
     };
 
@@ -99,8 +102,62 @@ describe('readSingleSpace', () => {
     await expect(readSingleSpace(spaceFile)).resolves.toEqual(expected);
   });
 
+  /*
+   * A `.md` beside `space.json` or in `resources/` that no Resource file names
+   * is read so that it can be refused, naming it: a Resource left in an older
+   * format, or a sidecar whose Resource file is gone, is never silently
+   * dropped (ADR 0128).
+   */
+  it('refuses a .md no Resource file names, beside space.json or in resources/', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    const resourcesDirectory = join(talkDirectory, 'resources');
+    await mkdir(resourcesDirectory, { recursive: true });
+    await writeFile(
+      join(talkDirectory, 'space.json'),
+      JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }),
+    );
+    const besideSpaceFile = join(talkDirectory, 'README.md');
+    const orphaned = join(resourcesDirectory, `${DETAIL_RESOURCE_ID}.md`);
+    await writeFile(besideSpaceFile, '# Notes\n');
+    await writeFile(orphaned, 'Detail body\n');
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toEqual([
+      expect.stringContaining(besideSpaceFile),
+      expect.stringContaining(orphaned),
+    ]);
+    expect(thrown.diagnostics.every((line) => line.includes('no Resource file names'))).toBe(true);
+  });
+
+  it('refuses a Markdown Resource file whose sidecar is missing, naming the Resource file', async () => {
+    const temporaryDirectory = await makeTemporaryDirectory();
+    const talkDirectory = join(temporaryDirectory, 'talk');
+    const resourcesDirectory = join(talkDirectory, 'resources');
+    await mkdir(resourcesDirectory, { recursive: true });
+    await writeFile(
+      join(talkDirectory, 'space.json'),
+      JSON.stringify({ version: 1, id: SPACE_ID, title: 'Talk' }),
+    );
+    const resourceFile = join(resourcesDirectory, `${ROOT_RESOURCE_ID}.json`);
+    const files = markdownResourceFiles(ROOT_RESOURCE_ID, 'Root', 'Root body\n');
+    await writeFile(resourceFile, files[`${ROOT_RESOURCE_ID}.json`] ?? '');
+
+    const thrown = await captureError(() => readSingleSpace(talkDirectory));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toEqual([expect.stringContaining(resourceFile)]);
+    expect(thrown.diagnostics[0]).toContain(`${ROOT_RESOURCE_ID}.md`);
+  });
+
   // Unreadable-mode is the only way to fail a *discovered* resource file's read:
-  // `markdownFilesIn` keeps `entry.isFile()` entries only, so a directory or a
+  // discovery keeps `entry.isFile()` entries only, so a directory or a
   // symlink named `x.md` is filtered out before any read and never produces the
   // EISDIR/ELOOP a uid-independent version would need. Root ignores the mode bits
   // and reads the files anyway, which would fail these assertions rather than
@@ -114,13 +171,18 @@ describe('readSingleSpace', () => {
       await mkdir(resourcesDirectory, { recursive: true });
 
       const rootResource = join(talkDirectory, 'a.md');
-      const nestedResource = join(resourcesDirectory, 'z.md');
+      const nestedResource = join(resourcesDirectory, `${UR_RESOURCE_ID}.json`);
       await writeFile(
         join(talkDirectory, 'space.json'),
         JSON.stringify({ version: 1, title: 'Talk' }),
       );
-      await writeFile(rootResource, '---\ntitle: A\nkind: markdown\n---\nA body\n');
-      await writeFile(nestedResource, '---\ntitle: Z\nkind: markdown\n---\nZ body\n');
+      await writeFile(rootResource, 'A body\n');
+      await writeFile(
+        nestedResource,
+        resourceFiles({ id: UR_RESOURCE_ID, title: 'Z', kind: 'ur', content: {} })[
+          `${UR_RESOURCE_ID}.json`
+        ] ?? '',
+      );
       await chmod(rootResource, 0o000);
       await chmod(nestedResource, 0o000);
 
@@ -150,7 +212,7 @@ describe('readSingleSpace', () => {
 
   // A directory standing in for `space.json` fails its read as EISDIR for every
   // uid, where an unreadable mode would let root through. Nothing filters the
-  // space file on type the way `markdownFilesIn` filters resources, so the resolved
+  // space file on type the way discovery filters resources, so the resolved
   // path is read as-is and this needs no root guard.
   it('reports an unreadable space file as an absolute discovery diagnostic', async () => {
     const temporaryDirectory = await makeTemporaryDirectory();
@@ -178,11 +240,14 @@ describe('readSingleSpace', () => {
     await mkdir(resourcesDirectory, { recursive: true });
 
     const spaceFile = join(talkDirectory, 'space.json');
-    const invalidYamlResource = join(talkDirectory, 'invalid-yaml.md');
-    const missingFrontmatterResource = join(resourcesDirectory, 'missing-frontmatter.md');
+    const invalidJsonResource = join(resourcesDirectory, `${ROOT_RESOURCE_ID}.json`);
+    const kindlessResource = join(resourcesDirectory, `${UR_RESOURCE_ID}.json`);
     await writeFile(spaceFile, '{ invalid JSON');
-    await writeFile(invalidYamlResource, '---\ntitle: [broken\n---\n');
-    await writeFile(missingFrontmatterResource, 'No frontmatter here.\n');
+    await writeFile(invalidJsonResource, '{ "id": ');
+    await writeFile(
+      kindlessResource,
+      JSON.stringify({ id: UR_RESOURCE_ID, title: 'Node', content: {} }),
+    );
 
     const thrown = await captureError(() =>
       readSingleSpace(relative(process.cwd(), talkDirectory)),
@@ -192,8 +257,8 @@ describe('readSingleSpace', () => {
     if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.kind).toBe('parsing');
     expect(thrown.diagnostics.join('\n')).toContain(spaceFile);
-    expect(thrown.diagnostics.join('\n')).toContain(invalidYamlResource);
-    expect(thrown.diagnostics.join('\n')).toContain(missingFrontmatterResource);
+    expect(thrown.diagnostics.join('\n')).toContain(invalidJsonResource);
+    expect(thrown.diagnostics.join('\n')).toContain(kindlessResource);
   });
 
   it('reports schema-invalid JSON against the absolute space-file path', async () => {
@@ -242,7 +307,7 @@ describe('readSingleSpace', () => {
     // A document of a version this build cannot read is not a document to
     // report the files of, either: nothing here is worth saying until the
     // version is.
-    await writeFile(join(talkDirectory, 'broken.md'), 'No frontmatter here.\n');
+    await writeFile(join(talkDirectory, 'broken.md'), 'No Resource file names this.\n');
 
     const thrown = await captureError(() => readSingleSpace(talkDirectory));
 
@@ -271,7 +336,7 @@ describe('readSingleSpace', () => {
       const spaceFile = join(talkDirectory, 'space.json');
       const unreadableResource = join(talkDirectory, 'a.md');
       await writeFile(spaceFile, JSON.stringify(versionTwoDocument));
-      await writeFile(unreadableResource, '---\ntitle: A\nkind: markdown\n---\nA body\n');
+      await writeFile(unreadableResource, 'A body\n');
       await chmod(unreadableResource, 0o000);
 
       const thrown = await captureError(() => readSingleSpace(talkDirectory));

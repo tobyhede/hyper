@@ -12,7 +12,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@project/core": "workspace:*",
-    "yaml": "^2.9.0"
+    "@project/core": "workspace:*"
   }
 }

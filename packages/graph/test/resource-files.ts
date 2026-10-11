@@ -1,32 +1,56 @@
-import { stringify as stringifyYaml } from 'yaml';
 import { uuidSchema, type Resource, type UUID } from '@project/core';
 import type { ResourceFile } from '../src/index';
 
 /**
- * Resource files as an author writes them: frontmatter, then body, one file per resource
- * (ADR 0020). Tests build these rather than resource objects, because that is what
- * `loadSpace` takes.
+ * A Resource's files as an author writes them (ADR 0128): its Resource file
+ * `resources/<id>.json`, and for a Markdown Resource the `<id>.md` sidecar its
+ * locator names. Tests build these rather than resource objects, because that
+ * is what `loadSpace` takes. Each helper returns every file of one Resource, so
+ * a list of Resources is spread into one list of files.
  *
- * The frontmatter goes through `stringify` rather than a template string, so a
- * generated title carrying a YAML indicator (`,`, `:`, `-`) is quoted rather
- * than mis-parsed. Hand-rolling the emitting side would put the property tests
- * to work on the helper's escaping instead of on `loadSpace`.
+ * The JSON is written here with `JSON.stringify` rather than through
+ * `serializeResource`, so the tests exercise intake against files the codec
+ * under test did not produce.
  */
 
-function file(id: string, frontmatter: Record<string, string>, body: string): ResourceFile {
-  return { path: `resources/${id}.md`, text: `---\n${stringifyYaml(frontmatter)}---\n\n${body}` };
+/** A value JSON can write; `undefined` is a key JSON leaves out. */
+export type Json =
+  string | number | boolean | null | readonly Json[] | { readonly [key: string]: Json | undefined };
+
+function file(id: string, title: string, kind: string, content: Json): ResourceFile {
+  return {
+    path: `resources/${id}.json`,
+    text: `${JSON.stringify({ id, title, kind, content }, null, 2)}\n`,
+  };
 }
 
-export function resourceFile(id: string, title = defaultTitle(id), body = ''): ResourceFile {
-  return file(id, { id, title, kind: 'markdown' }, body);
+export function resourceFile(
+  id: string,
+  title = defaultTitle(id),
+  body = '',
+): readonly ResourceFile[] {
+  return [
+    file(id, title, 'markdown', { path: `${id}.md`, mediaType: 'text/markdown' }),
+    { path: `resources/${id}.md`, text: body },
+  ];
 }
 
-export function referenceFile(id: string, title: string, target: string): ResourceFile {
-  return file(id, { id, title, kind: 'reference', target }, '');
+/** Any kind's Resource file, its content written as given. */
+export function jsonResourceFile(
+  id: string,
+  title: string,
+  kind: string,
+  content: Json,
+): readonly ResourceFile[] {
+  return [file(id, title, kind, content)];
 }
 
-export function imageFile(id: string, title: string, url: string): ResourceFile {
-  return file(id, { id, title, kind: 'image', url }, '');
+export function referenceFile(id: string, title: string, target: string): readonly ResourceFile[] {
+  return [file(id, title, 'reference', { target })];
+}
+
+export function imageFile(id: string, title: string, url: string): readonly ResourceFile[] {
+  return [file(id, title, 'image', { url })];
 }
 
 /**

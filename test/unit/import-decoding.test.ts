@@ -1,7 +1,7 @@
 import {
-  referenceResourceFrontmatterSchema,
+  referenceResourceSchema,
   importSpaceSchema,
-  markdownResourceFrontmatterSchema,
+  markdownResourceSchema,
   spaceSnapshotSchema,
   uuidSchema,
   type ImportSpace,
@@ -347,7 +347,7 @@ describe('import decoding', () => {
     if (parsed.success) throw new Error('Expected an unknown resource kind to be refused');
     const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
 
-    expect(summary).toContain(`'${markdownResourceFrontmatterSchema.shape.kind.value}'`);
-    expect(summary).toContain(`'${referenceResourceFrontmatterSchema.shape.kind.value}'`);
+    expect(summary).toContain(`'${markdownResourceSchema.shape.kind.value}'`);
+    expect(summary).toContain(`'${referenceResourceSchema.shape.kind.value}'`);
   });
 });

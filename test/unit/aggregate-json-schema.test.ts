@@ -2,7 +2,18 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ajv2020 } from 'ajv/dist/2020';
-import { aggregateFileSchema, importSpaceFileSchema, isAcceptedImageUrl } from '@project/core';
+import {
+  aggregateFileSchema,
+  importSpaceFileSchema,
+  isAcceptedImageUrl,
+  uuidSchema,
+} from '@project/core';
+import {
+  loadSpace,
+  loadSpaceAggregate,
+  parseResourceFiles,
+  type ResourceFile,
+} from '@project/graph';
 import { describe, expect, it } from 'vitest';
 import hyperFileSchema from '../../docs/schema/hyper.schema.json';
 import idSchema from '../../docs/schema/id.schema.json';
@@ -166,6 +177,63 @@ describe('the aggregate JSON Schemas agree with intake', () => {
   });
 });
 
+const id = '6f1d6a2e-3b7c-4d2a-9c1e-0a5b7d9e1f20';
+const envelope = (kind: string, content: Json) => ({ id, title: 'A', kind, content });
+
+const refused: [string, Json, { instancePath: string; keyword: string }][] = [
+  [
+    'a Resource with no kind',
+    { id, title: 'A', content: {} },
+    { instancePath: '', keyword: 'required' },
+  ],
+  ['a bare kind no build registers', envelope('video', {}), { instancePath: '', keyword: 'oneOf' }],
+  [
+    'a media type as a vendor kind',
+    envelope('vnd.acme.image/png', {}),
+    { instancePath: '/kind', keyword: 'pattern' },
+  ],
+  [
+    'a vendor kind with no name',
+    envelope('vnd.acme', {}),
+    { instancePath: '/kind', keyword: 'pattern' },
+  ],
+  [
+    'a vendor kind with an empty owner',
+    envelope('vnd..chart', {}),
+    { instancePath: '/kind', keyword: 'pattern' },
+  ],
+  [
+    'an unknown Markdown content key',
+    envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown', source: 'x' }),
+    { instancePath: '/content', keyword: 'unevaluatedProperties' },
+  ],
+  [
+    'an unknown envelope key',
+    { ...envelope('ur', {}), body: 'x' },
+    { instancePath: '', keyword: 'additionalProperties' },
+  ],
+  [
+    'an unknown content key',
+    envelope('image', { url: 'https://example.com/a.png', alt: 'x' }),
+    { instancePath: '/content', keyword: 'unevaluatedProperties' },
+  ],
+  [
+    'Ur content',
+    envelope('ur', { source: 'x' }),
+    { instancePath: '/content', keyword: 'additionalProperties' },
+  ],
+  [
+    'Markdown content by URL',
+    envelope('markdown', { url: 'https://example.com/a.md' }),
+    { instancePath: '/content', keyword: 'required' },
+  ],
+  [
+    'Image content by path',
+    envelope('image', { path: `${id}.png`, mediaType: 'image/png' }),
+    { instancePath: '/content', keyword: 'required' },
+  ],
+];
+
 /**
  * No intake reads the Resource file format yet; issue 07 holds this schema to
  * one. Until then it is held to compiling under strict mode, to accepting the
@@ -185,9 +253,6 @@ describe('the Resource file JSON Schema', () => {
     },
   );
 
-  const id = '6f1d6a2e-3b7c-4d2a-9c1e-0a5b7d9e1f20';
-  const envelope = (kind: string, content: Json) => ({ id, title: 'A', kind, content });
-
   it.each([
     ['a vendor kind with any content', envelope('vnd.acme.chart', { series: [1, 2] })],
     ['a vendor kind in upper case', envelope('vnd.Acme.Chart', {})],
@@ -198,64 +263,6 @@ describe('the Resource file JSON Schema', () => {
   ])('accepts %s', (_name, file) => {
     expect(resourceFileSchema(file), JSON.stringify(resourceFileSchema.errors)).toBe(true);
   });
-
-  const refused: [string, Json, { instancePath: string; keyword: string }][] = [
-    [
-      'a Resource with no kind',
-      { id, title: 'A', content: {} },
-      { instancePath: '', keyword: 'required' },
-    ],
-    [
-      'a bare kind no build registers',
-      envelope('video', {}),
-      { instancePath: '', keyword: 'oneOf' },
-    ],
-    [
-      'a media type as a vendor kind',
-      envelope('vnd.acme.image/png', {}),
-      { instancePath: '/kind', keyword: 'pattern' },
-    ],
-    [
-      'a vendor kind with no name',
-      envelope('vnd.acme', {}),
-      { instancePath: '/kind', keyword: 'pattern' },
-    ],
-    [
-      'a vendor kind with an empty owner',
-      envelope('vnd..chart', {}),
-      { instancePath: '/kind', keyword: 'pattern' },
-    ],
-    [
-      'an unknown Markdown content key',
-      envelope('markdown', { path: `${id}.md`, mediaType: 'text/markdown', source: 'x' }),
-      { instancePath: '/content', keyword: 'unevaluatedProperties' },
-    ],
-    [
-      'an unknown envelope key',
-      { ...envelope('ur', {}), body: 'x' },
-      { instancePath: '', keyword: 'additionalProperties' },
-    ],
-    [
-      'an unknown content key',
-      envelope('image', { url: 'https://example.com/a.png', alt: 'x' }),
-      { instancePath: '/content', keyword: 'unevaluatedProperties' },
-    ],
-    [
-      'Ur content',
-      envelope('ur', { source: 'x' }),
-      { instancePath: '/content', keyword: 'additionalProperties' },
-    ],
-    [
-      'Markdown content by URL',
-      envelope('markdown', { url: 'https://example.com/a.md' }),
-      { instancePath: '/content', keyword: 'required' },
-    ],
-    [
-      'Image content by path',
-      envelope('image', { path: `${id}.png`, mediaType: 'image/png' }),
-      { instancePath: '/content', keyword: 'required' },
-    ],
-  ];
 
   it.each(refused)('refuses %s', (_name, file, error) => {
     expect(resourceFileSchema(file)).toBe(false);
@@ -285,5 +292,126 @@ describe('the Resource file JSON Schema', () => {
 
   it("names a Markdown sidecar by the Id schema's own pattern", () => {
     expect(markdownSchema.properties.path.pattern).toBe(`${idSchema.pattern.slice(0, -1)}\\.md$`);
+  });
+});
+
+/**
+ * The Resource file schema is necessary, not sufficient: every file it refuses
+ * intake refuses too, and intake refuses more. Intake here is the whole of it,
+ * in order: the kind's file codec (`parseResourceFiles`), the Space's
+ * (`loadSpace`, where a Target resolves) and the aggregate's
+ * (`loadSpaceAggregate`, where a Space Resource's Space resolves).
+ */
+describe('the Resource file JSON Schema refuses only what intake refuses', () => {
+  const examples = join(repoRoot, 'docs/schema/resource/examples');
+  const space = uuidSchema.parse('c0000000-0000-4000-8000-000000000001');
+  const other = 'c0000000-0000-4000-8000-000000000002';
+  const markdown = (path: string) => envelope('markdown', { path, mediaType: 'text/markdown' });
+
+  /** A Resource file at `resources/<id>.json`, with whatever sidecars the row puts beside it. */
+  const filesOf = (file: Json, sidecars: readonly string[] = []): ResourceFile[] => [
+    { path: `resources/${id}.json`, text: JSON.stringify(file) },
+    ...sidecars.map((name) => ({ path: `resources/${name}`, text: 'Body.\n' })),
+  ];
+
+  const intakeRefuses = (files: readonly ResourceFile[]): boolean => {
+    const decoded = parseResourceFiles(files);
+    if (!decoded.ok) return true;
+    const loaded = loadSpace({ version: 1, id: space, title: 'Space', maps: [] }, files);
+    if (!loaded.ok) return true;
+    const snapshot = {
+      id: space,
+      document: { version: 1, title: 'Space', maps: [] },
+      resources: decoded.resources.map(({ resource: { id: resourceId, ...document } }) => ({
+        id: resourceId,
+        document,
+      })),
+    };
+    return !loadSpaceAggregate({ metaSpaceId: space, snapshots: [snapshot] }).ok;
+  };
+
+  it.each(['markdown', 'reference', 'space', 'image', 'ur'])(
+    "decodes the published %s example through its kind's file codec",
+    (kind) => {
+      const text = readFileSync(join(examples, `${kind}.json`), 'utf8');
+      const example: unknown = JSON.parse(text);
+      expect(resourceFileSchema(example)).toBe(true);
+      const sidecars = (kind === 'markdown' ? ['0b9e4f3a-1c2d-4e5f-8a6b-7c8d9e0f1a2b.md'] : []).map(
+        (name) => ({
+          path: `resources/${name}`,
+          text: readFileSync(join(examples, name), 'utf8'),
+        }),
+      );
+      const decoded = parseResourceFiles([{ path: `resources/${kind}.json`, text }, ...sidecars]);
+      expect(decoded.ok, JSON.stringify(decoded)).toBe(true);
+    },
+  );
+
+  it('admits a valid Resource file through the whole of intake', () => {
+    expect(intakeRefuses(filesOf(envelope('ur', {})))).toBe(false);
+    expect(intakeRefuses(filesOf(markdown(`${id}.md`), [`${id}.md`]))).toBe(false);
+    const target = {
+      path: `resources/${other}.json`,
+      text: JSON.stringify({ id: other, title: 'T', kind: 'ur', content: {} }),
+    };
+    expect(intakeRefuses([...filesOf(envelope('reference', { target: other })), target])).toBe(
+      false,
+    );
+  });
+
+  /** Row by row: whether the schema refuses the file as well as intake. */
+  const invalid: [string, ResourceFile[], 'both' | 'only intake'][] = [
+    ['a Resource with no kind', filesOf({ id, title: 'A', content: {} }), 'both'],
+    ['a malformed kind id', filesOf(envelope('a.b', {})), 'both'],
+    ['a bare kind no build registers', filesOf(envelope('video', {})), 'both'],
+    [
+      'a vendor kind this build does not register',
+      filesOf(envelope('vnd.acme.chart', {})),
+      'only intake',
+    ],
+    ['an unknown envelope key', filesOf({ ...envelope('ur', {}), body: 'x' }), 'both'],
+    [
+      'an unknown content key',
+      filesOf(envelope('image', { url: 'https://example.com/a.png', alt: 'x' })),
+      'both',
+    ],
+    ['an Image URL of "https://"', filesOf(envelope('image', { url: 'https://' })), 'only intake'],
+    [
+      'an Image URL with a space in its host',
+      filesOf(envelope('image', { url: 'https://exa mple.com/a.png' })),
+      'only intake',
+    ],
+    [
+      "a Markdown path naming another Resource's <id>.md",
+      filesOf(markdown(`${other}.md`), [`${other}.md`]),
+      'only intake',
+    ],
+    ['a Markdown sidecar that does not exist', filesOf(markdown(`${id}.md`)), 'only intake'],
+    [
+      'a .md no Resource file names',
+      [...filesOf(envelope('ur', {})), { path: 'resources/stray.md', text: 'Stray.\n' }],
+      'only intake',
+    ],
+    [
+      'a Reference whose Target does not resolve',
+      filesOf(envelope('reference', { target: other })),
+      'only intake',
+    ],
+    [
+      'a Space Resource whose Space does not resolve',
+      filesOf(envelope('space', { spaceId: other, map: other, graph: other })),
+      'only intake',
+    ],
+  ];
+
+  it.each(invalid)('intake refuses %s, and the schema: %s', (_name, files, refusedBy) => {
+    expect(intakeRefuses(files)).toBe(true);
+    const [resourceFile] = files;
+    if (resourceFile === undefined) throw new Error('a row has its Resource file first');
+    expect(resourceFileSchema(JSON.parse(resourceFile.text))).toBe(refusedBy === 'only intake');
+  });
+
+  it.each(refused)('intake refuses %s too, which the schema refuses', (_name, file) => {
+    expect(intakeRefuses(filesOf(file))).toBe(true);
   });
 });

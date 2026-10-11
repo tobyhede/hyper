@@ -77,7 +77,7 @@ function fixture(): Space {
         },
       ],
     },
-    [resourceFile(RESOURCE_A), resourceFile(RESOURCE_B), resourceFile(RESOURCE_C)],
+    [...resourceFile(RESOURCE_A), ...resourceFile(RESOURCE_B), ...resourceFile(RESOURCE_C)],
   );
   if (!result.ok) throw new Error('fixture should load');
   return result.space;
@@ -112,7 +112,7 @@ function spaceOwning(
         },
       ],
     },
-    resources.map((resource) =>
+    resources.flatMap((resource) =>
       resource.title === undefined
         ? resourceFile(resource.id)
         : resourceFile(resource.id, resource.title),
@@ -181,7 +181,11 @@ it('traverses an Edge from the changing working Space without installing a copy'
         },
       ],
     },
-    [resourceFile(resourceA), resourceFile(resourceB), resourceFile(resourceC, 'New destination')],
+    [
+      ...resourceFile(resourceA),
+      ...resourceFile(resourceB),
+      ...resourceFile(resourceC, 'New destination'),
+    ],
   );
   if (!changed.ok) throw new Error('changed fixture should load');
   working = changed.space;

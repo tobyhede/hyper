@@ -8,7 +8,7 @@ import {
   type UUID,
 } from '@project/core';
 import { nextGraphColor } from './graph-color';
-import { serializeResourceFile, type ResourceFile } from './resource-file';
+import { serializeResource, type ResourceFile } from './resource-file';
 
 /**
  * A new Space: one Resource in one complete default Map (ADRs 0018 and 0080).
@@ -109,7 +109,7 @@ export function initializeSpace({ title, newId }: InitializeSpaceOptions): NewSp
       ],
       defaultMap: mapId,
     },
-    resourceFiles: [{ path: `resources/${resource.id}.md`, text: serializeResourceFile(resource) }],
+    resourceFiles: serializeResource(resource),
   };
 }
 

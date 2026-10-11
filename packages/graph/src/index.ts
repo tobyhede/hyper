@@ -11,9 +11,8 @@
  * an offered form that calls it — `graphResourceIds` calls `resourceIdsForGraphs`,
  * `graphStartResource` calls `graphEntryResources`.
  *
- * Two modules are absent whole for that reason and not by oversight.
- * `frontmatter` is how `resource-file` reads a fence, and `parseResourceFile` is the
- * intake it exists to serve. `validate` runs inside `loadSpace`, which ADR 0010
+ * One module is absent whole for that reason and not by oversight.
+ * `validate` runs inside `loadSpace`, which ADR 0010
  * makes the one intake — a caller never checks references itself, so it never
  * names the check, its input or its errors. `SpaceReferenceError` is the edge
  * worth knowing, and not because a union nobody narrows hides it: `loadSpace`
@@ -26,13 +25,13 @@
  * produces to the same set of names.
  */
 
-export { parseResourceFile, parseImportResourceFile, serializeResourceFile } from './resource-file';
+export { parseResourceFiles, serializeResource } from './resource-file';
 export type {
+  DecodedResourceFile,
   ResourceFile,
   ResourceFileError,
   ResourceFileErrorKind,
-  ParseResourceFileResult,
-  ParseImportResourceFileResult,
+  ParseResourceFilesResult,
 } from './resource-file';
 
 // The rule for "the same Edge twice in one Graph" (ADR 0032).

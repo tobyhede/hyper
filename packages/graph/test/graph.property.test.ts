@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { Resource, UUID } from '@project/core';
-import { loadSpace, resolveResourceContent, serializeResourceFile, type Space } from '../src/index';
+import { loadSpace, resolveResourceContent, serializeResource, type Space } from '../src/index';
 import { resourceFile, uuid } from './resource-files';
 
 /**
@@ -55,7 +55,7 @@ function documentFrom(maps: { ids: number[]; graphs: number }[]) {
       title: 'Generated',
       maps: maps.map((entry, index) => mapOver(index, entry.ids, entry.graphs)),
     },
-    resources: resources.map((id) => resourceFile(resourceId(id), `Resource ${id}`)),
+    resources: resources.flatMap((id) => resourceFile(resourceId(id), `Resource ${id}`)),
   };
 }
 
@@ -312,10 +312,7 @@ function withKinds(
   );
   return {
     file,
-    files: resources.map((resource) => ({
-      path: `resources/${resource.id}.md`,
-      text: serializeResourceFile(resource),
-    })),
+    files: resources.flatMap(serializeResource),
   };
 }
 

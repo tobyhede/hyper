@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { normalizeTitle, titleLines, type Resource } from '@project/core';
-import { parseResourceFile, serializeResourceFile } from '../src/index';
+import { parseResourceFiles, serializeResource } from '../src/index';
 import { uuid } from './resource-files';
 
 /**
@@ -9,14 +9,12 @@ import { uuid } from './resource-files';
  *
  * The newlines in a Title are load-bearing — the first line names the Resource and
  * the lines after it qualify it — and the only transformation between an authored Title
- * and a stored one is `stringify`/`parse` inside the frontmatter fence. The
- * `yaml` package writes a multiline string as a block scalar, so this is
- * expected to hold rather than expected to break, which is exactly why it needs
- * a test: when it stops holding, the aggregate import/export round trip will go
- * red somewhere else entirely and say nothing about why.
+ * and a stored one is the Resource file's JSON string and the schema's
+ * normalization. When it stops holding, the aggregate import/export round trip
+ * will go red somewhere else entirely and say nothing about why.
  *
  * So the assertions here compare Title *Lines* rather than Titles. A dropped
- * blank line, a swallowed indent or a line the fence ate then reads as a diff
+ * blank line, a swallowed indent or a mis-escaped character then reads as a diff
  * of one entry against another, with the role each line carries beside it,
  * rather than as two long strings a reader has to align by eye.
  */
@@ -34,8 +32,8 @@ const EVERY_KIND: readonly ResourceKind[] = ['markdown', 'reference', 'space', '
 /**
  * The same Title on each Resource kind. Every kind writes its Title through the one
  * `resourceTitleSchema`, so a Title that only survived on a Markdown Resource would be
- * a fence or a field-order fault rather than a schema one — which is a result
- * only writing every kind out can tell us.
+ * a codec fault rather than a schema one — which is a result only writing
+ * every kind out can tell us.
  */
 function resourceOf(kind: ResourceKind, title: string): Resource {
   switch (kind) {
@@ -53,21 +51,20 @@ function resourceOf(kind: ResourceKind, title: string): Resource {
 }
 
 /**
- * The Title the Resource file gives back, or a failure naming the file that failed.
- *
- * A round trip that does not even parse is the more likely break of the two —
- * a block scalar whose indentation the fence reader mistakes for the closing
- * `---` produces errors, not a mangled string — so the file itself goes into
- * the message. Reading it is how anyone tells the two apart.
+ * The Title the Resource files give back, or a failure naming the files that
+ * failed, so a round trip that does not parse at all shows what was written.
  */
 function roundTrippedTitle(resource: Resource): string {
-  const text = serializeResourceFile(resource);
-  const parsed = parseResourceFile({ path: 'resources/multiline-title.md', text });
+  const files = serializeResource(resource);
+  const parsed = parseResourceFiles(files);
   if (!parsed.ok) {
+    const written = files.map(({ path, text }) => `${path}:\n${text}`).join('\n');
     const errors = parsed.errors.map((error) => error.message).join('\n');
-    throw new Error(`this Resource file did not parse back:\n${text}\n${errors}`);
+    throw new Error(`these Resource files did not parse back:\n${written}\n${errors}`);
   }
-  return parsed.resource.title;
+  const [decoded] = parsed.resources;
+  if (decoded === undefined) throw new Error('no Resource parsed back');
+  return decoded.resource.title;
 }
 
 function expectTitleSurvives(kind: ResourceKind, title: string): void {
@@ -81,37 +78,32 @@ describe('a multiline Title survives a Resource file round trip', () => {
 
   it.each(EVERY_KIND)('keeps an interior blank line on a %s Resource', (kind) => {
     // The one shape normalization deliberately preserves — an author who left a
-    // gap meant it — and the one a block scalar is most likely to lose, since a
-    // blank line inside one is written with no indentation at all.
+    // gap meant it.
     expectTitleSurvives(kind, 'The data model\n\nADR 0020');
   });
 
   it.each(EVERY_KIND)('keeps the leading spaces on a line of a %s Resource', (kind) => {
-    // Leading whitespace is a line's own and normalization leaves it alone. A
-    // block scalar spends indentation on its own nesting, so the writer has to
-    // say how much of it is the scalar's and how much is the author's.
+    // Leading whitespace is a line's own and normalization leaves it alone.
     expectTitleSurvives(kind, 'The data model\n  How a Resource is stored\n    ADR 0020');
   });
 
   it.each(EVERY_KIND)('keeps a leading space on the first line of a %s Resource', (kind) => {
-    // The first line is the case that needs an explicit indentation indicator
-    // (`|2-`): without one a reader takes the deepest common indent as the
-    // scalar's own and every line loses two spaces.
+    // Normalization trims blank lines from the ends of a Title, never the
+    // leading spaces of its first line.
     expectTitleSurvives(kind, '  The data model\nHow a Resource is stored');
   });
 
-  it.each(EVERY_KIND)('keeps Title Lines that read as YAML syntax on a %s Resource', (kind) => {
-    // A leading `-` is a sequence entry, a trailing `:` is a mapping key, `---`
-    // is a document break and `#` opens a comment. Inside a block scalar all
-    // four are text, and this is what says so.
-    expectTitleSurvives(kind, '- The data model\nHow a Resource is stored:\n---\n# ADR 0020');
+  it.each(EVERY_KIND)('keeps Title Lines that JSON has to escape on a %s Resource', (kind) => {
+    // Quotes, backslashes and a tab are each written as an escape in the
+    // Resource file's JSON string, and read back as themselves.
+    expectTitleSurvives(kind, '"The data model"\nC:\\Resources\\stored\n\tADR 0020 \\n');
   });
 });
 
 /**
- * Title Lines drawn from the shapes that make a YAML writer or a fence reader
+ * Title Lines drawn from the shapes that make a writer or a reader of Titles
  * wrong. Left to `fc.string()` alone the generator would essentially never emit
- * a blank line, an indent or a `---`, and the property would pass without ever
+ * a blank line, an indent or an escaped character, and the property would pass without ever
  * reaching the cases it exists for. The whitespace-only and trailing-whitespace
  * members are there to be *normalized away*, so the property's precondition is
  * doing work rather than decorating it.
@@ -122,10 +114,10 @@ const titleLineArb = fc.oneof(
   fc.constant('   '),
   fc.constant('  an indented line'),
   fc.constant('\ta tabbed line'),
-  fc.constant('- a sequence entry'),
-  fc.constant('a mapping key:'),
+  fc.constant('"a quoted line"'),
+  fc.constant('a back\\slash'),
+  fc.constant('\u2028a line separator'),
   fc.constant('---'),
-  fc.constant('# a comment'),
   fc.constant('trailing whitespace   '),
   fc.string({ maxLength: 24 }).filter((line) => !line.includes('\n')),
 );
@@ -149,12 +141,11 @@ interface CasesReached {
   moreThanOneLine: number;
   anInteriorBlankLine: number;
   aLineWithLeadingWhitespace: number;
-  aLineThatReadsAsYamlSyntax: number;
+  aLineJsonEscapes: number;
   aTitleNormalizationChanged: number;
 }
 
-const readsAsYamlSyntax = (line: string): boolean =>
-  line.startsWith('-') || line.startsWith('#') || line.endsWith(':');
+const jsonEscapes = (line: string): boolean => JSON.stringify(line) !== `"${line}"`;
 
 describe('the property over generated Titles', () => {
   it('round-trips any Title that survives normalization', () => {
@@ -162,7 +153,7 @@ describe('the property over generated Titles', () => {
       moreThanOneLine: 0,
       anInteriorBlankLine: 0,
       aLineWithLeadingWhitespace: 0,
-      aLineThatReadsAsYamlSyntax: 0,
+      aLineJsonEscapes: 0,
       aTitleNormalizationChanged: 0,
     };
 
@@ -177,7 +168,7 @@ describe('the property over generated Titles', () => {
         if (lines.length > 1) reached.moreThanOneLine += 1;
         if (title.includes('\n\n')) reached.anInteriorBlankLine += 1;
         if (lines.some((line) => /^[ \t]/u.test(line))) reached.aLineWithLeadingWhitespace += 1;
-        if (lines.some(readsAsYamlSyntax)) reached.aLineThatReadsAsYamlSyntax += 1;
+        if (lines.some(jsonEscapes)) reached.aLineJsonEscapes += 1;
         if (drawn !== title) reached.aTitleNormalizationChanged += 1;
 
         expect(titleLines(roundTrippedTitle(resourceOf(kind, title)))).toEqual(titleLines(title));

@@ -225,7 +225,8 @@ describe('exporting and importing one complete aggregate', () => {
         .sort(),
     ).toEqual([META_SPACE_ID, TARGET_SPACE_ID, SECOND_TARGET_ID].sort());
     // A Resource is named by its own id, never by its title (ADR 0020).
-    expect(await readdir(join(destination, TARGET_SPACE_ID, 'resources'))).toEqual([
+    expect((await readdir(join(destination, TARGET_SPACE_ID, 'resources'))).sort()).toEqual([
+      `${TARGET_RESOURCE_ID}.json`,
       `${TARGET_RESOURCE_ID}.md`,
     ]);
   });
@@ -428,22 +429,27 @@ describe('exporting and importing one complete aggregate', () => {
 
     const stored = (await storedSnapshots(reimported)).find(({ id }) => id === META_SPACE_ID);
     expect(stored?.resources.filter(({ document }) => document.kind === 'image')).toEqual(images);
-    expect(await readFile(join(destination, META_SPACE_ID, 'resources', `${STORED_ID}.md`), 'utf8'))
-      .toBe(`---
-id: ${STORED_ID}
-title: Stored
-kind: image
-url: /images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU
----
-
+    expect(
+      await readFile(join(destination, META_SPACE_ID, 'resources', `${STORED_ID}.json`), 'utf8'),
+    ).toBe(`{
+  "id": "${STORED_ID}",
+  "title": "Stored",
+  "kind": "image",
+  "content": {
+    "url": "/images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU"
+  }
+}
 `);
+    expect(await readdir(join(destination, META_SPACE_ID, 'resources'))).not.toContain(
+      `${STORED_ID}.md`,
+    );
     await expect(readdir(destination)).resolves.not.toContain('images');
   });
 
   /*
-   * An Ur Resource is its Title and its kind (ADR 0113): its file is a
-   * frontmatter fence and no body, and a Reference Resource to it comes back
-   * still pointing at it.
+   * An Ur Resource is its Title and its kind (ADR 0113): its Resource file's
+   * content is empty and it has no sidecar, and a Reference Resource to it comes
+   * back still pointing at it.
    */
   it('round-trips an Ur Resource and a Reference Resource to it', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
@@ -467,14 +473,17 @@ url: /images/47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU
     expect(stored?.resources.filter(({ id }) => id === UR_ID || id === TO_UR_ID)).toEqual(
       expect.arrayContaining(added),
     );
-    expect(await readFile(join(destination, META_SPACE_ID, 'resources', `${UR_ID}.md`), 'utf8'))
-      .toBe(`---
-id: ${UR_ID}
-title: Node
-kind: ur
----
-
+    expect(await readFile(join(destination, META_SPACE_ID, 'resources', `${UR_ID}.json`), 'utf8'))
+      .toBe(`{
+  "id": "${UR_ID}",
+  "title": "Node",
+  "kind": "ur",
+  "content": {}
+}
 `);
+    expect(await readdir(join(destination, META_SPACE_ID, 'resources'))).not.toContain(
+      `${UR_ID}.md`,
+    );
   });
 
   it('re-exports over its own output without changing a byte', async () => {
@@ -685,14 +694,15 @@ describe('re-exporting over an earlier export', () => {
 
   /*
    * The format reads a root aggregate file and `<space-uuid>/` children, and
-   * inside a Space directory it reads `space.json`, `*.md` and `resources/*.md`.
+   * inside a Space directory it reads `space.json`, `*.md`, `resources/*.json`
+   * and `resources/*.md`.
    * Everything else is the author's — notes, assets — and re-export has to carry
    * it across rather than tidy it away.
    *
    * A `README.md` inside a Space directory is **not** one of those, and does not
    * survive as one and must not: root `*.md` is what the reader scans
-   * for Resource files, so a README left there imports as a Resource or refuses the
-   * import for carrying no frontmatter. Asserted alongside, so the boundary is
+   * so that one no Resource file names is refused, and a README left there would
+   * refuse the import as an unclaimed sidecar. Asserted alongside, so the boundary is
    * the tested one rather than the plausible one.
    */
   it('preserves root files it ignores and undiscovered contents of a Space it keeps', async () => {
@@ -712,7 +722,7 @@ describe('re-exporting over an earlier export', () => {
     expect(await readdir(join(destination, META_SPACE_ID))).not.toContain('README.md');
   });
 
-  it('removes the file of a Resource the Space no longer holds', async () => {
+  it('removes the Resource file and sidecar of a Resource the Space no longer holds', async () => {
     const destination = join(await makeTemporaryDirectory(), 'aggregate');
     const complete = completeAggregate();
 
@@ -737,9 +747,10 @@ describe('re-exporting over an earlier export', () => {
     );
     await exportTo(repositoryHolding(withoutMarkdown), destination);
 
-    expect(await readdir(join(destination, META_SPACE_ID, 'resources'))).not.toContain(
-      `${MARKDOWN_RESOURCE_ID}.md`,
-    );
+    const remaining = await readdir(join(destination, META_SPACE_ID, 'resources'));
+    expect(remaining).not.toContain(`${MARKDOWN_RESOURCE_ID}.json`);
+    expect(remaining).not.toContain(`${MARKDOWN_RESOURCE_ID}.md`);
+    expect(remaining).toContain(`${FIRST_LINK_ID}.json`);
   });
 });
 

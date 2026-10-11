@@ -551,10 +551,10 @@ const decodeSpaceError = (value: unknown): SpaceError => {
       const error = exactRecord(value, ['kind', 'message'], 'Space intake error');
       return { kind, message: requiredString(error['message'], 'Space intake message') };
     }
-    case 'missing-frontmatter':
-    case 'unterminated-frontmatter':
-    case 'invalid-yaml':
-    case 'invalid-frontmatter': {
+    case 'invalid-json':
+    case 'invalid-resource-file':
+    case 'missing-sidecar':
+    case 'unclaimed-sidecar': {
       const error = exactRecord(value, ['kind', 'path', 'message'], 'Resource file error');
       return {
         kind,
