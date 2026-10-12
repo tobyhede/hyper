@@ -12,13 +12,22 @@ const unreachableStore: ImageSources['store'] = () =>
   Promise.reject(new Error('No image store is reachable.'));
 
 /**
- * Stores nothing, measures no size and picks no file: for a Space that creates
- * or replaces no image. Opening its picker throws, so a press that was not
- * meant to open one fails where it is made.
+ * Stores nothing and measures no size: for a Space that creates or replaces no
+ * image. Its picker is the browser's own, so a story still opens one.
  */
 export const storelessImages: ImageSources = {
   store: unreachableStore,
   measure: () => Promise.resolve(undefined),
+  pick: pickImagesInBrowser,
+};
+
+/**
+ * {@link storelessImages} with no picker: opening one throws, so a unit test's
+ * press that was not meant to open a picker fails where it is made rather than
+ * attaching an input that never answers.
+ */
+export const pickerlessImages: ImageSources = {
+  ...storelessImages,
   pick: () => {
     throw new Error('This Space picks no image files.');
   },
