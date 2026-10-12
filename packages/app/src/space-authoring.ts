@@ -22,7 +22,9 @@ import {
   normalizeTitle,
   type SpaceSnapshot,
   type UUID,
+  imageKind,
   urKind,
+  type ImageKindId,
   type UrKindId,
 } from '@project/core';
 import {
@@ -106,9 +108,9 @@ export interface CreatedImage {
 
 /** An Image Resource's document: its Title, its URL, and its natural size when the picture loaded. */
 const imageDocument = (title: string, { url, naturalSize }: CreatedImage): ResourceDocument => {
-  const content: Extract<ResourceDocument, { kind: 'image' }>['content'] = { url };
+  const content: Extract<ResourceDocument, { kind: ImageKindId }>['content'] = { url };
   if (naturalSize !== undefined) content.naturalSize = naturalSize;
-  return { title, kind: 'image', content };
+  return { title, kind: imageKind.id, content };
 };
 
 /** The gap between Image Resources a single gesture creates side by side. */
@@ -1240,7 +1242,8 @@ export function createSpaceAuthoring({
       );
       const resource = snapshot.resources[resourceIndex];
       if (resource === undefined) return refuse({ code: 'resource-not-found' });
-      if (resource.document.kind !== 'image') return refuse({ code: 'resource-kind-immutable' });
+      if (resource.document.kind !== imageKind.id)
+        return refuse({ code: 'resource-kind-immutable' });
       if (completion.url === resource.document.content.url) return UNCHANGED;
       // A URL the schema will not hold is refused before intake, which answers
       // it by throwing, and an author's URL may not throw

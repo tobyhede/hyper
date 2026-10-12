@@ -1,4 +1,6 @@
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { KindFlags } from './kind-module';
+import { imageKind } from './image';
 import { urKind } from './ur';
 
 /**
@@ -6,7 +8,10 @@ import { urKind } from './ur';
  * not yet moved onto its module keeps its own branches and the flags every
  * Resource had before a kind could set them.
  */
-const KIND_FLAGS: ReadonlyMap<string, KindFlags> = new Map([[urKind.id, urKind.flags]]);
+const KIND_FLAGS: ReadonlyMap<string, KindFlags> = new Map<string, KindFlags>([
+  [urKind.id, urKind.flags],
+  [imageKind.id, imageKind.flags],
+]);
 
 const UNMOVED_KIND_FLAGS: KindFlags = { takesResourceShape: false, canOpen: true };
 

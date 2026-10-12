@@ -30,7 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
-import { urKind, type Resource } from '@project/core';
+import { imageKind, urKind, type Resource } from '@project/core';
 
 type ResourceActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
@@ -278,7 +278,7 @@ interface BaseGlyphProps {
 export const BASE_GLYPHS = {
   markdown: MarkdownIcon,
   space: SpaceResourceIcon,
-  image: ImageIcon,
+  [imageKind.id]: ImageIcon,
   [urKind.id]: UrIcon,
 } satisfies Record<ResourceBaseKind, ComponentType<BaseGlyphProps>>;
 

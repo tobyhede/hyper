@@ -1,7 +1,7 @@
 import type { Dirent } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { SpaceSnapshot } from '@project/core';
+import { imageKind, type SpaceSnapshot } from '@project/core';
 import {
   admitImage,
   IMAGE_COLLECTION_PATH,
@@ -142,7 +142,7 @@ export const loadReferencedImages = async (
   const ids = new Set(
     spaces.flatMap(({ resources }) =>
       resources.flatMap(({ document }) => {
-        const id = document.kind === 'image' ? storedImageId(document.content.url) : undefined;
+        const id = document.kind === imageKind.id ? storedImageId(document.content.url) : undefined;
         return id === undefined ? [] : [id];
       }),
     ),

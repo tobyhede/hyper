@@ -8,6 +8,7 @@ import {
   type Resource,
   type ResourceId,
   type UUID,
+  imageKind,
   urKind,
 } from '@project/core';
 import type { Space } from '@project/graph';
@@ -430,7 +431,7 @@ export function useDockChrome(
           case 'space':
             placement.createSpaceResource();
             return;
-          case 'image':
+          case imageKind.id:
             placement.createImagesFromFiles(creation.files);
             return;
           case urKind.id:
@@ -441,7 +442,7 @@ export function useDockChrome(
       createDisabled: {
         markdown: !availability.addResource,
         space: !availability.createSpaceResource,
-        image: !availability.addResource,
+        [imageKind.id]: !availability.addResource,
         [urKind.id]: !availability.addResource,
       } satisfies Record<DockResourceKind, boolean>,
     },

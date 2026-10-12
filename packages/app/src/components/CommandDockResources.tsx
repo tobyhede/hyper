@@ -4,6 +4,7 @@
  * {@link ResourcesControl}.
  */
 import { useContext, useEffect, useId, useRef } from 'react';
+import { imageKind } from '@project/core';
 import {
   ImageFilePicker,
   ResourceKindIcon,
@@ -62,7 +63,7 @@ function CreatePeers({
      nothing. */
   const picker = useRef<HTMLInputElement | null>(null);
   const press = (kind: DockResourceKind): void => {
-    if (kind === 'image') picker.current?.click();
+    if (kind === imageKind.id) picker.current?.click();
     else onCreate({ kind });
   };
   return (
@@ -96,7 +97,7 @@ function CreatePeers({
         ref={picker}
         accept={PICKED_IMAGE_TYPES}
         data-testid="create-image-file"
-        onChoose={(files) => onCreate({ kind: 'image', files })}
+        onChoose={(files) => onCreate({ kind: imageKind.id, files })}
       />
     </ToolbarGroup>
   );

@@ -1,4 +1,5 @@
-import { urKind, type Resource } from '@project/core';
+import { imageKind, urKind, type Resource } from '@project/core';
+import { imageView } from './kinds/image';
 import { urView } from './kinds/ur';
 import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
 
@@ -19,7 +20,7 @@ const KIND_NAMES = {
   markdown: 'Markdown Resource',
   reference: 'Reference Resource',
   space: 'Space Resource',
-  image: 'Image Resource',
+  [imageKind.id]: imageView.name,
   [urKind.id]: urView.name,
 } satisfies Record<Resource['kind'], string>;
 
@@ -31,7 +32,7 @@ const KIND_NAMES = {
 const REFERENCE_NAMES = {
   markdown: 'Reference to a Markdown Resource',
   space: 'Reference to a Space Resource',
-  image: 'Reference to an Image Resource',
+  [imageKind.id]: imageView.referenceName,
   [urKind.id]: urView.referenceName,
 } satisfies Record<ResourceBaseKind, string>;
 

@@ -1,6 +1,8 @@
 import {
   contentAction,
+  imageKind,
   type ContentVia,
+  type ImageKindId,
   type ResourceContent,
   type SpaceView,
 } from '@project/core';
@@ -8,7 +10,7 @@ import type { ImageReplaceEditor } from './ImageReplaceTarget';
 import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
 
 /** A Resource's own content of one kind: never a Target's, reached by reference. */
-export type OwnContent<K extends 'markdown' | 'image'> = Extract<
+export type OwnContent<K extends 'markdown' | ImageKindId> = Extract<
   ResourceContent,
   { readonly kind: K }
 > & { readonly via: 'self' };
@@ -36,7 +38,7 @@ export type ResourceDisplay =
     }
   | {
       readonly shown: 'replacing';
-      readonly content: OwnContent<'image'>;
+      readonly content: OwnContent<ImageKindId>;
       readonly replacer: ImageReplaceEditor;
     };
 
@@ -76,7 +78,7 @@ export function beginReplacing<D extends ResourceDisplay>(
 ): D | Extract<ResourceDisplay, { readonly shown: 'replacing' }> {
   if (display.shown !== 'open') return display;
   const content = display.content;
-  if (contentAction(content) !== 'replace-image' || content.kind !== 'image') return display;
+  if (contentAction(content) !== 'replace-image' || content.kind !== imageKind.id) return display;
   return {
     shown: 'replacing',
     content: { ...content, via: 'self' },

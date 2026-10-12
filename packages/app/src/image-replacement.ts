@@ -1,4 +1,9 @@
-import { isAcceptedImageUrl, IMAGE_URL_UNSUPPORTED, type ResourceId } from '@project/core';
+import {
+  imageKind,
+  isAcceptedImageUrl,
+  IMAGE_URL_UNSUPPORTED,
+  type ResourceId,
+} from '@project/core';
 import {
   createNonThrowingReporter,
   createObservableState,
@@ -81,7 +86,7 @@ const resolveTarget = (
 ): ReplacementTarget | undefined => {
   const { replacementEpoch: epoch, session } = authoring.getState();
   const stored = session.working.resources.find((resource) => resource.id === resourceId);
-  if (stored?.document.kind !== 'image') return undefined;
+  if (stored?.document.kind !== imageKind.id) return undefined;
   return { resourceId, heldUrl: stored.document.content.url, epoch };
 };
 

@@ -6,7 +6,9 @@ import {
   type ResourceId,
   type ResourceShape,
   type UUID,
+  imageKind,
   urKind,
+  type ImageKindId,
   type UrKindId,
 } from '@project/core';
 import type {
@@ -36,11 +38,11 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /** Each kind's operations and decoration, built by assigning what a gate allows. */
 type MarkdownOperations = Mutable<KindOperationsOf<'markdown'>>;
-type ImageOperations = Mutable<KindOperationsOf<'image'>>;
+type ImageOperations = Mutable<KindOperationsOf<ImageKindId>>;
 type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
 type SpaceOperations = Mutable<KindOperationsOf<'space'>>;
 type MarkdownDecoration = Mutable<KindDecoration<'markdown'>>;
-type ImageDecoration = Mutable<KindDecoration<'image'>>;
+type ImageDecoration = Mutable<KindDecoration<ImageKindId>>;
 type SpaceDecoration = Mutable<KindDecoration<'space'>>;
 
 /** What the shared decoration adds to a Resource of any kind. */
@@ -324,11 +326,11 @@ export function decorateMarkdownResourceNode(
  * replacement while the caret is on it.
  */
 export function decorateImageResourceNode(
-  node: ResourceFlowNodeOf<'image'>,
+  node: ResourceFlowNodeOf<ImageKindId>,
   context: ImageResourceDecorationContext,
-): KindDecoration<'image'> {
+): KindDecoration<ImageKindId> {
   const replace = context.replaceResourceImage;
-  const kindOperations: ImageOperations = { kind: 'image' };
+  const kindOperations: ImageOperations = { kind: imageKind.id };
   const decoration: ImageDecoration = { kindOperations };
   if (node.data.contentAction !== 'replace-image') return decoration;
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);

@@ -9,6 +9,7 @@ import {
   type ResourceId,
   type ResourceShape,
   type GraphId,
+  imageKind,
   urKind,
 } from '@project/core';
 import type { SpaceSession } from '@project/persistence';
@@ -620,7 +621,7 @@ export function useCanvasResourceAuthoring({
   const imageDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (isResourceNodeOf(node, 'image')) {
+      if (isResourceNodeOf(node, imageKind.id)) {
         next.set(node.id, applyKindDecoration(node, decorateImageResourceNode(node, imageContext)));
       }
     }
