@@ -12,11 +12,6 @@ export const referenceResourceContentSchema = z
   })
   .strict();
 
-/**
- * The Reference kind (ADR 0070): a Resource that shows its Target's content
- * read-only. Its one Resource reference is its Target, and it may not itself
- * be a Target, so referencing is a single hop (ADR 0113).
- */
 /** The Reference kind's id, declared before its module because the content any kind resolves names it. */
 const REFERENCE_KIND_ID = 'reference';
 
@@ -29,6 +24,11 @@ export const UNRESOLVED_CONTENT: ReferenceContentUnresolved = {
   via: REFERENCE_KIND_ID,
 };
 
+/**
+ * The Reference kind (ADR 0070): a Resource that shows its Target's content
+ * read-only. Its one Resource reference is its Target, and it may not itself
+ * be a Target, so referencing is a single hop (ADR 0113).
+ */
 export const referenceKind = defineKind({
   id: REFERENCE_KIND_ID,
   contentSchema: referenceResourceContentSchema,

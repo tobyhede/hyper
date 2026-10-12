@@ -260,7 +260,7 @@ const resourceSizeSchema = z
   .strict();
 
 /**
- * The outline an Ur Resource is drawn in on a Map (ADR 0121), Open or Closed.
+ * The outline a Resource whose kind takes a Shape is drawn in on a Map (ADR 0121), Open or Closed.
  * Every member touches the midpoint of each side of the Resource's rect, where
  * Edges attach.
  */
