@@ -282,10 +282,14 @@ export function spaceEntityActions({
      * 0069). Offered only on a Resource whose kind references a Space — a
      * Markdown Resource has no target Space to address.
      */
+    // The first referenced Space keeps the plain ids; any further one is
+    // suffixed with its Space, so a kind referencing several keeps them distinct.
+    const referencedId = (base: string, targetSpaceId: string, index: number): string =>
+      index === 0 ? base : `${base}:${targetSpaceId}`;
     const targetSpaceAddress: readonly EntityAction[] = spaceReferences(resource).flatMap(
-      (targetSpaceId) => [
+      (targetSpaceId, index) => [
         copy(
-          COPY_SPACE_LINK_ACTION_ID,
+          referencedId(COPY_SPACE_LINK_ACTION_ID, targetSpaceId, index),
           COPY_SPACE_LINK,
           { kind: 'space', spaceId: targetSpaceId },
           onCopy,
@@ -294,7 +298,7 @@ export function spaceEntityActions({
           ? []
           : [
               {
-                id: OPEN_INDEPENDENTLY_ACTION_ID,
+                id: referencedId(OPEN_INDEPENDENTLY_ACTION_ID, targetSpaceId, index),
                 label: OPEN_INDEPENDENTLY,
                 report: { done: 'Sent', failed: NOT_SENT },
                 icon: <OpenIndependentlyIcon />,

@@ -1,5 +1,5 @@
 import { referenceKind } from '@project/core';
-import type { KindView } from './kind-view';
+import { BADGED_TARGET_GLYPH, type KindView } from './kind-view';
 
 /** What a Reference Resource offers beyond its Title: nothing. */
 export interface ReferenceOperations {
@@ -16,5 +16,7 @@ export interface ReferenceOperations {
 export const referenceView: KindView<ReferenceOperations> = {
   name: 'Reference Resource',
   listName: 'Reference Resources',
+  referenceName: null,
+  Glyph: BADGED_TARGET_GLYPH,
   bareOperations: { kind: referenceKind.id },
 };

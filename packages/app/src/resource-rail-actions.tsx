@@ -4,6 +4,7 @@ import {
   referenceKind,
   spaceKind,
   titleName,
+  type KindId,
   type Map as SpaceMap,
   type Resource,
   type ResourceId,
@@ -12,6 +13,7 @@ import type { Space } from '@project/graph';
 import {
   DeleteIcon,
   EnterSpaceIcon,
+  kindNaming,
   RemoveFromMapIcon,
   ResourceKindIcon,
   type EntityActionGroup,
@@ -24,8 +26,9 @@ import type { FocusFallback } from './delete-confirmation';
 import { OPEN_INDEPENDENTLY_ACTION_ID, type SpaceEntity } from './entity-actions';
 import type { OpenSpaces } from './open-spaces';
 
-/** The sentence a Reference Resource's unavailable Create Reference row carries. */
-export const REFERENCE_TERMINAL = 'A Reference Resource cannot be referenced.';
+/** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
+export const referenceTerminal = (kind: KindId): string =>
+  `${kindNaming(kind).listName} cannot be referenced.`;
 
 export interface ResourceRailCommands {
   /** Create Reference, or `null` while no Resource may be added. */
@@ -74,7 +77,7 @@ export function resourceRailGroups(
   const { createReference, removeFromMap, deleteFromSpace, enter } = commands;
   // A Resource no other may reference as its Target offers Create Reference
   // disabled, saying why, so referencing stays a single hop (ADR 0113).
-  const terminal = kindFlags(resource.kind).mayBeTarget ? null : REFERENCE_TERMINAL;
+  const terminal = kindFlags(resource.kind).mayBeTarget ? null : referenceTerminal(resource.kind);
   const reference: readonly EntityActionGroup[] =
     createReference === null
       ? []

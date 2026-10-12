@@ -389,10 +389,13 @@ export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKi
 /**
  * A kind the Create cluster draws a control for.
  *
- * Named rather than written inline at the prop, because it is the type the
- * *dispatch* is held to: `dock-chrome.ts` answers every creation by a switch
- * over {@link DockCreation}, so a kind added above has to say what creating it
- * does before the application compiles.
+ * `dock-chrome.ts` sends a creation with files to the Image path, a Space
+ * Resource's to the Space Resource lifecycle, and every other to
+ * `createResource`, which takes only an `InputFreeResourceKind`: a kind added
+ * above that needs input does not compile until the dispatch says what creating
+ * it does. Its availability is not held so: every kind but the Space Resource's
+ * takes Add Resource's, until each kind declares its creation input
+ * (`.scratch/resource-kind-modules/issues/10`, candidate E).
  */
 export type DockResourceKind = (typeof RESOURCE_KINDS)[number];
 

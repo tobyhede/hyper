@@ -1,5 +1,6 @@
 import type { Resource } from '@project/core';
 import { kindNaming } from './kinds/registry';
+import { BADGED_TARGET_GLYPH } from './kinds/kind-view';
 import { ReferenceIcon, type ResourceBaseKind } from './icons';
 
 /**
@@ -70,9 +71,9 @@ function KindGlyph({ kind, referenceOf, size }: ResourceKindIconProps) {
   // selects — so passing it through preserves omission rather than overriding
   // it, and no conditional spread is needed to say so.
   const { Glyph } = kindNaming(kind);
-  if (Glyph !== undefined) return <Glyph size={size} />;
+  if (Glyph !== BADGED_TARGET_GLYPH) return <Glyph size={size} />;
   const Base = referenceOf === undefined ? undefined : kindNaming(referenceOf).Glyph;
-  return <ReferenceIcon Base={Base} size={size} />;
+  return <ReferenceIcon Base={Base === BADGED_TARGET_GLYPH ? undefined : Base} size={size} />;
 }
 
 /**
@@ -97,6 +98,7 @@ export function ResourceKindIcon({
   decorative = false,
 }: ResourceKindIconProps) {
   const naming = kindNaming(kind);
+  const badged = naming.Glyph === BADGED_TARGET_GLYPH;
   // Named only where a name is drawn: the decorative arm announces nothing and
   // shows the pointer nothing, so deriving one for it would be a value that
   // exists to be discarded.
@@ -106,13 +108,13 @@ export function ResourceKindIcon({
         className="inline-flex flex-none items-center text-muted-foreground"
         aria-hidden="true"
         data-resource-kind={kind}
-        data-reference-of={naming.Glyph === undefined ? referenceOf : undefined}
+        data-reference-of={badged ? referenceOf : undefined}
       >
         <KindGlyph kind={kind} referenceOf={referenceOf} size={size} />
       </span>
     );
   const name =
-    naming.Glyph === undefined && referenceOf !== undefined
+    badged && referenceOf !== undefined
       ? (kindNaming(referenceOf).referenceName ?? naming.name)
       : naming.name;
   return (
@@ -122,7 +124,7 @@ export function ResourceKindIcon({
       aria-label={name}
       title={name}
       data-resource-kind={kind}
-      data-reference-of={naming.Glyph === undefined ? referenceOf : undefined}
+      data-reference-of={badged ? referenceOf : undefined}
     >
       <KindGlyph kind={kind} referenceOf={referenceOf} size={size} />
     </span>
