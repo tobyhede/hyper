@@ -136,10 +136,11 @@ const mountAuthoring = (
 ) => {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-  const { authoring, adapter, imageReplacement, commandOutcomes, continuation } = composeApp({
-    images: unusedImageSources,
-    spaceSession,
-  });
+  const { authoring, adapter, imageReplacement, pickImages, commandOutcomes, continuation } =
+    composeApp({
+      images: unusedImageSources,
+      spaceSession,
+    });
   const initialProps: HookProps = {
     open: false,
     enabled: true,
@@ -152,6 +153,7 @@ const mountAuthoring = (
       useCanvasResourceAuthoring({
         continuation,
         imageReplacement,
+        pickImages,
         nodes: [node(open, resourceId, projectedKind)],
         // The two facts this hook's rules turn on, stated as facts and turned
         // into answers by the one module that owns them. A live chrome rename is
@@ -616,7 +618,7 @@ describe('canvas Resource authoring Space rail', () => {
   const mountRail = (open: boolean, withTarget: boolean, readOnly = false, enabled = true) => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, continuation } = composeApp({
+    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
       images: unusedImageSources,
       spaceSession,
     });
@@ -624,6 +626,7 @@ describe('canvas Resource authoring Space rail', () => {
       useCanvasResourceAuthoring({
         continuation,
         imageReplacement,
+        pickImages,
         nodes: [spaceNode(open, readOnly)],
         availability: authoringAvailability({
           editable: true,
@@ -728,7 +731,7 @@ describe('canvas Resource authoring decoration identity', () => {
   const mountIdentity = () => {
     const loaded = { snapshot, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, continuation } = composeApp({
+    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
       images: unusedImageSources,
       spaceSession,
     });
@@ -741,6 +744,7 @@ describe('canvas Resource authoring decoration identity', () => {
         useCanvasResourceAuthoring({
           continuation,
           imageReplacement,
+          pickImages,
           nodes: projection,
           availability: authoringAvailability({
             editable: true,
@@ -894,7 +898,7 @@ describe('canvas Resource authoring, replacing an image', () => {
   const mountImage = (images: ImageSources = unusedImageSources) => {
     const loaded = { snapshot: withImage, revision: 0n, exportedRevision: null };
     const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded);
-    const { authoring, adapter, imageReplacement, continuation } = composeApp({
+    const { authoring, adapter, imageReplacement, pickImages, continuation } = composeApp({
       images,
       spaceSession,
       reportObserverError: vi.fn(),
@@ -919,6 +923,7 @@ describe('canvas Resource authoring, replacing an image', () => {
         resourceResize: adapter.getState().resourceResize,
         onSelectResource: () => undefined,
         imageReplacement,
+        pickImages,
       }),
     );
     return { ...hook, spaceSession };

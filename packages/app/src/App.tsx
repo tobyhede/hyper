@@ -372,6 +372,7 @@ export const createApp = (
                   commandOutcomes={commandOutcomes}
                   deleteConfirmation={deleteConfirmation}
                   imageReplacement={composition.imageReplacement}
+                  pickImages={composition.pickImages}
                   nameOnCreation={nameOnCreation}
                   spaceSession={spaceSession}
                   spaceResourceTargets={spaceResourceTargets.targets}

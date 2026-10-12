@@ -113,7 +113,9 @@ export interface CanvasResourceAuthoringInput {
    * The Space's image replacements (ADR 0106), which own the whole attempt;
    * this hook keeps only the caret on the target and says the answer.
    */
-  readonly imageReplacement: Pick<ImageReplacements, 'replace' | 'pick'>;
+  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
+  /** The Space's image picker, which Replace's Upload opens. */
+  readonly pickImages: () => Promise<readonly File[]>;
   /**
    * What each referenced Space offers a Space Resource to select, keyed by target.
    *
@@ -177,6 +179,7 @@ export function useCanvasResourceAuthoring({
   onBodyEditingChange,
   onTitleEditingChange,
   imageReplacement,
+  pickImages,
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   portalEditing,
@@ -522,7 +525,7 @@ export function useCanvasResourceAuthoring({
     completeResourceBody,
     clearCaret,
     replaceResourceImage,
-    pickImageFiles: imageReplacement.pick,
+    pickImageFiles: pickImages,
     changeResourceShape,
     continuation,
     containingSpaceId: working.id,

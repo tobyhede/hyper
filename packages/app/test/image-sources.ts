@@ -1,4 +1,4 @@
 export {
   heldImageSources,
-  pickerlessImages as unusedImageSources,
+  storelessImages as unusedImageSources,
 } from '../stories/support/image-sources';

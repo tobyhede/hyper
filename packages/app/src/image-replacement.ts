@@ -46,8 +46,6 @@ export interface ImageReplacements {
   /** True from the moment an attempt starts until it settles. */
   readonly getState: () => boolean;
   readonly subscribe: (listener: () => void) => () => void;
-  /** This Space's image picker, {@link ImageSources.pick}, which Replace's Upload opens. */
-  readonly pick: () => Promise<readonly File[]>;
   /**
    * Replace the identified Image Resource's picture with what the author brought.
    *
@@ -159,7 +157,6 @@ export function createImageReplacements({
   return {
     getState: busy.getState,
     subscribe: busy.subscribe,
-    pick: images.pick,
     replace: async (resourceId, replacement) => {
       if (busy.getState()) return { kind: 'already-replacing' };
       const target = resolveTarget(authoring, resourceId);

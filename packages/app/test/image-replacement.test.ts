@@ -577,22 +577,7 @@ describe('the replacement module', () => {
       'describeImageReplacement',
     ]);
     const { imageReplacement } = open(unusedImageSources);
-    expect(Object.keys(imageReplacement).sort()).toEqual([
-      'getState',
-      'pick',
-      'replace',
-      'subscribe',
-    ]);
-  });
-
-  it('opens the Space’s own image picker, answering what it chose', async () => {
-    const chosen = file('chosen.png');
-    const { imageReplacement } = open({
-      ...unusedImageSources,
-      pick: () => Promise.resolve([chosen]),
-    });
-
-    await expect(imageReplacement.pick()).resolves.toEqual([chosen]);
+    expect(Object.keys(imageReplacement).sort()).toEqual(['getState', 'replace', 'subscribe']);
   });
 
   it('is composed once per Space, so one Space’s replacement holds no other', async () => {
