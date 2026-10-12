@@ -20,10 +20,10 @@ const OTHER_MAP = uuid(4);
 const OTHER_GRAPH = uuid(5);
 const ABSENT = uuid(0x99);
 
-const selecting = (map: typeof MAP, graph: typeof GRAPH) => ({
+const selecting = (mapId: typeof MAP, graphId: typeof GRAPH) => ({
   spaceId: TARGET_SPACE,
-  map,
-  graph,
+  map: mapId,
+  graph: graphId,
 });
 
 /** A target Space with `MAP` owning `GRAPH`, and `OTHER_MAP` owning `OTHER_GRAPH`. */
