@@ -110,7 +110,7 @@ export function useKindDecoratedNodes(
     completeResourceBody,
     clearCaret,
     replaceResourceImage,
-    imageAccept,
+    pickImageFiles,
     changeResourceShape,
     continuation,
     containingSpaceId,
@@ -154,7 +154,7 @@ export function useKindDecoratedNodes(
       beginBodyEditing,
       bodyEditorResourceId,
       replaceResourceImage,
-      imageAccept,
+      pickImageFiles,
       clearCaret,
     }),
     [
@@ -164,7 +164,7 @@ export function useKindDecoratedNodes(
       beginBodyEditing,
       bodyEditorResourceId,
       replaceResourceImage,
-      imageAccept,
+      pickImageFiles,
       clearCaret,
     ],
   );

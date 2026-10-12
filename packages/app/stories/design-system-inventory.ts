@@ -162,7 +162,7 @@ export const interactiveDeviations = [
   {
     subject: 'packages/ui/src/ImageReplaceTarget.tsx — dropping a file on the upload target',
     existingHyperComponentConsidered:
-      '`Empty` (outline treatment) with `InputGroup`, `Button` and `ImageFilePicker`, which the target is composed of. None of them accepts a dropped file.',
+      '`Empty` (outline treatment) with `InputGroup` and `Button`, which the target is composed of, and the injected file picker its Upload opens. None of them accepts a dropped file.',
     shadcnOrBaseUiConsidered:
       "shadcn's `empty-outline` and `empty-input-group` examples, which the target follows. The registry has no dropzone component and Base UI has no drop primitive.",
     productRequirement:

@@ -16,7 +16,6 @@ import {
 import type { SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { EntityActionGroup, ImageReplacement } from '@project/ui';
-import { PICKED_IMAGE_TYPES } from './image-creation';
 import { describeImageReplacement, type ImageReplacements } from './image-replacement';
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
@@ -114,7 +113,7 @@ export interface CanvasResourceAuthoringInput {
    * The Space's image replacements (ADR 0106), which own the whole attempt;
    * this hook keeps only the caret on the target and says the answer.
    */
-  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
+  readonly imageReplacement: Pick<ImageReplacements, 'replace' | 'pick'>;
   /**
    * What each referenced Space offers a Space Resource to select, keyed by target.
    *
@@ -523,7 +522,7 @@ export function useCanvasResourceAuthoring({
     completeResourceBody,
     clearCaret,
     replaceResourceImage,
-    imageAccept: PICKED_IMAGE_TYPES,
+    pickImageFiles: imageReplacement.pick,
     changeResourceShape,
     continuation,
     containingSpaceId: working.id,

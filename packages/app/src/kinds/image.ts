@@ -31,8 +31,8 @@ export type ImageResourceDecorationContext = Pick<
     resourceId: ResourceId,
     replacement: ImageReplacement,
   ) => Promise<string | null>;
-  /** What a replacement's file picker offers. */
-  readonly imageAccept: string;
+  /** Open the file picker for a replacement, within the press that asked for it. */
+  readonly pickImageFiles: () => Promise<readonly File[]>;
 };
 
 /**
@@ -55,7 +55,7 @@ export function decorateImageResourceNode(
   if (resourceBelongsToWorkingSpace && context.bodyEditorResourceId === node.id) {
     const resourceId = node.data.resourceId;
     const replacer = {
-      accept: context.imageAccept,
+      pick: context.pickImageFiles,
       onReplace: (replacement: ImageReplacement) => replace(resourceId, replacement),
       onEnd: () => context.clearCaret(),
     };

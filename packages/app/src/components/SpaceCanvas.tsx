@@ -209,7 +209,7 @@ export interface SpaceCanvasProps {
    * The Space's image replacements (ADR 0106), which own the whole attempt.
    * The one way Replace reaches an Image Resource on this canvas that offers it.
    */
-  readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
+  readonly imageReplacement: Pick<ImageReplacements, 'replace' | 'pick'>;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *

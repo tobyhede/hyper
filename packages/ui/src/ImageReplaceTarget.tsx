@@ -10,7 +10,6 @@ import {
 } from './components/empty';
 import { FieldError } from './components/field';
 import { InputGroup, InputGroupInput } from './components/input-group';
-import { ImageFilePicker } from './ImageFilePicker';
 import { usePublishResourceContentEdit, type ResourceContentEdit } from './resource-content-edit';
 import { ImageIcon } from './icons';
 import './resource-image.css';
@@ -25,8 +24,12 @@ export type ImageReplacement =
  * replacement, as `MarkdownResourceBodyEditor`'s is a running body edit.
  */
 export interface ImageReplaceEditor {
-  /** The media types offered to the file picker, as its `accept` attribute. */
-  readonly accept: string;
+  /**
+   * Open the browser's file picker for an image, answering the files chosen,
+   * or none when it is cancelled. Called within the Upload press, before any
+   * `await`, since a browser opens a picker only within a user's gesture.
+   */
+  readonly pick: () => Promise<readonly File[]>;
   /**
    * Replace the image. Answers the sentence to show in the target when the
    * replacement is refused, or `null` once it is over.
@@ -70,7 +73,6 @@ export function ImageReplaceTarget({ name, editor }: ImageReplaceTargetProps) {
     };
   }, []);
   const refusalId = useId();
-  const picker = useRef<HTMLInputElement | null>(null);
   const upload = useRef<HTMLButtonElement | null>(null);
   // The caret starts on Upload, as a body edit's starts in its editor. Not
   // scrolled into view: the canvas, not the page, decides what is shown.
@@ -169,18 +171,16 @@ export function ImageReplaceTarget({ name, editor }: ImageReplaceTargetProps) {
             size="compact"
             disabled={busy}
             focusableWhenDisabled
-            onClick={() => picker.current?.click()}
+            onClick={() => {
+              if (busyNow.current) return;
+              void editor.pick().then((files) => {
+                // A target that has gone was ended by something else.
+                if (mounted.current && files.length > 0) void replace({ kind: 'files', files });
+              });
+            }}
           >
             Upload
           </Button>
-          <ImageFilePicker
-            ref={picker}
-            accept={editor.accept}
-            data-testid="replace-image-file"
-            onChoose={(files) => {
-              if (files.length > 0) void replace({ kind: 'files', files });
-            }}
-          />
           <form
             className="w-full"
             onSubmit={(event) => {
