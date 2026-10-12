@@ -44,7 +44,7 @@ const markdownCanvas = (content: MarkdownContent, area: CanvasArea) => {
 };
 
 /**
- * The view half of the Markdown kind (ADR 0020, ADR 0128): what a Markdown
+ * The view half of the Markdown kind (ADR 0020): what a Markdown
  * Resource is called and drawn as, and what it offers beyond the shared
  * Title. On a Map its content view is `MarkdownResourceBody`, and its content
  * action is Edit; presented, its source is rendered.

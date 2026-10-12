@@ -363,7 +363,7 @@ describe('Running an Aggregate directory', () => {
 
   /*
    * A Markdown Resource is written as its Resource file and the sidecar it
-   * names (ADR 0128), and a Resource deleted during the run takes both with it.
+   * names, and a Resource deleted during the run takes both with it.
    */
   it('writes a Markdown Resource as its Resource file and sidecar, and removes both on delete', async () => {
     const directory = await fixtureCopy();

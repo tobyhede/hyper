@@ -28,7 +28,7 @@ export interface SpaceOperations {
 }
 
 /**
- * The view half of the Space kind (ADR 0068, ADR 0128): what a Space Resource
+ * The view half of the Space kind (ADR 0068): what a Space Resource
  * is called and drawn as, and what it offers beyond the shared Title. Its
  * content view is the embedded Map the application draws, and its frame is
  * `space-canvas.css`, which `CanvasResource` imports.

@@ -364,6 +364,6 @@ describe('import decoding', () => {
     if (parsed.success) throw new Error('Expected an unregistered resource kind to be refused');
     const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
 
-    for (const kind of KIND_IDS) expect(summary).toContain(kind);
+    expect(summary).toContain(`names no kind this build registers (${KIND_IDS.join(', ')})`);
   });
 });

@@ -5,7 +5,7 @@ import {
   uuidSchema,
   type GraphId,
   type MapId,
-  type ResourceDocument,
+  type SpaceResourceDocument,
   type SpaceSnapshot,
 } from '@project/core';
 import {
@@ -43,7 +43,7 @@ const THIRD_GRAPH = id('11');
 const SECOND_COLOR = '#aa0000';
 const OTHER_COLOR = '#00aa00';
 
-const document: Extract<ResourceDocument, { kind: 'space' }> = {
+const document: SpaceResourceDocument = {
   kind: 'space',
   title: 'Target',
   content: { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH },

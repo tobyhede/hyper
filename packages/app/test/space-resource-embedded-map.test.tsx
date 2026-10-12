@@ -4,6 +4,7 @@ import {
   spaceSnapshotSchema,
   uuidSchema,
   type ResourceDocument,
+  type SpaceResourceDocument,
   type ResourceId,
   type SpaceSnapshot,
   type UUID,
@@ -127,7 +128,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
 });
 
 /** Home, holding one Space Resource the Map has already Opened (ADR 0064). */
-const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): SpaceSnapshot =>
+const home = (spaceResource: SpaceResourceDocument): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: HOME_ID,
     document: {
@@ -850,7 +851,7 @@ describe('the Map an Open Space Resource draws', () => {
    * arrived inside the window.
    */
   it('authors framing on each Space Resource wheeled within the debounce window', async () => {
-    const spaceResource: Extract<ResourceDocument, { kind: 'space' }> = {
+    const spaceResource: SpaceResourceDocument = {
       title: 'Elsewhere',
       kind: 'space',
       content: { spaceId: TARGET_ID, map: SELECTED_MAP_ID, graph: SELECTED_GRAPH_ID },

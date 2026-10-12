@@ -14,8 +14,9 @@ const KINDS = ['ur', 'image', 'markdown', 'reference', 'space'] as const;
 /**
  * Quoted ids that are not the kind: `'space'` also tags a Space itself, as an
  * entity, a product destination, a Resources-list row, a drag, an icon and a
- * path label. Each file lists how many it holds, so a new one fails until it
- * is read and counted here.
+ * path label. Each file lists how many it holds, exactly, so a new one fails
+ * until it is read and counted here, and one that goes fails until its count
+ * comes down.
  */
 const NOT_THE_KIND = new Map<string, ReadonlyMap<string, number>>([
   [
@@ -48,14 +49,34 @@ const sourceOf = (file: string): string =>
 const quotedAt = (source: string, kind: string): readonly number[] =>
   [...source.matchAll(new RegExp(`(['"\`])${kind}\\1`, 'gu'))].map((match) => match.index);
 
+/**
+ * Each file whose count of `at`'s matches differs from `counted`, in either
+ * direction, with the lines it found: a file that falls below its count fails
+ * as surely as one that rises, so a table of counts follows the source down.
+ */
+const miscounted = (
+  files: readonly string[],
+  counted: ReadonlyMap<string, number>,
+  at: (source: string) => readonly number[],
+): readonly string[] => {
+  const tracked = new Set(files);
+  return [...new Set([...files, ...counted.keys()])].flatMap((file) => {
+    const source = tracked.has(file) ? sourceOf(file) : '';
+    const lines = at(source).map((index) => lineAt(source, index));
+    const expected = counted.get(file) ?? 0;
+    return lines.length === expected
+      ? []
+      : [`${file}: counted ${expected}, found ${lines.length} (lines ${lines.join(', ')})`];
+  });
+};
+
+const scannedOutsideKinds = (): readonly string[] =>
+  trackedFiles().filter((file) => isScannedSource(file) && !isKindModule(file));
+
 const namings = (kind: string): readonly string[] =>
-  trackedFiles()
-    .filter((file) => isScannedSource(file) && !isKindModule(file))
-    .flatMap((file) => {
-      const source = sourceOf(file);
-      const lines = quotedAt(source, kind).map((index) => `${file}:${lineAt(source, index)}`);
-      return lines.length === (NOT_THE_KIND.get(kind)?.get(file) ?? 0) ? [] : lines;
-    });
+  miscounted(scannedOutsideKinds(), NOT_THE_KIND.get(kind) ?? new Map(), (source) =>
+    quotedAt(source, kind),
+  );
 
 /**
  * Code outside a `kinds/` module that reaches one kind through its module's id,
@@ -66,6 +87,10 @@ const namings = (kind: string): readonly string[] =>
  * a feature that exists for one kind and acts on that kind's own content, so a
  * new one, or a dispatch written with module ids, fails until it is read and
  * either routed or counted.
+ *
+ * The list only shrinks. Each count is the file's own count, so a file that
+ * reaches a kind less often fails until its count comes down with it, and a
+ * new entry needs a ticket under `.scratch/resource-kind-modules/`.
  */
 const ONE_KIND_FEATURES = new Map<string, number>([
   // A Space Resource's selection, framing and portal; a Markdown body's completion.
@@ -78,8 +103,6 @@ const ONE_KIND_FEATURES = new Map<string, number>([
   ['packages/app/src/components/command-dock-chrome.ts', 4],
   // A Space Resource's Create runs, and is available with, the Space Resource lifecycle (ADR 0074).
   ['packages/app/src/dock-chrome.ts', 2],
-  // A Space Resource's Delete runs the Space Resource lifecycle (ADR 0074).
-  ['packages/app/src/resource-deletion.ts', 1],
   // Replace is an Image Resource's (ADR 0106).
   ['packages/app/src/image-replacement.ts', 1],
   // Create Reference's glyph, and a Space Resource's Enter and menu.
@@ -88,8 +111,10 @@ const ONE_KIND_FEATURES = new Map<string, number>([
   ['packages/app/src/space-authoring.ts', 3],
   // The Space Resources that reference an entry of this Meta Space.
   ['packages/app/src/space-resource-targets.ts', 1],
-  // The Space Resource lifecycle (ADR 0074).
+  // The Space Resource lifecycle (ADR 0074), its create and delete; and two reads of
+  // its selection (`spaceId`, `map`, `graph`), unbuilt behind the module (issue 10, F).
   ['packages/persistence/src/space-resource-planning.ts', 4],
+  // A Space Resource's selection compared by kind, unbuilt behind the module (issue 10, F).
   ['src/persistence/sql-space-repository.ts', 2],
   // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
   ['src/aggregate-directory/images.ts', 1],
@@ -102,13 +127,11 @@ const moduleIdsAt = (source: string): readonly number[] =>
   [...source.matchAll(KIND_MODULE_IDS)].map((match) => match.index);
 
 const moduleIdReaches = (): readonly string[] =>
-  trackedFiles()
-    .filter((file) => isScannedSource(file) && !isKindModule(file) && !file.endsWith('.css'))
-    .flatMap((file) => {
-      const source = sourceOf(file);
-      const lines = moduleIdsAt(source).map((index) => `${file}:${lineAt(source, index)}`);
-      return lines.length === (ONE_KIND_FEATURES.get(file) ?? 0) ? [] : lines;
-    });
+  miscounted(
+    scannedOutsideKinds().filter((file) => !file.endsWith('.css')),
+    ONE_KIND_FEATURES,
+    moduleIdsAt,
+  );
 
 describe('a kind is named only by its module', () => {
   it.each(KINDS)('names %s nowhere outside a kinds/ module', (kind) => {

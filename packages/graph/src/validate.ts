@@ -280,7 +280,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   }
 
   // Every Resource reference a kind declares resolves, to a kind that may be a
-  // Target, so referencing stays a single hop (ADR 0113, ADR 0128).
+  // Target, so referencing stays a single hop (ADR 0113).
   for (const resource of space.resources) {
     for (const targetId of resourceReferences(resource)) {
       if (targetId === resource.id) {

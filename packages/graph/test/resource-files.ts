@@ -2,7 +2,7 @@ import { uuidSchema, type Resource, type UUID } from '@project/core';
 import type { ResourceFile } from '../src/index';
 
 /**
- * A Resource's files as an author writes them (ADR 0128): its Resource file
+ * A Resource's files as an author writes them: its Resource file
  * `resources/<id>.json`, and for a Markdown Resource the `<id>.md` sidecar its
  * locator names. Tests build these rather than resource objects, because that
  * is what `loadSpace` takes. Each helper returns every file of one Resource, so

@@ -1,3 +1,4 @@
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { z } from 'zod';
 import type { ContentFacts, ContentVia } from '../resource-content';
 import type { SpaceResourceTarget, SpaceSelectionProblem } from './space';
@@ -34,8 +35,7 @@ export type FileContentDecoding =
     };
 
 /**
- * How a kind's content is written to its Resource file and read back
- * (ADR 0128): the content the file holds, and the sidecars beside it.
+ * How a kind's content is written to its Resource file and read back: the content the file holds, and the sidecars beside it.
  */
 export interface KindFileCodec<Content, FileContent> {
   /** The content a Resource file of this kind holds, strict, so a key the kind does not declare is refused. */
@@ -61,7 +61,7 @@ export interface KindResolvedContent {
 }
 
 /**
- * A Resource kind (ADR 0120, ADR 0128): its id, the schema its `content` is
+ * A Resource kind (ADR 0120): its id, the schema its `content` is
  * parsed by, and every rule it declares. The core reads these and names no
  * kind; a kind with nothing to say about a rule takes `defineKind`'s answer.
  * The view half is the application's.

@@ -202,13 +202,13 @@ describe('parseResourceFiles refuses a file that is not a Resource file', () => 
     }
   });
 
-  it('refuses a well-formed kind id this build does not register, naming those it does', () => {
+  it('refuses a well-formed kind id this build does not register, naming it and those it does', () => {
     for (const kind of ['video', 'Markdown', 'vnd.acme.widget']) {
       const files = [json({ id: RESOURCE_A, title: 'A', kind, content: {} })];
       expect(errorKinds(files)).toEqual(['invalid-resource-file']);
-      expect(messages(files)[0]).toContain(
-        `kind: names no kind this build registers (${KIND_IDS.join(', ')})`,
-      );
+      expect(messages(files)).toEqual([
+        `resources/${RESOURCE_A}.json: kind: "${kind}" names no kind this build registers (${KIND_IDS.join(', ')})`,
+      ]);
     }
   });
 
@@ -247,7 +247,7 @@ describe('parseResourceFiles refuses a file that is not a Resource file', () => 
   });
 });
 
-describe('Resource files are strict at both levels (ADR 0127, ADR 0128)', () => {
+describe('Resource files are strict at both levels (ADR 0127)', () => {
   it('refuses an envelope key no Resource declares, naming the key and the file', () => {
     const files = [json(markdownEnvelope({ description: 'Where every graph begins' }))];
     expect(errorKinds(files)).toEqual(['invalid-resource-file']);
@@ -311,7 +311,7 @@ describe('Resource files are strict at both levels (ADR 0127, ADR 0128)', () => 
   });
 });
 
-describe('a Markdown Resource and its sidecar (ADR 0128)', () => {
+describe('a Markdown Resource and its sidecar', () => {
   it('refuses a media type other than Markdown', () => {
     const files = [
       json(markdownEnvelope({ content: { path: `${RESOURCE_A}.md`, mediaType: 'text/plain' } })),
@@ -373,7 +373,7 @@ describe('a Markdown Resource and its sidecar (ADR 0128)', () => {
   });
 });
 
-describe('a .md no Resource file names is refused (ADR 0128)', () => {
+describe('a .md no Resource file names is refused', () => {
   it('refuses a stray .md under resources/, naming it', () => {
     const files = [sidecar('Orphan\n', 'orphan')];
     expect(errorsOf(parseResourceFiles(files)).map(({ kind, path }) => [kind, path])).toEqual([

@@ -1,4 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { builtinModules } from 'node:module';
+import { join } from 'node:path';
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
@@ -147,6 +149,141 @@ const packageInternalsPattern = (exemptApp) => ({
   message:
     'Reaches past a package public surface. Import from @project/* — and export it from the package index if it is missing (AGENTS.md).',
 });
+
+/**
+ * The kind-neutral modules under a `kinds/` directory: the interface every kind
+ * implements and the registry each choice among kinds goes through. Every other
+ * module there is one kind's, and what it exports names that kind.
+ */
+const KIND_NEUTRAL_MODULES = new Set(['registry', 'kind-module', 'kind-view']);
+
+/** Each name a module's source exports, by declaration or by an `export { … }` list. */
+const exportedNames = (source) => [
+  ...[
+    ...source.matchAll(
+      /^export\s+(?:declare\s+)?(?:async\s+)?(?:const|let|var|function\*?|type|interface|(?:abstract\s+)?class|enum)\s+([A-Za-z_$][\w$]*)/gmu,
+    ),
+  ].map((match) => match[1]),
+  ...[...source.matchAll(/^export\s+(?:type\s+)?\{([^}]*)\}/gmu)].flatMap((match) =>
+    match[1]
+      .split(',')
+      .map((entry) => entry.trim().replace(/^type\s+/u, ''))
+      .filter((entry) => entry.length > 0)
+      .map((entry) => entry.split(/\s+as\s+/u).at(-1)),
+  ),
+];
+
+/**
+ * The names one package's kind modules export, read from their source, so a
+ * kind module's new export is banned outside `kinds/` with no list to update.
+ * `test/unit/kind-module-imports.test.ts` holds this reading to the compiler's.
+ */
+const kindModuleNames = (pkg) => {
+  const directory = join(import.meta.dirname, 'packages', pkg, 'src', 'kinds');
+  return [
+    ...new Set(
+      readdirSync(directory)
+        .filter((file) => /\.tsx?$/u.test(file))
+        .filter((file) => !KIND_NEUTRAL_MODULES.has(file.replace(/\.tsx?$/u, '')))
+        .flatMap((file) => exportedNames(readFileSync(join(directory, file), 'utf8'))),
+    ),
+  ].sort();
+};
+
+const KIND_MODULE_MESSAGE =
+  'A kind is named only by its module under kinds/ (ADR 0128). Route a choice among kinds through kinds/registry.ts; a feature that exists for one kind alone is listed in KIND_FEATURE_FILES in eslint.config.js, with its reason.';
+
+/**
+ * Outside a `kinds/` directory, nothing imports what one kind's module exports:
+ * by name from `@project/core` or `@project/ui`, which re-export the kind
+ * modules, or by relative path to the module itself. A namespace import of
+ * either package is refused by the same rule, so it cannot reach round the
+ * names. A literal kind id is not an import, and stays
+ * `test/unit/kind-ids-in-modules.test.ts`'s to count.
+ *
+ * It is the `@typescript-eslint` form of the rule, so it neither replaces nor
+ * is replaced by the package zones' `no-restricted-imports`, and it refuses an
+ * `import type` as well.
+ */
+const KIND_MODULE_IMPORTS = {
+  paths: [
+    { name: '@project/core', importNames: kindModuleNames('core'), message: KIND_MODULE_MESSAGE },
+    { name: '@project/ui', importNames: kindModuleNames('ui'), message: KIND_MODULE_MESSAGE },
+  ],
+  patterns: [
+    {
+      regex: `(?:^|/)kinds/(?!(?:${[...KIND_NEUTRAL_MODULES].join('|')})$)[^/.]+$`,
+      message: KIND_MODULE_MESSAGE,
+    },
+  ],
+};
+
+/**
+ * The files outside `kinds/` that import a kind module's export, each for a
+ * feature that exists for that kind alone. The list only shrinks: a new entry
+ * needs a ticket under `.scratch/resource-kind-modules/`, and
+ * `test/unit/kind-module-imports.test.ts` fails an entry that no longer imports
+ * one.
+ */
+const KIND_FEATURE_FILES = [
+  // The core's surface, which re-exports every kind module.
+  'packages/core/src/index.ts',
+  // Content reached through a Reference Resource names the Reference kind as the way it was reached.
+  'packages/core/src/resource-content.ts',
+  // An Image Resource's natural size, as a type.
+  'packages/core/src/types.ts',
+  // The UI surface, which re-exports the kind view functions the application's one-kind features call.
+  'packages/ui/src/index.ts',
+  // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
+  'packages/ui/src/icons.tsx',
+  // A Markdown Resource's editing and an Image Resource's replacing display states.
+  'packages/ui/src/resource-display.ts',
+  // A Space Resource's portal, an Ur Resource's Shape menu, an Image Resource's Replace label and glyph, and a Reference Resource's unreachable Target.
+  'packages/ui/src/CanvasResource.tsx',
+  // A Reference Resource's unreachable Target, presented.
+  'packages/ui/src/PresentedResource.tsx',
+  // A Space Resource's portal editing keeps its toolbar drawn.
+  'packages/react-flow-adapter/src/ResourceNode.tsx',
+  // A stored image's URL is held to what an Image Resource may record.
+  'packages/persistence/src/http-protocol.ts',
+  // A stored image's id and collection path are an Image Resource's (ADR 0106).
+  'packages/persistence/src/images.ts',
+  // The Space Resource lifecycle (ADR 0074), and two reads of its selection,
+  // unbuilt behind the module (.scratch/resource-kind-modules/issues/10, F).
+  'packages/persistence/src/space-resource-planning.ts',
+  // A Space Resource's selection compared by kind, unbuilt behind the module (issue 10, F).
+  'src/persistence/sql-space-repository.ts',
+  // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
+  'src/aggregate-directory/images.ts',
+  // A Space Resource's rail.
+  'packages/app/src/build-space-resource-rail.tsx',
+  // A Space Resource's selection, framing and portal; a Markdown body's completion.
+  'packages/app/src/canvas-resource-authoring.ts',
+  // An Image Resource's Create opens the file picker first (ADR 0106).
+  'packages/app/src/components/CommandDockResources.tsx',
+  // The Space glyph on the Space cluster's own controls.
+  'packages/app/src/components/CommandDockSpaces.tsx',
+  // A Space Resource's framing of its embedded Map; a dropped image URL creates an Image Resource.
+  'packages/app/src/components/SpaceCanvas.tsx',
+  // The kinds the Create cluster offers, in its order, an Image Resource's with its files (ADR 0089).
+  'packages/app/src/components/command-dock-chrome.ts',
+  // A Space Resource's Create runs, and is available with, the Space Resource lifecycle (ADR 0074).
+  'packages/app/src/dock-chrome.ts',
+  // A Space Resource's embedded Map.
+  'packages/app/src/embedded-open-space-resource.ts',
+  // Replace is an Image Resource's (ADR 0106).
+  'packages/app/src/image-replacement.ts',
+  // Create Reference's glyph, and a Space Resource's Enter and menu.
+  'packages/app/src/resource-rail-actions.tsx',
+  // Creating an Image, a Reference or an input-free Resource, and Replace.
+  'packages/app/src/space-authoring.ts',
+  // A Space Resource's Map and Graph commands.
+  'packages/app/src/space-resource-context-commands.ts',
+  // A Space Resource's framing.
+  'packages/app/src/space-resource-framing.ts',
+  // The Space Resources that reference an entry of this Meta Space.
+  'packages/app/src/space-resource-targets.ts',
+];
 
 export default tseslint.config(
   {
@@ -473,6 +610,13 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    files: ['packages/*/src/**/*.{ts,tsx}', 'src/**/*.{ts,tsx}'],
+    ignores: ['**/kinds/**', ...KIND_FEATURE_FILES],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', KIND_MODULE_IMPORTS],
     },
   },
   // Vite loads these in Node and externalizes bare specifiers, so a `@project/*`

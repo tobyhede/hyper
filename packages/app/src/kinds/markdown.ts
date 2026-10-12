@@ -1,4 +1,4 @@
-import { markdownKind, type MarkdownKindId } from '@project/core';
+import { markdownKind, type MarkdownKindId, type ResourceId } from '@project/core';
 import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
 import { beginEditing } from '@project/ui';
 import type {
@@ -18,9 +18,10 @@ export type MarkdownResourceDecorationContext = Pick<
   | 'editableResourceIds'
   | 'beginBodyEditing'
   | 'bodyEditorResourceId'
-  | 'completeResourceBody'
   | 'clearCaret'
->;
+> & {
+  readonly completeResourceBody: (resourceId: ResourceId, body: string) => 'completed' | 'retained';
+};
 
 export function decorateMarkdownResourceNode(
   node: ResourceFlowNodeOf<MarkdownKindId>,

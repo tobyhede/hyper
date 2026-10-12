@@ -1,4 +1,11 @@
-import { spaceKind, type SpaceKindId } from '@project/core';
+import {
+  spaceKind,
+  type GraphId,
+  type ResourceId,
+  type SpaceKindId,
+  type SpaceResourceDocument,
+  type UUID,
+} from '@project/core';
 import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
 import { buildSpaceResourceRail } from '../build-space-resource-rail';
 import type {
@@ -6,7 +13,13 @@ import type {
   KindDecoration,
   Mutable,
 } from '../canvas-resource-decoration';
+import type { CommandOutcomes } from '../command-outcomes';
+import type { Continuation } from '../continuation';
+import type { DeleteConfirmation } from '../delete-confirmation';
+import type { OpenSpaces } from '../open-spaces';
 import type { SpaceResourceRailContext } from '../space-resource-context-commands';
+import type { SpaceResourceTargetMap } from '../space-resource-lifecycle';
+import type { SpaceResourceTargets } from '../space-resource-targets';
 
 /** The Space kind's operations and decoration, built by assigning what a gate allows. */
 type SpaceOperations = Mutable<KindOperationsOf<SpaceKindId>>;
@@ -14,22 +27,26 @@ type SpaceDecoration = Mutable<KindDecoration<SpaceKindId>>;
 
 export type SpaceResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
-  | 'authorOnCanvas'
-  | 'editableResourceIds'
-  | 'continuation'
-  | 'containingSpaceId'
-  | 'spaceDocuments'
-  | 'spaceResourceTargets'
-  | 'spaces'
-  | 'commandOutcomes'
-  | 'deleteConfirmation'
-  | 'completeSpaceResourceSelection'
-  | 'portalEditing'
-  | 'onPortalEditingChange'
-  | 'contextNotices'
-  | 'onContextEditingChange'
-  | 'onContextReport'
->;
+  'authorOnCanvas' | 'editableResourceIds'
+> & {
+  readonly continuation: Continuation;
+  readonly containingSpaceId: UUID;
+  readonly spaceDocuments: ReadonlyMap<ResourceId, SpaceResourceDocument>;
+  readonly spaceResourceTargets: SpaceResourceTargets;
+  readonly spaces: OpenSpaces | null;
+  readonly commandOutcomes: CommandOutcomes | undefined;
+  readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'> | undefined;
+  readonly completeSpaceResourceSelection: (
+    resourceId: ResourceId,
+    targetMap: Pick<SpaceResourceTargetMap, 'id'>,
+    graphId: GraphId,
+  ) => string | null;
+  readonly portalEditing: ReadonlySet<ResourceId> | undefined;
+  readonly onPortalEditingChange: ((resourceId: ResourceId, editing: boolean) => void) | undefined;
+  readonly contextNotices: ReadonlyMap<ResourceId, string>;
+  readonly onContextEditingChange: (resourceId: ResourceId, editing: boolean) => void;
+  readonly onContextReport: (resourceId: ResourceId, message: string | null) => void;
+};
 
 export function decorateSpaceResourceNode(
   node: ResourceFlowNodeOf<SpaceKindId>,

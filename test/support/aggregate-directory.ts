@@ -14,10 +14,10 @@ export interface SpaceDirectory {
 }
 
 /**
- * One Resource's file under `resources/`, by name, as an author writes it
- * (ADR 0128): `<id>.json` holding the document. Written with `JSON.stringify`
- * rather than the codec, so intake is exercised against files the codec under
- * test did not produce.
+ * One Resource's file under `resources/`, by name, as an author writes it:
+ * `<id>.json` holding the document. Written with `JSON.stringify` rather than
+ * the codec, so intake is exercised against files the codec under test did
+ * not produce.
  */
 export const resourceFiles = (document: ResourceFileDocument) => ({
   [`${document.id}.json`]: `${JSON.stringify(document, null, 2)}\n`,

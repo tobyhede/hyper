@@ -17,5 +17,7 @@ Each step is its own PR and leaves `main` green. The envelope comes first becaus
 2. `02` — the kind registry and module interface, with Ur moved onto it.
 3. `03`–`06` — one kind per step: Image, Markdown, Reference, Space. Each deletes that kind's branches outside its module.
 4. `07` — JSON Resource files, the Markdown sidecar and the shared locator on disk; `kind` required.
+5. `08` — the remaining per-kind branches routed through the registries; `09` — the kind's module is the one parser of its content.
+6. `10` — the sites that still name a kind outside `kinds/`, and the architecture candidates that would remove them.
 
-When `06` lands, no non-test source outside a module names a kind id. A module is a `kinds/` directory in each package the kind reaches; `test/unit/kind-ids-in-modules.test.ts` holds each moved kind to that, and each step adds its kind to the scan. The Resource-file codec's missing-kind default (`defaultUrKind` in `packages/core/src/schema.ts`) writes `urKind.id` until `07` makes `kind` required and deletes it.
+When `06` lands, no non-test source outside a module names a kind id. (Not met: `08` routed the dispatches, and the sites still naming a kind outside `kinds/` are counted and recorded as unbuilt in `10`.) A module is a `kinds/` directory in each package the kind reaches; `test/unit/kind-ids-in-modules.test.ts` holds each moved kind to that, and each step adds its kind to the scan. The Resource-file codec's missing-kind default (`defaultUrKind` in `packages/core/src/schema.ts`) writes `urKind.id` until `07` makes `kind` required and deletes it.

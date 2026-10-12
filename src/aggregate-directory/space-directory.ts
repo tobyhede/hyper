@@ -48,7 +48,7 @@ export const isMissingFile = (error: unknown): boolean =>
 
 /**
  * The files Import reads in a Space directory, in ordinal order of their
- * relative paths: `resources/*.json`, the Resource files (ADR 0128), and every
+ * relative paths: `resources/*.json`, the Resource files, and every
  * `.md` in `resources/` or beside `space.json`. A `.md` is read so that one no
  * Resource file names as its sidecar is refused, naming it, rather than
  * ignored: a Resource written in an older format is never silently dropped.

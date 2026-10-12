@@ -35,9 +35,9 @@ const useDecoratedOfKind = <K extends ResourceFlowNode['data']['kind'], Context>
   }, [nodes, kind, decorate, context]);
 
 /**
- * Every Resource node with its kind's operations (ADR 0128): the app half of
- * each kind, and the one place in the application each kind's canvas
- * decoration is named. Each kind's nodes are decorated from that kind's own
+ * Every Resource node with its kind's operations: the app half of each kind,
+ * and the one place in the application each kind's canvas decoration is named
+ * (ADR 0128). Each kind's nodes are decorated from that kind's own
  * part of the context, so a change that only one kind reads keeps every other
  * kind's nodes, and their identities, as they were.
  */

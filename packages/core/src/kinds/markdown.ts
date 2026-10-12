@@ -17,14 +17,14 @@ export interface MarkdownContent {
   readonly via: ContentVia;
 }
 
-/** The media type of a Markdown Resource's sidecar (ADR 0128). */
+/** The media type of a Markdown Resource's sidecar. */
 export const MARKDOWN_MEDIA_TYPE = 'text/markdown';
 
 /** The sidecar a Markdown Resource's file names: its own `<id>.md`, beside its Resource file. */
 export const markdownSidecarPath = (id: string): string => `${id}.md`;
 
 /**
- * A Markdown Resource's content as its Resource file holds it (ADR 0128): a
+ * A Markdown Resource's content as its Resource file holds it: a
  * locator naming its sidecar, in place of the source the sidecar holds. The
  * media type compares case-insensitively; that the path is the Resource's own
  * `<id>.md` is the codec's to check, since the schema does not see the id.

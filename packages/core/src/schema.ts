@@ -67,6 +67,12 @@ const declaredKindAndContentSchema = z.object({ kind: z.string(), content: z.unk
  * with each issue added to `ctx`: a kind no module registers is refused, and
  * the registered kind's module is the one parser of its content.
  */
+/**
+ * The `params.code` of the issue refusing a kind no module registers, so a door
+ * that knows the declared kind can quote it beside the schema's message.
+ */
+export const KIND_UNREGISTERED = 'kind-unregistered';
+
 const kindedContent = <Kinded>(
   kind: string,
   content: unknown,
@@ -80,6 +86,7 @@ const kindedContent = <Kinded>(
       // Not echoing the kind: a summary that folds case would misquote it.
       // The registered ids are lower case, so the fold leaves them intact.
       message: `names no kind this build registers (${KIND_IDS.join(', ')})`,
+      params: { code: KIND_UNREGISTERED },
     });
     return undefined;
   }
@@ -120,7 +127,7 @@ export const resourceSchema: z.ZodType<Resource, z.ZodTypeDef, unknown> = envelo
 );
 
 /**
- * A Resource file, `resources/<id>.json` (ADR 0128), as
+ * A Resource file, `resources/<id>.json`, as
  * `docs/schema/resource/` specifies it: the envelope is strict, and so is
  * every kind's content schema, so a key no kind declares is refused, naming
  * it, and no authored key is dropped on intake (ADR 0127). `kind` is

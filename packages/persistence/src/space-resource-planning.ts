@@ -437,7 +437,7 @@ const recoveryBlockedBy = (
   return undefined;
 };
 
-/** The Spaces a Space's Resources hold the lifetime of, once per reference (ADR 0074, ADR 0128). */
+/** The Spaces a Space's Resources hold the lifetime of, once per reference (ADR 0074). */
 const heldSpaces = (snapshot: SpaceSnapshot): readonly UUID[] =>
   snapshot.resources.flatMap(({ document }) => lifetimeSpaceReferences(document));
 

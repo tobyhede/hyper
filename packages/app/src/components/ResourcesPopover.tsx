@@ -66,11 +66,10 @@ export const SPACE_DRAG_TYPE = 'application/x-hyper-space-id';
 type Activation = 'keyboard' | 'pointer';
 
 /**
- * What the list may show, as four independent switches.
- *
- * Three of them narrow the Resources this Map does not place, by kind. The
- * fourth is not a kind at all: `spaces` adds a second **source** — every Space
- * in this Meta Space — and placing one of those authors the Space Resource that
+ * What the list may show, as independent switches: one per kind, each
+ * narrowing the Resources this Map does not place to that kind, and `spaces`.
+ * `spaces` is not a kind at all: it adds a second **source** — every Space in
+ * this Meta Space — and placing one of those authors the Space Resource that
  * frames it. They share a control because they answer one question for the
  * reader ("what am I looking at?"). The All Spaces filter uses the Opener/Meta
  * OPEN mark for the collection; Space Resources and individual Space rows keep
@@ -80,7 +79,7 @@ export type ResourcesFilter = Resource['kind'] | 'spaces';
 
 /**
  * Every filter exactly once, in the order they are drawn: each kind's, in the
- * order the kinds' view halves are registered (ADR 0128), then `spaces`. The
+ * order the kinds' view halves are registered, then `spaces`. The
  * registry types a view half for every kind, so a kind added to `Resource` has
  * a filter, a name and a glyph here before the application compiles.
  */

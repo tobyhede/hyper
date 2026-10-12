@@ -42,8 +42,8 @@ type KindViews = {
 };
 
 /**
- * The kinds' view halves (ADR 0128): the one place in this package each kind
- * is named. The Resources list offers its filters in this order.
+ * The kinds' view halves: the one place in this package each kind is named
+ * (ADR 0128). The Resources list offers its filters in this order.
  */
 const KIND_VIEWS: KindViews = {
   [markdownKind.id]: markdownView,

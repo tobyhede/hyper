@@ -4,6 +4,7 @@ import {
   decodeFileContent,
   encodeFileContent,
   isKindId,
+  KIND_UNREGISTERED,
   resourceFileSchema,
   sidecarNames,
   resourceSchema,
@@ -58,10 +59,10 @@ type FileDecoding =
     };
 
 /**
- * A Resource file's JSON, refused as ADR 0128 fixes it: a `kind` is required
- * and is a kind id; then the file's schema refuses a kind this build does not
- * register, naming those it does, and holds the envelope and the kind's content
- * each strict.
+ * A Resource file's JSON, refused unless its `kind` is declared, with no
+ * default kind (ADR 0128), and is a kind id; then the file's schema refuses a kind this build does not
+ * register, which this door quotes beside the registered ones the schema
+ * names, and holds the envelope and the kind's content each strict.
  */
 function decodeFile(file: ResourceFile): FileDecoding {
   let json: unknown;
@@ -106,7 +107,11 @@ function decodeFile(file: ResourceFile): FileDecoding {
       parsed.error.issues.map((issue) => ({
         kind: 'invalid-resource-file',
         path: file.path,
-        message: `${file.path}: ${issue.path.join('.') || '(resource)'}: ${issue.message}`,
+        // A file is read as written, so its door quotes the kind it declares.
+        message:
+          issue.code === 'custom' && issue.params?.['code'] === KIND_UNREGISTERED
+            ? `${file.path}: kind: "${kind}" ${issue.message}`
+            : `${file.path}: ${issue.path.join('.') || '(resource)'}: ${issue.message}`,
       })),
     );
   }
@@ -115,7 +120,7 @@ function decodeFile(file: ResourceFile): FileDecoding {
 
 /**
  * Read a Space directory's Resource files and the sidecars they name into
- * Resources (ADR 0128). Each `*.json` is one Resource file; each kind's file
+ * Resources. Each `*.json` is one Resource file; each kind's file
  * codec maps its content to the document's. A Markdown Resource's source is
  * its sidecar, which must be its own `<id>.md` beside its Resource file. A
  * `.md` no Resource file names is refused, naming it, so a Resource written
@@ -183,7 +188,7 @@ export function parseResourceFiles(files: readonly ResourceFile[]): ParseResourc
 /**
  * A Resource as its files, by path relative to the Space directory: its
  * Resource file `resources/<id>.json`, and a Markdown Resource's sidecar
- * `resources/<id>.md` beside it (ADR 0128). The inverse of
+ * `resources/<id>.md` beside it. The inverse of
  * {@link parseResourceFiles}, and held to that by a round-trip property.
  *
  * The JSON is pretty-printed with two spaces and a closing newline, keys in

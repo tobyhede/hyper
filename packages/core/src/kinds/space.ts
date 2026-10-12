@@ -89,7 +89,7 @@ export type SpaceSelectionProblem =
     };
 
 /**
- * The Space kind's own check (ADR 0128): its Map and Graph resolve in its
+ * The Space kind's own check: its Map and Graph resolve in its
  * target Space, and the Graph is the Map's. The Resource's own stored Map,
  * with no fallback to the target's `defaultMap` (ADR 0079): a Space Resource
  * selects a Map from the moment it exists, so a `map` that resolves to nothing

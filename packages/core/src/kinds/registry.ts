@@ -1,8 +1,8 @@
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { z } from 'zod';
 import type { ContentFacts, ContentVia } from '../resource-content';
 import type { UUID } from '../types';
 import type { FileContentDecoding, KindFlags, KindModule, KindSidecar } from './kind-module';
-/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { imageKind } from './image';
 import { EMPTY_MARKDOWN, markdownKind } from './markdown';
 import { UNRESOLVED_CONTENT, referenceKind } from './reference';
@@ -61,22 +61,24 @@ const parsersOf = <K extends KindId>(kind: K): KindParsers<K> => ({
   file: KIND_MODULES[kind].file.contentSchema.transform((content) => ({ kind, content })),
 });
 
-/** Each registered kind's parsers, built once; the type refuses a registered kind left out. */
-const KIND_PARSERS = {
-  [urKind.id]: parsersOf(urKind.id),
-  [imageKind.id]: parsersOf(imageKind.id),
-  [markdownKind.id]: parsersOf(markdownKind.id),
-  [referenceKind.id]: parsersOf(referenceKind.id),
-  [spaceKind.id]: parsersOf(spaceKind.id),
-} satisfies { readonly [K in KindId]: KindParsers<K> };
+const builtParsers = new Map<KindId, KindParsers<KindId>>();
+
+/** A registered kind's parsers, built at its first use and kept, so a list of the kinds is not written twice. */
+const parsersFor = (kind: KindId): KindParsers<KindId> => {
+  const built = builtParsers.get(kind);
+  if (built !== undefined) return built;
+  const parsers = parsersOf(kind);
+  builtParsers.set(kind, parsers);
+  return parsers;
+};
 
 /** The one parser of a Resource's `content`: its kind's module's schema. */
 export const contentParser = (kind: KindId): KindedParser<Kinded<KindId>> =>
-  KIND_PARSERS[kind].content;
+  parsersFor(kind).content;
 
 /** The parser of a Resource file's `content`: its kind's file codec's schema. */
 export const fileContentParser = (kind: KindId): KindedParser<KindedFile<KindId>> =>
-  KIND_PARSERS[kind].file;
+  parsersFor(kind).file;
 
 /**
  * A Resource: the core's envelope, `id`, `title` and `kind`, and
@@ -184,7 +186,7 @@ const UNRESOLVED_CONTENT_FACTS: ContentFacts = {
 
 /** What resolved content lets an author do and how it lays out, as its kind declares (ADR 0114). */
 export const contentFacts = (content: ResourceContent): ContentFacts =>
-  (content.kind === 'unresolved' ? undefined : KIND_MODULES[content.kind].facts) ??
+  (content.kind === UNRESOLVED_CONTENT.kind ? undefined : KIND_MODULES[content.kind].facts) ??
   UNRESOLVED_CONTENT_FACTS;
 
 const canonicalContentOf = <K extends KindId>(resource: Kinded<K>) =>

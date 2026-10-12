@@ -18,10 +18,10 @@ export interface CanvasArea {
 }
 
 /**
- * The view half of a Resource kind (ADR 0120, ADR 0128): what a Resource of it
+ * The view half of a Resource kind (ADR 0120): what a Resource of it
  * is called and drawn as, its operations with none offered, and what it draws
  * when presented. Each kind declares one under `kinds/`, and the registry is
- * the one place they are listed, so no surface names a kind.
+ * the one place they are listed, so no surface names a kind (ADR 0128).
  */
 export interface KindView<Operations, OwnContent = never> {
   /** What one Resource of this kind is called. */

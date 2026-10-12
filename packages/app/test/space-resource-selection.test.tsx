@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   spaceSnapshotSchema,
   uuidSchema,
-  type ResourceDocument,
+  type SpaceResourceDocument,
   type SpaceSnapshot,
 } from '@project/core';
 import { loadSpaceSnapshot } from '@project/graph';
@@ -129,7 +129,7 @@ const target: SpaceSnapshot = spaceSnapshotSchema.parse({
  * that seeds a *stale* selection has to say so with real ids rather than with a
  * value the type would not have allowed.
  */
-const home = (spaceResource: Extract<ResourceDocument, { kind: 'space' }>): SpaceSnapshot =>
+const home = (spaceResource: SpaceResourceDocument): SpaceSnapshot =>
   spaceSnapshotSchema.parse({
     id: HOME_ID,
     document: {
