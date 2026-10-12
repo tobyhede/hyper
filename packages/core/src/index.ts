@@ -27,10 +27,12 @@ export {
   DEFAULT_KIND,
   newDefaultResourceDocument,
   newResourceDocument,
+  startsEmpty,
   resolveContent,
   resourceReferences,
   sidecarNames,
   spaceReferences,
   spaceSelectionProblem,
   type KindId,
+  type EmptyCreatableKindId,
 } from './kinds/registry';

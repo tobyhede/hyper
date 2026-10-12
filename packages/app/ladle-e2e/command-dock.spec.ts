@@ -855,9 +855,9 @@ test(
  * is*, so the accessible name is what separates "make one of these" from "one
  * of these" — and it is asserted rather than assumed.
  *
- * They withdraw together, because `createDisabled` is one fact about the set:
- * a surface that greyed one kind and not another would be saying something the
- * application cannot mean.
+ * They withdraw together while Add Resource is withdrawn, because that is one
+ * fact about the set; a kind narrows it only for a window of its own, as
+ * Create Space Resource does while its Edit is in flight.
  */
 test(
   'Create offers the four kinds as peers, each named for what it makes',

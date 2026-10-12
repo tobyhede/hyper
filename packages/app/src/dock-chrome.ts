@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   graphHeadShape,
-  spaceKind,
   type Graph,
   type GraphHeadShape,
   type GraphId,
@@ -31,6 +30,8 @@ import type { ResourcePlacementCommands } from './resource-placement';
 import { CANVAS } from './space-authoring';
 import type { ResourcesDisclosure } from './resources-disclosure';
 import { useReferenceableSpaces } from './referenceable-spaces';
+import { dockCreates } from './kind-creation';
+import { KIND_CREATIONS } from './kinds/registry';
 
 /**
  * The Graph the Dock's Graph cluster names: the Active Graph, or nothing.
@@ -417,16 +418,18 @@ export function useDockChrome(
         onSpaceDragStart: placement.startSpaceDrag,
         onDragEnd: placement.endDrag,
       },
-      // Every kind completes its Edit on the press, an Image Resource once its
-      // file is chosen (ADR 0089, ADR 0106), and a Space Resource through the
-      // Space Resource lifecycle, which creates its Space with it (ADR 0074).
-      onCreate: (creation) => {
-        if ('files' in creation) placement.createImagesFromFiles(creation.files);
-        else if (creation.kind === spaceKind.id) placement.createSpaceResource();
-        else placement.createResource(creation.kind);
-      },
-      createDisabled: (kind) =>
-        kind === spaceKind.id ? !availability.createSpaceResource : !availability.addResource,
+      // Each kind's app half says what its press does and when it is withheld.
+      create: dockCreates(
+        KIND_CREATIONS,
+        {
+          createResource: placement.createResource,
+          createSpaceResource: placement.createSpaceResource,
+          creatingSpaceResource: placement.creatingSpaceResource,
+          createImagesFromFiles: placement.createImagesFromFiles,
+          pickFiles: app.pickFiles,
+        },
+        availability.addResource,
+      ),
     },
     persistence: {
       state: persistence,

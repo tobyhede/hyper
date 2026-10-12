@@ -4,26 +4,14 @@
  * {@link ResourcesControl}.
  */
 import { useContext, useEffect, useId, useRef } from 'react';
-import { DEFAULT_KIND, imageKind } from '@project/core';
-import {
-  ImageFilePicker,
-  ResourceKindIcon,
-  resourceKindName,
-  ToolbarButton,
-  ToolbarGroup,
-} from '@project/ui';
+import { DEFAULT_KIND } from '@project/core';
+import { ResourceKindIcon, resourceKindName, ToolbarButton, ToolbarGroup } from '@project/ui';
 import type { MenuSide } from '../dock-placement';
 import { RESOURCES_TRIGGER } from './command-dock-triggers';
 import { DockDisclosureContext, RESOURCES_DISCLOSURE_ID } from './command-dock-shared';
-import {
-  RESOURCE_KINDS,
-  type DockCreation,
-  type DockResourceKind,
-  type DockResources,
-  type DockResourcesList,
-} from './command-dock-chrome';
+import type { DockResources, DockResourcesList } from './command-dock-chrome';
 import { SetTrigger } from './CommandDockParts';
-import { PICKED_IMAGE_TYPES } from '../image-creation';
+import type { DockCreate } from '../kind-creation';
 import { ResourcesPopover } from './ResourcesPopover';
 
 /**
@@ -51,21 +39,7 @@ import { ResourcesPopover } from './ResourcesPopover';
  * Graph cluster — bare glyphs after the disclosure — and a second chevron
  * beside `Resources ⌄` would read as a second disclosure of the same list.
  */
-function CreatePeers({
-  onCreate,
-  disabled,
-}: {
-  readonly onCreate: (creation: DockCreation) => void;
-  readonly disabled: (kind: DockResourceKind) => boolean;
-}) {
-  /* The browser's own file picker, behind the Image Resource's peer, which is
-     an ordinary toolbar button that opens it. A cancelled picker creates
-     nothing. */
-  const picker = useRef<HTMLInputElement | null>(null);
-  const press = (kind: DockResourceKind): void => {
-    if (kind === imageKind.id) picker.current?.click();
-    else onCreate({ kind });
-  };
+function CreatePeers({ creates }: { readonly creates: readonly DockCreate[] }) {
   return (
     /* **A nested group, and it is what lets the vertical dock pack.** Base UI's
        toolbar group is a plain `role="group"` div with no positional logic, so
@@ -75,7 +49,7 @@ function CreatePeers({
        onto a row each and the Resources cluster would grow past the Map and
        Graph clusters beside it. */
     <ToolbarGroup aria-label="Create a Resource" className="command-dock__create">
-      {RESOURCE_KINDS.map((kind) => (
+      {creates.map(({ kind, disabled, create }) => (
         <ToolbarButton
           key={kind}
           variant="ghost"
@@ -83,8 +57,8 @@ function CreatePeers({
           className="nokey"
           aria-label={`Create ${resourceKindName(kind)}`}
           title={`Create ${resourceKindName(kind)}`}
-          disabled={disabled(kind)}
-          onClick={() => press(kind)}
+          disabled={disabled}
+          onClick={create}
         >
           {/* Decorative here and nowhere else in the Dock: this button already
               says `Create <kind>`, so a glyph announcing `<kind>` beside it is a
@@ -93,12 +67,6 @@ function CreatePeers({
           <ResourceKindIcon kind={kind} decorative />
         </ToolbarButton>
       ))}
-      <ImageFilePicker
-        ref={picker}
-        accept={PICKED_IMAGE_TYPES}
-        data-testid="create-image-file"
-        onChoose={(files) => onCreate({ kind: imageKind.id, files })}
-      />
     </ToolbarGroup>
   );
 }
@@ -223,7 +191,7 @@ export function ResourcesControl({
           never needed: Space, Map and Graph name entities the author renamed,
           so their names take the slack and truncate, while "Resources" is a fixed
           word. See `command-dock.css`. */}
-      <CreatePeers onCreate={resources.onCreate} disabled={resources.createDisabled} />
+      <CreatePeers creates={resources.create} />
     </ToolbarGroup>
   );
 }

@@ -3,6 +3,7 @@ import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
 import type { SpaceBackend } from '@project/persistence';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
+import { pickFilesInBrowser } from './browser-file-picker';
 import type { ImageSources } from './image-creation';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { OpenedApplicationStartup } from './startup';
@@ -49,12 +50,13 @@ const measureInBrowser = (url: string): Promise<ImageNaturalSize | undefined> =>
     picture.src = url;
   });
 
-/** The host's image store over HTTP, and the browser measuring what it loads. */
+/** The host's image store over HTTP, and the browser measuring what it loads and choosing files. */
 const browserImageSources = (): ImageSources => {
   const host = new HttpSpaceBackend();
   return {
     store: (image) => host.storeImage(image),
     measure: measureInBrowser,
+    pick: (accept) => pickFilesInBrowser(document)(accept),
   };
 };
 

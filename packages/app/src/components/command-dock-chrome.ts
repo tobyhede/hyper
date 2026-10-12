@@ -12,20 +12,11 @@ import type {
   Resource,
   ResourceId,
   UUID,
-  ImageKindId,
-  UrKindId,
-} from '@project/core';
-import {
-  type SpaceKindId,
-  spaceKind,
-  type MarkdownKindId,
-  markdownKind,
-  imageKind,
-  urKind,
 } from '@project/core';
 import type { SpaceSessionState } from '@project/persistence';
 import type { FocusFallback } from '../delete-confirmation';
 import type { ExitOutcome } from '../dock-model';
+import type { DockCreate } from '../kind-creation';
 import type { MapMemberships } from '../map-memberships';
 import type { ListingRow, NamedSpace, RejectedExitConfirmation } from '../open-spaces';
 import type { ResourcesPopoverSpace, SettlePlacement, SettleResource } from '../resources-drag';
@@ -377,40 +368,6 @@ export interface DockGraph {
 }
 
 /**
- * The four kinds Create offers, in the order the cluster draws them.
- *
- * **`reference` is not one of them.** A Reference Resource is always created
- * *from* the Resource it points at, which supplies the Target (ADR 0089), so
- * the gesture is a row in that Resource's own command menu and there is
- * nothing here for it to be a peer of.
- */
-export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;
-
-/**
- * A kind the Create cluster draws a control for.
- *
- * `dock-chrome.ts` sends a creation with files to the Image path, a Space
- * Resource's to the Space Resource lifecycle, and every other to
- * `createResource`, which takes only an `InputFreeResourceKind`: a kind added
- * above that needs input does not compile until the dispatch says what creating
- * it does. Its availability is not held so: every kind but the Space Resource's
- * takes Add Resource's, until each kind declares its creation input
- * (`.scratch/resource-kind-modules/issues/10`, candidate E).
- */
-export type DockResourceKind = (typeof RESOURCE_KINDS)[number];
-
-/**
- * One Create, as the cluster reports it. An Image Resource's control opens the
- * file picker first, so what it reports is the files chosen there; a cancelled
- * picker reports nothing (ADR 0106).
- */
-export type DockCreation =
-  | { readonly kind: MarkdownKindId }
-  | { readonly kind: SpaceKindId }
-  | { readonly kind: ImageKindId; readonly files: readonly File[] }
-  | { readonly kind: UrKindId };
-
-/**
  * What the Resources list draws and what activating a row does.
  *
  * **Two one-way writes rather than an `open` flag**, and that is what lets the
@@ -498,13 +455,14 @@ export interface DockResources {
    */
   readonly list: DockResourcesList;
   /**
-   * Create a Resource of one kind — the one command about the *set*.
+   * Create a Resource of one kind — the one command about the *set* — one
+   * control per kind that may be created here, in the order they are drawn.
    *
    * The kind is chosen at creation, so the cluster offers peers rather than a
    * split button with a hidden default. This is *Create*, distinct from adding
-   * an existing Resource, which is what the list above is for.
+   * an existing Resource, which is what the list above is for. What a press
+   * does, and whether it may run, is each kind's (`kinds/registry.ts`); the
+   * cluster draws the kind's name and glyph and nothing else about it.
    */
-  readonly onCreate: (creation: DockCreation) => void;
-  /** Whether each Create peer may run — the kinds withdraw independently when in flight. */
-  readonly createDisabled: (kind: DockResourceKind) => boolean;
+  readonly create: readonly DockCreate[];
 }

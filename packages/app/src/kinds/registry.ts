@@ -1,15 +1,58 @@
 import { useMemo } from 'react';
-import { imageKind, markdownKind, spaceKind, urKind } from '@project/core';
+import {
+  imageKind,
+  KIND_IDS,
+  markdownKind,
+  referenceKind,
+  spaceKind,
+  urKind,
+  type KindId,
+} from '@project/core';
 import {
   isResourceNodeOf,
   type ResourceFlowNode,
   type ResourceFlowNodeOf,
 } from '@project/react-flow-adapter';
 import { applyKindDecoration, type KindDecoration } from '../canvas-resource-decoration';
-import { decorateImageResourceNode, type ImageResourceDecorationContext } from './image';
-import { decorateMarkdownResourceNode, type MarkdownResourceDecorationContext } from './markdown';
-import { decorateSpaceResourceNode, type SpaceResourceDecorationContext } from './space';
-import { decorateUrResourceNode, type UrResourceDecorationContext } from './ur';
+import type { KindCreation } from '../kind-creation';
+import {
+  decorateImageResourceNode,
+  imageCreation,
+  type ImageResourceDecorationContext,
+} from './image';
+import {
+  decorateMarkdownResourceNode,
+  markdownCreation,
+  type MarkdownResourceDecorationContext,
+} from './markdown';
+import {
+  decorateSpaceResourceNode,
+  spaceCreation,
+  type SpaceResourceDecorationContext,
+} from './space';
+import { decorateUrResourceNode, type UrResourceDecorationContext, urCreation } from './ur';
+
+/**
+ * How each kind is created from the Command Dock, or `null` for a kind it does
+ * not create. A Reference Resource is always created *from* the Resource it
+ * points at, which supplies the Target (ADR 0089), so its Create is a row in
+ * that Resource's own command menu.
+ */
+const CREATIONS = {
+  [markdownKind.id]: markdownCreation,
+  [spaceKind.id]: spaceCreation,
+  [imageKind.id]: imageCreation,
+  [urKind.id]: urCreation,
+  [referenceKind.id]: null,
+} satisfies Readonly<Record<KindId, KindCreation | null>>;
+
+/** Every kind the Command Dock creates, with its Create, in registry order. */
+export const KIND_CREATIONS: readonly (readonly [KindId, KindCreation])[] = KIND_IDS.flatMap(
+  (kind): (readonly [KindId, KindCreation])[] => {
+    const creation = CREATIONS[kind];
+    return creation === null ? [] : [[kind, creation]];
+  },
+);
 
 /** What every kind's canvas decoration reads, together. */
 export type KindDecorationContext = MarkdownResourceDecorationContext &

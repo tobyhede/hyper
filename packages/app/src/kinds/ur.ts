@@ -5,6 +5,7 @@ import type {
   KindDecoration,
   Mutable,
 } from '../canvas-resource-decoration';
+import type { KindCreation } from '../kind-creation';
 
 /** The Ur kind's operations, built by assigning what a gate allows. */
 type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
@@ -38,3 +39,8 @@ export function decorateUrResourceNode(
   }
   return { kindOperations };
 }
+
+/** Create Ur Resource: one press, a Title and nothing else, continuing in its Title (ADR 0113). */
+export const urCreation: KindCreation = {
+  create: ({ createResource }) => createResource(urKind.id),
+};

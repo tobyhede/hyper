@@ -5,6 +5,7 @@ import {
   isKindId,
   isRegisteredKind,
   newResourceDocument,
+  startsEmpty,
   resourceReferences,
   type ResourceDocument,
 } from '../src/kinds/registry';
@@ -35,7 +36,7 @@ const SPACE = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 /** Content of every kind: what each kind starts with, and one of each that references something. */
 const REPRESENTATIVE: readonly ResourceDocument[] = [
-  ...KIND_IDS.flatMap((kind) => newResourceDocument(kind, 'New') ?? []),
+  ...KIND_IDS.filter(startsEmpty).map((kind) => newResourceDocument(kind, 'New')),
   { title: 'Figure', kind: imageKind.id, content: { url: 'https://example.com/a.png' } },
   { title: 'Recap', kind: referenceKind.id, content: { target: TARGET } },
   { title: 'Inner', kind: spaceKind.id, content: { spaceId: SPACE, map: SPACE, graph: SPACE } },

@@ -106,7 +106,6 @@ export function EmbeddedMapAuthoring({
   } = useMapSurface(entry.app, composition, {
     presenting: false,
     spaceOnCanvas: policy === 'authoring' && spaceOnCanvas,
-    creatingSpaceResource: false,
   });
   const state = composition.adapter();
   const space = entry.app.currentSpace();

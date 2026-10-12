@@ -98,7 +98,6 @@ export function surfaceAvailability(
         deleteResource: false,
         present: false,
         addResource: false,
-        createSpaceResource: false,
         createMap: false,
         authorOnCanvas: false,
         authorInEmbeddedMap: false,

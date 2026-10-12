@@ -20,7 +20,6 @@ const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editingChromeTitle: false,
   spaceOnCanvas: true,
   editingEmbeddedMap: false,
-  creatingSpaceResource: false,
 };
 
 const ALL_AVAILABLE: AuthoringAvailability = {
@@ -30,7 +29,6 @@ const ALL_AVAILABLE: AuthoringAvailability = {
   deleteResource: true,
   present: true,
   addResource: true,
-  createSpaceResource: true,
   createMap: true,
   authorOnCanvas: true,
   authorInEmbeddedMap: true,
@@ -81,7 +79,6 @@ describe('authoring availability', () => {
         entityEdits: false,
         deleteResource: false,
         addResource: false,
-        createSpaceResource: false,
         createMap: false,
         authorOnCanvas: false,
         authorInEmbeddedMap: false,
@@ -101,7 +98,6 @@ describe('authoring availability', () => {
         deleteResource: false,
         present: false,
         addResource: false,
-        createSpaceResource: false,
         createMap: false,
       },
     ],
@@ -125,7 +121,6 @@ describe('authoring availability', () => {
         deleteResource: false,
         present: false,
         addResource: false,
-        createSpaceResource: false,
         createMap: false,
         authorOnCanvas: false,
         authorInEmbeddedMap: false,
@@ -147,11 +142,6 @@ describe('authoring availability', () => {
       { editingEmbeddedMap: true },
       { ...ALL_AVAILABLE, authorOnCanvas: false },
     ],
-    [
-      'a Space Resource creation in flight',
-      { creatingSpaceResource: true },
-      { ...ALL_AVAILABLE, createSpaceResource: false },
-    ],
   ])('withdraws what %s takes away', (_what, inProgress, expected) => {
     expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress })).toStrictEqual(
       expected,
@@ -167,16 +157,6 @@ describe('authoring availability', () => {
 
       expect(availability.addResource).toBe(true);
       expect(availability.createMap).toBe(false);
-    });
-
-    it('withholds only Create Space Resource while its coordinated Edit is in flight', () => {
-      const availability = authoringAvailability({
-        ...NOTHING_IN_PROGRESS,
-        creatingSpaceResource: true,
-      });
-
-      expect(availability.createSpaceResource).toBe(false);
-      expect(availability.addResource).toBe(true);
     });
 
     it('withdraws canvas connection while presenting, with every other canvas authoring capability', () => {

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import {
   contentTarget,
+  KIND_IDS,
   spaceReferences,
   titleName,
   type Resource,
@@ -52,7 +53,6 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  VIEW_KIND_IDS,
   kindNaming,
 } from '@project/ui';
 import './resources-popover.css';
@@ -80,14 +80,14 @@ export type ResourcesFilter = Resource['kind'] | 'spaces';
 
 /**
  * Every filter exactly once, in the order they are drawn: each kind's, in the
- * order the kinds' view halves are registered, then `spaces`. The
- * registry types a view half for every kind, so a kind added to `Resource` has
- * a filter, a name and a glyph here before the application compiles.
+ * order the kinds are registered, then `spaces`. The ui registry types a view
+ * half for every kind, so a kind added to `Resource` has a filter, a name and a
+ * glyph here before the application compiles.
  */
-const FILTERS: readonly ResourcesFilter[] = [...VIEW_KIND_IDS, 'spaces'];
+const FILTERS: readonly ResourcesFilter[] = [...KIND_IDS, 'spaces'];
 
 /** The Connect list's filters: an Edge never ends at an unplaced Space. */
-const RESOURCE_FILTERS = VIEW_KIND_IDS;
+const RESOURCE_FILTERS = KIND_IDS;
 
 /**
  * Everything on, because the list's job is to show what is *not* on the canvas

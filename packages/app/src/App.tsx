@@ -158,7 +158,6 @@ export const createApp = (
     const reading = useMapSurface(composition, composition.surface, {
       presenting,
       spaceOnCanvas: active,
-      creatingSpaceResource: placement.creatingSpaceResource,
     });
     const { view, canvasRendering, availability, editingResourceBody, setEditingChromeTitle } =
       reading;

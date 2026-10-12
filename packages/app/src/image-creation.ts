@@ -2,6 +2,7 @@ import type { ImageNaturalSize, MapId, MapPosition } from '@project/core';
 import type { PlacementMode } from '@project/graph';
 import { IMAGE_MEDIA_TYPES, refusalForDeclaredType, type ImageStoring } from '@project/persistence';
 import type { RefusedFile } from './authoring-refusal';
+import type { PickFiles } from './kind-creation';
 import type { SurfaceDrawing } from './map-surface-policy';
 import {
   CANVAS,
@@ -14,8 +15,8 @@ import {
 /**
  * Where an Image Resource's picture comes from, and how big it is (ADR 0106).
  *
- * Both reach outside the process — the host's image store, and the browser
- * loading a picture — so they are supplied once, when Open Spaces is composed,
+ * Each reaches outside the process — the host's image store, the browser
+ * loading a picture, and its file picker — so they are supplied once, when Open Spaces is composed,
  * and a test supplies answers of its own.
  */
 export interface ImageSources {
@@ -23,6 +24,8 @@ export interface ImageSources {
   readonly store: (image: Blob) => Promise<ImageStoring>;
   /** Load the picture at a URL, answering its natural size, or `undefined` when it does not load. */
   readonly measure: (url: string) => Promise<ImageNaturalSize | undefined>;
+  /** Choose image files with the browser's own picker, for Create Image Resource. */
+  readonly pick: PickFiles;
 }
 
 /**

@@ -30,9 +30,8 @@
  *
  * Every Resource creation completes its Edit on activation, so there is no
  * modal creation surface for the rest of the product to stand out of the way
- * of. `creatingSpaceResource` is the one async creation: its coordinated Edit
- * lands one await after the press, and the Space Resource peer is
- * withdrawn for that window rather than swallowing a second press silently.
+ * of. A kind whose Create is withheld for a window of its own says so in its
+ * app half (`kinds/space.ts`), narrowing `addResource` there.
  */
 export interface AuthoringInProgress {
   /**
@@ -107,8 +106,6 @@ export interface AuthoringInProgress {
    * together, where a report through a callback prop would land an effect late.
    */
   readonly editingEmbeddedMap: boolean;
-  /** A Space Resource coordinated Edit is in flight (command-dock issue 23). */
-  readonly creatingSpaceResource: boolean;
 }
 
 /** What each authoring operation answers to the surfaces that offer it. */
@@ -125,8 +122,6 @@ export interface AuthoringAvailability {
   readonly present: boolean;
   /** A Resource may be created — from the toolbar, or by the canvas's own `C`. */
   readonly addResource: boolean;
-  /** The Create Space Resource peer may run — withdrawn while its Edit is in flight. */
-  readonly createSpaceResource: boolean;
   /** A Map may be created. */
   readonly createMap: boolean;
   /** The canvas's Resource controls and the whole Edge lifecycle may run. */
@@ -181,7 +176,6 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     deleteResource: false,
     present: false,
     addResource: false,
-    createSpaceResource: false,
     createMap: false,
     authorOnCanvas: false,
     authorInEmbeddedMap: false,
@@ -204,7 +198,6 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
     editingChromeTitle,
     spaceOnCanvas,
     editingEmbeddedMap,
-    creatingSpaceResource,
   } = inProgress;
 
   /**
@@ -319,17 +312,6 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const addResource = !presenting && !editingResourceBody && !editingChromeTitle;
 
   /**
-   * Create Space Resource reads `addResource` and one term of its own.
-   *
-   * The coordinated Edit is optimistic — the Resource is drawn before the durable
-   * commit settles — but a second press before it installs would reuse the same
-   * title and anchor and replace the first continuation. Add Markdown Resource is
-   * synchronous and stays on `addResource`; only this peer is withdrawn for the
-   * window.
-   */
-  const createSpaceResource = addResource && !creatingSpaceResource;
-
-  /**
    * Add Map needs its naming continuation available as well as Add Resource.
    *
    * Creating a Map selects it, and the created Map is empty — so the
@@ -435,7 +417,6 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
     deleteResource,
     present,
     addResource,
-    createSpaceResource,
     createMap,
     authorOnCanvas,
     authorInEmbeddedMap,

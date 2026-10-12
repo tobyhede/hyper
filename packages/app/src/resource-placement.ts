@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  EmptyCreatableKindId,
   Map as SpaceMap,
   MapId,
   MapPosition,
@@ -29,7 +30,6 @@ import {
   type SettlePlacement,
   type SettleResource,
 } from './resources-drag';
-import type { InputFreeResourceKind } from './space-authoring';
 import { nextSpaceTitle } from './titles';
 import { useVisibleCentre, type VisibleCentreReporting } from './visible-centre';
 
@@ -79,8 +79,8 @@ export interface ResourcePlacementInput {
 }
 
 export interface ResourcePlacementCommands extends VisibleCentreReporting {
-  /** Create a Resource of a kind that takes no input: one completed Edit, then the naming continuation. */
-  readonly createResource: (kind: InputFreeResourceKind) => void;
+  /** Create a Resource of a kind that starts empty: one completed Edit, then the naming continuation. */
+  readonly createResource: (kind: EmptyCreatableKindId) => void;
   /** Place a Resource this Map leaves out, answering a refusal's sentence or `null`. */
   readonly addExistingResource: (
     resourceId: ResourceId,
@@ -96,7 +96,7 @@ export interface ResourcePlacementCommands extends VisibleCentreReporting {
   readonly createSpaceResource: () => void;
   /** Whether a Create Space Resource is between its press and its installed Edit. */
   readonly creatingSpaceResource: boolean;
-  /** Create Image Resource from the files the Dock's picker chose, at the visible centre. */
+  /** Create Image Resources from chosen files, at the visible centre. */
   readonly createImagesFromFiles: (files: readonly File[]) => void;
   /** Image files dropped on the canvas: one Image Resource each, in a row from the drop point. */
   readonly dropImages: (files: readonly File[], anchor: MapPosition) => void;
@@ -292,21 +292,21 @@ export function useResourcePlacement(
   );
 
   /**
-   * Create Resource, for a kind that takes no input: one Edit at the visible
+   * Create Resource, for a kind that starts empty: one Edit at the visible
    * centre, continuing in the new Resource's Title.
    *
    * **The creations whose refusal no surface shows, and that is a decision.**
    * A refusal carries a sentence for the author, worth showing where
    * the author can act on it. These creations take no input at all, cannot
    * refuse against a choice the author made, and leave nothing standing that a
-   * sentence could correct. A kind that grows an input leaves
-   * `InputFreeResourceKind` and grows a surface, and the refusal goes there.
+   * sentence could correct. A kind that takes input creates through a command
+   * of its own, which shows its refusal where the input was given.
    *
    * The toolbar stays available for an empty authored Map: it is the
    * zero-Resource Space's way to create the first Resource.
    */
   const createResource = useCallback(
-    (resourceKind: InputFreeResourceKind) => {
+    (resourceKind: EmptyCreatableKindId) => {
       const created = authoring.complete({
         kind: 'created-resource',
         resourceKind,

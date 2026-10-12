@@ -41,10 +41,7 @@ type KindViews = {
   readonly [K in KindId]: KindView<KindOperationsByKind[K], OwnContentByKind[K]>;
 };
 
-/**
- * The kinds' view halves: the one place in this package each kind is named
- * (ADR 0128). The Resources list offers its filters in this order.
- */
+/** The kinds' view halves: the one place in this package each kind is named (ADR 0128). */
 const KIND_VIEWS: KindViews = {
   [markdownKind.id]: markdownView,
   [imageKind.id]: imageView,
@@ -53,7 +50,7 @@ const KIND_VIEWS: KindViews = {
   [spaceKind.id]: spaceView,
 };
 
-/** Every kind with a view half, in the order the Resources list offers them. */
+/** Every kind with a view half. */
 export const VIEW_KIND_IDS: readonly KindId[] = Object.values(KIND_VIEWS).map(
   (view) => view.bareOperations.kind,
 );
