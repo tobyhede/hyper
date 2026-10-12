@@ -29,11 +29,15 @@ Research against the CodeRabbit documentation (2026-08) and the live configurati
 
 ### Path filters are a sparse checkout
 
-The schema is explicit: path filters "also apply to `git sparse-checkout`". An exclusion therefore removes the file from the context CodeRabbit can read, not just from the review surface. So `AGENTS.md`, `CONTEXT.md`, `docs/` and `.scratch/` must **not** be filtered — they are the review criteria. Only four exclusions, all emitted artifacts that mirror `.prettierignore` and the ESLint `ignores`:
+The schema is explicit: path filters "also apply to `git sparse-checkout`". An exclusion therefore removes the file from the context CodeRabbit can read, not just from the review surface. So `AGENTS.md`, `CONTEXT.md`, `docs/` and `.scratch/` must **not** be filtered — they are the review criteria. Generated contracts and fixture data are excluded; [fixture review scope](fixture-review-scope.md) records the trade-off and the corresponding GitHub settings:
 
 ```
+!packages/app/fixture/**
+!packages/app/example/**
 !src/prisma/contract.json
 !src/prisma/contract.d.ts
+!src/sqlite/contract.json
+!src/sqlite/contract.d.ts
 !migrations/**/*.json
 !migrations/**/*.d.ts
 ```

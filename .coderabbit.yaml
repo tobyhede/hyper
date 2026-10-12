@@ -58,10 +58,12 @@ reviews:
     ignore_title_keywords: ['WIP', 'DO NOT MERGE']
 
   # These drive a sparse checkout, so an exclusion also removes the file from
-  # the context CodeRabbit can read. Exclude only artifacts a tool emits and
-  # nobody edits. Do NOT exclude AGENTS.md, CONTEXT.md, docs/ or .scratch/ —
-  # they are the review criteria.
+  # the context CodeRabbit can read. Exclude generated contracts and fixture
+  # data; fixture builders and tests remain in scope. Keep AGENTS.md,
+  # CONTEXT.md, docs/ and .scratch/ available as review criteria.
   path_filters:
+    - '!packages/app/fixture/**'
+    - '!packages/app/example/**'
     - '!src/prisma/contract.json'
     - '!src/prisma/contract.d.ts'
     - '!src/sqlite/contract.json'

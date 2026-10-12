@@ -1,0 +1,3 @@
+# Collapse fixture data in GitHub diffs. Reviewers can expand it when needed.
+packages/app/fixture/** linguist-generated=true
+packages/app/example/** linguist-generated=true
