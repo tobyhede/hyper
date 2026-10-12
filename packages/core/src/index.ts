@@ -11,3 +11,5 @@ export * from './kinds/kind-module';
 export * from './kinds/ur';
 export * from './kinds/image';
 export * from './kinds/markdown';
+export * from './kinds/reference';
+export { contentTarget, mayBeTarget, resourceReferences } from './kinds/registry';

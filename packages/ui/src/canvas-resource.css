@@ -77,10 +77,6 @@
     background-color var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
 }
 
-.canvas-resource[data-kind='reference'] {
-  border-style: dotted;
-}
-
 /* Hover is not a `data-state` value the adapter computes: it is real
    pointer/focus state, owned here, so `:hover` stands beside the adapter's
    "not resting" states. The adapter's four spatial source handles
@@ -104,14 +100,6 @@
   /* The face rather than the background, so a Shape drawn in place of the
      Resource's own paper takes the same active face. */
   --canvas-resource-face: var(--canvas-resource-active-face);
-}
-
-.canvas-resource[data-kind='reference']:is(
-    :hover,
-    :has(~ .rf-resource-node__authoring-handle:hover),
-    :not([data-state='rest'])
-  ) {
-  border-style: solid;
 }
 
 .canvas-resource[data-state='selected'],

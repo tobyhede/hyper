@@ -30,7 +30,13 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
-import { markdownKind, imageKind, urKind, type Resource } from '@project/core';
+import {
+  type ReferenceKindId,
+  markdownKind,
+  imageKind,
+  urKind,
+  type Resource,
+} from '@project/core';
 
 type ResourceActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
@@ -267,7 +273,7 @@ export const SpaceResourceIcon = SpaceIcon;
  * every record keyed by this type exhaustive and wrong. Derived, the addition lands here, and
  * {@link BASE_GLYPHS} fails to build until the new kind has a silhouette.
  */
-export type ResourceBaseKind = Exclude<Resource['kind'], 'reference'>;
+export type ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>;
 
 /** What every base glyph accepts. */
 interface BaseGlyphProps {

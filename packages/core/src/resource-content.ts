@@ -1,10 +1,11 @@
 import { imageKind, type ImageContent } from './kinds/image';
 import { markdownKind, type MarkdownContent } from './kinds/markdown';
+import type { ReferenceKindId } from './kinds/reference';
 import { urKind, type UrContent } from './kinds/ur';
 import type { Resource } from './types';
 
 /** Whether content is the Resource's own or reached through a Reference Resource (ADR 0070). */
-export type ContentVia = 'self' | 'reference';
+export type ContentVia = 'self' | ReferenceKindId;
 
 type SpaceResource = Extract<Resource, { kind: 'space' }>;
 
@@ -32,7 +33,7 @@ export type ResourceContent =
   | ImageContent
   | { readonly kind: 'space'; readonly view: SpaceView; readonly via: ContentVia }
   | UrContent
-  | { readonly kind: 'unresolved'; readonly via: 'reference' };
+  | { readonly kind: 'unresolved'; readonly via: ReferenceKindId };
 
 export type ContentAction = 'none' | 'edit-markdown' | 'replace-image' | 'author-space-view';
 
@@ -53,7 +54,7 @@ const CONTENT_FACTS = {
 
 /** The operation an author may perform on this content. */
 export function contentAction(content: ResourceContent): ContentAction {
-  return content.via === 'reference' ? 'none' : CONTENT_FACTS[content.kind].action;
+  return content.via !== 'self' ? 'none' : CONTENT_FACTS[content.kind].action;
 }
 
 /** Whether this content draws a Map inside its Resource. */

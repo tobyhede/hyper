@@ -1,7 +1,7 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
-import type { KindModule } from './kind-module';
+import type { ContentOwnerKindModule } from './kind-module';
 
 /** The refusal code for an image URL an Image Resource may not hold; the application owns the wording. */
 export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
@@ -80,10 +80,14 @@ export interface ImageContent {
 export const imageKind = {
   id: 'image',
   contentSchema: imageResourceContentSchema,
-  flags: { takesResourceShape: false, canOpen: true },
+  flags: { takesResourceShape: false, canOpen: true, mayBeTarget: true },
   facts: { action: 'replace-image', embedsMap: false, drawsContentArea: true },
   resolveContent: (content, via) => ({ kind: 'image', url: content.url, via }),
-} as const satisfies KindModule<'image', z.infer<typeof imageResourceContentSchema>, ImageContent>;
+} as const satisfies ContentOwnerKindModule<
+  'image',
+  z.infer<typeof imageResourceContentSchema>,
+  ImageContent
+>;
 
 /** The Image kind's id. */
 export type ImageKindId = typeof imageKind.id;

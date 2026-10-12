@@ -3,6 +3,7 @@ import { Position } from '@xyflow/react';
 import { CLOSED_DISPLAY } from '@project/ui';
 import type { EntityActionGroup, KindOperations, ResourceDisplay } from '@project/ui';
 import {
+  referenceKind,
   markdownKind,
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
@@ -219,7 +220,7 @@ export function bareKindData(kind: Resource['kind']): ResourceKindData {
   switch (kind) {
     case markdownKind.id:
       return { kind, kindOperations: { kind } };
-    case 'reference':
+    case referenceKind.id:
       return { kind, kindOperations: { kind } };
     case imageKind.id:
       return { kind, kindOperations: { kind } };

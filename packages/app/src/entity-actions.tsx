@@ -1,4 +1,11 @@
-import { type Resource, type Graph, type GraphId, type Map, type UUID } from '@project/core';
+import {
+  referenceKind,
+  type Resource,
+  type Graph,
+  type GraphId,
+  type Map,
+  type UUID,
+} from '@project/core';
 import type { ProductDestination } from '@project/http';
 import {
   CopyIcon,
@@ -311,7 +318,7 @@ export function spaceEntityActions({
      * Resource (ADR 0092); a Markdown or Space Resource has no Target to address.
      */
     const targetResourceAddress: readonly EntityAction[] =
-      resource.kind !== 'reference'
+      resource.kind !== referenceKind.id
         ? []
         : [
             copy(

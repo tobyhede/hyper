@@ -1,4 +1,5 @@
 import {
+  referenceKind,
   type MarkdownKindId,
   markdownKind,
   type ResourceDocument,
@@ -1212,8 +1213,8 @@ export function createSpaceAuthoring({
         return refuse({ code: 'resource-kind-immutable' });
       }
       if (
-        resource.document.kind === 'reference' &&
-        completion.document.kind === 'reference' &&
+        resource.document.kind === referenceKind.id &&
+        completion.document.kind === referenceKind.id &&
         resource.document.content.target !== completion.document.content.target
       ) {
         return refuse({ code: 'reference-target-immutable' });
@@ -1323,7 +1324,7 @@ export function createSpaceAuthoring({
       const entered = namedResourceTitle(completion.title ?? '');
       const document: ResourceDocument = {
         title: entered ?? nextResourceTitle(snapshot),
-        kind: 'reference',
+        kind: referenceKind.id,
         content: { target: completion.target },
       };
       const created = createResource(document, completion.anchor, 'avoidingOverlap');

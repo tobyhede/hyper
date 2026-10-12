@@ -1,4 +1,6 @@
 import {
+  mayBeTarget,
+  resourceReferences,
   DEFAULT_RESOURCE_SHAPE,
   resourceOpen,
   resourceShape,
@@ -276,32 +278,34 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
     }
   }
 
+  // Every Resource reference a kind declares resolves, to a kind that may be a
+  // Target, so referencing stays a single hop (ADR 0113, ADR 0128).
   for (const resource of space.resources) {
-    if (resource.kind !== 'reference') continue;
-    if (resource.content.target === resource.id) {
-      errors.push({
-        kind: 'reference-targets-self',
-        ref: resource.id,
-        message: `Reference Resource "${resource.id}" points at itself`,
-      });
-      continue;
-    }
-    const target = resourceById.get(resource.content.target);
-    if (!target) {
-      errors.push({
-        kind: 'unresolved-reference-target',
-        ref: resource.content.target,
-        message: `Reference Resource "${resource.id}" targets missing resource "${resource.content.target}"`,
-      });
-      continue;
-    }
-    if (target.kind === 'reference') {
-      errors.push({
-        kind: 'reference-targets-reference',
-        ref: resource.content.target,
-        message: `Reference Resource "${resource.id}" targets reference "${resource.content.target}"; referencing is a single hop`,
-      });
-      continue;
+    for (const targetId of resourceReferences(resource)) {
+      if (targetId === resource.id) {
+        errors.push({
+          kind: 'reference-targets-self',
+          ref: resource.id,
+          message: `Reference Resource "${resource.id}" points at itself`,
+        });
+        continue;
+      }
+      const target = resourceById.get(targetId);
+      if (!target) {
+        errors.push({
+          kind: 'unresolved-reference-target',
+          ref: targetId,
+          message: `Reference Resource "${resource.id}" targets missing resource "${targetId}"`,
+        });
+        continue;
+      }
+      if (!mayBeTarget(target.kind)) {
+        errors.push({
+          kind: 'reference-targets-reference',
+          ref: targetId,
+          message: `Reference Resource "${resource.id}" targets reference "${targetId}"; referencing is a single hop`,
+        });
+      }
     }
   }
 

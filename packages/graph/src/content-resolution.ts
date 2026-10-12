@@ -1,4 +1,7 @@
 import {
+  contentTarget,
+  mayBeTarget,
+  referenceKind,
   markdownKind,
   imageKind,
   urKind,
@@ -8,11 +11,13 @@ import {
   type UUID,
 } from '@project/core';
 
-/** A Resource that owns its content: every kind but a Reference Resource. */
-type ContentOwner = Exclude<ResourceDocument, { kind: 'reference' }>;
+/** No content: a Resource that is missing, or shows a Target it cannot reach. */
+const UNRESOLVED: ResourceContent = { kind: 'unresolved', via: referenceKind.id };
 
-function ownedContent(resource: ContentOwner, via: ContentVia): ResourceContent {
+function ownedContent(resource: ResourceDocument, via: ContentVia): ResourceContent {
   switch (resource.kind) {
+    case referenceKind.id:
+      return UNRESOLVED;
     case markdownKind.id:
       return markdownKind.resolveContent(resource.content, via);
     case imageKind.id:
@@ -38,11 +43,10 @@ export function resolveDocumentContent(
   document: ResourceDocument | undefined,
   documentOf: (id: UUID) => ResourceDocument | undefined,
 ): ResourceContent {
-  if (document === undefined) return { kind: 'unresolved', via: 'reference' };
-  if (document.kind !== 'reference') return ownedContent(document, 'self');
-  const target = documentOf(document.content.target);
-  if (target === undefined || target.kind === 'reference') {
-    return { kind: 'unresolved', via: 'reference' };
-  }
-  return ownedContent(target, 'reference');
+  if (document === undefined) return UNRESOLVED;
+  const targetId = contentTarget(document);
+  if (targetId === undefined) return ownedContent(document, 'self');
+  const target = documentOf(targetId);
+  if (target === undefined || !mayBeTarget(target.kind)) return UNRESOLVED;
+  return ownedContent(target, referenceKind.id);
 }

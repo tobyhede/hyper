@@ -1,5 +1,11 @@
 import { useCallback } from 'react';
-import { titleName, type Map as SpaceMap, type Resource, type ResourceId } from '@project/core';
+import {
+  referenceKind,
+  titleName,
+  type Map as SpaceMap,
+  type Resource,
+  type ResourceId,
+} from '@project/core';
 import type { Space } from '@project/graph';
 import {
   DeleteIcon,
@@ -64,7 +70,7 @@ export function resourceRailGroups(
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
   const { createReference, removeFromMap, deleteFromSpace, enter } = commands;
-  const terminal = resource.kind === 'reference' ? REFERENCE_TERMINAL : null;
+  const terminal = resource.kind === referenceKind.id ? REFERENCE_TERMINAL : null;
   const reference: readonly EntityActionGroup[] =
     createReference === null
       ? []
@@ -77,7 +83,7 @@ export function resourceRailGroups(
               label: 'Create Reference',
               disabled: terminal !== null,
               description: terminal ?? undefined,
-              icon: <ResourceKindIcon kind="reference" decorative />,
+              icon: <ResourceKindIcon kind={referenceKind.id} decorative />,
               // **No `report`, and that is what closes the menu.** A reporting
               // item is held open to show its word (`EntityActionsMenu`), and
               // this command puts the caret in the new Reference Resource's
