@@ -1,4 +1,4 @@
-import { shortTitle, urKind, type Resource } from '@project/core';
+import { imageKind, markdownKind, shortTitle, urKind, type Resource } from '@project/core';
 import {
   deletionReach,
   graphColorsByGraphId,
@@ -33,9 +33,9 @@ const DELETES_THE_RESOURCE =
  * it, so its deletion can reach Spaces that are not on screen (ADR 0074).
  */
 const DELETION_DESCRIPTIONS = {
-  markdown: DELETES_THE_RESOURCE,
+  [markdownKind.id]: DELETES_THE_RESOURCE,
   reference: DELETES_THE_RESOURCE,
-  image: DELETES_THE_RESOURCE,
+  [imageKind.id]: DELETES_THE_RESOURCE,
   [urKind.id]: DELETES_THE_RESOURCE,
   space: `${DELETES_THE_RESOURCE} If it is the last reference to its Space, that Space is deleted with it, along with every Space below it that nothing else references.`,
 } satisfies Record<Resource['kind'], string>;

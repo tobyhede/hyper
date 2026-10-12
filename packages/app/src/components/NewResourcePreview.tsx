@@ -1,3 +1,4 @@
+import { markdownKind } from '@project/core';
 import { ViewportPortal, useConnection } from '@xyflow/react';
 import { CanvasResource, CLOSED_DISPLAY } from '@project/ui';
 import { RESOURCE_SIZE } from '../resource';
@@ -74,7 +75,7 @@ export function NewResourcePreview({
         }}
       >
         <CanvasResource
-          kindOperations={{ kind: 'markdown' }}
+          kindOperations={{ kind: markdownKind.id }}
           display={CLOSED_DISPLAY}
           state="rest"
           title={title}

@@ -8,7 +8,7 @@ import { lineAt, maskedCssSource, maskedTsSource, trackedFiles } from '../suppor
  * `kinds/` directory; everything else reaches it through the module's exports.
  * A kind joins this list in the change that moves it.
  */
-const MOVED_KINDS = ['ur', 'image'] as const;
+const MOVED_KINDS = ['ur', 'image', 'markdown'] as const;
 
 /** Source the application, the hosts and the CLI are built from; tests and stories are not. */
 const isScannedSource = (file: string): boolean =>

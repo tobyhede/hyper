@@ -1,6 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import {
+  markdownKind,
   SPACE_FILE_VERSION,
   type GraphEdge,
   imageResourceContentSchema,
@@ -149,11 +150,11 @@ const canonicalResource = (
       };
     case urKind.id:
       return { id, title, kind: urKind.id, content: {} };
-    case 'markdown':
+    case markdownKind.id:
       return {
         id,
         title,
-        kind: 'markdown',
+        kind: markdownKind.id,
         content: { source: document.content.source.replace(/\r\n?/g, '\n') },
       };
   }

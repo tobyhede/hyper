@@ -1,5 +1,7 @@
 import type { Continuation } from './continuation';
 import {
+  type MarkdownKindId,
+  markdownKind,
   takesOpen,
   type GraphId,
   type ResourceDocument,
@@ -37,11 +39,11 @@ import { RESOURCE_SIZE } from './resource';
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /** Each kind's operations and decoration, built by assigning what a gate allows. */
-type MarkdownOperations = Mutable<KindOperationsOf<'markdown'>>;
+type MarkdownOperations = Mutable<KindOperationsOf<MarkdownKindId>>;
 type ImageOperations = Mutable<KindOperationsOf<ImageKindId>>;
 type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
 type SpaceOperations = Mutable<KindOperationsOf<'space'>>;
-type MarkdownDecoration = Mutable<KindDecoration<'markdown'>>;
+type MarkdownDecoration = Mutable<KindDecoration<MarkdownKindId>>;
 type ImageDecoration = Mutable<KindDecoration<ImageKindId>>;
 type SpaceDecoration = Mutable<KindDecoration<'space'>>;
 
@@ -287,10 +289,10 @@ export function decorateSharedResourceNode(
 }
 
 export function decorateMarkdownResourceNode(
-  node: ResourceFlowNodeOf<'markdown'>,
+  node: ResourceFlowNodeOf<MarkdownKindId>,
   context: MarkdownResourceDecorationContext,
-): KindDecoration<'markdown'> {
-  const kindOperations: MarkdownOperations = { kind: 'markdown' };
+): KindDecoration<MarkdownKindId> {
+  const kindOperations: MarkdownOperations = { kind: markdownKind.id };
   const decoration: MarkdownDecoration = { kindOperations };
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (

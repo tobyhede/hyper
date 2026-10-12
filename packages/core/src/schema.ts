@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
 import { imageKind, imageNaturalSizeSchema, imageResourceContentSchema } from './kinds/image';
+import { markdownKind, markdownResourceContentSchema } from './kinds/markdown';
 import { kindFlags } from './kinds/registry';
 import { urKind } from './kinds/ur';
 import { RESOURCE_TITLE_REQUIRED, normalizeTitle } from './title';
@@ -73,7 +74,7 @@ const resourceTitleSchema = z
 export const markdownResourceFrontmatterSchema = z.object({
   id: idSchema,
   title: resourceTitleSchema,
-  kind: z.literal('markdown'),
+  kind: z.literal(markdownKind.id),
 });
 
 /** A Reference Resource's content: a pointer to the resource whose content it shows. */
@@ -228,9 +229,6 @@ export const importResourceFrontmatterSchema = z.preprocess(
     importUrResourceFrontmatterSchema,
   ]),
 );
-
-/** A Markdown Resource's content: the source its author wrote, which its file holds as the body. */
-export const markdownResourceContentSchema = z.object({ source: z.string() });
 
 /** An Ur Resource's content, which is nothing (ADR 0113). */
 export const urResourceContentSchema = urKind.contentSchema;

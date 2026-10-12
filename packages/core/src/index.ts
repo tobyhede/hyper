@@ -10,3 +10,4 @@ export * from './resource-content';
 export * from './kinds/kind-module';
 export * from './kinds/ur';
 export * from './kinds/image';
+export * from './kinds/markdown';

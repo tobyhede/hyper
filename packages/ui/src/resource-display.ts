@@ -1,4 +1,6 @@
 import {
+  type MarkdownKindId,
+  markdownKind,
   contentAction,
   imageKind,
   type ContentVia,
@@ -10,7 +12,7 @@ import type { ImageReplaceEditor } from './ImageReplaceTarget';
 import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
 
 /** A Resource's own content of one kind: never a Target's, reached by reference. */
-export type OwnContent<K extends 'markdown' | ImageKindId> = Extract<
+export type OwnContent<K extends MarkdownKindId | ImageKindId> = Extract<
   ResourceContent,
   { readonly kind: K }
 > & { readonly via: 'self' };
@@ -31,7 +33,7 @@ export type ResourceDisplay =
   | { readonly shown: 'open'; readonly content: ResourceContent }
   | {
       readonly shown: 'editing';
-      readonly content: OwnContent<'markdown'>;
+      readonly content: OwnContent<MarkdownKindId>;
       readonly editor: MarkdownResourceBodyEditor;
       /** Whether the editor takes focus when it is drawn. */
       readonly autoFocus: boolean;
@@ -59,7 +61,8 @@ export function beginEditing<D extends ResourceDisplay>(
 ): D | Extract<ResourceDisplay, { readonly shown: 'editing' }> {
   if (display.shown !== 'open') return display;
   const content = display.content;
-  if (contentAction(content) !== 'edit-markdown' || content.kind !== 'markdown') return display;
+  if (contentAction(content) !== 'edit-markdown' || content.kind !== markdownKind.id)
+    return display;
   return {
     shown: 'editing',
     content: { ...content, via: 'self' },

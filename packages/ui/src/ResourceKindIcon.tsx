@@ -1,5 +1,6 @@
-import { imageKind, urKind, type Resource } from '@project/core';
+import { markdownKind, imageKind, urKind, type Resource } from '@project/core';
 import { imageView } from './kinds/image';
+import { markdownView } from './kinds/markdown';
 import { urView } from './kinds/ur';
 import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
 
@@ -17,7 +18,7 @@ import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
  */
 
 const KIND_NAMES = {
-  markdown: 'Markdown Resource',
+  [markdownKind.id]: markdownView.name,
   reference: 'Reference Resource',
   space: 'Space Resource',
   [imageKind.id]: imageView.name,
@@ -30,7 +31,7 @@ const KIND_NAMES = {
  * two draw differently and announce identically.
  */
 const REFERENCE_NAMES = {
-  markdown: 'Reference to a Markdown Resource',
+  [markdownKind.id]: markdownView.referenceName,
   space: 'Reference to a Space Resource',
   [imageKind.id]: imageView.referenceName,
   [urKind.id]: urView.referenceName,
@@ -91,7 +92,8 @@ function KindGlyph({ kind, referenceOf, size }: ResourceKindIconProps) {
   // default by destructuring, and a destructuring default is what `undefined`
   // selects — so passing it through preserves omission rather than overriding
   // it, and no conditional spread is needed to say so.
-  if (kind === 'reference') return <ReferenceIcon base={referenceOf ?? 'markdown'} size={size} />;
+  if (kind === 'reference')
+    return <ReferenceIcon base={referenceOf ?? markdownKind.id} size={size} />;
   const Base = BASE_GLYPHS[kind];
   return <Base size={size} />;
 }
