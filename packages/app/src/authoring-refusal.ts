@@ -125,7 +125,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
     case 'reference-target-not-found':
       return 'That Target is no longer part of the Space.';
     case 'reference-target-must-own-content':
-      return 'A Reference Resource cannot target another Reference Resource.';
+      return 'That Resource cannot be a Target: referencing is a single hop.';
     case 'resource-already-in-map':
       return 'This Resource is already in this Map.';
     case 'resource-not-in-map':

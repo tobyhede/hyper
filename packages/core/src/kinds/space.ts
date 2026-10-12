@@ -70,8 +70,8 @@ export interface SpaceContent {
   readonly via: ContentVia;
 }
 
-/** What the Space kind's own check reads of a Space Resource's target Space. */
-export interface SpaceResourceTarget {
+/** What a Space Resource's selection is checked against: the Space kind's own check's reading of its target Space. */
+export interface SpaceSelectionTarget {
   /** The ids of the Graphs a Map of the target owns, or `undefined` when it has no such Map. */
   readonly mapGraphIds: (mapId: UUID) => readonly UUID[] | undefined;
   /** Whether the target has a Graph with this id. */
@@ -97,7 +97,7 @@ export type SpaceSelectionProblem =
  */
 const selectionProblem = (
   content: SpaceResourceContent,
-  target: SpaceResourceTarget,
+  target: SpaceSelectionTarget,
 ): SpaceSelectionProblem | undefined => {
   const graphIds = target.mapGraphIds(content.map);
   if (graphIds === undefined) return { kind: 'space-resource-map-missing', mapId: content.map };

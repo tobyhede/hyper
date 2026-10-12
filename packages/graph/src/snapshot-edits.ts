@@ -47,9 +47,9 @@ export type SnapshotEditRefusal =
   | { readonly code: 'map-not-found' }
   | { readonly code: 'resource-not-in-map' }
   | { readonly code: 'resource-already-in-map' }
-  /** A Reference Resource created with a Target the Space does not hold. */
+  /** A Resource created referencing a Resource the Space does not hold. */
   | { readonly code: 'reference-target-not-found'; readonly targetId: UUID }
-  /** A Reference Resource created with a Target that is itself a Reference Resource. */
+  /** A Resource created referencing a Resource whose kind may not be a Target. */
   | { readonly code: 'reference-target-must-own-content'; readonly targetId: UUID }
   /** An Open of a Resource with no content to show: an Ur Resource is always Closed. */
   | { readonly code: 'open-requires-content' }
@@ -57,7 +57,7 @@ export type SnapshotEditRefusal =
   | { readonly code: 'shape-requires-ur-resource' }
   | {
       readonly code: 'resource-has-references';
-      /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
+      /** The referencing Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
       readonly referenceTitles: readonly string[];
     };
 
@@ -118,10 +118,10 @@ const freeAnchor = (placement: Placement, anchor: MapPosition): MapPosition => {
  * lands (ADR 0089, {@link freeAnchor}). `exact` keeps the aimed point, for a
  * caller with one to aim — create-and-connect's drop point.
  *
- * A Reference Resource is refused `reference-target-not-found` for a Target
- * the snapshot does not hold, and `reference-target-must-own-content` for a
- * Target that is itself a Reference Resource: resolution ends after one hop
- * (ADR 0070). The same rule intake enforces, asked here so an author choosing
+ * A Resource whose kind declares Resource references is refused
+ * `reference-target-not-found` for one the snapshot does not hold, and
+ * `reference-target-must-own-content` for one whose kind may not be a Target:
+ * resolution ends after one hop (ADR 0070, ADR 0113). The same rule intake enforces, asked here so an author choosing
  * the wrong Target meets a refusal rather than an unloadable Space, and the
  * creation half of the rule {@link deleteFromSpace}'s `resource-has-references`
  * enforces from the other side.
@@ -180,10 +180,10 @@ const withoutIncidentEdges = (graphs: readonly Graph[], resourceId: UUID): Graph
  * `defaultMap`, `activeGraph` and every title are untouched.
  *
  * Refuses `resource-not-found` for an id the Space does not hold, and
- * `resource-has-references` — naming every Reference Resource by title — for a Resource a Reference Resource in
- * this Space still targets: a Reference Resource whose Target vanished is not a Resource
- * intake accepts (ADR 0070), so the Space must not lose one out from under its
- * Reference Resources.
+ * `resource-has-references` — naming by title every Resource in this Space
+ * that still references it: a Resource whose declared reference is missing is
+ * not one intake accepts (ADR 0070), so the Space must not lose one out from
+ * under the Resources that reference it.
  */
 function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEditOutcome {
   if (!snapshot.resources.some((resource) => resource.id === resourceId)) {

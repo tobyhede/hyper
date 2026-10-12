@@ -680,6 +680,22 @@ describe.each([
       );
     });
 
+    /** The loop reads every kind's declared Resource references, so its sentences name no kind (ADR 0128). */
+    it('describes a declared Resource reference it refuses without naming a kind', () => {
+      const messages = [
+        refused(load({ resources: [referenceTo(A, A)], maps: [] })),
+        refused(load({ resources: [referenceTo(A, ABSENT)], maps: [] })),
+        refused(
+          load({ resources: [markdown(C, 'C'), referenceTo(B, C), referenceTo(A, B)], maps: [] }),
+        ),
+      ].flatMap((errors) => errors.map(({ message }) => message));
+      expect(messages).toEqual([
+        `Resource "${A}" references itself`,
+        `Resource "${A}" references missing resource "${ABSENT}"`,
+        `Resource "${A}" references "${B}", whose kind may not be a Target; referencing is a single hop`,
+      ]);
+    });
+
     it('accepts a reference resource whose target is an Ur Resource (ADR 0113)', () => {
       const ur: Resource = { id: A, title: 'Node', kind: 'ur', content: {} };
       expect(load({ resources: [ur, referenceTo(B, A)], maps: [] }).ok).toBe(true);

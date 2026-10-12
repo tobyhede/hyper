@@ -287,7 +287,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         errors.push({
           kind: 'reference-targets-self',
           ref: resource.id,
-          message: `Reference Resource "${resource.id}" points at itself`,
+          message: `Resource "${resource.id}" references itself`,
         });
         continue;
       }
@@ -296,7 +296,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         errors.push({
           kind: 'unresolved-reference-target',
           ref: targetId,
-          message: `Reference Resource "${resource.id}" targets missing resource "${targetId}"`,
+          message: `Resource "${resource.id}" references missing resource "${targetId}"`,
         });
         continue;
       }
@@ -304,7 +304,7 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         errors.push({
           kind: 'reference-targets-reference',
           ref: targetId,
-          message: `Reference Resource "${resource.id}" targets reference "${targetId}"; referencing is a single hop`,
+          message: `Resource "${resource.id}" references "${targetId}", whose kind may not be a Target; referencing is a single hop`,
         });
       }
     }

@@ -21,6 +21,19 @@ The enforcement is an import ban: outside `kinds/`, no file may import a name a 
 - **The Space selection** (candidate F): `sql-space-repository.ts` and `space-resource-planning.ts` compare a Space Resource's `spaceId`, `map` and `graph` by kind. Ticket 06 left this unbuilt; the kind scan and the import ban now give it as the reason.
 - **Decoration contexts**: the app registry intersects every kind's decoration context. Each kind's context type now sits in its own app module, but the registry still lists them.
 
+## Latent faults in the declared-reference rules
+
+The code reviews of #362 and #363 found six places where the generic rules still assume the one kind that declares each reference today. Each bites only when a second kind declares references or sets the flags; they are fixed together in the follow-up to this stack, each with a test: a red one where a registered kind could reach the fault, a guard where only a second kind could.
+
+- Space deletion recovery checked only lifetime references (`space-resource-planning.ts`), while intake refuses any declared Space reference whose target is missing.
+- Live Space targets were filtered by `spaceKind.id` (`space-resource-targets.ts`), while subscriptions come from the declared references.
+- Intake's generic reference errors said "Reference Resource" and "targets reference" (`validate.ts`, `snapshot-edits.ts`).
+- Nothing held a kind's `contentTarget` to be one of its declared `resourceReferences`.
+- `NOT_THE_KIND` counted quoted `'space'` per file, so swapping a non-kind `'space'` for a kind-naming one passed.
+- The Reference frame's border rule, moved into its kind's stylesheet, won the cascade over equal-specificity rules it used to lose to.
+
+The review of #363 added three: the core's `SpaceResourceTarget` shared a name with an unrelated app type (now `SpaceSelectionTarget`), `SpaceAggregateError` restated the Space kind's selection problems instead of using them, and the Space kind's selection check and Space references had no core tests. The author-facing `resource-has-references` sentence in `packages/app/src/authoring-refusal.ts` still says "Reference Resources"; it is left, because only the Reference kind declares Resource references today.
+
 ## Candidates (from the 2026-10-11 architecture review of the stack)
 
 Each is grilled with Toby before it is built; candidate A became ticket 09.
