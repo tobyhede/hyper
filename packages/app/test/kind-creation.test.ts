@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { KIND_IDS, type EmptyCreatableKindId } from '@project/core';
 import { PICKED_IMAGE_TYPES } from '../src/image-creation';
-import { dockCreates, type CreationCommands, type DockCreate } from '../src/kind-creation';
-import { KIND_CREATIONS } from '../src/kinds/registry';
+import { dockCreates, type DockCreate } from '../src/kind-creation';
+import { KIND_CREATIONS, type KindCreationContext } from '../src/kinds/registry';
 
 /** Commands that record what a Create ran, picking `chosen` when a picker is opened. */
 const recording = (
   facts: { readonly creatingSpaceResource?: boolean; readonly chosen?: readonly File[] } = {},
 ) => {
   const ran: string[] = [];
-  const commands: CreationCommands = {
+  const commands: KindCreationContext = {
     createResource: (kind: EmptyCreatableKindId) => ran.push(`resource:${kind}`),
     createSpaceResource: () => ran.push('space-resource'),
     creatingSpaceResource: facts.creatingSpaceResource ?? false,
@@ -22,7 +22,7 @@ const recording = (
   return { ran, commands };
 };
 
-const creates = (commands: CreationCommands, addResource = true): readonly DockCreate[] =>
+const creates = (commands: KindCreationContext, addResource = true): readonly DockCreate[] =>
   dockCreates(KIND_CREATIONS, commands, addResource);
 
 const createOf = (all: readonly DockCreate[], kind: string): DockCreate => {

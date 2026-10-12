@@ -33,11 +33,11 @@ Built.
 - `startsEmpty` answers the same question at runtime.
 
 **App.**
-- `packages/app/src/kind-creation.ts` declares `KindCreation` (`create`, and optionally `withheld`) and `dockCreates`, which applies Add Resource's answer once.
+- `packages/app/src/kind-creation.ts` declares `KindCreation<Context>` (`create`, and optionally `withheld`) and `dockCreates`, which applies Add Resource's answer once. Each kind declares the context its Create reads in its own app half, and the registry intersects them as `KindCreationContext`, as it does the decoration contexts.
 - Each kind's app half exports its Create: `markdownCreation`, `spaceCreation`, `imageCreation` and `urCreation`.
 - `kinds/registry.ts` lists them in a record over every kind, where Reference is `null` because it is created from its Target. So a new kind does not compile until it says how it is created.
 - `KIND_CREATIONS` takes the registry's order.
-- `ImageSources.pick` is the browser picker (`browser-file-picker.ts`), and the composition exposes it as `pickFiles`.
+- `ImageSources.pick` is the browser picker (`browser-file-picker.ts`), and the composition exposes it as `pickFiles`. A browser that fires no `cancel` leaves a picker unsettled; the next picker closes it, so at most one input is attached.
 
 **Removed:**
 

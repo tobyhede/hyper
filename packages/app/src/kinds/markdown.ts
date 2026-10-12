@@ -7,6 +7,7 @@ import type {
   Mutable,
 } from '../canvas-resource-decoration';
 import type { KindCreation } from '../kind-creation';
+import type { ResourcePlacementCommands } from '../resource-placement';
 
 /** The Markdown kind's operations and decoration, built by assigning what a gate allows. */
 type MarkdownOperations = Mutable<KindOperationsOf<MarkdownKindId>>;
@@ -58,7 +59,9 @@ export function decorateMarkdownResourceNode(
   return decoration;
 }
 
+export type MarkdownCreationContext = Pick<ResourcePlacementCommands, 'createResource'>;
+
 /** Create Markdown Resource: one press, an empty body, continuing in its Title. */
-export const markdownCreation: KindCreation = {
+export const markdownCreation: KindCreation<MarkdownCreationContext> = {
   create: ({ createResource }) => createResource(markdownKind.id),
 };

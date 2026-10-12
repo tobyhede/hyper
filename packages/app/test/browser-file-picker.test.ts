@@ -44,4 +44,15 @@ describe("the browser's file picker", () => {
     expect(await picking).toEqual([]);
     expect(document.querySelector('input[type="file"]')).toBeNull();
   });
+
+  it('closes a picker that never settled when the next one opens', () => {
+    void pickFilesInBrowser(document)('image/png');
+    void pickFilesInBrowser(document)('image/jpeg');
+
+    const open = document.querySelectorAll('input[type="file"]');
+    expect([...open].map((input) => input instanceof HTMLInputElement && input.accept)).toEqual([
+      'image/jpeg',
+    ]);
+    openInput().dispatchEvent(new Event('cancel'));
+  });
 });

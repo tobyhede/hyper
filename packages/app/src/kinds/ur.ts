@@ -6,6 +6,7 @@ import type {
   Mutable,
 } from '../canvas-resource-decoration';
 import type { KindCreation } from '../kind-creation';
+import type { ResourcePlacementCommands } from '../resource-placement';
 
 /** The Ur kind's operations, built by assigning what a gate allows. */
 type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
@@ -40,7 +41,9 @@ export function decorateUrResourceNode(
   return { kindOperations };
 }
 
+export type UrCreationContext = Pick<ResourcePlacementCommands, 'createResource'>;
+
 /** Create Ur Resource: one press, a Title and nothing else, continuing in its Title (ADR 0113). */
-export const urCreation: KindCreation = {
+export const urCreation: KindCreation<UrCreationContext> = {
   create: ({ createResource }) => createResource(urKind.id),
 };

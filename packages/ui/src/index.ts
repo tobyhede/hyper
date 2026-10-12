@@ -78,7 +78,7 @@ export type {
 } from './ChoiceMenu';
 export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
 export { BADGED_TARGET_GLYPH } from './kinds/kind-view';
-export { bareOperations, kindNaming, VIEW_KIND_IDS } from './kinds/registry';
+export { bareOperations, kindNaming } from './kinds/registry';
 export type { KindNaming, KindOperationsByKind } from './kinds/registry';
 export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';

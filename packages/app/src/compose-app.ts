@@ -138,12 +138,12 @@ export interface ComposedApp extends AppCore {
     origin: ImageOrigin,
     target: ImageTarget,
   ) => Promise<ImageEditResult>;
+  /** The browser's file picker this Space's image sources choose with. */
+  readonly pickFiles: PickFiles;
   /**
    * This Space's image replacements: the one way to replace an Image
    * Resource's picture, and its busy state.
    */
-  /** The browser's file picker this Space's image sources choose with. */
-  readonly pickFiles: PickFiles;
   readonly imageReplacement: ImageReplacements;
   readonly authoring: SpaceAuthoring;
   readonly adapter: RenderAdapter;

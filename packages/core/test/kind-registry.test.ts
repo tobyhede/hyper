@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   KIND_IDS,
   contentTarget,
@@ -7,6 +7,7 @@ import {
   newResourceDocument,
   startsEmpty,
   resourceReferences,
+  type EmptyCreatableKindId,
   type ResourceDocument,
 } from '../src/kinds/registry';
 import { uuidSchema } from '../src/schema';
@@ -81,5 +82,21 @@ describe('a kind id', () => {
     'café',
   ])('refuses %j', (id) => {
     expect(isKindId(id)).toBe(false);
+  });
+});
+
+/**
+ * The kinds a press may create empty, written out once, so the type the
+ * modules' declarations derive and the runtime answer are held to the same list.
+ */
+const STARTS_EMPTY = ['markdown', 'ur'] as const;
+
+describe('the kinds a Resource may be created empty as', () => {
+  it('are typed as exactly the kinds whose module declares new content', () => {
+    expectTypeOf<EmptyCreatableKindId>().toEqualTypeOf<(typeof STARTS_EMPTY)[number]>();
+  });
+
+  it('are answered at runtime as the same kinds', () => {
+    expect(KIND_IDS.filter(startsEmpty)).toEqual(STARTS_EMPTY);
   });
 });

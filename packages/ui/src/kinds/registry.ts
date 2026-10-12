@@ -50,11 +50,6 @@ const KIND_VIEWS: KindViews = {
   [spaceKind.id]: spaceView,
 };
 
-/** Every kind with a view half. */
-export const VIEW_KIND_IDS: readonly KindId[] = Object.values(KIND_VIEWS).map(
-  (view) => view.bareOperations.kind,
-);
-
 /** What a kind's Resources are called and drawn as. */
 export type KindNaming = Pick<KindView<unknown>, 'name' | 'listName' | 'referenceName' | 'Glyph'>;
 

@@ -7,7 +7,8 @@ import type {
   Mutable,
 } from '../canvas-resource-decoration';
 import { PICKED_IMAGE_TYPES } from '../image-creation';
-import type { KindCreation } from '../kind-creation';
+import type { KindCreation, PickFiles } from '../kind-creation';
+import type { ResourcePlacementCommands } from '../resource-placement';
 
 /** The Image kind's operations and decoration, built by assigning what a gate allows. */
 type ImageOperations = Mutable<KindOperationsOf<ImageKindId>>;
@@ -64,12 +65,16 @@ export function decorateImageResourceNode(
   return decoration;
 }
 
+export type ImageCreationContext = Pick<ResourcePlacementCommands, 'createImagesFromFiles'> & {
+  readonly pickFiles: PickFiles;
+};
+
 /**
  * Create Image Resource: the press opens the browser's file picker, and the
  * files chosen there are created at the visible centre; a cancelled picker
  * creates nothing (ADR 0106).
  */
-export const imageCreation: KindCreation = {
+export const imageCreation: KindCreation<ImageCreationContext> = {
   create: ({ pickFiles, createImagesFromFiles }) => {
     void pickFiles(PICKED_IMAGE_TYPES).then(createImagesFromFiles);
   },

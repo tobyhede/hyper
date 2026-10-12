@@ -17,6 +17,7 @@ import type { CommandOutcomes } from '../command-outcomes';
 import type { Continuation } from '../continuation';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { KindCreation } from '../kind-creation';
+import type { ResourcePlacementCommands } from '../resource-placement';
 import type { OpenSpaces } from '../open-spaces';
 import type { SpaceResourceRailContext } from '../space-resource-context-commands';
 import type { SpaceResourceTargetMap } from '../space-resource-lifecycle';
@@ -115,12 +116,17 @@ export function decorateSpaceResourceNode(
   return decoration;
 }
 
+export type SpaceCreationContext = Pick<
+  ResourcePlacementCommands,
+  'createSpaceResource' | 'creatingSpaceResource'
+>;
+
 /**
  * Create Space Resource: one press, one Resource, one new Space (ADR 0074).
  * Its coordinated Edit lands one await after the press, so it is withheld
  * for that window rather than swallowing a second press silently.
  */
-export const spaceCreation: KindCreation = {
+export const spaceCreation: KindCreation<SpaceCreationContext> = {
   withheld: ({ creatingSpaceResource }) => creatingSpaceResource,
   create: ({ createSpaceResource }) => createSpaceResource(),
 };
