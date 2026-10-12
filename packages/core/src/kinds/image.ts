@@ -1,7 +1,7 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
-import type { ContentOwnerKindModule } from './kind-module';
+import { defineKind } from './kind-module';
 
 /** The refusal code for an image URL an Image Resource may not hold; the application owns the wording. */
 export const IMAGE_URL_UNSUPPORTED = 'image-url-unsupported';
@@ -77,7 +77,7 @@ export interface ImageContent {
  * The Image kind (ADR 0106): a content kind whose content is a picture shown
  * from its URL. Its content action is Replace.
  */
-export const imageKind = {
+export const imageKind = defineKind({
   id: 'image',
   contentSchema: imageResourceContentSchema,
   flags: {
@@ -87,12 +87,8 @@ export const imageKind = {
     ownsReferencedSpaces: false,
   },
   facts: { action: 'replace-image', embedsMap: false, drawsContentArea: true },
-  resolveContent: (content, via) => ({ kind: 'image', url: content.url, via }),
-} as const satisfies ContentOwnerKindModule<
-  'image',
-  z.infer<typeof imageResourceContentSchema>,
-  ImageContent
->;
+  resolveContent: (content, via): ImageContent => ({ kind: 'image', url: content.url, via }),
+});
 
 /** The Image kind's id. */
 export type ImageKindId = typeof imageKind.id;

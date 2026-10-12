@@ -503,5 +503,5 @@ export interface DockResources {
    */
   readonly onCreate: (creation: DockCreation) => void;
   /** Whether each Create peer may run — the kinds withdraw independently when in flight. */
-  readonly createDisabled: Readonly<Record<DockResourceKind, boolean>>;
+  readonly createDisabled: (kind: DockResourceKind) => boolean;
 }

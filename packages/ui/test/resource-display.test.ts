@@ -1,14 +1,10 @@
 import fc from 'fast-check';
 import { uuidSchema, type ResourceContent, type SpaceView } from '@project/core';
 import { describe, expect, it } from 'vitest';
-import {
-  atRest,
-  beginEditing,
-  beginReplacing,
-  CLOSED_DISPLAY,
-  spaceViewOf,
-  type ResourceDisplay,
-} from '../src/resource-display';
+import { atRest, CLOSED_DISPLAY, type ResourceDisplay } from '../src/resource-display';
+import { beginReplacing } from '../src/kinds/image';
+import { beginEditing } from '../src/kinds/markdown';
+import { spaceViewOf } from '../src/kinds/space';
 import type { CanvasResourceBodyEditor } from '../src/CanvasResource';
 import type { ImageReplaceEditor } from '../src/ImageReplaceTarget';
 

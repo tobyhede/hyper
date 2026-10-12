@@ -1,44 +1,34 @@
 import {
   useCallback,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type ReactNode,
 } from 'react';
 import {
-  type SpaceKindId,
-  spaceKind,
-  referenceKind,
-  markdownKind,
   COLLAPSED_RESOURCE_SIZE,
   DEFAULT_RESOURCE_SHAPE,
   contentAction,
   drawsContentArea,
-  imageKind,
   takesResourceShape,
   titleLines,
   titleName,
-  type ContentVia,
   type ResourceContent,
   type ResourceShape,
-  type UrContent,
-  urKind,
 } from '@project/core';
 import { Button } from './Button';
-import { isImageOperations, type ImageOperations } from './kinds/image';
-import type { MarkdownOperations } from './kinds/markdown';
-import type { ReferenceOperations } from './kinds/reference';
-import type { SpaceOperations } from './kinds/space';
-import { isUrOperations, type UrOperations } from './kinds/ur';
+import { isImageOperations } from './kinds/image';
+import { canvasContent, type KindOperations } from './kinds/registry';
+import { isSpaceOperations } from './kinds/space';
+import { isUrOperations } from './kinds/ur';
 import {
   ResourceRailAction,
   ResourceRailActions,
   ResourceRailKindActions,
   ResourceRailSharedActions,
 } from './ResourceRailActions';
-import { ResourceContentEditProvider, type ResourceContentEdit } from './resource-content-edit';
+import type { ResourceContentEdit } from './resource-content-edit';
 import { EntityActions, EntityActionsTrigger, type EntityActionGroup } from './EntityActionsMenu';
 import { ResourceRail, ResourceRailKind } from './ResourceRail';
 import { ResourceShapeMenu } from './ResourceShapeMenu';
@@ -52,19 +42,13 @@ import {
   OpenResourceIcon,
   ReplaceImageIcon,
 } from './icons';
-import {
-  MarkdownResourceBody,
-  type MarkdownResourceBodyEditor,
-  type MarkdownResourceBodyProps,
-} from './MarkdownResourceBody';
+import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
 import './canvas-resource.css';
 import './kinds/reference-canvas.css';
 import './kinds/space-canvas.css';
 import './kinds/ur-canvas.css';
 import { usePresence } from './use-presence';
 import { InlineTitleEditor } from './InlineTitleEditor';
-import { ResourceImage } from './ResourceImage';
-import { ImageReplaceTarget } from './ImageReplaceTarget';
 import { UnresolvedContent } from './UnresolvedContent';
 import { atRest, type ResourceDisplay } from './resource-display';
 import {
@@ -74,21 +58,7 @@ import {
   type ResourceShapeOutline,
 } from './resource-shape-outline';
 
-/**
- * What a Resource's kind offers beyond its shared Title (ADR 0051): a kind-owned
- * choice of operations, not a kind tag plus an optional field every other kind
- * ignores. Opening and Closing are every Resource's and are not here; what it
- * draws, and whether it is Open, is the display's.
- */
-export type KindOperations =
-  MarkdownOperations | ReferenceOperations | ImageOperations | UrOperations | SpaceOperations;
-
-/**
- * What the content area below the Title draws. A Space Resource's content is
- * its embedded Map, which the canvas draws as sibling nodes, and an Ur
- * Resource has no content, so neither has an arm.
- */
-type AreaContent = Exclude<ResourceContent, { readonly kind: SpaceKindId } | UrContent>;
+export type { KindOperations } from './kinds/registry';
 
 /** The two authored operations that end a live Markdown body edit. */
 export type CanvasResourceBodyEditor = MarkdownResourceBodyEditor;
@@ -214,7 +184,6 @@ type CanvasResourceStyle = CSSProperties & {
   readonly '--canvas-resource-shape-inset-inline': string;
   readonly '--canvas-resource-shape-inset-block': string;
 };
-type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /**
  * What the rail's Edit control runs, or `undefined` when the Resource has no such
@@ -269,33 +238,28 @@ const opacityTransitionMs = (element: HTMLElement): number => {
 
 /**
  * The content the content area draws, or `null` for none, keeping one identity
- * while its kind, text and `via` are unchanged: `usePresence` holds its value by
- * identity, and a display is rebuilt on every projection.
+ * while it holds the same values: `usePresence` holds its value by identity, and
+ * a display is rebuilt on every projection. Content that draws an area is flat
+ * (its kind, its text and `via`), so equal values are equal content.
  */
-function useAreaContent(content: ResourceContent | null): AreaContent | null {
-  const kind = content?.kind;
-  const text =
-    content?.kind === markdownKind.id
-      ? content.source
-      : content?.kind === imageKind.id
-        ? content.url
-        : '';
-  const via: ContentVia = content?.via ?? 'self';
-  return useMemo<AreaContent | null>(() => {
-    switch (kind) {
-      case markdownKind.id:
-        return { kind, source: text, via };
-      case imageKind.id:
-        return { kind, url: text, via };
-      case 'unresolved':
-        return { kind, via: referenceKind.id };
-      case spaceKind.id:
-      case urKind.id:
-      case undefined:
-        return null;
-    }
-  }, [kind, text, via]);
+function useAreaContent(content: ResourceContent | null): ResourceContent | null {
+  const next = content !== null && drawsContentArea(content) ? content : null;
+  const [held, setHeld] = useState(next);
+  if (sameValues(held, next)) return held;
+  setHeld(next);
+  return next;
 }
+
+/** Whether two contents hold the same own values, compared one level deep. */
+const sameValues = (left: ResourceContent | null, right: ResourceContent | null): boolean => {
+  if (left === null || right === null) return left === right;
+  const leftEntries = Object.entries(left);
+  const rightValues = new Map(Object.entries(right));
+  return (
+    leftEntries.length === rightValues.size &&
+    leftEntries.every(([key, value]) => rightValues.has(key) && rightValues.get(key) === value)
+  );
+};
 
 /**
  * The one drawn Resource shared by the production canvas and its stories.
@@ -345,7 +309,7 @@ export function CanvasResource(props: CanvasResourceProps) {
     !readOnly &&
     content !== null &&
     contentAction(content) === 'author-space-view' &&
-    kindOperations.kind === spaceKind.id
+    isSpaceOperations(kindOperations)
       ? kindOperations
       : undefined;
   const areaContent = useAreaContent(content);
@@ -377,8 +341,6 @@ export function CanvasResource(props: CanvasResourceProps) {
    */
   const [contentEdit, setContentEdit] = useState<ResourceContentEdit | null>(null);
   const visibleContentEdit = readOnly ? null : contentEdit;
-  const runningReplacer =
-    contentAuthoring && display.shown === 'replacing' ? display.replacer : undefined;
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
   const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
@@ -410,52 +372,20 @@ export function CanvasResource(props: CanvasResourceProps) {
     '--canvas-resource-shape-inset-inline': `${(outline.inscribed.inline / size.width) * 100}%`,
     '--canvas-resource-shape-inset-block': `${(outline.inscribed.block / size.height) * 100}%`,
   };
-  const markdownBodyProps: Mutable<
-    Pick<MarkdownResourceBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>
-  > = {};
-  // A click on an unselected Resource selects it, as a click on any React Flow node
-  // does; editing its Markdown is the next click, or the Edit command (ADR 0102).
-  // So the body's edit target is offered only once the Resource is selected.
-  // Content that is leaving, or is a Target's, is drawn at rest: no editor and
-  // no edit target.
-  if (contentAuthoring && onBeginContentEdit !== undefined && state === 'selected') {
-    markdownBodyProps.onBeginEdit = onBeginContentEdit;
-  }
-  if (contentAuthoring && display.shown === 'editing') {
-    markdownBodyProps.editor = display.editor;
-    markdownBodyProps.autoFocus = display.autoFocus;
-  }
-
-  /** The content area's one switch over what it draws. */
-  const drawAreaContent = (value: AreaContent): ReactNode => {
-    switch (value.kind) {
-      case markdownKind.id:
-        return (
-          <ResourceContentEditProvider value={setContentEdit}>
-            <MarkdownResourceBody
-              source={value.source}
-              ariaLabel={`Markdown source of ${name}`}
-              {...markdownBodyProps}
-            />
-          </ResourceContentEditProvider>
-        );
-      case imageKind.id:
-        return runningReplacer !== undefined ? (
-          <ResourceContentEditProvider value={setContentEdit}>
-            <ImageReplaceTarget name={name} editor={runningReplacer} />
-          </ResourceContentEditProvider>
-        ) : (
-          <ResourceImage
-            key={value.url}
-            url={value.url}
-            name={name}
-            onReplace={contentAuthoring ? onBeginContentEdit : undefined}
-          />
-        );
-      case 'unresolved':
-        return <UnresolvedContent />;
-    }
-  };
+  /** The content area: unresolved content, or what its kind's view half draws. */
+  const drawAreaContent = (value: ResourceContent): ReactNode =>
+    value.kind === 'unresolved' ? (
+      <UnresolvedContent />
+    ) : (
+      canvasContent(value, {
+        name,
+        display,
+        authoring: contentAuthoring,
+        selected: state === 'selected',
+        onBeginEdit: onBeginContentEdit,
+        setContentEdit,
+      })
+    );
 
   const returnFocus = props.onReturnFocus;
   useLayoutEffect(() => {

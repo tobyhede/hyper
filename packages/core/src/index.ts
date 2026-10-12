@@ -14,12 +14,23 @@ export * from './kinds/markdown';
 export * from './kinds/reference';
 export * from './kinds/space';
 export {
+  KIND_IDS,
+  canonicalResource,
   contentTarget,
+  decodeFileContent,
+  encodeFileContent,
   isKindId,
   isRegisteredKind,
+  kindFlags,
   lifetimeSpaceReferences,
   mayBeTarget,
+  DEFAULT_KIND,
+  newDefaultResourceDocument,
+  newResourceDocument,
+  resolveContent,
   resourceReferences,
+  sidecarNames,
   spaceReferences,
   spaceSelectionProblem,
+  type KindId,
 } from './kinds/registry';

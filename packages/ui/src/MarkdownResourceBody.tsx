@@ -11,7 +11,7 @@ import {
 import { Button } from './Button';
 import { usePublishResourceContentEdit, type ResourceContentEdit } from './resource-content-edit';
 import { Kbd, KbdGroup } from './components/kbd';
-import { RenderedMarkdown } from './PresentedResource';
+import { RenderedMarkdown } from './RenderedMarkdown';
 import { MarkdownSourceEditor } from './markdown-source-editor-lazy';
 import type { MarkdownSourceEditorHandle } from './MarkdownSourceEditor';
 import { cn } from './lib/utils';

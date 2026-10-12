@@ -1,17 +1,6 @@
-import {
-  spaceKind,
-  referenceKind,
-  markdownKind,
-  imageKind,
-  urKind,
-  type Resource,
-} from '@project/core';
-import { imageView } from './kinds/image';
-import { markdownView } from './kinds/markdown';
-import { referenceView } from './kinds/reference';
-import { spaceView } from './kinds/space';
-import { urView } from './kinds/ur';
-import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
+import type { Resource } from '@project/core';
+import { kindNaming } from './kinds/registry';
+import { ReferenceIcon, type ResourceBaseKind } from './icons';
 
 /**
  * What kind of Resource this is, drawn rather than described.
@@ -21,37 +10,17 @@ import { ReferenceIcon, BASE_GLYPHS, type ResourceBaseKind } from './icons';
  * hunt for. It is the same glyph wherever a Resource appears — on the drawn Resource, and in
  * the Resources list — so recognising one teaches the other.
  *
- * Adding a Resource kind is a compile-time obligation here: both records are keyed
- * by the domain union, so a new kind fails to build until it has a glyph and a
- * name rather than silently drawing as nothing.
+ * Each kind's view half (`kinds/`) gives its glyph and its names, and the
+ * registry types every kind's view half, so a new kind fails to build until
+ * it has a name rather than silently drawing as nothing.
  */
-
-const KIND_NAMES = {
-  [markdownKind.id]: markdownView.name,
-  [referenceKind.id]: referenceView.name,
-  [spaceKind.id]: spaceView.name,
-  [imageKind.id]: imageView.name,
-  [urKind.id]: urView.name,
-} satisfies Record<Resource['kind'], string>;
-
-/**
- * What a Reference Resource announces once its Target's kind is known. The glyph carries
- * the distinction, so the accessible name has to carry it too — otherwise the
- * two draw differently and announce identically.
- */
-const REFERENCE_NAMES = {
-  [markdownKind.id]: markdownView.referenceName,
-  [spaceKind.id]: spaceView.referenceName,
-  [imageKind.id]: imageView.referenceName,
-  [urKind.id]: urView.referenceName,
-} satisfies Record<ResourceBaseKind, string>;
 
 /**
  * What this kind of Resource is called, for a surface that names one in words
  * rather than drawing it. The same names the glyph announces, so a Resource's kind
  * reads identically however it is reached.
  */
-export const resourceKindName = (kind: Resource['kind']): string => KIND_NAMES[kind];
+export const resourceKindName = (kind: Resource['kind']): string => kindNaming(kind).name;
 
 export interface ResourceKindIconProps {
   readonly kind: Resource['kind'];
@@ -61,8 +30,8 @@ export interface ResourceKindIconProps {
    * The badge is drawn over that kind's glyph, so a Reference to a Space Resource and
    * a Reference to a Markdown Resource are told apart — which a single Reference Resource glyph
    * could not do, and which is the whole reason the Reference Resource is a decoration.
-   * Absent, a Reference Resource draws over the Markdown base; it is also ignored for the
-   * other two kinds, which are not Reference Resources of anything.
+   * Absent, a Reference Resource draws over the Markdown glyph; it is ignored for
+   * a kind with a silhouette of its own, which is a Reference Resource of nothing.
    */
   readonly referenceOf?: ResourceBaseKind | undefined;
   readonly size?: number | undefined;
@@ -85,26 +54,25 @@ export interface ResourceKindIconProps {
 }
 
 /**
- * The glyph for one Resource: a table lookup for the kinds that own a silhouette,
- * and a composition for the one that does not.
+ * The glyph for one Resource: its kind's own silhouette, or, for a kind that
+ * draws none of its own, a composition.
  *
- * `reference` is the composition — it draws one of the other silhouettes with a
- * badge on it, because it needs a second input, which kind it is a Reference Resource of,
- * that the others do not have. Everything else is {@link BASE_GLYPHS}, keyed by
- * the domain union with `reference` subtracted, and **that lookup is what makes
- * adding a kind a compile-time obligation**. Do not pick between the two with
- * `kind === 'space' ? … : …`: that gives every future kind the Markdown
- * silhouette by default, silently, instead of a build failure.
+ * A Reference Resource is the composition: it draws its Target's silhouette
+ * with a badge on it, because it needs a second input, which kind it is a
+ * Reference Resource of, that the others do not have. What a Reference
+ * Resource announces once its Target's kind is known is that kind's
+ * `referenceName`: the glyph carries the distinction, so the accessible name
+ * has to carry it too.
  */
 function KindGlyph({ kind, referenceOf, size }: ResourceKindIconProps) {
   // `size` is forwarded even when absent: every one of these declares its own
   // default by destructuring, and a destructuring default is what `undefined`
   // selects — so passing it through preserves omission rather than overriding
   // it, and no conditional spread is needed to say so.
-  if (kind === referenceKind.id)
-    return <ReferenceIcon base={referenceOf ?? markdownKind.id} size={size} />;
-  const Base = BASE_GLYPHS[kind];
-  return <Base size={size} />;
+  const { Glyph } = kindNaming(kind);
+  if (Glyph !== undefined) return <Glyph size={size} />;
+  const Base = referenceOf === undefined ? undefined : kindNaming(referenceOf).Glyph;
+  return <ReferenceIcon Base={Base} size={size} />;
 }
 
 /**
@@ -128,6 +96,7 @@ export function ResourceKindIcon({
   size,
   decorative = false,
 }: ResourceKindIconProps) {
+  const naming = kindNaming(kind);
   // Named only where a name is drawn: the decorative arm announces nothing and
   // shows the pointer nothing, so deriving one for it would be a value that
   // exists to be discarded.
@@ -137,15 +106,15 @@ export function ResourceKindIcon({
         className="inline-flex flex-none items-center text-muted-foreground"
         aria-hidden="true"
         data-resource-kind={kind}
-        data-reference-of={kind === referenceKind.id ? referenceOf : undefined}
+        data-reference-of={naming.Glyph === undefined ? referenceOf : undefined}
       >
         <KindGlyph kind={kind} referenceOf={referenceOf} size={size} />
       </span>
     );
   const name =
-    kind === referenceKind.id && referenceOf !== undefined
-      ? REFERENCE_NAMES[referenceOf]
-      : KIND_NAMES[kind];
+    naming.Glyph === undefined && referenceOf !== undefined
+      ? (kindNaming(referenceOf).referenceName ?? naming.name)
+      : naming.name;
   return (
     <span
       className="inline-flex flex-none items-center text-muted-foreground"
@@ -153,7 +122,7 @@ export function ResourceKindIcon({
       aria-label={name}
       title={name}
       data-resource-kind={kind}
-      data-reference-of={kind === referenceKind.id ? referenceOf : undefined}
+      data-reference-of={naming.Glyph === undefined ? referenceOf : undefined}
     >
       <KindGlyph kind={kind} referenceOf={referenceOf} size={size} />
     </span>

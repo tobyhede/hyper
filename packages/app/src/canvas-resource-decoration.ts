@@ -1,19 +1,12 @@
 import type { Continuation } from './continuation';
 import {
-  type SpaceKindId,
-  spaceKind,
-  type MarkdownKindId,
-  markdownKind,
   takesOpen,
   type GraphId,
   type ResourceDocument,
   type ResourceId,
   type ResourceShape,
+  type SpaceKindId,
   type UUID,
-  imageKind,
-  urKind,
-  type ImageKindId,
-  type UrKindId,
 } from '@project/core';
 import type {
   KindOperationsOf,
@@ -21,15 +14,7 @@ import type {
   ResourceFlowNodeOf,
   ResourceNodeData,
 } from '@project/react-flow-adapter';
-import {
-  beginEditing,
-  beginReplacing,
-  type EntityActionGroup,
-  type ImageReplacement,
-  type ResourceDisplay,
-} from '@project/ui';
-import { buildSpaceResourceRail } from './build-space-resource-rail';
-import type { SpaceResourceRailContext } from './space-resource-context-commands';
+import type { EntityActionGroup, ImageReplacement, ResourceDisplay } from '@project/ui';
 import type { CommandOutcomes } from './command-outcomes';
 import type { DeleteConfirmation } from './delete-confirmation';
 import type { OpenSpaces } from './open-spaces';
@@ -38,16 +23,8 @@ import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
 import type { SpaceResourceTargets } from './space-resource-targets';
 import { RESOURCE_SIZE } from './resource';
 
-type Mutable<T> = { -readonly [K in keyof T]: T[K] };
-
-/** Each kind's operations and decoration, built by assigning what a gate allows. */
-type MarkdownOperations = Mutable<KindOperationsOf<MarkdownKindId>>;
-type ImageOperations = Mutable<KindOperationsOf<ImageKindId>>;
-type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
-type SpaceOperations = Mutable<KindOperationsOf<SpaceKindId>>;
-type MarkdownDecoration = Mutable<KindDecoration<MarkdownKindId>>;
-type ImageDecoration = Mutable<KindDecoration<ImageKindId>>;
-type SpaceDecoration = Mutable<KindDecoration<SpaceKindId>>;
+/** A value built by assigning what a gate allows. */
+export type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /** What the shared decoration adds to a Resource of any kind. */
 export type CanvasResourceDataPatch = Partial<
@@ -168,53 +145,6 @@ type SharedResourceDecorationContext = Pick<
   | 'resourceEntityActions'
 >;
 
-type UrResourceDecorationContext = Pick<
-  CanvasResourceDecorationContext,
-  'authorOnCanvas' | 'editableResourceIds' | 'changeResourceShape'
->;
-
-type MarkdownResourceDecorationContext = Pick<
-  CanvasResourceDecorationContext,
-  | 'authorOnCanvas'
-  | 'bodyEditing'
-  | 'editableResourceIds'
-  | 'beginBodyEditing'
-  | 'bodyEditorResourceId'
-  | 'completeResourceBody'
-  | 'clearCaret'
->;
-
-type ImageResourceDecorationContext = Pick<
-  CanvasResourceDecorationContext,
-  | 'authorOnCanvas'
-  | 'bodyEditing'
-  | 'editableResourceIds'
-  | 'beginBodyEditing'
-  | 'bodyEditorResourceId'
-  | 'replaceResourceImage'
-  | 'imageAccept'
-  | 'clearCaret'
->;
-
-type SpaceResourceDecorationContext = Pick<
-  CanvasResourceDecorationContext,
-  | 'authorOnCanvas'
-  | 'editableResourceIds'
-  | 'continuation'
-  | 'containingSpaceId'
-  | 'spaceDocuments'
-  | 'spaceResourceTargets'
-  | 'spaces'
-  | 'commandOutcomes'
-  | 'deleteConfirmation'
-  | 'completeSpaceResourceSelection'
-  | 'portalEditing'
-  | 'onPortalEditingChange'
-  | 'contextNotices'
-  | 'onContextEditingChange'
-  | 'onContextReport'
->;
-
 export function decorateSharedResourceNode(
   node: ResourceFlowNode,
   context: SharedResourceDecorationContext,
@@ -291,152 +221,4 @@ export function decorateSharedResourceNode(
       : [];
   }
   return patch;
-}
-
-export function decorateMarkdownResourceNode(
-  node: ResourceFlowNodeOf<MarkdownKindId>,
-  context: MarkdownResourceDecorationContext,
-): KindDecoration<MarkdownKindId> {
-  const kindOperations: MarkdownOperations = { kind: markdownKind.id };
-  const decoration: MarkdownDecoration = { kindOperations };
-  const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
-  if (
-    resourceBelongsToWorkingSpace &&
-    context.authorOnCanvas &&
-    !context.bodyEditing &&
-    node.data.contentAction === 'edit-markdown'
-  ) {
-    kindOperations.onBeginEdit = () => context.beginBodyEditing(node);
-  }
-  if (
-    resourceBelongsToWorkingSpace &&
-    node.data.contentAction === 'edit-markdown' &&
-    context.bodyEditorResourceId === node.id
-  ) {
-    const editor = {
-      onComplete: (body: string) => context.completeResourceBody(node.data.resourceId, body),
-      onEnd: () => context.clearCaret(),
-    };
-    // The editor is drawn only once the display is Open with this Resource's
-    // own Markdown: a caret that lands before the Open projection draws
-    // nothing until it arrives. It takes focus, since the author just asked
-    // to write.
-    const display = beginEditing(node.data.display, editor, true);
-    if (display !== node.data.display) decoration.display = display;
-  }
-  return decoration;
-}
-
-/**
- * An Image Resource's Replace, which takes the place a Markdown Resource's body
- * edit takes, through the same caret (ADR 0064): beginning it, and the running
- * replacement while the caret is on it.
- */
-export function decorateImageResourceNode(
-  node: ResourceFlowNodeOf<ImageKindId>,
-  context: ImageResourceDecorationContext,
-): KindDecoration<ImageKindId> {
-  const replace = context.replaceResourceImage;
-  const kindOperations: ImageOperations = { kind: imageKind.id };
-  const decoration: ImageDecoration = { kindOperations };
-  if (node.data.contentAction !== 'replace-image') return decoration;
-  const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
-  if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
-    kindOperations.onBeginEdit = () => context.beginBodyEditing(node);
-  }
-  if (resourceBelongsToWorkingSpace && context.bodyEditorResourceId === node.id) {
-    const resourceId = node.data.resourceId;
-    const replacer = {
-      accept: context.imageAccept,
-      onReplace: (replacement: ImageReplacement) => replace(resourceId, replacement),
-      onEnd: () => context.clearCaret(),
-    };
-    const display = beginReplacing(node.data.display, replacer);
-    if (display !== node.data.display) decoration.display = display;
-  }
-  return decoration;
-}
-
-/** An Ur Resource's Shape choice, offered Open and Closed alike (ADR 0121). */
-export function decorateUrResourceNode(
-  node: ResourceFlowNodeOf<UrKindId>,
-  context: UrResourceDecorationContext,
-): KindDecoration<UrKindId> {
-  const kindOperations: UrOperations = { kind: urKind.id };
-  const changeResourceShape = context.changeResourceShape;
-  if (
-    context.editableResourceIds.has(node.data.resourceId) &&
-    context.authorOnCanvas &&
-    changeResourceShape !== undefined
-  ) {
-    kindOperations.onResourceShapeChange = (resourceShape) =>
-      changeResourceShape(node.data.resourceId, resourceShape);
-  }
-  return { kindOperations };
-}
-
-export function decorateSpaceResourceNode(
-  node: ResourceFlowNodeOf<SpaceKindId>,
-  context: SpaceResourceDecorationContext,
-): KindDecoration<SpaceKindId> {
-  const kindOperations: SpaceOperations = { kind: spaceKind.id };
-  const decoration: SpaceDecoration = { kindOperations };
-  if (node.data.contentAction !== 'author-space-view') return decoration;
-  const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
-  const spaceDocument = context.spaceDocuments.get(node.data.resourceId);
-  const target =
-    spaceDocument !== undefined
-      ? context.spaceResourceTargets.get(spaceDocument.content.spaceId)
-      : undefined;
-  // Closed, read-only, and unread omit the rail. Withdrawn authoring still
-  // draws it, disabled: an absent rail is how the Resource says the target has
-  // not been read yet, so a canvas that had merely withdrawn authoring would
-  // put every Open Space Resource back to reporting a wait that had already ended.
-  if (node.data.open === true && !node.data.readOnly && target !== undefined) {
-    const resourceId = node.data.resourceId;
-    let railContext: SpaceResourceRailContext | undefined;
-    if (
-      context.spaces !== null &&
-      context.commandOutcomes !== undefined &&
-      context.deleteConfirmation !== undefined &&
-      spaceDocument !== undefined
-    ) {
-      const entry = context.spaces.entry(spaceDocument.content.spaceId);
-      if (entry !== undefined) {
-        railContext = {
-          entry,
-          continuation: context.continuation,
-          spaces: context.spaces,
-          containingSpaceId: context.containingSpaceId,
-          deleteConfirmation: entry.app.deleteConfirmation,
-        };
-      }
-    }
-    kindOperations.spaceRail = buildSpaceResourceRail({
-      target,
-      document: spaceDocument,
-      disabled: !(resourceBelongsToWorkingSpace && context.authorOnCanvas),
-      complete: (targetMap, graphId) =>
-        context.completeSpaceResourceSelection(resourceId, targetMap, graphId),
-      onEditingChange: (editing) => context.onContextEditingChange(resourceId, editing),
-      onReport: (message) => context.onContextReport(resourceId, message),
-      context: railContext,
-    });
-  }
-  if (kindOperations.spaceRail !== undefined) {
-    const notice = context.contextNotices.get(node.data.resourceId);
-    if (notice !== undefined) decoration.contextNotice = notice;
-  }
-  const onPortalEditingChange = context.onPortalEditingChange;
-  if (
-    onPortalEditingChange !== undefined &&
-    node.data.open === true &&
-    kindOperations.spaceRail !== undefined
-  ) {
-    kindOperations.portal = {
-      editing: context.portalEditing?.has(node.data.resourceId) === true,
-      onEditingChange: (editing) => onPortalEditingChange(node.data.resourceId, editing),
-    };
-  }
-  return decoration;
 }

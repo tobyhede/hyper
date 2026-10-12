@@ -1,17 +1,12 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
-import { CLOSED_DISPLAY } from '@project/ui';
-import type { EntityActionGroup, KindOperations, ResourceDisplay } from '@project/ui';
+import { CLOSED_DISPLAY, bareOperations } from '@project/ui';
+import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@project/ui';
 import {
-  spaceKind,
-  referenceKind,
-  markdownKind,
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
   contentAction,
   embedsMap,
-  imageKind,
-  urKind,
   type Resource,
   type ResourceId,
   type ResourceShape,
@@ -48,10 +43,7 @@ export type ResourceTitleEditor = {
 };
 
 /** What one Resource kind offers on its node: the operations `CanvasResource` takes. */
-export type KindOperationsOf<K extends Resource['kind']> = Extract<
-  KindOperations,
-  { readonly kind: K }
->;
+export type KindOperationsOf<K extends Resource['kind']> = KindOperationsByKind[K];
 
 /**
  * A Resource's own kind beside that kind's operations, one arm per kind, so the
@@ -59,9 +51,10 @@ export type KindOperationsOf<K extends Resource['kind']> = Extract<
  * A Reference Resource is `reference` whatever its Target is; what it draws is
  * its `display`.
  */
-type ResourceKindData = {
-  [K in Resource['kind']]: { kind: K; kindOperations: KindOperationsOf<K> };
-}[Resource['kind']];
+type KindDataOf<K extends Resource['kind']> = {
+  [P in K]: { kind: P; kindOperations: KindOperationsOf<P> };
+}[K];
+type ResourceKindData = KindDataOf<Resource['kind']>;
 
 /** Data carried by each custom resource node. Kept as a type alias so it satisfies
  *  React Flow's `Record<string, unknown>` data constraint. */
@@ -212,24 +205,9 @@ export function isResourceNodeOf<K extends Resource['kind']>(
   return node.data.kind === kind;
 }
 
-/**
- * A Resource kind with none of its operations offered yet. One arm per kind,
- * each identical in spelling, because a narrowed `kind` is what lets the
- * compiler pair `kind` with its own `kindOperations` arm.
- */
-export function bareKindData(kind: Resource['kind']): ResourceKindData {
-  switch (kind) {
-    case markdownKind.id:
-      return { kind, kindOperations: { kind } };
-    case referenceKind.id:
-      return { kind, kindOperations: { kind } };
-    case imageKind.id:
-      return { kind, kindOperations: { kind } };
-    case urKind.id:
-      return { kind, kindOperations: { kind } };
-    case spaceKind.id:
-      return { kind, kindOperations: { kind } };
-  }
+/** A Resource kind with none of its operations offered yet. */
+export function bareKindData<K extends Resource['kind']>(kind: K): KindDataOf<K> {
+  return { kind, kindOperations: bareOperations(kind) };
 }
 
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;

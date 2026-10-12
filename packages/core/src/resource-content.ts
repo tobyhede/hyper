@@ -1,8 +1,9 @@
-import { imageKind, type ImageContent } from './kinds/image';
-import { markdownKind, type MarkdownContent } from './kinds/markdown';
+import type { ImageContent } from './kinds/image';
+import type { MarkdownContent } from './kinds/markdown';
 import type { ReferenceKindId } from './kinds/reference';
-import { spaceKind, type SpaceContent } from './kinds/space';
-import { urKind, type UrContent } from './kinds/ur';
+import { contentFacts } from './kinds/registry';
+import type { SpaceContent } from './kinds/space';
+import type { UrContent } from './kinds/ur';
 
 /** Whether content is the Resource's own or reached through a Reference Resource (ADR 0070). */
 export type ContentVia = 'self' | ReferenceKindId;
@@ -14,11 +15,13 @@ export type ContentVia = 'self' | ReferenceKindId;
  * missing or is itself a Reference Resource.
  */
 export type ResourceContent =
-  | MarkdownContent
-  | ImageContent
-  | SpaceContent
-  | UrContent
-  | { readonly kind: 'unresolved'; readonly via: ReferenceKindId };
+  MarkdownContent | ImageContent | SpaceContent | UrContent | ReferenceContentUnresolved;
+
+/** No content: what a Reference Resource shows when its Target is missing or is itself a Reference. */
+export interface ReferenceContentUnresolved {
+  readonly kind: 'unresolved';
+  readonly via: ReferenceKindId;
+}
 
 export type ContentAction = 'none' | 'edit-markdown' | 'replace-image' | 'author-space-view';
 
@@ -29,25 +32,17 @@ export interface ContentFacts {
   readonly drawsContentArea: boolean;
 }
 
-const CONTENT_FACTS = {
-  [markdownKind.id]: markdownKind.facts,
-  [imageKind.id]: imageKind.facts,
-  [spaceKind.id]: spaceKind.facts,
-  [urKind.id]: urKind.facts,
-  unresolved: { action: 'none', embedsMap: false, drawsContentArea: true },
-} satisfies Record<ResourceContent['kind'], ContentFacts>;
-
 /** The operation an author may perform on this content. */
 export function contentAction(content: ResourceContent): ContentAction {
-  return content.via !== 'self' ? 'none' : CONTENT_FACTS[content.kind].action;
+  return content.via !== 'self' ? 'none' : contentFacts(content).action;
 }
 
 /** Whether this content draws a Map inside its Resource. */
 export function embedsMap(content: ResourceContent): boolean {
-  return CONTENT_FACTS[content.kind].embedsMap;
+  return contentFacts(content).embedsMap;
 }
 
 /** Whether an Open Resource reserves an area above its Title for content. */
 export function drawsContentArea(content: ResourceContent): boolean {
-  return CONTENT_FACTS[content.kind].drawsContentArea;
+  return contentFacts(content).drawsContentArea;
 }

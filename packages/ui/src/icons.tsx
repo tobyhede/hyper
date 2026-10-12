@@ -30,14 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
-import {
-  spaceKind,
-  type ReferenceKindId,
-  markdownKind,
-  imageKind,
-  urKind,
-  type Resource,
-} from '@project/core';
+import type { ReferenceKindId, Resource } from '@project/core';
 
 type ResourceActionIconProps = ComponentProps<typeof Pencil>;
 type CanvasControlIconProps = ComponentProps<typeof Minus>;
@@ -263,31 +256,16 @@ export const SpaceIcon = ({ size = 14 }: { size?: number | undefined }) => (
 export const SpaceResourceIcon = SpaceIcon;
 
 /**
- * The Resource kinds that own what they draw, and so have a glyph of their own.
- *
- * A Reference Resource is deliberately absent: it is not another silhouette but a badge on
- * one of these.
- *
- * **Subtracted from the domain union rather than restated as its own.** Written
- * out as `'markdown' | 'space' | 'image'` it would be a second list agreeing with
- * `Resource['kind']` only by hand, so a kind added to the domain would leave
- * every record keyed by this type exhaustive and wrong. Derived, the addition lands here, and
- * {@link BASE_GLYPHS} fails to build until the new kind has a silhouette.
+ * The Resource kinds that may be a Reference Resource's Target, and so draw a
+ * glyph of their own a badge can sit on. Subtracted from the domain union
+ * rather than restated, so a kind added to the domain lands here.
  */
 export type ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>;
 
 /** What every base glyph accepts. */
 interface BaseGlyphProps {
-  size?: number;
+  size?: number | undefined;
 }
-
-/** The silhouette each Resource kind that owns one draws. */
-export const BASE_GLYPHS = {
-  [markdownKind.id]: MarkdownIcon,
-  [spaceKind.id]: SpaceResourceIcon,
-  [imageKind.id]: ImageIcon,
-  [urKind.id]: UrIcon,
-} satisfies Record<ResourceBaseKind, ComponentType<BaseGlyphProps>>;
 
 /**
  * A Reference Resource, drawn as the glyph of the Resource it points at with a badge on it.
@@ -312,15 +290,14 @@ export const BASE_GLYPHS = {
  * weight does not.
  */
 export function ReferenceIcon({
-  base = markdownKind.id,
+  Base = MarkdownIcon,
   size = 14,
 }: {
-  /** The kind of the Target. Absent, a Reference Resource draws over the Markdown base. */
-  base?: ResourceBaseKind | undefined;
+  /** The glyph of the Target's kind. Absent, a Reference Resource draws over the Markdown glyph. */
+  Base?: ComponentType<BaseGlyphProps> | undefined;
   size?: number | undefined;
 }) {
   const maskId = useId();
-  const Base = BASE_GLYPHS[base];
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

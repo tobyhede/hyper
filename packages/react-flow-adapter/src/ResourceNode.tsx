@@ -1,4 +1,3 @@
-import { spaceKind } from '@project/core';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Handle,
@@ -12,7 +11,7 @@ import {
   type OnResizeStart,
   type ShouldResize,
 } from '@xyflow/react';
-import { CanvasResource, type CanvasResourceProps } from '@project/ui';
+import { CanvasResource, isSpaceOperations, type CanvasResourceProps } from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { useConnectionEndEligible } from './connection-end-eligibility';
@@ -333,7 +332,7 @@ export function ResourceNode({
     ((visuallySelected && !otherSelected) ||
       display.shown === 'editing' ||
       display.shown === 'replacing' ||
-      (kindOperations.kind === spaceKind.id && kindOperations.portal?.editing === true)) &&
+      (isSpaceOperations(kindOperations) && kindOperations.portal?.editing === true)) &&
     !dragging &&
     !resizeActive;
   /**

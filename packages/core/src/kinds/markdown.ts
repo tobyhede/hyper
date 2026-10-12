@@ -1,10 +1,11 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
-import type { ContentOwnerKindModule } from './kind-module';
+import { defineKind, type KindFileCodec } from './kind-module';
 
 /** A Markdown Resource's content: the source its author wrote, which its file holds as the body. */
 export const markdownResourceContentSchema = z.object({ source: z.string() });
+type MarkdownResourceContent = z.infer<typeof markdownResourceContentSchema>;
 
 /** What a Markdown Resource's content resolves to: the source it shows. */
 export interface MarkdownContent {
@@ -12,30 +13,6 @@ export interface MarkdownContent {
   readonly source: string;
   readonly via: ContentVia;
 }
-
-/**
- * The Markdown kind (ADR 0020): a content kind whose content is Markdown
- * source. Its content action is Edit.
- */
-export const markdownKind = {
-  id: 'markdown',
-  contentSchema: markdownResourceContentSchema,
-  flags: {
-    takesResourceShape: false,
-    canOpen: true,
-    mayBeTarget: true,
-    ownsReferencedSpaces: false,
-  },
-  facts: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
-  resolveContent: (content, via) => ({ kind: 'markdown', source: content.source, via }),
-} as const satisfies ContentOwnerKindModule<
-  'markdown',
-  z.infer<typeof markdownResourceContentSchema>,
-  MarkdownContent
->;
-
-/** The Markdown kind's id. */
-export type MarkdownKindId = typeof markdownKind.id;
 
 /** The media type of a Markdown Resource's sidecar (ADR 0128). */
 export const MARKDOWN_MEDIA_TYPE = 'text/markdown';
@@ -47,7 +24,7 @@ export const markdownSidecarPath = (id: string): string => `${id}.md`;
  * A Markdown Resource's content as its Resource file holds it (ADR 0128): a
  * locator naming its sidecar, in place of the source the sidecar holds. The
  * media type compares case-insensitively; that the path is the Resource's own
- * `<id>.md` is intake's to check, since the schema does not see the id.
+ * `<id>.md` is the codec's to check, since the schema does not see the id.
  */
 export const markdownFileContentSchema = z
   .object({
@@ -57,3 +34,67 @@ export const markdownFileContentSchema = z
     }),
   })
   .strict();
+
+/** A Markdown Resource's file holds a locator, and its source is the plain `<id>.md` beside it. */
+const markdownFile: KindFileCodec<
+  MarkdownResourceContent,
+  z.infer<typeof markdownFileContentSchema>
+> = {
+  sidecarNames: (id) => [markdownSidecarPath(id)],
+  encode: (id, content) => {
+    const path = markdownSidecarPath(id);
+    return {
+      content: { path, mediaType: MARKDOWN_MEDIA_TYPE },
+      sidecars: [{ name: path, text: content.source }],
+    };
+  },
+  decode: (id, content, sidecar) => {
+    const own = markdownSidecarPath(id);
+    if (content.path !== own) {
+      return {
+        ok: false,
+        kind: 'invalid-resource-file',
+        message: `content.path: a Markdown Resource's sidecar is its own "${own}", not "${content.path}"`,
+      };
+    }
+    const source = sidecar(own);
+    return source === undefined
+      ? {
+          ok: false,
+          kind: 'missing-sidecar',
+          message: `content.path: the sidecar "${own}" it names does not exist`,
+        }
+      : { ok: true, content: { source } };
+  },
+};
+
+/** A Markdown Resource's content before its author writes any: a genuinely empty body. */
+export const EMPTY_MARKDOWN: MarkdownResourceContent = { source: '' };
+
+/**
+ * The Markdown kind (ADR 0020): a content kind whose content is Markdown
+ * source. Its content action is Edit, and Export writes its source with `\n`
+ * line endings.
+ */
+export const markdownKind = defineKind({
+  id: 'markdown',
+  contentSchema: markdownResourceContentSchema,
+  flags: {
+    takesResourceShape: false,
+    canOpen: true,
+    mayBeTarget: true,
+    ownsReferencedSpaces: false,
+  },
+  facts: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
+  resolveContent: (content, via): MarkdownContent => ({
+    kind: 'markdown',
+    source: content.source,
+    via,
+  }),
+  canonicalContent: (content) => ({ source: content.source.replace(/\r\n?/g, '\n') }),
+  file: markdownFile,
+  newContent: EMPTY_MARKDOWN,
+});
+
+/** The Markdown kind's id. */
+export type MarkdownKindId = typeof markdownKind.id;
