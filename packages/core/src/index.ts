@@ -27,7 +27,6 @@ export {
   DEFAULT_KIND,
   newDefaultResourceDocument,
   newResourceDocument,
-  startsEmpty,
   resolveContent,
   resourceReferences,
   sidecarNames,

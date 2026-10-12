@@ -18,7 +18,6 @@ import {
   type SpaceAuthoring,
   type SurfaceAuthoring,
 } from './space-authoring';
-import type { PickFiles } from './kind-creation';
 import {
   createImageResources,
   type ImageEditResult,
@@ -138,8 +137,8 @@ export interface ComposedApp extends AppCore {
     origin: ImageOrigin,
     target: ImageTarget,
   ) => Promise<ImageEditResult>;
-  /** The browser's file picker this Space's image sources choose with. */
-  readonly pickFiles: PickFiles;
+  /** This Space's image picker, {@link ImageSources.pick}, which Create Image Resource opens. */
+  readonly pickImages: ImageSources['pick'];
   /**
    * This Space's image replacements: the one way to replace an Image
    * Resource's picture, and its busy state.
@@ -257,7 +256,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     ...core,
     createImageResources: (origin, target) =>
       createImageResources({ images, authoring }, origin, target),
-    pickFiles: images.pick,
+    pickImages: images.pick,
     imageReplacement: createImageReplacements({
       images,
       authoring,

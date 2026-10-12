@@ -2,7 +2,6 @@ import type { ImageNaturalSize, MapId, MapPosition } from '@project/core';
 import type { PlacementMode } from '@project/graph';
 import { IMAGE_MEDIA_TYPES, refusalForDeclaredType, type ImageStoring } from '@project/persistence';
 import type { RefusedFile } from './authoring-refusal';
-import type { PickFiles } from './kind-creation';
 import type { SurfaceDrawing } from './map-surface-policy';
 import {
   CANVAS,
@@ -24,8 +23,14 @@ export interface ImageSources {
   readonly store: (image: Blob) => Promise<ImageStoring>;
   /** Load the picture at a URL, answering its natural size, or `undefined` when it does not load. */
   readonly measure: (url: string) => Promise<ImageNaturalSize | undefined>;
-  /** Choose image files with the browser's own picker, for Create Image Resource. */
-  readonly pick: PickFiles;
+  /**
+   * Choose image files with the browser's own picker, offering
+   * {@link PICKED_IMAGE_TYPES}; a cancelled picker answers nothing, and it
+   * never rejects. Create Image Resource and Replace image both open it, each
+   * inside the press that asked for it, before any `await`: a browser opens a
+   * picker only within a user's gesture.
+   */
+  readonly pick: () => Promise<readonly File[]>;
 }
 
 /**

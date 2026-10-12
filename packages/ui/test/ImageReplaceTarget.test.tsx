@@ -103,6 +103,26 @@ describe('ImageReplaceTarget', () => {
     expect(replace.onEnd).not.toHaveBeenCalled();
   });
 
+  it('hands files chosen after the editor changed to the current one', async () => {
+    let choose: (files: readonly File[]) => void = () => undefined;
+    const pick = () => new Promise<readonly File[]>((resolve) => (choose = resolve));
+    const atPress = editor({ pick });
+    const current = editor({ pick });
+    const { rerender } = render(<ImageReplaceTarget name="Figure" editor={atPress} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+    rerender(<ImageReplaceTarget name="Figure" editor={current} />);
+    const chosen = new File(['bytes'], 'diagram.png', { type: 'image/png' });
+    await act(async () => {
+      choose([chosen]);
+      await Promise.resolve();
+    });
+
+    expect(atPress.onReplace).not.toHaveBeenCalled();
+    expect(current.onReplace).toHaveBeenCalledWith({ kind: 'files', files: [chosen] });
+    await waitFor(() => expect(current.onEnd).toHaveBeenCalledTimes(1));
+  });
+
   it('replaces nothing with files chosen after the target has gone', async () => {
     let choose: (files: readonly File[]) => void = () => undefined;
     const replace = editor({ pick: () => new Promise((resolve) => (choose = resolve)) });

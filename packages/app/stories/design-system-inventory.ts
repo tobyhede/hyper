@@ -174,4 +174,19 @@ export const interactiveDeviations = [
     tests:
       '`packages/ui/test/ImageReplaceTarget.test.tsx` (a dropped file is handed on; the drop does not reach the canvas), `packages/app/ladle-e2e` and `packages/app/e2e/image-resource.spec.ts` (a dropped non-image is refused in the target).',
   },
+  {
+    subject: 'packages/app/src/browser-file-picker.ts — the browser file picker',
+    existingHyperComponentConsidered:
+      '`@project/ui`\'s `Input` with `type="file"`, which `ImageFilePicker` was. A component is mounted by a surface, so Create Image Resource and Replace image each mounted one and the app had two pickers.',
+    shadcnOrBaseUiConsidered:
+      'The registry and Base UI have no file picker; a file input is the browser’s own control, with nothing to compose.',
+    productRequirement:
+      'Issue 11 of `.scratch/resource-kind-modules/`: a kind’s Create runs where no component of its own is drawn, and Create Image Resource and Replace image open one picker.',
+    whyCompositionIsInsufficient:
+      'The press that opens it may be made where no component is drawn, so the input is attached for as long as the picker is open rather than rendered by React.',
+    customBehaviour:
+      'A file input kept out of the layout, the tab order and the accessibility tree, attached and clicked inside the press, removed when it answers; `cancel` answers nothing, and the next picker closes one that never settled, answering it nothing.',
+    tests:
+      '`packages/app/test/browser-file-picker.test.ts`, `packages/app/ladle-e2e/replace-image.spec.ts` and `packages/app/ladle-e2e/command-dock.spec.ts` (the browser’s file chooser opens from Upload and from Create Image Resource).',
+  },
 ] as const;

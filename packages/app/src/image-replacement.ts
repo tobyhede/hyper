@@ -16,12 +16,7 @@ import {
   describeImageReplacementBreak,
   describeImageReplacementPending,
 } from './authoring-refusal';
-import {
-  PICKED_IMAGE_TYPES,
-  storeEach,
-  type ImageEditResult,
-  type ImageSources,
-} from './image-creation';
+import { storeEach, type ImageEditResult, type ImageSources } from './image-creation';
 import { CANVAS, type SpaceAuthoring } from './space-authoring';
 
 /**
@@ -51,11 +46,7 @@ export interface ImageReplacements {
   /** True from the moment an attempt starts until it settles. */
   readonly getState: () => boolean;
   readonly subscribe: (listener: () => void) => () => void;
-  /**
-   * Open the file picker offering the image types a file may be, answering
-   * the files chosen. Called within the press that asked for it, as
-   * {@link ImageSources.pick} must be.
-   */
+  /** This Space's image picker, {@link ImageSources.pick}, which Replace's Upload opens. */
   readonly pick: () => Promise<readonly File[]>;
   /**
    * Replace the identified Image Resource's picture with what the author brought.
@@ -168,7 +159,7 @@ export function createImageReplacements({
   return {
     getState: busy.getState,
     subscribe: busy.subscribe,
-    pick: () => images.pick(PICKED_IMAGE_TYPES),
+    pick: images.pick,
     replace: async (resourceId, replacement) => {
       if (busy.getState()) return { kind: 'already-replacing' };
       const target = resolveTarget(authoring, resourceId);

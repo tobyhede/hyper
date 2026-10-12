@@ -8,7 +8,7 @@ import {
   type ObserverErrorReporter,
 } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
-import { PICKED_IMAGE_TYPES, type ImageSources } from '../src/image-creation';
+import type { ImageSources } from '../src/image-creation';
 import * as imageReplacementModule from '../src/image-replacement';
 import { describeImageReplacement } from '../src/image-replacement';
 import { unusedImageSources } from './image-sources';
@@ -585,13 +585,14 @@ describe('the replacement module', () => {
     ]);
   });
 
-  it('opens the picker offering the image types a file may be, answering what it chose', async () => {
+  it('opens the Space’s own image picker, answering what it chose', async () => {
     const chosen = file('chosen.png');
-    const pick = vi.fn((_accept: string) => Promise.resolve([chosen]));
-    const { imageReplacement } = open({ ...unusedImageSources, pick });
+    const { imageReplacement } = open({
+      ...unusedImageSources,
+      pick: () => Promise.resolve([chosen]),
+    });
 
     await expect(imageReplacement.pick()).resolves.toEqual([chosen]);
-    expect(pick).toHaveBeenCalledWith(PICKED_IMAGE_TYPES);
   });
 
   it('is composed once per Space, so one Space’s replacement holds no other', async () => {

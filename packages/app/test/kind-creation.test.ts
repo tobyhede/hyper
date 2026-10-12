@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { KIND_IDS, type EmptyCreatableKindId } from '@project/core';
-import { PICKED_IMAGE_TYPES } from '../src/image-creation';
-import { dockCreates, type DockCreate } from '../src/kind-creation';
+import type { ObserverErrorReporter } from '@project/persistence';
+import { dockCreates, type CreateConditions, type DockCreate } from '../src/kind-creation';
 import { KIND_CREATIONS, type KindCreationContext } from '../src/kinds/registry';
 
 /** Commands that record what a Create ran, picking `chosen` when a picker is opened. */
@@ -14,16 +14,34 @@ const recording = (
     createSpaceResource: () => ran.push('space-resource'),
     creatingSpaceResource: facts.creatingSpaceResource ?? false,
     createImagesFromFiles: (files) => ran.push(`images:${files.map(({ name }) => name).join()}`),
-    pickFiles: (accept) => {
-      ran.push(`pick:${accept}`);
+    pickImages: () => {
+      ran.push('pick');
       return Promise.resolve(facts.chosen ?? []);
     },
   };
   return { ran, commands };
 };
 
-const creates = (commands: KindCreationContext, addResource = true): readonly DockCreate[] =>
-  dockCreates(KIND_CREATIONS, commands, addResource);
+const creates = (
+  commands: KindCreationContext,
+  addResource = true,
+  later: {
+    readonly current?: () => CreateConditions<KindCreationContext> | null;
+    readonly reportBreak?: ObserverErrorReporter;
+  } = {},
+): readonly DockCreate[] =>
+  dockCreates(
+    KIND_CREATIONS,
+    { context: commands, addResource },
+    {
+      current: later.current ?? (() => ({ context: commands, addResource })),
+      reportBreak:
+        later.reportBreak ??
+        ((failure) => {
+          throw failure;
+        }),
+    },
+  );
 
 const createOf = (all: readonly DockCreate[], kind: string): DockCreate => {
   const found = all.find((create) => create.kind === kind);
@@ -79,9 +97,60 @@ describe('the Creates the Command Dock draws', () => {
 
     createOf(creates(commands), 'image').create();
     // Within the press, before any await: a browser opens a picker only then.
-    expect(ran).toEqual([`pick:${PICKED_IMAGE_TYPES}`]);
+    expect(ran).toEqual(['pick']);
 
-    await Promise.resolve();
-    expect(ran).toEqual([`pick:${PICKED_IMAGE_TYPES}`, 'images:figure.png']);
+    await vi.waitFor(() => expect(ran).toEqual(['pick', 'images:figure.png']));
+  });
+
+  it('create the chosen images with the commands as they stand when the picker answers', async () => {
+    const figure = new File([''], 'figure.png', { type: 'image/png' });
+    const atPress = recording({ chosen: [figure] });
+    const now = recording();
+
+    createOf(
+      creates(atPress.commands, true, {
+        current: () => ({ context: now.commands, addResource: true }),
+      }),
+      'image',
+    ).create();
+
+    await vi.waitFor(() => expect(now.ran).toEqual(['images:figure.png']));
+    expect(atPress.ran).toEqual(['pick']);
+  });
+
+  it('create nothing from a picker that answers once Add Resource is withheld, or the Dock has gone', async () => {
+    const figure = new File([''], 'figure.png', { type: 'image/png' });
+    for (const current of [
+      (commands: KindCreationContext) => ({ context: commands, addResource: false }),
+      () => null,
+    ]) {
+      const { ran, commands } = recording({ chosen: [figure] });
+      createOf(creates(commands, true, { current: () => current(commands) }), 'image').create();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(ran).toEqual(['pick']);
+    }
+  });
+
+  it('report a Create that breaks after its press, rather than leaving it unhandled', async () => {
+    const broken = new Error('creating broke');
+    const { commands } = recording({ chosen: [new File([''], 'figure.png')] });
+    const reportBreak = vi.fn();
+
+    createOf(
+      creates(
+        {
+          ...commands,
+          createImagesFromFiles: () => {
+            throw broken;
+          },
+        },
+        true,
+        { reportBreak },
+      ),
+      'image',
+    ).create();
+
+    await vi.waitFor(() => expect(reportBreak).toHaveBeenCalledWith(broken));
   });
 });

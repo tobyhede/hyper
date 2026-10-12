@@ -16,7 +16,7 @@ describe("the browser's file picker", () => {
     let clicked = false;
     document.addEventListener('click', () => (clicked = true), { once: true });
 
-    void pickFilesInBrowser(document)('image/png,image/jpeg');
+    void pickFilesInBrowser(document, 'image/png,image/jpeg');
 
     const input = openInput();
     expect(input.accept).toBe('image/png,image/jpeg');
@@ -28,7 +28,7 @@ describe("the browser's file picker", () => {
   });
 
   it('answers the files chosen, and closes', async () => {
-    const picking = pickFilesInBrowser(document)('image/png');
+    const picking = pickFilesInBrowser(document, 'image/png');
     const input = openInput();
     const figure = new File([''], 'figure.png', { type: 'image/png' });
     fireEvent.change(input, { target: { files: [figure] } });
@@ -38,21 +38,22 @@ describe("the browser's file picker", () => {
   });
 
   it('answers nothing when cancelled, and closes', async () => {
-    const picking = pickFilesInBrowser(document)('image/png');
+    const picking = pickFilesInBrowser(document, 'image/png');
     openInput().dispatchEvent(new Event('cancel'));
 
     expect(await picking).toEqual([]);
     expect(document.querySelector('input[type="file"]')).toBeNull();
   });
 
-  it('closes a picker that never settled when the next one opens', () => {
-    void pickFilesInBrowser(document)('image/png');
-    void pickFilesInBrowser(document)('image/jpeg');
+  it('closes a picker that never settled when the next one opens, answering it nothing', async () => {
+    const stale = pickFilesInBrowser(document, 'image/png');
+    void pickFilesInBrowser(document, 'image/jpeg');
 
     const open = document.querySelectorAll('input[type="file"]');
     expect([...open].map((input) => input instanceof HTMLInputElement && input.accept)).toEqual([
       'image/jpeg',
     ]);
+    expect(await stale).toEqual([]);
     openInput().dispatchEvent(new Event('cancel'));
   });
 });

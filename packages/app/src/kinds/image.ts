@@ -6,8 +6,7 @@ import type {
   KindDecoration,
   Mutable,
 } from '../canvas-resource-decoration';
-import { PICKED_IMAGE_TYPES } from '../image-creation';
-import type { KindCreation, PickFiles } from '../kind-creation';
+import type { KindCreation } from '../kind-creation';
 import type { ResourcePlacementCommands } from '../resource-placement';
 
 /** The Image kind's operations and decoration, built by assigning what a gate allows. */
@@ -66,7 +65,8 @@ export function decorateImageResourceNode(
 }
 
 export type ImageCreationContext = Pick<ResourcePlacementCommands, 'createImagesFromFiles'> & {
-  readonly pickFiles: PickFiles;
+  /** Open the browser's file picker for images, within the press that asked for it. */
+  readonly pickImages: () => Promise<readonly File[]>;
 };
 
 /**
@@ -75,7 +75,11 @@ export type ImageCreationContext = Pick<ResourcePlacementCommands, 'createImages
  * creates nothing (ADR 0106).
  */
 export const imageCreation: KindCreation<ImageCreationContext> = {
-  create: ({ pickFiles, createImagesFromFiles }) => {
-    void pickFiles(PICKED_IMAGE_TYPES).then(createImagesFromFiles);
+  create: async ({ pickImages }, later) => {
+    // Opened before any `await`: a browser opens a picker only within the press.
+    const files = await pickImages();
+    // Placed by the Dock as it stands when the picker answers, not as it was
+    // pressed, and not at all once Create is withheld.
+    later()?.createImagesFromFiles(files);
   },
 };

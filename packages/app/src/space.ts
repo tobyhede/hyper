@@ -3,7 +3,7 @@ import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
 import type { SpaceBackend } from '@project/persistence';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
-import { pickFilesInBrowser } from './browser-file-picker';
+import { pickImagesInBrowser } from './browser-file-picker';
 import type { ImageSources } from './image-creation';
 import type { Fullscreen } from './presenting-fullscreen';
 import type { OpenedApplicationStartup } from './startup';
@@ -56,7 +56,7 @@ const browserImageSources = (): ImageSources => {
   return {
     store: (image) => host.storeImage(image),
     measure: measureInBrowser,
-    pick: (accept) => pickFilesInBrowser(document)(accept),
+    pick: pickImagesInBrowser,
   };
 };
 

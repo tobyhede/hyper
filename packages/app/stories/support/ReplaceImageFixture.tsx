@@ -3,7 +3,7 @@ import type { SpaceSession } from '@project/persistence';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { Application } from '#components/Application';
 import type { ImageSources } from '#src/image-creation';
-import { storelessImages } from './image-sources';
+import { pickImagesInBrowser } from '#src/browser-file-picker';
 import { storyOpening, storySpaces } from './application';
 import {
   authoredSnapshot,
@@ -101,7 +101,7 @@ const replaceImages: ImageSources = {
     return { kind: 'stored', url: REPLACE_STORED_URL };
   },
   measure: () => Promise.resolve(undefined),
-  pick: storelessImages.pick,
+  pick: pickImagesInBrowser,
 };
 
 /** Open the Pictures Space through the real session owner. */

@@ -37,7 +37,8 @@ Built.
 - Each kind's app half exports its Create: `markdownCreation`, `spaceCreation`, `imageCreation` and `urCreation`.
 - `kinds/registry.ts` lists them in a record over every kind, where Reference is `null` because it is created from its Target. So a new kind does not compile until it says how it is created.
 - `KIND_CREATIONS` takes the registry's order.
-- `ImageSources.pick` is the browser picker (`browser-file-picker.ts`), and the composition exposes it as `pickFiles`. A browser that fires no `cancel` leaves a picker unsettled; the next picker closes it, so at most one input is attached.
+- `ImageSources.pick` is the browser picker for images (`browser-file-picker.ts`), and the composition exposes it as `pickImages`. A browser that fires no `cancel` leaves a picker open; the next picker closes it and answers it nothing, so at most one input is attached. It is hand-rolled outside React, recorded in `interactiveDeviations`.
+- A Create that continues after its press (Create Image's picker answering) reads the Dock's conditions as they stand then, and does nothing once Create is withheld or the Dock has gone; a Create that rejects is reported as a break.
 - Replace image opens the same picker, through `ImageReplacements.pick` and the replacer's `pick`, so there is one file picker.
 
 **Removed:**
