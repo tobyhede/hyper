@@ -30,6 +30,7 @@ The code reviews of #362 and #363 found six places where the generic rules still
 - Intake's generic reference errors said "Reference Resource" and "targets reference" (`validate.ts`, `snapshot-edits.ts`).
 - Nothing held a kind's `contentTarget` to be one of its declared `resourceReferences`.
 - `NOT_THE_KIND` counted quoted `'space'` per file, so swapping a non-kind `'space'` for a kind-naming one passed.
+- `ONE_KIND_FEATURES` counted module-id reaches per file the same way, so swapping one counted reach for a new dispatch passed (the review of #365). Both lists now pin each line.
 - The Reference frame's border rule, moved into its kind's stylesheet, won the cascade over equal-specificity rules it used to lose to.
 
 The review of #363 added three: the core's `SpaceResourceTarget` shared a name with an unrelated app type (now `SpaceSelectionTarget`), `SpaceAggregateError` restated the Space kind's selection problems instead of using them, and the Space kind's selection check and Space references had no core tests. The author-facing `resource-has-references` sentence in `packages/app/src/authoring-refusal.ts` still says "Reference Resources"; it is left, because only the Reference kind declares Resource references today.

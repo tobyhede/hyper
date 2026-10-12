@@ -88,27 +88,6 @@ const sourceOf = (file: string): string =>
 const quotedAt = (source: string, kind: string): readonly number[] =>
   [...source.matchAll(new RegExp(`(['"\`])${kind}\\1`, 'gu'))].map((match) => match.index);
 
-/**
- * Each file whose count of `at`'s matches differs from `counted`, in either
- * direction, with the lines it found: a file that falls below its count fails
- * as surely as one that rises, so a table of counts follows the source down.
- */
-const miscounted = (
-  files: readonly string[],
-  counted: ReadonlyMap<string, number>,
-  at: (source: string) => readonly number[],
-): readonly string[] => {
-  const tracked = new Set(files);
-  return [...new Set([...files, ...counted.keys()])].flatMap((file) => {
-    const source = tracked.has(file) ? sourceOf(file) : '';
-    const lines = at(source).map((index) => lineAt(source, index));
-    const expected = counted.get(file) ?? 0;
-    return lines.length === expected
-      ? []
-      : [`${file}: counted ${expected}, found ${lines.length} (lines ${lines.join(', ')})`];
-  });
-};
-
 const scannedOutsideKinds = (): readonly string[] =>
   trackedFiles().filter((file) => isScannedSource(file) && !isKindModule(file));
 
@@ -167,34 +146,106 @@ const namings = (kind: string): readonly string[] =>
  * new one, or a dispatch written with module ids, fails until it is read and
  * either routed or counted.
  *
- * The list only shrinks. Each count is the file's own count, so a file that
- * reaches a kind less often fails until its count comes down with it, and a
- * new entry needs a ticket under `.scratch/resource-kind-modules/`.
+ * The list only shrinks. Each file lists the trimmed source line of every
+ * reach, once per occurrence, so a reach that goes fails until its line comes
+ * off the list, a reach swapped for another fails although the number of them
+ * is unchanged, and a new entry needs a ticket under
+ * `.scratch/resource-kind-modules/`.
  */
-const ONE_KIND_FEATURES = new Map<string, number>([
+const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
   // A Space Resource's selection, framing and portal; a Markdown body's completion.
-  ['packages/app/src/canvas-resource-authoring.ts', 4],
+  [
+    'packages/app/src/canvas-resource-authoring.ts',
+    [
+      'if (resource.document.kind === spaceKind.id) next.set(resource.id, resource.document);',
+      'resource.document.kind === spaceKind.id',
+      'if (stored?.document.kind !== spaceKind.id)',
+      "if (stored?.document.kind !== markdownKind.id) return 'retained';",
+    ],
+  ],
   // An Image Resource's Create opens the file picker first (ADR 0106).
-  ['packages/app/src/components/CommandDockResources.tsx', 2],
+  [
+    'packages/app/src/components/CommandDockResources.tsx',
+    [
+      'if (kind === imageKind.id) picker.current?.click();',
+      'onChoose={(files) => onCreate({ kind: imageKind.id, files })}',
+    ],
+  ],
   // The Space glyph on the Space cluster's own controls.
-  ['packages/app/src/components/CommandDockSpaces.tsx', 2],
+  [
+    'packages/app/src/components/CommandDockSpaces.tsx',
+    [
+      '<ResourceKindIcon kind={spaceKind.id} decorative />',
+      'icon={<ResourceKindIcon kind={spaceKind.id} decorative />}',
+    ],
+  ],
   // The kinds the Create cluster offers, in its order (ADR 0089).
-  ['packages/app/src/components/command-dock-chrome.ts', 4],
+  [
+    'packages/app/src/components/command-dock-chrome.ts',
+    [
+      'export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;',
+      'export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;',
+      'export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;',
+      'export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;',
+    ],
+  ],
   // A Space Resource's Create runs, and is available with, the Space Resource lifecycle (ADR 0074).
-  ['packages/app/src/dock-chrome.ts', 2],
+  [
+    'packages/app/src/dock-chrome.ts',
+    [
+      'else if (creation.kind === spaceKind.id) placement.createSpaceResource();',
+      'kind === spaceKind.id ? !availability.createSpaceResource : !availability.addResource,',
+    ],
+  ],
   // Replace is an Image Resource's (ADR 0106).
-  ['packages/app/src/image-replacement.ts', 1],
+  [
+    'packages/app/src/image-replacement.ts',
+    ['if (stored?.document.kind !== imageKind.id) return undefined;'],
+  ],
   // Create Reference's glyph, and a Space Resource's Enter and menu.
-  ['packages/app/src/resource-rail-actions.tsx', 3],
+  [
+    'packages/app/src/resource-rail-actions.tsx',
+    [
+      'icon: <ResourceKindIcon kind={referenceKind.id} decorative />,',
+      'if (resource.kind === spaceKind.id) {',
+      'spaces === null || resource.kind !== spaceKind.id',
+    ],
+  ],
   // Creating an Image or a Reference Resource, and Replace.
-  ['packages/app/src/space-authoring.ts', 3],
+  [
+    'packages/app/src/space-authoring.ts',
+    [
+      'return { title, kind: imageKind.id, content };',
+      'if (resource.document.kind !== imageKind.id)',
+      'kind: referenceKind.id,',
+    ],
+  ],
   // The Space Resource lifecycle (ADR 0074), its create and delete; and two reads of
   // its selection (`spaceId`, `map`, `graph`), unbuilt behind the module (issue 10, F).
-  ['packages/persistence/src/space-resource-planning.ts', 4],
+  [
+    'packages/persistence/src/space-resource-planning.ts',
+    [
+      'kind: spaceKind.id,',
+      'if (resource?.document.kind !== spaceKind.id) {',
+      'resource.document.kind !== spaceKind.id ||',
+      'document.kind === spaceKind.id &&',
+    ],
+  ],
   // A Space Resource's selection compared by kind, unbuilt behind the module (issue 10, F).
-  ['src/persistence/sql-space-repository.ts', 2],
+  [
+    'src/persistence/sql-space-repository.ts',
+    [
+      'if (resource.document.kind !== spaceKind.id || previous.document.kind !== spaceKind.id)',
+      'if (resource.document.kind !== spaceKind.id || previous.document.kind !== spaceKind.id)',
+    ],
+  ],
   // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
-  ['src/aggregate-directory/images.ts', 1],
+  [
+    'src/aggregate-directory/images.ts',
+    [
+      'const id = document.kind === imageKind.id ? storedImageId(document.content.url) : undefined;',
+    ],
+  ],
 ]);
 
 const KIND_MODULE_IDS = new RegExp(`\\b(?:${KINDS.join('|')})Kind\\.id\\b`, 'gu');
@@ -204,10 +255,11 @@ const moduleIdsAt = (source: string): readonly number[] =>
   [...source.matchAll(KIND_MODULE_IDS)].map((match) => match.index);
 
 const moduleIdReaches = (): readonly string[] =>
-  miscounted(
+  unlisted(
     scannedOutsideKinds().filter((file) => !file.endsWith('.css')),
     ONE_KIND_FEATURES,
     moduleIdsAt,
+    sourceOf,
   );
 
 describe('a kind is named only by its module', () => {
