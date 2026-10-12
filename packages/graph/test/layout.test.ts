@@ -43,9 +43,9 @@ function loadFixture(): Space {
       ],
     },
     [
-      resourceFile('00000000-0000-4000-8000-000000000002'),
-      resourceFile('00000000-0000-4000-8000-000000000003'),
-      resourceFile('00000000-0000-4000-8000-000000000005'),
+      ...resourceFile('00000000-0000-4000-8000-000000000002'),
+      ...resourceFile('00000000-0000-4000-8000-000000000003'),
+      ...resourceFile('00000000-0000-4000-8000-000000000005'),
     ],
   );
   if (!result.ok) throw new Error('fixture should load');

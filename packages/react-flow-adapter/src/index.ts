@@ -30,7 +30,7 @@ export {
   type RoutedFlowEdge,
 } from './RoutedEdge';
 // `edge-attachment` is absent whole, for the reason `@project/graph`'s index
-// gives for `frontmatter` and `validate`: `facingSides`, `anchorPoint`,
+// gives for `validate`: `facingSides`, `anchorPoint`,
 // `edgeAttachment`, `selfEdgeAttachment` and the rects they are written in are
 // how `RoutedEdge` decides where a curve lands, and no consumer outside this
 // package asks that question — the application composes the Edge, not the rule.

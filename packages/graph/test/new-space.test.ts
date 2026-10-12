@@ -58,10 +58,14 @@ describe('newSpace', () => {
     expect(spaceFileSchema.safeParse(first.file).success).toBe(true);
   });
 
-  it('puts the resource in `resources/`, named for its id', () => {
+  it('puts the resource in `resources/` as its Resource file and its sidecar, named for its id', () => {
     const { resourceFiles } = newSpace(newUuid);
-    expect(resourceFiles).toHaveLength(1);
-    expect(resourceFiles[0]!.path).toMatch(/^resources\/[0-9a-f-]{36}\.md$/);
+    const id = resourceFiles[0]?.path.match(/^resources\/([0-9a-f-]{36})\.json$/u)?.[1];
+    expect(id).toBeDefined();
+    expect(resourceFiles.map(({ path }) => path)).toEqual([
+      `resources/${id}.json`,
+      `resources/${id}.md`,
+    ]);
   });
 
   it('is a fresh value each time, so one space cannot mutate another', () => {

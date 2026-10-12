@@ -1,90 +1,92 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { stringify as stringifyYaml } from 'yaml';
-import { normalizeTitle, uuidSchema, type ResourceFrontmatter } from '@project/core';
-import { parseResourceFile } from '../src/index';
+import { uuidSchema, type Resource } from '@project/core';
+import { parseResourceFiles, type ResourceFile } from '../src/index';
+import type { Json } from './resource-files';
 
 /**
- * Write a resource file the way an author would: a fenced frontmatter block, a blank
- * line, then the body. The parser's job is to give both back untouched, whatever
- * the body happens to contain — including a `---` line of its own.
+ * A Resource file as an author writes it by hand, rather than as
+ * `serializeResource` does: keys in any order, any indentation, the media type
+ * in any case, and the file under any name, since identity is inside the file
+ * and never its name (ADR 0128). Intake reads every such file as the same
+ * Resource, and a Markdown Resource's source as its sidecar holds it.
  */
-function writeResourceFile(frontmatter: ResourceFrontmatter, body: string): string {
-  return `---\n${stringifyYaml(frontmatter)}---\n\n${body}`;
-}
 
-// A Title as a stored Resource carries it: non-empty, and already normalized, so a
-// generated trailing space is not read as a fence fault when intake trims it
-// (ADR 0083). Newlines are excluded because a multi-line Title is a YAML
-// question, not a fence question.
-const lineArb = fc
-  .string({ minLength: 1, maxLength: 40 })
-  .map(normalizeTitle)
-  .filter((s) => s.length > 0 && !s.includes('\n'));
+const uuidArb = fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value));
 
-const markdownFrontmatterArb: fc.Arbitrary<ResourceFrontmatter> = fc.record(
-  {
-    id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-    title: lineArb,
-    kind: fc.constant('markdown' as const),
-  },
-  { requiredKeys: ['id', 'title', 'kind'] },
-);
+const titleArb = fc
+  .string({ minLength: 1, maxLength: 30 })
+  .filter(
+    (title) => title.trim().length > 0 && title === title.trimEnd() && !/[\r\n]/u.test(title),
+  );
 
-const referenceFrontmatterArb: fc.Arbitrary<ResourceFrontmatter> = fc.record({
-  id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-  title: lineArb,
-  kind: fc.constant('reference' as const),
-  target: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-});
-
-const urFrontmatterArb: fc.Arbitrary<ResourceFrontmatter> = fc.record({
-  id: fc.uuid({ version: 4 }).map((value) => uuidSchema.parse(value)),
-  title: lineArb,
-  kind: fc.constant('ur' as const),
-});
-
-/**
- * Bodies built from the lines that make a fence parser wrong: a `---` rule, a
- * heading, a blank line, arbitrary prose. Left to `fc.string()` alone the
- * generator would essentially never emit `---` on its own line, and the property
- * would pass without ever testing the property it is here to test.
- */
-const bodyArb = fc
+/** Sources built from the lines that make a frontmatter or line-ending reader wrong. */
+const sourceArb = fc
   .array(
     fc.oneof(
       fc.constant('---'),
+      fc.constant('kind: ur'),
       fc.constant(''),
       fc.constant('# A heading'),
-      fc.string({ maxLength: 20 }).filter((s) => !s.includes('\n')),
+      fc.string({ maxLength: 20 }),
     ),
     { maxLength: 8 },
   )
-  .chain((lines) => fc.constantFrom(...['', '\n']).map((trailing) => lines.join('\n') + trailing));
+  .chain((lines) => fc.constantFrom('\n', '\r\n').map((lineBreak) => lines.join(lineBreak)));
 
-describe('resource file round-trip', () => {
-  it('gives back the frontmatter it was written with, and the body verbatim', () => {
-    const resourceFileArb = fc.oneof(
-      fc.tuple(markdownFrontmatterArb, bodyArb),
-      fc.tuple(referenceFrontmatterArb, fc.constant('')),
-      fc.tuple(urFrontmatterArb, fc.constant('')),
-    );
+/** `text/markdown` with each letter's case drawn independently. */
+const mediaTypeArb = fc
+  .array(fc.boolean(), { minLength: 13, maxLength: 13 })
+  .map((upper) =>
+    Array.from('text/markdown', (char, index) => (upper[index] ? char.toUpperCase() : char)).join(
+      '',
+    ),
+  );
+
+/** An object's entries in a drawn order, which JSON keeps. */
+const shuffled = (value: Record<string, Json>): fc.Arbitrary<Record<string, Json>> =>
+  fc
+    .shuffledSubarray(Object.entries(value), { minLength: Object.keys(value).length })
+    .map((entries) => Object.fromEntries(entries));
+
+const indentArb = fc.constantFrom(0, 1, 2, 4, '\t');
+
+const fileNameArb = fc.stringMatching(/^[a-z0-9-]{1,12}$/u);
+
+interface Authored {
+  readonly files: readonly ResourceFile[];
+  readonly resource: Resource;
+}
+
+const authoredArb: fc.Arbitrary<Authored> = fc
+  .record({
+    id: uuidArb,
+    title: titleArb,
+    source: sourceArb,
+    mediaType: mediaTypeArb,
+    indent: indentArb,
+    name: fileNameArb,
+  })
+  .chain(({ id, title, source, mediaType, indent, name }) =>
+    shuffled({ path: `${id}.md`, mediaType })
+      .chain((content) => shuffled({ id, title, kind: 'markdown', content }))
+      .map((envelope) => ({
+        files: [
+          { path: `resources/${name}.json`, text: JSON.stringify(envelope, null, indent) },
+          { path: `resources/${id}.md`, text: source },
+        ],
+        resource: { id, title, kind: 'markdown', content: { source } },
+      })),
+  );
+
+describe('a hand-written Resource file', () => {
+  it('reads as its Resource, with the sidecar as its source verbatim', () => {
     fc.assert(
-      fc.property(resourceFileArb, ([frontmatter, body]) => {
-        const result = parseResourceFile({
-          path: 'resources/generated.md',
-          text: writeResourceFile(frontmatter, body),
-        });
-
-        expect(result.ok).toBe(true);
-        if (!result.ok) return;
-        const { id, title, kind, ...content } = frontmatter;
-        expect(result.resource).toEqual({
-          id,
-          title,
-          kind,
-          content: kind === 'markdown' ? { source: body } : content,
-        });
+      fc.property(authoredArb, ({ files, resource }) => {
+        const result = parseResourceFiles(files);
+        expect(result.ok && result.resources.map((decoded) => decoded.resource)).toEqual([
+          resource,
+        ]);
       }),
     );
   });

@@ -15,7 +15,7 @@ import {
   type Resource,
   type UUID,
 } from '@project/core';
-import { Placement, serializeResourceFile } from '@project/graph';
+import { Placement, serializeResource } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
 import { compareOrdinal } from '../ordinal';
 import { discoverResourceFiles, isMissingFile } from './space-directory';
@@ -164,7 +164,8 @@ const canonicalResource = (
 
 /**
  * One Space's canonical files, by path relative to its Space directory:
- * `space.json` and one `resources/<id>.md` per Resource.
+ * `space.json`, one `resources/<id>.json` per Resource, and a Markdown
+ * Resource's sidecar `resources/<id>.md` beside its Resource file (ADR 0128).
  */
 export const spaceDirectoryFiles = (stored: LoadedSpace): ReadonlyMap<string, string> => {
   const files = new Map<string, string>([
@@ -173,10 +174,9 @@ export const spaceDirectoryFiles = (stored: LoadedSpace): ReadonlyMap<string, st
   for (const resource of [...stored.snapshot.resources].sort((left, right) =>
     compareOrdinal(left.id, right.id),
   )) {
-    files.set(
-      `resources/${resource.id}.md`,
-      serializeResourceFile(canonicalResource(resource.id, resource.document)),
-    );
+    for (const file of serializeResource(canonicalResource(resource.id, resource.document))) {
+      files.set(file.path, file.text);
+    }
   }
   return files;
 };
@@ -197,15 +197,16 @@ export const scannedSpaceFiles = async (directory: string): Promise<readonly str
  * alone.
  *
  * What it removes is exactly what `readSingleSpace` scans — `*.md` beside the
- * space file, `resources/*.md`, and `space.json` — so a Resource deleted since the
- * last export leaves no file behind to be read back as a Resource that still
- * exists. Anything the reader would not have looked at survives, which is what
- * lets a Space directory carry notes or assets across a round trip.
+ * space file, `resources/*.json` and `resources/*.md`, and `space.json` — so a
+ * Resource deleted since the last export leaves neither its Resource file nor
+ * its sidecar behind to be read back, and every other Resource's files stay.
+ * Anything the reader would not have looked at survives, which is what lets a
+ * Space directory carry notes or assets across a round trip.
  *
  * **Markdown is not among what survives, and a `README.md` here is no
- * exception.** The reader scans root `*.md` as Resource files, so a README beside
- * `space.json` is not an ignored file at all — left in place it would import as
- * a Resource, or refuse the import for having no frontmatter. Removing it is the
+ * exception.** The reader scans root `*.md` so that it can refuse one no
+ * Resource file names, so a README beside `space.json` is not an ignored file
+ * at all — left in place it would refuse the import. Removing it is the
  * correct behaviour rather than a gap; prose that belongs with a Space directory
  * has to sit under a name the reader does not scan.
  */

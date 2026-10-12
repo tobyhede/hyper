@@ -155,9 +155,10 @@ describe('tracked fixture images', () => {
   it('refuses to seed a fixture naming a stored image no tracked file produces', async () => {
     const copy = await copyOfTrackedFixture();
     const unknown = `${STORED_IMAGE_PREFIX}${'A'.repeat(43)}`;
+    const id = '00000000-0000-4000-8000-0000000000f0';
     await writeFile(
-      join(copy, '00000000-0000-4000-8000-000000000080', 'resources', 'unknown-picture.md'),
-      `---\nid: 00000000-0000-4000-8000-0000000000f0\ntitle: Unknown picture\nkind: image\nurl: ${unknown}\n---\n`,
+      join(copy, '00000000-0000-4000-8000-000000000080', 'resources', `${id}.json`),
+      JSON.stringify({ id, title: 'Unknown picture', kind: 'image', content: { url: unknown } }),
     );
 
     const repository = new MemorySpaceRepository();
@@ -210,6 +211,8 @@ describe('tracked fixture export', () => {
 
     const first = await exportOf(trackedFixture, join(root, 'first'));
     const second = await exportOf(join(root, 'first'), join(root, 'second'));
+    // Both Resource files and Markdown sidecars are among what round-trips.
+    expect(Object.keys(first).filter((path) => path.endsWith('.json')).length).toBeGreaterThan(0);
     expect(Object.keys(first).filter((path) => path.endsWith('.md')).length).toBeGreaterThan(0);
     expect(second).toEqual(first);
   });

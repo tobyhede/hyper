@@ -5,13 +5,12 @@ import {
   loadSpace,
   Placement,
   positionedStrategy,
-  serializeResourceFile,
   type Space,
 } from '@project/graph';
 import { OTHER_GRAPH_OPACITY } from '@project/react-flow-adapter';
 import { canvasProjection, type CanvasInteraction } from '../src/canvas-projection';
 import { resolveMap } from '../src/map-resolution';
-import { resourceFile } from './resource-files';
+import { jsonResourceFile, resourceFile } from './resource-files';
 
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const RESOURCE_B = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -20,7 +19,7 @@ const OTHER_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000008');
 const SECOND_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000009');
 
-const RESOURCES = [resourceFile(RESOURCE_A), resourceFile(RESOURCE_B)];
+const RESOURCES = [...resourceFile(RESOURCE_A), ...resourceFile(RESOURCE_B)];
 
 const DRAWN = { id: DRAWN_GRAPH, title: 'Drawn', edges: [{ from: RESOURCE_A, to: RESOURCE_B }] };
 const OTHER = { id: OTHER_GRAPH, title: 'Other', edges: [{ from: RESOURCE_B, to: RESOURCE_A }] };
@@ -278,10 +277,9 @@ describe('canvasProjection', () => {
       },
     };
     // Only an Ur Resource takes a Shape (ADR 0121).
-    const urResources = [RESOURCE_A, RESOURCE_B].map((id) => ({
-      path: `resources/${id}.md`,
-      text: serializeResourceFile({ id, title: id, kind: 'ur', content: {} }),
-    }));
+    const urResources = [RESOURCE_A, RESOURCE_B].flatMap((id) =>
+      jsonResourceFile(id, id, 'ur', {}),
+    );
     const { nodes } = await projectThrough(
       spaceWith({ maps: [diamondMap] }, urResources),
       AT_REST,

@@ -1,6 +1,6 @@
-/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { Resource, ResourceDocument, UUID } from '../types';
 import type { KindFlags } from './kind-module';
+/* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { imageKind } from './image';
 import { markdownKind } from './markdown';
 import { referenceKind } from './reference';
@@ -60,3 +60,17 @@ export const spaceSelectionProblem = (
   target: SpaceResourceTarget,
 ): SpaceSelectionProblem | undefined =>
   resource.kind === spaceKind.id ? spaceKind.selectionProblem(resource.content, target) : undefined;
+
+/**
+ * A kind id as ADR 0128 fixes it: a bare id, or a vendor kind's
+ * `vnd.<owner>.<name>`, each part ASCII letters, digits and hyphens starting
+ * with a letter or digit.
+ */
+const KIND_ID =
+  /^(?:[A-Za-z0-9][A-Za-z0-9-]*|vnd\.[A-Za-z0-9][A-Za-z0-9-]*\.[A-Za-z0-9][A-Za-z0-9-]*)$/u;
+
+/** Whether a value is a well-formed kind id, registered or not. */
+export const isKindId = (value: string): boolean => KIND_ID.test(value);
+
+/** Whether a module registers this kind with this build. */
+export const isRegisteredKind = (kind: string): boolean => KIND_FLAGS.has(kind);

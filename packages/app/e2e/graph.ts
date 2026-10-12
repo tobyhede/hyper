@@ -52,18 +52,14 @@ export const FIXTURE_ORDINARY_SPACE_COUNT = readdirSync(fixtureRoot, {
     existsSync(`${fixtureRoot}/${entry.name}/space.json`),
 ).length;
 
-const markdownFileCount = (directory: string): number =>
-  readdirSync(directory, { withFileTypes: true }).filter(
-    (entry) => entry.isFile() && entry.name.endsWith('.md'),
-  ).length;
-
 /**
- * Resources are discovered non-recursively in two places — beside the space file and
- * in `resources/` — and every `.md` in scope *is* a resource (ADR 0020), so counting
- * those files counts the Resources.
+ * Every Resource is one `resources/<id>.json` Resource file (ADR 0128), and
+ * Resources are discovered non-recursively there, so counting those files
+ * counts the Resources.
  */
-export const FIXTURE_RESOURCE_COUNT =
-  markdownFileCount(fixtureDir) + markdownFileCount(`${fixtureDir}/resources`);
+export const FIXTURE_RESOURCE_COUNT = readdirSync(`${fixtureDir}/resources`, {
+  withFileTypes: true,
+}).filter((entry) => entry.isFile() && entry.name.endsWith('.json')).length;
 
 /**
  * Graphs are a Map's only connection structure, so every Edge the overview

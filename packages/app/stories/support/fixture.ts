@@ -10,7 +10,7 @@ import {
   GRAPH_PALETTE as PRODUCTION_GRAPH_PALETTE,
   GRAPH_PALETTE_ENTRIES as PRODUCTION_GRAPH_PALETTE_ENTRIES,
   loadSpace,
-  serializeResourceFile,
+  serializeResource,
   type ResourceFile,
   type Space,
 } from '@project/graph';
@@ -157,10 +157,7 @@ export const maps: readonly Map[] = [
 
 export const spaceTitle = 'Graph-native presentations';
 
-const resourceFiles: ResourceFile[] = resources.map((resource) => ({
-  path: `resources/${resource.id}.md`,
-  text: serializeResourceFile(resource),
-}));
+const resourceFiles: ResourceFile[] = resources.flatMap((resource) => serializeResource(resource));
 
 const spaceFile: SpaceFile = {
   version: 1,

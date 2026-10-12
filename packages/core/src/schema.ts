@@ -2,7 +2,11 @@
 import { z } from 'zod';
 import { COLLAPSED_RESOURCE_SIZE } from './resource-geometry';
 import { imageKind, imageNaturalSizeSchema, imageResourceContentSchema } from './kinds/image';
-import { markdownKind, markdownResourceContentSchema } from './kinds/markdown';
+import {
+  markdownFileContentSchema,
+  markdownKind,
+  markdownResourceContentSchema,
+} from './kinds/markdown';
 import { referenceKind, referenceResourceContentSchema } from './kinds/reference';
 import { kindFlags } from './kinds/registry';
 import { spaceKind, spaceResourceContentSchema, spaceResourceFramingSchema } from './kinds/space';
@@ -37,9 +41,9 @@ const idSchema = uuidSchema;
  * all four the capability because they share a field type would be the model
  * following the implementation (ADR 0083).
  *
- * One instance, shared by every kind's frontmatter schema — `omit` and
+ * One instance, shared by the Resource and its file's schema — `omit` and
  * `extend` copy a field schema by reference, so the stored document and the
- * import variants inherit this rule rather than restating it, which is what
+ * file inherit this rule rather than restating it, which is what
  * `resource-document-equality.test.ts` holds them to.
  */
 const resourceTitleSchema = z
@@ -54,175 +58,49 @@ const resourceTitleSchema = z
     params: { code: RESOURCE_TITLE_REQUIRED },
   });
 
-/**
- * The frontmatter of a markdown resource file (ADR 0020). No `content` key: the
- * body of the file *is* the content, so the resource and its text are one artifact.
- */
-export const markdownResourceFrontmatterSchema = z.object({
-  id: idSchema,
-  title: resourceTitleSchema,
-  kind: z.literal(markdownKind.id),
-});
-
-/** The frontmatter of a reference resource file: the envelope's fields beside its content's. */
-export const referenceResourceFrontmatterSchema = z
-  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal(referenceKind.id) })
-  .extend(referenceResourceContentSchema.shape);
-
-export const spaceResourceFrontmatterSchema = z
-  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal(spaceKind.id) })
-  .extend(spaceResourceContentSchema.shape);
-
-export const imageResourceFrontmatterSchema = z
-  .object({ id: idSchema, title: resourceTitleSchema, kind: z.literal(imageKind.id) })
-  .extend(imageResourceContentSchema.shape);
-
-/**
- * A Resource with no content: a Title and every capability every Resource has
- * (ADR 0113). Its frontmatter is the whole of it, so its file has no body.
- */
-export const urResourceFrontmatterSchema = z.object({
-  id: idSchema,
-  title: resourceTitleSchema,
-  kind: z.literal(urKind.id),
-});
-
-const frontmatterRecordSchema = z.record(z.unknown());
-
-const frontmatterRecord = (value: unknown) => {
-  const record = frontmatterRecordSchema.safeParse(value);
-  return record.success ? record.data : undefined;
-};
-
-/** Whether parsed frontmatter names its kind, rather than taking the `ur` default. */
-export const declaresResourceKind = (frontmatter: unknown): boolean => {
-  const record = frontmatterRecord(frontmatter);
-  return record !== undefined && 'kind' in record;
-};
-
-/**
- * A Resource file that declares no `kind` is an Ur Resource (ADR 0120): its
- * frontmatter is its id and Title, and nothing says how to read content, so the
- * default names no content kind. `decodeResourceFile` in `@project/graph` refuses
- * a body under such a file (`packages/graph/test/resource-file.test.ts`, "refuses
- * a body under frontmatter with no kind, telling the author to declare Markdown").
- */
-const defaultUrKind = (value: unknown): unknown => {
-  const record = frontmatterRecord(value);
-  return record === undefined || declaresResourceKind(record)
-    ? value
-    : { ...record, kind: urKind.id };
-};
-
-/**
- * What a resource file's frontmatter must contain (ADR 0020). A resource's identity
- * lives here and never in its filename, so renaming the file is not an identity
- * change. `kind` defaults to `'ur'`, so a file that declares only an id and a
- * Title is an Ur Resource.
- *
- * Strict, as every `space.json` object is: a key no kind declares is refused,
- * naming the key, and so is one inside a nested object, `framing` or
- * `naturalSize`, so no authored key is dropped on intake (ADR 0127). Only
- * file intake is strict. The per-kind objects stay non-strict because the
- * content schemas they extend are the stored document's, HTTP's and the
- * domain's too, and those read what Hyper's own code wrote. `.strict()` keeps
- * the shape it is given, so the strict nested objects hold the same field
- * rules as the shared ones
- * (`packages/core/test/resource-document-equality.test.ts`).
- */
-const fileSpaceResourceFrontmatterSchema = spaceResourceFrontmatterSchema.extend({
-  framing: spaceResourceFramingSchema.strict().optional(),
-});
-const fileImageResourceFrontmatterSchema = imageResourceFrontmatterSchema.extend({
-  naturalSize: imageNaturalSizeSchema.strict().optional(),
-});
-
-export const resourceFrontmatterSchema = z.preprocess(
-  defaultUrKind,
-  z.discriminatedUnion('kind', [
-    markdownResourceFrontmatterSchema.strict(),
-    referenceResourceFrontmatterSchema.strict(),
-    fileSpaceResourceFrontmatterSchema.strict(),
-    fileImageResourceFrontmatterSchema.strict(),
-    urResourceFrontmatterSchema.strict(),
-  ]),
-);
-
-export const importMarkdownResourceFrontmatterSchema = markdownResourceFrontmatterSchema
-  .extend({ id: uuidSchema.optional() })
-  .strict();
-export const importReferenceResourceFrontmatterSchema = referenceResourceFrontmatterSchema
-  .extend({ id: uuidSchema.optional() })
-  .strict();
-export const importSpaceResourceFrontmatterSchema = fileSpaceResourceFrontmatterSchema
-  .extend({ id: uuidSchema.optional() })
-  .strict();
-export const importImageResourceFrontmatterSchema = fileImageResourceFrontmatterSchema
-  .extend({ id: uuidSchema.optional() })
-  .strict();
-export const importUrResourceFrontmatterSchema = urResourceFrontmatterSchema
-  .extend({ id: uuidSchema.optional() })
-  .strict();
-/** The import variant of {@link resourceFrontmatterSchema}: the same strictness and default, with `id` optional. */
-export const importResourceFrontmatterSchema = z.preprocess(
-  defaultUrKind,
-  z.discriminatedUnion('kind', [
-    importMarkdownResourceFrontmatterSchema,
-    importReferenceResourceFrontmatterSchema,
-    importSpaceResourceFrontmatterSchema,
-    importImageResourceFrontmatterSchema,
-    importUrResourceFrontmatterSchema,
-  ]),
-);
-
 /** An Ur Resource's content, which is nothing (ADR 0113). */
 export const urResourceContentSchema = urKind.contentSchema;
 
 /**
  * A Resource is an envelope (ADR 0128): the core owns `id`, `title` and
- * `kind`, and everything a kind adds sits under `content`. A Resource file's
- * frontmatter is flat; the codec in `@project/graph` maps between the two.
- * The envelope takes its `kind` from the frontmatter, so the two share one
- * instance of that rule as they share the Title's.
+ * `kind`, and everything a kind adds sits under `content`. A Resource file
+ * holds the same envelope, with a content kind's content replaced by the
+ * locator its file codec reads (`@project/graph`'s `resource-file.ts`).
  */
 const resourceEnvelope = <K extends z.ZodTypeAny, C extends z.ZodTypeAny>(kind: K, content: C) =>
   z.object({ id: idSchema, title: resourceTitleSchema, kind, content });
 
-/** A resource written directly by the author; the body of its file is its content. */
+/** A resource written directly by the author; its sidecar holds its source. */
 export const markdownResourceSchema = resourceEnvelope(
-  markdownResourceFrontmatterSchema.shape.kind,
+  z.literal(markdownKind.id),
   markdownResourceContentSchema,
 );
 
 /** A resource that shows its target's content at a second position (ADR 0009). */
 export const referenceResourceSchema = resourceEnvelope(
-  referenceResourceFrontmatterSchema.shape.kind,
+  z.literal(referenceKind.id),
   referenceResourceContentSchema,
 );
 
 /** A resource that embeds one selected view of another Space (ADR 0068). */
 export const spaceResourceSchema = resourceEnvelope(
-  spaceResourceFrontmatterSchema.shape.kind,
+  z.literal(spaceKind.id),
   spaceResourceContentSchema,
 );
 
 /** A resource that shows a picture from its URL (ADR 0106). */
 export const imageResourceSchema = resourceEnvelope(
-  imageResourceFrontmatterSchema.shape.kind,
+  z.literal(imageKind.id),
   imageResourceContentSchema,
 );
 
 /** A resource with no content (ADR 0113). */
-export const urResourceSchema = resourceEnvelope(
-  urResourceFrontmatterSchema.shape.kind,
-  urResourceContentSchema,
-);
+export const urResourceSchema = resourceEnvelope(z.literal(urKind.id), urResourceContentSchema);
 
 /**
- * A resource parsed from its file (ADR 0020). A markdown resource carries the file body
- * that stores its content; a reference resource carries only the pointer to its target's
- * content (ADR 0009). No default for `kind` here — by the time a resource exists
- * its frontmatter has been parsed, and that is where the `ur` default was applied.
+ * A Resource: the envelope with each kind's content (ADR 0128). A Markdown
+ * Resource carries its source; a Reference Resource only the pointer to its
+ * Target's content (ADR 0009).
  */
 export const resourceSchema = z.discriminatedUnion('kind', [
   markdownResourceSchema,
@@ -230,6 +108,55 @@ export const resourceSchema = z.discriminatedUnion('kind', [
   spaceResourceSchema,
   imageResourceSchema,
   urResourceSchema,
+]);
+
+/**
+ * A Resource file, `resources/<id>.json` (ADR 0128), as
+ * `docs/schema/resource/` specifies it: strict at both levels, so a key no
+ * kind declares is refused, naming the key, and so is one inside a nested
+ * object, `framing` or `naturalSize`, so no authored key is dropped on intake
+ * (ADR 0127). `kind` is required. Only file intake is strict: the stored
+ * document's content schemas read what Hyper's own code wrote. `.strict()`
+ * keeps the shape it is given, so the strict nested objects hold the same
+ * field rules as the shared ones
+ * (`packages/core/test/resource-document-equality.test.ts`).
+ */
+const resourceFileEnvelope = <K extends z.ZodTypeAny, C extends z.ZodTypeAny>(
+  kind: K,
+  content: C,
+) => z.object({ id: idSchema, title: resourceTitleSchema, kind, content }).strict();
+
+const declaredKindSchema = z.object({ kind: z.string() });
+const declaredIdSchema = z.object({ id: z.string() });
+
+/** The `id` a Resource file's JSON declares, when it is an object declaring a string one. */
+export const declaredId = (json: unknown): string | undefined => {
+  const parsed = declaredIdSchema.safeParse(json);
+  return parsed.success ? parsed.data.id : undefined;
+};
+
+/** The `kind` a Resource file's JSON declares, when it is an object declaring a string one. */
+export const declaredKind = (json: unknown): string | undefined => {
+  const parsed = declaredKindSchema.safeParse(json);
+  return parsed.success ? parsed.data.kind : undefined;
+};
+
+export const resourceFileSchema = z.discriminatedUnion('kind', [
+  resourceFileEnvelope(z.literal(markdownKind.id), markdownFileContentSchema),
+  resourceFileEnvelope(z.literal(referenceKind.id), referenceResourceContentSchema.strict()),
+  resourceFileEnvelope(
+    z.literal(spaceKind.id),
+    spaceResourceContentSchema
+      .extend({ framing: spaceResourceFramingSchema.strict().optional() })
+      .strict(),
+  ),
+  resourceFileEnvelope(
+    z.literal(imageKind.id),
+    imageResourceContentSchema
+      .extend({ naturalSize: imageNaturalSizeSchema.strict().optional() })
+      .strict(),
+  ),
+  resourceFileEnvelope(z.literal(urKind.id), urResourceContentSchema.strict()),
 ]);
 
 /** The refusal code for a multi-line Edge Title; the application owns the wording. */
@@ -423,9 +350,8 @@ export const positionedMapSchema = z
  * There is one kind today; the union is what makes a second one cost no
  * migration.
  *
- * `kind` defaults to `'positioned'` when absent, the same shape `resourceFrontmatterSchema`
- * uses — here it is for hand-authoring rather than back-compat, so a Map can
- * be written as just an id, a title, and its positions.
+ * `kind` defaults to `'positioned'` when absent, for hand-authoring, so a Map
+ * can be written as just an id, a title, and its positions.
  */
 const defaultPositionedKind = (value: unknown): unknown =>
   typeof value === 'object' && value !== null && !Array.isArray(value) && !('kind' in value)

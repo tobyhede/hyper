@@ -36,3 +36,24 @@ export const markdownKind = {
 
 /** The Markdown kind's id. */
 export type MarkdownKindId = typeof markdownKind.id;
+
+/** The media type of a Markdown Resource's sidecar (ADR 0128). */
+export const MARKDOWN_MEDIA_TYPE = 'text/markdown';
+
+/** The sidecar a Markdown Resource's file names: its own `<id>.md`, beside its Resource file. */
+export const markdownSidecarPath = (id: string): string => `${id}.md`;
+
+/**
+ * A Markdown Resource's content as its Resource file holds it (ADR 0128): a
+ * locator naming its sidecar, in place of the source the sidecar holds. The
+ * media type compares case-insensitively; that the path is the Resource's own
+ * `<id>.md` is intake's to check, since the schema does not see the id.
+ */
+export const markdownFileContentSchema = z
+  .object({
+    path: z.string(),
+    mediaType: z.string().refine((mediaType) => mediaType.toLowerCase() === MARKDOWN_MEDIA_TYPE, {
+      message: `A Markdown Resource's sidecar is ${MARKDOWN_MEDIA_TYPE}`,
+    }),
+  })
+  .strict();

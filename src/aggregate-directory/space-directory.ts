@@ -6,7 +6,7 @@ import {
   type ImportSpace,
   type ImportSpaceFile,
 } from '@project/core';
-import { documentRefusal, parseImportResourceFile } from '@project/graph';
+import { documentRefusal, parseResourceFiles } from '@project/graph';
 import { compareOrdinal } from '../ordinal';
 
 type AggregateDirectoryErrorKind = 'discovery' | 'parsing';
@@ -30,9 +30,11 @@ const resolveSpaceFile = async (inputPath: string): Promise<string> => {
     : absoluteInput;
 };
 
-const markdownFilesIn = async (directory: string): Promise<string[]> =>
+const filesIn = async (directory: string, extensions: readonly string[]): Promise<string[]> =>
   (await readdir(directory, { withFileTypes: true }))
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .filter(
+      (entry) => entry.isFile() && extensions.some((extension) => entry.name.endsWith(extension)),
+    )
     .map((entry) => join(directory, entry.name));
 
 /**
@@ -45,15 +47,18 @@ export const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
 
 /**
- * The Resource files Import reads in a Space directory: `*.md` beside
- * `space.json` and `resources/*.md`, in ordinal order of their relative paths.
+ * The files Import reads in a Space directory, in ordinal order of their
+ * relative paths: `resources/*.json`, the Resource files (ADR 0128), and every
+ * `.md` in `resources/` or beside `space.json`. A `.md` is read so that one no
+ * Resource file names as its sidecar is refused, naming it, rather than
+ * ignored: a Resource written in an older format is never silently dropped.
  * Export removes exactly these when a Resource leaves, so the two cannot drift.
  */
 export const discoverResourceFiles = async (spaceDirectory: string): Promise<string[]> => {
-  const rootFiles = await markdownFilesIn(spaceDirectory);
+  const rootFiles = await filesIn(spaceDirectory, ['.md']);
   let nestedFiles: string[];
   try {
-    nestedFiles = await markdownFilesIn(join(spaceDirectory, 'resources'));
+    nestedFiles = await filesIn(join(spaceDirectory, 'resources'), ['.json', '.md']);
   } catch (error) {
     if (!isMissingFile(error)) throw error;
     nestedFiles = [];
@@ -136,14 +141,13 @@ export const parseSingleSpace = ({
     }
   }
 
-  const resources = resourceFiles.flatMap(({ path, text }) => {
-    const parsed = parseImportResourceFile({ path, text });
-    if (!parsed.ok) {
-      diagnostics.push(...parsed.errors.map((error) => error.message));
-      return [];
-    }
-    return [parsed.resource];
-  });
+  const parsedResources = parseResourceFiles(resourceFiles);
+  const resources = parsedResources.ok
+    ? parsedResources.resources.map(({ resource: { id, ...document } }) => ({ id, document }))
+    : [];
+  if (!parsedResources.ok) {
+    diagnostics.push(...parsedResources.errors.map((error) => error.message));
+  }
 
   if (diagnostics.length > 0 || parsedSpaceFile === undefined) {
     throw new AggregateDirectoryError('parsing', diagnostics);

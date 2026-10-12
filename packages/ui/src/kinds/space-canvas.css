@@ -1,5 +1,6 @@
 /* The Space kind's frame on a Map (ADR 0068, ADR 0120). `CanvasResource`
-   imports it after `canvas-resource.css`.
+   imports it after `canvas-resource.css`, an order
+   `test/unit/kind-stylesheet-order.test.ts` holds.
 
    The title footer takes only its content. CanvasResource reports its measured
    height so embedded nodes and Edges clip at the same boundary. */

@@ -68,7 +68,7 @@ const mapSpaceArb = resourceIdPool.chain((pool) =>
           },
         ],
       },
-      resourceFiles: resources.map((id) => resourceFile(id)),
+      resourceFiles: resources.flatMap((id) => resourceFile(id)),
     };
   }),
 );

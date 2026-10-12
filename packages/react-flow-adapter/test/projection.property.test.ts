@@ -5,7 +5,7 @@ import { uuidSchema, type Resource, type UUID } from '@project/core';
 import {
   buildGraphRenderEdges,
   loadSpace,
-  serializeResourceFile,
+  serializeResource,
   type LayoutStrategyGraph,
   type ResourceFile,
 } from '@project/graph';
@@ -105,7 +105,7 @@ const spaceFileArb = resourceIdPool.chain((pool) =>
           },
         ],
       },
-      resourceFiles: visited.map((id) => resourceFile(id)),
+      resourceFiles: visited.flatMap((id) => resourceFile(id)),
     };
   }),
 );
@@ -216,33 +216,35 @@ function withKinds(
   kinds: readonly GeneratedKind[],
 ) {
   const owners: UUID[] = [];
-  const resourceFiles = generated.resourceFiles.map((file, index): ResourceFile => {
-    const id = uuidSchema.parse(file.path.slice('resources/'.length, -'.md'.length));
-    const title = `Resource ${index}`;
-    const chosen = kinds[index % kinds.length] ?? 'markdown';
-    const target = owners[index % Math.max(owners.length, 1)];
-    const resource: Resource =
-      chosen === 'reference' && target !== undefined
-        ? { id, title, kind: 'reference', content: { target } }
-        : chosen === 'image'
-          ? { id, title, kind: 'image', content: { url: `https://example.com/${index}.png` } }
-          : chosen === 'space'
-            ? {
-                id,
-                title,
-                kind: 'space',
-                content: {
-                  spaceId: uuidSchema.parse(uuidFrom(900)),
-                  map: uuidSchema.parse(uuidFrom(901)),
-                  graph: uuidSchema.parse(uuidFrom(902)),
-                },
-              }
-            : chosen === 'ur'
-              ? { id, title, kind: 'ur', content: {} }
-              : { id, title, kind: 'markdown', content: { source: `Body ${index}\n` } };
-    if (resource.kind !== 'reference') owners.push(id);
-    return { path: file.path, text: serializeResourceFile(resource) };
-  });
+  const resourceFiles = generated.resourceFiles
+    .filter((file) => file.path.endsWith('.json'))
+    .flatMap((file, index): readonly ResourceFile[] => {
+      const id = uuidSchema.parse(file.path.slice('resources/'.length, -'.json'.length));
+      const title = `Resource ${index}`;
+      const chosen = kinds[index % kinds.length] ?? 'markdown';
+      const target = owners[index % Math.max(owners.length, 1)];
+      const resource: Resource =
+        chosen === 'reference' && target !== undefined
+          ? { id, title, kind: 'reference', content: { target } }
+          : chosen === 'image'
+            ? { id, title, kind: 'image', content: { url: `https://example.com/${index}.png` } }
+            : chosen === 'space'
+              ? {
+                  id,
+                  title,
+                  kind: 'space',
+                  content: {
+                    spaceId: uuidSchema.parse(uuidFrom(900)),
+                    map: uuidSchema.parse(uuidFrom(901)),
+                    graph: uuidSchema.parse(uuidFrom(902)),
+                  },
+                }
+              : chosen === 'ur'
+                ? { id, title, kind: 'ur', content: {} }
+                : { id, title, kind: 'markdown', content: { source: `Body ${index}\n` } };
+      if (resource.kind !== 'reference') owners.push(id);
+      return serializeResource(resource);
+    });
   return { file: generated.file, resourceFiles };
 }
 

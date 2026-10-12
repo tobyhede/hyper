@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { type Resource, type ResourcePlacement } from '@project/core';
-import {
-  loadSpace,
-  loadSpaceSnapshot,
-  serializeResourceFile,
-  type LoadSpaceResult,
-} from '../src/index';
+import { loadSpace, loadSpaceSnapshot, type LoadSpaceResult } from '../src/index';
 import type { SpaceReferenceError } from '../src/validate';
-import { referenceFile, resourceFile, uuid } from './resource-files';
+import { jsonResourceFile, resourceFile, uuid } from './resource-files';
 
 /**
  * The Space intake contract, run against **both** loaders.
@@ -47,23 +42,16 @@ interface Document {
 type Loader = (document: Document) => LoadSpaceResult;
 
 /**
- * The file loader: resources arrive as the markdown files an author wrote, so the
- * document under test is turned back into frontmatter on the way in.
+ * The file loader: resources arrive as the Resource files an author wrote, so
+ * the document under test is written back out as JSON and sidecars on the way in.
  */
 const viaFiles: Loader = ({ resources, ...structure }) =>
   loadSpace(
     { version: 1, id: SPACE, title: 'Test space', ...structure },
-    resources.map((resource) =>
-      resource.kind === 'reference'
-        ? referenceFile(resource.id, resource.title, resource.content.target)
-        : resource.kind === 'space'
-          ? {
-              path: `resources/${resource.id}.md`,
-              text: `---\nid: ${resource.id}\ntitle: ${resource.title}\nkind: space\nspaceId: ${resource.content.spaceId}\nmap: ${resource.content.map}\ngraph: ${resource.content.graph}\n---\n`,
-            }
-          : resource.kind === 'image' || resource.kind === 'ur'
-            ? { path: `resources/${resource.id}.md`, text: serializeResourceFile(resource) }
-            : resourceFile(resource.id, resource.title, resource.content.source),
+    resources.flatMap((resource) =>
+      resource.kind === 'markdown'
+        ? resourceFile(resource.id, resource.title, resource.content.source)
+        : jsonResourceFile(resource.id, resource.title, resource.kind, resource.content),
     ),
   );
 

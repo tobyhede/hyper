@@ -41,7 +41,7 @@ const load = (defaultMap: MapId | undefined) =>
         },
       ],
     },
-    [resourceFile(PLACED), resourceFile(ALSO_PLACED), resourceFile(OMITTED)],
+    [...resourceFile(PLACED), ...resourceFile(ALSO_PLACED), ...resourceFile(OMITTED)],
   );
 
 const loaded = load(MAP);

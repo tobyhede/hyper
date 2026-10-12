@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { captureError } from '../support/capture-error';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
-import { admitted, pngBytes, showing } from '../support/stored-images';
+import { admitted, directoryTree, pngBytes, showing } from '../support/stored-images';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('a0000000-0000-4000-8000-000000000010');
@@ -259,13 +259,21 @@ describe('canonical export', () => {
     await expect(readFile(spaceFileIn(first), 'utf8')).resolves.toBe(
       await readFile(spaceFileIn(second), 'utf8'),
     );
-    for (const resourceId of [RESOURCE_A, RESOURCE_B, RESOURCE_E, RESOURCE_F]) {
-      await expect(
-        readFile(join(first, SPACE_ID, 'resources', `${resourceId}.md`), 'utf8'),
-      ).resolves.toBe(
-        await readFile(join(second, SPACE_ID, 'resources', `${resourceId}.md`), 'utf8'),
-      );
-    }
+    const resources = join(SPACE_ID, 'resources');
+    // Every Resource file, and the sidecar of each Markdown Resource.
+    expect((await readdir(join(first, resources))).sort()).toEqual(
+      [
+        `${RESOURCE_A}.json`,
+        `${RESOURCE_A}.md`,
+        `${RESOURCE_B}.json`,
+        `${RESOURCE_E}.json`,
+        `${RESOURCE_F}.json`,
+        `${RESOURCE_F}.md`,
+      ].sort(),
+    );
+    expect(await directoryTree(join(second, resources))).toEqual(
+      await directoryTree(join(first, resources)),
+    );
   });
 
   /**
@@ -549,8 +557,8 @@ describe('stored image bytes', () => {
 
     expect(await readdir(destination)).not.toContain('images');
     await expect(
-      readFile(join(destination, SPACE_ID, 'resources', `${PICTURE_ID}.md`), 'utf8'),
-    ).resolves.toContain(`url: /images/${missing.id}`);
+      readFile(join(destination, SPACE_ID, 'resources', `${PICTURE_ID}.json`), 'utf8'),
+    ).resolves.toContain(`"url": "/images/${missing.id}"`);
   });
 
   /*

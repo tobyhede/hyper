@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadSpace } from '../src/index';
-import { resourceFile, uuid } from './resource-files';
+import { jsonResourceFile, resourceFile, uuid } from './resource-files';
 
 /**
  * `loadSpace`'s own half of intake: the space file's shape, the resource files
@@ -49,8 +49,8 @@ const noStructure = { ...validInput, maps: [] };
 const { version: _version, ...versionless } = noStructure;
 
 const validResources = [
-  resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
-  resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
+  ...resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'Body of A.\n'),
+  ...resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'B', 'Body of B.\n'),
 ];
 
 describe('loadSpace', () => {
@@ -76,27 +76,30 @@ describe('loadSpace', () => {
     });
   });
 
-  it('rejects a reference resource file with a body, because its content comes from its target', () => {
+  it('rejects a reference resource file carrying a body, because its content comes from its target', () => {
     const result = loadSpace(noStructure, [
-      resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
-      {
-        path: 'resources/a-again.md',
-        text: '---\nid: 00000000-0000-4000-8000-000000000007\ntitle: A again\nkind: reference\ntarget: 00000000-0000-4000-8000-000000000002\n---\n\nThis would be discarded.\n',
-      },
+      ...resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'A', 'The source.\n'),
+      ...jsonResourceFile('00000000-0000-4000-8000-000000000007', 'A again', 'reference', {
+        target: '00000000-0000-4000-8000-000000000002',
+        source: 'This would be discarded.\n',
+      }),
     ]);
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.errors).toEqual([
-      expect.objectContaining({ kind: 'invalid-frontmatter', path: 'resources/a-again.md' }),
+      expect.objectContaining({
+        kind: 'invalid-resource-file',
+        path: 'resources/00000000-0000-4000-8000-000000000007.json',
+      }),
     ]);
   });
 
   it('orders resources by title, whatever order the files arrived in', () => {
     const result = loadSpace(noStructure, [
-      resourceFile(uuid('00000000-0000-4000-8000-000000000005'), 'Carla'),
-      resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'Anders'),
-      resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'Bo'),
+      ...resourceFile(uuid('00000000-0000-4000-8000-000000000005'), 'Carla'),
+      ...resourceFile(uuid('00000000-0000-4000-8000-000000000002'), 'Anders'),
+      ...resourceFile(uuid('00000000-0000-4000-8000-000000000003'), 'Bo'),
     ]);
     if (!result.ok) throw new Error('expected a valid space');
     expect(result.space.resources.map((r) => r.title)).toEqual(['Anders', 'Bo', 'Carla']);
@@ -104,26 +107,53 @@ describe('loadSpace', () => {
 
   it('rejects the same resource id in two files, naming both', () => {
     const result = loadSpace(noStructure, [
-      { path: 'intro.md', text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\n---\n' },
       {
-        path: 'resources/a.md',
-        text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A again\n---\n',
+        path: 'resources/intro.json',
+        text: JSON.stringify({
+          id: '00000000-0000-4000-8000-000000000002',
+          title: 'A',
+          kind: 'ur',
+          content: {},
+        }),
+      },
+      {
+        path: 'resources/a.json',
+        text: JSON.stringify({
+          id: '00000000-0000-4000-8000-000000000002',
+          title: 'A again',
+          kind: 'ur',
+          content: {},
+        }),
       },
     ]);
     expect(result.ok).toBe(false);
     if (result.ok) return;
     const duplicate = result.errors.find((e) => e.kind === 'duplicate-resource-id');
-    expect(duplicate?.message).toContain('intro.md');
-    expect(duplicate?.message).toContain('resources/a.md');
+    expect(duplicate?.message).toContain('resources/intro.json');
+    expect(duplicate?.message).toContain('resources/a.json');
   });
 
   it('reports a resource file that will not parse, without throwing', () => {
+    const result = loadSpace(noStructure, [{ path: 'resources/a.json', text: 'Not JSON.\n' }]);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors).toEqual([
+      expect.objectContaining({ kind: 'invalid-json', path: 'resources/a.json' }),
+    ]);
+  });
+
+  it('refuses a .md beside space.json, naming it, rather than dropping it', () => {
     const result = loadSpace(noStructure, [
-      { path: 'resources/a.md', text: 'No frontmatter here.\n' },
+      {
+        path: 'intro.md',
+        text: '---\nid: 00000000-0000-4000-8000-000000000002\ntitle: A\nkind: markdown\n---\n',
+      },
     ]);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors.some((e) => e.kind === 'missing-frontmatter')).toBe(true);
+    expect(result.errors).toEqual([
+      expect.objectContaining({ kind: 'unclaimed-sidecar', path: 'intro.md' }),
+    ]);
   });
 
   it('loads a space with no resources at all — a new space, before anything is written', () => {

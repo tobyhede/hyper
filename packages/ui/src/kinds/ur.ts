@@ -4,7 +4,8 @@ import { urKind, type ResourceShape } from '@project/core';
  * The view half of the Ur kind (ADR 0120, ADR 0128): what an Ur Resource is
  * called, and the one operation it offers beyond the shared Title. It draws no
  * content, having none (ADR 0113), so it has no content view. Its frame is
- * `ur-canvas.css` and `ur-stage.css`, which `CanvasResource` and `Stage` import.
+ * `ur-canvas.css` and `ur-stage.css`, which `CanvasResource` and `Stage` import
+ * after their own stylesheets (`test/unit/kind-stylesheet-order.test.ts`).
  */
 export const urView = {
   name: 'Ur Resource',

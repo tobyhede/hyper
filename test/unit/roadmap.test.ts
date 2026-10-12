@@ -633,7 +633,12 @@ describe('release scope', () => {
     if (release === null) throw new Error('Expected a release.');
     const destination = writeReleaseSpace(root, buildRoadmap(root), release);
     if (destination === null) throw new Error('Expected a generated Space.');
-    expect(readdirSync(join(destination, 'resources'))).toHaveLength(1);
+    // One Resource: its Resource file and its Markdown sidecar.
+    expect(
+      readdirSync(join(destination, 'resources'))
+        .map((name) => name.slice(name.lastIndexOf('.')))
+        .sort(),
+    ).toEqual(['.json', '.md']);
 
     // And once the work that outlived the gate settles too, the release is over
     // and there is nothing left to draw. Generating a Space is still the normal
@@ -687,10 +692,10 @@ describe('release scope', () => {
     const destination = writeReleaseSpace(root, roadmap, release);
     if (destination === null) throw new Error('Expected a generated Space.');
 
-    expect(readdirSync(join(destination, 'resources'))).toHaveLength(3);
-    expect(readFileSync(join(destination, 'resources/parallel-01.md'), 'utf8')).toContain(
-      '- **Tags:** `release/v1`',
-    );
+    // A Resource file and a Markdown sidecar for each of the three issues.
+    const files = readdirSync(join(destination, 'resources'));
+    expect(files.filter((name) => name.endsWith('.json'))).toHaveLength(3);
+    expect(files.filter((name) => name.endsWith('.md'))).toHaveLength(3);
     const written: unknown = JSON.parse(readFileSync(join(destination, 'space.json'), 'utf8'));
     const file = spaceFileSchema.parse(written);
     expect(file.maps?.[0]?.graphs.map(({ edges }) => edges)).toEqual([
@@ -699,6 +704,13 @@ describe('release scope', () => {
     ]);
 
     const imported = await readSingleSpace(destination);
+    const parallel = imported.resources.find(
+      ({ document }) => document.title === 'parallel/01 — Reference Resource',
+    );
+    expect(parallel?.document.kind).toBe('markdown');
+    expect(
+      readFileSync(join(destination, 'resources', `${String(parallel?.id)}.md`), 'utf8'),
+    ).toContain('- **Tags:** `release/v1`');
     const intake = loadSpaceSnapshot(
       spaceSnapshotSchema.parse({
         id: imported.id,
@@ -763,12 +775,20 @@ const ROADMAP_SCRIPT = join(REPOSITORY_ROOT, 'scripts/roadmap.ts');
 // declares, so this asks for what tsx exports rather than for a path inside its
 // build output that it never promised to keep.
 const TSX_CLI = createRequire(import.meta.url).resolve('tsx/cli');
+// The script imports `@project/*`, which resolve through the repository's
+// tsconfig `paths`. tsx reads the tsconfig of its cwd, and the cwd here is
+// outside the repository, so it is named.
+const TSCONFIG = join(REPOSITORY_ROOT, 'tsconfig.json');
 
 const runRoadmap = (cwd: string, ...args: readonly string[]) => {
-  const result = spawnSync(process.execPath, [TSX_CLI, ROADMAP_SCRIPT, ...args], {
-    cwd,
-    encoding: 'utf8',
-  });
+  const result = spawnSync(
+    process.execPath,
+    [TSX_CLI, '--tsconfig', TSCONFIG, ROADMAP_SCRIPT, ...args],
+    {
+      cwd,
+      encoding: 'utf8',
+    },
+  );
   return { status: result.status ?? -1, stdout: result.stdout, stderr: result.stderr };
 };
 

@@ -23,7 +23,11 @@ import { runHyper } from '../../src/cli/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import type { SpaceRepository } from '../../src/persistence/space-repository';
 import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
-import { writeAggregateInto, type SpaceDirectory } from '../support/aggregate-directory';
+import {
+  markdownResourceFiles,
+  writeAggregateInto,
+  type SpaceDirectory,
+} from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
 import { runCommand } from '../support/hyper-command';
 
@@ -32,6 +36,19 @@ const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
 const GRAPH_ID = uuidSchema.parse('33333333-3333-4333-8333-333333333333');
 const OTHER_SPACE_ID = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
 const THIRD_SPACE_ID = uuidSchema.parse('55555555-5555-4555-8555-555555555555');
+const OPENING_ID = uuidSchema.parse('66666666-6666-4666-8666-666666666666');
+
+/** Stored resource's Resource file, as Export writes it: envelope keys in order, two-space indent. */
+const STORED_RESOURCE_FILE = `${JSON.stringify(
+  {
+    id: RESOURCE_ID,
+    title: 'Stored resource',
+    kind: 'markdown',
+    content: { path: `${RESOURCE_ID}.md`, mediaType: 'text/markdown' },
+  },
+  null,
+  2,
+)}\n`;
 
 const USAGE = 'Usage: hyper <init|run|import|export|help> [arguments]\n';
 
@@ -79,7 +96,7 @@ const writeSingleSpaceAggregate = (id: UUID = SPACE_ID, title = 'Imported talk')
     {
       name: id,
       spaceFile: JSON.stringify({ version: 1, id, title }),
-      resources: { 'opening.md': '---\ntitle: Opening\nkind: markdown\n---\nHello.\n' },
+      resources: markdownResourceFiles(OPENING_ID, 'Opening', 'Hello.\n'),
     },
   ]);
 
@@ -170,10 +187,11 @@ describe('runHyper', () => {
       `${JSON.stringify({ version: 1, id: SPACE_ID, title: 'Stored talk' }, null, 2)}\n`,
     );
     await expect(
+      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.json`), 'utf8'),
+    ).resolves.toBe(STORED_RESOURCE_FILE);
+    await expect(
       readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
-    ).resolves.toBe(
-      `---\nid: ${RESOURCE_ID}\ntitle: Stored resource\nkind: markdown\n---\n\nStored body.\n`,
-    );
+    ).resolves.toBe('Stored body.\n');
   });
 
   /*
@@ -207,6 +225,8 @@ describe('runHyper', () => {
     await writeFile(join(spaceDirectory, 'space.json'), '{}\n');
     await writeFile(join(spaceDirectory, 'stale-root.md'), 'stale\n');
     await writeFile(join(spaceDirectory, 'resources', 'stale.md'), 'stale\n');
+    await writeFile(join(spaceDirectory, 'resources', 'stale.json'), '{}\n');
+    await writeFile(join(spaceDirectory, 'resources', 'nested', 'keep.json'), '{}\n');
     await writeFile(join(spaceDirectory, 'notes.txt'), 'keep space\n');
     await writeFile(join(spaceDirectory, 'resources', 'nested', 'keep.md'), 'keep nested\n');
     await writeFile(join(destination, 'notes.txt'), 'keep root\n');
@@ -224,6 +244,12 @@ describe('runHyper', () => {
     await expect(access(join(spaceDirectory, 'resources', 'stale.md'))).rejects.toMatchObject({
       code: 'ENOENT',
     });
+    await expect(access(join(spaceDirectory, 'resources', 'stale.json'))).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    await expect(
+      readFile(join(spaceDirectory, 'resources', 'nested', 'keep.json'), 'utf8'),
+    ).resolves.toBe('{}\n');
     await expect(readFile(join(destination, 'notes.txt'), 'utf8')).resolves.toBe('keep root\n');
     await expect(readFile(join(spaceDirectory, 'notes.txt'), 'utf8')).resolves.toBe('keep space\n');
     await expect(
@@ -371,11 +397,11 @@ describe('runHyper', () => {
   it('rejects a symlinked canonical resource file without changing its external target', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const spaceDirectory = join(destination, SPACE_ID);
-    const external = join(await makeTemporaryDirectory(), 'external.md');
+    const external = join(await makeTemporaryDirectory(), 'external.json');
     await mkdir(join(spaceDirectory, 'resources'), { recursive: true });
     await writeFile(join(spaceDirectory, 'space.json'), 'previous space\n');
     await writeFile(external, 'external resource\n');
-    await symlink(external, join(spaceDirectory, 'resources', `${RESOURCE_ID}.md`));
+    await symlink(external, join(spaceDirectory, 'resources', `${RESOURCE_ID}.json`));
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
@@ -384,10 +410,10 @@ describe('runHyper', () => {
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
-      `Export failed: Export destination contains a symbolic link: ${join(spaceDirectory, 'resources', `${RESOURCE_ID}.md`)}\n`,
+      `Export failed: Export destination contains a symbolic link: ${join(spaceDirectory, 'resources', `${RESOURCE_ID}.json`)}\n`,
     ]);
     expect(
-      (await lstat(join(spaceDirectory, 'resources', `${RESOURCE_ID}.md`))).isSymbolicLink(),
+      (await lstat(join(spaceDirectory, 'resources', `${RESOURCE_ID}.json`))).isSymbolicLink(),
     ).toBe(true);
     await expect(readFile(join(spaceDirectory, 'space.json'), 'utf8')).resolves.toBe(
       'previous space\n',
@@ -558,7 +584,7 @@ describe('runHyper', () => {
     });
   });
 
-  it('canonicalizes resource frontmatter independently of document key insertion order', async () => {
+  it('canonicalizes a Resource file independently of document key insertion order', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const reordered: LoadedSpace = {
       ...storedSpace,
@@ -586,10 +612,8 @@ describe('runHyper', () => {
     ).resolves.toBe(0);
 
     await expect(
-      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
-    ).resolves.toBe(
-      `---\nid: ${RESOURCE_ID}\ntitle: Stored resource\nkind: markdown\n---\n\nStored body.\n`,
-    );
+      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.json`), 'utf8'),
+    ).resolves.toBe(STORED_RESOURCE_FILE);
   });
 
   it('normalizes exported Markdown line endings to LF', async () => {
@@ -619,12 +643,9 @@ describe('runHyper', () => {
       }),
     ).resolves.toBe(0);
 
-    const resourceFile = await readFile(
-      join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`),
-      'utf8',
-    );
-    expect(resourceFile).not.toContain('\r');
-    expect(resourceFile).toContain('\nFirst\nSecond\nThird\n');
+    await expect(
+      readFile(join(destination, SPACE_ID, 'resources', `${RESOURCE_ID}.md`), 'utf8'),
+    ).resolves.toBe('First\nSecond\nThird\n');
   });
 
   /*
@@ -753,9 +774,7 @@ describe('runHyper', () => {
       {
         name: SPACE_ID,
         spaceFile: JSON.stringify({ version: 1, id: SPACE_ID, title: 'Imported talk' }),
-        resources: {
-          [`${RESOURCE_ID}.md`]: `---\nid: ${RESOURCE_ID}\ntitle: Opening\nkind: markdown\n---\n\nHello.\n`,
-        },
+        resources: markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
       },
     ]);
     const repository = new MemorySpaceRepository();
@@ -861,11 +880,12 @@ describe('runHyper', () => {
       join(root, AGGREGATE_FILE_NAME),
       JSON.stringify({ version: 1, metaSpaceId: SPACE_ID }),
     );
-    const firstResourcePath = join(spaceDirectory, 'first.md');
+    await mkdir(join(spaceDirectory, 'resources'));
+    const firstResourcePath = join(spaceDirectory, 'resources', `${RESOURCE_ID}.json`);
     const secondResourcePath = join(spaceDirectory, 'second.md');
     await writeFile(join(spaceDirectory, 'space.json'), '{ invalid JSON');
-    await writeFile(firstResourcePath, 'Missing frontmatter.\n');
-    await writeFile(secondResourcePath, 'Also missing frontmatter.\n');
+    await writeFile(firstResourcePath, '{ invalid JSON');
+    await writeFile(secondResourcePath, 'No Resource file names this.\n');
     const output = captureIo();
     const repository = new MemorySpaceRepository();
 
@@ -924,9 +944,7 @@ describe('runHyper', () => {
             },
           ],
         }),
-        resources: {
-          'opening.md': `---\nid: ${RESOURCE_ID}\ntitle: Opening\nkind: markdown\n---\nHello.\n`,
-        },
+        resources: markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
       },
     ]);
     const output = captureIo();

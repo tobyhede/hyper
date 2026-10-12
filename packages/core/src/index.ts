@@ -15,6 +15,8 @@ export * from './kinds/reference';
 export * from './kinds/space';
 export {
   contentTarget,
+  isKindId,
+  isRegisteredKind,
   lifetimeSpaceReferences,
   mayBeTarget,
   resourceReferences,

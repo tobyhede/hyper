@@ -1,6 +1,6 @@
 # 07 — A Resource file is JSON
 
-Status: ready-for-agent
+Status: resolved
 
 **What to build:** ADR 0128's file format, as `docs/schema/resource/` specifies it. Each Resource is `resources/<id>.json` holding `{ id, title, kind, content }`; Resource files are strict at both levels (core keys, then the kind's `content` keys) and a Resource file with no `kind` is refused. A content kind locates a file of its content with `{ path, mediaType }` or `{ url }`:
 
@@ -18,3 +18,13 @@ A kind id is checked at intake as ADR 0128 fixes it: a bare id or `vnd.<owner>.<
 **Depends on:** 06.
 
 **Acceptance:** a test holds the JSON Schema to refusing only what intake refuses — necessary, not sufficient: every Resource file under `docs/schema/resource/examples/` passes the schema and decodes through its kind's file codec, and a table of invalid Resource files records, row by row, whether both refuse it or only intake does. Rows only intake refuses include an Image `url` of `"https://"` and of `"https://exa mple.com/a.png"`, a Markdown `path` naming another Resource's `<id>.md`, and a Reference Target or Space that does not resolve; Reference and Space resolution is also held by a tracked fixture. Deleting a Markdown Resource removes only its own sidecar. Ajv is a dev dependency, and `test/unit/aggregate-json-schema.test.ts` already compiles the Resource schema and holds it to the published examples. Every tracked aggregate round-trips through Import and Export unchanged; `pnpm hyper run` on a temp directory writes Resource files and sidecars; no Resource file is `.md` unless it is a sidecar.
+
+## Answer
+
+Built. Each Resource is `resources/<id>.json`, `{ id, title, kind, content }`, and a Markdown Resource's source is the `<id>.md` sidecar its content names.
+
+- **Core:** `resourceFileSchema` in `packages/core/src/schema.ts` is the file's strict envelope per kind; Markdown's content is `markdownFileContentSchema` (`packages/core/src/kinds/markdown.ts`), with `MARKDOWN_MEDIA_TYPE` and `markdownSidecarPath`. `isKindId` and `isRegisteredKind` in `kinds/registry.ts` check a kind id. Every frontmatter schema, the import variants and `defaultUrKind` are gone, so a Resource file must declare its `id` and `kind`; Resource ids are no longer minted on Import.
+- **Codec:** `packages/graph/src/resource-file.ts`: `parseResourceFiles` and `serializeResource`; `frontmatter.ts` and graph's `yaml` dependency are gone. Its refusals are `invalid-json`, `invalid-resource-file`, `missing-sidecar` and `unclaimed-sidecar`. A refused Resource file's own `<id>.md` is not reported again as unclaimed.
+- **Discovery and Export:** `src/aggregate-directory/` reads `resources/*.json`, `resources/*.md` and any `.md` beside `space.json`, so an unclaimed `.md` is refused naming it; Export writes and removes Resource files and sidecars in place. `scripts/roadmap.ts` writes through `serializeResource`.
+- **Fixtures and docs rolled forward:** `packages/app/fixture/`, `packages/app/example/`, `docs/aggregate-directory.md`, both `hyper-*` skills, `docs/agents/editing-and-persistence.md`, `docs/schema/resource/README.md` and AGENTS.md.
+- **Acceptance:** `test/unit/aggregate-json-schema.test.ts`, "the Resource file JSON Schema refuses only what intake refuses", decodes every published example through the codec and holds a table of invalid Resource files, each marked refused by both or only by intake, with intake run through `parseResourceFiles`, `loadSpace` and `loadSpaceAggregate`. `export-aggregate-in-place.test.ts` holds that deleting a Markdown Resource removes only its own two files, and `run.test.ts` that a run writes them.

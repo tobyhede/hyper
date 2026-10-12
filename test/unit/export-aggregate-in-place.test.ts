@@ -64,6 +64,9 @@ const exportTo = async (repository: MemorySpaceRepository, destination: string):
 };
 
 const resourceFile = (destination: string, id: string): string =>
+  join(destination, SPACE_ID, 'resources', `${id}.json`);
+
+const sidecar = (destination: string, id: string): string =>
   join(destination, SPACE_ID, 'resources', `${id}.md`);
 
 /** What identifies a file or directory on disk, and when its contents last changed. */
@@ -91,7 +94,7 @@ describe('Export writes in place', () => {
       resources: (await stat(join(destination, SPACE_ID, 'resources'))).ino,
     }).toEqual(before);
     await expect(readdir(parent)).resolves.toEqual(['exported']);
-    await expect(readFile(resourceFile(destination, RESOURCE_B), 'utf8')).resolves.toContain(
+    await expect(readFile(sidecar(destination, RESOURCE_B), 'utf8')).resolves.toContain(
       'B edited.',
     );
   });
@@ -99,21 +102,72 @@ describe('Export writes in place', () => {
   it('leaves a file whose bytes are unchanged exactly as it was', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     await exportTo(holding(storedSpace()), destination);
-    const unchanged = {
+    const unchangedFiles = async () => ({
       resource: await identity(resourceFile(destination, RESOURCE_A)),
+      sidecar: await identity(sidecar(destination, RESOURCE_A)),
+      // Editing B's body changes its sidecar and leaves its Resource file's bytes alone.
+      editedResource: await identity(resourceFile(destination, RESOURCE_B)),
       space: await identity(join(destination, SPACE_ID, 'space.json')),
       aggregate: await identity(join(destination, 'hyper.json')),
-    };
-    const changed = await identity(resourceFile(destination, RESOURCE_B));
+    });
+    const unchanged = await unchangedFiles();
+    const changed = await identity(sidecar(destination, RESOURCE_B));
 
     await exportTo(holding(storedSpace('B edited.\n')), destination);
 
-    expect({
-      resource: await identity(resourceFile(destination, RESOURCE_A)),
-      space: await identity(join(destination, SPACE_ID, 'space.json')),
-      aggregate: await identity(join(destination, 'hyper.json')),
-    }).toEqual(unchanged);
-    expect((await identity(resourceFile(destination, RESOURCE_B))).ino).not.toBe(changed.ino);
+    expect(await unchangedFiles()).toEqual(unchanged);
+    expect((await identity(sidecar(destination, RESOURCE_B))).ino).not.toBe(changed.ino);
+  });
+
+  /*
+   * A Resource that leaves takes its own Resource file with it, and a Markdown
+   * Resource its own sidecar; every other Resource's files, and a file Import
+   * does not read in `resources/`, stay.
+   */
+  it("removes a deleted Resource's own files and nothing else", async () => {
+    const destination = join(await makeTemporaryDirectory(), 'exported');
+    const RESOURCE_C = uuidSchema.parse('44444444-4444-4444-8444-444444444444');
+    const holdingAll = storedSpace();
+    const withUr: LoadedSpace = {
+      ...holdingAll,
+      snapshot: {
+        ...holdingAll.snapshot,
+        resources: [
+          ...holdingAll.snapshot.resources,
+          { id: RESOURCE_C, document: { title: 'C', kind: 'ur', content: {} } },
+        ],
+      },
+    };
+    const without = (id: string): LoadedSpace => ({
+      ...withUr,
+      snapshot: {
+        ...withUr.snapshot,
+        resources: withUr.snapshot.resources.filter((resource) => resource.id !== id),
+      },
+    });
+    const resources = join(destination, SPACE_ID, 'resources');
+    await exportTo(holding(withUr), destination);
+    await writeFile(join(resources, 'notes.txt'), 'kept\n');
+    const kept = await identity(sidecar(destination, RESOURCE_A));
+
+    await exportTo(holding(without(RESOURCE_B)), destination);
+
+    expect((await readdir(resources)).sort()).toEqual(
+      [`${RESOURCE_A}.json`, `${RESOURCE_A}.md`, `${RESOURCE_C}.json`, 'notes.txt'].sort(),
+    );
+    await expect(identity(sidecar(destination, RESOURCE_A))).resolves.toEqual(kept);
+
+    await exportTo(holding(without(RESOURCE_C)), destination);
+
+    expect((await readdir(resources)).sort()).toEqual(
+      [
+        `${RESOURCE_A}.json`,
+        `${RESOURCE_A}.md`,
+        `${RESOURCE_B}.json`,
+        `${RESOURCE_B}.md`,
+        'notes.txt',
+      ].sort(),
+    );
   });
 
   /*
@@ -261,7 +315,7 @@ describe('Export writes in place', () => {
     async () => {
       const destination = join(await makeTemporaryDirectory(), 'exported');
       await exportTo(holding(storedSpace()), destination);
-      const previous = await readFile(resourceFile(destination, RESOURCE_B), 'utf8');
+      const previous = await readFile(sidecar(destination, RESOURCE_B), 'utf8');
       await chmod(join(destination, SPACE_ID, 'resources'), 0o555);
       const repository = holding(storedSpace('B edited.\n'));
 
@@ -269,9 +323,9 @@ describe('Export writes in place', () => {
         code: 'EACCES',
       });
 
-      await expect(readFile(resourceFile(destination, RESOURCE_B), 'utf8')).resolves.toBe(previous);
-      await expect(readdir(join(destination, SPACE_ID, 'resources'))).resolves.toEqual(
-        [`${RESOURCE_A}.md`, `${RESOURCE_B}.md`].sort(),
+      await expect(readFile(sidecar(destination, RESOURCE_B), 'utf8')).resolves.toBe(previous);
+      expect((await readdir(join(destination, SPACE_ID, 'resources'))).sort()).toEqual(
+        [`${RESOURCE_A}.json`, `${RESOURCE_A}.md`, `${RESOURCE_B}.json`, `${RESOURCE_B}.md`].sort(),
       );
       await expect(repository.loadSpace(SPACE_ID)).resolves.toMatchObject({
         exportedRevision: null,

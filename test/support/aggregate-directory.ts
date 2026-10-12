@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { AGGREGATE_FILE_VERSION, type UUID } from '@project/core';
+import { AGGREGATE_FILE_VERSION, type ResourceFileDocument, type UUID } from '@project/core';
 import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
 
 /** One Space directory inside a canonical aggregate, written from raw bytes. */
@@ -9,8 +9,30 @@ export interface SpaceDirectory {
   readonly name: string;
   /** Raw text, so a test can write a space file that does not parse. */
   readonly spaceFile: string;
+  /** Files of the Space directory's `resources/`, by name. */
   readonly resources?: Readonly<Record<string, string>>;
 }
+
+/**
+ * One Resource's file under `resources/`, by name, as an author writes it
+ * (ADR 0128): `<id>.json` holding the document. Written with `JSON.stringify`
+ * rather than the codec, so intake is exercised against files the codec under
+ * test did not produce.
+ */
+export const resourceFiles = (document: ResourceFileDocument) => ({
+  [`${document.id}.json`]: `${JSON.stringify(document, null, 2)}\n`,
+});
+
+/** A Markdown Resource's files under `resources/`: its Resource file and its `<id>.md` sidecar. */
+export const markdownResourceFiles = (id: UUID, title: string, source: string) => ({
+  ...resourceFiles({
+    id,
+    title,
+    kind: 'markdown',
+    content: { path: `${id}.md`, mediaType: 'text/markdown' },
+  }),
+  [`${id}.md`]: source,
+});
 
 /**
  * Write a canonical aggregate directory into `root`: a versioned aggregate file

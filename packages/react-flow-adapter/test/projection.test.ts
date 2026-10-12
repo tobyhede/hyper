@@ -9,15 +9,15 @@ import {
   OTHER_GRAPH_OPACITY,
   ROUTED_EDGE_TYPE,
 } from '../src/index';
-import { imageFile, referenceFile, resourceFile } from './resource-files';
+import { imageFile, jsonResourceFile, referenceFile, resourceFile } from './resource-files';
 import { DETACHED_END_TRIM, GRAPH_LANE_SPACING } from '../src/edge-lanes';
 import { uuid } from './uuid';
 
 function load(
   input: unknown,
   resourceFiles = [
-    resourceFile('00000000-0000-4000-8000-000000000002', 'Resource A'),
-    resourceFile('00000000-0000-4000-8000-000000000003', 'Resource B'),
+    ...resourceFile('00000000-0000-4000-8000-000000000002', 'Resource A'),
+    ...resourceFile('00000000-0000-4000-8000-000000000003', 'Resource B'),
   ],
 ): Space {
   const result = loadSpace(input, resourceFiles);
@@ -103,10 +103,11 @@ describe('projectResourceNodes', () => {
       const target =
         kind === 'markdown'
           ? resourceFile(targetId, 'Target', 'Body')
-          : {
-              path: `resources/${targetId}.md`,
-              text: `---\nid: ${targetId}\ntitle: Target\nkind: space\nspaceId: 00000000-0000-4000-8000-000000000009\nmap: 00000000-0000-4000-8000-000000000050\ngraph: 00000000-0000-4000-8000-000000000004\n---\n`,
-            };
+          : jsonResourceFile(targetId, 'Target', 'space', {
+              spaceId: '00000000-0000-4000-8000-000000000009',
+              map: '00000000-0000-4000-8000-000000000050',
+              graph: '00000000-0000-4000-8000-000000000004',
+            });
       const loaded = load(
         spaceFile([
           {
@@ -115,7 +116,7 @@ describe('projectResourceNodes', () => {
             edges: [{ from: targetId, to: referenceId }],
           },
         ]),
-        [target, referenceFile(referenceId, 'Reference', targetId)],
+        [...target, ...referenceFile(referenceId, 'Reference', targetId)],
       );
       for (const open of [false, true]) {
         const nodes = projectResourceNodes(loaded, {
@@ -297,8 +298,8 @@ describe('projectResourceNodes', () => {
         },
       ]),
       [
-        resourceFile('00000000-0000-4000-8000-000000000002', 'Opening', '## Authored once'),
-        referenceFile(referenceId, 'Return', '00000000-0000-4000-8000-000000000002'),
+        ...resourceFile('00000000-0000-4000-8000-000000000002', 'Opening', '## Authored once'),
+        ...referenceFile(referenceId, 'Return', '00000000-0000-4000-8000-000000000002'),
       ],
     );
 
@@ -328,8 +329,8 @@ describe('projectResourceNodes', () => {
         },
       ]),
       [
-        resourceFile('00000000-0000-4000-8000-000000000002', 'Opening'),
-        imageFile(imageId, 'Harbour', url),
+        ...resourceFile('00000000-0000-4000-8000-000000000002', 'Opening'),
+        ...imageFile(imageId, 'Harbour', url),
       ],
     );
     const imageNode = (options: Parameters<typeof projectResourceNodes>[1]) =>
@@ -362,9 +363,9 @@ describe('projectResourceNodes display', () => {
       },
     ]),
     [
-      resourceFile(markdownId, 'Opening', '## Authored once'),
-      imageFile(imageId, 'Harbour', url),
-      referenceFile(referenceId, 'Harbour, again', imageId),
+      ...resourceFile(markdownId, 'Opening', '## Authored once'),
+      ...imageFile(imageId, 'Harbour', url),
+      ...referenceFile(referenceId, 'Harbour, again', imageId),
     ],
   );
   const display = (id: string, options: Parameters<typeof projectResourceNodes>[1]) =>

@@ -8,6 +8,7 @@ import {
   AggregateDirectoryError,
   readAggregate,
 } from '../../src/aggregate-directory';
+import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
@@ -49,6 +50,17 @@ const writeSpace = async (
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, 'space.json'), spaceFile);
   return directory;
+};
+
+/** Write a Space directory's `resources/`, by file name. */
+const writeResources = async (
+  directory: string,
+  files: Readonly<Record<string, string>>,
+): Promise<void> => {
+  await mkdir(join(directory, 'resources'), { recursive: true });
+  for (const [name, text] of Object.entries(files)) {
+    await writeFile(join(directory, 'resources', name), text);
+  }
 };
 
 afterEach(async () => {
@@ -226,7 +238,7 @@ describe('readAggregate', () => {
     expect(aggregate.spaces.map(({ id }) => id)).toEqual([META_SPACE_ID]);
   });
 
-  it('mints the nested ids a hand-authored Space leaves out', async () => {
+  it("mints the Map and Graph ids a hand-authored Space leaves out, and keeps its Resources' own", async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
     const directory = await writeSpace(
@@ -236,20 +248,51 @@ describe('readAggregate', () => {
         version: 1,
         id: META_SPACE_ID,
         title: 'Hand authored',
+        maps: [
+          {
+            title: 'Only',
+            kind: 'positioned',
+            positions: { [RESOURCE_ID]: { x: 0, y: 0 } },
+            graphs: [{ title: 'Only', edges: [] }],
+          },
+        ],
       }),
     );
-    await mkdir(join(directory, 'resources'));
-    await writeFile(
-      join(directory, 'resources', 'opening.md'),
-      '---\ntitle: Opening\nkind: markdown\n---\nHello.\n',
-    );
+    await writeResources(directory, markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'));
 
     const aggregate = await readAggregate(root, countingIds());
 
     const [space] = aggregate.spaces;
     if (space === undefined) throw new Error('No Space was read');
-    expect(space.resources).toHaveLength(1);
-    expect(uuidSchema.safeParse(space.resources[0]?.id).success).toBe(true);
+    expect(space.resources.map(({ id }) => id)).toEqual([RESOURCE_ID]);
+    expect(space.document.maps?.[0]?.id).toBe('00000000-0000-4000-8000-000000000001');
+    expect(space.document.maps?.[0]?.graphs[0]?.id).toBe('00000000-0000-4000-8000-000000000002');
+  });
+
+  /*
+   * A Resource's id is its file's name and its links' target, so a Resource
+   * file that leaves it out is refused rather than given a minted one (ADR 0128).
+   */
+  it('refuses a Resource file that leaves out its id rather than minting one', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    const directory = await writeSpace(
+      root,
+      META_SPACE_ID,
+      JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Hand authored' }),
+    );
+    await writeResources(directory, {
+      [`${RESOURCE_ID}.json`]: JSON.stringify({ title: 'Opening', kind: 'ur', content: {} }),
+    });
+
+    const thrown = await captureError(() => readAggregate(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.diagnostics).toEqual([
+      expect.stringContaining(join(directory, 'resources', `${RESOURCE_ID}.json`)),
+    ]);
+    expect(thrown.diagnostics[0]).toContain('id');
   });
 
   /*
@@ -295,15 +338,18 @@ describe('readAggregate', () => {
       // order and ordinal order disagree. Without that the two coincide and the
       // race never shows: equal-sized reads settle in submission order.
       if (id !== META_SPACE_ID) continue;
-      await mkdir(join(directory, 'resources'));
+      // The files buy read latency without drawing from the generator, which
+      // leaves the Map and its Graph as the only draws and the expectation below
+      // readable.
       for (let index = 0; index < 40; index += 1) {
         const suffix = index.toString().padStart(12, '0');
-        // Each Resource carries its own id, so the files buy read latency without
-        // drawing from the generator — which leaves the Map and its Graph as
-        // the only draws and the expectation below readable.
-        await writeFile(
-          join(directory, 'resources', `resource-${suffix}.md`),
-          `---\nid: 44444444-4444-4444-8444-${suffix}\ntitle: Resource ${index}\nkind: markdown\n---\nBody.\n`,
+        await writeResources(
+          directory,
+          markdownResourceFiles(
+            uuidSchema.parse(`44444444-4444-4444-8444-${suffix}`),
+            `Resource ${index}`,
+            'Body.\n',
+          ),
         );
       }
     }
@@ -374,15 +420,22 @@ describe('readAggregate', () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
     await writeSpace(root, META_SPACE_ID, '{ invalid');
-    const unidentified = await writeSpace(
+    // A Map with no id, so reading this Space draws from the generator.
+    await writeSpace(
       root,
       OTHER_SPACE_ID,
-      JSON.stringify({ version: 1, title: 'Unidentified' }),
-    );
-    await mkdir(join(unidentified, 'resources'));
-    await writeFile(
-      join(unidentified, 'resources', 'opening.md'),
-      '---\ntitle: Opening\nkind: markdown\n---\nHello.\n',
+      JSON.stringify({
+        version: 1,
+        title: 'Unidentified',
+        maps: [
+          {
+            title: 'Only',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ title: 'Only', edges: [] }],
+          },
+        ],
+      }),
     );
 
     const thrown = await captureError(() =>
@@ -407,10 +460,14 @@ describe('readAggregate', () => {
         title: 'Meta',
       }),
     );
-    await mkdir(join(meta, 'resources'));
-    await writeFile(
-      join(meta, 'resources', `${RESOURCE_ID}.md`),
-      `---\nid: ${RESOURCE_ID}\ntitle: Ordinary\nkind: space\nspaceId: ${OTHER_SPACE_ID}\nmap: ${META_SPACE_ID}\ngraph: ${OTHER_SPACE_ID}\n---\n`,
+    await writeResources(
+      meta,
+      resourceFiles({
+        id: RESOURCE_ID,
+        title: 'Ordinary',
+        kind: 'space',
+        content: { spaceId: OTHER_SPACE_ID, map: META_SPACE_ID, graph: OTHER_SPACE_ID },
+      }),
     );
 
     const aggregate = await readAggregate(root, countingIds());

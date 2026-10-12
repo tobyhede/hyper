@@ -1,11 +1,11 @@
 ---
 name: hyper-authoring
-description: Write or change Hyper content as files — an Aggregate directory's `hyper.json`, Space directories, `space.json` Maps, Graphs and Edges, Resource Markdown and `images/`. Use when writing or editing the files of a Hyper talk or design on disk rather than in the browser; setting Hyper up or starting a run is `hyper-getting-started`.
+description: Write or change Hyper content as files — an Aggregate directory's `hyper.json`, Space directories, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, and `images/`. Use when writing or editing the files of a Hyper talk or design on disk rather than in the browser; setting Hyper up or starting a run is `hyper-getting-started`.
 ---
 
 # Authoring an Aggregate directory
 
-An **Aggregate directory** is Hyper's on-disk form: `hyper.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and its Resources' Markdown, and `images/` holding stored pictures. The complete reference is [`docs/aggregate-directory.md`](../../../docs/aggregate-directory.md) in the Hyper repository. Read it before writing, and treat it as the authority on every key and rule; this skill is the order to work in and the traps.
+An **Aggregate directory** is Hyper's on-disk form: `hyper.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `images/` holding stored pictures. The complete reference is [`docs/aggregate-directory.md`](../../../docs/aggregate-directory.md) in the Hyper repository. Read it before writing, and treat it as the authority on every key and rule; this skill is the order to work in and the traps.
 
 ## Steps
 
@@ -17,20 +17,20 @@ An **Aggregate directory** is Hyper's on-disk form: `hyper.json` naming the Meta
 
 3. **Write the change.** Follow the reference. The rules that most often refuse a hand-written directory:
    - A Space's directory name **is** its Id: a lower-case UUID. Mint new UUIDs with `uuidgen | tr A-Z a-z` or `node -e 'console.log(crypto.randomUUID())'`.
-   - **Write the Id of anything another file names.** Ids may be left out and are minted on Import, but a minted Id cannot be referred to. So every Resource a Map positions or an Edge joins needs its frontmatter `id`, and a Map or Graph needs its `id` if `defaultMap`, `activeGraph` or a Space Resource names it.
+   - **Every Resource file has an `id`.** A Map's and a Graph's Ids may be left out and are minted on Import, but a minted Id cannot be referred to, so a Map or Graph needs its `id` if `defaultMap`, `activeGraph` or a Space Resource names it.
+   - A Resource is `resources/<id>.json`: `{ "id", "title", "kind", "content" }`, all four required. A Markdown Resource's `content` is `{ "path": "<id>.md", "mediaType": "text/markdown" }`, and its source is that plain `resources/<id>.md` beside it, with no frontmatter. Each kind's `content` is in the reference's table; `docs/schema/resource/examples/` has one file per kind.
    - A Map's `positions` keys are its membership, and an Edge may only join Resources its Map positions.
    - Every Map owns at least one Graph.
    - Resource Ids are unique across the whole aggregate, not just within a Space.
-   - Every ordinary Space must be reached by a Space Resource (`kind: space`, with `spaceId`, `map` and `graph`, and an optional `framing` of `centreX`, `centreY` and `zoom` that Export writes for a framed one; keep it) somewhere else in the aggregate, so it needs a Map and a Graph for that Space Resource to name. Only the Meta Space may be written without Maps.
-   - Every object in `space.json` and every Resource's frontmatter is strict: an unknown or misspelt key is refused, naming the key and the file.
-   - Declare every Resource's `kind`. A file with no `kind` is an Ur Resource, which has no body, so a Markdown file that leaves `kind: markdown` out is refused.
-   - A picture is `images/<content-id>.<ext>`, named by the SHA-256 of its bytes; the reference shows the command. The Resource's `url` is `/images/<content-id>`.
-   - Keep prose that is not a Resource out of a Space directory and its `resources/`: every `*.md` there is read as a Resource, and the next write rewrites or removes it.
+   - Every ordinary Space must be reached by a Space Resource (`"kind": "space"`, its `content` holding `spaceId`, `map` and `graph`, and an optional `framing` of `centreX`, `centreY` and `zoom` that Export writes for a framed one; keep it) somewhere else in the aggregate, so it needs a Map and a Graph for that Space Resource to name. Only the Meta Space may be written without Maps.
+   - Every object in `space.json` and every Resource file, `content` included, is strict: an unknown or misspelt key is refused, naming the key and the file.
+   - A picture is `images/<content-id>.<ext>`, named by the SHA-256 of its bytes; the reference shows the command. The Resource's `content.url` is `/images/<content-id>`.
+   - Keep prose that is not a Resource out of a Space directory and its `resources/`: a `*.md` there that is not a Markdown Resource's own sidecar is refused, naming it.
 
    Done when every file you meant to add or change is written.
 
 4. **Check it.** Run a headless copy, so the check never writes the person's files. From the Hyper clone, as one command line: `tmp=$(mktemp -d) && trap : INT && { cp -R "<dir>/." "$tmp" && pnpm hyper run "$tmp" --no-open; s=$?; rm -rf "$tmp"; (exit $s); }`. It takes port 4173 or the next free one, and removes the copy when the run ends, however it ends: `trap : INT` keeps the shell alive through the SIGINT that stops the run, so the removal after it still runs. The line exits with the status of the copy or the run, not of the removal, so a refused directory still ends non-zero. A refused directory exits non-zero and prints each problem, naming a file by its path and a broken reference by its Space and Ids; fix them in `<dir>` and run the line again, since a second round of problems can follow the first. When it prints `Running … at <url>`, stop it with SIGINT to the process group you started.
    Done when a run starts cleanly, has been stopped, and the command line has exited.
 
-5. **Expect the canonical rewrite.** Hyper rewrites what it reads in a fixed form the first time an edit is written: every Resource becomes `resources/<id>.md`, minted Ids are filled in, and opening a Space that names no `defaultMap` records one, which is itself an edit. Starting and stopping a run with no edit changes nothing. Tell the person to review the diff and commit in the content directory's own repository.
+5. **Expect the canonical rewrite.** Hyper rewrites what it reads in a fixed form the first time an edit is written: every Resource becomes `resources/<id>.json` (and a Markdown Resource's source `resources/<id>.md`) in a fixed key order, minted Ids are filled in, and opening a Space that names no `defaultMap` records one, which is itself an edit. Starting and stopping a run with no edit changes nothing. Tell the person to review the diff and commit in the content directory's own repository.
    Done when `git -C <dir> status` shows only the changes you intended plus, after an edit in the browser, that rewrite.

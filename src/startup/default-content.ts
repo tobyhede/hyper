@@ -1,5 +1,5 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
-import { newSpace, parseResourceFile } from '@project/graph';
+import { newSpace, parseResourceFiles } from '@project/graph';
 import type { AggregateInput } from '../persistence/space-repository';
 
 /**
@@ -25,12 +25,9 @@ import type { AggregateInput } from '../persistence/space-repository';
  */
 export const defaultContentAggregate = (newId: () => UUID): AggregateInput => {
   const minted = newSpace(newId);
-  const resources = minted.resourceFiles.map((file) => {
-    const parsed = parseResourceFile(file);
-    if (!parsed.ok) throw new Error(parsed.errors.map(({ message }) => message).join('\n'));
-    const { id, ...document } = parsed.resource;
-    return { id, document };
-  });
+  const parsed = parseResourceFiles(minted.resourceFiles);
+  if (!parsed.ok) throw new Error(parsed.errors.map(({ message }) => message).join('\n'));
+  const resources = parsed.resources.map(({ resource: { id, ...document } }) => ({ id, document }));
   const { id, ...document } = minted.file;
   const meta: SpaceSnapshot = { id, document, resources };
   return { metaSpaceId: meta.id, spaces: [meta] };

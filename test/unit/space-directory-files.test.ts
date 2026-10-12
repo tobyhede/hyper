@@ -16,7 +16,9 @@ const space = (resources: SpaceSnapshot['resources']): SpaceSnapshot => ({
 });
 
 const resourceFile = (snapshot: SpaceSnapshot, id: string): string | undefined =>
-  spaceDirectoryFiles({ snapshot, revision: 0n, exportedRevision: null }).get(`resources/${id}.md`);
+  spaceDirectoryFiles({ snapshot, revision: 0n, exportedRevision: null }).get(
+    `resources/${id}.json`,
+  );
 
 /**
  * A stored document's keys can arrive in any order (`jsonb` reorders them on
@@ -74,23 +76,26 @@ describe("a Resource file's keys", () => {
 
     expect(resourceFile(ordered, EMBED_ID)).toBe(
       [
-        '---',
-        `id: ${EMBED_ID}`,
-        'title: Embed',
-        'kind: space',
-        `spaceId: ${TARGET_ID}`,
-        `map: ${MAP_ID}`,
-        `graph: ${GRAPH_ID}`,
-        'framing:',
-        '  centreX: 1',
-        '  centreY: 2',
-        '  zoom: 0.5',
-        '---',
-        '',
+        '{',
+        `  "id": "${EMBED_ID}",`,
+        '  "title": "Embed",',
+        '  "kind": "space",',
+        '  "content": {',
+        `    "spaceId": "${TARGET_ID}",`,
+        `    "map": "${MAP_ID}",`,
+        `    "graph": "${GRAPH_ID}",`,
+        '    "framing": {',
+        '      "centreX": 1,',
+        '      "centreY": 2,',
+        '      "zoom": 0.5',
+        '    }',
+        '  }',
+        '}',
         '',
       ].join('\n'),
     );
     for (const id of [EMBED_ID, PICTURE_ID]) {
+      expect(resourceFile(ordered, id), id).toBeDefined();
       expect(resourceFile(shuffled, id), id).toBe(resourceFile(ordered, id));
     }
   });

@@ -4,16 +4,15 @@
 the one Playwright drives. It is a **test bed**, not the product demo — the
 narrative demo lives in `example/` and is kept as a single Space directory.
 
-This file sits here rather than in `fixture/` on purpose. A space is a directory
-(ADR 0020) and every `.md` beside its space file is a resource, so a `README.md` in
-there would be scanned as one and fail to parse for want of frontmatter.
+This file sits here rather than in `fixture/` on purpose. Import reads every
+`.md` beside a space file and refuses one that is not a Markdown Resource's own
+sidecar (ADR 0128), so a `README.md` in there would refuse the fixture.
 
 The fixture is Meta-rooted. `hyper.json` names Meta; ordinary Spaces live in
 sibling `<space-uuid>/` directories. Each Space is a directory: `space.json`
 holding structure — `version`, `id`, `title`, `maps` and `defaultMap` —
-and one markdown file per resource, either beside it or under `resources/`. The Meta
-Space uses both locations so the two-location scan is exercised by the Space
-the app actually opens.
+and one JSON Resource file per resource under `resources/`, with a Markdown
+Resource's source in the `<id>.md` sidecar beside it.
 
 `defaultMap` is the opening canvas (ADR 0079). A selected Map draws only
 the Graphs it owns. Cycle refusal is an aggregate-intake test, not an invalid
