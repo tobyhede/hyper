@@ -1,7 +1,7 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { z } from 'zod';
 import type { ContentFacts, ContentVia } from '../resource-content';
-import type { SpaceResourceTarget, SpaceSelectionProblem } from './space';
+import type { SpaceSelectionTarget, SpaceSelectionProblem } from './space';
 import type { UUID } from '../types';
 
 /**
@@ -90,7 +90,7 @@ export interface KindModule<
   /** The kind's own check of a selection in a target Space it alone understands. */
   readonly selectionProblem: (
     content: Content,
-    target: SpaceResourceTarget,
+    target: SpaceSelectionTarget,
   ) => SpaceSelectionProblem | undefined;
   /** The content as Export writes it, so a file's bytes do not depend on how it was built. */
   readonly canonicalContent: (content: Content) => Content;

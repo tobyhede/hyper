@@ -1,4 +1,4 @@
-import { spaceKind, spaceReferences } from '@project/core';
+import { spaceReferences } from '@project/core';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Resource, UUID } from '@project/core';
 import {
@@ -166,11 +166,7 @@ export const useSpaceResourceTargets = (
   return useMemo(() => {
     const live = new Map(targets);
     for (const entry of entries) {
-      if (
-        resources.some(
-          (resource) => resource.kind === spaceKind.id && resource.content.spaceId === entry.id,
-        )
-      ) {
+      if (resources.some((resource) => spaceReferences(resource).includes(entry.id))) {
         live.set(entry.id, spaceResourceTarget(entry.app.currentSpace()));
       }
     }

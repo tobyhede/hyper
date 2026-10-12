@@ -28,6 +28,9 @@ interface SpaceResourceLocation {
   readonly targetSpaceId: UUID;
 }
 
+/** Why a Space Resource's selection does not resolve in its target, in the shape its kind's own check answers. */
+type SpaceSelectionProblem = NonNullable<ReturnType<typeof spaceSelectionProblem>>;
+
 export type SpaceAggregateError =
   | {
       readonly kind: 'invalid-space-snapshot';
@@ -48,19 +51,7 @@ export type SpaceAggregateError =
   | ({ readonly kind: 'space-resource-target-missing' } & SpaceResourceLocation)
   | ({ readonly kind: 'space-resource-reference-cycle' } & SpaceResourceLocation)
   | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: UUID }
-  | ({
-      readonly kind: 'space-resource-map-missing';
-      readonly mapId: UUID;
-    } & SpaceResourceLocation)
-  | ({
-      readonly kind: 'space-resource-graph-missing';
-      readonly graphId: UUID;
-    } & SpaceResourceLocation)
-  | ({
-      readonly kind: 'space-resource-graph-outside-map';
-      readonly mapId: UUID;
-      readonly graphId: UUID;
-    } & SpaceResourceLocation);
+  | (SpaceSelectionProblem & SpaceResourceLocation);
 
 export type LoadSpaceAggregateResult =
   | { readonly ok: true; readonly aggregate: SpaceAggregate }

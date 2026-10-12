@@ -14,6 +14,7 @@ import {
   spaceKind,
   SPACE_FILE_VERSION,
   lifetimeSpaceReferences,
+  spaceReferences,
   type Map,
   type MapPosition,
   type ResourceDocument,
@@ -519,10 +520,15 @@ export const planDelete = (
     if (recovery !== undefined) return recovery;
   }
   const deletedIds = new Set(deleted);
+  // Every declared Space reference, owning or not: intake refuses any whose
+  // Space is missing, so one to a cascaded Space blocks as a held one does.
   const blocked = recoveryBlockedBy(
     view,
     new Set([input.containingSpaceId, ...deleted]),
-    (snapshot) => heldSpaces(snapshot).some((targetId) => deletedIds.has(targetId)),
+    (snapshot) =>
+      snapshot.resources.some(({ document }) =>
+        spaceReferences(document).some((targetId) => deletedIds.has(targetId)),
+      ),
   );
   if (blocked !== undefined) return blocked;
   return {

@@ -1,8 +1,12 @@
 /* The Reference kind's frame on a Map (ADR 0070, ADR 0120): a dotted border at
    rest, solid while active. `CanvasResource` imports it after
    `canvas-resource.css`, whose solid border it overrides.
-   The order is held by `test/unit/kind-stylesheet-order.test.ts`. */
-.canvas-resource[data-kind='reference'] {
+   The order is held by `test/unit/kind-stylesheet-order.test.ts`.
+   The kind is matched inside `:where()` so the dotted rule is only as specific
+   as `.canvas-resource` itself: it overrides that rule's solid border by
+   loading after it, and every more specific rule in `canvas-resource.css`
+   that sets the border still overrides it. */
+.canvas-resource:where([data-kind='reference']) {
   border-style: dotted;
 }
 

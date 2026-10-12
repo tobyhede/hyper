@@ -281,8 +281,6 @@ const KIND_FEATURE_FILES = [
   'packages/app/src/space-resource-context-commands.ts',
   // A Space Resource's framing.
   'packages/app/src/space-resource-framing.ts',
-  // The Space Resources that reference an entry of this Meta Space.
-  'packages/app/src/space-resource-targets.ts',
 ];
 
 export default tseslint.config(

@@ -6,7 +6,7 @@ import type { FileContentDecoding, KindFlags, KindModule, KindSidecar } from './
 import { imageKind } from './image';
 import { EMPTY_MARKDOWN, markdownKind } from './markdown';
 import { UNRESOLVED_CONTENT, referenceKind } from './reference';
-import type { SpaceResourceTarget, SpaceSelectionProblem } from './space';
+import type { SpaceSelectionTarget, SpaceSelectionProblem } from './space';
 import { spaceKind } from './space';
 import { urKind } from './ur';
 
@@ -147,13 +147,13 @@ export const spaceReferences = (resource: KindedResource): readonly UUID[] =>
 export const lifetimeSpaceReferences = (resource: KindedResource): readonly UUID[] =>
   kindFlags(resource.kind).ownsReferencedSpaces ? spaceReferences(resource) : [];
 
-const selectionProblemOf = <K extends KindId>(resource: Kinded<K>, target: SpaceResourceTarget) =>
+const selectionProblemOf = <K extends KindId>(resource: Kinded<K>, target: SpaceSelectionTarget) =>
   KIND_MODULES[resource.kind].selectionProblem(resource.content, target);
 
 /** Why this Resource's selection does not resolve in its target Space, by its kind's own check. */
 export const spaceSelectionProblem = (
   resource: KindedResource,
-  target: SpaceResourceTarget,
+  target: SpaceSelectionTarget,
 ): SpaceSelectionProblem | undefined => selectionProblemOf(resource, target);
 
 const resolveContentOf = <K extends KindId>(resource: Kinded<K>, via: ContentVia) =>
