@@ -28,6 +28,7 @@ import {
   type MapMemberships,
 } from '../map-memberships';
 import {
+  BADGED_TARGET_GLYPH,
   Button,
   Alert,
   Badge,
@@ -66,11 +67,10 @@ export const SPACE_DRAG_TYPE = 'application/x-hyper-space-id';
 type Activation = 'keyboard' | 'pointer';
 
 /**
- * What the list may show, as four independent switches.
- *
- * Three of them narrow the Resources this Map does not place, by kind. The
- * fourth is not a kind at all: `spaces` adds a second **source** — every Space
- * in this Meta Space — and placing one of those authors the Space Resource that
+ * What the list may show, as independent switches: one per kind, each
+ * narrowing the Resources this Map does not place to that kind, and `spaces`.
+ * `spaces` is not a kind at all: it adds a second **source** — every Space in
+ * this Meta Space — and placing one of those authors the Space Resource that
  * frames it. They share a control because they answer one question for the
  * reader ("what am I looking at?"). The All Spaces filter uses the Opener/Meta
  * OPEN mark for the collection; Space Resources and individual Space rows keep
@@ -80,7 +80,7 @@ export type ResourcesFilter = Resource['kind'] | 'spaces';
 
 /**
  * Every filter exactly once, in the order they are drawn: each kind's, in the
- * order the kinds' view halves are registered (ADR 0128), then `spaces`. The
+ * order the kinds' view halves are registered, then `spaces`. The
  * registry types a view half for every kind, so a kind added to `Resource` has
  * a filter, a name and a glyph here before the application compiles.
  */
@@ -109,7 +109,7 @@ const filterName = (filter: ResourcesFilter): string =>
 const FilterGlyph = ({ filter }: { readonly filter: ResourcesFilter }) => {
   if (filter === 'spaces') return <ParentIcon />;
   const { Glyph } = kindNaming(filter);
-  return Glyph === undefined ? <ReferenceIcon /> : <Glyph />;
+  return Glyph === BADGED_TARGET_GLYPH ? <ReferenceIcon /> : <Glyph />;
 };
 
 /**
@@ -634,17 +634,16 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
    * hidden: "none of these match" is the answer most worth having, and a
    * control that vanishes when empty teaches nothing.
    */
-  const counts = useMemo(() => {
+  const countOf = useMemo(() => {
     const matched = (text: string) => text.toLocaleLowerCase().includes(needle);
-    const ofKind = (kind: Resource['kind']) =>
-      resources.filter(
-        (resource) =>
-          resource.kind === kind && matched(searchableText(resource, titleById, spaceTitles)),
-      ).length;
-    return new Map<ResourcesFilter, number>([
-      ...VIEW_KIND_IDS.map((kind) => [kind, ofKind(kind)] as const),
-      ['spaces', spaces.filter((space) => matched(space.title)).length],
-    ]);
+    // Answered for every filter by its kind, so no filter can go uncounted.
+    return (filter: ResourcesFilter): number =>
+      filter === 'spaces'
+        ? spaces.filter((space) => matched(space.title)).length
+        : resources.filter(
+            (resource) =>
+              resource.kind === filter && matched(searchableText(resource, titleById, spaceTitles)),
+          ).length;
   }, [resources, spaces, titleById, spaceTitles, needle]);
 
   /**
@@ -872,13 +871,13 @@ export function ResourcesPopover(props: ResourcesPopoverProps) {
                   // badge with a bare number in it contributes nothing to a
                   // control that carries its own label, so a screen reader would
                   // be told which kinds there are and never how many.
-                  aria-label={`${filterName(filter)}, ${String(counts.get(filter) ?? 0)}`}
+                  aria-label={`${filterName(filter)}, ${String(countOf(filter))}`}
                   title={filterName(filter)}
                   className="resources-popover__toggle"
                 >
                   <FilterGlyph filter={filter} />
                   <span className="resources-popover__count" aria-hidden="true">
-                    {counts.get(filter) ?? 0}
+                    {countOf(filter)}
                   </span>
                 </FilterToggle>
               ))}

@@ -4,7 +4,7 @@ import { normalizeTitle, uuidSchema, type Resource } from '@project/core';
 import { parseResourceFiles, serializeResource } from '../src/index';
 
 /**
- * `serializeResource` and `parseResourceFiles` are inverses (ADR 0128): every
+ * `serializeResource` and `parseResourceFiles` are inverses: every
  * kind's Resource written as its files reads back as the same Resource, a
  * Markdown Resource's source byte for byte through its sidecar.
  */

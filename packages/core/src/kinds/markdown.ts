@@ -4,24 +4,27 @@ import type { ContentVia } from '../resource-content';
 import { defineKind, type KindFileCodec } from './kind-module';
 
 /** A Markdown Resource's content: the source its author wrote, which its file holds as the body. */
-export const markdownResourceContentSchema = z.object({ source: z.string() });
+export const markdownResourceContentSchema = z.object({ source: z.string() }).strict();
 type MarkdownResourceContent = z.infer<typeof markdownResourceContentSchema>;
+
+/** The Markdown kind's id, declared before its module because the content it resolves to names it. */
+const MARKDOWN_KIND_ID = 'markdown';
 
 /** What a Markdown Resource's content resolves to: the source it shows. */
 export interface MarkdownContent {
-  readonly kind: 'markdown';
+  readonly kind: typeof MARKDOWN_KIND_ID;
   readonly source: string;
   readonly via: ContentVia;
 }
 
-/** The media type of a Markdown Resource's sidecar (ADR 0128). */
+/** The media type of a Markdown Resource's sidecar. */
 export const MARKDOWN_MEDIA_TYPE = 'text/markdown';
 
 /** The sidecar a Markdown Resource's file names: its own `<id>.md`, beside its Resource file. */
 export const markdownSidecarPath = (id: string): string => `${id}.md`;
 
 /**
- * A Markdown Resource's content as its Resource file holds it (ADR 0128): a
+ * A Markdown Resource's content as its Resource file holds it: a
  * locator naming its sidecar, in place of the source the sidecar holds. The
  * media type compares case-insensitively; that the path is the Resource's own
  * `<id>.md` is the codec's to check, since the schema does not see the id.
@@ -40,6 +43,7 @@ const markdownFile: KindFileCodec<
   MarkdownResourceContent,
   z.infer<typeof markdownFileContentSchema>
 > = {
+  contentSchema: markdownFileContentSchema,
   sidecarNames: (id) => [markdownSidecarPath(id)],
   encode: (id, content) => {
     const path = markdownSidecarPath(id);
@@ -77,7 +81,7 @@ export const EMPTY_MARKDOWN: MarkdownResourceContent = { source: '' };
  * line endings.
  */
 export const markdownKind = defineKind({
-  id: 'markdown',
+  id: MARKDOWN_KIND_ID,
   contentSchema: markdownResourceContentSchema,
   flags: {
     takesResourceShape: false,
@@ -87,7 +91,7 @@ export const markdownKind = defineKind({
   },
   facts: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
   resolveContent: (content, via): MarkdownContent => ({
-    kind: 'markdown',
+    kind: MARKDOWN_KIND_ID,
     source: content.source,
     via,
   }),

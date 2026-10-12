@@ -16,6 +16,7 @@ import { decorateImageResourceNode } from '../src/kinds/image';
 import { decorateMarkdownResourceNode } from '../src/kinds/markdown';
 import { decorateSpaceResourceNode } from '../src/kinds/space';
 import { decorateUrResourceNode } from '../src/kinds/ur';
+import type { KindDecorationContext } from '../src/kinds/registry';
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
@@ -97,9 +98,10 @@ const continuation: Continuation = {
   dispose: () => undefined,
 };
 
-const context = (
-  overrides: Partial<CanvasResourceDecorationContext> = {},
-): CanvasResourceDecorationContext => ({
+/** Every field a decoration reads: the shared ones and each kind's own. */
+type DecorationContext = CanvasResourceDecorationContext & KindDecorationContext;
+
+const context = (overrides: Partial<DecorationContext> = {}): DecorationContext => ({
   authorOnCanvas: true,
   bodyEditing: false,
   imageAccept: 'image/png',

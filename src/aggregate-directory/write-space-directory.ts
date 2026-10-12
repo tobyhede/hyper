@@ -94,7 +94,7 @@ const canonicalSpaceFile = ({ snapshot }: LoadedSpace): SpaceFile => {
 /**
  * One Space's canonical files, by path relative to its Space directory:
  * `space.json`, one `resources/<id>.json` per Resource, and a Markdown
- * Resource's sidecar `resources/<id>.md` beside its Resource file (ADR 0128).
+ * Resource's sidecar `resources/<id>.md` beside its Resource file.
  */
 export const spaceDirectoryFiles = (stored: LoadedSpace): ReadonlyMap<string, string> => {
   const files = new Map<string, string>([

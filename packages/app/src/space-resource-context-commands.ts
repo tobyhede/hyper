@@ -1,7 +1,6 @@
 import {
-  type SpaceKindId,
+  type SpaceResourceDocument,
   graphHeadShape,
-  type ResourceDocument,
   type GraphHeadShape,
   type GraphId,
   type MapId,
@@ -40,7 +39,7 @@ export interface SpaceResourceRailContext {
 /** The Dock commands, addressed to the target and the context this Resource stores. */
 export function spaceResourceContextCommands(
   { entry, spaces, containingSpaceId, deleteConfirmation, continuation }: SpaceResourceRailContext,
-  document: Extract<ResourceDocument, { kind: SpaceKindId }>,
+  document: SpaceResourceDocument,
   select: (targetMap: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   available: () => boolean,
 ): SpaceResourceContextCommands {

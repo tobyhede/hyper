@@ -1,7 +1,6 @@
 import {
-  referenceResourceSchema,
   importSpaceSchema,
-  markdownResourceSchema,
+  KIND_IDS,
   spaceSnapshotSchema,
   uuidSchema,
   type ImportSpace,
@@ -326,17 +325,16 @@ describe('import decoding', () => {
   });
 
   /**
-   * The same conclusion at the level a reader meets it: the kinds a resource may
-   * declare survive the fold verbatim. Read off the schemas rather than written
-   * out, so changing a literal to `'Markdown'` fails here instead of quietly
-   * shipping a summary that names a kind nothing accepts.
+   * The same conclusion at the level a reader meets it: a kind no module
+   * registers is named by its path, and the summary does not quote it back,
+   * since the fold would misquote a kind whose case is information.
    *
    * Off the pair the door composes — `spaceSnapshotSchema` and
    * `describeSchemaFailure` — rather than through `identifySpace` itself,
    * because a `kind` outside the union is not a value an `ImportSpace` can
    * carry, and the tests above are what tie that pair to the door.
    */
-  it('leaves a resource kind legible in the summary it prints', () => {
+  it('names the unregistered resource kind by its path in the summary it prints', () => {
     const parsed = spaceSnapshotSchema.safeParse({
       id: SPACE_ID,
       document: { version: 1, title: 'T' },
@@ -347,7 +345,25 @@ describe('import decoding', () => {
     if (parsed.success) throw new Error('Expected an unknown resource kind to be refused');
     const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
 
-    expect(summary).toContain(`'${markdownResourceSchema.shape.kind.value}'`);
-    expect(summary).toContain(`'${referenceResourceSchema.shape.kind.value}'`);
+    expect(summary).toContain('resources.0.document.kind names no kind this build registers');
+  });
+
+  /**
+   * A client that sent a kind this build does not register learns which kinds
+   * it does, so a miscased `Markdown` points at `markdown`. The registered ids
+   * are lower case, so the summary's fold quotes them intact.
+   */
+  it('names every registered kind when it refuses an unregistered one', () => {
+    const parsed = spaceSnapshotSchema.safeParse({
+      id: SPACE_ID,
+      document: { version: 1, title: 'T' },
+      resources: [
+        { id: RESOURCE_ID, document: { title: 'C', kind: 'Markdown', content: { source: '' } } },
+      ],
+    });
+    if (parsed.success) throw new Error('Expected an unregistered resource kind to be refused');
+    const summary = describeSchemaFailure(parsed.error.issues, 'identified space');
+
+    expect(summary).toContain(`names no kind this build registers (${KIND_IDS.join(', ')})`);
   });
 });

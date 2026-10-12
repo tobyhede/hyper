@@ -1,26 +1,12 @@
-import type { Continuation } from './continuation';
-import {
-  takesOpen,
-  type GraphId,
-  type ResourceDocument,
-  type ResourceId,
-  type ResourceShape,
-  type SpaceKindId,
-  type UUID,
-} from '@project/core';
+import { takesOpen, type ResourceId } from '@project/core';
 import type {
   KindOperationsOf,
   ResourceFlowNode,
   ResourceFlowNodeOf,
   ResourceNodeData,
 } from '@project/react-flow-adapter';
-import type { EntityActionGroup, ImageReplacement, ResourceDisplay } from '@project/ui';
-import type { CommandOutcomes } from './command-outcomes';
-import type { DeleteConfirmation } from './delete-confirmation';
-import type { OpenSpaces } from './open-spaces';
+import type { EntityActionGroup, ResourceDisplay } from '@project/ui';
 import type { ResourceResize } from './render-adapter';
-import type { SpaceResourceTargetMap } from './space-resource-lifecycle';
-import type { SpaceResourceTargets } from './space-resource-targets';
 import { RESOURCE_SIZE } from './resource';
 
 /** A value built by assigning what a gate allows. */
@@ -45,8 +31,9 @@ export interface KindDecoration<K extends ResourceFlowNode['data']['kind']> {
 }
 
 /**
- * Completions and canvas facts the decorate functions read. The hook owns
+ * Completions and canvas facts every kind's decoration may read. The hook owns
  * caret, session subscription, and the completion functions passed in here.
+ * What one kind alone reads is declared in that kind's module under `kinds/`.
  */
 export interface CanvasResourceDecorationContext {
   readonly authorOnCanvas: boolean;
@@ -62,45 +49,8 @@ export interface CanvasResourceDecorationContext {
   readonly clearCaret: () => void;
   readonly beginBodyEditing: (node: ResourceFlowNode) => void;
   readonly bodyEditorResourceId: string | null;
-  readonly completeResourceBody: (resourceId: ResourceId, body: string) => 'completed' | 'retained';
-  /**
-   * Replace an Image Resource's image, answering the sentence for a refusal or
-   * `null` once the replacement is over.
-   */
-  readonly replaceResourceImage: (
-    resourceId: ResourceId,
-    replacement: ImageReplacement,
-  ) => Promise<string | null>;
-  /** What a replacement's file picker offers. */
-  readonly imageAccept: string;
   readonly resourceEntityActions?:
     ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
-  /**
-   * Draw an Ur Resource in another Shape on this Map, reporting a refusal.
-   * Absent where this canvas has no command outcomes to report one through.
-   */
-  readonly changeResourceShape?:
-    ((resourceId: ResourceId, resourceShape: ResourceShape) => void) | undefined;
-  readonly continuation: Continuation;
-  readonly containingSpaceId: UUID;
-  readonly spaceDocuments: ReadonlyMap<
-    ResourceId,
-    Extract<ResourceDocument, { kind: SpaceKindId }>
-  >;
-  readonly spaceResourceTargets: SpaceResourceTargets;
-  readonly spaces: OpenSpaces | null;
-  readonly commandOutcomes: CommandOutcomes | undefined;
-  readonly deleteConfirmation: Pick<DeleteConfirmation, 'arm'> | undefined;
-  readonly completeSpaceResourceSelection: (
-    resourceId: ResourceId,
-    targetMap: Pick<SpaceResourceTargetMap, 'id'>,
-    graphId: GraphId,
-  ) => string | null;
-  readonly portalEditing: ReadonlySet<ResourceId> | undefined;
-  readonly onPortalEditingChange: ((resourceId: ResourceId, editing: boolean) => void) | undefined;
-  readonly contextNotices: ReadonlyMap<ResourceId, string>;
-  readonly onContextEditingChange: (resourceId: ResourceId, editing: boolean) => void;
-  readonly onContextReport: (resourceId: ResourceId, message: string | null) => void;
 }
 
 export function applyResourceDataPatch(
@@ -157,7 +107,7 @@ export function decorateSharedResourceNode(
     >
   > = {};
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && takesOpen(node.data.kind)) {
-    // An Ur Resource has no content to show, so it offers no Open or Close.
+    // A kind that declares no Open offers no Open or Close.
     patch.onOpenChange = (open) =>
       open ? context.openResource(node.id) : context.closeResource(node.data.resourceId);
   } else if (resourceBelongsToWorkingSpace && node.id === context.bodyEditorResourceId) {

@@ -4,7 +4,7 @@ import {
   uuidSchema,
   type GraphId,
   type MapId,
-  type ResourceDocument,
+  type SpaceResourceDocument,
   type SpaceSnapshot,
 } from '@project/core';
 import { MemorySpaceBackend, MemorySpaceBackendTestControl } from '@project/persistence';
@@ -46,7 +46,7 @@ const META_GRAPH = id('7');
 const FIRST_GRAPH = id('8');
 const SECOND_GRAPH = id('9');
 
-const document: Extract<ResourceDocument, { kind: 'space' }> = {
+const document: SpaceResourceDocument = {
   kind: 'space',
   title: 'Target',
   content: { spaceId: TARGET, map: SECOND_MAP, graph: SECOND_GRAPH },

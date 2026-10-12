@@ -10,7 +10,7 @@
  * plan out (`session-registry.ts`).
  */
 import {
-  type SpaceKindId,
+  type SpaceResourceDocument,
   spaceKind,
   SPACE_FILE_VERSION,
   lifetimeSpaceReferences,
@@ -437,7 +437,7 @@ const recoveryBlockedBy = (
   return undefined;
 };
 
-/** The Spaces a Space's Resources hold the lifetime of, once per reference (ADR 0074, ADR 0128). */
+/** The Spaces a Space's Resources hold the lifetime of, once per reference (ADR 0074). */
 const heldSpaces = (snapshot: SpaceSnapshot): readonly UUID[] =>
   snapshot.resources.flatMap(({ document }) => lifetimeSpaceReferences(document));
 
@@ -579,7 +579,7 @@ export const precheckContextDeletion = (
 const replaceSpaceResourceSelection = (
   snapshot: SpaceSnapshot,
   targetSpaceId: UUID,
-  matches: (document: Extract<ResourceDocument, { kind: SpaceKindId }>) => boolean,
+  matches: (document: SpaceResourceDocument) => boolean,
   selection: SpaceResourceSelection,
   resetFraming: boolean,
 ): SpaceSnapshot => ({

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceSnapshot, type Resource } from '@project/core';
+import { kindFlags, uuidSchema, type SpaceSnapshot, type Resource } from '@project/core';
 import { MemorySpaceBackend } from '@project/persistence';
 import { composeApp } from '../src/compose-app';
 import { openTestSpace } from './opened-space';
@@ -149,6 +149,35 @@ describe('deleting', () => {
 
     expect(deleteSpy.mock.calls).toEqual([
       [{ containingSpaceId: SPACE_ID, resourceId: SPACE_RESOURCE }],
+    ]);
+  });
+
+  /**
+   * Routing by the kind's lifetime flag, with nothing stubbed: a Space Resource
+   * Space Resource authoring created is deleted, which Space Authoring refuses
+   * for every kind that owns the Spaces it references.
+   */
+  it('deletes a Resource whose kind owns its Spaces through the Space Resource lifecycle', async () => {
+    const opened = open();
+    const { resourceDeletion, spaceResources, session } = opened;
+    const created = await spaceResources.create({
+      containingSpaceId: SPACE_ID,
+      mapId: MAP_ID,
+      title: 'Linked',
+      position: { x: 600, y: 0 },
+    });
+    if (created.kind !== 'completed') throw new Error('the Space Resource was not created');
+    expect(kindFlags(lookupResource(opened, created.resourceId).kind).ownsReferencedSpaces).toBe(
+      true,
+    );
+    resourceDeletion.askToDelete(lookupResource(opened, created.resourceId), NO_FALLBACK);
+
+    await confirmed(opened);
+
+    expect(deletionNotice(opened)).toBeNull();
+    expect(session.getState().working.resources.map(({ id }) => id)).toEqual([
+      RESOURCE_A,
+      RESOURCE_B,
     ]);
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isKindId, isRegisteredKind, kindFlags } from '../src/kinds/registry';
+import { isKindId, isRegisteredKind } from '../src/kinds/registry';
 import { imageKind } from '../src/kinds/image';
 import { markdownKind } from '../src/kinds/markdown';
 import { referenceKind } from '../src/kinds/reference';
@@ -7,15 +7,6 @@ import { spaceKind } from '../src/kinds/space';
 import { urKind } from '../src/kinds/ur';
 
 describe('the kind registry', () => {
-  it('answers the most constrained flags for a kind no module registers', () => {
-    expect(kindFlags('vnd.example.unregistered')).toEqual({
-      takesResourceShape: false,
-      canOpen: false,
-      mayBeTarget: false,
-      ownsReferencedSpaces: false,
-    });
-  });
-
   it('registers every kind module', () => {
     for (const kind of [urKind, imageKind, markdownKind, referenceKind, spaceKind]) {
       expect(isRegisteredKind(kind.id), kind.id).toBe(true);

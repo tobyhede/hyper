@@ -1,4 +1,4 @@
-import { imageKind, type ImageKindId } from '@project/core';
+import { imageKind, type ImageKindId, type ResourceId } from '@project/core';
 import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
 import { beginReplacing, type ImageReplacement } from '@project/ui';
 import type {
@@ -18,10 +18,19 @@ export type ImageResourceDecorationContext = Pick<
   | 'editableResourceIds'
   | 'beginBodyEditing'
   | 'bodyEditorResourceId'
-  | 'replaceResourceImage'
-  | 'imageAccept'
   | 'clearCaret'
->;
+> & {
+  /**
+   * Replace an Image Resource's image, answering the sentence for a refusal or
+   * `null` once the replacement is over.
+   */
+  readonly replaceResourceImage: (
+    resourceId: ResourceId,
+    replacement: ImageReplacement,
+  ) => Promise<string | null>;
+  /** What a replacement's file picker offers. */
+  readonly imageAccept: string;
+};
 
 /**
  * An Image Resource's Replace, which takes the place a Markdown Resource's body

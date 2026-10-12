@@ -3,16 +3,13 @@ import type { ZodIssue, ZodType, ZodTypeDef } from 'zod';
 import {
   RESOURCE_TITLE_REQUIRED,
   graphSchema,
-  markdownResourceSchema,
   normalizeTitle,
   positionedMapSchema,
-  referenceResourceSchema,
   resourceDocumentSchema,
   resourceFileSchema,
   resourceSchema,
   shortTitle,
   spaceFileSchema,
-  spaceResourceSchema,
   titleLines,
   titleName,
 } from '../src/index';
@@ -74,17 +71,14 @@ const withoutId =
 
 /**
  * Every schema a Resource's Title arrives through, beside the drafts it reads:
- * each kind's own schema, the Resource union, the stored document and the
- * Resource file, which holds a Markdown Resource's content as a locator.
+ * the Resource, the stored document and the Resource file, which holds a
+ * Markdown Resource's content as a locator.
  */
 const doors: readonly {
   readonly label: string;
   readonly schema: ResourceTitleSchema;
   readonly drafts: readonly ((title: string) => ResourceDraft)[];
 }[] = [
-  { label: 'markdown resource', schema: markdownResourceSchema, drafts: [markdownResource] },
-  { label: 'reference resource', schema: referenceResourceSchema, drafts: [referenceResource] },
-  { label: 'space resource', schema: spaceResourceSchema, drafts: [spaceResource] },
   {
     label: 'resource',
     schema: resourceSchema,
@@ -105,10 +99,9 @@ const doors: readonly {
 /**
  * Every door a Resource's Title arrives through, carrying one Title.
  *
- * A rule that reaches only the per-kind schemas is visibly not the rule at
- * every door: the union, the stored document and the Resource file have to
- * answer the same way, which is what makes a stored Title and an imported one
- * the same Title.
+ * The Resource, the stored document and the Resource file have to answer the
+ * same way, which is what makes a stored Title and an imported one the same
+ * Title.
  */
 const titleCases = (
   title: string,

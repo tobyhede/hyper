@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   graphHeadShape,
-  kindFlags,
   spaceKind,
   type Graph,
   type GraphHeadShape,
@@ -419,18 +418,15 @@ export function useDockChrome(
         onDragEnd: placement.endDrag,
       },
       // Every kind completes its Edit on the press, an Image Resource once its
-      // file is chosen (ADR 0089, ADR 0106), and a kind that owns the Space it
-      // references through the Space Resource lifecycle, which creates that
-      // Space with it (ADR 0074).
+      // file is chosen (ADR 0089, ADR 0106), and a Space Resource through the
+      // Space Resource lifecycle, which creates its Space with it (ADR 0074).
       onCreate: (creation) => {
         if ('files' in creation) placement.createImagesFromFiles(creation.files);
         else if (creation.kind === spaceKind.id) placement.createSpaceResource();
         else placement.createResource(creation.kind);
       },
       createDisabled: (kind) =>
-        kindFlags(kind).ownsReferencedSpaces
-          ? !availability.createSpaceResource
-          : !availability.addResource,
+        kind === spaceKind.id ? !availability.createSpaceResource : !availability.addResource,
     },
     persistence: {
       state: persistence,

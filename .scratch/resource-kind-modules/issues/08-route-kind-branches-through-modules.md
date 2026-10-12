@@ -2,7 +2,7 @@
 
 Status: resolved
 
-**Why:** tickets 02 to 06 asked for each kind's rules to live in its module and be named nowhere else. The code outside `kinds/` instead tests a kind through its module's id (`case referenceKind.id:`, `resource.kind === spaceKind.id`, `[urKind.id]: …` tables). The id is no longer quoted, so `test/unit/kind-ids-in-modules.test.ts` passes, but the rule still lives at the call site and adding a kind still means editing every one of them. The code review of #359 and #360 found this; `/mnt/project-files/reviews/359-360-code-review.md` has the findings.
+**Why:** tickets 02 to 06 asked for each kind's rules to live in its module and be named nowhere else. The code outside `kinds/` instead tests a kind through its module's id (`case referenceKind.id:`, `resource.kind === spaceKind.id`, `[urKind.id]: …` tables). The id is no longer quoted, so `test/unit/kind-ids-in-modules.test.ts` passes, but the rule still lives at the call site and adding a kind still means editing every one of them. The code review of #359 and #360 found this.
 
 **What to build:** move each branch into the module it belongs to, as a flag, a declared operation or a view-half entry, so a call site asks the registry rather than switching on a kind. The sites outside `kinds/` that test a kind through its id when this was filed:
 
@@ -28,3 +28,5 @@ Built. A choice among kinds now goes through each package's registry, the one pl
 - **app** (`packages/app/src/kinds/`): each kind's canvas decoration is its app half, and `useKindDecoratedNodes` is the one place they are listed. The Resources list, deletion, the Create cluster's availability, Create Reference's terminal state and the target addresses read the core rules and the view registry.
 
 What is left outside `kinds/` is a feature one kind offers on its own content: the Space Resource lifecycle, Image Create and Replace, Create Reference, a Markdown body's completion, and the closed union `content` is typed by. `test/unit/kind-ids-in-modules.test.ts` now counts every `<kind>Kind.id` outside `kinds/` by file, with the reason beside each, so a new dispatch written with module ids fails until it is routed or counted.
+
+**Correction (2026-10-12):** the Acceptance is not met. Adding a kind still edits files outside its modules and the registries: the Dock's Create list (`RESOURCE_KINDS`, `DockCreation`, `InputFreeResourceKind`), the edit and replace display states (`resource-display.ts`, `CanvasResource`'s `is<Kind>Operations` branches, `ResourceNode.tsx`), `ContentAction` and `ContentVia` in `resource-content.ts`, the decoration contexts' central interface, and type-level names such as `<Kind>KindId` that the scan does not read. "The tightened scan holds it" was false: it matched only `<kind>Kind.id`. Toby decided to keep these as counted sites, record them as unbuilt in issue 10, and enforce the rest with an import ban on each kind module's exports outside `kinds/`, whose exemptions only shrink.

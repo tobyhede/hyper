@@ -30,7 +30,7 @@ const imageCanvas = (content: ImageContent, area: CanvasArea) =>
   );
 
 /**
- * The view half of the Image kind (ADR 0106, ADR 0128): what an Image Resource
+ * The view half of the Image kind (ADR 0106): what an Image Resource
  * is called and drawn as, and what it offers beyond the shared Title. Its
  * content view is `ResourceImage`, and its content action is Replace; a
  * presented image is never replaced, its own or a Target's.

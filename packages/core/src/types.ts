@@ -1,10 +1,7 @@
 import type { z } from 'zod';
 import type {
-  resourceFileSchema,
   resourcePlacementSchema,
   resourceShapeSchema,
-  resourceDocumentSchema,
-  resourceSchema,
   importSpaceFileSchema,
   importSpaceSchema,
   mapPositionSchema,
@@ -23,9 +20,10 @@ import type { imageNaturalSizeSchema } from './kinds/image';
 
 /** Domain types are derived from the Zod schemas so they can never drift apart. */
 
-export type Resource = z.infer<typeof resourceSchema>;
+import type { Resource } from './kinds/registry';
+
+export type { Resource, ResourceDocument, ResourceFileDocument } from './kinds/registry';
 export type UUID = z.infer<typeof uuidSchema>;
-export type ResourceDocument = z.infer<typeof resourceDocumentSchema>;
 export type SpaceDocument = z.infer<typeof spaceDocumentSchema>;
 export type SpaceSnapshot = z.infer<typeof spaceSnapshotSchema>;
 /** `hyper.json` — what a canonical aggregate directory declares about itself. */
@@ -34,8 +32,6 @@ export type ImportResource = z.infer<typeof importSpaceSchema>['resources'][numb
 export type ImportSpaceFile = z.infer<typeof importSpaceFileSchema>;
 export type ImportSpace = z.infer<typeof importSpaceSchema>;
 
-/** A Resource file as intake reads it (ADR 0128): the envelope, with a content kind's locator as its content. */
-export type ResourceFileDocument = z.infer<typeof resourceFileSchema>;
 /**
  * One `{ from, to }` connection a graph is made of (ADR 0032). The authored
  * element — distinct from `@project/graph`'s `GraphRenderEdge`, which is this plus the

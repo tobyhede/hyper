@@ -14,6 +14,7 @@ import {
   takesResourceShape,
   titleLines,
   titleName,
+  UNRESOLVED_CONTENT,
   type ResourceContent,
   type ResourceShape,
 } from '@project/core';
@@ -239,8 +240,10 @@ const opacityTransitionMs = (element: HTMLElement): number => {
 /**
  * The content the content area draws, or `null` for none, keeping one identity
  * while it holds the same values: `usePresence` holds its value by identity, and
- * a display is rebuilt on every projection. Content that draws an area is flat
- * (its kind, its text and `via`), so equal values are equal content.
+ * a display is rebuilt on every projection. Values are compared whole, nested
+ * ones included, so content that holds an object keeps its identity too. The
+ * held value is adjusted during render, React's pattern for state that follows
+ * a prop, and only when the values differ, so it settles in one pass.
  */
 function useAreaContent(content: ResourceContent | null): ResourceContent | null {
   const next = content !== null && drawsContentArea(content) ? content : null;
@@ -250,16 +253,9 @@ function useAreaContent(content: ResourceContent | null): ResourceContent | null
   return next;
 }
 
-/** Whether two contents hold the same own values, compared one level deep. */
-const sameValues = (left: ResourceContent | null, right: ResourceContent | null): boolean => {
-  if (left === null || right === null) return left === right;
-  const leftEntries = Object.entries(left);
-  const rightValues = new Map(Object.entries(right));
-  return (
-    leftEntries.length === rightValues.size &&
-    leftEntries.every(([key, value]) => rightValues.has(key) && rightValues.get(key) === value)
-  );
-};
+/** Whether two contents hold the same values, nested ones included; each kind builds its content in one key order. */
+const sameValues = (left: ResourceContent | null, right: ResourceContent | null): boolean =>
+  left === right || JSON.stringify(left) === JSON.stringify(right);
 
 /**
  * The one drawn Resource shared by the production canvas and its stories.
@@ -374,7 +370,7 @@ export function CanvasResource(props: CanvasResourceProps) {
   };
   /** The content area: unresolved content, or what its kind's view half draws. */
   const drawAreaContent = (value: ResourceContent): ReactNode =>
-    value.kind === 'unresolved' ? (
+    value.kind === UNRESOLVED_CONTENT.kind ? (
       <UnresolvedContent />
     ) : (
       canvasContent(value, {

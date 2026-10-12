@@ -17,7 +17,7 @@ const NOTES_MAP = uuidSchema.parse('00000000-0000-4000-8000-000000000081');
  *
  * A space is a directory, not a file (ADR 0020): the space file holds
  * structure, and every Resource is a Resource file under `resources/`, a
- * Markdown Resource's source the sidecar beside it (ADR 0128). So this reads
+ * Markdown Resource's source the sidecar beside it. So this reads
  * every Resource file and every `.md` in the directory, as intake would be
  * handed them, and is the regression test that the Resource files are still
  * authored correctly: a malformed Resource file, a missing sidecar or a `.md`

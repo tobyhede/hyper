@@ -95,6 +95,8 @@ export function createResourceDeletion({
   spaceResources,
 }: ResourceDeletionDependencies): ResourceDeletion {
   const execute = async (resource: Resource): Promise<void> => {
+    // A kind that owns the Spaces it references deletes through the lifecycle
+    // that counts every reference to them, which a one-Space Edit cannot.
     if (kindFlags(resource.kind).ownsReferencedSpaces) {
       await commandOutcomes.run('space-resource-delete', async () => {
         if (spaceResources === undefined) {

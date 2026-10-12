@@ -53,7 +53,7 @@ export const FIXTURE_ORDINARY_SPACE_COUNT = readdirSync(fixtureRoot, {
 ).length;
 
 /**
- * Every Resource is one `resources/<id>.json` Resource file (ADR 0128), and
+ * Every Resource is one `resources/<id>.json` Resource file, and
  * Resources are discovered non-recursively there, so counting those files
  * counts the Resources.
  */

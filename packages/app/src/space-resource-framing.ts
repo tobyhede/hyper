@@ -1,10 +1,8 @@
-import type { SpaceKindId, MapPosition, ResourceDocument } from '@project/core';
+import type { SpaceResourceDocument, MapPosition } from '@project/core';
 import type { EmbeddedBounds } from './embedded-map';
 
 /** The Map-coordinate centre and scale a Space Resource stores for its window. */
-export type SpaceResourceFraming = NonNullable<
-  Extract<ResourceDocument, { kind: SpaceKindId }>['content']['framing']
->;
+export type SpaceResourceFraming = NonNullable<SpaceResourceDocument['content']['framing']>;
 
 /**
  * How an embedding places authored coordinates inside the Space Resource's window.

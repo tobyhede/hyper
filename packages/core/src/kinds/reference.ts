@@ -5,16 +5,13 @@ import type { ReferenceContentUnresolved } from '../resource-content';
 import { defineKind } from './kind-module';
 
 /** A Reference Resource's content: a pointer to the resource whose content it shows. */
-export const referenceResourceContentSchema = z.object({
-  /** The id of the resource this reference shows. Intake resolves it from `resourceReferences`. */
-  target: uuidSchema,
-});
+export const referenceResourceContentSchema = z
+  .object({
+    /** The id of the resource this reference shows, which it declares as its one Resource reference. */
+    target: uuidSchema,
+  })
+  .strict();
 
-/**
- * The Reference kind (ADR 0070): a Resource that shows its Target's content
- * read-only. Its one Resource reference is its Target, and it may not itself
- * be a Target, so referencing is a single hop (ADR 0113).
- */
 /** The Reference kind's id, declared before its module because the content any kind resolves names it. */
 const REFERENCE_KIND_ID = 'reference';
 
@@ -27,6 +24,11 @@ export const UNRESOLVED_CONTENT: ReferenceContentUnresolved = {
   via: REFERENCE_KIND_ID,
 };
 
+/**
+ * The Reference kind (ADR 0070): a Resource that shows its Target's content
+ * read-only. Its one Resource reference is its Target, and it may not itself
+ * be a Target, so referencing is a single hop (ADR 0113).
+ */
 export const referenceKind = defineKind({
   id: REFERENCE_KIND_ID,
   contentSchema: referenceResourceContentSchema,

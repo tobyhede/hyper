@@ -1,4 +1,4 @@
-import { urKind, type UrKindId } from '@project/core';
+import { urKind, type ResourceId, type ResourceShape, type UrKindId } from '@project/core';
 import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
 import type {
   CanvasResourceDecorationContext,
@@ -11,8 +11,15 @@ type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
 
 export type UrResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
-  'authorOnCanvas' | 'editableResourceIds' | 'changeResourceShape'
->;
+  'authorOnCanvas' | 'editableResourceIds'
+> & {
+  /**
+   * Draw an Ur Resource in another Shape on this Map, reporting a refusal.
+   * Absent where this canvas has no command outcomes to report one through.
+   */
+  readonly changeResourceShape?:
+    ((resourceId: ResourceId, resourceShape: ResourceShape) => void) | undefined;
+};
 
 /** An Ur Resource's Shape choice, offered Open and Closed alike (ADR 0121). */
 export function decorateUrResourceNode(

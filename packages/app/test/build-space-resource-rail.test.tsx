@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type ResourceDocument } from '@project/core';
+import { uuidSchema, type SpaceResourceDocument } from '@project/core';
 import { ResourceRailActions } from '@project/ui';
 import { buildSpaceResourceRail } from '../src/build-space-resource-rail';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
@@ -54,7 +54,7 @@ const target: SpaceResourceTarget = {
 const documentOf = (
   mapId: typeof FIRST_MAP_ID,
   graph: typeof FIRST_GRAPH_ID,
-): Extract<ResourceDocument, { kind: 'space' }> => ({
+): SpaceResourceDocument => ({
   title: 'Elsewhere',
   kind: 'space',
   content: { spaceId: TARGET_ID, map: mapId, graph },

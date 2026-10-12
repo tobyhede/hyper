@@ -51,24 +51,31 @@ const imageUrlSchema = z.string().refine(isAcceptedImageUrl, {
  * (ADR 0106). Recorded with the image; no size rule reads it, because a
  * Resource's size is its Map entry's and the picture fits the rect it is given.
  */
-export const imageNaturalSizeSchema = z.object({
-  width: z.number().positive().finite(),
-  height: z.number().positive().finite(),
-});
+export const imageNaturalSizeSchema = z
+  .object({
+    width: z.number().positive().finite(),
+    height: z.number().positive().finite(),
+  })
+  .strict();
 
 /**
  * A Resource that shows a picture from its URL (ADR 0106). It owns the URL and
  * not the bytes, so nothing here says where the picture is stored; the natural
  * size is absent when the picture did not load when its URL was set.
  */
-export const imageResourceContentSchema = z.object({
-  url: imageUrlSchema,
-  naturalSize: imageNaturalSizeSchema.optional(),
-});
+export const imageResourceContentSchema = z
+  .object({
+    url: imageUrlSchema,
+    naturalSize: imageNaturalSizeSchema.optional(),
+  })
+  .strict();
+
+/** The Image kind's id, declared before its module because the content it resolves to names it. */
+const IMAGE_KIND_ID = 'image';
 
 /** What an Image Resource's content resolves to: the URL its picture is shown from. */
 export interface ImageContent {
-  readonly kind: 'image';
+  readonly kind: typeof IMAGE_KIND_ID;
   readonly url: string;
   readonly via: ContentVia;
 }
@@ -78,7 +85,7 @@ export interface ImageContent {
  * from its URL. Its content action is Replace.
  */
 export const imageKind = defineKind({
-  id: 'image',
+  id: IMAGE_KIND_ID,
   contentSchema: imageResourceContentSchema,
   flags: {
     takesResourceShape: false,
@@ -87,7 +94,7 @@ export const imageKind = defineKind({
     ownsReferencedSpaces: false,
   },
   facts: { action: 'replace-image', embedsMap: false, drawsContentArea: true },
-  resolveContent: (content, via): ImageContent => ({ kind: 'image', url: content.url, via }),
+  resolveContent: (content, via): ImageContent => ({ kind: IMAGE_KIND_ID, url: content.url, via }),
 });
 
 /** The Image kind's id. */
