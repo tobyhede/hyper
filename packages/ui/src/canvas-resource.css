@@ -278,14 +278,6 @@
   flex: 1 1 auto;
 }
 
-/* The title footer takes only its content. CanvasResource reports its measured
-   height so embedded nodes and Edges clip at the same boundary. */
-.canvas-resource[data-content-kind='space'][data-open='true'] .canvas-resource__body {
-  height: auto;
-  flex: none;
-  margin-top: auto;
-}
-
 /* A drawn content area sits above its Title. The attribute follows that area's
    presence through Close, keeping the ordering until its exit fade completes. */
 .canvas-resource[data-content-area='true'] .canvas-resource__body {

@@ -80,7 +80,12 @@ export interface ImageContent {
 export const imageKind = {
   id: 'image',
   contentSchema: imageResourceContentSchema,
-  flags: { takesResourceShape: false, canOpen: true, mayBeTarget: true },
+  flags: {
+    takesResourceShape: false,
+    canOpen: true,
+    mayBeTarget: true,
+    ownsReferencedSpaces: false,
+  },
   facts: { action: 'replace-image', embedsMap: false, drawsContentArea: true },
   resolveContent: (content, via) => ({ kind: 'image', url: content.url, via }),
 } as const satisfies ContentOwnerKindModule<

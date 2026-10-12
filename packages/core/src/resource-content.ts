@@ -1,26 +1,11 @@
 import { imageKind, type ImageContent } from './kinds/image';
 import { markdownKind, type MarkdownContent } from './kinds/markdown';
 import type { ReferenceKindId } from './kinds/reference';
+import { spaceKind, type SpaceContent } from './kinds/space';
 import { urKind, type UrContent } from './kinds/ur';
-import type { Resource } from './types';
 
 /** Whether content is the Resource's own or reached through a Reference Resource (ADR 0070). */
 export type ContentVia = 'self' | ReferenceKindId;
-
-type SpaceResource = Extract<Resource, { kind: 'space' }>;
-
-/**
- * What an Open Space Resource shows: its Space, Map, Graph and framing. It is
- * not the Resource, because a drawn Resource names nothing outside itself (ADR 0083).
- * `framing` is a required key that may hold `undefined`, so a value is built
- * whole rather than by a conditional spread.
- */
-export interface SpaceView {
-  readonly spaceId: SpaceResource['content']['spaceId'];
-  readonly map: SpaceResource['content']['map'];
-  readonly graph: SpaceResource['content']['graph'];
-  readonly framing: SpaceResource['content']['framing'] | undefined;
-}
 
 /**
  * What a Resource's content is. `''` is a genuinely empty body; `ur` is no
@@ -31,7 +16,7 @@ export interface SpaceView {
 export type ResourceContent =
   | MarkdownContent
   | ImageContent
-  | { readonly kind: 'space'; readonly view: SpaceView; readonly via: ContentVia }
+  | SpaceContent
   | UrContent
   | { readonly kind: 'unresolved'; readonly via: ReferenceKindId };
 
@@ -47,7 +32,7 @@ export interface ContentFacts {
 const CONTENT_FACTS = {
   [markdownKind.id]: markdownKind.facts,
   [imageKind.id]: imageKind.facts,
-  space: { action: 'author-space-view', embedsMap: true, drawsContentArea: false },
+  [spaceKind.id]: spaceKind.facts,
   [urKind.id]: urKind.facts,
   unresolved: { action: 'none', embedsMap: false, drawsContentArea: true },
 } satisfies Record<ResourceContent['kind'], ContentFacts>;

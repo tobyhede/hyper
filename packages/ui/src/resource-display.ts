@@ -1,4 +1,5 @@
 import {
+  spaceKind,
   type MarkdownKindId,
   markdownKind,
   contentAction,
@@ -113,7 +114,7 @@ export function spaceViewOf(
 ): { readonly view: SpaceView; readonly via: ContentVia } | undefined {
   switch (display.shown) {
     case 'open':
-      return display.content.kind === 'space'
+      return display.content.kind === spaceKind.id
         ? { view: display.content.view, via: display.content.via }
         : undefined;
     case 'closed':

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  spaceKind,
   markdownKind,
   graphHeadShape,
   type Graph,
@@ -429,7 +430,7 @@ export function useDockChrome(
           case markdownKind.id:
             placement.createResource(markdownKind.id);
             return;
-          case 'space':
+          case spaceKind.id:
             placement.createSpaceResource();
             return;
           case imageKind.id:
@@ -442,7 +443,7 @@ export function useDockChrome(
       },
       createDisabled: {
         [markdownKind.id]: !availability.addResource,
-        space: !availability.createSpaceResource,
+        [spaceKind.id]: !availability.createSpaceResource,
         [imageKind.id]: !availability.addResource,
         [urKind.id]: !availability.addResource,
       } satisfies Record<DockResourceKind, boolean>,

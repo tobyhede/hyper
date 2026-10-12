@@ -1,4 +1,5 @@
 import {
+  spaceKind,
   referenceKind,
   markdownKind,
   declaresResourceKind,
@@ -105,7 +106,7 @@ function decodeEnvelope(frontmatter: ImportResourceFrontmatter, body: string): D
     }
     case referenceKind.id:
       return contentFromRest(frontmatter);
-    case 'space':
+    case spaceKind.id:
       return contentFromRest(frontmatter);
     case imageKind.id:
       return contentFromRest(frontmatter);

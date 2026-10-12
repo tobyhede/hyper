@@ -1,6 +1,8 @@
 import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
+  type SpaceKindId,
+  spaceKind,
   markdownKind,
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
@@ -43,7 +45,9 @@ type Caret =
   | { readonly resourceId: string; readonly field: 'body'; readonly openObserved: boolean }
   | null;
 
-const spaceDocumentIdentity = (document: Extract<ResourceDocument, { kind: 'space' }>): string => {
+const spaceDocumentIdentity = (
+  document: Extract<ResourceDocument, { kind: SpaceKindId }>,
+): string => {
   const framing = document.content.framing;
   const framingKey =
     framing === undefined ? '' : `${framing.centreX}:${framing.centreY}:${framing.zoom}`;
@@ -52,10 +56,10 @@ const spaceDocumentIdentity = (document: Extract<ResourceDocument, { kind: 'spac
 
 const spaceDocumentsOf = (
   resources: readonly { readonly id: ResourceId; readonly document: ResourceDocument }[],
-): ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: 'space' }>> => {
-  const next = new Map<ResourceId, Extract<ResourceDocument, { kind: 'space' }>>();
+): ReadonlyMap<ResourceId, Extract<ResourceDocument, { kind: SpaceKindId }>> => {
+  const next = new Map<ResourceId, Extract<ResourceDocument, { kind: SpaceKindId }>>();
   for (const resource of resources) {
-    if (resource.document.kind === 'space') next.set(resource.id, resource.document);
+    if (resource.document.kind === spaceKind.id) next.set(resource.id, resource.document);
   }
   return next;
 };
@@ -65,7 +69,7 @@ const spaceDocumentsKeyOf = (
 ): string =>
   resources
     .flatMap((resource) =>
-      resource.document.kind === 'space'
+      resource.document.kind === spaceKind.id
         ? [`${resource.id}:${spaceDocumentIdentity(resource.document)}`]
         : [],
     )
@@ -81,13 +85,13 @@ const completeEditedSpaceResource = (
   authoring: Pick<SurfaceAuthoring, 'complete'>,
   spaceSession: SpaceSession,
   resourceId: ResourceId,
-  nextDocument: (document: Extract<ResourceDocument, { kind: 'space' }>) => ResourceDocument,
+  nextDocument: (document: Extract<ResourceDocument, { kind: SpaceKindId }>) => ResourceDocument,
   invalidMessage: string,
 ): string | null => {
   const stored = spaceSession
     .getState()
     .working.resources.find((resource) => resource.id === resourceId);
-  if (stored?.document.kind !== 'space')
+  if (stored?.document.kind !== spaceKind.id)
     return describeAuthoringRefusal({ code: 'resource-not-found' });
   const parsed = resourceDocumentSchema.safeParse(nextDocument(stored.document));
   if (!parsed.success) return invalidMessage;
@@ -413,7 +417,7 @@ export function useCanvasResourceAuthoring({
         spaceSession,
         resourceId,
         (document) => {
-          const next: Extract<ResourceDocument, { kind: 'space' }> = {
+          const next: Extract<ResourceDocument, { kind: SpaceKindId }> = {
             ...document,
             content: { ...document.content, map: targetMap.id, graph: graphId },
           };
@@ -640,7 +644,7 @@ export function useCanvasResourceAuthoring({
   const spaceDecorated = useMemo(() => {
     const next = new Map<string, ResourceFlowNode>();
     for (const node of withShared) {
-      if (isResourceNodeOf(node, 'space')) {
+      if (isResourceNodeOf(node, spaceKind.id)) {
         next.set(node.id, applyKindDecoration(node, decorateSpaceResourceNode(node, spaceContext)));
       }
     }

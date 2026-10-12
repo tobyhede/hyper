@@ -1,6 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { relative } from 'node:path';
 import {
+  spaceKind,
   referenceKind,
   markdownKind,
   SPACE_FILE_VERSION,
@@ -135,11 +136,11 @@ const canonicalResource = (
         kind: referenceKind.id,
         content: inSchemaOrder(referenceResourceContentSchema, document.content),
       };
-    case 'space':
+    case spaceKind.id:
       return {
         id,
         title,
-        kind: 'space',
+        kind: spaceKind.id,
         content: inSchemaOrder(spaceResourceContentSchema, document.content),
       };
     case imageKind.id:

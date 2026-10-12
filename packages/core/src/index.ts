@@ -12,4 +12,12 @@ export * from './kinds/ur';
 export * from './kinds/image';
 export * from './kinds/markdown';
 export * from './kinds/reference';
-export { contentTarget, mayBeTarget, resourceReferences } from './kinds/registry';
+export * from './kinds/space';
+export {
+  contentTarget,
+  lifetimeSpaceReferences,
+  mayBeTarget,
+  resourceReferences,
+  spaceReferences,
+  spaceSelectionProblem,
+} from './kinds/registry';

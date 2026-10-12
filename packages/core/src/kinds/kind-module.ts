@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { ContentFacts, ContentVia } from '../resource-content';
+import type { SpaceResourceTarget, SpaceSelectionProblem } from './space';
 import type { UUID } from '../types';
 
 /**
@@ -13,6 +14,8 @@ export interface KindFlags {
   readonly canOpen: boolean;
   /** Whether another Resource may reference one of this kind as its Target, which keeps referencing a single hop (ADR 0113). */
   readonly mayBeTarget: boolean;
+  /** Whether a Space this kind references lives by that reference, and is deleted with its last (ADR 0074). */
+  readonly ownsReferencedSpaces: boolean;
 }
 
 /**
@@ -43,4 +46,21 @@ export interface ContentOwnerKindModule<K extends string, Content, Resolved> ext
 export interface TargetingKindModule<K extends string, Content> extends KindModule<K, Content> {
   readonly resourceReferences: (content: Content) => readonly UUID[];
   readonly contentTarget: (content: Content) => UUID;
+}
+
+/**
+ * A kind whose Resources reference other Spaces: the Spaces its content
+ * references, from which the core enforces cycles, lifetime and rooting, and
+ * the one narrow check of its own selection in a target it alone understands.
+ */
+export interface SpaceReferencingKindModule<
+  K extends string,
+  Content,
+  Resolved,
+> extends ContentOwnerKindModule<K, Content, Resolved> {
+  readonly spaceReferences: (content: Content) => readonly UUID[];
+  readonly selectionProblem: (
+    content: Content,
+    target: SpaceResourceTarget,
+  ) => SpaceSelectionProblem | undefined;
 }

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { useId, type ComponentProps, type ComponentType } from 'react';
 import {
+  spaceKind,
   type ReferenceKindId,
   markdownKind,
   imageKind,
@@ -283,7 +284,7 @@ interface BaseGlyphProps {
 /** The silhouette each Resource kind that owns one draws. */
 export const BASE_GLYPHS = {
   [markdownKind.id]: MarkdownIcon,
-  space: SpaceResourceIcon,
+  [spaceKind.id]: SpaceResourceIcon,
   [imageKind.id]: ImageIcon,
   [urKind.id]: UrIcon,
 } satisfies Record<ResourceBaseKind, ComponentType<BaseGlyphProps>>;

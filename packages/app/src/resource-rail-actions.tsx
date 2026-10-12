@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import {
+  spaceKind,
   referenceKind,
   titleName,
   type Map as SpaceMap,
@@ -133,7 +134,7 @@ export function resourceRailGroups(
           },
         ]),
   ];
-  if (resource.kind === 'space') {
+  if (resource.kind === spaceKind.id) {
     // The Title edits in place on the drawn Resource; this menu authors neither
     // the Resource's name nor the target Space's.
     const links = addresses.flat();
@@ -244,7 +245,7 @@ export function useResourceRailActions(
                 resourceDeletion.askToDelete(resource, railFocusFallback(currentSpace, resourceId))
             : null,
           enter:
-            spaces === null || resource.kind !== 'space'
+            spaces === null || resource.kind !== spaceKind.id
               ? null
               : {
                   available: navigate,

@@ -3,12 +3,35 @@ import { lineAt, maskedCssSource, maskedTsSource, trackedFiles } from '../suppor
 
 /**
  * ADR 0128: every Resource kind is a module, and no rule outside it names the
- * kind. A kind moved onto its module (`.scratch/resource-kind-modules/`) is
- * named, as a quoted id in source or a CSS attribute selector, only under a
- * `kinds/` directory; everything else reaches it through the module's exports.
- * A kind joins this list in the change that moves it.
+ * kind. A kind is named, as a quoted id in source or a CSS attribute selector,
+ * only under a `kinds/` directory; everything else reaches it through the
+ * module's exports.
  */
-const MOVED_KINDS = ['ur', 'image', 'markdown', 'reference'] as const;
+const KINDS = ['ur', 'image', 'markdown', 'reference', 'space'] as const;
+
+/**
+ * Quoted ids that are not the kind: `'space'` also tags a Space itself, as an
+ * entity, a product destination, a Resources-list row, a drag, an icon and a
+ * path label. Each file lists how many it holds, so a new one fails until it
+ * is read and counted here.
+ */
+const NOT_THE_KIND = new Map<string, ReadonlyMap<string, number>>([
+  [
+    'space',
+    new Map([
+      ['packages/app/src/components/ResourcesPopover.tsx', 2],
+      ['packages/app/src/destination-opening.ts', 1],
+      ['packages/app/src/dock-chrome.ts', 1],
+      ['packages/app/src/entity-actions.tsx', 6],
+      ['packages/app/src/resource-placement.ts', 1],
+      ['packages/app/src/resources-drag.ts', 2],
+      ['packages/http/src/product-destination.ts', 3],
+      ['packages/ui/src/icons.tsx', 1],
+      ['src/aggregate-directory/identify-space.ts', 1],
+      ['src/http/space-host.ts', 1],
+    ]),
+  ],
+]);
 
 /** Source the application, the hosts and the CLI are built from; tests and stories are not. */
 const isScannedSource = (file: string): boolean =>
@@ -28,11 +51,12 @@ const namings = (kind: string): readonly string[] =>
     .filter((file) => isScannedSource(file) && !isKindModule(file))
     .flatMap((file) => {
       const source = sourceOf(file);
-      return quotedAt(source, kind).map((index) => `${file}:${lineAt(source, index)}`);
+      const lines = quotedAt(source, kind).map((index) => `${file}:${lineAt(source, index)}`);
+      return lines.length === (NOT_THE_KIND.get(kind)?.get(file) ?? 0) ? [] : lines;
     });
 
-describe('a moved kind is named only by its module', () => {
-  it.each(MOVED_KINDS)('names %s nowhere outside a kinds/ module', (kind) => {
+describe('a kind is named only by its module', () => {
+  it.each(KINDS)('names %s nowhere outside a kinds/ module', (kind) => {
     expect(namings(kind)).toEqual([]);
   });
 

@@ -1,3 +1,4 @@
+import { spaceKind, spaceReferences } from '@project/core';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { Resource, UUID } from '@project/core';
 import {
@@ -19,9 +20,7 @@ export const NO_SPACE_RESOURCE_TARGETS: SpaceResourceTargets = new Map();
 
 /** The distinct Spaces the Space Resources of one Space reference, in authored order. */
 const referencedSpaceIds = (resources: readonly Resource[]): readonly UUID[] => [
-  ...new Set(
-    resources.flatMap((resource) => (resource.kind === 'space' ? [resource.content.spaceId] : [])),
-  ),
+  ...new Set(resources.flatMap((resource) => spaceReferences(resource))),
 ];
 
 /**
@@ -169,7 +168,7 @@ export const useSpaceResourceTargets = (
     for (const entry of entries) {
       if (
         resources.some(
-          (resource) => resource.kind === 'space' && resource.content.spaceId === entry.id,
+          (resource) => resource.kind === spaceKind.id && resource.content.spaceId === entry.id,
         )
       ) {
         live.set(entry.id, spaceResourceTarget(entry.app.currentSpace()));

@@ -1,6 +1,7 @@
 import {
   mayBeTarget,
   resourceReferences,
+  spaceReferences,
   DEFAULT_RESOURCE_SHAPE,
   resourceOpen,
   resourceShape,
@@ -310,11 +311,11 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
   }
 
   for (const resource of space.resources) {
-    if (resource.kind !== 'space' || resource.content.spaceId !== space.id) continue;
+    if (!spaceReferences(resource).includes(space.id)) continue;
     errors.push({
       kind: 'space-resource-reference-cycle',
-      ref: resource.content.spaceId,
-      message: `Space Resource "${resource.id}" targets its own Space "${resource.content.spaceId}"`,
+      ref: space.id,
+      message: `Space Resource "${resource.id}" targets its own Space "${space.id}"`,
     });
   }
 

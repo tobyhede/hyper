@@ -1,3 +1,4 @@
+import { spaceKind } from '@project/core';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Handle,
@@ -332,7 +333,7 @@ export function ResourceNode({
     ((visuallySelected && !otherSelected) ||
       display.shown === 'editing' ||
       display.shown === 'replacing' ||
-      (kindOperations.kind === 'space' && kindOperations.portal?.editing === true)) &&
+      (kindOperations.kind === spaceKind.id && kindOperations.portal?.editing === true)) &&
     !dragging &&
     !resizeActive;
   /**

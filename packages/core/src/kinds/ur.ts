@@ -20,7 +20,12 @@ const urContentSchema = z.object({});
 export const urKind = {
   id: 'ur',
   contentSchema: urContentSchema,
-  flags: { takesResourceShape: true, canOpen: false, mayBeTarget: true },
+  flags: {
+    takesResourceShape: true,
+    canOpen: false,
+    mayBeTarget: true,
+    ownsReferencedSpaces: false,
+  },
   facts: { action: 'none', embedsMap: false, drawsContentArea: false },
   resolveContent: (_content, via) => ({ kind: 'ur', via }),
 } as const satisfies ContentOwnerKindModule<'ur', z.infer<typeof urContentSchema>, UrContent>;

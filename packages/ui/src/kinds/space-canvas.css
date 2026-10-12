@@ -1,0 +1,10 @@
+/* The Space kind's frame on a Map (ADR 0068, ADR 0120). `CanvasResource`
+   imports it after `canvas-resource.css`.
+
+   The title footer takes only its content. CanvasResource reports its measured
+   height so embedded nodes and Edges clip at the same boundary. */
+.canvas-resource[data-content-kind='space'][data-open='true'] .canvas-resource__body {
+  height: auto;
+  flex: none;
+  margin-top: auto;
+}
