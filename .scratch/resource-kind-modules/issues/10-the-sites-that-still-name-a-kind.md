@@ -17,7 +17,7 @@ The enforcement is an import ban: outside `kinds/`, no file may import a name a 
 
 - **Content commands** (candidate C): `ContentAction` is a closed union of one command per kind (`edit-markdown`, `replace-image`, `author-space-view`), and the display states that run them (`resource-display.ts`'s `editing` and `replacing`, `CanvasResource`'s and `ResourceNode`'s `is<Kind>Operations` branches, the Replace label and icon) choose by kind.
 - **Content reached through a Reference**: `ContentVia` names `ReferenceKindId`. It is a feature of the Reference kind alone today, but a second kind that may reach another's content would have to edit the core.
-- **Creation** (candidate E): the Dock's Create list (`RESOURCE_KINDS`, `DockCreation`) and `InputFreeResourceKind` in `space-authoring.ts` list kinds; the file picker is chosen by `imageKind.id`.
+- **Creation** (candidate E): the Dock's Create list (`RESOURCE_KINDS`, `DockCreation`) and `InputFreeResourceKind` in `space-authoring.ts` list kinds; the file picker is chosen by `imageKind.id`. The Dock's availability falls through to Add Resource's for every kind but the Space Resource's, so a new Dock kind that needs a gate of its own is not caught at compile time.
 - **The Space selection** (candidate F): `sql-space-repository.ts` and `space-resource-planning.ts` compare a Space Resource's `spaceId`, `map` and `graph` by kind. Ticket 06 left this unbuilt; the kind scan and the import ban now give it as the reason.
 - **Decoration contexts**: the app registry intersects every kind's decoration context. Each kind's context type now sits in its own app module, but the registry still lists them.
 

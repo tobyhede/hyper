@@ -8,7 +8,7 @@ import { nameOnCreationOf } from '../src/name-on-creation';
 import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';
-import { REFERENCE_TERMINAL, resourceRailGroups } from '../src/resource-rail-actions';
+import { resourceRailGroups } from '../src/resource-rail-actions';
 import { revealStep } from '../src/resources-disclosure';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import { spaceTitlesById } from '../src/space-resource-targets';
@@ -295,7 +295,7 @@ describe('resourceRailGroups', () => {
     expect(row).toMatchObject({
       id: 'create-reference',
       disabled: true,
-      description: REFERENCE_TERMINAL,
+      description: 'Reference Resources cannot be referenced.',
     });
   });
 });
