@@ -3,6 +3,8 @@
 # them, and `**/test/**` misses the root `test/` tree, so each test home is
 # named here.
 ignore:
+  - 'packages/app/fixture/**'
+  - 'packages/app/example/**'
   - 'test/**'
   - '**/test/**'
   - '**/e2e/**'
