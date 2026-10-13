@@ -86,12 +86,12 @@ describe('describeAggregateRefusal', () => {
   });
 
   it.each([
-    { kind: 'space-resource-target-missing' as const, expected: 'does not contain' },
-    { kind: 'space-resource-reference-cycle' as const, expected: 'closes a reference cycle' },
-  ])('names the Space Resource and its target for $kind', ({ kind, expected }) => {
+    { kind: 'space-reference-missing' as const, expected: 'does not contain' },
+    { kind: 'space-reference-cycle' as const, expected: 'closes a reference cycle' },
+  ])('names the referencing Resource and its target for $kind', ({ kind, expected }) => {
     const described = describeOne({ kind, ...location });
 
-    expect(described).toContain(`Space Resource ${RESOURCE_ID} in Space ${SPACE_ID}`);
+    expect(described).toContain(`Resource ${RESOURCE_ID} in Space ${SPACE_ID}`);
     expect(described).toContain(TARGET_SPACE_ID);
     expect(described).toContain(expected);
   });

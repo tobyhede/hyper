@@ -25,7 +25,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/space-authoring.ts:1326 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
 | packages/app/src/space-resource-targets.ts:171 | `spaceKind.id`: Space Resources referencing a Meta entry | space | one-kind | space-resource-targets.ts |
 | packages/persistence/src/space-resource-planning.ts:329 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
-| packages/persistence/src/space-resource-planning.ts:497 | `spaceKind.id`: deletion target guard | space | one-kind (lifecycle) | space-resource-planning.ts |
 | packages/persistence/src/space-resource-planning.ts:589 | `spaceKind.id`: matching Space Resources | space | one-kind (lifecycle) | space-resource-planning.ts |
 | packages/persistence/src/space-resource-planning.ts:642 | `spaceKind.id`: Space Resource for a Space | space | one-kind (lifecycle) | space-resource-planning.ts |
 | src/persistence/sql-space-repository.ts:175 (x2) | `spaceKind.id`: selection is part of the snapshot boundary | space | F | sql-space-repository.ts |

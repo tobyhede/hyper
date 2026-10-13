@@ -660,7 +660,7 @@ describe.each([
     it('refuses a reference resource whose target resolves to no resource', () => {
       const errors = refused(load({ resources: [referenceTo(A, ABSENT)], maps: [] }));
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'unresolved-reference-target', ref: ABSENT }),
+        expect.objectContaining({ kind: 'reference-target-missing', ref: ABSENT }),
       );
     });
 
@@ -676,7 +676,7 @@ describe.each([
         load({ resources: [markdown(A, 'A'), referenceTo(B, A), referenceTo(C, B)], maps: [] }),
       );
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'reference-targets-reference', ref: B }),
+        expect.objectContaining({ kind: 'reference-target-not-targetable', ref: B }),
       );
     });
 
@@ -784,7 +784,7 @@ describe.each([
       (_kind, resources) => {
         for (const resourceShape of ['pill', 'ellipse', 'diamond'] as const) {
           expect(refused(placedIn(resources, resourceShape))).toEqual([
-            expect.objectContaining({ kind: 'shape-requires-ur-resource', ref: A }),
+            expect.objectContaining({ kind: 'shape-not-taken', ref: A }),
           ]);
         }
       },
@@ -828,7 +828,7 @@ describe.each([
       const errors = refused(load({ resources: [spaceResource(A, SPACE)], maps: [] }));
 
       expect(errors).toContainEqual(
-        expect.objectContaining({ kind: 'space-resource-reference-cycle', ref: SPACE }),
+        expect.objectContaining({ kind: 'space-reference-cycle', ref: SPACE }),
       );
     });
 
@@ -872,7 +872,7 @@ describe.each([
       );
 
       expect(new Set(errors.map(({ kind }) => kind))).toEqual(
-        new Set(['duplicate-map-id', 'unresolved-default-map', 'unresolved-reference-target']),
+        new Set(['duplicate-map-id', 'unresolved-default-map', 'reference-target-missing']),
       );
     });
 

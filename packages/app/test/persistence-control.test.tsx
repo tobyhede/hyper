@@ -101,7 +101,7 @@ describe('PersistenceControl', () => {
             kind: 'aggregate-refused',
             errors: [
               {
-                kind: 'space-resource-target-missing',
+                kind: 'space-reference-missing',
                 spaceId: SPACE_ID,
                 resourceId: RESOURCE_ID,
                 targetSpaceId: TARGET_ID,
@@ -115,13 +115,11 @@ describe('PersistenceControl', () => {
       />,
     );
 
-    expect(
-      screen.getByText(/space resource points at a space that no longer exists/i),
-    ).toBeVisible();
+    expect(screen.getByText(/Resource points at a space that no longer exists/i)).toBeVisible();
     expect(screen.getByText(/nothing pointing at it/i)).toBeVisible();
     // The domain identity stays in the domain: a refusal code is a stable name
     // for the repository to answer with, not a sentence to show an author.
-    expect(screen.queryByText(/space-resource-target-missing/)).toBeNull();
+    expect(screen.queryByText(/space-reference-missing/)).toBeNull();
     expect(screen.queryByText(/ordinary-space-unreferenced/)).toBeNull();
   });
 

@@ -741,7 +741,7 @@ describe('Space HTTP aggregate commit', () => {
 
   it('preserves stable aggregate-refusal identity and location fields', async () => {
     const error = {
-      kind: 'space-resource-target-missing' as const,
+      kind: 'space-reference-missing' as const,
       spaceId: SPACE_ID,
       resourceId: RESOURCE_ID,
       targetSpaceId: TARGET_ID,
@@ -1288,7 +1288,7 @@ describe('Space HTTP response media', () => {
                   kind: 'aggregate-refused' as const,
                   errors: [
                     {
-                      kind: 'space-resource-target-missing' as const,
+                      kind: 'space-reference-missing' as const,
                       spaceId: SPACE_ID,
                       resourceId: RESOURCE_ID,
                       targetSpaceId: TARGET_ID,

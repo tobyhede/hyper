@@ -342,7 +342,7 @@ describe('SnapshotEdit.createInMap properties', () => {
             SnapshotEdit.createInMap(base, MAP_ID, newResourceId, referenceTo(missing), at, mode),
           ).toEqual({
             kind: 'refused',
-            refusal: { code: 'reference-target-not-found', targetId: missing },
+            refusal: { code: 'reference-target-missing', targetId: missing },
           });
           expect(
             SnapshotEdit.createInMap(
@@ -355,7 +355,7 @@ describe('SnapshotEdit.createInMap properties', () => {
             ),
           ).toEqual({
             kind: 'refused',
-            refusal: { code: 'reference-target-must-own-content', targetId: target },
+            refusal: { code: 'reference-target-not-targetable', targetId: target },
           });
         },
       ),

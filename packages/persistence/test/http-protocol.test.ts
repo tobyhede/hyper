@@ -200,7 +200,7 @@ describe('aggregate wire protocol', () => {
       kind: 'aggregate-refused' as const,
       errors: [
         {
-          kind: 'space-resource-target-missing' as const,
+          kind: 'space-reference-missing' as const,
           spaceId: SPACE_ID,
           resourceId: RESOURCE_ID,
           targetSpaceId: secondId,
@@ -231,12 +231,12 @@ describe('aggregate wire protocol', () => {
       { kind: 'graph-edge-resource-outside-map', ...described },
       { kind: 'unresolved-default-map', ...described },
       { kind: 'duplicate-graph-edge', ...described },
-      { kind: 'unresolved-reference-target', ...described },
+      { kind: 'reference-target-missing', ...described },
       { kind: 'reference-targets-self', ...described },
-      { kind: 'reference-targets-reference', ...described },
-      { kind: 'reference-target-must-own-content', ...described },
-      { kind: 'space-resource-reference-cycle', ...described },
-      { kind: 'shape-requires-ur-resource', ...described },
+      { kind: 'reference-target-not-targetable', ...described },
+      { kind: 'reference-target-not-targetable', ...described },
+      { kind: 'space-reference-cycle', ...described },
+      { kind: 'shape-not-taken', ...described },
       { kind: 'open-requires-content', ...described },
     ];
     const location = { spaceId: SPACE_ID, resourceId: RESOURCE_ID, targetSpaceId: secondId };
@@ -245,8 +245,8 @@ describe('aggregate wire protocol', () => {
       { kind: 'duplicate-space-id', spaceId: SPACE_ID, snapshotIndexes: [0, 2] },
       { kind: 'duplicate-resource-id', resourceId: RESOURCE_ID, spaceIds: [SPACE_ID, secondId] },
       { kind: 'meta-space-missing', metaSpaceId: SPACE_ID },
-      { kind: 'space-resource-target-missing', ...location },
-      { kind: 'space-resource-reference-cycle', ...location },
+      { kind: 'space-reference-missing', ...location },
+      { kind: 'space-reference-cycle', ...location },
       { kind: 'ordinary-space-unreferenced', spaceId: secondId },
       { kind: 'space-resource-map-missing', ...location, mapId: secondId },
       { kind: 'space-resource-graph-missing', ...location, graphId: secondId },
