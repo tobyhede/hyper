@@ -12,18 +12,21 @@ export interface ReferenceContentUnresolved {
   readonly via: ReferenceKindId;
 }
 
-export type ContentAction = 'none' | 'edit-markdown' | 'replace-image' | 'author-space-view';
-
 /** What a kind's content lets an author do and how it is laid out (ADR 0114). */
 export interface ContentFacts {
-  readonly action: ContentAction;
+  /**
+   * Whether an author changes the content itself, the Resource's own: in its
+   * content area through the content caret, or, for content that embeds a Map,
+   * in that Map. What the command is called and drawn as is the kind's view half's.
+   */
+  readonly authored: boolean;
   readonly embedsMap: boolean;
   readonly drawsContentArea: boolean;
 }
 
-/** The operation an author may perform on this content. */
-export function contentAction(content: ResourceContent): ContentAction {
-  return content.via !== 'self' ? 'none' : contentFacts(content).action;
+/** Whether an author may change this content here: the Resource's own, of a kind whose content is authored. */
+export function authorsContent(content: ResourceContent): boolean {
+  return content.via === 'self' && contentFacts(content).authored;
 }
 
 /** Whether this content draws a Map inside its Resource. */

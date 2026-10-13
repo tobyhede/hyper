@@ -37,13 +37,13 @@ export function decorateMarkdownResourceNode(
     resourceBelongsToWorkingSpace &&
     context.authorOnCanvas &&
     !context.bodyEditing &&
-    node.data.contentAction === 'edit-markdown'
+    node.data.authorsContent
   ) {
     kindOperations.onBeginEdit = () => context.beginBodyEditing(node);
   }
   if (
     resourceBelongsToWorkingSpace &&
-    node.data.contentAction === 'edit-markdown' &&
+    node.data.authorsContent &&
     context.bodyEditorResourceId === node.id
   ) {
     const editor = {

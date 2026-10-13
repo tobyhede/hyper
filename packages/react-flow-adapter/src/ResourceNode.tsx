@@ -331,7 +331,6 @@ export function ResourceNode({
   const toolbarVisible =
     ((visuallySelected && !otherSelected) ||
       display.shown === 'editing' ||
-      display.shown === 'replacing' ||
       (isSpaceOperations(kindOperations) && kindOperations.portal?.editing === true)) &&
     !dragging &&
     !resizeActive;

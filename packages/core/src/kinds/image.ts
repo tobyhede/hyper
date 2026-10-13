@@ -93,7 +93,7 @@ export const imageKind = defineKind({
     mayBeTarget: true,
     ownsReferencedSpaces: false,
   },
-  facts: { action: 'replace-image', embedsMap: false, drawsContentArea: true },
+  facts: { authored: true, embedsMap: false, drawsContentArea: true },
   resolveContent: (content, via): ImageContent => ({ kind: IMAGE_KIND_ID, url: content.url, via }),
 });
 

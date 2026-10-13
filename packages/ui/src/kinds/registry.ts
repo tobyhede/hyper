@@ -9,9 +9,9 @@ import {
   type ReferenceContentUnresolved,
   type ResourceContent,
 } from '@project/core';
-import { imageView, type ImageOperations } from './image';
-import type { CanvasArea, KindView } from './kind-view';
-import { markdownView, type MarkdownOperations } from './markdown';
+import { imageView, type ImageOperations, type ImageReplaceEditor } from './image';
+import type { CanvasArea, ContentCommand, KindView } from './kind-view';
+import { markdownView, type MarkdownEdit, type MarkdownOperations } from './markdown';
 import { referenceView, type ReferenceOperations } from './reference';
 import { spaceView, type SpaceOperations } from './space';
 import { urView, type UrOperations } from './ur';
@@ -23,6 +23,16 @@ export interface KindOperationsByKind {
   [imageKind.id]: ImageOperations;
   [urKind.id]: UrOperations;
   [spaceKind.id]: SpaceOperations;
+}
+
+/**
+ * What an edit running in a Resource's content area holds, by the id of each
+ * kind whose own content is edited there; the display carries it while the
+ * edit runs.
+ */
+export interface KindEditByKind {
+  [markdownKind.id]: MarkdownEdit;
+  [imageKind.id]: ImageReplaceEditor;
 }
 
 /**
@@ -55,6 +65,10 @@ export type KindNaming = Pick<KindView<unknown>, 'name' | 'listName' | 'referenc
 
 /** What a kind's Resources are called and drawn as, from its view half. */
 export const kindNaming = (kind: KindId): KindNaming => KIND_VIEWS[kind];
+
+/** What the command beginning an edit of a Resource's own content is called and drawn as, for its kind. */
+export const contentCommand = (kind: KindId): ContentCommand | undefined =>
+  KIND_VIEWS[kind].contentCommand;
 
 /** What a Resource of this kind offers before the composition offers anything. */
 export const bareOperations = <K extends KindId>(kind: K): KindOperationsByKind[K] =>

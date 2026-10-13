@@ -44,6 +44,7 @@ import {
   type EntityActionGroup,
 } from '@project/ui';
 import {
+  authorsEmbeddedMap,
   nodeTypes,
   GraphConnectionLine,
   GraphHeadMarkers,
@@ -867,7 +868,7 @@ export function SpaceCanvas({
           : node;
         if (
           !editingPortals.has(withHeight.data.resourceId) ||
-          withHeight.data.contentAction !== 'author-space-view'
+          !authorsEmbeddedMap(withHeight.data)
         ) {
           return withHeight;
         }
@@ -1034,7 +1035,7 @@ export function SpaceCanvas({
       if (id === undefined) return undefined;
       const node = portalGestureSnapshot.current.portalNodesById.get(id);
       if (node === undefined || node.parentId !== undefined) return undefined;
-      if (node.data.contentAction !== 'author-space-view') return undefined;
+      if (!authorsEmbeddedMap(node.data)) return undefined;
       if (!portalGestureSnapshot.current.editingPortals.has(node.data.resourceId)) return undefined;
       return node;
     };

@@ -124,7 +124,7 @@ export const spaceKind = defineKind({
     mayBeTarget: true,
     ownsReferencedSpaces: true,
   },
-  facts: { action: 'author-space-view', embedsMap: true, drawsContentArea: false },
+  facts: { authored: true, embedsMap: true, drawsContentArea: false },
   resolveContent: (content, via): SpaceContent => ({
     kind: SPACE_KIND_ID,
     view: viewOf(content),

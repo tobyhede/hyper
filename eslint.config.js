@@ -236,9 +236,7 @@ const KIND_FEATURE_FILES = [
   'packages/ui/src/index.ts',
   // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
   'packages/ui/src/icons.tsx',
-  // A Markdown Resource's editing and an Image Resource's replacing display states.
-  'packages/ui/src/resource-display.ts',
-  // A Space Resource's portal, an Ur Resource's Shape menu, an Image Resource's Replace label and glyph, and a Reference Resource's unreachable Target.
+  // A Space Resource's portal, an Ur Resource's Shape menu, and a Reference Resource's unreachable Target.
   'packages/ui/src/CanvasResource.tsx',
   // A Reference Resource's unreachable Target, presented.
   'packages/ui/src/PresentedResource.tsx',

@@ -199,9 +199,9 @@ export function useCanvasResourceAuthoring({
   const [caret, setCaret] = useState<Caret>(null);
   const editingTitleResourceId = caret?.field === 'title' ? caret.resourceId : null;
   /**
-   * The body caret is on content that can be edited in place: an Open Markdown
-   * Resource's body, or an Open Image Resource's image where images can be
-   * stored, which is replaced rather than edited.
+   * The body caret is on content that can be edited in place: an Open
+   * Resource's own authored content that does not embed a Map, which is
+   * authored in that Map instead.
    */
   const bodyCaretNamesOpenContent =
     caret?.field === 'body' &&
@@ -209,8 +209,8 @@ export function useCanvasResourceAuthoring({
       (node) =>
         node.id === caret.resourceId &&
         node.data.open === true &&
-        (node.data.contentAction === 'edit-markdown' ||
-          node.data.contentAction === 'replace-image'),
+        node.data.authorsContent &&
+        !node.data.embedsMap,
     );
 
   if (caret?.field === 'body') {

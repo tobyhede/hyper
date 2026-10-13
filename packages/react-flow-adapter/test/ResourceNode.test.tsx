@@ -1,4 +1,4 @@
-import { contentAction, embedsMap } from '@project/core';
+import { authorsContent, embedsMap } from '@project/core';
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type * as ReactFlowReact from '@xyflow/react';
@@ -287,7 +287,7 @@ function props({
     resourceId,
     title,
     ...bareKindData(kind),
-    contentAction: contentAction(resolved),
+    authorsContent: authorsContent(resolved),
     embedsMap: embedsMap(resolved),
     selectedForAuthoring,
     display: running(

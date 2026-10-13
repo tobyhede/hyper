@@ -61,7 +61,11 @@ describe('the display states only a Resource’s own content enters', () => {
           expect(editing).toBe(value);
           return;
         }
-        expect(editing).toMatchObject({ shown: 'editing', editor, autoFocus });
+        expect(editing).toMatchObject({
+          shown: 'editing',
+          kind: 'markdown',
+          edit: { editor, autoFocus },
+        });
         expect(atRest(editing)).toEqual(value);
       }),
     );
@@ -75,7 +79,7 @@ describe('the display states only a Resource’s own content enters', () => {
           expect(replacing).toBe(value);
           return;
         }
-        expect(replacing).toMatchObject({ shown: 'replacing', replacer });
+        expect(replacing).toMatchObject({ shown: 'editing', kind: 'image', edit: replacer });
         expect(atRest(replacing)).toEqual(value);
       }),
     );

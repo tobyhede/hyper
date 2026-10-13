@@ -47,7 +47,7 @@ export function decorateImageResourceNode(
   const replace = context.replaceResourceImage;
   const kindOperations: ImageOperations = { kind: imageKind.id };
   const decoration: ImageDecoration = { kindOperations };
-  if (node.data.contentAction !== 'replace-image') return decoration;
+  if (!node.data.authorsContent) return decoration;
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   if (resourceBelongsToWorkingSpace && context.authorOnCanvas && !context.bodyEditing) {
     kindOperations.onBeginEdit = () => context.beginBodyEditing(node);

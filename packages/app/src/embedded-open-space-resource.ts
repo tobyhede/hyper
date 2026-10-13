@@ -5,7 +5,7 @@ import {
   type GraphId,
   type ResourceId,
 } from '@project/core';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { authorsEmbeddedMap, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { spaceViewOf } from '@project/ui';
 import { mapSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 
@@ -213,10 +213,10 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
     if (parent.data.open !== true) continue;
     const shown = spaceViewOf(parent.data.display);
     if (shown === undefined) continue;
-    const { view } = shown;
+    const { view, via } = shown;
     const policy = mapSurfacePolicy({
       inherited: item.policy,
-      throughReference: parent.data.contentAction !== 'author-space-view',
+      throughReference: via !== 'self',
       stale:
         input.staleSpaces.has(view.spaceId) ||
         (input.publications.has(parent.id) &&
@@ -287,10 +287,7 @@ export function editingPortalAncestor(
 ): ResourceFlowNode | undefined {
   let current = start;
   while (current !== undefined) {
-    if (
-      current.data.contentAction === 'author-space-view' &&
-      editingPortals.has(current.data.resourceId)
-    ) {
+    if (authorsEmbeddedMap(current.data) && editingPortals.has(current.data.resourceId)) {
       return current;
     }
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);

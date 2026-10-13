@@ -887,9 +887,11 @@ describe('canvas Resource authoring, replacing an image', () => {
       activeGraphColor: '#8a94a6',
     },
   };
-  /** The replacer an Image Resource's `replacing` display carries, absent at rest. */
+  /** The replacer an Image Resource's running edit carries, absent at rest. */
   const replacerOf = (drawn: ResourceFlowNode) =>
-    drawn.data.display.shown === 'replacing' ? drawn.data.display.replacer : undefined;
+    drawn.data.display.shown === 'editing' && drawn.data.display.kind === 'image'
+      ? drawn.data.display.edit
+      : undefined;
   /**
    * The hook over a composed Space whose image replacements store and measure
    * through `images`. What a replacement does is the replacement module's

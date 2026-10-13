@@ -5,7 +5,7 @@ import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
   DEFAULT_RESOURCE_SHAPE,
-  contentAction,
+  authorsContent,
   embedsMap,
   type Resource,
   type ResourceId,
@@ -57,12 +57,24 @@ type ResourceKindData = KindDataOf<Resource['kind']>;
  *  React Flow's `Record<string, unknown>` data constraint. */
 export type ResourceNodeData = ResourceKindData & ResourceNodeCommonData;
 
+/**
+ * Whether this Resource's own content embeds a Map its author edits in that
+ * Map, rather than in the Resource's content area.
+ */
+export const authorsEmbeddedMap = (
+  data: Pick<ResourceNodeData, 'authorsContent' | 'embedsMap'>,
+): boolean => data.authorsContent && data.embedsMap;
+
 /** A Resource node's data for one kind. */
 export type ResourceNodeDataOf<K extends Resource['kind']> = Extract<ResourceNodeData, { kind: K }>;
 
 type ResourceNodeCommonData = {
-  /** Resolved content facts remain available while the display is Closed. */
-  contentAction: ReturnType<typeof contentAction>;
+  /**
+   * Resolved content facts, available while the display is Closed.
+   * `authorsContent`: whether an author may change this content here, the
+   * Resource's own, of a kind whose content is authored.
+   */
+  authorsContent: boolean;
   embedsMap: boolean;
   /** Reports rendered title geometry by placement, including embedded placements. */
   onBodyHeightChange?: (id: string, height: number | null) => void;
@@ -307,7 +319,7 @@ export function projectResourceNodes(
         title: resource.title,
         readOnly: options.readOnly ?? false,
         ...bareKindData(resource.kind),
-        contentAction: contentAction(content),
+        authorsContent: authorsContent(content),
         embedsMap: embedsMap(content),
         selectedForAuthoring: resource.id === (options.selectedResourceId ?? null),
         display,

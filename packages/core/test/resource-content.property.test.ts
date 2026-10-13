@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {
-  contentAction,
+  authorsContent,
   embedsMap,
   drawsContentArea,
   uuidSchema,
@@ -38,10 +38,10 @@ const asSelf = (content: ResourceContent): ResourceContent =>
   content.kind === 'unresolved' ? content : { ...content, via: 'self' };
 
 describe('content facts', () => {
-  it('offers an action only for own content that has one', () => {
+  it('offers authoring only for own content of a kind that authors it', () => {
     fc.assert(
       fc.property(contentArbitrary, (content) => {
-        const offered = contentAction(content) !== 'none';
+        const offered = authorsContent(content);
         // `unresolved` is always `via: 'reference'`, so `via` alone excludes it.
         expect(offered).toBe(content.via === 'self' && content.kind !== 'ur');
       }),
@@ -58,14 +58,9 @@ describe('content facts', () => {
     );
   });
 
-  it('answers each kind’s own action and content facts', () => {
-    expect(contents('self').map(contentAction)).toEqual([
-      'edit-markdown',
-      'replace-image',
-      'author-space-view',
-      'none',
-    ]);
-    expect(contentAction(UNRESOLVED)).toBe('none');
+  it('answers each kind’s own authoring and content facts', () => {
+    expect(contents('self').map(authorsContent)).toEqual([true, true, true, false]);
+    expect(authorsContent(UNRESOLVED)).toBe(false);
     expect([...contents('self'), UNRESOLVED].map(embedsMap)).toEqual([
       false,
       false,
