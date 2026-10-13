@@ -104,7 +104,7 @@ type DecorationContext = CanvasResourceDecorationContext & KindDecorationContext
 const context = (overrides: Partial<DecorationContext> = {}): DecorationContext => ({
   authorOnCanvas: true,
   bodyEditing: false,
-  imageAccept: 'image/png',
+  pickImageFiles: () => Promise.resolve([]),
   replaceResourceImage: () => Promise.resolve(null),
   editableResourceIds: new Set([RESOURCE_ID, REFERENCE_ID, SPACE_RESOURCE_ID, UR_ID]),
   openResource: () => 'completed',
@@ -412,16 +412,18 @@ describe('decorateImageResourceNode', () => {
       'image',
     );
   };
+  const pickImageFiles = (): Promise<readonly File[]> => Promise.resolve([]);
   const replacing = context({
     bodyEditorResourceId: RESOURCE_ID,
     replaceResourceImage: () => Promise.resolve(null),
+    pickImageFiles,
   });
 
   it('enters the replacing display on an Open Image Resource whose caret is live', () => {
     expect(decorateImageResourceNode(imageNode(true), replacing).display).toMatchObject({
       shown: 'replacing',
       content: { kind: 'image', url: IMAGE_URL, via: 'self' },
-      replacer: { accept: 'image/png' },
+      replacer: { pick: pickImageFiles },
     });
   });
 

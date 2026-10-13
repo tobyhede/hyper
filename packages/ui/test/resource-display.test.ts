@@ -32,7 +32,7 @@ const content: fc.Arbitrary<ResourceContent> = fc.oneof(
 
 const editor: CanvasResourceBodyEditor = { onComplete: () => 'completed', onEnd: () => undefined };
 const replacer: ImageReplaceEditor = {
-  accept: 'image/png',
+  pick: () => Promise.resolve([]),
   onReplace: () => Promise.resolve(null),
   onEnd: () => undefined,
 };

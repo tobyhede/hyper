@@ -16,7 +16,6 @@ import {
 import type { SpaceSession } from '@project/persistence';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { EntityActionGroup, ImageReplacement } from '@project/ui';
-import { PICKED_IMAGE_TYPES } from './image-creation';
 import { describeImageReplacement, type ImageReplacements } from './image-replacement';
 import type { AuthoringAvailability } from './authoring-availability';
 import { describeAuthoringRefusal } from './authoring-refusal';
@@ -115,6 +114,8 @@ export interface CanvasResourceAuthoringInput {
    * this hook keeps only the caret on the target and says the answer.
    */
   readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
+  /** The Space's image picker, which Replace's Upload opens. */
+  readonly pickImages: () => Promise<readonly File[]>;
   /**
    * What each referenced Space offers a Space Resource to select, keyed by target.
    *
@@ -178,6 +179,7 @@ export function useCanvasResourceAuthoring({
   onBodyEditingChange,
   onTitleEditingChange,
   imageReplacement,
+  pickImages,
   spaceResourceTargets = NO_SPACE_RESOURCE_TARGETS,
   resourceEntityActions,
   portalEditing,
@@ -523,7 +525,7 @@ export function useCanvasResourceAuthoring({
     completeResourceBody,
     clearCaret,
     replaceResourceImage,
-    imageAccept: PICKED_IMAGE_TYPES,
+    pickImageFiles: pickImages,
     changeResourceShape,
     continuation,
     containingSpaceId: working.id,

@@ -17,7 +17,7 @@ The enforcement is an import ban: outside `kinds/`, no file may import a name a 
 
 - **Content commands** (candidate C): `ContentAction` is a closed union of one command per kind (`edit-markdown`, `replace-image`, `author-space-view`), and the display states that run them (`resource-display.ts`'s `editing` and `replacing`, `CanvasResource`'s and `ResourceNode`'s `is<Kind>Operations` branches, the Replace label and icon) choose by kind.
 - **Content reached through a Reference**: `ContentVia` names `ReferenceKindId`. It is a feature of the Reference kind alone today, but a second kind that may reach another's content would have to edit the core.
-- **Creation** (candidate E): the Dock's Create list (`RESOURCE_KINDS`, `DockCreation`) and `InputFreeResourceKind` in `space-authoring.ts` list kinds; the file picker is chosen by `imageKind.id`. The Dock's availability falls through to Add Resource's for every kind but the Space Resource's, so a new Dock kind that needs a gate of its own is not caught at compile time.
+- **Creation** (candidate E): routed by [issue 11](11-each-kind-declares-its-create.md). Each kind's app half declares its Command Dock Create, and the Dock draws an opaque list.
 - **The Space selection** (candidate F): `sql-space-repository.ts` and `space-resource-planning.ts` compare a Space Resource's `spaceId`, `map` and `graph` by kind. Ticket 06 left this unbuilt; the kind scan and the import ban now give it as the reason.
 - **Decoration contexts**: the app registry intersects every kind's decoration context. Each kind's context type now sits in its own app module, but the registry still lists them.
 
@@ -42,7 +42,7 @@ Each is grilled with Toby before it is built; candidate A became ticket 09.
 - **B — one declared-references module.** The Resource and Space references a kind declares are read in `validate.ts`, `snapshot-edits.ts`, `space-aggregate.ts` and `space-resource-planning.ts`; one module would own reading them.
 - **C — each kind declares its content command.** Replaces `ContentAction` and the display-state branches with a command each kind's module declares and its view half runs. A cheaper first step is the creation half alone (see E), roughly 150 to 250 lines removing about 10 of the counted sites.
 - **D — one kind view module.** The view half's names, glyph and content views in one place per kind.
-- **E — each kind declares its creation input.** Whether the Dock offers it, in what order, and whether it needs input such as a file.
+- **E — each kind declares its creation input.** Built as issue 11, with no creation mode: each kind's app half owns its Create.
 - **F — the Space selection inside the Space module.** Selection reads and comparisons behind the Space kind's module.
 - **G — registry pass-throughs** (speculative): functions in the registries that only forward to a module.
 - **H — stable content identity** (speculative).

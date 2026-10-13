@@ -1,6 +1,6 @@
 # Sites outside `kinds/` that name a Resource kind
 
-Read on 2026-10-12, when ticket 10 was filed; line numbers are that commit's.
+Read on 2026-10-12, when ticket 10 was filed; line numbers are that commit's. Issue 11 removed the Command Dock's Create sites (`CommandDockResources.tsx`, `command-dock-chrome.ts`, `dock-chrome.ts`'s Create routing and availability, and `InputFreeResourceKind`): each kind's app half now declares its Create.
 
 Categories: **one-kind** = a feature that exists for that kind alone; **registry** = a dispatch among kinds that belongs in a registry; **C** = content command (Edit/Replace/author-space-view); **E** = creation; **F** = Space Resource selection; **display** = display state or glyph.
 
@@ -14,13 +14,8 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/canvas-resource-authoring.ts:61 | `spaceKind.id`: Space document identity key | space | F | canvas-resource-authoring.ts |
 | packages/app/src/canvas-resource-authoring.ts:83 | `spaceKind.id`: framing/selection completion guard | space | F | canvas-resource-authoring.ts |
 | packages/app/src/canvas-resource-authoring.ts:303 | `markdownKind.id`: body completion guard | markdown | C | canvas-resource-authoring.ts |
-| packages/app/src/components/CommandDockResources.tsx:66 | `imageKind.id`: Create opens the file picker | image | E | CommandDockResources.tsx |
-| packages/app/src/components/CommandDockResources.tsx:100 | `imageKind.id`: Create with chosen files | image | E | CommandDockResources.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:459 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:564 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
-| packages/app/src/components/command-dock-chrome.ts:387 | `RESOURCE_KINDS`: markdown, space, image, ur in Create order | all but reference | E (a list of kinds: registry candidate) | command-dock-chrome.ts |
-| packages/app/src/dock-chrome.ts:425 | `spaceKind.id`: Create runs the Space Resource lifecycle | space | E | dock-chrome.ts |
-| packages/app/src/dock-chrome.ts:429 | `spaceKind.id`: Create availability | space | E | dock-chrome.ts |
 | packages/app/src/image-replacement.ts:89 | `imageKind.id`: Replace guard | image | C | image-replacement.ts |
 | packages/app/src/resource-rail-actions.tsx:90 | `referenceKind.id`: Create Reference glyph | reference | E (display of a creation) | resource-rail-actions.tsx |
 | packages/app/src/resource-rail-actions.tsx:140 | `spaceKind.id`: Space Resource menu | space | one-kind | resource-rail-actions.tsx |
@@ -66,11 +61,9 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/components/SpaceCanvas.tsx:866,1033 | `contentAction !== 'author-space-view'` portal gestures | space | C (ESLint-blind) | SpaceCanvas.tsx |
 | packages/app/src/components/SpaceCanvas.tsx:1010,1655 | `spaceViewOf(...).view.framing` | space | F | SpaceCanvas.tsx |
 | packages/app/src/components/SpaceCanvas.tsx:1367 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
-| packages/app/src/components/command-dock-chrome.ts:405-408 | `ResourceCreation` by `MarkdownKindId \| SpaceKindId \| ImageKindId \| UrKindId` | all but reference | E (registry candidate) | command-dock-chrome.ts |
 | packages/app/src/embedded-open-space-resource.ts:214 | `spaceViewOf` | space | F | embedded-open-space-resource.ts |
 | packages/app/src/embedded-open-space-resource.ts:219,291 | `contentAction === 'author-space-view'` | space | C (ESLint-blind) | embedded-open-space-resource.ts |
 | packages/app/src/image-replacement.ts:113-114 | `isAcceptedImageUrl`, `IMAGE_URL_UNSUPPORTED` | image | C (image-URL rule) | image-replacement.ts |
-| packages/app/src/space-authoring.ts:107 | `InputFreeResourceKind = MarkdownKindId \| UrKindId` | markdown, ur | E (registry candidate: a flag "created from a press") | space-authoring.ts |
 | packages/app/src/space-authoring.ts:117 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
 | packages/app/src/space-authoring.ts:364 | refusal `IMAGE_URL_UNSUPPORTED` | image | C/E (image-URL rule) | space-authoring.ts |
 | packages/app/src/space-authoring.ts:1254,1297-1298 | `isAcceptedImageUrl` on Replace and Create | image | C, E (image-URL rule) | space-authoring.ts |

@@ -6,6 +6,8 @@ import type {
   KindDecoration,
   Mutable,
 } from '../canvas-resource-decoration';
+import type { KindCreation } from '../kind-creation';
+import type { ResourcePlacementCommands } from '../resource-placement';
 
 /** The Image kind's operations and decoration, built by assigning what a gate allows. */
 type ImageOperations = Mutable<KindOperationsOf<ImageKindId>>;
@@ -28,8 +30,8 @@ export type ImageResourceDecorationContext = Pick<
     resourceId: ResourceId,
     replacement: ImageReplacement,
   ) => Promise<string | null>;
-  /** What a replacement's file picker offers. */
-  readonly imageAccept: string;
+  /** Open the file picker for a replacement, within the press that asked for it. */
+  readonly pickImageFiles: () => Promise<readonly File[]>;
 };
 
 /**
@@ -52,7 +54,7 @@ export function decorateImageResourceNode(
   if (resourceBelongsToWorkingSpace && context.bodyEditorResourceId === node.id) {
     const resourceId = node.data.resourceId;
     const replacer = {
-      accept: context.imageAccept,
+      pick: context.pickImageFiles,
       onReplace: (replacement: ImageReplacement) => replace(resourceId, replacement),
       onEnd: () => context.clearCaret(),
     };
@@ -61,3 +63,23 @@ export function decorateImageResourceNode(
   }
   return decoration;
 }
+
+export type ImageCreationContext = Pick<ResourcePlacementCommands, 'createImagesFromFiles'> & {
+  /** Open the browser's file picker for images, within the press that asked for it. */
+  readonly pickImages: () => Promise<readonly File[]>;
+};
+
+/**
+ * Create Image Resource: the press opens the browser's file picker, and the
+ * files chosen there are created at the visible centre; a cancelled picker
+ * creates nothing (ADR 0106).
+ */
+export const imageCreation: KindCreation<ImageCreationContext> = {
+  create: async ({ pickImages }, later) => {
+    // Opened before any `await`: a browser opens a picker only within the press.
+    const files = await pickImages();
+    // Placed by the Dock as it stands when the picker answers, not as it was
+    // pressed, and not at all once Create is withheld.
+    later()?.createImagesFromFiles(files);
+  },
+};

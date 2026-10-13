@@ -106,7 +106,6 @@ export function EmbeddedMapAuthoring({
   } = useMapSurface(entry.app, composition, {
     presenting: false,
     spaceOnCanvas: policy === 'authoring' && spaceOnCanvas,
-    creatingSpaceResource: false,
   });
   const state = composition.adapter();
   const space = entry.app.currentSpace();
@@ -173,6 +172,7 @@ export function EmbeddedMapAuthoring({
     commandOutcomes: entry.app.commandOutcomes,
     deleteConfirmation: entry.app.deleteConfirmation,
     imageReplacement: entry.app.imageReplacement,
+    pickImages: entry.app.pickImages,
     nodes: canvasRendering.liveProjection?.nodes ?? EMPTY_NODES,
     availability,
     nameOnCreation,

@@ -78,7 +78,7 @@ export type {
 } from './ChoiceMenu';
 export { ResourceKindIcon, resourceKindName } from './ResourceKindIcon';
 export { BADGED_TARGET_GLYPH } from './kinds/kind-view';
-export { bareOperations, kindNaming, VIEW_KIND_IDS } from './kinds/registry';
+export { bareOperations, kindNaming } from './kinds/registry';
 export type { KindNaming, KindOperationsByKind } from './kinds/registry';
 export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';
@@ -125,14 +125,12 @@ export {
   GraphHeadShapeGlyph,
 } from './GraphHeadShape';
 export type { GraphHeadMarkerProps, GraphHeadShapeGlyphProps } from './GraphHeadShape';
-export { ImageFilePicker } from './ImageFilePicker';
 export { ImageReplaceTarget } from './ImageReplaceTarget';
 export type {
   ImageReplaceEditor,
   ImageReplaceTargetProps,
   ImageReplacement,
 } from './ImageReplaceTarget';
-export type { ImageFilePickerProps } from './ImageFilePicker';
 export { PaletteColorPicker } from './PaletteColorPicker';
 export type { PaletteColorEntry, PaletteColorPickerProps } from './PaletteColorPicker';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';

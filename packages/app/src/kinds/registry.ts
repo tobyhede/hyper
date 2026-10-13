@@ -1,15 +1,71 @@
 import { useMemo } from 'react';
-import { imageKind, markdownKind, spaceKind, urKind } from '@project/core';
+import {
+  imageKind,
+  KIND_IDS,
+  markdownKind,
+  referenceKind,
+  spaceKind,
+  urKind,
+  type KindId,
+} from '@project/core';
 import {
   isResourceNodeOf,
   type ResourceFlowNode,
   type ResourceFlowNodeOf,
 } from '@project/react-flow-adapter';
 import { applyKindDecoration, type KindDecoration } from '../canvas-resource-decoration';
-import { decorateImageResourceNode, type ImageResourceDecorationContext } from './image';
-import { decorateMarkdownResourceNode, type MarkdownResourceDecorationContext } from './markdown';
-import { decorateSpaceResourceNode, type SpaceResourceDecorationContext } from './space';
-import { decorateUrResourceNode, type UrResourceDecorationContext } from './ur';
+import type { KindCreation } from '../kind-creation';
+import {
+  decorateImageResourceNode,
+  imageCreation,
+  type ImageCreationContext,
+  type ImageResourceDecorationContext,
+} from './image';
+import {
+  decorateMarkdownResourceNode,
+  markdownCreation,
+  type MarkdownCreationContext,
+  type MarkdownResourceDecorationContext,
+} from './markdown';
+import {
+  decorateSpaceResourceNode,
+  spaceCreation,
+  type SpaceCreationContext,
+  type SpaceResourceDecorationContext,
+} from './space';
+import {
+  decorateUrResourceNode,
+  urCreation,
+  type UrCreationContext,
+  type UrResourceDecorationContext,
+} from './ur';
+
+/** What every kind's Create reads, together. */
+export type KindCreationContext = MarkdownCreationContext &
+  SpaceCreationContext &
+  ImageCreationContext &
+  UrCreationContext;
+
+/**
+ * How each kind is created from the Command Dock, or `null` for a kind it does
+ * not create. A Reference Resource is always created *from* the Resource it
+ * points at, which supplies the Target (ADR 0089), so its Create is a row in
+ * that Resource's own command menu.
+ */
+const CREATIONS = {
+  [markdownKind.id]: markdownCreation,
+  [spaceKind.id]: spaceCreation,
+  [imageKind.id]: imageCreation,
+  [urKind.id]: urCreation,
+  [referenceKind.id]: null,
+} satisfies Readonly<Record<KindId, KindCreation<KindCreationContext> | null>>;
+
+/** Every kind the Command Dock creates, with its Create, in registry order. */
+export const KIND_CREATIONS: readonly (readonly [KindId, KindCreation<KindCreationContext>])[] =
+  KIND_IDS.flatMap((kind): (readonly [KindId, KindCreation<KindCreationContext>])[] => {
+    const creation = CREATIONS[kind];
+    return creation === null ? [] : [[kind, creation]];
+  });
 
 /** What every kind's canvas decoration reads, together. */
 export type KindDecorationContext = MarkdownResourceDecorationContext &
@@ -54,7 +110,7 @@ export function useKindDecoratedNodes(
     completeResourceBody,
     clearCaret,
     replaceResourceImage,
-    imageAccept,
+    pickImageFiles,
     changeResourceShape,
     continuation,
     containingSpaceId,
@@ -98,7 +154,7 @@ export function useKindDecoratedNodes(
       beginBodyEditing,
       bodyEditorResourceId,
       replaceResourceImage,
-      imageAccept,
+      pickImageFiles,
       clearCaret,
     }),
     [
@@ -108,7 +164,7 @@ export function useKindDecoratedNodes(
       beginBodyEditing,
       bodyEditorResourceId,
       replaceResourceImage,
-      imageAccept,
+      pickImageFiles,
       clearCaret,
     ],
   );

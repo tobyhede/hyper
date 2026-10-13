@@ -14,8 +14,8 @@ import {
 /**
  * Where an Image Resource's picture comes from, and how big it is (ADR 0106).
  *
- * Both reach outside the process — the host's image store, and the browser
- * loading a picture — so they are supplied once, when Open Spaces is composed,
+ * Each reaches outside the process — the host's image store, the browser
+ * loading a picture, and its file picker — so they are supplied once, when Open Spaces is composed,
  * and a test supplies answers of its own.
  */
 export interface ImageSources {
@@ -23,6 +23,14 @@ export interface ImageSources {
   readonly store: (image: Blob) => Promise<ImageStoring>;
   /** Load the picture at a URL, answering its natural size, or `undefined` when it does not load. */
   readonly measure: (url: string) => Promise<ImageNaturalSize | undefined>;
+  /**
+   * Choose image files with the browser's own picker, offering
+   * {@link PICKED_IMAGE_TYPES}; a cancelled picker answers nothing, and it
+   * never rejects. Create Image Resource and Replace image both open it, each
+   * inside the press that asked for it, before any `await`: a browser opens a
+   * picker only within a user's gesture.
+   */
+  readonly pick: () => Promise<readonly File[]>;
 }
 
 /**

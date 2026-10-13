@@ -506,7 +506,7 @@ describe('ResourceNode canvas Resource state adapter', () => {
           open: true,
           selected: true,
           replacer: {
-            accept: 'image/png',
+            pick: () => Promise.resolve([]),
             onReplace: () => Promise.resolve(null),
             onEnd: () => undefined,
           },
@@ -793,7 +793,7 @@ describe("ResourceNode floats a Resource's commands in React Flow's NodeToolbar"
           url: 'https://example.com/figure.png',
           open: true,
           replacer: {
-            accept: 'image/png',
+            pick: () => Promise.resolve([]),
             onReplace: vi.fn(() => Promise.resolve(null)),
             onEnd: vi.fn(),
           },

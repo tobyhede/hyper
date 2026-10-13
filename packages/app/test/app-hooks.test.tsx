@@ -386,7 +386,6 @@ describe('useMapSurface', () => {
       useMapSurface(app, app.surface, {
         presenting: false,
         spaceOnCanvas: true,
-        creatingSpaceResource: false,
       }),
     );
     await waitFor(() => expect(result.current.canvasRendering.hasResourcesOnCanvas).toBe(true));
@@ -417,7 +416,6 @@ describe('useAuthoringAvailability', () => {
     presenting: false,
     spaceOnCanvas: true,
     editingEmbeddedMap: false,
-    creatingSpaceResource: false,
   };
   const withheld = authoringAvailability({
     ...facts,
@@ -647,7 +645,6 @@ describe('useDockChrome', () => {
       editingChromeTitle: false,
       spaceOnCanvas: true,
       editingEmbeddedMap: false,
-      creatingSpaceResource: false,
     });
     const containingSpaceId = () => SPACE_ID;
     const reportBreak = () => undefined;
@@ -716,7 +713,7 @@ describe('useDockChrome', () => {
   it("creates a markdown Resource on the drawing Map from the Create cluster's press", () => {
     const opened = openDerivationSpace(mintingIds(CREATED));
     const chrome = chromeFor(opened, GRAPH_ID).result.current.chrome;
-    act(() => chrome?.resources.onCreate({ kind: 'markdown' }));
+    act(() => chrome?.resources.create.find(({ kind }) => kind === 'markdown')?.create());
     expect(placedIds(opened)).toContain(CREATED);
   });
 

@@ -1,4 +1,5 @@
 import type { ImageNaturalSize } from '@project/core';
+import { pickImagesInBrowser } from '#src/browser-file-picker';
 import type { ImageSources } from '#src/image-creation';
 
 /**
@@ -10,10 +11,14 @@ import type { ImageSources } from '#src/image-creation';
 const unreachableStore: ImageSources['store'] = () =>
   Promise.reject(new Error('No image store is reachable.'));
 
-/** Stores nothing and measures no size: for a Space that creates or replaces no image. */
+/**
+ * Stores nothing and measures no size: for a Space that creates or replaces no
+ * image. Its picker is the browser's own, as every Space's is.
+ */
 export const storelessImages: ImageSources = {
   store: unreachableStore,
   measure: () => Promise.resolve(undefined),
+  pick: pickImagesInBrowser,
 };
 
 /**
@@ -28,6 +33,7 @@ export const heldImageSources = () => {
   const images: ImageSources = {
     store: unreachableStore,
     measure: () => measuring.promise,
+    pick: pickImagesInBrowser,
   };
   return { images, release: (size?: ImageNaturalSize) => measuring.resolve(size) };
 };

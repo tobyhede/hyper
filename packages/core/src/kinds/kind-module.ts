@@ -101,6 +101,16 @@ export interface KindModule<
   readonly newContent?: Content;
 }
 
+/**
+ * A kind a Resource may be created as from nothing but a press: its module
+ * declares the content a new one starts with, and its type says so, so the
+ * kinds that may be created empty are derived from the modules rather than
+ * listed.
+ */
+export interface StartsEmpty<Content> {
+  readonly newContent: Content;
+}
+
 /** What a kind must declare; the rest takes {@link defineKind}'s answer. */
 type KindDeclaration<
   K extends string,
@@ -139,8 +149,22 @@ const asWritten = <Content>(
 /**
  * A kind module with every rule it does not declare answered as a kind that
  * references nothing, has no content of its own to author, writes its content
- * as it is, and puts it in its schema's key order on Export.
+ * as it is, and puts it in its schema's key order on Export. A module that
+ * declares the content a new Resource starts with keeps it in its type.
  */
+export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
+  declaration: KindDeclaration<K, Content, Content, Resolved> & StartsEmpty<Content>,
+): KindModule<K, Content, Content, Resolved> & StartsEmpty<Content>;
+export function defineKind<
+  const K extends string,
+  Content,
+  FileContent,
+  Resolved extends KindResolvedContent,
+>(
+  declaration: KindDeclaration<K, Content, FileContent, Resolved> & {
+    readonly file: KindFileCodec<Content, FileContent>;
+  } & StartsEmpty<Content>,
+): KindModule<K, Content, FileContent, Resolved> & StartsEmpty<Content>;
 export function defineKind<const K extends string, Content, Resolved extends KindResolvedContent>(
   declaration: KindDeclaration<K, Content, Content, Resolved>,
 ): KindModule<K, Content, Content, Resolved>;

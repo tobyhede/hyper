@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   KIND_IDS,
   contentTarget,
   isKindId,
   isRegisteredKind,
   newResourceDocument,
+  startsEmpty,
   resourceReferences,
+  type EmptyCreatableKindId,
   type ResourceDocument,
 } from '../src/kinds/registry';
 import { uuidSchema } from '../src/schema';
@@ -35,7 +37,7 @@ const SPACE = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 
 /** Content of every kind: what each kind starts with, and one of each that references something. */
 const REPRESENTATIVE: readonly ResourceDocument[] = [
-  ...KIND_IDS.flatMap((kind) => newResourceDocument(kind, 'New') ?? []),
+  ...KIND_IDS.filter(startsEmpty).map((kind) => newResourceDocument(kind, 'New')),
   { title: 'Figure', kind: imageKind.id, content: { url: 'https://example.com/a.png' } },
   { title: 'Recap', kind: referenceKind.id, content: { target: TARGET } },
   { title: 'Inner', kind: spaceKind.id, content: { spaceId: SPACE, map: SPACE, graph: SPACE } },
@@ -80,5 +82,21 @@ describe('a kind id', () => {
     'café',
   ])('refuses %j', (id) => {
     expect(isKindId(id)).toBe(false);
+  });
+});
+
+/**
+ * The kinds a press may create empty, written out once, so the type the
+ * modules' declarations derive and the runtime answer are held to the same list.
+ */
+const STARTS_EMPTY = ['markdown', 'ur'] as const;
+
+describe('the kinds a Resource may be created empty as', () => {
+  it('are typed as exactly the kinds whose module declares new content', () => {
+    expectTypeOf<EmptyCreatableKindId>().toEqualTypeOf<(typeof STARTS_EMPTY)[number]>();
+  });
+
+  it('are answered at runtime as the same kinds', () => {
+    expect(KIND_IDS.filter(startsEmpty)).toEqual(STARTS_EMPTY);
   });
 });

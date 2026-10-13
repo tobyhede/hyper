@@ -138,6 +138,11 @@ export interface ComposedApp extends AppCore {
     target: ImageTarget,
   ) => Promise<ImageEditResult>;
   /**
+   * This Space's image picker, {@link ImageSources.pick}: the one Create Image
+   * Resource and Replace image both open.
+   */
+  readonly pickImages: ImageSources['pick'];
+  /**
    * This Space's image replacements: the one way to replace an Image
    * Resource's picture, and its busy state.
    */
@@ -254,6 +259,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     ...core,
     createImageResources: (origin, target) =>
       createImageResources({ images, authoring }, origin, target),
+    pickImages: images.pick,
     imageReplacement: createImageReplacements({
       images,
       authoring,

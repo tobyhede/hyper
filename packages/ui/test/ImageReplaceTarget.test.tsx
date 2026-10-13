@@ -8,7 +8,7 @@ import {
 } from '../src/resource-content-edit';
 
 const editor = (overrides: Partial<ImageReplaceEditor> = {}): ImageReplaceEditor => ({
-  accept: 'image/png',
+  pick: vi.fn(() => Promise.resolve([])),
   onReplace: vi.fn(() => Promise.resolve(null)),
   onEnd: vi.fn(),
   ...overrides,
@@ -72,19 +72,70 @@ describe('ImageReplaceTarget', () => {
     expect(replace.onEnd).not.toHaveBeenCalled();
   });
 
-  it('opens the file picker from Upload and replaces with the file chosen', async () => {
-    const replace = editor();
+  it('opens the file picker within the Upload press and replaces with the file chosen', async () => {
+    const chosen = new File(['bytes'], 'diagram.png', { type: 'image/png' });
+    const pick = vi.fn(() => Promise.resolve([chosen]));
+    const replace = editor({ pick });
     render(<ImageReplaceTarget name="Figure" editor={replace} />);
-    const picker = screen.getByTestId('replace-image-file');
-    const opened = vi.spyOn(picker, 'click');
 
     fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
-    expect(opened).toHaveBeenCalledTimes(1);
+    // Within the press, before any await: a browser opens a picker only then.
+    expect(pick).toHaveBeenCalledTimes(1);
 
-    const chosen = new File(['bytes'], 'diagram.png', { type: 'image/png' });
-    fireEvent.change(picker, { target: { files: [chosen] } });
-    expect(replace.onReplace).toHaveBeenCalledWith({ kind: 'files', files: [chosen] });
+    await waitFor(() =>
+      expect(replace.onReplace).toHaveBeenCalledWith({ kind: 'files', files: [chosen] }),
+    );
     await waitFor(() => expect(replace.onEnd).toHaveBeenCalledTimes(1));
+  });
+
+  it('replaces nothing and stays when the picker is cancelled', async () => {
+    let cancel: (files: readonly File[]) => void = () => undefined;
+    const replace = editor({ pick: () => new Promise((resolve) => (cancel = resolve)) });
+    render(<ImageReplaceTarget name="Figure" editor={replace} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+    await act(async () => {
+      cancel([]);
+      await Promise.resolve();
+    });
+
+    expect(replace.onReplace).not.toHaveBeenCalled();
+    expect(replace.onEnd).not.toHaveBeenCalled();
+  });
+
+  it('hands files chosen after the editor changed to the current one', async () => {
+    let choose: (files: readonly File[]) => void = () => undefined;
+    const pick = () => new Promise<readonly File[]>((resolve) => (choose = resolve));
+    const atPress = editor({ pick });
+    const current = editor({ pick });
+    const { rerender } = render(<ImageReplaceTarget name="Figure" editor={atPress} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+    rerender(<ImageReplaceTarget name="Figure" editor={current} />);
+    const chosen = new File(['bytes'], 'diagram.png', { type: 'image/png' });
+    await act(async () => {
+      choose([chosen]);
+      await Promise.resolve();
+    });
+
+    expect(atPress.onReplace).not.toHaveBeenCalled();
+    expect(current.onReplace).toHaveBeenCalledWith({ kind: 'files', files: [chosen] });
+    await waitFor(() => expect(current.onEnd).toHaveBeenCalledTimes(1));
+  });
+
+  it('replaces nothing with files chosen after the target has gone', async () => {
+    let choose: (files: readonly File[]) => void = () => undefined;
+    const replace = editor({ pick: () => new Promise((resolve) => (choose = resolve)) });
+    const { unmount } = render(<ImageReplaceTarget name="Figure" editor={replace} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload' }));
+    unmount();
+    await act(async () => {
+      choose([new File(['bytes'], 'late.png', { type: 'image/png' })]);
+      await Promise.resolve();
+    });
+
+    expect(replace.onReplace).not.toHaveBeenCalled();
   });
 
   it('takes a file dropped anywhere on it, and the drop goes no further', async () => {

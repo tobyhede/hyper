@@ -86,6 +86,7 @@ const sources = (
   const sent: string[] = [];
   return {
     sent,
+    pick: () => Promise.resolve([]),
     store: (image) => {
       const name = image instanceof File ? image.name : '';
       sent.push(name);
@@ -300,6 +301,7 @@ describe('an Image Resource gesture the author moves away from', () => {
     const url = 'https://example.com/a.png';
     let measured: (size: ImageNaturalSize | undefined) => void = () => undefined;
     const images: ImageSources = {
+      pick: () => Promise.resolve([]),
       store: () => Promise.reject(new Error('A URL is not stored')),
       measure: () =>
         new Promise((resolve) => {
@@ -340,6 +342,7 @@ describe('an Image Resource gesture the author moves away from', () => {
     const url = 'https://example.com/a.png';
     let measured: (size: ImageNaturalSize | undefined) => void = () => undefined;
     const images: ImageSources = {
+      pick: () => Promise.resolve([]),
       store: () => Promise.reject(new Error('A URL is not stored')),
       measure: () =>
         new Promise((resolve) => {

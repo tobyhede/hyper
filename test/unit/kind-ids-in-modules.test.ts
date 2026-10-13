@@ -163,38 +163,12 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
       "if (stored?.document.kind !== markdownKind.id) return 'retained';",
     ],
   ],
-  // An Image Resource's Create opens the file picker first (ADR 0106).
-  [
-    'packages/app/src/components/CommandDockResources.tsx',
-    [
-      'if (kind === imageKind.id) picker.current?.click();',
-      'onChoose={(files) => onCreate({ kind: imageKind.id, files })}',
-    ],
-  ],
   // The Space glyph on the Space cluster's own controls.
   [
     'packages/app/src/components/CommandDockSpaces.tsx',
     [
       '<ResourceKindIcon kind={spaceKind.id} decorative />',
       'icon={<ResourceKindIcon kind={spaceKind.id} decorative />}',
-    ],
-  ],
-  // The kinds the Create cluster offers, in its order (ADR 0089).
-  [
-    'packages/app/src/components/command-dock-chrome.ts',
-    [
-      'export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;',
-      'export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;',
-      'export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;',
-      'export const RESOURCE_KINDS = [markdownKind.id, spaceKind.id, imageKind.id, urKind.id] as const;',
-    ],
-  ],
-  // A Space Resource's Create runs, and is available with, the Space Resource lifecycle (ADR 0074).
-  [
-    'packages/app/src/dock-chrome.ts',
-    [
-      'else if (creation.kind === spaceKind.id) placement.createSpaceResource();',
-      'kind === spaceKind.id ? !availability.createSpaceResource : !availability.addResource,',
     ],
   ],
   // Replace is an Image Resource's (ADR 0106).

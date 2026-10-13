@@ -1,7 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   graphHeadShape,
-  spaceKind,
   type Graph,
   type GraphHeadShape,
   type GraphId,
@@ -31,6 +30,8 @@ import type { ResourcePlacementCommands } from './resource-placement';
 import { CANVAS } from './space-authoring';
 import type { ResourcesDisclosure } from './resources-disclosure';
 import { useReferenceableSpaces } from './referenceable-spaces';
+import { dockCreates, type CreateConditions } from './kind-creation';
+import { KIND_CREATIONS, type KindCreationContext } from './kinds/registry';
 
 /**
  * The Graph the Dock's Graph cluster names: the Active Graph, or nothing.
@@ -85,6 +86,23 @@ export interface DockChromeInput {
   /** The containing Space's id, read when the referenceable Spaces are. */
   readonly containingSpaceId: () => UUID;
   readonly reportBreak: ObserverErrorReporter;
+}
+
+/**
+ * The Create conditions as last committed, for a Create that continues after
+ * its press (a picker answering), and `null` once the Dock that drew it has
+ * gone. Not a ref: it is read by the presses `dockCreates` builds during render.
+ */
+class CommittedCreateConditions {
+  #conditions: CreateConditions<KindCreationContext> | null = null;
+  readonly current = (): CreateConditions<KindCreationContext> | null => this.#conditions;
+  /** Commit these conditions, answering how to withdraw them when the Dock goes. */
+  commit(conditions: CreateConditions<KindCreationContext>): () => void {
+    this.#conditions = conditions;
+    return () => {
+      this.#conditions = null;
+    };
+  }
 }
 
 export interface DockChromeState {
@@ -241,6 +259,20 @@ export function useDockChrome(
     },
     [spaces, space.title, exiting, commandOutcomes],
   );
+
+  /** What each kind's Create is drawn with this render. */
+  const createConditions: CreateConditions<KindCreationContext> = {
+    context: {
+      createResource: resources.placement.createResource,
+      createSpaceResource: resources.placement.createSpaceResource,
+      creatingSpaceResource: resources.placement.creatingSpaceResource,
+      createImagesFromFiles: resources.placement.createImagesFromFiles,
+      pickImages: app.pickImages,
+    },
+    addResource: availability.addResource,
+  };
+  const [committedCreate] = useState(() => new CommittedCreateConditions());
+  useLayoutEffect(() => committedCreate.commit(createConditions));
 
   const activeGraph = activeGraphOf(projection.visibleGraphs, activeGraphId);
   if (activeGraph === null) return { chrome: null, onChromeContinuationLand };
@@ -417,16 +449,11 @@ export function useDockChrome(
         onSpaceDragStart: placement.startSpaceDrag,
         onDragEnd: placement.endDrag,
       },
-      // Every kind completes its Edit on the press, an Image Resource once its
-      // file is chosen (ADR 0089, ADR 0106), and a Space Resource through the
-      // Space Resource lifecycle, which creates its Space with it (ADR 0074).
-      onCreate: (creation) => {
-        if ('files' in creation) placement.createImagesFromFiles(creation.files);
-        else if (creation.kind === spaceKind.id) placement.createSpaceResource();
-        else placement.createResource(creation.kind);
-      },
-      createDisabled: (kind) =>
-        kind === spaceKind.id ? !availability.createSpaceResource : !availability.addResource,
+      // Each kind's app half says what its press does and when it is withheld.
+      create: dockCreates(KIND_CREATIONS, createConditions, {
+        current: committedCreate.current,
+        reportBreak,
+      }),
     },
     persistence: {
       state: persistence,

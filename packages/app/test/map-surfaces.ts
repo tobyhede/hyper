@@ -115,7 +115,6 @@ export function canvasReading(
         editingResourceTitle: false,
         editingChromeTitle: false,
         spaceOnCanvas: true,
-        creatingSpaceResource: false,
         ...facts,
         ...renderedFacts({ hasResourcesOnCanvas, editingEmbeddedMap }),
       }),

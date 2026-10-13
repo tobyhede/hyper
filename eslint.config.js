@@ -259,23 +259,17 @@ const KIND_FEATURE_FILES = [
   'packages/app/src/build-space-resource-rail.tsx',
   // A Space Resource's selection, framing and portal; a Markdown body's completion.
   'packages/app/src/canvas-resource-authoring.ts',
-  // An Image Resource's Create opens the file picker first (ADR 0106).
-  'packages/app/src/components/CommandDockResources.tsx',
   // The Space glyph on the Space cluster's own controls.
   'packages/app/src/components/CommandDockSpaces.tsx',
   // A Space Resource's framing of its embedded Map; a dropped image URL creates an Image Resource.
   'packages/app/src/components/SpaceCanvas.tsx',
-  // The kinds the Create cluster offers, in its order, an Image Resource's with its files (ADR 0089).
-  'packages/app/src/components/command-dock-chrome.ts',
-  // A Space Resource's Create runs, and is available with, the Space Resource lifecycle (ADR 0074).
-  'packages/app/src/dock-chrome.ts',
   // A Space Resource's embedded Map.
   'packages/app/src/embedded-open-space-resource.ts',
   // Replace is an Image Resource's (ADR 0106).
   'packages/app/src/image-replacement.ts',
   // Create Reference's glyph, and a Space Resource's Enter and menu.
   'packages/app/src/resource-rail-actions.tsx',
-  // Creating an Image, a Reference or an input-free Resource, and Replace.
+  // Creating an Image or a Reference Resource, and Replace.
   'packages/app/src/space-authoring.ts',
   // A Space Resource's Map and Graph commands.
   'packages/app/src/space-resource-context-commands.ts',

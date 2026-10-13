@@ -133,10 +133,12 @@ async function mountGraph(
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
   const spaceSession = openSpaceSession(MemorySpaceBackend.asMeta(stored), stored);
-  const { surface, commandOutcomes, deleteConfirmation, imageReplacement } = composeApp({
-    images: unusedImageSources,
-    spaceSession,
-  });
+  const { surface, commandOutcomes, deleteConfirmation, imageReplacement, pickImages } = composeApp(
+    {
+      images: unusedImageSources,
+      spaceSession,
+    },
+  );
   const placement = {
     ...IDLE_PLACEMENT,
     createResource: addResource,
@@ -163,6 +165,7 @@ async function mountGraph(
         })}
         placement={placement}
         imageReplacement={imageReplacement}
+        pickImages={pickImages}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}
         nameOnCreation={null}

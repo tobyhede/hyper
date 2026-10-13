@@ -77,7 +77,6 @@ describe('useMapSurface', () => {
         return useMapSurface(app, surface, {
           presenting: false,
           spaceOnCanvas: true,
-          creatingSpaceResource: false,
         });
       },
       { wrapper: strict },
@@ -114,7 +113,6 @@ describe('useMapSurface', () => {
       const reading = useMapSurface(app, surface, {
         presenting: false,
         spaceOnCanvas: true,
-        creatingSpaceResource: false,
       });
       useLayoutEffect(() => {
         committed.push(reading.newResourceTitle);

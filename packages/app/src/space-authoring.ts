@@ -5,7 +5,7 @@ import {
   referenceKind,
   resourceReferences,
   spaceReferences,
-  type MarkdownKindId,
+  type EmptyCreatableKindId,
   type ResourceDocument,
   type ResourceId,
   type Graph,
@@ -31,7 +31,6 @@ import {
   type UUID,
   imageKind,
   type ImageKindId,
-  type UrKindId,
 } from '@project/core';
 import {
   graphColorsByGraphId,
@@ -102,9 +101,6 @@ const assertValidAuthoredSnapshot = (snapshot: SpaceSnapshot): void => {
     );
   }
 };
-
-/** The Resource kinds created from nothing but a press: no Target, no Space, no file. */
-export type InputFreeResourceKind = MarkdownKindId | UrKindId;
 
 /** One picture an Image Resource is created for: its URL, and its size when it loaded. */
 export interface CreatedImage {
@@ -197,13 +193,13 @@ export type AuthoringCompletion =
       readonly position: MapPosition | 'beside-source';
     }
   /**
-   * Create Resource: a detached Resource of a kind that takes no input at the
-   * visible centre, neutrally titled. A `markdown` one has an empty body; a `ur`
-   * one carries a Title and nothing else (ADR 0113).
+   * Create Resource: a detached Resource of a kind that starts empty, at the
+   * visible centre, neutrally titled, with the content its kind's module
+   * declares it starts with.
    */
   | {
       readonly kind: 'created-resource';
-      readonly resourceKind: InputFreeResourceKind;
+      readonly resourceKind: EmptyCreatableKindId;
       readonly anchor: MapPosition;
     }
   /**
@@ -1280,11 +1276,6 @@ export function createSpaceAuthoring({
     } else if (completion.kind === 'created-resource') {
       const title = nextResourceTitle(snapshot);
       const document = newResourceDocument(completion.resourceKind, title);
-      if (document === undefined) {
-        throw new Error(
-          `A ${completion.resourceKind} Resource has no empty content to start with.`,
-        );
-      }
       const created = createResource(document, completion.anchor, 'avoidingOverlap');
       if ('kind' in created) return created;
       createdResourceId = created.id;

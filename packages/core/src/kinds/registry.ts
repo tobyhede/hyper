@@ -2,21 +2,30 @@
 import type { z } from 'zod';
 import type { ContentFacts, ContentVia } from '../resource-content';
 import type { UUID } from '../types';
-import type { FileContentDecoding, KindFlags, KindModule, KindSidecar } from './kind-module';
+import type {
+  FileContentDecoding,
+  KindFlags,
+  KindModule,
+  KindSidecar,
+  StartsEmpty,
+} from './kind-module';
 import { imageKind } from './image';
-import { EMPTY_MARKDOWN, markdownKind } from './markdown';
+import { markdownKind } from './markdown';
 import { UNRESOLVED_CONTENT, referenceKind } from './reference';
 import type { SpaceSelectionTarget, SpaceSelectionProblem } from './space';
 import { spaceKind } from './space';
 import { urKind } from './ur';
 
-/** The kinds, every one a module, registered with every build: the one place each is registered. */
+/**
+ * The kinds, every one a module, registered with every build: the one place each
+ * is registered. Their order is the order every list of kinds is drawn in.
+ */
 const REGISTERED = {
-  [urKind.id]: urKind,
-  [imageKind.id]: imageKind,
   [markdownKind.id]: markdownKind,
-  [referenceKind.id]: referenceKind,
   [spaceKind.id]: spaceKind,
+  [imageKind.id]: imageKind,
+  [urKind.id]: urKind,
+  [referenceKind.id]: referenceKind,
 };
 type Registered = typeof REGISTERED;
 
@@ -201,24 +210,38 @@ export const canonicalResource = <R extends KindedResource>(resource: R): R => (
 /** The kind a Resource is created as when its author chooses none: a new Space's first, the canvas's Add. */
 export const DEFAULT_KIND = markdownKind.id;
 
-/** A new Resource of the default kind with this Title, its body empty. */
-export const newDefaultResourceDocument = (title: string): ResourceDocument => ({
-  title,
-  kind: DEFAULT_KIND,
-  content: EMPTY_MARKDOWN,
-});
+/** A kind whose module declares the content a new Resource of it starts with, so it may be created empty. */
+export type EmptyCreatableKindId = {
+  [K in KindId]: Registered[K] extends StartsEmpty<unknown> ? K : never;
+}[KindId];
 
-const newDocumentOf = <K extends KindId>(
-  kind: K,
-  title: string,
-): { [P in K]: { kind: P; title: string; content: ContentByKind[P] } }[K] | undefined => {
-  const content = KIND_MODULES[kind].newContent;
-  return content === undefined ? undefined : { kind, title, content };
+/** Each kind that may be created empty, typed so its new content is its own kind's. */
+type EmptyCreatableModules = {
+  readonly [K in EmptyCreatableKindId]: StartsEmpty<ContentByKind[K]>;
 };
 
-/** A new Resource of this kind with this Title and the content its kind starts with, when it may be created empty. */
-export const newResourceDocument = (kind: KindId, title: string): ResourceDocument | undefined =>
+const EMPTY_CREATABLE_MODULES: EmptyCreatableModules = REGISTERED;
+
+const newDocumentOf = <K extends EmptyCreatableKindId>(
+  kind: K,
+  title: string,
+): { [P in K]: { kind: P; title: string; content: ContentByKind[P] } }[K] => ({
+  kind,
+  title,
+  content: EMPTY_CREATABLE_MODULES[kind].newContent,
+});
+
+/** A new Resource of this kind with this Title and the content its kind starts with. */
+export const newResourceDocument = (kind: EmptyCreatableKindId, title: string): ResourceDocument =>
   newDocumentOf(kind, title);
+
+/** Whether a Resource of this kind may be created empty. */
+export const startsEmpty = (kind: KindId): kind is EmptyCreatableKindId =>
+  KIND_MODULES[kind].newContent !== undefined;
+
+/** A new Resource of the default kind with this Title, its body empty. */
+export const newDefaultResourceDocument = (title: string): ResourceDocument =>
+  newResourceDocument(DEFAULT_KIND, title);
 
 const encodeFileContentOf = <K extends KindId>(id: string, resource: Kinded<K>) =>
   KIND_MODULES[resource.kind].file.encode(id, resource.content);

@@ -94,6 +94,7 @@ const sources = (
   return {
     sent,
     measured,
+    pick: () => Promise.resolve([]),
     store: (image) => {
       const name = image instanceof File ? image.name : '';
       sent.push(name);
@@ -116,6 +117,7 @@ const held = () => {
   const sent: string[] = [];
   const measured: string[] = [];
   const images: ImageSources = {
+    pick: () => Promise.resolve([]),
     store: (image) => {
       sent.push(image instanceof File ? image.name : '');
       return storing.promise;
@@ -469,6 +471,7 @@ describe('a replacement that breaks', () => {
     async (stage, replacement) => {
       const failure = new Error(`${stage} failed`);
       const images: ImageSources = {
+        pick: () => Promise.resolve([]),
         store: () => Promise.reject(failure),
         measure: () => Promise.reject(failure),
       };
@@ -492,7 +495,11 @@ describe('a replacement that breaks', () => {
       throw new Error('Broken diagnostic sink');
     });
     const { imageReplacement } = open(
-      { store: () => Promise.reject(failure), measure: () => Promise.resolve(undefined) },
+      {
+        store: () => Promise.reject(failure),
+        measure: () => Promise.resolve(undefined),
+        pick: () => Promise.resolve([]),
+      },
       report,
     );
 
@@ -510,6 +517,7 @@ describe('a replacement whose Space was replaced', () => {
     async (stage) => {
       const waiting = Promise.withResolvers<undefined>();
       const images: ImageSources = {
+        pick: () => Promise.resolve([]),
         store: async () => {
           if (stage === 'storing') await waiting.promise;
           return { kind: 'stored', url: STORED };

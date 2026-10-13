@@ -162,7 +162,7 @@ export const interactiveDeviations = [
   {
     subject: 'packages/ui/src/ImageReplaceTarget.tsx — dropping a file on the upload target',
     existingHyperComponentConsidered:
-      '`Empty` (outline treatment) with `InputGroup`, `Button` and `ImageFilePicker`, which the target is composed of. None of them accepts a dropped file.',
+      '`Empty` (outline treatment) with `InputGroup` and `Button`, which the target is composed of, and the injected file picker its Upload opens. None of them accepts a dropped file.',
     shadcnOrBaseUiConsidered:
       "shadcn's `empty-outline` and `empty-input-group` examples, which the target follows. The registry has no dropzone component and Base UI has no drop primitive.",
     productRequirement:
@@ -173,5 +173,20 @@ export const interactiveDeviations = [
       "`dragover` is accepted and `drop` is taken on the `Empty` itself, both stopped so the canvas's own image drop does not also create a Resource; the drop cursor refuses a drop while a replacement is busy; otherwise the dropped files are handed to the same replacement the Upload button starts, and the application refuses anything other than one image in its own words before storing it.",
     tests:
       '`packages/ui/test/ImageReplaceTarget.test.tsx` (a dropped file is handed on; the drop does not reach the canvas), `packages/app/ladle-e2e` and `packages/app/e2e/image-resource.spec.ts` (a dropped non-image is refused in the target).',
+  },
+  {
+    subject: 'packages/app/src/browser-file-picker.ts — the browser file picker',
+    existingHyperComponentConsidered:
+      '`@project/ui`\'s `Input` with `type="file"`, which `ImageFilePicker` was. A component is mounted by a surface, so Create Image Resource and Replace image each mounted one and the app had two pickers.',
+    shadcnOrBaseUiConsidered:
+      'The registry and Base UI have no file picker; a file input is the browser’s own control, with nothing to compose.',
+    productRequirement:
+      'Issue 11 of `.scratch/resource-kind-modules/`: a kind’s Create runs where no component of its own is drawn, and Create Image Resource and Replace image open one picker.',
+    whyCompositionIsInsufficient:
+      'The press that opens it may be made where no component is drawn, so the input is attached for as long as the picker is open rather than rendered by React.',
+    customBehaviour:
+      'A file input kept out of the layout, the tab order and the accessibility tree, attached and clicked inside the press, removed when it answers; `cancel` answers nothing, and the next picker closes one that never settled, answering it nothing.',
+    tests:
+      '`packages/app/test/browser-file-picker.test.ts`, `packages/app/ladle-e2e/replace-image.spec.ts` and `packages/app/ladle-e2e/command-dock.spec.ts` (the browser’s file chooser opens from Upload and from Create Image Resource).',
   },
 ] as const;

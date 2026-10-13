@@ -55,7 +55,7 @@ it('keeps a pending replacement mounted when its entity actions become unavailab
   const waiting = Promise.withResolvers<string | null>();
   const kindOperations: KindOperations = { kind: 'image' };
   const display = beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-    accept: 'image/png',
+    pick: () => Promise.resolve([]),
     onReplace: () => waiting.promise,
     onEnd: () => undefined,
   });
@@ -342,7 +342,7 @@ describe('CanvasResource kind and interaction state', () => {
         kindOperations={{ kind: 'image', onBeginEdit: () => undefined }}
         onOpenChange={() => 'completed'}
         display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-          accept: 'image/png',
+          pick: () => Promise.resolve([]),
           onReplace: () => Promise.resolve(null),
           onEnd,
         })}
@@ -372,7 +372,7 @@ describe('CanvasResource kind and interaction state', () => {
         kindOperations={{ kind: 'image' }}
         onOpenChange={() => 'completed'}
         display={beginReplacing(opened({ kind: 'image', url: FIGURE_URL, via: 'self' }), {
-          accept: 'image/png',
+          pick: () => Promise.resolve([]),
           onReplace: () => new Promise(() => undefined),
           onEnd,
         })}

@@ -313,6 +313,7 @@ function DeleteWhenCommitted({ armed }: { readonly armed: boolean }) {
 function CanvasHarness({
   surface,
   imageReplacement,
+  pickImages,
   adapter,
   continuation,
   commandOutcomes,
@@ -324,6 +325,7 @@ function CanvasHarness({
   ReturnType<typeof compose>,
   | 'surface'
   | 'imageReplacement'
+  | 'pickImages'
   | 'adapter'
   | 'continuation'
   | 'commandOutcomes'
@@ -366,6 +368,7 @@ function CanvasHarness({
         })}
         placement={IDLE_PLACEMENT}
         imageReplacement={imageReplacement}
+        pickImages={pickImages}
         commandOutcomes={commandOutcomes}
         deleteConfirmation={deleteConfirmation}
         nameOnCreation={null}

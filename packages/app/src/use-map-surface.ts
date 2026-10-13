@@ -27,7 +27,6 @@ export function useMapSurface(
   facts: {
     readonly presenting: boolean;
     readonly spaceOnCanvas: boolean;
-    readonly creatingSpaceResource: boolean;
   },
 ) {
   const state = useSyncExternalStore(surface.authoring.subscribe, surface.authoring.getState);

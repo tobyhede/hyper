@@ -210,6 +210,8 @@ export interface SpaceCanvasProps {
    * The one way Replace reaches an Image Resource on this canvas that offers it.
    */
   readonly imageReplacement: Pick<ImageReplacements, 'replace'>;
+  /** The Space's image picker, which Replace's Upload opens. */
+  readonly pickImages: () => Promise<readonly File[]>;
   /**
    * The Resource a completed creation asks to be named, or `null`.
    *
@@ -274,6 +276,7 @@ export function SpaceCanvas({
   commandOutcomes,
   deleteConfirmation,
   imageReplacement,
+  pickImages,
   nameOnCreation,
   spaceSession,
   spaceResourceTargets,
@@ -511,6 +514,7 @@ export function SpaceCanvas({
     resourceResize,
     onSelectResource: selectResource,
     imageReplacement,
+    pickImages,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
     portalEditing: editingPortals,

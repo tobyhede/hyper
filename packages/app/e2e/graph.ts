@@ -501,8 +501,8 @@ export type ResourceKindName =
  * available at all — the peers are withdrawn by the same fact.
  *
  * **The default answers the availability question and nothing else.** Asking
- * "can a Resource be created" may use any peer, because `createDisabled`
- * withdraws them together; an assertion about *which* control names its kind.
+ * "can a Resource be created" may use any peer, because every peer is
+ * withdrawn while Add Resource is; an assertion about *which* control names its kind.
  */
 export function createResourceControl(
   page: Page,
