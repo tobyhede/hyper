@@ -1,5 +1,5 @@
 import {
-  kindFlags,
+  lifetimeSpaceReferences,
   mayBeTarget,
   resourceReferences,
   spaceReferences,
@@ -71,12 +71,12 @@ export const declaredSpaceReferences = (spaces: readonly ReferencingSpace[]): Sp
   spaceIds: spaces.map(({ id }) => id),
   references: spaces.flatMap((space) =>
     space.resources.flatMap(({ id, document }) => {
-      const lifetime = kindFlags(document.kind).ownsReferencedSpaces;
+      const held = lifetimeSpaceReferences(document);
       return spaceReferences(document).map((targetSpaceId) => ({
         spaceId: space.id,
         resourceId: id,
         targetSpaceId,
-        lifetime,
+        lifetime: held.includes(targetSpaceId),
       }));
     }),
   ),
@@ -120,8 +120,10 @@ export const spaceReferenceCycles = ({
 
 /**
  * The Spaces read, other than the Meta Space, whose lifetime no reference
- * holds. With no cycles this is exactly the Spaces not reachable from the Meta
- * Space through lifetime references (ADR 0074).
+ * holds. Each one is unreachable from the Meta Space through lifetime
+ * references, but not every unreachable Space is one: a Space held only by an
+ * unrooted Space is held. So with no cycles, an empty answer means every Space
+ * is reachable from the Meta Space (ADR 0074).
  */
 export const unrootedSpaces = (
   { spaceIds, references }: SpaceReferences,
