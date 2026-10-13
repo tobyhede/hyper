@@ -23,7 +23,7 @@ import type { AuthoringAvailability } from './authoring-availability';
 import type { ComposedApp } from './compose-app';
 import { canvasElement } from './canvas-element';
 import type { FocusFallback } from './delete-confirmation';
-import { OPEN_INDEPENDENTLY_ACTION_ID, type SpaceEntity } from './entity-actions';
+import { isOpenIndependently, type SpaceEntity } from './entity-actions';
 import type { OpenSpaces } from './open-spaces';
 
 /** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
@@ -162,8 +162,8 @@ export function resourceRailGroups(
     return [
       reference.flat(),
       connect,
-      [...entering, ...links.filter((action) => action.id === OPEN_INDEPENDENTLY_ACTION_ID)],
-      links.filter((action) => action.id !== OPEN_INDEPENDENTLY_ACTION_ID),
+      [...entering, ...links.filter((action) => isOpenIndependently(action.id))],
+      links.filter((action) => !isOpenIndependently(action.id)),
       leaving,
     ];
   }

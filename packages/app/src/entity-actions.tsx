@@ -56,6 +56,14 @@ export const COPY_SPACE_LINK_ACTION_ID = 'copy-space-link';
 export const COPY_LINK_TO_TARGET_ACTION_ID = 'copy-link-to-target';
 export const OPEN_INDEPENDENTLY_ACTION_ID = 'open-independently';
 
+/**
+ * Whether an action is Open Independently, for any Space a Resource
+ * references: the first reference's id is the bare one, and each later one
+ * carries its target Space's id.
+ */
+export const isOpenIndependently = (id: string): boolean =>
+  id === OPEN_INDEPENDENTLY_ACTION_ID || id.startsWith(`${OPEN_INDEPENDENTLY_ACTION_ID}:`);
+
 /** The commands a surface may ask this list for by id. */
 export type EntityCommandId = typeof COPY_LINK_ACTION_ID | typeof COPY_RESOURCE_LINK_ACTION_ID;
 
