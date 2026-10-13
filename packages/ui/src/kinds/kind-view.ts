@@ -31,9 +31,18 @@ export const BADGED_TARGET_GLYPH = 'badged-target';
  * The view half of a Resource kind (ADR 0120): what a Resource of it
  * is called and drawn as, its operations with none offered, and what it draws
  * when presented. Each kind declares one under `kinds/`, and the registry is
- * the one place they are listed, so no surface names a kind (ADR 0128).
+ * the one place they are listed, so no surface names a kind (ADR 0128). A kind
+ * whose operations begin an edit of its own content, in its content area or
+ * through a portal, names the command that begins it, since that command is
+ * the only control that runs the begin.
  */
-export interface KindView<Operations, OwnContent = never> {
+export type KindView<Operations, OwnContent = never> = KindViewFields<Operations, OwnContent> &
+  ([Extract<keyof Operations, 'onBeginEdit' | 'portal'>] extends [never]
+    ? unknown
+    : { readonly contentCommand: ContentCommand });
+
+/** The fields of {@link KindView}, each kind's alike. */
+interface KindViewFields<Operations, OwnContent> {
   /** What one Resource of this kind is called. */
   readonly name: string;
   /** What the Resources list calls this kind's Resources. */

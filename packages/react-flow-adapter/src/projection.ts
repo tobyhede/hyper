@@ -57,6 +57,14 @@ type ResourceKindData = KindDataOf<Resource['kind']>;
  *  React Flow's `Record<string, unknown>` data constraint. */
 export type ResourceNodeData = ResourceKindData & ResourceNodeCommonData;
 
+/**
+ * Whether this Resource's own content embeds a Map its author edits in that
+ * Map, rather than in the Resource's content area.
+ */
+export const authorsEmbeddedMap = (
+  data: Pick<ResourceNodeData, 'authorsContent' | 'embedsMap'>,
+): boolean => data.authorsContent && data.embedsMap;
+
 /** A Resource node's data for one kind. */
 export type ResourceNodeDataOf<K extends Resource['kind']> = Extract<ResourceNodeData, { kind: K }>;
 

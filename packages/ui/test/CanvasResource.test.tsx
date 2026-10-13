@@ -542,6 +542,27 @@ describe('CanvasResource kind and interaction state', () => {
   });
 });
 
+describe('CanvasResource content command', () => {
+  it('draws a rail for a content begin only with the command that runs it', () => {
+    // A begin is offered only through the command its kind names, so a rail
+    // drawn for the begin always holds a control that runs it.
+    const operations = { kind: 'space' as const, onBeginEdit: vi.fn() };
+    render(
+      <CanvasResource
+        kindOperations={operations}
+        display={opened(SPACE_CONTENT)}
+        state="selected"
+        title="Overview"
+        graphColor="#ffc53d"
+      />,
+    );
+    const controls = screen
+      .queryByTestId('canvas-resource-actions')
+      ?.querySelectorAll('button').length;
+    expect(controls, 'a rail is drawn only with a control in it').not.toBe(0);
+  });
+});
+
 describe('CanvasResource Open and Close operation', () => {
   it('owns its read-only state and withholds supplied authoring operations', () => {
     render(

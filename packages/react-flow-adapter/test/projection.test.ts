@@ -132,6 +132,7 @@ describe('projectResourceNodes', () => {
           });
         expect(nodes.find((node) => node.id === targetId)?.data).toMatchObject({
           authorsContent: true,
+          embedsMap: kind === 'space',
         });
       }
     },

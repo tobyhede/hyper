@@ -37,7 +37,6 @@ import {
   AbandonEditIcon,
   CloseResourceIcon,
   CommitEditIcon,
-  EditIcon,
   EntityActionsIcon,
   OpenResourceIcon,
 } from './icons';
@@ -333,7 +332,10 @@ export function CanvasResource(props: CanvasResourceProps) {
   const visibleContentEdit = readOnly ? null : contentEdit;
   const editControl = useRef<HTMLButtonElement>(null);
   const contentEditingWas = useRef(false);
-  const beginContentEdit = contentEditAction(open, onOpenChange, onBeginContentEdit);
+  // Begun only through the command its kind names, so a rail is never drawn
+  // for a begin it has no control to run.
+  const beginContentEdit =
+    command === undefined ? undefined : contentEditAction(open, onOpenChange, onBeginContentEdit);
   const actionableEntityActions =
     !readOnly && entityActions?.some((group) => group.length > 0) === true;
   const onResourceShapeChange =
@@ -462,15 +464,15 @@ export function CanvasResource(props: CanvasResourceProps) {
             >
               <CommitEditIcon data-icon="inline-start" />
             </ResourceRailAction>
-          ) : (
+          ) : command !== undefined ? (
             <ResourceRailAction
               ref={editControl}
-              aria-label={`Edit Resource ${name}`}
+              aria-label={command.label(name)}
               onClick={() => portal.onEditingChange(true)}
             >
-              <EditIcon data-icon="inline-start" />
+              <command.Icon data-icon="inline-start" />
             </ResourceRailAction>
-          )
+          ) : null
         ) : null}
       </ResourceRailKindActions>
       <ResourceRailSharedActions>

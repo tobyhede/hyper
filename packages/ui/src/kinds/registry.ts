@@ -9,8 +9,7 @@ import {
   type ReferenceContentUnresolved,
   type ResourceContent,
 } from '@project/core';
-import type { ImageReplaceEditor } from '../ImageReplaceTarget';
-import { imageView, type ImageOperations } from './image';
+import { imageView, type ImageOperations, type ImageReplaceEditor } from './image';
 import type { CanvasArea, ContentCommand, KindView } from './kind-view';
 import { markdownView, type MarkdownEdit, type MarkdownOperations } from './markdown';
 import { referenceView, type ReferenceOperations } from './reference';

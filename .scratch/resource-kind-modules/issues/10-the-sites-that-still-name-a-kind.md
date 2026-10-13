@@ -21,7 +21,7 @@ The enforcement is an import ban: outside `kinds/`, no file may import a name a 
 
 ## The unbuilt gaps
 
-- **Content commands** (candidate C): `ContentAction` is a closed union of one command per kind (`edit-markdown`, `replace-image`, `author-space-view`), and the display states that run them (`resource-display.ts`'s `editing` and `replacing`, `CanvasResource`'s and `ResourceNode`'s `is<Kind>Operations` branches, the Replace label and icon) choose by kind. **Routed by C (2026-10-13).**
+- **Content commands** (candidate C): routed by C (2026-10-13). `ContentAction`, the closed union of one command per kind, is gone: each kind's core module declares whether its content is `authored`, each view half names its `contentCommand`, and the display holds one `editing` arm per kind, so neither `resource-display.ts` nor `CanvasResource` and `ResourceNode` choose by kind. What still names a kind is listed under C below.
 - **Content reached through a Reference**: `ContentVia` names `ReferenceKindId`. It is a feature of the Reference kind alone today, but a second kind that may reach another's content would have to edit the core.
 - **Creation** (candidate E): routed by [issue 11](11-each-kind-declares-its-create.md). Each kind's app half declares its Command Dock Create, and the Dock draws an opaque list.
 - **The Space selection** (candidate F): `sql-space-repository.ts` and `space-resource-planning.ts` compare a Space Resource's `spaceId`, `map` and `graph` by kind. Ticket 06 left this unbuilt; the kind scan and the import ban now give it as the reason.

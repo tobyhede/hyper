@@ -5,7 +5,7 @@ import {
   type GraphId,
   type ResourceId,
 } from '@project/core';
-import type { ResourceFlowNode } from '@project/react-flow-adapter';
+import { authorsEmbeddedMap, type ResourceFlowNode } from '@project/react-flow-adapter';
 import { spaceViewOf } from '@project/ui';
 import { mapSurfacePolicy, type MapSurfacePolicy } from './map-surface-policy';
 
@@ -287,11 +287,7 @@ export function editingPortalAncestor(
 ): ResourceFlowNode | undefined {
   let current = start;
   while (current !== undefined) {
-    if (
-      current.data.authorsContent &&
-      current.data.embedsMap &&
-      editingPortals.has(current.data.resourceId)
-    ) {
+    if (authorsEmbeddedMap(current.data) && editingPortals.has(current.data.resourceId)) {
       return current;
     }
     current = current.parentId === undefined ? undefined : nodesById.get(current.parentId);

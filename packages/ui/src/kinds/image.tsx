@@ -7,6 +7,9 @@ import { ResourceContentEditProvider } from '../resource-content-edit';
 import { ResourceImage } from '../ResourceImage';
 import type { CanvasArea, KindView } from './kind-view';
 
+/** An Image Resource's running edit: the replacement of its image. */
+export type { ImageReplaceEditor };
+
 /** What an Image Resource offers beyond its Title. */
 export interface ImageOperations {
   readonly kind: typeof imageKind.id;
