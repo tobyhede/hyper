@@ -95,8 +95,8 @@ export interface KindCanvasDecoration<K extends KindId, Context extends object> 
 export interface KindDecorator<Context> {
   /** The decoration bound to this kind's part of `context`. */
   readonly bind: (context: Context) => {
-    /** The part read, compared field by field with the part the kept nodes were decorated from. */
-    readonly read: object;
+    /** The values of the part read, in its order, compared one by one with those the kept nodes were decorated from. */
+    readonly read: readonly unknown[];
     /** `node` decorated, or `undefined` for a node of another kind. */
     readonly decorate: (node: ResourceFlowNode) => ResourceFlowNode | undefined;
   };
@@ -107,12 +107,12 @@ export const kindDecorator = <K extends KindId, Context extends object>(
   decoration: KindCanvasDecoration<K, Context>,
 ): KindDecorator<Context> => ({
   bind: (context) => {
-    const read = decoration.slice(context);
+    const slice = decoration.slice(context);
     return {
-      read,
+      read: Object.values(slice),
       decorate: (node) =>
         isResourceNodeOf(node, decoration.kind)
-          ? applyKindDecoration(node, decoration.decorate(node, read))
+          ? applyKindDecoration(node, decoration.decorate(node, slice))
           : undefined,
     };
   },
@@ -122,21 +122,15 @@ export const kindDecorator = <K extends KindId, Context extends object>(
 export interface KindDecoratedNodes {
   readonly from: readonly ResourceFlowNode[];
   readonly byKind: readonly {
-    readonly read: object;
+    readonly read: readonly unknown[];
     readonly decorated: ReadonlyMap<string, ResourceFlowNode>;
   }[];
   readonly nodes: ResourceFlowNode[];
 }
 
-/** Whether `a` and `b` have the same fields, each the same value. */
-const sameFields = (a: object, b: object): boolean => {
-  const entries = Object.entries(a);
-  const other = new Map(Object.entries(b));
-  return (
-    entries.length === other.size &&
-    entries.every(([key, value]) => other.has(key) && Object.is(other.get(key), value))
-  );
-};
+/** Whether `a` and `b` hold the same values in the same order. */
+const sameValues = (a: readonly unknown[], b: readonly unknown[]): boolean =>
+  a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
 
 /**
  * `nodes` with each kind's decoration, from `context`. A kind whose part of the
@@ -155,7 +149,7 @@ export function decorateKinds<Context>(
   const byKind = decorators.map((decorator, index) => {
     const bound = decorator.bind(context);
     const before = keptNodes?.byKind[index];
-    if (before !== undefined && sameFields(before.read, bound.read)) return before;
+    if (before !== undefined && sameValues(before.read, bound.read)) return before;
     const decorated = new Map<string, ResourceFlowNode>();
     for (const node of nodes) {
       const next = bound.decorate(node);
