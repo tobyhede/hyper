@@ -50,3 +50,5 @@ Built.
 - three `KIND_FEATURE_FILES` exemptions.
 
 **Still counted:** Image drop and paste, through `resource-placement.ts`, and the Create Reference glyph. These are outside this scope.
+
+**Since (2026-10-13):** Replace image no longer goes through `ImageReplacements.pick` (removed in c107761): the canvas takes `pickImages`, and Replace reads it through `pickImageFiles` in `canvas-resource-authoring.ts`. Two points of the design pass were built differently, and are kept: a Dock entry carries `disabled` rather than a refusal sentence, since the Dock draws no sentence for a withheld Create; and the Space kind owns the rule that withholds Create while a Space Resource is being created (`kinds/space.ts`), while the in-flight state stays in `resource-placement.ts`, the hook that runs the creation.

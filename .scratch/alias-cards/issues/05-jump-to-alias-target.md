@@ -16,7 +16,7 @@ Neither belongs in the initial read-only Open Alias work. Both require a settled
 
 ## Blocked by
 
-Implementation of ADR 0069's Card URL addressability, including the behavior when the addressed Card is outside the current Layout or otherwise unavailable on the current canvas.
+~~Implementation of ADR 0069's Card URL addressability~~ — built: every Resource has a product URL, in a Space and on a Map (`docs/agents/navigation.md`; `packages/http/src/product-destination.ts`). In current words this ticket is Jump from an Open Reference Resource to its Target Resource. What it waits on now is a product decision (2026-10-13 audit): which Map a Jump lands on when the Target is not on the current Map, whether it selects or Opens the Target, whether Edit Target is a separate control, and what a Jump does when the Target is a Space Resource.
 
 ## Questions to settle
 

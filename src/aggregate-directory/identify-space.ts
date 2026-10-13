@@ -77,6 +77,10 @@ export const describeSchemaFailure = (issues: readonly SchemaIssue[], label: str
  * left to dangle and refused by aggregate intake, which is where a dangling
  * reference is reported anyway.
  *
+ * A Resource's id is **never minted**: every Resource file carries its own
+ * (ADR 0128), so `ImportSpace` requires it and the resources pass through as
+ * written.
+ *
  * A map's own id and the ids of the graphs it owns are minted in the
  * **same pass**, because under version 1 a graph is reached only through its
  * owner (ADR 0040): there is no space-level collection to walk beside the
@@ -117,7 +121,7 @@ export const identifySpace = (
   const parsed = spaceSnapshotSchema.safeParse({
     id: spaceId,
     document,
-    resources: input.resources.map((resource) => ({ ...resource, id: resource.id ?? newId() })),
+    resources: input.resources,
   });
   if (!parsed.success) {
     throw new SpaceIdentityError(describeSchemaFailure(parsed.error.issues, 'identified space'));

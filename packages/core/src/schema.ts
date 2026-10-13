@@ -42,9 +42,9 @@ const idSchema = uuidSchema;
  * all four the capability because they share a field type would be the model
  * following the implementation (ADR 0083).
  *
- * One instance, shared by the Resource and its file's schema — `omit` and
- * `extend` copy a field schema by reference, so the stored document and the
- * file inherit this rule rather than restating it, which is what
+ * One instance, shared by the Resource and its file's schema: each envelope
+ * door uses this field schema itself, so the stored document and the file
+ * inherit this rule rather than restating it, which is what
  * `resource-document-equality.test.ts` holds them to.
  */
 const resourceTitleSchema = z
@@ -494,11 +494,13 @@ const importSpaceFileObjectSchema = spaceFileObjectSchema.extend({
 export const importSpaceFileSchema = importSpaceFileObjectSchema;
 
 /**
- * The only shape in which entity ids may be absent. References remain UUIDs:
- * identity allocation precedes normal domain validation during import.
+ * The only shape in which entity ids may be absent: a Space's, its Maps' and
+ * their Graphs'. A Resource's id is required, because every Resource file
+ * carries its own (ADR 0128). References remain UUIDs: identity allocation
+ * precedes normal domain validation during import.
  */
 export const importSpaceSchema = z.object({
   id: uuidSchema.optional(),
   document: importSpaceFileObjectSchema.omit({ id: true }),
-  resources: z.array(z.object({ id: uuidSchema.optional(), document: resourceDocumentSchema })),
+  resources: spaceSnapshotSchema.shape.resources,
 });

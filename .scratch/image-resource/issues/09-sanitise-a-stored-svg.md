@@ -6,7 +6,7 @@
 
 **Where the blocker stands:** neither condition holds yet. ADR 0107 is still proposed rather than accepted and is missing from `docs/adr/README.md`; storing still refuses an SVG as `image-svg-unsupported` (`packages/persistence/src/images.ts:182`); and stored images are served with `X-Content-Type-Options: nosniff` only, with no `Content-Security-Policy` (`packages/http/src/index.ts:72`).
 
-**Also to account for:** ADR 0118 carries a stored image's bytes in an Aggregate directory's `images/<content-id>.<ext>`, and Import admits them by that id. If the id becomes the digest of sanitised bytes, an Export writes sanitised bytes, and Import of a directory holding an unsanitised SVG either re-keys it or refuses it. The refining ADR has to say which. DOMPurify is already a dependency of `@project/ui`, where it runs in the browser (`packages/ui/src/PresentedResource.tsx:3`). Running it on the host would need jsdom as a runtime dependency of the storing package; today jsdom is only a root dev dependency.
+**Also to account for:** ADR 0118 carries a stored image's bytes in an Aggregate directory's `images/<content-id>.<ext>`, and Import admits them by that id. If the id becomes the digest of sanitised bytes, an Export writes sanitised bytes, and Import of a directory holding an unsanitised SVG either re-keys it or refuses it. The refining ADR has to say which. DOMPurify is already a dependency of `@project/ui`, where it runs in the browser (`packages/ui/src/RenderedMarkdown.tsx`). Running it on the host would need jsdom as a runtime dependency of the storing package; today jsdom is only a root dev dependency.
 
 **Status:** needs-triage
 
