@@ -20,6 +20,12 @@ export interface MarkdownContent {
 /** The media type of a Markdown Resource's sidecar. */
 export const MARKDOWN_MEDIA_TYPE = 'text/markdown';
 
+/**
+ * Media types compare case-insensitively in ASCII only: `toLowerCase` would
+ * also fold the Kelvin sign (U+212A) to `k`, which the JSON Schema refuses.
+ */
+const MARKDOWN_MEDIA_TYPE_IN_ANY_CASE = /^text\/markdown$/i;
+
 /** The sidecar a Markdown Resource's file names: its own `<id>.md`, beside its Resource file. */
 export const markdownSidecarPath = (id: string): string => `${id}.md`;
 
@@ -32,7 +38,7 @@ export const markdownSidecarPath = (id: string): string => `${id}.md`;
 export const markdownFileContentSchema = z
   .object({
     path: z.string(),
-    mediaType: z.string().refine((mediaType) => mediaType.toLowerCase() === MARKDOWN_MEDIA_TYPE, {
+    mediaType: z.string().refine((mediaType) => MARKDOWN_MEDIA_TYPE_IN_ANY_CASE.test(mediaType), {
       message: `A Markdown Resource's sidecar is ${MARKDOWN_MEDIA_TYPE}`,
     }),
   })

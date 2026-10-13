@@ -90,10 +90,7 @@ describe('import space schema', () => {
           },
         ],
       },
-      resources: [
-        ...identified.resources,
-        { document: { title: 'New', kind: 'markdown', content: { source: '' } } },
-      ],
+      resources: identified.resources,
     };
 
     const parsed = importSpaceSchema.parse(input);
@@ -101,7 +98,6 @@ describe('import space schema', () => {
     expect(parsed.id).toBeUndefined();
     expect(parsed.document.maps?.[0]?.id).toBeUndefined();
     expect(parsed.document.maps?.[0]?.graphs[0]?.id).toBeUndefined();
-    expect(parsed.resources.at(-1)?.id).toBeUndefined();
   });
 
   /**
@@ -126,6 +122,14 @@ describe('import space schema', () => {
         ...identified,
         document: { ...identified.document, version: 2 },
       }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an imported Resource with no id, which its Resource file always carries', () => {
+    const [resource] = identified.resources;
+    expect(
+      importSpaceSchema.safeParse({ ...identified, resources: [{ document: resource?.document }] })
+        .success,
     ).toBe(false);
   });
 

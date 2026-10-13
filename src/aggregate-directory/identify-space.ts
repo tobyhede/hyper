@@ -117,7 +117,7 @@ export const identifySpace = (
   const parsed = spaceSnapshotSchema.safeParse({
     id: spaceId,
     document,
-    resources: input.resources.map((resource) => ({ ...resource, id: resource.id ?? newId() })),
+    resources: input.resources,
   });
   if (!parsed.success) {
     throw new SpaceIdentityError(describeSchemaFailure(parsed.error.issues, 'identified space'));

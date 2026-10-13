@@ -13,6 +13,12 @@ Status: ready-for-human
 
 The enforcement is an import ban: outside `kinds/`, no file may import a name a `kinds/<kind>` module exports, except the files `KIND_FEATURE_FILES` in `eslint.config.js` lists with the feature each serves; `test/unit/kind-module-imports.test.ts` derives the banned names from each module's exports and fails on a listed file that no longer needs its exemption. Literal ids stay the kind-ids scan's job, and string literals such as `ContentAction`'s and the display states' are seen by neither. Every site, with its category and exemption, is in [`../kind-sites.md`](../kind-sites.md).
 
+**Decided (Toby, 2026-10-13, after the audit in `/mnt/project-files/reviews/resource-issues-audit-2026-10-13.md`):** build candidates B, C, D and F, each its own PR stacked on the last; drop G and H, which were speculative and close no gap above. D takes the decoration-context gap, since it gives each kind its own slice of the context. `ContentVia` is not decided. The audit also found three sites no guard sees, which B and C take:
+
+- the refusal code `shape-requires-ur-resource` and its message name Ur, although the rule reads `takesResourceShape` (B);
+- intake's self-reference message says "Space Resource … targets its own Space" (B);
+- `ContentAction`'s and the display states' string literals are seen by neither guard (C).
+
 ## The unbuilt gaps
 
 - **Content commands** (candidate C): `ContentAction` is a closed union of one command per kind (`edit-markdown`, `replace-image`, `author-space-view`), and the display states that run them (`resource-display.ts`'s `editing` and `replacing`, `CanvasResource`'s and `ResourceNode`'s `is<Kind>Operations` branches, the Replace label and icon) choose by kind.

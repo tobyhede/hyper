@@ -236,12 +236,12 @@ const refused: [string, Json, { instancePath: string; keyword: string }][] = [
 ];
 
 /**
- * No intake reads the Resource file format yet; issue 07 holds this schema to
- * one. Until then it is held to compiling under strict mode, to accepting the
- * example its README publishes for each kind, to refusing what ADR 0128 names
- * at the place it names (a missing or malformed `kind`, a bare kind no build
+ * The schema is held to compiling under strict mode, to accepting the example
+ * its README publishes for each kind, to refusing what ADR 0128 names at the
+ * place it names (a missing or malformed `kind`, a bare kind no build
  * registers, an unknown key at either level, Ur content, and a locator form
- * the kind does not take), and to accepting what only intake refuses.
+ * the kind does not take), and to accepting what only intake refuses. The
+ * next block holds it to intake itself.
  */
 describe('the Resource file JSON Schema', () => {
   const examples = join(repoRoot, 'docs/schema/resource/examples');
@@ -387,6 +387,13 @@ describe('the Resource file JSON Schema refuses only what intake refuses', () =>
       'only intake',
     ],
     ['a Markdown sidecar that does not exist', filesOf(markdown(`${id}.md`)), 'only intake'],
+    [
+      'a Markdown media type spelled with the Kelvin sign',
+      filesOf(envelope('markdown', { path: `${id}.md`, mediaType: 'text/mar\u212Adown' }), [
+        `${id}.md`,
+      ]),
+      'both',
+    ],
     [
       'a .md no Resource file names',
       [...filesOf(envelope('ur', {})), { path: 'resources/stray.md', text: 'Stray.\n' }],

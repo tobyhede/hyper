@@ -18,3 +18,5 @@ Built. The Reference kind is the fourth module:
 - **Everything else** names the kind through `referenceKind.id`, and the kind-id scan now covers `'reference'`. `ContentVia` is `'self' | ReferenceKindId`: content reached through a Reference Resource says so by that kind's id.
 
 One part is not built as written: `resourceReferences` and `contentTarget` in the registry still pick the Reference kind out of the closed Resource union, because `content` is typed per kind (`02`'s Answer) and TypeScript cannot call a module looked up by id with its own content without an assertion. They are the one place that match, and they sit in the registry.
+
+**Since (2026-10-13):** issue `10` made intake's reference messages kind-neutral (the codes are kept), so "wording unchanged" no longer holds. `content-resolution.ts` is gone: resolution is in `packages/core/src/kinds/registry.ts`, whose correlated `Kinded<K>` helpers call each module with its own content, so the "not built as written" paragraph is retired.

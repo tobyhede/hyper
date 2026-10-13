@@ -4,7 +4,7 @@ JSON Schema (draft 2020-12) for the files of an Aggregate directory ([`docs/aggr
 
 - `hyper.schema.json` is `hyper.json` at the directory's root: the format version and the Meta Space's Id. It describes the format as built.
 - `space.schema.json` is each Space directory's `space.json`: the Space's title, its Maps, their placements and the Graphs they own. It describes the format as built, as intake reads it: the Space, Map and Graph ids that Export always writes may be omitted by a hand-written file.
-- `resource/` is the Resource file, `resources/<id>.json`, which [ADR 0128](../adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md) accepts and which is not yet built. Its own [README](resource/README.md) says what that means.
+- `resource/` is the Resource file, `resources/<id>.json`, which [ADR 0128](../adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md) makes every Resource. It describes the format as built; its own [README](resource/README.md) says what intake checks beyond it.
 - `id.schema.json` is the Id every file shares: a UUID.
 
 The examples of `hyper.json` and `space.json` are the ones in [`docs/aggregate-directory.md`](../aggregate-directory.md).

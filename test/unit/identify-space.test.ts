@@ -61,7 +61,6 @@ describe('identifySpace', () => {
           id: SECOND_RESOURCE_ID,
           document: { title: 'Second', kind: 'markdown', content: { source: 'Two' } },
         },
-        { document: { title: 'Minted', kind: 'markdown', content: { source: 'Three' } } },
       ],
     };
 
@@ -69,16 +68,15 @@ describe('identifySpace', () => {
 
     const [first, second] = snapshot.document.maps ?? [];
     if (first === undefined || second === undefined) throw new Error('Structure was not kept');
-    const minted = snapshot.resources.find(
-      ({ id }) => id !== RESOURCE_ID && id !== SECOND_RESOURCE_ID,
-    )?.id;
     const mintedGraph = first.graphs[0]?.id;
-    if (minted === undefined || mintedGraph === undefined) throw new Error('Nothing was minted');
+    if (mintedGraph === undefined) throw new Error('Nothing was minted');
 
     // The explicit ids survive exactly; the minted ones are distinct UUIDs.
+    // A Resource's id is never minted: every Resource file carries it (ADR 0128).
+    expect(snapshot.resources.map(({ id }) => id)).toEqual([RESOURCE_ID, SECOND_RESOURCE_ID]);
     expect(second.graphs[0]?.id).toBe(GRAPH_ID);
     expect(first.graphs[0]?.edges).toEqual([{ from: RESOURCE_ID, to: SECOND_RESOURCE_ID }]);
-    const identities = [snapshot.id, minted, mintedGraph, first.id, second.id];
+    const identities = [snapshot.id, mintedGraph, first.id, second.id];
     for (const id of identities) expect(uuidSchema.safeParse(id).success).toBe(true);
     expect(new Set(identities).size).toBe(identities.length);
   });
