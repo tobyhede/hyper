@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type Resource, type Graph, type Map } from '@project/core';
 import type { ProductDestination } from '@project/http';
 import type { EntityActionGroup } from '@project/ui';
-import { spaceEntityActions, type SpaceEntity } from '../src/entity-actions';
+import { isOpenIndependently, spaceEntityActions, type SpaceEntity } from '../src/entity-actions';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -354,5 +354,15 @@ describe('spaceEntityActions', () => {
     expect(onRename).toHaveBeenCalledOnce();
     expect(onRename.mock.calls[0]?.[0]).toEqual({ kind: 'graph', id: GRAPH_ID });
     expect(onRename.mock.calls[0]?.[1]).toBe('Long');
+  });
+});
+
+describe('isOpenIndependently', () => {
+  it('names Open Independently for every Space a Resource references, and nothing else', () => {
+    expect(isOpenIndependently('open-independently')).toBe(true);
+    expect(isOpenIndependently(`open-independently:${TARGET_SPACE_ID}`)).toBe(true);
+    expect(isOpenIndependently('copy-space-link')).toBe(false);
+    expect(isOpenIndependently(`copy-space-link:${TARGET_SPACE_ID}`)).toBe(false);
+    expect(isOpenIndependently('open-independently-elsewhere')).toBe(false);
   });
 });
