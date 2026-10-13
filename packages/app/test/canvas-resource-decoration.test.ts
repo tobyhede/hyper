@@ -379,8 +379,9 @@ describe('decorateMarkdownResourceNode', () => {
     );
     expect(patch.display).toMatchObject({
       shown: 'editing',
+      kind: 'markdown',
       content: { kind: 'markdown', via: 'self' },
-      autoFocus: true,
+      edit: { autoFocus: true },
     });
     expect(decorateMarkdownResourceNode(markdown, context()).display).toBeUndefined();
   });
@@ -424,11 +425,12 @@ describe('decorateImageResourceNode', () => {
     pickImageFiles,
   });
 
-  it('enters the replacing display on an Open Image Resource whose caret is live', () => {
+  it('enters the replacement on an Open Image Resource whose caret is live', () => {
     expect(decorateImageResourceNode(imageNode(true), replacing).display).toMatchObject({
-      shown: 'replacing',
+      shown: 'editing',
+      kind: 'image',
       content: { kind: 'image', url: IMAGE_URL, via: 'self' },
-      replacer: { pick: pickImageFiles },
+      edit: { pick: pickImageFiles },
     });
   });
 

@@ -1,7 +1,7 @@
-import { contentAction, markdownKind, type MarkdownContent } from '@project/core';
+import { authorsContent, markdownKind, type MarkdownContent } from '@project/core';
 import type { MarkdownResourceBodyEditor } from '../MarkdownResourceBody';
 import type { ResourceDisplay } from '../resource-display';
-import { MarkdownIcon } from '../icons';
+import { EditIcon, MarkdownIcon } from '../icons';
 import { MarkdownResourceBody, type MarkdownResourceBodyProps } from '../MarkdownResourceBody';
 import { RenderedMarkdown } from '../RenderedMarkdown';
 import { ResourceContentEditProvider } from '../resource-content-edit';
@@ -14,6 +14,12 @@ export interface MarkdownOperations {
   readonly onBeginEdit?: () => void;
 }
 
+/** A Markdown Resource's running edit: the editor of its source, and whether it takes focus when drawn. */
+export interface MarkdownEdit {
+  readonly editor: MarkdownResourceBodyEditor;
+  readonly autoFocus: boolean;
+}
+
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 
 /**
@@ -24,13 +30,14 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  * Target's, is drawn at rest: no editor and no edit target.
  */
 const markdownCanvas = (content: MarkdownContent, area: CanvasArea) => {
+  const display = area.display;
   const body: Mutable<Pick<MarkdownResourceBodyProps, 'onBeginEdit' | 'editor' | 'autoFocus'>> = {};
   if (area.authoring && area.onBeginEdit !== undefined && area.selected) {
     body.onBeginEdit = area.onBeginEdit;
   }
-  if (area.authoring && area.display.shown === 'editing') {
-    body.editor = area.display.editor;
-    body.autoFocus = area.display.autoFocus;
+  if (area.authoring && display.shown === 'editing' && display.kind === markdownKind.id) {
+    body.editor = display.edit.editor;
+    body.autoFocus = display.edit.autoFocus;
   }
   return (
     <ResourceContentEditProvider value={area.setContentEdit}>
@@ -55,6 +62,7 @@ export const markdownView: KindView<MarkdownOperations, MarkdownContent> = {
   referenceName: 'Reference to a Markdown Resource',
   Glyph: MarkdownIcon,
   bareOperations: { kind: markdownKind.id },
+  contentCommand: { label: (name) => `Edit Resource ${name}`, Icon: EditIcon },
   canvas: markdownCanvas,
   presented: (_name, content) => (
     <RenderedMarkdown className="resource__body" markdown={content.source} />
@@ -70,15 +78,14 @@ export function beginEditing<D extends ResourceDisplay>(
   display: D,
   editor: MarkdownResourceBodyEditor,
   autoFocus: boolean,
-): D | Extract<ResourceDisplay, { readonly shown: 'editing' }> {
+): D | Extract<ResourceDisplay, { readonly kind: typeof markdownKind.id }> {
   if (display.shown !== 'open') return display;
   const content = display.content;
-  if (contentAction(content) !== 'edit-markdown' || content.kind !== markdownKind.id)
-    return display;
+  if (!authorsContent(content) || content.kind !== markdownKind.id) return display;
   return {
     shown: 'editing',
+    kind: markdownKind.id,
     content: { ...content, via: 'self' },
-    editor,
-    autoFocus,
+    edit: { editor, autoFocus },
   };
 }

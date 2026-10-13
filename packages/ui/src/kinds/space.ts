@@ -61,7 +61,6 @@ export function spaceViewOf(
         : undefined;
     case 'closed':
     case 'editing':
-    case 'replacing':
       return undefined;
   }
 }

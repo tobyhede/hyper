@@ -58,7 +58,7 @@ export function decorateSpaceResourceNode(
 ): KindDecoration<SpaceKindId> {
   const kindOperations: SpaceOperations = { kind: spaceKind.id };
   const decoration: SpaceDecoration = { kindOperations };
-  if (node.data.contentAction !== 'author-space-view') return decoration;
+  if (!node.data.authorsContent) return decoration;
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
   const selection = context.spaceSelections.get(node.data.resourceId);
   const target =

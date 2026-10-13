@@ -123,7 +123,7 @@ describe('projectResourceNodes', () => {
           openResourceIds: new Set(open ? [referenceId] : []),
         });
         expect(nodes.find((node) => node.id === referenceId)?.data).toMatchObject({
-          contentAction: 'none',
+          authorsContent: false,
           embedsMap: kind === 'space',
         });
         if (!open)
@@ -131,7 +131,7 @@ describe('projectResourceNodes', () => {
             shown: 'closed',
           });
         expect(nodes.find((node) => node.id === targetId)?.data).toMatchObject({
-          contentAction: kind === 'space' ? 'author-space-view' : 'edit-markdown',
+          authorsContent: true,
         });
       }
     },

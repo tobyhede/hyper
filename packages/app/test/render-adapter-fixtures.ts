@@ -1,6 +1,6 @@
 import type { NodeChange } from '@xyflow/react';
 import {
-  contentAction,
+  authorsContent,
   embedsMap,
   uuidSchema,
   type Resource,
@@ -84,13 +84,13 @@ function fixtureContent(
 /** The projection's answers for the content used by node fixtures. */
 export function fixtureFacts(
   kind: Resource['kind'],
-): Pick<ResourceFlowNode['data'], 'contentAction' | 'embedsMap'> {
+): Pick<ResourceFlowNode['data'], 'authorsContent' | 'embedsMap'> {
   const content = fixtureContent(kind, '', {
     spaceId: FIXTURE_TARGET_SPACE,
     map: FIXTURE_TARGET_MAP,
   });
   return {
-    contentAction: contentAction(content),
+    authorsContent: authorsContent(content),
     embedsMap: embedsMap(content),
   };
 }

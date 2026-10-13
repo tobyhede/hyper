@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import {
-  contentAction,
+  authorsContent,
   embedsMap,
   uuidSchema,
   type ResourceContent,
@@ -388,7 +388,7 @@ describe('Open Spaces', () => {
         title: 'Other',
         readOnly: false,
         ...bareKindData('reference'),
-        contentAction: contentAction(content),
+        authorsContent: authorsContent(content),
         embedsMap: embedsMap(content),
         open,
         selectedForAuthoring: false,

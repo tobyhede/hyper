@@ -234,7 +234,7 @@ export const resolveContent = (
 
 /** The facts of content that shows nothing. */
 const UNRESOLVED_CONTENT_FACTS: ContentFacts = {
-  action: 'none',
+  authored: false,
   embedsMap: false,
   drawsContentArea: true,
 };

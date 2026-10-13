@@ -85,7 +85,7 @@ const openSpaceResource = (
     title: 'Elsewhere',
     readOnly: false,
     ...bareKindData(geometry.kind ?? 'space'),
-    contentAction: geometry.kind === 'reference' ? 'none' : 'author-space-view',
+    authorsContent: geometry.kind !== 'reference',
     embedsMap: geometry.kind !== 'markdown',
     open: geometry.open ?? true,
     selectedForAuthoring: false,

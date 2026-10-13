@@ -9,7 +9,7 @@ import {
 import {
   COLLAPSED_RESOURCE_SIZE,
   DEFAULT_RESOURCE_SHAPE,
-  contentAction,
+  authorsContent,
   drawsContentArea,
   takesResourceShape,
   titleLines,
@@ -19,8 +19,7 @@ import {
   type ResourceShape,
 } from '@project/core';
 import { Button } from './Button';
-import { isImageOperations } from './kinds/image';
-import { canvasContent, type KindOperations } from './kinds/registry';
+import { canvasContent, contentCommand, type KindOperations } from './kinds/registry';
 import { isSpaceOperations } from './kinds/space';
 import { isUrOperations } from './kinds/ur';
 import {
@@ -41,7 +40,6 @@ import {
   EditIcon,
   EntityActionsIcon,
   OpenResourceIcon,
-  ReplaceImageIcon,
 } from './icons';
 import type { MarkdownResourceBodyEditor } from './MarkdownResourceBody';
 import './canvas-resource.css';
@@ -295,17 +293,13 @@ export function CanvasResource(props: CanvasResourceProps) {
   const onBeginTitleEdit = readOnly ? undefined : props.onBeginTitleEdit;
   const onOpenChange = readOnly ? undefined : props.onOpenChange;
   const contentOperations =
-    !readOnly &&
-    'onBeginEdit' in kindOperations &&
-    (content === null || contentAction(content) !== 'none')
+    !readOnly && 'onBeginEdit' in kindOperations && (content === null || authorsContent(content))
       ? kindOperations
       : undefined;
   const onBeginContentEdit = contentOperations?.onBeginEdit;
+  const command = contentCommand(kind);
   const spaceOperations =
-    !readOnly &&
-    content !== null &&
-    contentAction(content) === 'author-space-view' &&
-    isSpaceOperations(kindOperations)
+    !readOnly && content !== null && authorsContent(content) && isSpaceOperations(kindOperations)
       ? kindOperations
       : undefined;
   const areaContent = useAreaContent(content);
@@ -327,7 +321,7 @@ export function CanvasResource(props: CanvasResourceProps) {
    * edited or replaced from the Reference Resource (ADR 0070).
    */
   const contentAuthoring =
-    contentPresence.mounted && !contentLeaving && contentAction(contentPresence.value) !== 'none';
+    contentPresence.mounted && !contentLeaving && authorsContent(contentPresence.value);
   /**
    * The edit running inside the Markdown content this Resource owns.
    *
@@ -451,21 +445,13 @@ export function CanvasResource(props: CanvasResourceProps) {
         )}
         {visibleContentEdit !== null ? (
           <ContentEditActions name={name} edit={visibleContentEdit} />
-        ) : beginContentEdit !== undefined ? (
+        ) : beginContentEdit !== undefined && command !== undefined ? (
           <ResourceRailAction
             ref={editControl}
-            aria-label={
-              isImageOperations(kindOperations)
-                ? `Replace image of Resource ${name}`
-                : `Edit Resource ${name}`
-            }
+            aria-label={command.label(name)}
             onClick={beginContentEdit}
           >
-            {isImageOperations(kindOperations) ? (
-              <ReplaceImageIcon data-icon="inline-start" />
-            ) : (
-              <EditIcon data-icon="inline-start" />
-            )}
+            <command.Icon data-icon="inline-start" />
           </ResourceRailAction>
         ) : portal !== undefined ? (
           portalEditing ? (

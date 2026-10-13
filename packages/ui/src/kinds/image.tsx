@@ -1,7 +1,7 @@
-import { contentAction, imageKind, type ImageContent } from '@project/core';
+import { authorsContent, imageKind, type ImageContent } from '@project/core';
 import type { ImageReplaceEditor } from '../ImageReplaceTarget';
 import type { ResourceDisplay } from '../resource-display';
-import { ImageIcon } from '../icons';
+import { ImageIcon, ReplaceImageIcon } from '../icons';
 import { ImageReplaceTarget } from '../ImageReplaceTarget';
 import { ResourceContentEditProvider } from '../resource-content-edit';
 import { ResourceImage } from '../ResourceImage';
@@ -16,9 +16,9 @@ export interface ImageOperations {
 
 /** An Open Image Resource's picture, or the replacement running in its place. */
 const imageCanvas = (content: ImageContent, area: CanvasArea) =>
-  area.authoring && area.display.shown === 'replacing' ? (
+  area.authoring && area.display.shown === 'editing' && area.display.kind === imageKind.id ? (
     <ResourceContentEditProvider value={area.setContentEdit}>
-      <ImageReplaceTarget name={area.name} editor={area.display.replacer} />
+      <ImageReplaceTarget name={area.name} editor={area.display.edit} />
     </ResourceContentEditProvider>
   ) : (
     <ResourceImage
@@ -41,14 +41,10 @@ export const imageView: KindView<ImageOperations, ImageContent> = {
   referenceName: 'Reference to an Image Resource',
   Glyph: ImageIcon,
   bareOperations: { kind: imageKind.id },
+  contentCommand: { label: (name) => `Replace image of Resource ${name}`, Icon: ReplaceImageIcon },
   canvas: imageCanvas,
   presented: (name, content) => <ResourceImage key={content.url} url={content.url} name={name} />,
 };
-
-/** Whether these operations are an Image Resource's. */
-export const isImageOperations = (operations: {
-  readonly kind: string;
-}): operations is ImageOperations => operations.kind === imageKind.id;
 
 /**
  * Replace an Image Resource's image. Answers `display` itself unless it is Open
@@ -57,13 +53,14 @@ export const isImageOperations = (operations: {
 export function beginReplacing<D extends ResourceDisplay>(
   display: D,
   replacer: ImageReplaceEditor,
-): D | Extract<ResourceDisplay, { readonly shown: 'replacing' }> {
+): D | Extract<ResourceDisplay, { readonly kind: typeof imageKind.id }> {
   if (display.shown !== 'open') return display;
   const content = display.content;
-  if (contentAction(content) !== 'replace-image' || content.kind !== imageKind.id) return display;
+  if (!authorsContent(content) || content.kind !== imageKind.id) return display;
   return {
-    shown: 'replacing',
+    shown: 'editing',
+    kind: imageKind.id,
     content: { ...content, via: 'self' },
-    replacer,
+    edit: replacer,
   };
 }

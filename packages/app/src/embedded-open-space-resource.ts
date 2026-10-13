@@ -213,10 +213,10 @@ export function discoverEmbeddedOpenSpaceResources<Entry extends { readonly id: 
     if (parent.data.open !== true) continue;
     const shown = spaceViewOf(parent.data.display);
     if (shown === undefined) continue;
-    const { view } = shown;
+    const { view, via } = shown;
     const policy = mapSurfacePolicy({
       inherited: item.policy,
-      throughReference: parent.data.contentAction !== 'author-space-view',
+      throughReference: via !== 'self',
       stale:
         input.staleSpaces.has(view.spaceId) ||
         (input.publications.has(parent.id) &&
@@ -288,7 +288,8 @@ export function editingPortalAncestor(
   let current = start;
   while (current !== undefined) {
     if (
-      current.data.contentAction === 'author-space-view' &&
+      current.data.authorsContent &&
+      current.data.embedsMap &&
       editingPortals.has(current.data.resourceId)
     ) {
       return current;

@@ -236,9 +236,7 @@ const KIND_FEATURE_FILES = [
   'packages/ui/src/index.ts',
   // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
   'packages/ui/src/icons.tsx',
-  // A Markdown Resource's editing and an Image Resource's replacing display states.
-  'packages/ui/src/resource-display.ts',
-  // A Space Resource's portal, an Ur Resource's Shape menu, an Image Resource's Replace label and glyph, and a Reference Resource's unreachable Target.
+  // A Space Resource's portal, an Ur Resource's Shape menu, and a Reference Resource's unreachable Target.
   'packages/ui/src/CanvasResource.tsx',
   // A Reference Resource's unreachable Target, presented.
   'packages/ui/src/PresentedResource.tsx',
@@ -248,12 +246,11 @@ const KIND_FEATURE_FILES = [
   'packages/persistence/src/http-protocol.ts',
   // A stored image's id and collection path are an Image Resource's (ADR 0106).
   'packages/persistence/src/images.ts',
-  // The Space Resource lifecycle (ADR 0074), and two reads of its selection,
-  // unbuilt behind the module (.scratch/resource-kind-modules/issues/10, F).
+  // The Space Resource lifecycle (ADR 0074): its create.
   'packages/persistence/src/space-resource-planning.ts',
   // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
   'src/aggregate-directory/images.ts',
-  // A Space Resource's portal; a Markdown body's completion.
+  // A Markdown body's completion.
   'packages/app/src/canvas-resource-authoring.ts',
   // The Space glyph on the Space cluster's own controls.
   'packages/app/src/components/CommandDockSpaces.tsx',

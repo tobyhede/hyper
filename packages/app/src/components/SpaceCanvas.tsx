@@ -867,7 +867,7 @@ export function SpaceCanvas({
           : node;
         if (
           !editingPortals.has(withHeight.data.resourceId) ||
-          withHeight.data.contentAction !== 'author-space-view'
+          !(withHeight.data.authorsContent && withHeight.data.embedsMap)
         ) {
           return withHeight;
         }
@@ -1034,7 +1034,7 @@ export function SpaceCanvas({
       if (id === undefined) return undefined;
       const node = portalGestureSnapshot.current.portalNodesById.get(id);
       if (node === undefined || node.parentId !== undefined) return undefined;
-      if (node.data.contentAction !== 'author-space-view') return undefined;
+      if (!(node.data.authorsContent && node.data.embedsMap)) return undefined;
       if (!portalGestureSnapshot.current.editingPortals.has(node.data.resourceId)) return undefined;
       return node;
     };

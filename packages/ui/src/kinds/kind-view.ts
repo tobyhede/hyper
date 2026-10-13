@@ -17,6 +17,13 @@ export interface CanvasArea {
   readonly setContentEdit: (edit: ResourceContentEdit | null) => void;
 }
 
+/** The command that begins an edit of a Resource's own content, as its kind names and draws it. */
+export interface ContentCommand {
+  /** The command's accessible name, for the Resource called `name`. */
+  readonly label: (name: string) => string;
+  readonly Icon: ComponentType;
+}
+
 /** The glyph of a kind that draws the Resource it shows with a badge on it, as a Reference Resource does. */
 export const BADGED_TARGET_GLYPH = 'badged-target';
 
@@ -41,6 +48,8 @@ export interface KindView<Operations, OwnContent = never> {
   readonly Glyph: ComponentType<{ size?: number | undefined }> | typeof BADGED_TARGET_GLYPH;
   /** What a Resource of this kind offers before the composition offers anything. */
   readonly bareOperations: Operations;
+  /** What the command that begins an edit of its own content is called and drawn as, for a kind whose operations offer one. */
+  readonly contentCommand?: ContentCommand;
   /** What an Open Resource of this kind draws in its content area on a Map, when its content draws one. */
   readonly canvas?: (content: OwnContent, area: CanvasArea) => ReactNode;
   /** What a presented Resource of this kind draws below its name; absent, its name alone. */

@@ -95,7 +95,7 @@ export const markdownKind = defineKind({
     mayBeTarget: true,
     ownsReferencedSpaces: false,
   },
-  facts: { action: 'edit-markdown', embedsMap: false, drawsContentArea: true },
+  facts: { authored: true, embedsMap: false, drawsContentArea: true },
   resolveContent: (content, via): MarkdownContent => ({
     kind: MARKDOWN_KIND_ID,
     source: content.source,

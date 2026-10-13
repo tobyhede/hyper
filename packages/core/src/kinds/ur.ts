@@ -29,7 +29,7 @@ export const urKind = defineKind({
     mayBeTarget: true,
     ownsReferencedSpaces: false,
   },
-  facts: { action: 'none', embedsMap: false, drawsContentArea: false },
+  facts: { authored: false, embedsMap: false, drawsContentArea: false },
   resolveContent: (_content, via): UrContent => ({ kind: UR_KIND_ID, via }),
   newContent: {},
 });
