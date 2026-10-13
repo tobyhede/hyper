@@ -1,8 +1,9 @@
 import { imageKind, type ImageKindId, type ResourceId } from '@project/core';
-import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
-import { beginReplacing, type ImageReplacement } from '@project/ui';
+import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
+import { beginReplacing, type ImageReplacement, type KindOperationsByKind } from '@project/ui';
 import type {
   CanvasResourceDecorationContext,
+  KindCanvasDecoration,
   KindDecoration,
   Mutable,
 } from '../canvas-resource-decoration';
@@ -10,7 +11,7 @@ import type { KindCreation } from '../kind-creation';
 import type { ResourcePlacementCommands } from '../resource-placement';
 
 /** The Image kind's operations and decoration, built by assigning what a gate allows. */
-type ImageOperations = Mutable<KindOperationsOf<ImageKindId>>;
+type ImageOperations = Mutable<KindOperationsByKind[ImageKindId]>;
 type ImageDecoration = Mutable<KindDecoration<ImageKindId>>;
 
 export type ImageResourceDecorationContext = Pick<
@@ -63,6 +64,31 @@ export function decorateImageResourceNode(
   }
   return decoration;
 }
+
+/** The Image kind's canvas decoration, from its own part of the context. */
+export const imageDecoration: KindCanvasDecoration<ImageKindId, ImageResourceDecorationContext> = {
+  kind: imageKind.id,
+  slice: ({
+    authorOnCanvas,
+    bodyEditing,
+    editableResourceIds,
+    beginBodyEditing,
+    bodyEditorResourceId,
+    replaceResourceImage,
+    pickImageFiles,
+    clearCaret,
+  }) => ({
+    authorOnCanvas,
+    bodyEditing,
+    editableResourceIds,
+    beginBodyEditing,
+    bodyEditorResourceId,
+    replaceResourceImage,
+    pickImageFiles,
+    clearCaret,
+  }),
+  decorate: decorateImageResourceNode,
+};
 
 export type ImageCreationContext = Pick<ResourcePlacementCommands, 'createImagesFromFiles'> & {
   /** Open the browser's file picker for images, within the press that asked for it. */

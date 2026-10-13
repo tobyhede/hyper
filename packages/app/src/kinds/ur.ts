@@ -1,7 +1,9 @@
 import { urKind, type ResourceId, type ResourceShape, type UrKindId } from '@project/core';
-import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
+import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
+import type { KindOperationsByKind } from '@project/ui';
 import type {
   CanvasResourceDecorationContext,
+  KindCanvasDecoration,
   KindDecoration,
   Mutable,
 } from '../canvas-resource-decoration';
@@ -9,7 +11,7 @@ import type { KindCreation } from '../kind-creation';
 import type { ResourcePlacementCommands } from '../resource-placement';
 
 /** The Ur kind's operations, built by assigning what a gate allows. */
-type UrOperations = Mutable<KindOperationsOf<UrKindId>>;
+type UrOperations = Mutable<KindOperationsByKind[UrKindId]>;
 
 export type UrResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
@@ -40,6 +42,17 @@ export function decorateUrResourceNode(
   }
   return { kindOperations };
 }
+
+/** The Ur kind's canvas decoration, from its own part of the context. */
+export const urDecoration: KindCanvasDecoration<UrKindId, UrResourceDecorationContext> = {
+  kind: urKind.id,
+  slice: ({ authorOnCanvas, editableResourceIds, changeResourceShape }) => ({
+    authorOnCanvas,
+    editableResourceIds,
+    changeResourceShape,
+  }),
+  decorate: decorateUrResourceNode,
+};
 
 export type UrCreationContext = Pick<ResourcePlacementCommands, 'createResource'>;
 
