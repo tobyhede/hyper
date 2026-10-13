@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
 import type { UUID } from '../types';
 import { uuidSchema } from '../uuid';
-import { defineKind } from './kind-module';
+import { defineKind, type SpaceView } from './kind-module';
 import type { ResourceDocument } from './registry';
 
 /**
@@ -46,19 +46,6 @@ export const spaceResourceContentSchema = z
   })
   .strict();
 type SpaceResourceContent = z.infer<typeof spaceResourceContentSchema>;
-
-/**
- * What an Open Space Resource shows: its Space, Map, Graph and framing. It is
- * not the Resource, because a drawn Resource names nothing outside itself (ADR 0083).
- * `framing` is a required key that may hold `undefined`, so a value is built
- * whole rather than by a conditional spread.
- */
-export interface SpaceView {
-  readonly spaceId: SpaceResourceContent['spaceId'];
-  readonly map: SpaceResourceContent['map'];
-  readonly graph: SpaceResourceContent['graph'];
-  readonly framing: SpaceResourceContent['framing'] | undefined;
-}
 
 /** The Space kind's id, declared before its module because the content it resolves to names it. */
 const SPACE_KIND_ID = 'space';
@@ -142,6 +129,20 @@ export const spaceKind = defineKind({
   }),
   spaceReferences: (content) => [content.spaceId],
   selectionProblem,
+  selection: {
+    of: (content) => ({
+      spaceId: content.spaceId,
+      map: content.map,
+      graph: content.graph,
+      framing: content.framing,
+    }),
+    select: (content, choice): SpaceResourceContent => {
+      const { framing, ...selected } = content;
+      const chosen = { ...selected, map: choice.map, graph: choice.graph };
+      return framing === undefined || choice.map !== content.map ? chosen : { ...chosen, framing };
+    },
+    frame: (content, framing): SpaceResourceContent => ({ ...content, framing }),
+  },
 });
 
 /** The Space kind's id. */

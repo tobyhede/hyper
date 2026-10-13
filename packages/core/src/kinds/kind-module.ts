@@ -54,6 +54,47 @@ export interface KindFileCodec<Content, FileContent> {
   ) => FileContentDecoding;
 }
 
+/** The Map-coordinate centre and scale one window onto another Space is framed at. */
+export interface SpaceFraming {
+  readonly centreX: number;
+  readonly centreY: number;
+  readonly zoom: number;
+}
+
+/**
+ * The view of another Space a Resource shows: the Space, a Map of it, a Graph
+ * that Map owns, and how the window is framed. It is not the Resource, because
+ * a drawn Resource names nothing outside itself (ADR 0083). `framing` is a
+ * required key that may hold `undefined`, so a value is built whole rather than
+ * by a conditional spread.
+ */
+export interface SpaceView {
+  readonly spaceId: UUID;
+  readonly map: UUID;
+  readonly graph: UUID;
+  readonly framing: SpaceFraming | undefined;
+}
+
+/** A Map and one of its Graphs, chosen in the Space a selection shows. */
+export interface SpaceViewChoice {
+  readonly map: UUID;
+  readonly graph: UUID;
+}
+
+/**
+ * How a kind whose content shows a view of another Space reads and changes it
+ * (ADR 0068, ADR 0079), so that no reader outside the kind compares its
+ * `spaceId`, `map` and `graph` by kind.
+ */
+export interface SpaceSelection<Content> {
+  /** The Space, Map and Graph this content shows, and its framing. */
+  readonly of: (content: Content) => SpaceView;
+  /** The content showing `choice` in the same Space. A framing is the old Map's, so a different Map drops it. */
+  readonly select: (content: Content, choice: SpaceViewChoice) => Content;
+  /** The content framed as given. */
+  readonly frame: (content: Content, framing: SpaceFraming) => Content;
+}
+
 /** What a kind's content resolves to: tagged with a kind, and reached `via` its own Resource or a Reference. */
 export interface KindResolvedContent {
   readonly kind: string;
@@ -92,6 +133,8 @@ export interface KindModule<
     content: Content,
     target: SpaceSelectionTarget,
   ) => SpaceSelectionProblem | undefined;
+  /** How this kind's content shows a view of another Space, when it shows one. */
+  readonly selection?: SpaceSelection<Content>;
   /** The content as Export writes it, so a file's bytes do not depend on how it was built. */
   readonly canonicalContent: (content: Content) => Content;
   readonly file: KindFileCodec<Content, FileContent>;

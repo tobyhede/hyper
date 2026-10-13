@@ -51,6 +51,7 @@ Each is grilled with Toby before it is built; candidate A became ticket 09.
 - **D — one kind view module.** The view half's names, glyph and content views in one place per kind.
 - **E — each kind declares its creation input.** Built as issue 11, with no creation mode: each kind's app half owns its Create.
 - **F — the Space selection inside the Space module.** Selection reads and comparisons behind the Space kind's module.
+  **Built (2026-10-13):** a kind whose content shows a view of another Space declares `selection` (`of`, `select`, `frame`; `SpaceSelection` in `kind-module.ts`), and the Space kind is the one that does. The registry answers `spaceSelection`, `selectSpaceView` and `frameSpaceView`, and `SpaceView` and `SpaceFraming` are kind-neutral types in `kind-module.ts`. The SQL fast path, the Map and Graph deletion plan and the canvas's selection and framing completions read and change the view through them, so their kind comparisons are gone, and the Space rail, its context commands and the framing helper take a `SpaceView` and leave the import ban's exemptions. `select` drops a framing when the Map changes, the rule the deletion plan and the canvas each kept on their own. `ui`'s `spaceViewOf` reads a display state and stays with candidate C.
 - **G — registry pass-throughs** (speculative): functions in the registries that only forward to a module.
 - **H — stable content identity** (speculative).
 

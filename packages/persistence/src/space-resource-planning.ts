@@ -10,9 +10,10 @@
  * plan out (`session-registry.ts`).
  */
 import {
-  type SpaceResourceDocument,
   spaceKind,
   SPACE_FILE_VERSION,
+  selectSpaceView,
+  spaceSelection,
   kindFlags,
   lifetimeSpaceReferences,
   type Map,
@@ -559,25 +560,20 @@ export const precheckContextDeletion = (
     : { kind: 'proceed' };
 };
 
+/**
+ * Each Resource of `snapshot` that `matches` shows `selection` instead, through
+ * its kind's own selection, which drops a framing when the Map changes.
+ */
 const replaceSpaceResourceSelection = (
   snapshot: SpaceSnapshot,
-  targetSpaceId: UUID,
-  matches: (document: SpaceResourceDocument) => boolean,
+  matches: (document: ResourceDocument) => boolean,
   selection: SpaceResourceSelection,
-  resetFraming: boolean,
 ): SpaceSnapshot => ({
   ...snapshot,
   resources: snapshot.resources.map((resource) => {
-    if (
-      resource.document.kind !== spaceKind.id ||
-      resource.document.content.spaceId !== targetSpaceId ||
-      !matches(resource.document)
-    )
-      return resource;
-    const content = { ...resource.document.content, map: selection.map, graph: selection.graph };
-    if (resetFraming) delete content.framing;
-    const document = { ...resource.document, content };
-    return { ...resource, document };
+    if (!matches(resource.document)) return resource;
+    const document = selectSpaceView(resource.document, selection);
+    return document === undefined ? resource : { ...resource, document };
   }),
 });
 
@@ -621,12 +617,14 @@ export const planContextDeletion = (
       targetMap.graphs.find(({ id }) => id !== input.graphId));
   if (replacementMap === undefined || replacementGraph === undefined) return { kind: 'unchanged' };
 
-  const selectsDeletedContext = (document: ResourceDocument): boolean =>
-    document.kind === spaceKind.id &&
-    document.content.spaceId === input.targetSpaceId &&
-    (deletingMap
-      ? document.content.map === input.mapId
-      : document.content.map === input.mapId && document.content.graph === input.graphId);
+  const selectsDeletedContext = (document: ResourceDocument): boolean => {
+    const shown = spaceSelection(document);
+    return (
+      shown?.spaceId === input.targetSpaceId &&
+      shown.map === input.mapId &&
+      (deletingMap || shown.graph === input.graphId)
+    );
+  };
   const affectedBy = (snapshot: SpaceSnapshot): boolean =>
     snapshot.resources.some(({ document }) => selectsDeletedContext(document));
   const affected = view.aggregate.spaces.map(({ snapshot }) => snapshot).filter(affectedBy);
@@ -673,10 +671,8 @@ export const planContextDeletion = (
       spaceId: snapshot.id,
       snapshot: replaceSpaceResourceSelection(
         view.spaces.get(snapshot.id) ?? snapshot,
-        input.targetSpaceId,
         selectsDeletedContext,
         selection,
-        deletingMap,
       ),
     }));
   return {

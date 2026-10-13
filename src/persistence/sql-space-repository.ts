@@ -1,5 +1,5 @@
 import {
-  spaceKind,
+  spaceSelection,
   spaceDocumentSchema,
   uuidSchema,
   type SpaceSnapshot,
@@ -172,12 +172,12 @@ const preservesSnapshotBoundary = (current: SpaceSnapshot, next: SpaceSnapshot):
   return next.resources.every((resource) => {
     const previous = currentById.get(resource.id);
     if (previous?.document.kind !== resource.document.kind) return false;
-    if (resource.document.kind !== spaceKind.id || previous.document.kind !== spaceKind.id)
-      return true;
+    const before = spaceSelection(previous.document);
+    const after = spaceSelection(resource.document);
     return (
-      previous.document.content.spaceId === resource.document.content.spaceId &&
-      previous.document.content.map === resource.document.content.map &&
-      previous.document.content.graph === resource.document.content.graph
+      before?.spaceId === after?.spaceId &&
+      before?.map === after?.map &&
+      before?.graph === after?.graph
     );
   });
 };

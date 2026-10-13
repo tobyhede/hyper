@@ -1,4 +1,4 @@
-import type { SpaceResourceDocument, GraphId } from '@project/core';
+import type { GraphId, SpaceView } from '@project/core';
 import { SpaceResourceSelectors, type SpaceResourceSelectorsProps } from '@project/ui';
 import {
   spaceResourceContextCommands,
@@ -20,7 +20,7 @@ type Mutable<T> = { -readonly [K in keyof T]: T[K] };
  */
 export interface BuildSpaceResourceRailInput {
   readonly target: SpaceResourceTarget;
-  readonly document: SpaceResourceDocument | undefined;
+  readonly selection: SpaceView | undefined;
   readonly disabled: boolean;
   readonly complete: (
     targetMap: Pick<SpaceResourceTargetMap, 'id'>,
@@ -33,20 +33,20 @@ export interface BuildSpaceResourceRailInput {
 
 export function buildSpaceResourceRail({
   target,
-  document,
+  selection,
   disabled,
   complete,
   onEditingChange,
   onReport,
   context,
 }: BuildSpaceResourceRailInput) {
-  const selectedMap = target.maps.find((m) => m.id === document?.content.map);
+  const selectedMap = target.maps.find((m) => m.id === selection?.map);
   const mapOf = (id: string): SpaceResourceTargetMap | undefined =>
     target.maps.find((m) => m.id === id);
   const commands =
-    context === undefined || document === undefined
+    context === undefined || selection === undefined
       ? undefined
-      : spaceResourceContextCommands(context, document, complete, () => !disabled);
+      : spaceResourceContextCommands(context, selection, complete, () => !disabled);
   const optional: Mutable<
     Pick<SpaceResourceSelectorsProps, 'onEditingChange' | 'mapCommands' | 'graphCommands'>
   > = {};
@@ -62,8 +62,8 @@ export function buildSpaceResourceRail({
       graphs={selectedMap?.graphs ?? []}
       mapId={selectedMap?.id ?? null}
       graphId={
-        selectedMap?.graphs.some((graph) => graph.id === document?.content.graph)
-          ? (document?.content.graph ?? null)
+        selectedMap?.graphs.some((graph) => graph.id === selection?.graph)
+          ? (selection?.graph ?? null)
           : null
       }
       onMapChange={(id) => {
