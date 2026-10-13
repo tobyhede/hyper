@@ -125,7 +125,12 @@ const context = (overrides: Partial<DecorationContext> = {}): DecorationContext 
   completeResourceBody: () => 'completed',
   continuation,
   containingSpaceId: SPACE_ID,
-  spaceDocuments: new Map([[SPACE_RESOURCE_ID, spaceDocument]]),
+  spaceSelections: new Map([
+    [
+      SPACE_RESOURCE_ID,
+      { spaceId: TARGET_SPACE_ID, map: TARGET_MAP_ID, graph: TARGET_GRAPH_ID, framing: undefined },
+    ],
+  ]),
   spaceResourceTargets: new Map([[TARGET_SPACE_ID, target]]),
   spaces: null,
   commandOutcomes: undefined,

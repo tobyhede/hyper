@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  frameSpaceView,
   lifetimeSpaceReferences,
+  selectSpaceView,
   spaceReferences,
+  spaceSelection,
   spaceSelectionProblem,
   type ResourceDocument,
 } from '../src/kinds/registry';
@@ -47,25 +50,33 @@ const REFERENCE: ResourceDocument = {
 
 describe("the Space kind's own check of its selection", () => {
   it('accepts a Map of the target and a Graph that Map owns', () => {
-    expect(spaceKind.selectionProblem(selecting(MAP, GRAPH), TARGET)).toBeUndefined();
+    expect(
+      spaceSelectionProblem({ ...SPACE_RESOURCE, content: selecting(MAP, GRAPH) }, TARGET),
+    ).toBeUndefined();
   });
 
   it('refuses a missing Map first, though its Graph is missing too', () => {
-    expect(spaceKind.selectionProblem(selecting(ABSENT, ABSENT), TARGET)).toEqual({
+    expect(
+      spaceSelectionProblem({ ...SPACE_RESOURCE, content: selecting(ABSENT, ABSENT) }, TARGET),
+    ).toEqual({
       kind: 'space-resource-map-missing',
       mapId: ABSENT,
     });
   });
 
   it('refuses a Graph the target does not have before asking whether the Map owns it', () => {
-    expect(spaceKind.selectionProblem(selecting(MAP, ABSENT), TARGET)).toEqual({
+    expect(
+      spaceSelectionProblem({ ...SPACE_RESOURCE, content: selecting(MAP, ABSENT) }, TARGET),
+    ).toEqual({
       kind: 'space-resource-graph-missing',
       graphId: ABSENT,
     });
   });
 
   it("refuses a Graph of the target that is another Map's", () => {
-    expect(spaceKind.selectionProblem(selecting(MAP, OTHER_GRAPH), TARGET)).toEqual({
+    expect(
+      spaceSelectionProblem({ ...SPACE_RESOURCE, content: selecting(MAP, OTHER_GRAPH) }, TARGET),
+    ).toEqual({
       kind: 'space-resource-graph-outside-map',
       mapId: MAP,
       graphId: OTHER_GRAPH,
@@ -103,4 +114,47 @@ describe("a Resource's selection problem, by its kind's own check", () => {
   it.each([MARKDOWN, REFERENCE])('answers nothing for a $kind Resource', (document) => {
     expect(spaceSelectionProblem(document, TARGET)).toBeUndefined();
   });
+});
+
+describe("a Resource's view of another Space, through its kind's own selection", () => {
+  const FRAMING = { centreX: 10, centreY: 20, zoom: 2 };
+  const FRAMED: ResourceDocument = {
+    ...SPACE_RESOURCE,
+    content: { ...selecting(MAP, GRAPH), framing: FRAMING },
+  };
+
+  it('reads the Space, Map, Graph and framing a Space Resource shows', () => {
+    expect(spaceSelection(FRAMED)).toEqual({ ...selecting(MAP, GRAPH), framing: FRAMING });
+    expect(spaceSelection(SPACE_RESOURCE)).toEqual({
+      ...selecting(MAP, GRAPH),
+      framing: undefined,
+    });
+  });
+
+  it('keeps the framing when only the Graph changes, since it frames the same Map', () => {
+    expect(selectSpaceView(FRAMED, { map: MAP, graph: OTHER_GRAPH })).toEqual({
+      ...FRAMED,
+      content: { ...selecting(MAP, OTHER_GRAPH), framing: FRAMING },
+    });
+  });
+
+  it("drops the framing when the Map changes, since it was the old Map's", () => {
+    expect(selectSpaceView(FRAMED, { map: OTHER_MAP, graph: OTHER_GRAPH })).toEqual({
+      ...FRAMED,
+      content: selecting(OTHER_MAP, OTHER_GRAPH),
+    });
+  });
+
+  it('frames a Space Resource as given', () => {
+    expect(frameSpaceView(SPACE_RESOURCE, FRAMING)).toEqual(FRAMED);
+  });
+
+  it.each([MARKDOWN, REFERENCE])(
+    'shows no view of another Space for a $kind Resource',
+    (document) => {
+      expect(spaceSelection(document)).toBeUndefined();
+      expect(selectSpaceView(document, { map: MAP, graph: GRAPH })).toBeUndefined();
+      expect(frameSpaceView(document, FRAMING)).toBeUndefined();
+    },
+  );
 });

@@ -7,6 +7,10 @@ import type {
   KindFlags,
   KindModule,
   KindSidecar,
+  SpaceFraming,
+  SpaceSelection,
+  SpaceView,
+  SpaceViewChoice,
   StartsEmpty,
 } from './kind-module';
 import { imageKind } from './image';
@@ -157,13 +161,55 @@ export const lifetimeSpaceReferences = (resource: KindedResource): readonly UUID
   kindFlags(resource.kind).ownsReferencedSpaces ? spaceReferences(resource) : [];
 
 const selectionProblemOf = <K extends KindId>(resource: Kinded<K>, target: SpaceSelectionTarget) =>
-  KIND_MODULES[resource.kind].selectionProblem(resource.content, target);
+  KIND_MODULES[resource.kind].selection?.problem(resource.content, target);
 
 /** Why this Resource's selection does not resolve in its target Space, by its kind's own check. */
 export const spaceSelectionProblem = (
   resource: KindedResource,
   target: SpaceSelectionTarget,
 ): SpaceSelectionProblem | undefined => selectionProblemOf(resource, target);
+
+const selectionOf = <K extends KindId>(resource: Kinded<K>) =>
+  KIND_MODULES[resource.kind].selection?.of(resource.content);
+
+/** The view of another Space this Resource shows, when its kind shows one (ADR 0068). */
+export const spaceSelection = (resource: KindedResource): SpaceView | undefined =>
+  selectionOf(resource);
+
+const reselectedOf = <K extends KindId>(
+  resource: Kinded<K>,
+  change: (
+    selection: SpaceSelection<ContentByKind[K]>,
+    content: ContentByKind[K],
+  ) => ContentByKind[K],
+): Kinded<K> | undefined => {
+  const selection = KIND_MODULES[resource.kind].selection;
+  return selection === undefined
+    ? undefined
+    : { ...resource, content: change(selection, resource.content) };
+};
+
+/**
+ * The document showing `choice` in the Space it already shows, or `undefined`
+ * when its kind shows none. A different Map drops the framing, which was the
+ * old Map's.
+ */
+export const selectSpaceView = (
+  document: ResourceDocument,
+  choice: SpaceViewChoice,
+): ResourceDocument | undefined => {
+  const content = reselectedOf(document, (selection, current) => selection.select(current, choice));
+  return content === undefined ? undefined : { ...document, ...content };
+};
+
+/** The document framed as given, or `undefined` when its kind shows no view of another Space. */
+export const frameSpaceView = (
+  document: ResourceDocument,
+  framing: SpaceFraming,
+): ResourceDocument | undefined => {
+  const content = reselectedOf(document, (selection, current) => selection.frame(current, framing));
+  return content === undefined ? undefined : { ...document, ...content };
+};
 
 const resolveContentOf = <K extends KindId>(resource: Kinded<K>, via: ContentVia) =>
   KIND_MODULES[resource.kind].resolveContent(resource.content, via);

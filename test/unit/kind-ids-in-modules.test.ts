@@ -153,15 +153,10 @@ const namings = (kind: string): readonly string[] =>
  * `.scratch/resource-kind-modules/`.
  */
 const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
-  // A Space Resource's selection, framing and portal; a Markdown body's completion.
+  // A Markdown body's completion.
   [
     'packages/app/src/canvas-resource-authoring.ts',
-    [
-      'if (resource.document.kind === spaceKind.id) next.set(resource.id, resource.document);',
-      'resource.document.kind === spaceKind.id',
-      'if (stored?.document.kind !== spaceKind.id)',
-      "if (stored?.document.kind !== markdownKind.id) return 'retained';",
-    ],
+    ["if (stored?.document.kind !== markdownKind.id) return 'retained';"],
   ],
   // The Space glyph on the Space cluster's own controls.
   [
@@ -194,24 +189,8 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
       'kind: referenceKind.id,',
     ],
   ],
-  // The Space Resource lifecycle (ADR 0074), its create; and two reads of
-  // its selection (`spaceId`, `map`, `graph`), unbuilt behind the module (issue 10, F).
-  [
-    'packages/persistence/src/space-resource-planning.ts',
-    [
-      'kind: spaceKind.id,',
-      'resource.document.kind !== spaceKind.id ||',
-      'document.kind === spaceKind.id &&',
-    ],
-  ],
-  // A Space Resource's selection compared by kind, unbuilt behind the module (issue 10, F).
-  [
-    'src/persistence/sql-space-repository.ts',
-    [
-      'if (resource.document.kind !== spaceKind.id || previous.document.kind !== spaceKind.id)',
-      'if (resource.document.kind !== spaceKind.id || previous.document.kind !== spaceKind.id)',
-    ],
-  ],
+  // The Space Resource lifecycle (ADR 0074): its create.
+  ['packages/persistence/src/space-resource-planning.ts', ['kind: spaceKind.id,']],
   // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
   [
     'src/aggregate-directory/images.ts',

@@ -10,15 +10,17 @@
  * plan out (`session-registry.ts`).
  */
 import {
-  type SpaceResourceDocument,
   spaceKind,
   SPACE_FILE_VERSION,
+  selectSpaceView,
+  spaceSelection,
   kindFlags,
   lifetimeSpaceReferences,
   type Map,
   type MapPosition,
   type ResourceDocument,
   type SpaceSnapshot,
+  type SpaceViewChoice,
   type UUID,
 } from '@project/core';
 import {
@@ -53,12 +55,6 @@ export type SpaceResourceChanges = readonly [
 export const changedSpaceId = (change: SpaceResourceLifecycleChange): UUID =>
   change.kind === 'create' ? change.snapshot.id : change.spaceId;
 
-/** What a Space Resource selects in the Space it shows: one Map and one of its Graphs. */
-export interface SpaceResourceSelection {
-  readonly map: UUID;
-  readonly graph: UUID;
-}
-
 /**
  * Why a target supplied no Map and Graph for a Space Resource to select.
  *
@@ -76,7 +72,7 @@ export type SpaceResourceTargetUnavailableReason =
 
 /** A target's selection, or why it has none. */
 export type TargetSelection =
-  | { readonly kind: 'selected'; readonly selection: SpaceResourceSelection }
+  | { readonly kind: 'selected'; readonly selection: SpaceViewChoice }
   | { readonly kind: 'unavailable'; readonly reason: SpaceResourceTargetUnavailableReason };
 
 export interface CreateSpaceResourceInput {
@@ -207,7 +203,7 @@ const storedSnapshot = (aggregate: LoadedAggregate, id: UUID): LoadedSpace | und
  * and the ids read out of it: an initialized Space records a `defaultMap`, and
  * a Map owning no Graph fails intake before it can be asked.
  */
-const selectionOf = (space: Space): SpaceResourceSelection | undefined => {
+const selectionOf = (space: Space): SpaceViewChoice | undefined => {
   if (space.defaultMap === undefined) return undefined;
   const resolved = space.lookup.map(space.defaultMap);
   return resolved === undefined
@@ -297,7 +293,7 @@ const snapshotFromSpace = (space: Space): SpaceSnapshot => {
 /** A new target Space and the selection it opens on. */
 export interface InitializedTarget {
   readonly target: SpaceSnapshot;
-  readonly selection: SpaceResourceSelection;
+  readonly selection: SpaceViewChoice;
 }
 
 /**
@@ -325,7 +321,7 @@ const createSpaceResource = (
   input: CreateSpaceResourceInput,
   resourceId: UUID,
   targetSpaceId: UUID,
-  selection: SpaceResourceSelection,
+  selection: SpaceViewChoice,
 ): SpaceResourceRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
   const document: ResourceDocument = {
     title: input.title,
@@ -559,25 +555,20 @@ export const precheckContextDeletion = (
     : { kind: 'proceed' };
 };
 
+/**
+ * Each Resource of `snapshot` that `matches` shows `selection` instead, through
+ * its kind's own selection, which drops a framing when the Map changes.
+ */
 const replaceSpaceResourceSelection = (
   snapshot: SpaceSnapshot,
-  targetSpaceId: UUID,
-  matches: (document: SpaceResourceDocument) => boolean,
-  selection: SpaceResourceSelection,
-  resetFraming: boolean,
+  matches: (document: ResourceDocument) => boolean,
+  selection: SpaceViewChoice,
 ): SpaceSnapshot => ({
   ...snapshot,
   resources: snapshot.resources.map((resource) => {
-    if (
-      resource.document.kind !== spaceKind.id ||
-      resource.document.content.spaceId !== targetSpaceId ||
-      !matches(resource.document)
-    )
-      return resource;
-    const content = { ...resource.document.content, map: selection.map, graph: selection.graph };
-    if (resetFraming) delete content.framing;
-    const document = { ...resource.document, content };
-    return { ...resource, document };
+    if (!matches(resource.document)) return resource;
+    const document = selectSpaceView(resource.document, selection);
+    return document === undefined ? resource : { ...resource, document };
   }),
 });
 
@@ -621,12 +612,14 @@ export const planContextDeletion = (
       targetMap.graphs.find(({ id }) => id !== input.graphId));
   if (replacementMap === undefined || replacementGraph === undefined) return { kind: 'unchanged' };
 
-  const selectsDeletedContext = (document: ResourceDocument): boolean =>
-    document.kind === spaceKind.id &&
-    document.content.spaceId === input.targetSpaceId &&
-    (deletingMap
-      ? document.content.map === input.mapId
-      : document.content.map === input.mapId && document.content.graph === input.graphId);
+  const selectsDeletedContext = (document: ResourceDocument): boolean => {
+    const shown = spaceSelection(document);
+    return (
+      shown?.spaceId === input.targetSpaceId &&
+      shown.map === input.mapId &&
+      (deletingMap || shown.graph === input.graphId)
+    );
+  };
   const affectedBy = (snapshot: SpaceSnapshot): boolean =>
     snapshot.resources.some(({ document }) => selectsDeletedContext(document));
   const affected = view.aggregate.spaces.map(({ snapshot }) => snapshot).filter(affectedBy);
@@ -673,10 +666,8 @@ export const planContextDeletion = (
       spaceId: snapshot.id,
       snapshot: replaceSpaceResourceSelection(
         view.spaces.get(snapshot.id) ?? snapshot,
-        input.targetSpaceId,
         selectsDeletedContext,
         selection,
-        deletingMap,
       ),
     }));
   return {

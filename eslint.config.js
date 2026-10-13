@@ -248,16 +248,11 @@ const KIND_FEATURE_FILES = [
   'packages/persistence/src/http-protocol.ts',
   // A stored image's id and collection path are an Image Resource's (ADR 0106).
   'packages/persistence/src/images.ts',
-  // The Space Resource lifecycle (ADR 0074), and two reads of its selection,
-  // unbuilt behind the module (.scratch/resource-kind-modules/issues/10, F).
+  // The Space Resource lifecycle (ADR 0074): its create.
   'packages/persistence/src/space-resource-planning.ts',
-  // A Space Resource's selection compared by kind, unbuilt behind the module (issue 10, F).
-  'src/persistence/sql-space-repository.ts',
   // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
   'src/aggregate-directory/images.ts',
-  // A Space Resource's rail.
-  'packages/app/src/build-space-resource-rail.tsx',
-  // A Space Resource's selection, framing and portal; a Markdown body's completion.
+  // A Markdown body's completion.
   'packages/app/src/canvas-resource-authoring.ts',
   // The Space glyph on the Space cluster's own controls.
   'packages/app/src/components/CommandDockSpaces.tsx',
@@ -271,10 +266,6 @@ const KIND_FEATURE_FILES = [
   'packages/app/src/resource-rail-actions.tsx',
   // Creating an Image or a Reference Resource, and Replace.
   'packages/app/src/space-authoring.ts',
-  // A Space Resource's Map and Graph commands.
-  'packages/app/src/space-resource-context-commands.ts',
-  // A Space Resource's framing.
-  'packages/app/src/space-resource-framing.ts',
 ];
 
 export default tseslint.config(

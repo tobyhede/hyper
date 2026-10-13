@@ -1,9 +1,11 @@
 import type { Continuation } from './continuation';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  type SpaceResourceDocument,
-  spaceKind,
+  frameSpaceView,
   markdownKind,
+  selectSpaceView,
+  spaceSelection,
+  type SpaceView,
   RESOURCE_TITLE_REQUIRED,
   resourceDocumentSchema,
   takesOpen,
@@ -35,53 +37,55 @@ type Caret =
   | { readonly resourceId: string; readonly field: 'body'; readonly openObserved: boolean }
   | null;
 
-const spaceDocumentIdentity = (document: SpaceResourceDocument): string => {
-  const framing = document.content.framing;
+const spaceViewIdentity = (view: SpaceView): string => {
+  const framing = view.framing;
   const framingKey =
     framing === undefined ? '' : `${framing.centreX}:${framing.centreY}:${framing.zoom}`;
-  return `${document.content.spaceId}:${document.content.map}:${document.content.graph}:${document.title}:${framingKey}`;
+  return `${view.spaceId}:${view.map}:${view.graph}:${framingKey}`;
 };
 
-const spaceDocumentsOf = (
+/** The view of another Space each Resource shows, for the kinds that show one. */
+const spaceSelectionsOf = (
   resources: readonly { readonly id: ResourceId; readonly document: ResourceDocument }[],
-): ReadonlyMap<ResourceId, SpaceResourceDocument> => {
-  const next = new Map<ResourceId, SpaceResourceDocument>();
+): ReadonlyMap<ResourceId, SpaceView> => {
+  const next = new Map<ResourceId, SpaceView>();
   for (const resource of resources) {
-    if (resource.document.kind === spaceKind.id) next.set(resource.id, resource.document);
+    const view = spaceSelection(resource.document);
+    if (view !== undefined) next.set(resource.id, view);
   }
   return next;
 };
 
-const spaceDocumentsKeyOf = (
+const spaceSelectionsKeyOf = (
   resources: readonly { readonly id: ResourceId; readonly document: ResourceDocument }[],
 ): string =>
   resources
-    .flatMap((resource) =>
-      resource.document.kind === spaceKind.id
-        ? [`${resource.id}:${spaceDocumentIdentity(resource.document)}`]
-        : [],
-    )
+    .flatMap((resource) => {
+      const view = spaceSelection(resource.document);
+      return view === undefined ? [] : [`${resource.id}:${spaceViewIdentity(view)}`];
+    })
     .join();
 
 /**
- * Load a Space Resource, parse the next document, persist it as `edited-resource`.
+ * Load a Resource that shows a view of another Space, parse the next document,
+ * persist it as `edited-resource`.
  *
- * Selection and framing both write that one Edit; they differ only in which
- * fields they patch and the sentence a failed parse returns.
+ * Selection and framing both write that one Edit; they differ only in how the
+ * kind changes its view and the sentence a failed parse returns.
  */
-const completeEditedSpaceResource = (
+const completeEditedSpaceView = (
   authoring: Pick<SurfaceAuthoring, 'complete'>,
   spaceSession: SpaceSession,
   resourceId: ResourceId,
-  nextDocument: (document: SpaceResourceDocument) => ResourceDocument,
+  nextDocument: (document: ResourceDocument) => ResourceDocument | undefined,
   invalidMessage: string,
 ): string | null => {
   const stored = spaceSession
     .getState()
     .working.resources.find((resource) => resource.id === resourceId);
-  if (stored?.document.kind !== spaceKind.id)
-    return describeAuthoringRefusal({ code: 'resource-not-found' });
-  const parsed = resourceDocumentSchema.safeParse(nextDocument(stored.document));
+  const next = stored === undefined ? undefined : nextDocument(stored.document);
+  if (next === undefined) return describeAuthoringRefusal({ code: 'resource-not-found' });
+  const parsed = resourceDocumentSchema.safeParse(next);
   if (!parsed.success) return invalidMessage;
   const result = authoring.complete({ kind: 'edited-resource', resourceId, document: parsed.data });
   return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
@@ -403,18 +407,11 @@ export function useCanvasResourceAuthoring({
       targetMap: Pick<SpaceResourceTargetMap, 'id'>,
       graphId: GraphId,
     ): string | null =>
-      completeEditedSpaceResource(
+      completeEditedSpaceView(
         authoring,
         spaceSession,
         resourceId,
-        (document) => {
-          const next: SpaceResourceDocument = {
-            ...document,
-            content: { ...document.content, map: targetMap.id, graph: graphId },
-          };
-          if (document.content.map !== targetMap.id) delete next.content.framing;
-          return next;
-        },
+        (document) => selectSpaceView(document, { map: targetMap.id, graph: graphId }),
         'The selection is invalid.',
       ),
     [authoring, spaceSession],
@@ -422,11 +419,11 @@ export function useCanvasResourceAuthoring({
 
   const completeSpaceResourceFraming = useCallback(
     (resourceId: ResourceId, framing: SpaceResourceFraming): string | null =>
-      completeEditedSpaceResource(
+      completeEditedSpaceView(
         authoring,
         spaceSession,
         resourceId,
-        (document) => ({ ...document, content: { ...document.content, framing } }),
+        (document) => frameSpaceView(document, framing),
         'The framing is invalid.',
       ),
     [authoring, spaceSession],
@@ -443,8 +440,8 @@ export function useCanvasResourceAuthoring({
     () => new Set(working.resources.map((resource) => resource.id)),
     [editableResourceIdsKey],
   );
-  const spaceDocumentsKey = spaceDocumentsKeyOf(working.resources);
-  const spaceDocuments = useMemo(() => spaceDocumentsOf(working.resources), [spaceDocumentsKey]);
+  const spaceSelectionsKey = spaceSelectionsKeyOf(working.resources);
+  const spaceSelections = useMemo(() => spaceSelectionsOf(working.resources), [spaceSelectionsKey]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const clearCaret = useCallback(() => {
     setCaret(null);
@@ -529,7 +526,7 @@ export function useCanvasResourceAuthoring({
     changeResourceShape,
     continuation,
     containingSpaceId: working.id,
-    spaceDocuments,
+    spaceSelections,
     spaceResourceTargets,
     spaces,
     commandOutcomes,

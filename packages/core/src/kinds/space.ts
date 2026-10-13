@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ContentVia } from '../resource-content';
 import type { UUID } from '../types';
 import { uuidSchema } from '../uuid';
-import { defineKind } from './kind-module';
+import { defineKind, type SpaceView } from './kind-module';
 import type { ResourceDocument } from './registry';
 
 /**
@@ -46,19 +46,6 @@ export const spaceResourceContentSchema = z
   })
   .strict();
 type SpaceResourceContent = z.infer<typeof spaceResourceContentSchema>;
-
-/**
- * What an Open Space Resource shows: its Space, Map, Graph and framing. It is
- * not the Resource, because a drawn Resource names nothing outside itself (ADR 0083).
- * `framing` is a required key that may hold `undefined`, so a value is built
- * whole rather than by a conditional spread.
- */
-export interface SpaceView {
-  readonly spaceId: SpaceResourceContent['spaceId'];
-  readonly map: SpaceResourceContent['map'];
-  readonly graph: SpaceResourceContent['graph'];
-  readonly framing: SpaceResourceContent['framing'] | undefined;
-}
 
 /** The Space kind's id, declared before its module because the content it resolves to names it. */
 const SPACE_KIND_ID = 'space';
@@ -114,6 +101,14 @@ const selectionProblem = (
   return undefined;
 };
 
+/** The view of its target a Space Resource's content shows. */
+const viewOf = (content: SpaceResourceContent): SpaceView => ({
+  spaceId: content.spaceId,
+  map: content.map,
+  graph: content.graph,
+  framing: content.framing,
+});
+
 /**
  * The Space kind (ADR 0068): a Resource that embeds a selected view of
  * another Space. Its one Space reference is its target, whose lifetime it
@@ -132,16 +127,20 @@ export const spaceKind = defineKind({
   facts: { action: 'author-space-view', embedsMap: true, drawsContentArea: false },
   resolveContent: (content, via): SpaceContent => ({
     kind: SPACE_KIND_ID,
-    view: {
-      spaceId: content.spaceId,
-      map: content.map,
-      graph: content.graph,
-      framing: content.framing,
-    },
+    view: viewOf(content),
     via,
   }),
   spaceReferences: (content) => [content.spaceId],
-  selectionProblem,
+  selection: {
+    of: viewOf,
+    select: (content, choice): SpaceResourceContent => {
+      const { framing, ...selected } = content;
+      const chosen = { ...selected, map: choice.map, graph: choice.graph };
+      return framing === undefined || choice.map !== content.map ? chosen : { ...chosen, framing };
+    },
+    frame: (content, framing): SpaceResourceContent => ({ ...content, framing }),
+    problem: selectionProblem,
+  },
 });
 
 /** The Space kind's id. */

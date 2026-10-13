@@ -1,5 +1,5 @@
 import {
-  type SpaceResourceDocument,
+  type SpaceView,
   graphHeadShape,
   type GraphHeadShape,
   type GraphId,
@@ -39,7 +39,7 @@ export interface SpaceResourceRailContext {
 /** The Dock commands, addressed to the target and the context this Resource stores. */
 export function spaceResourceContextCommands(
   { entry, spaces, containingSpaceId, deleteConfirmation, continuation }: SpaceResourceRailContext,
-  document: SpaceResourceDocument,
+  selection: SpaceView,
   select: (targetMap: Pick<SpaceResourceTargetMap, 'id'>, graphId: GraphId) => string | null,
   available: () => boolean,
 ): SpaceResourceContextCommands {
@@ -55,7 +55,7 @@ export function spaceResourceContextCommands(
   const mapAuthoring = embeddedMapAuthoringCommands(embedded);
   const graphAuthoring = embeddedGraphAuthoringCommands(embedded);
   const location = spaces.browserLocation;
-  const { map: mapId, graph: graphId } = document.content;
+  const { map: mapId, graph: graphId } = selection;
   const space = entry.app.currentSpace();
   const targetMap = space.maps.find((each) => each.id === mapId);
   const graph = targetMap?.graphs.find((each) => each.id === graphId);

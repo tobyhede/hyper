@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type SpaceResourceDocument } from '@project/core';
+import { uuidSchema, type SpaceView } from '@project/core';
 import { ResourceRailActions } from '@project/ui';
 import { buildSpaceResourceRail } from '../src/build-space-resource-rail';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
@@ -51,13 +51,11 @@ const target: SpaceResourceTarget = {
   ],
 };
 
-const documentOf = (
-  mapId: typeof FIRST_MAP_ID,
-  graph: typeof FIRST_GRAPH_ID,
-): SpaceResourceDocument => ({
-  title: 'Elsewhere',
-  kind: 'space',
-  content: { spaceId: TARGET_ID, map: mapId, graph },
+const selectionOf = (mapId: typeof FIRST_MAP_ID, graph: typeof FIRST_GRAPH_ID): SpaceView => ({
+  spaceId: TARGET_ID,
+  map: mapId,
+  graph,
+  framing: undefined,
 });
 
 const mountRail = (rail: ReturnType<typeof buildSpaceResourceRail>) =>
@@ -68,7 +66,7 @@ describe('buildSpaceResourceRail', () => {
     mountRail(
       buildSpaceResourceRail({
         target,
-        document: documentOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
+        selection: selectionOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
         disabled: false,
         complete: () => null,
         onReport: () => undefined,
@@ -88,7 +86,7 @@ describe('buildSpaceResourceRail', () => {
     mountRail(
       buildSpaceResourceRail({
         target,
-        document: documentOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
+        selection: selectionOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
         disabled: false,
         complete: () => null,
         onReport: () => undefined,
@@ -124,7 +122,7 @@ describe('buildSpaceResourceRail', () => {
     mountRail(
       buildSpaceResourceRail({
         target,
-        document: documentOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
+        selection: selectionOf(FIRST_MAP_ID, FIRST_GRAPH_ID),
         disabled: false,
         complete,
         onReport: () => undefined,
@@ -145,7 +143,7 @@ describe('buildSpaceResourceRail', () => {
     mountRail(
       buildSpaceResourceRail({
         target,
-        document: documentOf(
+        selection: selectionOf(
           uuidSchema.parse('00000000-0000-4000-8000-000000000099'),
           uuidSchema.parse('00000000-0000-4000-8000-00000000009a'),
         ),

@@ -3,7 +3,7 @@ import {
   type GraphId,
   type ResourceId,
   type SpaceKindId,
-  type SpaceResourceDocument,
+  type SpaceView,
   type UUID,
 } from '@project/core';
 import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
@@ -33,7 +33,7 @@ export type SpaceResourceDecorationContext = Pick<
 > & {
   readonly continuation: Continuation;
   readonly containingSpaceId: UUID;
-  readonly spaceDocuments: ReadonlyMap<ResourceId, SpaceResourceDocument>;
+  readonly spaceSelections: ReadonlyMap<ResourceId, SpaceView>;
   readonly spaceResourceTargets: SpaceResourceTargets;
   readonly spaces: OpenSpaces | null;
   readonly commandOutcomes: CommandOutcomes | undefined;
@@ -58,11 +58,9 @@ export function decorateSpaceResourceNode(
   const decoration: SpaceDecoration = { kindOperations };
   if (node.data.contentAction !== 'author-space-view') return decoration;
   const resourceBelongsToWorkingSpace = context.editableResourceIds.has(node.data.resourceId);
-  const spaceDocument = context.spaceDocuments.get(node.data.resourceId);
+  const selection = context.spaceSelections.get(node.data.resourceId);
   const target =
-    spaceDocument !== undefined
-      ? context.spaceResourceTargets.get(spaceDocument.content.spaceId)
-      : undefined;
+    selection !== undefined ? context.spaceResourceTargets.get(selection.spaceId) : undefined;
   // Closed, read-only, and unread omit the rail. Withdrawn authoring still
   // draws it, disabled: an absent rail is how the Resource says the target has
   // not been read yet, so a canvas that had merely withdrawn authoring would
@@ -74,9 +72,9 @@ export function decorateSpaceResourceNode(
       context.spaces !== null &&
       context.commandOutcomes !== undefined &&
       context.deleteConfirmation !== undefined &&
-      spaceDocument !== undefined
+      selection !== undefined
     ) {
-      const entry = context.spaces.entry(spaceDocument.content.spaceId);
+      const entry = context.spaces.entry(selection.spaceId);
       if (entry !== undefined) {
         railContext = {
           entry,
@@ -89,7 +87,7 @@ export function decorateSpaceResourceNode(
     }
     kindOperations.spaceRail = buildSpaceResourceRail({
       target,
-      document: spaceDocument,
+      selection,
       disabled: !(resourceBelongsToWorkingSpace && context.authorOnCanvas),
       complete: (targetMap, graphId) =>
         context.completeSpaceResourceSelection(resourceId, targetMap, graphId),

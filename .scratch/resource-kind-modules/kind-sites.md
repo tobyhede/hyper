@@ -10,9 +10,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 
 | file:line | what it names | kind | category | G19 exemption |
 |---|---|---|---|---|
-| packages/app/src/canvas-resource-authoring.ts:51 | `spaceKind.id`: collect Space Resource documents | space | F | canvas-resource-authoring.ts |
-| packages/app/src/canvas-resource-authoring.ts:61 | `spaceKind.id`: Space document identity key | space | F | canvas-resource-authoring.ts |
-| packages/app/src/canvas-resource-authoring.ts:83 | `spaceKind.id`: framing/selection completion guard | space | F | canvas-resource-authoring.ts |
 | packages/app/src/canvas-resource-authoring.ts:303 | `markdownKind.id`: body completion guard | markdown | C | canvas-resource-authoring.ts |
 | packages/app/src/components/CommandDockSpaces.tsx:459 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
 | packages/app/src/components/CommandDockSpaces.tsx:564 | `spaceKind.id`: Space glyph | space | display | CommandDockSpaces.tsx |
@@ -25,9 +22,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/space-authoring.ts:1326 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
 | packages/app/src/space-resource-targets.ts:171 | `spaceKind.id`: Space Resources referencing a Meta entry | space | one-kind | space-resource-targets.ts |
 | packages/persistence/src/space-resource-planning.ts:329 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
-| packages/persistence/src/space-resource-planning.ts:589 | `spaceKind.id`: matching Space Resources | space | one-kind (lifecycle) | space-resource-planning.ts |
-| packages/persistence/src/space-resource-planning.ts:642 | `spaceKind.id`: Space Resource for a Space | space | one-kind (lifecycle) | space-resource-planning.ts |
-| src/persistence/sql-space-repository.ts:175 (x2) | `spaceKind.id`: selection is part of the snapshot boundary | space | F | sql-space-repository.ts |
 | src/aggregate-directory/images.ts:145 | `imageKind.id`: stored image travels with its Resource | image | one-kind | src/aggregate-directory/images.ts |
 
 `packages/app/src/resource-deletion.ts` no longer reaches a module id: Delete routes by `kindFlags(kind).ownsReferencedSpaces` (G02).
@@ -53,9 +47,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/react-flow-adapter/src/ResourceNode.tsx:335 | `isSpaceOperations(...).portal.editing` keeps the toolbar | space | one-kind | ResourceNode.tsx |
 | packages/persistence/src/http-protocol.ts:760 | `isAcceptedImageUrl`: stored image URL | image | one-kind (image-URL rule) | http-protocol.ts |
 | packages/persistence/src/images.ts:28,31 | `isStoredImageId`, `STORED_IMAGE_COLLECTION_PATH` | image | one-kind | persistence/src/images.ts |
-| packages/persistence/src/space-resource-planning.ts:582 | `SpaceResourceDocument` | space | one-kind (lifecycle) | space-resource-planning.ts |
-| packages/app/src/build-space-resource-rail.tsx:23 | `SpaceResourceDocument` | space | F | build-space-resource-rail.tsx |
-| packages/app/src/canvas-resource-authoring.ts:39,48-49,77,409 | `SpaceResourceDocument` | space | F | canvas-resource-authoring.ts |
 | packages/app/src/canvas-resource-authoring.ts:206-207 | `'edit-markdown' \| 'replace-image'` body caret | markdown, image | C (ESLint-blind) | canvas-resource-authoring.ts |
 | packages/app/src/components/SpaceCanvas.tsx:866,1033 | `contentAction !== 'author-space-view'` portal gestures | space | C (ESLint-blind) | SpaceCanvas.tsx |
 | packages/app/src/components/SpaceCanvas.tsx:1010,1655 | `spaceViewOf(...).view.framing` | space | F | SpaceCanvas.tsx |
@@ -66,8 +57,6 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/space-authoring.ts:117 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
 | packages/app/src/space-authoring.ts:364 | refusal `IMAGE_URL_UNSUPPORTED` | image | C/E (image-URL rule) | space-authoring.ts |
 | packages/app/src/space-authoring.ts:1254,1297-1298 | `isAcceptedImageUrl` on Replace and Create | image | C, E (image-URL rule) | space-authoring.ts |
-| packages/app/src/space-resource-context-commands.ts:42 | `SpaceResourceDocument` | space | F | space-resource-context-commands.ts |
-| packages/app/src/space-resource-framing.ts:5 | `SpaceResourceDocument['content']['framing']` | space | F | space-resource-framing.ts |
 
 ## Sites now off the list
 
