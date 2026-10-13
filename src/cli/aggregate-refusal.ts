@@ -34,6 +34,8 @@ export const describeAggregateRefusal = (
   };
   const spaceResource = (error: { readonly spaceId: UUID; readonly resourceId: UUID }): string =>
     `Space Resource ${error.resourceId} in Space ${error.spaceId}`;
+  const referencing = (error: { readonly spaceId: UUID; readonly resourceId: UUID }): string =>
+    `Resource ${error.resourceId} in Space ${error.spaceId}`;
 
   return errors.map((error) => {
     switch (error.kind) {
@@ -49,10 +51,10 @@ export const describeAggregateRefusal = (
         return `The aggregate names Meta Space ${error.metaSpaceId}, which it does not contain`;
       case 'ordinary-space-unreferenced':
         return `Space ${error.spaceId} is not the Meta Space and no Space Resource points at it`;
-      case 'space-resource-target-missing':
-        return `${spaceResource(error)} points at Space ${error.targetSpaceId}, which the aggregate does not contain`;
-      case 'space-resource-reference-cycle':
-        return `${spaceResource(error)} closes a reference cycle through Space ${error.targetSpaceId}`;
+      case 'space-reference-missing':
+        return `${referencing(error)} references Space ${error.targetSpaceId}, which the aggregate does not contain`;
+      case 'space-reference-cycle':
+        return `${referencing(error)} closes a reference cycle through Space ${error.targetSpaceId}`;
       case 'space-resource-map-missing':
         return `${spaceResource(error)} selects Map ${error.mapId}, which Space ${error.targetSpaceId} does not have`;
       case 'space-resource-graph-missing':

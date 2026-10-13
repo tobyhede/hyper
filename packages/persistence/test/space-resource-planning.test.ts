@@ -346,7 +346,7 @@ describe('planDelete', () => {
   });
 
   it('never cascades to the Meta Space', () => {
-    expect(cascadeDeletion(view([space(0, [])]).aggregate, space(1, []), META)).toEqual([]);
+    expect(cascadeDeletion(view([space(0, [])]).aggregate, space(1, []), [META])).toEqual([]);
   });
 });
 

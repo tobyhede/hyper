@@ -1633,7 +1633,7 @@ describe('Space Resource lifecycle', () => {
         code: 'aggregate-refused',
         errors: [
           {
-            kind: 'space-resource-reference-cycle',
+            kind: 'space-reference-cycle',
             spaceId: TARGET_ID,
             resourceId: TARGET_RESOURCE_ID,
             targetSpaceId: META_ID,

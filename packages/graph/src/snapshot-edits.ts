@@ -1,6 +1,4 @@
 import {
-  mayBeTarget,
-  resourceReferences,
   titleName,
   resourceOpen,
   resourceShape,
@@ -16,6 +14,7 @@ import {
   type ResourceDocument,
   type UUID,
 } from '@project/core';
+import { referencesResource, resourceReferenceProblems } from './declared-references';
 import { Placement } from './placement';
 
 /**
@@ -47,14 +46,16 @@ export type SnapshotEditRefusal =
   | { readonly code: 'map-not-found' }
   | { readonly code: 'resource-not-in-map' }
   | { readonly code: 'resource-already-in-map' }
+  /** A Resource created referencing itself. */
+  | { readonly code: 'reference-targets-self'; readonly targetId: UUID }
   /** A Resource created referencing a Resource the Space does not hold. */
-  | { readonly code: 'reference-target-not-found'; readonly targetId: UUID }
+  | { readonly code: 'reference-target-missing'; readonly targetId: UUID }
   /** A Resource created referencing a Resource whose kind may not be a Target. */
-  | { readonly code: 'reference-target-must-own-content'; readonly targetId: UUID }
+  | { readonly code: 'reference-target-not-targetable'; readonly targetId: UUID }
   /** An Open of a Resource with no content to show: an Ur Resource is always Closed. */
   | { readonly code: 'open-requires-content' }
-  /** A Shape Edit on a Resource that is not an Ur Resource: every other kind is the rectangle. */
-  | { readonly code: 'shape-requires-ur-resource' }
+  /** A Shape Edit on a Resource whose kind takes no Shape: it is the rectangle. */
+  | { readonly code: 'shape-not-taken' }
   | {
       readonly code: 'resource-has-references';
       /** The referencing Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */
@@ -119,8 +120,8 @@ const freeAnchor = (placement: Placement, anchor: MapPosition): MapPosition => {
  * caller with one to aim — create-and-connect's drop point.
  *
  * A Resource whose kind declares Resource references is refused
- * `reference-target-not-found` for one the snapshot does not hold, and
- * `reference-target-must-own-content` for one whose kind may not be a Target:
+ * `reference-target-missing` for one the snapshot does not hold, and
+ * `reference-target-not-targetable` for one whose kind may not be a Target:
  * resolution ends after one hop (ADR 0070, ADR 0113). The same rule intake enforces, asked here so an author choosing
  * the wrong Target meets a refusal rather than an unloadable Space, and the
  * creation half of the rule {@link deleteFromSpace}'s `resource-has-references`
@@ -139,13 +140,12 @@ function createInMap(
   if (target === undefined) {
     return { kind: 'refused', refusal: { code: 'map-not-found' } };
   }
-  for (const targetId of resourceReferences(document)) {
-    const resolved = snapshot.resources.find((resource) => resource.id === targetId);
-    if (resolved === undefined) return refused({ code: 'reference-target-not-found', targetId });
-    if (!mayBeTarget(resolved.document.kind)) {
-      return refused({ code: 'reference-target-must-own-content', targetId });
-    }
-  }
+  const [problem] = resourceReferenceProblems(
+    resourceId,
+    document,
+    (id) => snapshot.resources.find((resource) => resource.id === id)?.document.kind,
+  );
+  if (problem !== undefined) return refused(problem);
   const placement = Placement.fromMap(target);
   const at = mode === 'avoidingOverlap' ? freeAnchor(placement, position) : position;
   return withPlacement(
@@ -190,7 +190,7 @@ function deleteFromSpace(snapshot: SpaceSnapshot, resourceId: UUID): SnapshotEdi
     return { kind: 'refused', refusal: { code: 'resource-not-found' } };
   }
   const incoming = snapshot.resources.filter((resource) =>
-    resourceReferences(resource.document).includes(resourceId),
+    referencesResource(resource.document, resourceId),
   );
   if (incoming.length > 0) {
     return {
@@ -379,8 +379,7 @@ function changeResourceShape(
   if (at === undefined) return refused({ code: 'resource-not-in-map' });
   const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
   if (resource === undefined) return refused({ code: 'resource-not-found' });
-  if (!takesResourceShape(resource.document.kind))
-    return refused({ code: 'shape-requires-ur-resource' });
+  if (!takesResourceShape(resource.document.kind)) return refused({ code: 'shape-not-taken' });
   if (resourceShape(at) === chosen) return UNCHANGED;
   return withPlacement(
     snapshot,

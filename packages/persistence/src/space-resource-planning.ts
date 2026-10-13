@@ -13,8 +13,8 @@ import {
   type SpaceResourceDocument,
   spaceKind,
   SPACE_FILE_VERSION,
+  kindFlags,
   lifetimeSpaceReferences,
-  spaceReferences,
   type Map,
   type MapPosition,
   type ResourceDocument,
@@ -22,9 +22,11 @@ import {
   type UUID,
 } from '@project/core';
 import {
+  declaredSpaceReferences,
   initializeSpace,
   loadSpace,
   loadSpaceSnapshot,
+  releasedSpaces,
   SnapshotEdit,
   type Space,
   type SpaceAggregateError,
@@ -438,14 +440,10 @@ const recoveryBlockedBy = (
   return undefined;
 };
 
-/** The Spaces a Space's Resources hold the lifetime of, once per reference (ADR 0074). */
-const heldSpaces = (snapshot: SpaceSnapshot): readonly UUID[] =>
-  snapshot.resources.flatMap(({ document }) => lifetimeSpaceReferences(document));
-
 /**
- * The Spaces a Space Resource deletion cascades to, in deletion order: the
- * target when nothing else references it, then each Space it alone referenced,
- * never the Meta Space.
+ * The Spaces a Space Resource deletion cascades to, in deletion order: each
+ * Space the deleted Resource held that nothing else holds, then each Space it
+ * alone held, never the Meta Space (ADR 0074).
  *
  * The containing Space is read as `edited`, its one changed working Space (ADR
  * 0097); every other Space is read as stored. A Space's uncommitted local Edit
@@ -455,34 +453,13 @@ const heldSpaces = (snapshot: SpaceSnapshot): readonly UUID[] =>
 export const cascadeDeletion = (
   aggregate: LoadedAggregate,
   edited: SpaceSnapshot,
-  targetSpaceId: UUID,
+  released: readonly UUID[],
 ): readonly UUID[] => {
-  const edgesById = new Map<UUID, readonly UUID[]>(
-    aggregate.spaces.map(({ snapshot }) => [snapshot.id, heldSpaces(snapshot)]),
-  );
-  edgesById.set(edited.id, heldSpaces(edited));
-  const inbound = new Map<UUID, number>();
-  for (const id of edgesById.keys()) inbound.set(id, 0);
-  for (const edges of edgesById.values())
-    for (const childSpaceId of edges)
-      inbound.set(childSpaceId, (inbound.get(childSpaceId) ?? 0) + 1);
-  const deleted: UUID[] = [];
-  const pending: UUID[] =
-    targetSpaceId === aggregate.metaSpaceId || (inbound.get(targetSpaceId) ?? 0) !== 0
-      ? []
-      : [targetSpaceId];
-  for (const id of pending) {
-    if (deleted.includes(id)) continue;
-    const edges = edgesById.get(id);
-    if (edges === undefined) continue;
-    deleted.push(id);
-    for (const childSpaceId of edges) {
-      const count = (inbound.get(childSpaceId) ?? 0) - 1;
-      inbound.set(childSpaceId, count);
-      if (childSpaceId !== aggregate.metaSpaceId && count === 0) pending.push(childSpaceId);
-    }
-  }
-  return deleted;
+  const stored = aggregate.spaces.map(({ snapshot }) => snapshot);
+  const read = stored.some(({ id }) => id === edited.id)
+    ? stored.map((snapshot) => (snapshot.id === edited.id ? edited : snapshot))
+    : [...stored, edited];
+  return releasedSpaces(declaredSpaceReferences(read), released, aggregate.metaSpaceId);
 };
 
 /**
@@ -495,7 +472,7 @@ export const planDelete = (
 ): SpaceResourcePlanOutcome => {
   const source = containingSpace(view, input.containingSpaceId);
   const resource = source.resources.find(({ id }) => id === input.resourceId);
-  if (resource?.document.kind !== spaceKind.id) {
+  if (resource === undefined || !kindFlags(resource.document.kind).ownsReferencedSpaces) {
     return refused({ code: 'space-resource-not-found', resourceId: input.resourceId });
   }
   // `resource-not-found` cannot occur for an id `source.resources` was just
@@ -513,7 +490,7 @@ export const planDelete = (
   const deleted = cascadeDeletion(
     view.aggregate,
     deletion.snapshot,
-    resource.document.content.spaceId,
+    lifetimeSpaceReferences(resource.document),
   );
   for (const id of deleted) {
     const recovery = recoveryRefusal(view.recovery, id);
@@ -526,8 +503,8 @@ export const planDelete = (
     view,
     new Set([input.containingSpaceId, ...deleted]),
     (snapshot) =>
-      snapshot.resources.some(({ document }) =>
-        spaceReferences(document).some((targetId) => deletedIds.has(targetId)),
+      declaredSpaceReferences([snapshot]).references.some(({ targetSpaceId }) =>
+        deletedIds.has(targetSpaceId),
       ),
   );
   if (blocked !== undefined) return blocked;

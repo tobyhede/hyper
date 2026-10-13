@@ -75,6 +75,17 @@ export { positionedStrategy } from './positioned';
 // Same shape as `Placement`: one name carrying both the operations and the
 // module that builds them, offered with its outcome and refusal types since a
 // caller has to write both down to handle what an operation answers.
+// The rules over the references a kind declares (ADR 0128). Intake, the
+// aggregate and `SnapshotEdit` ask them inside this package; the Space Resource
+// lifecycle in `@project/persistence` asks the Space reference graph directly.
+export { declaredSpaceReferences, releasedSpaces } from './declared-references';
+export type {
+  ReferencingSpace,
+  ResourceReferenceProblem,
+  SpaceReference,
+  SpaceReferences,
+} from './declared-references';
+
 export { SnapshotEdit, deletionReach } from './snapshot-edits';
 export type {
   DeletionReach,

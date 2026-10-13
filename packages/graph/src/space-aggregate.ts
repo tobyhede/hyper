@@ -1,9 +1,11 @@
+import { spaceSelectionProblem, type UUID } from '@project/core';
 import {
-  lifetimeSpaceReferences,
-  spaceReferences,
-  spaceSelectionProblem,
-  type UUID,
-} from '@project/core';
+  declaredSpaceReferences,
+  missingSpaceReferences,
+  spaceReferenceCycles,
+  unrootedSpaces,
+  type SpaceReference,
+} from './declared-references';
 import { loadSpaceSnapshot, type Space, type SpaceError } from './space';
 
 /** The aggregate intake brand's carrier. */
@@ -48,8 +50,8 @@ export type SpaceAggregateError =
       readonly spaceIds: readonly UUID[];
     }
   | { readonly kind: 'meta-space-missing'; readonly metaSpaceId: UUID }
-  | ({ readonly kind: 'space-resource-target-missing' } & SpaceResourceLocation)
-  | ({ readonly kind: 'space-resource-reference-cycle' } & SpaceResourceLocation)
+  | ({ readonly kind: 'space-reference-missing' } & SpaceResourceLocation)
+  | ({ readonly kind: 'space-reference-cycle' } & SpaceResourceLocation)
   | { readonly kind: 'ordinary-space-unreferenced'; readonly spaceId: UUID }
   | (SpaceSelectionProblem & SpaceResourceLocation);
 
@@ -119,84 +121,43 @@ export function loadSpaceAggregate({
   if (!byId.has(metaSpaceId)) {
     return { ok: false, errors: [{ kind: 'meta-space-missing', metaSpaceId }] };
   }
-  for (const space of spaces) {
-    for (const resource of space.resources) {
-      for (const targetSpaceId of spaceReferences(resource)) {
-        if (byId.has(targetSpaceId)) continue;
-        errors.push({
-          kind: 'space-resource-target-missing',
-          spaceId: space.id,
-          resourceId: resource.id,
-          targetSpaceId,
-        });
-      }
-    }
+  const declared = declaredSpaceReferences(
+    spaces.map((space) => ({
+      id: space.id,
+      resources: space.resources.map((resource) => ({ id: resource.id, document: resource })),
+    })),
+  );
+  const located =
+    (kind: 'space-reference-missing' | 'space-reference-cycle') =>
+    ({ spaceId, resourceId, targetSpaceId }: SpaceReference): SpaceAggregateError => ({
+      kind,
+      spaceId,
+      resourceId,
+      targetSpaceId,
+    });
+  errors.push(...missingSpaceReferences(declared).map(located('space-reference-missing')));
+  if (errors.length > 0) return { ok: false, errors };
+
+  for (const { spaceId, resourceId, targetSpaceId } of declared.references) {
+    const target = byId.get(targetSpaceId);
+    const resource = byId.get(spaceId)?.lookup.resource(resourceId);
+    // Missing targets were returned above, so this only keeps the type-level
+    // boundary between Map lookup and the validated topology.
+    if (target === undefined || resource === undefined) continue;
+    const problem = spaceSelectionProblem(resource, {
+      mapGraphIds: (mapId) => target.lookup.map(mapId)?.map.graphs.map((graph) => graph.id),
+      hasGraph: (graphId) => target.lookup.graph(graphId) !== undefined,
+    });
+    if (problem === undefined) continue;
+    errors.push({ ...problem, spaceId, resourceId, targetSpaceId });
   }
   if (errors.length > 0) return { ok: false, errors };
 
-  for (const space of spaces) {
-    for (const resource of space.resources) {
-      for (const targetSpaceId of spaceReferences(resource)) {
-        const target = byId.get(targetSpaceId);
-        if (target === undefined) continue;
-        const problem = spaceSelectionProblem(resource, {
-          mapGraphIds: (mapId) => target.lookup.map(mapId)?.map.graphs.map((graph) => graph.id),
-          hasGraph: (graphId) => target.lookup.graph(graphId) !== undefined,
-        });
-        if (problem === undefined) continue;
-        errors.push({
-          ...problem,
-          spaceId: space.id,
-          resourceId: resource.id,
-          targetSpaceId: target.id,
-        });
-      }
-    }
-  }
+  errors.push(...spaceReferenceCycles(declared).map(located('space-reference-cycle')));
   if (errors.length > 0) return { ok: false, errors };
 
-  const visitState = new Map<UUID, 'visiting' | 'visited'>();
-  const visit = (space: Space): void => {
-    visitState.set(space.id, 'visiting');
-    for (const resource of space.resources) {
-      for (const targetSpaceId of spaceReferences(resource)) {
-        const target = byId.get(targetSpaceId);
-        // Missing targets were returned above, so this branch only preserves the
-        // type-level boundary between Map lookup and the validated topology.
-        if (target === undefined) continue;
-        const state = visitState.get(target.id);
-        if (state === 'visiting') {
-          errors.push({
-            kind: 'space-resource-reference-cycle',
-            spaceId: space.id,
-            resourceId: resource.id,
-            targetSpaceId: target.id,
-          });
-        } else if (state === undefined) {
-          visit(target);
-        }
-      }
-    }
-    visitState.set(space.id, 'visited');
-  };
-  for (const space of spaces) {
-    if (visitState.has(space.id)) continue;
-    visit(space);
-  }
-  if (errors.length > 0) return { ok: false, errors };
-
-  const referencedSpaceIds = new Set<UUID>();
-  for (const space of spaces) {
-    for (const resource of space.resources) {
-      for (const targetSpaceId of lifetimeSpaceReferences(resource)) {
-        referencedSpaceIds.add(targetSpaceId);
-      }
-    }
-  }
-  for (const space of spaces) {
-    if (space.id !== metaSpaceId && !referencedSpaceIds.has(space.id)) {
-      errors.push({ kind: 'ordinary-space-unreferenced', spaceId: space.id });
-    }
+  for (const spaceId of unrootedSpaces(declared, metaSpaceId)) {
+    errors.push({ kind: 'ordinary-space-unreferenced', spaceId });
   }
   if (errors.length > 0) return { ok: false, errors };
   return {

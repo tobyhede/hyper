@@ -1,7 +1,4 @@
 import {
-  mayBeTarget,
-  resourceReferences,
-  spaceReferences,
   DEFAULT_RESOURCE_SHAPE,
   resourceOpen,
   resourceShape,
@@ -12,6 +9,11 @@ import {
   type Map,
   type UUID,
 } from '@project/core';
+import {
+  declaredSpaceReferences,
+  resourceReferenceProblems,
+  type ResourceReferenceProblem,
+} from './declared-references';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
@@ -58,14 +60,17 @@ export type SpaceReferenceErrorKind =
   | 'graph-edge-resource-outside-map'
   | 'unresolved-default-map'
   | 'duplicate-graph-edge'
-  | 'unresolved-reference-target'
+  /** A Resource reference a kind declares names the Resource declaring it. */
   | 'reference-targets-self'
-  | 'reference-targets-reference'
-  | 'reference-target-must-own-content'
-  | 'space-resource-reference-cycle'
-  /** A Map gives a Resource that is not an Ur Resource a Shape other than the rectangle. */
-  | 'shape-requires-ur-resource'
-  /** A Map stores an Ur Resource Open, which has no content to show. */
+  /** A Resource reference a kind declares names a Resource the Space does not hold. */
+  | 'reference-target-missing'
+  /** A Resource reference a kind declares names a Resource whose kind may not be a Target. */
+  | 'reference-target-not-targetable'
+  /** A Space reference a kind declares names the Space holding it. */
+  | 'space-reference-cycle'
+  /** A Map gives a Resource whose kind takes no Shape a Shape other than the rectangle. */
+  | 'shape-not-taken'
+  /** A Map stores a Resource with no content to show Open. */
   | 'open-requires-content';
 
 /**
@@ -191,9 +196,9 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
         resourceShape(placement) !== DEFAULT_RESOURCE_SHAPE
       ) {
         errors.push({
-          kind: 'shape-requires-ur-resource',
+          kind: 'shape-not-taken',
           ref: resourceId,
-          message: `Map "${subject.id}" draws ${member.kind} resource "${resourceId}" as a ${resourceShape(placement)}; only an Ur Resource takes a Shape other than the rectangle`,
+          message: `Map "${subject.id}" draws ${member.kind} resource "${resourceId}" as a ${resourceShape(placement)}; its kind takes no Shape other than the rectangle`,
         });
       }
       if (!takesOpen(member.kind) && placement !== undefined && resourceOpen(placement)) {
@@ -281,43 +286,55 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
 
   // Every Resource reference a kind declares resolves, to a kind that may be a
   // Target, so referencing stays a single hop (ADR 0113).
+  const kindOf = (id: UUID) => resourceById.get(id)?.kind;
   for (const resource of space.resources) {
-    for (const targetId of resourceReferences(resource)) {
-      if (targetId === resource.id) {
-        errors.push({
-          kind: 'reference-targets-self',
-          ref: resource.id,
-          message: `Resource "${resource.id}" references itself`,
-        });
-        continue;
-      }
-      const target = resourceById.get(targetId);
-      if (!target) {
-        errors.push({
-          kind: 'unresolved-reference-target',
-          ref: targetId,
-          message: `Resource "${resource.id}" references missing resource "${targetId}"`,
-        });
-        continue;
-      }
-      if (!mayBeTarget(target.kind)) {
-        errors.push({
-          kind: 'reference-targets-reference',
-          ref: targetId,
-          message: `Resource "${resource.id}" references "${targetId}", whose kind may not be a Target; referencing is a single hop`,
-        });
-      }
+    for (const problem of resourceReferenceProblems(resource.id, resource, kindOf)) {
+      errors.push(describeReferenceProblem(resource.id, problem));
     }
   }
 
-  for (const resource of space.resources) {
-    if (!spaceReferences(resource).includes(space.id)) continue;
+  // A Space reference to the Space holding it is a cycle intake can see without
+  // the aggregate; the aggregate refuses the longer ones.
+  const { references } = declaredSpaceReferences([
+    {
+      id: space.id,
+      resources: space.resources.map((resource) => ({ id: resource.id, document: resource })),
+    },
+  ]);
+  for (const reference of references) {
+    if (reference.targetSpaceId !== space.id) continue;
     errors.push({
-      kind: 'space-resource-reference-cycle',
+      kind: 'space-reference-cycle',
       ref: space.id,
-      message: `Space Resource "${resource.id}" targets its own Space "${space.id}"`,
+      message: `Resource "${reference.resourceId}" references its own Space "${space.id}"`,
     });
   }
 
   return errors;
 }
+
+const describeReferenceProblem = (
+  resourceId: UUID,
+  problem: ResourceReferenceProblem,
+): SpaceReferenceError => {
+  switch (problem.code) {
+    case 'reference-targets-self':
+      return {
+        kind: problem.code,
+        ref: resourceId,
+        message: `Resource "${resourceId}" references itself`,
+      };
+    case 'reference-target-missing':
+      return {
+        kind: problem.code,
+        ref: problem.targetId,
+        message: `Resource "${resourceId}" references missing resource "${problem.targetId}"`,
+      };
+    case 'reference-target-not-targetable':
+      return {
+        kind: problem.code,
+        ref: problem.targetId,
+        message: `Resource "${resourceId}" references "${problem.targetId}", whose kind may not be a Target; referencing is a single hop`,
+      };
+  }
+};

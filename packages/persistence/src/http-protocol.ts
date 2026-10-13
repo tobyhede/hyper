@@ -476,13 +476,13 @@ export interface CommitRefusalBody {
       }
     | { readonly kind: 'meta-space-missing'; readonly metaSpaceId: string }
     | {
-        readonly kind: 'space-resource-target-missing';
+        readonly kind: 'space-reference-missing';
         readonly spaceId: string;
         readonly resourceId: string;
         readonly targetSpaceId: string;
       }
     | {
-        readonly kind: 'space-resource-reference-cycle';
+        readonly kind: 'space-reference-cycle';
         readonly spaceId: string;
         readonly resourceId: string;
         readonly targetSpaceId: string;
@@ -572,12 +572,11 @@ const decodeSpaceError = (value: unknown): SpaceError => {
     case 'graph-edge-resource-outside-map':
     case 'unresolved-default-map':
     case 'duplicate-graph-edge':
-    case 'unresolved-reference-target':
+    case 'reference-target-missing':
     case 'reference-targets-self':
-    case 'reference-targets-reference':
-    case 'reference-target-must-own-content':
-    case 'space-resource-reference-cycle':
-    case 'shape-requires-ur-resource':
+    case 'reference-target-not-targetable':
+    case 'space-reference-cycle':
+    case 'shape-not-taken':
     case 'open-requires-content': {
       const error = exactRecord(value, ['kind', 'ref', 'message'], 'Space reference error');
       return {
@@ -649,8 +648,8 @@ const decodeAggregateError = (value: unknown): SpaceAggregateError => {
       const error = exactRecord(value, ['kind', 'metaSpaceId'], 'missing Meta Space refusal');
       return { kind, metaSpaceId: requiredUuid(error['metaSpaceId'], 'Meta Space id') };
     }
-    case 'space-resource-target-missing':
-    case 'space-resource-reference-cycle': {
+    case 'space-reference-missing':
+    case 'space-reference-cycle': {
       const error = exactRecord(
         value,
         ['kind', 'spaceId', 'resourceId', 'targetSpaceId'],

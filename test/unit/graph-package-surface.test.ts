@@ -58,6 +58,8 @@ const OFFERED_VALUES = [
   'serializeResource',
   'SnapshotEdit',
   'deletionReach',
+  'declaredSpaceReferences',
+  'releasedSpaces',
 ] as const;
 
 const OFFERED_TYPES = [
@@ -90,6 +92,10 @@ const OFFERED_TYPES = [
   'PlacementMode',
   'SnapshotEditOutcome',
   'SnapshotEditRefusal',
+  'ReferencingSpace',
+  'ResourceReferenceProblem',
+  'SpaceReference',
+  'SpaceReferences',
 ] as const;
 
 /** What the index declares, split the way the index declares it. */

@@ -122,9 +122,11 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'An image URL must start with https: or http:.';
     case 'space-title-required':
       return 'A Space title is required.';
-    case 'reference-target-not-found':
+    case 'reference-targets-self':
+      return 'A Resource cannot be its own Target.';
+    case 'reference-target-missing':
       return 'That Target is no longer part of the Space.';
-    case 'reference-target-must-own-content':
+    case 'reference-target-not-targetable':
       return 'That Resource cannot be a Target: referencing is a single hop.';
     case 'resource-already-in-map':
       return 'This Resource is already in this Map.';
@@ -132,7 +134,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
       return 'This Resource is not in this Map.';
     case 'open-requires-content':
       return 'An Ur Resource has no content to open.';
-    case 'shape-requires-ur-resource':
+    case 'shape-not-taken':
       return 'Only an Ur Resource can be drawn in a Shape other than the rectangle.';
     case 'resource-has-references':
       return `Delete the Reference Resources of this Resource first: ${refusal.referenceTitles.join(', ')}.`;
@@ -160,7 +162,7 @@ export const describeAuthoringRefusal = (refusal: PresentedAuthoringRefusal): st
  * repository's.
  *
  * A refusal kind is a stable domain identity (ADR 0057), which is exactly why
- * it is the wrong resource to show: `space-resource-target-missing` names the fact for
+ * it is the wrong resource to show: `space-reference-missing` names the fact for
  * a caller matching on it, and says nothing to the person who has just been
  * told their work would not save. The identity stays on the wire; only this
  * translation is user-facing.
@@ -179,8 +181,8 @@ const AGGREGATE_REFUSAL_REASONS = {
   'duplicate-space-id': 'Two spaces in this edit share one identity.',
   'duplicate-resource-id': 'Two spaces in this edit claim the same resource.',
   'meta-space-missing': 'The repository’s Meta Space is missing.',
-  'space-resource-target-missing': 'A space resource points at a space that no longer exists.',
-  'space-resource-reference-cycle': 'A space resource would make a space contain itself.',
+  'space-reference-missing': 'A Resource points at a space that no longer exists.',
+  'space-reference-cycle': 'A Resource would make a space contain itself.',
   'ordinary-space-unreferenced': 'A space would be left with nothing pointing at it.',
   'space-resource-map-missing': 'A space resource points at a Map that no longer exists.',
   'space-resource-graph-missing': 'A space resource points at a Graph that no longer exists.',

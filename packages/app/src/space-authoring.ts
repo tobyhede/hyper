@@ -364,12 +364,13 @@ export type AuthoringRefusal =
    * empty case wearing different bytes and only this Edit can refuse it.
    */
   | { readonly code: 'space-title-required' }
-  | { readonly code: 'reference-target-not-found'; readonly targetId: ResourceId }
-  | { readonly code: 'reference-target-must-own-content'; readonly targetId: ResourceId }
+  | { readonly code: 'reference-targets-self'; readonly targetId: ResourceId }
+  | { readonly code: 'reference-target-missing'; readonly targetId: ResourceId }
+  | { readonly code: 'reference-target-not-targetable'; readonly targetId: ResourceId }
   | { readonly code: 'resource-already-in-map' }
   | { readonly code: 'resource-not-in-map' }
   | { readonly code: 'open-requires-content' }
-  | { readonly code: 'shape-requires-ur-resource' }
+  | { readonly code: 'shape-not-taken' }
   | {
       readonly code: 'resource-has-references';
       /** The Reference Resources by **name**, which is what a sentence listing Resources says (ADR 0083). */

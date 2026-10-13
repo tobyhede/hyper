@@ -186,7 +186,7 @@ describe('loadSpaceAggregate', () => {
 
     expect(errors).toEqual([
       {
-        kind: 'space-resource-target-missing',
+        kind: 'space-reference-missing',
         spaceId: META,
         resourceId: META_RESOURCE,
         targetSpaceId: CHILD,
@@ -211,7 +211,7 @@ describe('loadSpaceAggregate', () => {
 
     expect(errors).toEqual([
       {
-        kind: 'space-resource-reference-cycle',
+        kind: 'space-reference-cycle',
         spaceId: CHILD,
         resourceId: CHILD_RESOURCE,
         targetSpaceId: META,

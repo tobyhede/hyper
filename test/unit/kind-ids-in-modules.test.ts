@@ -194,13 +194,12 @@ const ONE_KIND_FEATURES = new Map<string, readonly string[]>([
       'kind: referenceKind.id,',
     ],
   ],
-  // The Space Resource lifecycle (ADR 0074), its create and delete; and two reads of
+  // The Space Resource lifecycle (ADR 0074), its create; and two reads of
   // its selection (`spaceId`, `map`, `graph`), unbuilt behind the module (issue 10, F).
   [
     'packages/persistence/src/space-resource-planning.ts',
     [
       'kind: spaceKind.id,',
-      'if (resource?.document.kind !== spaceKind.id) {',
       'resource.document.kind !== spaceKind.id ||',
       'document.kind === spaceKind.id &&',
     ],

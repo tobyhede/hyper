@@ -95,7 +95,7 @@ describe('HTTP Space backend aggregate protocol', () => {
       kind: 'aggregate-refused' as const,
       errors: [
         {
-          kind: 'space-resource-target-missing' as const,
+          kind: 'space-reference-missing' as const,
           spaceId: SPACE_ID,
           resourceId: RESOURCE_ID,
           targetSpaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000003'),

@@ -822,7 +822,7 @@ describe('Change Shape', () => {
     ['Reference', withA({ title: 'A', kind: 'reference', content: { target: RESOURCE_B } })],
   ])('refuses any Shape on a %s Resource, Open or Closed, changing nothing', (_kind, snapshot) => {
     const { authoring, session } = open(snapshot);
-    const refusal = { kind: 'refused', refusal: { code: 'shape-requires-ur-resource' } };
+    const refusal = { kind: 'refused', refusal: { code: 'shape-not-taken' } };
 
     expect(
       authoring.complete(CANVAS, {
@@ -924,7 +924,7 @@ describe('Add Reference Resource', () => {
       authoring.complete(CANVAS, { kind: 'created-reference', target: RESOURCE_B, anchor: CENTRE }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'reference-target-must-own-content', targetId: RESOURCE_B },
+      refusal: { code: 'reference-target-not-targetable', targetId: RESOURCE_B },
     });
     expect(session.getState().working).toBe(before);
   });
@@ -940,7 +940,7 @@ describe('Add Reference Resource', () => {
       }),
     ).toEqual({
       kind: 'refused',
-      refusal: { code: 'reference-target-not-found', targetId: UNKNOWN_RESOURCE },
+      refusal: { code: 'reference-target-missing', targetId: UNKNOWN_RESOURCE },
     });
   });
 });

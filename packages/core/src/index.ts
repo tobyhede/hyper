@@ -33,5 +33,6 @@ export {
   spaceReferences,
   spaceSelectionProblem,
   type KindId,
+  type KindedResource,
   type EmptyCreatableKindId,
 } from './kinds/registry';

@@ -126,7 +126,7 @@ export const isRegisteredKind = (kind: string): kind is KindId =>
 export const kindFlags = (kind: KindId): KindFlags => KIND_MODULES[kind].flags;
 
 /** A Resource, stored or not: what its kind's declarations are read from. */
-type KindedResource = Kinded<KindId>;
+export type KindedResource = Kinded<KindId>;
 
 const resourceReferencesOf = <K extends KindId>(resource: Kinded<K>) =>
   KIND_MODULES[resource.kind].resourceReferences(resource.content);

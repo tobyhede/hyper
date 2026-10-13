@@ -983,9 +983,7 @@ describe('referencing an existing Space', () => {
 
     await addExistingSpace('Other Space');
 
-    expect(
-      await screen.findByText('A space resource would make a space contain itself.'),
-    ).toBeVisible();
+    expect(await screen.findByText('A Resource would make a space contain itself.')).toBeVisible();
     expect(spaceResourcesOf(session)).toEqual([]);
     await settled(session);
   });
