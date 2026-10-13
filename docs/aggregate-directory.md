@@ -163,7 +163,9 @@ A hand-written directory may omit these, and Importing mints them:
 - a Space's `id` in `space.json` (the directory name supplies it);
 - a Map's `id`, and a Graph's `id`;
 
-**A minted Id cannot be referred to**, because nothing in your files knows it. So write the Id of anything another file names: a Resource that a Map positions or an Edge joins, a Map named by `defaultMap` or a Space Resource's `map`, a Graph named by `activeGraph` or a Space Resource's `graph`. A reference to an Id nobody declares is refused.
+A Resource's `id` is never left out and never minted: every Resource file carries its own, whether or not anything names it.
+
+**A minted Id cannot be referred to**, because nothing in your files knows it. So write the Id of anything another file names: a Map named by `defaultMap` or a Space Resource's `map`, a Graph named by `activeGraph` or a Space Resource's `graph`. A reference to an Id nobody declares is refused.
 
 The next Export writes every minted Id into the files.
 
