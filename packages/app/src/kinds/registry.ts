@@ -12,6 +12,7 @@ import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
   kindDecorationMemo,
   kindDecorator,
+  type AgreeingAllOf,
   type KindDecorator,
 } from '../canvas-resource-decoration';
 import type { KindCreation } from '../kind-creation';
@@ -63,15 +64,11 @@ const DECORATIONS = {
 /** The context one kind's decoration reads. */
 type ContextOf<Decorator> = Decorator extends KindDecorator<infer Context> ? Context : never;
 
-/** Every member of the union `Parts` at once. */
-type AllOf<Parts> = (Parts extends unknown ? (part: Parts) => void : never) extends (
-  all: infer All,
-) => void
-  ? All
-  : never;
-
-/** What every kind's canvas decoration reads, together. */
-export type KindDecorationContext = AllOf<ContextOf<(typeof DECORATIONS)[KindId]>>;
+/**
+ * What every kind's canvas decoration reads, together. Two kinds that read a
+ * field of one name with different types fail to compile where it is supplied.
+ */
+export type KindDecorationContext = AgreeingAllOf<ContextOf<(typeof DECORATIONS)[KindId]>>;
 
 /** Every kind's decoration, in registry order. */
 const KIND_DECORATORS: readonly KindDecorator<KindDecorationContext>[] = KIND_IDS.flatMap(

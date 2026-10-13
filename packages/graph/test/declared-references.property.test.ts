@@ -63,7 +63,8 @@ const anyLinks = fc.integer({ min: 1, max: 6 }).chain((count) =>
 
 /*
  * An aggregate as the lifecycle builds one: references run from lower to higher
- * index and each ordinary Space has at least one, so every Space is rooted.
+ * index and each ordinary Space has at least one, so every Space is rooted. Then
+ * one or more of its references to remove, whose targets may repeat.
  */
 const rootedLinks = fc.integer({ min: 2, max: 7 }).chain((count) =>
   fc
@@ -78,7 +79,10 @@ const rootedLinks = fc.integer({ min: 2, max: 7 }).chain((count) =>
         for (const i of from) links[i]?.push(index + 1);
       });
       const edges = links.flatMap((targets, i) => targets.map((j) => [i, j] as const));
-      return fc.record({ links: fc.constant(links), removed: fc.constantFrom(...edges) });
+      return fc.record({
+        links: fc.constant(links),
+        removed: fc.subarray(edges, { minLength: 1 }),
+      });
     }),
 );
 
@@ -120,15 +124,17 @@ describe('the Space reference rules over any graph of declared references', () =
     );
   });
 
-  it('releases exactly the Spaces a removed reference leaves unreachable from the Meta Space', () => {
+  it('releases exactly the Spaces the removed references leave unreachable from the Meta Space', () => {
     fc.assert(
-      fc.property(rootedLinks, ({ links, removed: [from, to] }) => {
+      fc.property(rootedLinks, ({ links, removed }) => {
         const remaining = links.map((targets, index) =>
-          index === from ? targets.filter((target) => target !== to) : targets,
+          targets.filter(
+            (target) => !removed.some(([from, to]) => from === index && to === target),
+          ),
         );
         const released = releasedSpaces(
           declaredSpaceReferences(referencingSpaces(remaining)),
-          [spaceOf(to)],
+          removed.map(([, to]) => spaceOf(to)),
           META,
         );
         const kept = reachable(remaining);

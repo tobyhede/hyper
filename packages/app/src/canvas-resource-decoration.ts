@@ -86,10 +86,38 @@ export function applyKindDecoration<K extends ResourceFlowNode['data']['kind']>(
  */
 export interface KindCanvasDecoration<K extends KindId, Context extends object> {
   readonly kind: K;
-  /** This kind's part of `context`, field by field: a change to no field of it keeps this kind's nodes. */
-  readonly slice: (context: Context) => Context;
+  /**
+   * This kind's part of `context`, field by field: a change to no field of it
+   * keeps this kind's nodes. Every field is named, an optional one too, so a
+   * field this kind reads cannot change without decorating its nodes again.
+   */
+  readonly slice: (context: Context) => EveryField<Context>;
   readonly decorate: (node: ResourceFlowNodeOf<K>, context: Context) => KindDecoration<K>;
 }
+
+/** `Context` with each of its fields present, an optional one holding `undefined` where it is absent. */
+export type EveryField<Context> = { readonly [K in keyof Context]-?: Context[K] };
+
+/** Every member of the union `Parts` at once. */
+export type AllOf<Parts> = (Parts extends unknown ? (part: Parts) => void : never) extends (
+  all: infer All,
+) => void
+  ? All
+  : never;
+
+/** The fields some member of the union `Parts` declares with a type another member's field of that name does not share. */
+export type ClashingFields<Parts, All = AllOf<Parts>> = Parts extends unknown
+  ? { [K in keyof Parts]-?: [Parts[K]] extends [All[K & keyof All]] ? never : K }[keyof Parts]
+  : never;
+
+/**
+ * Every member of `Parts` at once, where each field the members share has one
+ * type; otherwise an object no context satisfies, naming the clashing fields,
+ * rather than one whose clashing field has silently become `never`.
+ */
+export type AgreeingAllOf<Parts> = [ClashingFields<Parts>] extends [never]
+  ? AllOf<Parts>
+  : { readonly fieldsDeclaredWithDifferentTypes: ClashingFields<Parts> };
 
 /** One kind's decoration with its kind and context erased, as the registry's loop runs it. */
 export interface KindDecorator<Context> {

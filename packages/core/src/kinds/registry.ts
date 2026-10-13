@@ -161,7 +161,7 @@ export const lifetimeSpaceReferences = (resource: KindedResource): readonly UUID
   kindFlags(resource.kind).ownsReferencedSpaces ? spaceReferences(resource) : [];
 
 const selectionProblemOf = <K extends KindId>(resource: Kinded<K>, target: SpaceSelectionTarget) =>
-  KIND_MODULES[resource.kind].selectionProblem(resource.content, target);
+  KIND_MODULES[resource.kind].selection?.problem(resource.content, target);
 
 /** Why this Resource's selection does not resolve in its target Space, by its kind's own check. */
 export const spaceSelectionProblem = (
