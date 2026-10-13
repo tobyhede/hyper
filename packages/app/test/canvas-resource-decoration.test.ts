@@ -1,5 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import { uuidSchema, type ResourceId, type SpaceSnapshot } from '@project/core';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
+import {
+  urKind,
+  uuidSchema,
+  type ResourceId,
+  type SpaceSnapshot,
+  type UrKindId,
+} from '@project/core';
 import {
   bareKindData,
   isResourceNodeOf,
@@ -9,13 +15,24 @@ import {
 } from '@project/react-flow-adapter';
 import { loadSpaceSnapshot } from '@project/graph';
 import {
+  decorateKinds,
   decorateSharedResourceNode,
+  kindDecorationMemo,
+  kindDecorator,
+  type AgreeingAllOf,
   type CanvasResourceDecorationContext,
+  type ClashingFields,
+  type KindCanvasDecoration,
+  type KindDecorator,
 } from '../src/canvas-resource-decoration';
 import { decorateImageResourceNode } from '../src/kinds/image';
 import { decorateMarkdownResourceNode } from '../src/kinds/markdown';
 import { decorateSpaceResourceNode } from '../src/kinds/space';
-import { decorateUrResourceNode } from '../src/kinds/ur';
+import {
+  decorateUrResourceNode,
+  urDecoration,
+  type UrResourceDecorationContext,
+} from '../src/kinds/ur';
 import type { KindDecorationContext } from '../src/kinds/registry';
 import { RESOURCE_SIZE } from '../src/resource';
 import { NO_SPACE_RESOURCE_TARGETS } from '../src/space-resource-targets';
@@ -497,5 +514,101 @@ describe('decorateSpaceResourceNode', () => {
     expect(patch.kindOperations.portal?.onEditingChange).toBeTypeOf('function');
     patch.kindOperations.portal?.onEditingChange(false);
     expect(onPortalEditingChange).toHaveBeenCalledWith(SPACE_RESOURCE_ID, false);
+  });
+});
+
+describe('decorating each kind from its own part of the context', () => {
+  interface Labels {
+    readonly markdownLabel: string;
+    readonly urLabel: string;
+  }
+  /** Decorations that mark each node of their kind with the label they read, counting each node decorated. */
+  const labelling = (reads: () => void = () => undefined): KindDecorator<Labels>[] => [
+    kindDecorator<'markdown', Pick<Labels, 'markdownLabel'>>({
+      kind: 'markdown',
+      slice: ({ markdownLabel }) => ({ markdownLabel }),
+      decorate: (_node, { markdownLabel }) => {
+        reads();
+        return { kindOperations: { kind: 'markdown' }, contextNotice: markdownLabel };
+      },
+    }),
+    kindDecorator<'ur', Pick<Labels, 'urLabel'>>({
+      kind: 'ur',
+      slice: ({ urLabel }) => ({ urLabel }),
+      decorate: (_node, { urLabel }) => {
+        reads();
+        return { kindOperations: { kind: 'ur' }, contextNotice: urLabel };
+      },
+    }),
+  ];
+  const nodes = [projectionNode(RESOURCE_ID, 'markdown'), projectionNode(UR_ID, 'ur')];
+  const labels = { markdownLabel: 'm', urLabel: 'u' };
+
+  it('keeps every kind’s nodes, and answers what it kept, while no kind’s part changes', () => {
+    const decorators = labelling();
+    const first = decorateKinds(decorators, nodes, labels, undefined);
+    expect(first.nodes.map((node) => node.data.contextNotice)).toEqual(['m', 'u']);
+    expect(decorateKinds(decorators, nodes, { ...labels }, first)).toBe(first);
+  });
+
+  it('decorates again only the kind whose part changed', () => {
+    const reads = vi.fn();
+    const decorate = kindDecorationMemo(labelling(reads));
+    const first = decorate(nodes, labels);
+    const second = decorate(nodes, { ...labels, urLabel: 'v' });
+    expect(second[0]).toBe(first[0]);
+    expect(second[1]).not.toBe(first[1]);
+    expect(second[1]?.data.contextNotice).toBe('v');
+    expect(reads).toHaveBeenCalledTimes(3);
+  });
+
+  it('decorates every kind again over other nodes', () => {
+    const reads = vi.fn();
+    const decorate = kindDecorationMemo(labelling(reads));
+    const first = decorate(nodes, labels);
+    const second = decorate([...nodes], labels);
+    expect(second[0]).not.toBe(first[0]);
+    expect(second[1]).not.toBe(first[1]);
+    expect(reads).toHaveBeenCalledTimes(4);
+  });
+
+  it('decorates an Ur Resource again when only its optional Shape change is replaced', () => {
+    const decorate = kindDecorationMemo([kindDecorator(urDecoration)]);
+    const urNodes = [projectionNode(UR_ID, 'ur')];
+    const first = vi.fn();
+    const second = vi.fn();
+    decorate(urNodes, context({ changeResourceShape: first }));
+    const [node] = decorate(urNodes, context({ changeResourceShape: second }));
+    if (node === undefined || !isResourceNodeOf(node, 'ur')) throw new Error('no Ur Resource');
+    node.data.kindOperations.onResourceShapeChange?.('ellipse');
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledWith(UR_ID, 'ellipse');
+  });
+
+  it('names every field of a kind’s context in the part it reads', () => {
+    const dropsOptional: KindCanvasDecoration<UrKindId, UrResourceDecorationContext> = {
+      kind: urKind.id,
+      // @ts-expect-error A part read field by field names every field, the optional ones too.
+      slice: ({ authorOnCanvas, editableResourceIds }) => ({ authorOnCanvas, editableResourceIds }),
+      decorate: decorateUrResourceNode,
+    };
+    expect(dropsOptional.kind).toBe(urKind.id);
+  });
+
+  it('refuses a context two kinds read under one field name with different types', () => {
+    interface Shared {
+      readonly shared: boolean;
+    }
+    expectTypeOf<
+      ClashingFields<(Shared & { a: string }) | (Shared & { a: number })>
+    >().toEqualTypeOf<'a'>();
+    expectTypeOf<
+      AgreeingAllOf<(Shared & { a: string }) | (Shared & { a: number })>
+    >().toEqualTypeOf<{
+      readonly fieldsDeclaredWithDifferentTypes: 'a';
+    }>();
+    expectTypeOf<
+      AgreeingAllOf<(Shared & { a: string }) | (Shared & { b: number })>
+    >().toEqualTypeOf<Shared & { a: string } & { b: number }>();
   });
 });
