@@ -6,10 +6,12 @@ import {
   type SpaceView,
   type UUID,
 } from '@project/core';
-import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
+import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
+import type { KindOperationsByKind } from '@project/ui';
 import { buildSpaceResourceRail } from '../build-space-resource-rail';
 import type {
   CanvasResourceDecorationContext,
+  KindCanvasDecoration,
   KindDecoration,
   Mutable,
 } from '../canvas-resource-decoration';
@@ -24,7 +26,7 @@ import type { SpaceResourceTargetMap } from '../space-resource-lifecycle';
 import type { SpaceResourceTargets } from '../space-resource-targets';
 
 /** The Space kind's operations and decoration, built by assigning what a gate allows. */
-type SpaceOperations = Mutable<KindOperationsOf<SpaceKindId>>;
+type SpaceOperations = Mutable<KindOperationsByKind[SpaceKindId]>;
 type SpaceDecoration = Mutable<KindDecoration<SpaceKindId>>;
 
 export type SpaceResourceDecorationContext = Pick<
@@ -113,6 +115,45 @@ export function decorateSpaceResourceNode(
   }
   return decoration;
 }
+
+/** The Space kind's canvas decoration, from its own part of the context. */
+export const spaceDecoration: KindCanvasDecoration<SpaceKindId, SpaceResourceDecorationContext> = {
+  kind: spaceKind.id,
+  slice: ({
+    authorOnCanvas,
+    editableResourceIds,
+    continuation,
+    containingSpaceId,
+    spaceSelections,
+    spaceResourceTargets,
+    spaces,
+    commandOutcomes,
+    deleteConfirmation,
+    completeSpaceResourceSelection,
+    portalEditing,
+    onPortalEditingChange,
+    contextNotices,
+    onContextEditingChange,
+    onContextReport,
+  }) => ({
+    authorOnCanvas,
+    editableResourceIds,
+    continuation,
+    containingSpaceId,
+    spaceSelections,
+    spaceResourceTargets,
+    spaces,
+    commandOutcomes,
+    deleteConfirmation,
+    completeSpaceResourceSelection,
+    portalEditing,
+    onPortalEditingChange,
+    contextNotices,
+    onContextEditingChange,
+    onContextReport,
+  }),
+  decorate: decorateSpaceResourceNode,
+};
 
 export type SpaceCreationContext = Pick<
   ResourcePlacementCommands,

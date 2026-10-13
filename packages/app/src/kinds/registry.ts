@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState } from 'react';
 import {
   imageKind,
   KIND_IDS,
@@ -8,37 +8,17 @@ import {
   urKind,
   type KindId,
 } from '@project/core';
+import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
-  isResourceNodeOf,
-  type ResourceFlowNode,
-  type ResourceFlowNodeOf,
-} from '@project/react-flow-adapter';
-import { applyKindDecoration, type KindDecoration } from '../canvas-resource-decoration';
+  kindDecorationMemo,
+  kindDecorator,
+  type KindDecorator,
+} from '../canvas-resource-decoration';
 import type { KindCreation } from '../kind-creation';
-import {
-  decorateImageResourceNode,
-  imageCreation,
-  type ImageCreationContext,
-  type ImageResourceDecorationContext,
-} from './image';
-import {
-  decorateMarkdownResourceNode,
-  markdownCreation,
-  type MarkdownCreationContext,
-  type MarkdownResourceDecorationContext,
-} from './markdown';
-import {
-  decorateSpaceResourceNode,
-  spaceCreation,
-  type SpaceCreationContext,
-  type SpaceResourceDecorationContext,
-} from './space';
-import {
-  decorateUrResourceNode,
-  urCreation,
-  type UrCreationContext,
-  type UrResourceDecorationContext,
-} from './ur';
+import { imageCreation, imageDecoration, type ImageCreationContext } from './image';
+import { markdownCreation, markdownDecoration, type MarkdownCreationContext } from './markdown';
+import { spaceCreation, spaceDecoration, type SpaceCreationContext } from './space';
+import { urCreation, urDecoration, type UrCreationContext } from './ur';
 
 /** What every kind's Create reads, together. */
 export type KindCreationContext = MarkdownCreationContext &
@@ -67,174 +47,51 @@ export const KIND_CREATIONS: readonly (readonly [KindId, KindCreation<KindCreati
     return creation === null ? [] : [[kind, creation]];
   });
 
-/** What every kind's canvas decoration reads, together. */
-export type KindDecorationContext = MarkdownResourceDecorationContext &
-  ImageResourceDecorationContext &
-  UrResourceDecorationContext &
-  SpaceResourceDecorationContext;
+/**
+ * How each kind decorates its Resources on the canvas, or `null` for a kind
+ * whose Resources take only the shared decoration. A Reference Resource offers
+ * nothing of its own: its Target's content is shown read-only (ADR 0070).
+ */
+const DECORATIONS = {
+  [markdownKind.id]: kindDecorator(markdownDecoration),
+  [imageKind.id]: kindDecorator(imageDecoration),
+  [urKind.id]: kindDecorator(urDecoration),
+  [spaceKind.id]: kindDecorator(spaceDecoration),
+  [referenceKind.id]: null,
+} satisfies Readonly<Record<KindId, KindDecorator<never> | null>>;
 
-/** Each node of one kind decorated from that kind's own context, by node id. */
-const useDecoratedOfKind = <K extends ResourceFlowNode['data']['kind'], Context>(
-  nodes: readonly ResourceFlowNode[],
-  kind: K,
-  decorate: (node: ResourceFlowNodeOf<K>, context: Context) => KindDecoration<K>,
-  context: Context,
-): ReadonlyMap<string, ResourceFlowNode> =>
-  useMemo(() => {
-    const next = new Map<string, ResourceFlowNode>();
-    for (const node of nodes) {
-      if (isResourceNodeOf(node, kind)) {
-        next.set(node.id, applyKindDecoration(node, decorate(node, context)));
-      }
-    }
-    return next;
-  }, [nodes, kind, decorate, context]);
+/** The context one kind's decoration reads. */
+type ContextOf<Decorator> = Decorator extends KindDecorator<infer Context> ? Context : never;
+
+/** Every member of the union `Parts` at once. */
+type AllOf<Parts> = (Parts extends unknown ? (part: Parts) => void : never) extends (
+  all: infer All,
+) => void
+  ? All
+  : never;
+
+/** What every kind's canvas decoration reads, together. */
+export type KindDecorationContext = AllOf<ContextOf<(typeof DECORATIONS)[KindId]>>;
+
+/** Every kind's decoration, in registry order. */
+const KIND_DECORATORS: readonly KindDecorator<KindDecorationContext>[] = KIND_IDS.flatMap(
+  (kind): KindDecorator<KindDecorationContext>[] => {
+    const decorator = DECORATIONS[kind];
+    return decorator === null ? [] : [decorator];
+  },
+);
 
 /**
  * Every Resource node with its kind's operations: the app half of each kind,
  * and the one place in the application each kind's canvas decoration is named
- * (ADR 0128). Each kind's nodes are decorated from that kind's own
- * part of the context, so a change that only one kind reads keeps every other
- * kind's nodes, and their identities, as they were.
+ * (ADR 0128). Each kind's nodes are decorated from that kind's own part of the
+ * context, so a change that only one kind reads keeps every other kind's
+ * nodes, and their identities, as they were.
  */
 export function useKindDecoratedNodes(
   nodes: readonly ResourceFlowNode[],
   context: KindDecorationContext,
 ): ResourceFlowNode[] {
-  const {
-    authorOnCanvas,
-    bodyEditing,
-    editableResourceIds,
-    beginBodyEditing,
-    bodyEditorResourceId,
-    completeResourceBody,
-    clearCaret,
-    replaceResourceImage,
-    pickImageFiles,
-    changeResourceShape,
-    continuation,
-    containingSpaceId,
-    spaceSelections,
-    spaceResourceTargets,
-    spaces,
-    commandOutcomes,
-    deleteConfirmation,
-    completeSpaceResourceSelection,
-    portalEditing,
-    onPortalEditingChange,
-    contextNotices,
-    onContextEditingChange,
-    onContextReport,
-  } = context;
-  const markdownContext = useMemo(
-    (): MarkdownResourceDecorationContext => ({
-      authorOnCanvas,
-      bodyEditing,
-      editableResourceIds,
-      beginBodyEditing,
-      bodyEditorResourceId,
-      completeResourceBody,
-      clearCaret,
-    }),
-    [
-      authorOnCanvas,
-      bodyEditing,
-      editableResourceIds,
-      beginBodyEditing,
-      bodyEditorResourceId,
-      completeResourceBody,
-      clearCaret,
-    ],
-  );
-  const imageContext = useMemo(
-    (): ImageResourceDecorationContext => ({
-      authorOnCanvas,
-      bodyEditing,
-      editableResourceIds,
-      beginBodyEditing,
-      bodyEditorResourceId,
-      replaceResourceImage,
-      pickImageFiles,
-      clearCaret,
-    }),
-    [
-      authorOnCanvas,
-      bodyEditing,
-      editableResourceIds,
-      beginBodyEditing,
-      bodyEditorResourceId,
-      replaceResourceImage,
-      pickImageFiles,
-      clearCaret,
-    ],
-  );
-  const urContext = useMemo(
-    (): UrResourceDecorationContext => ({
-      authorOnCanvas,
-      editableResourceIds,
-      changeResourceShape,
-    }),
-    [authorOnCanvas, editableResourceIds, changeResourceShape],
-  );
-  const spaceContext = useMemo(
-    (): SpaceResourceDecorationContext => ({
-      authorOnCanvas,
-      editableResourceIds,
-      continuation,
-      containingSpaceId,
-      spaceSelections,
-      spaceResourceTargets,
-      spaces,
-      commandOutcomes,
-      deleteConfirmation,
-      completeSpaceResourceSelection,
-      portalEditing,
-      onPortalEditingChange,
-      contextNotices,
-      onContextEditingChange,
-      onContextReport,
-    }),
-    [
-      authorOnCanvas,
-      editableResourceIds,
-      continuation,
-      containingSpaceId,
-      spaceSelections,
-      spaceResourceTargets,
-      spaces,
-      commandOutcomes,
-      deleteConfirmation,
-      completeSpaceResourceSelection,
-      portalEditing,
-      onPortalEditingChange,
-      contextNotices,
-      onContextEditingChange,
-      onContextReport,
-    ],
-  );
-  const markdownDecorated = useDecoratedOfKind(
-    nodes,
-    markdownKind.id,
-    decorateMarkdownResourceNode,
-    markdownContext,
-  );
-  const imageDecorated = useDecoratedOfKind(
-    nodes,
-    imageKind.id,
-    decorateImageResourceNode,
-    imageContext,
-  );
-  const urDecorated = useDecoratedOfKind(nodes, urKind.id, decorateUrResourceNode, urContext);
-  const spaceDecorated = useDecoratedOfKind(
-    nodes,
-    spaceKind.id,
-    decorateSpaceResourceNode,
-    spaceContext,
-  );
-  return useMemo(() => {
-    const decorated = new Map(
-      [markdownDecorated, imageDecorated, urDecorated, spaceDecorated].flatMap((byId) => [...byId]),
-    );
-    return nodes.map((node) => decorated.get(node.id) ?? node);
-  }, [nodes, markdownDecorated, imageDecorated, urDecorated, spaceDecorated]);
+  const [decorate] = useState(() => kindDecorationMemo(KIND_DECORATORS));
+  return decorate(nodes, context);
 }

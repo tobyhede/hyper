@@ -1,11 +1,11 @@
-import { takesOpen, type ResourceId } from '@project/core';
-import type {
-  KindOperationsOf,
-  ResourceFlowNode,
-  ResourceFlowNodeOf,
-  ResourceNodeData,
+import { takesOpen, type KindId, type ResourceId } from '@project/core';
+import {
+  isResourceNodeOf,
+  type ResourceFlowNode,
+  type ResourceFlowNodeOf,
+  type ResourceNodeData,
 } from '@project/react-flow-adapter';
-import type { EntityActionGroup, ResourceDisplay } from '@project/ui';
+import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@project/ui';
 import type { ResourceResize } from './render-adapter';
 import { RESOURCE_SIZE } from './resource';
 
@@ -25,7 +25,7 @@ export type CanvasResourceDataPatch = Partial<
  * display or context notice where it changes them.
  */
 export interface KindDecoration<K extends ResourceFlowNode['data']['kind']> {
-  readonly kindOperations: KindOperationsOf<K>;
+  readonly kindOperations: KindOperationsByKind[K];
   readonly display?: ResourceDisplay;
   readonly contextNotice?: string;
 }
@@ -76,6 +76,118 @@ export function applyKindDecoration<K extends ResourceFlowNode['data']['kind']>(
     decoration.contextNotice === undefined;
   if (offersNothing) return node;
   return { ...node, data: { ...node.data, ...decoration } };
+}
+
+/**
+ * How one kind decorates its Resources on the canvas, declared by that kind's
+ * app half under `kinds/` and listed by the app registry: the part of the
+ * whole decoration context it reads, and what it makes of one node from that
+ * part alone.
+ */
+export interface KindCanvasDecoration<K extends KindId, Context extends object> {
+  readonly kind: K;
+  /** This kind's part of `context`, field by field: a change to no field of it keeps this kind's nodes. */
+  readonly slice: (context: Context) => Context;
+  readonly decorate: (node: ResourceFlowNodeOf<K>, context: Context) => KindDecoration<K>;
+}
+
+/** One kind's decoration with its kind and context erased, as the registry's loop runs it. */
+export interface KindDecorator<Context> {
+  /** The decoration bound to this kind's part of `context`. */
+  readonly bind: (context: Context) => {
+    /** The part read, compared field by field with the part the kept nodes were decorated from. */
+    readonly read: object;
+    /** `node` decorated, or `undefined` for a node of another kind. */
+    readonly decorate: (node: ResourceFlowNode) => ResourceFlowNode | undefined;
+  };
+}
+
+/** Erase `decoration`'s kind and context, so every kind's runs through one loop. */
+export const kindDecorator = <K extends KindId, Context extends object>(
+  decoration: KindCanvasDecoration<K, Context>,
+): KindDecorator<Context> => ({
+  bind: (context) => {
+    const read = decoration.slice(context);
+    return {
+      read,
+      decorate: (node) =>
+        isResourceNodeOf(node, decoration.kind)
+          ? applyKindDecoration(node, decoration.decorate(node, read))
+          : undefined,
+    };
+  },
+});
+
+/** Every kind's nodes decorated, kept with what each kind's were decorated from. */
+export interface KindDecoratedNodes {
+  readonly from: readonly ResourceFlowNode[];
+  readonly byKind: readonly {
+    readonly read: object;
+    readonly decorated: ReadonlyMap<string, ResourceFlowNode>;
+  }[];
+  readonly nodes: ResourceFlowNode[];
+}
+
+/** Whether `a` and `b` have the same fields, each the same value. */
+const sameFields = (a: object, b: object): boolean => {
+  const entries = Object.entries(a);
+  const other = new Map(Object.entries(b));
+  return (
+    entries.length === other.size &&
+    entries.every(([key, value]) => other.has(key) && Object.is(other.get(key), value))
+  );
+};
+
+/**
+ * `nodes` with each kind's decoration, from `context`. A kind whose part of the
+ * context is field for field what `kept` was decorated from, over the same
+ * nodes, keeps its decorated nodes, so a change one kind alone reads keeps
+ * every other kind's nodes, and their identities, as they were; and with no
+ * kind's part changed, `kept` itself is answered.
+ */
+export function decorateKinds<Context>(
+  decorators: readonly KindDecorator<Context>[],
+  nodes: readonly ResourceFlowNode[],
+  context: Context,
+  kept: KindDecoratedNodes | undefined,
+): KindDecoratedNodes {
+  const keptNodes = kept?.from === nodes ? kept : undefined;
+  const byKind = decorators.map((decorator, index) => {
+    const bound = decorator.bind(context);
+    const before = keptNodes?.byKind[index];
+    if (before !== undefined && sameFields(before.read, bound.read)) return before;
+    const decorated = new Map<string, ResourceFlowNode>();
+    for (const node of nodes) {
+      const next = bound.decorate(node);
+      if (next !== undefined) decorated.set(node.id, next);
+    }
+    return { read: bound.read, decorated };
+  });
+  if (
+    keptNodes !== undefined &&
+    byKind.every((entry, index) => entry === keptNodes.byKind[index])
+  ) {
+    return keptNodes;
+  }
+  const decorated = new Map(byKind.flatMap(({ decorated: byId }) => [...byId]));
+  return { from: nodes, byKind, nodes: nodes.map((node) => decorated.get(node.id) ?? node) };
+}
+
+/**
+ * {@link decorateKinds} remembering its last answer: each call is decorated
+ * against the one before, so a caller that runs it on every render keeps each
+ * kind's nodes where nothing that kind reads changed. Only identity is
+ * remembered; the nodes answered are what `decorateKinds` answers for the same
+ * nodes and context.
+ */
+export function kindDecorationMemo<Context>(
+  decorators: readonly KindDecorator<Context>[],
+): (nodes: readonly ResourceFlowNode[], context: Context) => ResourceFlowNode[] {
+  let kept: KindDecoratedNodes | undefined;
+  return (nodes, context) => {
+    kept = decorateKinds(decorators, nodes, context, kept);
+    return kept.nodes;
+  };
 }
 
 type SharedResourceDecorationContext = Pick<

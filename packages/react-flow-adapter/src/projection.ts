@@ -42,9 +42,6 @@ export type ResourceTitleEditor = {
   onCancel: () => void;
 };
 
-/** What one Resource kind offers on its node: the operations `CanvasResource` takes. */
-export type KindOperationsOf<K extends Resource['kind']> = KindOperationsByKind[K];
-
 /**
  * A Resource's own kind beside that kind's operations, one arm per kind, so the
  * two cannot disagree. The kind is drawn as a persistent glyph on the Resource.
@@ -52,7 +49,7 @@ export type KindOperationsOf<K extends Resource['kind']> = KindOperationsByKind[
  * its `display`.
  */
 type KindDataOf<K extends Resource['kind']> = {
-  [P in K]: { kind: P; kindOperations: KindOperationsOf<P> };
+  [P in K]: { kind: P; kindOperations: KindOperationsByKind[P] };
 }[K];
 type ResourceKindData = KindDataOf<Resource['kind']>;
 

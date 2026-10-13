@@ -1,8 +1,9 @@
 import { markdownKind, type MarkdownKindId, type ResourceId } from '@project/core';
-import type { KindOperationsOf, ResourceFlowNodeOf } from '@project/react-flow-adapter';
-import { beginEditing } from '@project/ui';
+import type { ResourceFlowNodeOf } from '@project/react-flow-adapter';
+import { beginEditing, type KindOperationsByKind } from '@project/ui';
 import type {
   CanvasResourceDecorationContext,
+  KindCanvasDecoration,
   KindDecoration,
   Mutable,
 } from '../canvas-resource-decoration';
@@ -10,7 +11,7 @@ import type { KindCreation } from '../kind-creation';
 import type { ResourcePlacementCommands } from '../resource-placement';
 
 /** The Markdown kind's operations and decoration, built by assigning what a gate allows. */
-type MarkdownOperations = Mutable<KindOperationsOf<MarkdownKindId>>;
+type MarkdownOperations = Mutable<KindOperationsByKind[MarkdownKindId]>;
 type MarkdownDecoration = Mutable<KindDecoration<MarkdownKindId>>;
 
 export type MarkdownResourceDecorationContext = Pick<
@@ -58,6 +59,32 @@ export function decorateMarkdownResourceNode(
   }
   return decoration;
 }
+
+/** The Markdown kind's canvas decoration, from its own part of the context. */
+export const markdownDecoration: KindCanvasDecoration<
+  MarkdownKindId,
+  MarkdownResourceDecorationContext
+> = {
+  kind: markdownKind.id,
+  slice: ({
+    authorOnCanvas,
+    bodyEditing,
+    editableResourceIds,
+    beginBodyEditing,
+    bodyEditorResourceId,
+    completeResourceBody,
+    clearCaret,
+  }) => ({
+    authorOnCanvas,
+    bodyEditing,
+    editableResourceIds,
+    beginBodyEditing,
+    bodyEditorResourceId,
+    completeResourceBody,
+    clearCaret,
+  }),
+  decorate: decorateMarkdownResourceNode,
+};
 
 export type MarkdownCreationContext = Pick<ResourcePlacementCommands, 'createResource'>;
 
