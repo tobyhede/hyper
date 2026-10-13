@@ -20,6 +20,7 @@ import {
   type MapPosition,
   type ResourceDocument,
   type SpaceSnapshot,
+  type SpaceViewChoice,
   type UUID,
 } from '@project/core';
 import {
@@ -54,12 +55,6 @@ export type SpaceResourceChanges = readonly [
 export const changedSpaceId = (change: SpaceResourceLifecycleChange): UUID =>
   change.kind === 'create' ? change.snapshot.id : change.spaceId;
 
-/** What a Space Resource selects in the Space it shows: one Map and one of its Graphs. */
-export interface SpaceResourceSelection {
-  readonly map: UUID;
-  readonly graph: UUID;
-}
-
 /**
  * Why a target supplied no Map and Graph for a Space Resource to select.
  *
@@ -77,7 +72,7 @@ export type SpaceResourceTargetUnavailableReason =
 
 /** A target's selection, or why it has none. */
 export type TargetSelection =
-  | { readonly kind: 'selected'; readonly selection: SpaceResourceSelection }
+  | { readonly kind: 'selected'; readonly selection: SpaceViewChoice }
   | { readonly kind: 'unavailable'; readonly reason: SpaceResourceTargetUnavailableReason };
 
 export interface CreateSpaceResourceInput {
@@ -208,7 +203,7 @@ const storedSnapshot = (aggregate: LoadedAggregate, id: UUID): LoadedSpace | und
  * and the ids read out of it: an initialized Space records a `defaultMap`, and
  * a Map owning no Graph fails intake before it can be asked.
  */
-const selectionOf = (space: Space): SpaceResourceSelection | undefined => {
+const selectionOf = (space: Space): SpaceViewChoice | undefined => {
   if (space.defaultMap === undefined) return undefined;
   const resolved = space.lookup.map(space.defaultMap);
   return resolved === undefined
@@ -298,7 +293,7 @@ const snapshotFromSpace = (space: Space): SpaceSnapshot => {
 /** A new target Space and the selection it opens on. */
 export interface InitializedTarget {
   readonly target: SpaceSnapshot;
-  readonly selection: SpaceResourceSelection;
+  readonly selection: SpaceViewChoice;
 }
 
 /**
@@ -326,7 +321,7 @@ const createSpaceResource = (
   input: CreateSpaceResourceInput,
   resourceId: UUID,
   targetSpaceId: UUID,
-  selection: SpaceResourceSelection,
+  selection: SpaceViewChoice,
 ): SpaceResourceRefused | { readonly kind: 'completed'; readonly snapshot: SpaceSnapshot } => {
   const document: ResourceDocument = {
     title: input.title,
@@ -567,7 +562,7 @@ export const precheckContextDeletion = (
 const replaceSpaceResourceSelection = (
   snapshot: SpaceSnapshot,
   matches: (document: ResourceDocument) => boolean,
-  selection: SpaceResourceSelection,
+  selection: SpaceViewChoice,
 ): SpaceSnapshot => ({
   ...snapshot,
   resources: snapshot.resources.map((resource) => {

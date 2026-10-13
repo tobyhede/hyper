@@ -101,6 +101,14 @@ const selectionProblem = (
   return undefined;
 };
 
+/** The view of its target a Space Resource's content shows. */
+const viewOf = (content: SpaceResourceContent): SpaceView => ({
+  spaceId: content.spaceId,
+  map: content.map,
+  graph: content.graph,
+  framing: content.framing,
+});
+
 /**
  * The Space kind (ADR 0068): a Resource that embeds a selected view of
  * another Space. Its one Space reference is its target, whose lifetime it
@@ -119,29 +127,19 @@ export const spaceKind = defineKind({
   facts: { action: 'author-space-view', embedsMap: true, drawsContentArea: false },
   resolveContent: (content, via): SpaceContent => ({
     kind: SPACE_KIND_ID,
-    view: {
-      spaceId: content.spaceId,
-      map: content.map,
-      graph: content.graph,
-      framing: content.framing,
-    },
+    view: viewOf(content),
     via,
   }),
   spaceReferences: (content) => [content.spaceId],
-  selectionProblem,
   selection: {
-    of: (content) => ({
-      spaceId: content.spaceId,
-      map: content.map,
-      graph: content.graph,
-      framing: content.framing,
-    }),
+    of: viewOf,
     select: (content, choice): SpaceResourceContent => {
       const { framing, ...selected } = content;
       const chosen = { ...selected, map: choice.map, graph: choice.graph };
       return framing === undefined || choice.map !== content.map ? chosen : { ...chosen, framing };
     },
     frame: (content, framing): SpaceResourceContent => ({ ...content, framing }),
+    problem: selectionProblem,
   },
 });
 

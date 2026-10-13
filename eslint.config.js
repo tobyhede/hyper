@@ -248,12 +248,11 @@ const KIND_FEATURE_FILES = [
   'packages/persistence/src/http-protocol.ts',
   // A stored image's id and collection path are an Image Resource's (ADR 0106).
   'packages/persistence/src/images.ts',
-  // The Space Resource lifecycle (ADR 0074), and two reads of its selection,
-  // unbuilt behind the module (.scratch/resource-kind-modules/issues/10, F).
+  // The Space Resource lifecycle (ADR 0074): its create.
   'packages/persistence/src/space-resource-planning.ts',
   // A stored image's bytes travel with the Image Resource that references it (ADR 0118).
   'src/aggregate-directory/images.ts',
-  // A Space Resource's portal; a Markdown body's completion.
+  // A Markdown body's completion.
   'packages/app/src/canvas-resource-authoring.ts',
   // The Space glyph on the Space cluster's own controls.
   'packages/app/src/components/CommandDockSpaces.tsx',
