@@ -50,25 +50,33 @@ const REFERENCE: ResourceDocument = {
 
 describe("the Space kind's own check of its selection", () => {
   it('accepts a Map of the target and a Graph that Map owns', () => {
-    expect(spaceKind.selectionProblem(selecting(MAP, GRAPH), TARGET)).toBeUndefined();
+    expect(
+      spaceSelectionProblem({ ...SPACE_RESOURCE, content: selecting(MAP, GRAPH) }, TARGET),
+    ).toBeUndefined();
   });
 
   it('refuses a missing Map first, though its Graph is missing too', () => {
-    expect(spaceKind.selectionProblem(selecting(ABSENT, ABSENT), TARGET)).toEqual({
+    expect(
+      spaceSelectionProblem({ ...SPACE_RESOURCE, content: selecting(ABSENT, ABSENT) }, TARGET),
+    ).toEqual({
       kind: 'space-resource-map-missing',
       mapId: ABSENT,
     });
   });
 
   it('refuses a Graph the target does not have before asking whether the Map owns it', () => {
-    expect(spaceKind.selectionProblem(selecting(MAP, ABSENT), TARGET)).toEqual({
+    expect(
+      spaceSelectionProblem({ ...SPACE_RESOURCE, content: selecting(MAP, ABSENT) }, TARGET),
+    ).toEqual({
       kind: 'space-resource-graph-missing',
       graphId: ABSENT,
     });
   });
 
   it("refuses a Graph of the target that is another Map's", () => {
-    expect(spaceKind.selectionProblem(selecting(MAP, OTHER_GRAPH), TARGET)).toEqual({
+    expect(
+      spaceSelectionProblem({ ...SPACE_RESOURCE, content: selecting(MAP, OTHER_GRAPH) }, TARGET),
+    ).toEqual({
       kind: 'space-resource-graph-outside-map',
       mapId: MAP,
       graphId: OTHER_GRAPH,

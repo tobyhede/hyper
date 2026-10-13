@@ -1,4 +1,5 @@
 import {
+  spaceReferences,
   DEFAULT_RESOURCE_SHAPE,
   resourceOpen,
   resourceShape,
@@ -9,11 +10,7 @@ import {
   type Map,
   type UUID,
 } from '@project/core';
-import {
-  declaredSpaceReferences,
-  resourceReferenceProblems,
-  type ResourceReferenceProblem,
-} from './declared-references';
+import { resourceReferenceProblems, type ResourceReferenceProblem } from './declared-references';
 import { repeatedGraphEdges } from './graph-edges';
 
 /**
@@ -295,18 +292,12 @@ export function validateReferences(space: Referenceable): SpaceReferenceError[] 
 
   // A Space reference to the Space holding it is a cycle intake can see without
   // the aggregate; the aggregate refuses the longer ones.
-  const { references } = declaredSpaceReferences([
-    {
-      id: space.id,
-      resources: space.resources.map((resource) => ({ id: resource.id, document: resource })),
-    },
-  ]);
-  for (const reference of references) {
-    if (reference.targetSpaceId !== space.id) continue;
+  for (const resource of space.resources) {
+    if (!spaceReferences(resource).includes(space.id)) continue;
     errors.push({
       kind: 'space-reference-cycle',
       ref: space.id,
-      message: `Resource "${reference.resourceId}" references its own Space "${space.id}"`,
+      message: `Resource "${resource.id}" references its own Space "${space.id}"`,
     });
   }
 

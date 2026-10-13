@@ -1,4 +1,4 @@
-import { spaceSelectionProblem, type UUID } from '@project/core';
+import { spaceReferences, spaceSelectionProblem, type UUID } from '@project/core';
 import {
   declaredSpaceReferences,
   missingSpaceReferences,
@@ -138,18 +138,21 @@ export function loadSpaceAggregate({
   errors.push(...missingSpaceReferences(declared).map(located('space-reference-missing')));
   if (errors.length > 0) return { ok: false, errors };
 
-  for (const { spaceId, resourceId, targetSpaceId } of declared.references) {
-    const target = byId.get(targetSpaceId);
-    const resource = byId.get(spaceId)?.lookup.resource(resourceId);
-    // Missing targets were returned above, so this only keeps the type-level
-    // boundary between Map lookup and the validated topology.
-    if (target === undefined || resource === undefined) continue;
-    const problem = spaceSelectionProblem(resource, {
-      mapGraphIds: (mapId) => target.lookup.map(mapId)?.map.graphs.map((graph) => graph.id),
-      hasGraph: (graphId) => target.lookup.graph(graphId) !== undefined,
-    });
-    if (problem === undefined) continue;
-    errors.push({ ...problem, spaceId, resourceId, targetSpaceId });
+  for (const space of spaces) {
+    for (const resource of space.resources) {
+      for (const targetSpaceId of spaceReferences(resource)) {
+        const target = byId.get(targetSpaceId);
+        // Missing targets were returned above, so this only keeps the type-level
+        // boundary between Map lookup and the validated topology.
+        if (target === undefined) continue;
+        const problem = spaceSelectionProblem(resource, {
+          mapGraphIds: (mapId) => target.lookup.map(mapId)?.map.graphs.map((graph) => graph.id),
+          hasGraph: (graphId) => target.lookup.graph(graphId) !== undefined,
+        });
+        if (problem === undefined) continue;
+        errors.push({ ...problem, spaceId: space.id, resourceId: resource.id, targetSpaceId });
+      }
+    }
   }
   if (errors.length > 0) return { ok: false, errors };
 

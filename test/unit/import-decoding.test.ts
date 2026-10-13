@@ -88,8 +88,8 @@ describe('import decoding', () => {
    * counts.
    *
    * **Every fault is a title the schema refuses**, because `identifySpace` takes
-   * an `ImportSpace` rather than unproven input: it walks the maps and the
-   * resources to mint what they left out *before* it parses, so a wrong-typed
+   * an `ImportSpace` rather than unproven input: it walks the maps to mint
+   * what they left out *before* it parses, so a wrong-typed
    * `maps` never reaches the summariser at all — it throws a `TypeError` on
    * the way. A blank title is a fault the type permits and the schema names, at
    * five nested paths, which is what lets the counts be built without handing

@@ -1,7 +1,12 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { z } from 'zod';
 import type { ContentFacts, ContentVia } from '../resource-content';
-import type { SpaceSelectionTarget, SpaceSelectionProblem } from './space';
+import type {
+  SpaceSelectionTarget,
+  SpaceSelectionProblem,
+  spaceResourceContentSchema,
+  spaceResourceFramingSchema,
+} from './space';
 import type { UUID } from '../types';
 
 /**
@@ -54,12 +59,10 @@ export interface KindFileCodec<Content, FileContent> {
   ) => FileContentDecoding;
 }
 
+type SpaceResourceContent = z.infer<typeof spaceResourceContentSchema>;
+
 /** The Map-coordinate centre and scale one window onto another Space is framed at. */
-export interface SpaceFraming {
-  readonly centreX: number;
-  readonly centreY: number;
-  readonly zoom: number;
-}
+export type SpaceFraming = Readonly<z.infer<typeof spaceResourceFramingSchema>>;
 
 /**
  * The view of another Space a Resource shows: the Space, a Map of it, a Graph
@@ -69,17 +72,14 @@ export interface SpaceFraming {
  * by a conditional spread.
  */
 export interface SpaceView {
-  readonly spaceId: UUID;
-  readonly map: UUID;
-  readonly graph: UUID;
+  readonly spaceId: SpaceResourceContent['spaceId'];
+  readonly map: SpaceResourceContent['map'];
+  readonly graph: SpaceResourceContent['graph'];
   readonly framing: SpaceFraming | undefined;
 }
 
 /** A Map and one of its Graphs, chosen in the Space a selection shows. */
-export interface SpaceViewChoice {
-  readonly map: UUID;
-  readonly graph: UUID;
-}
+export type SpaceViewChoice = Pick<SpaceView, 'map' | 'graph'>;
 
 /**
  * How a kind whose content shows a view of another Space reads and changes it
@@ -93,6 +93,11 @@ export interface SpaceSelection<Content> {
   readonly select: (content: Content, choice: SpaceViewChoice) => Content;
   /** The content framed as given. */
   readonly frame: (content: Content, framing: SpaceFraming) => Content;
+  /** The kind's own check of this content's selection in a target Space it alone understands. */
+  readonly problem: (
+    content: Content,
+    target: SpaceSelectionTarget,
+  ) => SpaceSelectionProblem | undefined;
 }
 
 /** What a kind's content resolves to: tagged with a kind, and reached `via` its own Resource or a Reference. */
@@ -128,11 +133,6 @@ export interface KindModule<
   readonly contentTarget: (content: Content) => UUID | undefined;
   /** The Spaces this content references, from which the core enforces cycles, lifetime and rooting. */
   readonly spaceReferences: (content: Content) => readonly UUID[];
-  /** The kind's own check of a selection in a target Space it alone understands. */
-  readonly selectionProblem: (
-    content: Content,
-    target: SpaceSelectionTarget,
-  ) => SpaceSelectionProblem | undefined;
   /** How this kind's content shows a view of another Space, when it shows one. */
   readonly selection?: SpaceSelection<Content>;
   /** The content as Export writes it, so a file's bytes do not depend on how it was built. */
@@ -228,7 +228,6 @@ export function defineKind<K extends string, Content, Resolved extends KindResol
     resourceReferences: () => [],
     contentTarget: () => undefined,
     spaceReferences: () => [],
-    selectionProblem: () => undefined,
     canonicalContent: inSchemaOrder(declaration.contentSchema),
     file: asWritten<unknown>(declaration.contentSchema),
     ...declaration,

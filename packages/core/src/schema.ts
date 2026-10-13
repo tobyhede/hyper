@@ -502,5 +502,5 @@ export const importSpaceFileSchema = importSpaceFileObjectSchema;
 export const importSpaceSchema = z.object({
   id: uuidSchema.optional(),
   document: importSpaceFileObjectSchema.omit({ id: true }),
-  resources: z.array(z.object({ id: uuidSchema, document: resourceDocumentSchema })),
+  resources: spaceSnapshotSchema.shape.resources,
 });
