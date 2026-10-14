@@ -1,4 +1,4 @@
-import { authorsContent, markdownKind, type MarkdownContent } from '@project/core';
+import { authorsContent, isOwnContent, markdownKind, type MarkdownContent } from '@project/core';
 import type { MarkdownResourceBodyEditor } from '../MarkdownResourceBody';
 import type { ResourceDisplay } from '../resource-display';
 import { EditIcon, MarkdownIcon } from '../icons';
@@ -81,7 +81,8 @@ export function beginEditing<D extends ResourceDisplay>(
 ): D | Extract<ResourceDisplay, { readonly kind: typeof markdownKind.id }> {
   if (display.shown !== 'open') return display;
   const content = display.content;
-  if (!authorsContent(content) || content.kind !== markdownKind.id) return display;
+  if (!isOwnContent(content) || !authorsContent(content) || content.kind !== markdownKind.id)
+    return display;
   return {
     shown: 'editing',
     kind: markdownKind.id,

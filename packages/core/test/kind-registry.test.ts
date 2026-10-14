@@ -1,4 +1,3 @@
-import type { z } from 'zod';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   KIND_IDS,
@@ -15,8 +14,7 @@ import {
 } from '../src/kinds/registry';
 import { uuidSchema } from '../src/schema';
 import { imageKind } from '../src/kinds/image';
-import { markdownKind, type markdownResourceContentSchema } from '../src/kinds/markdown';
-import type { KindResolvedContent } from '../src/kinds/kind-module';
+import { markdownKind } from '../src/kinds/markdown';
 import { referenceKind } from '../src/kinds/reference';
 import { spaceKind } from '../src/kinds/space';
 import { urKind } from '../src/kinds/ur';
@@ -87,14 +85,17 @@ describe('where resolved content came from', () => {
   });
 
   it('is not said by any kind module', () => {
-    expectTypeOf<KindResolvedContent>().not.toHaveProperty('via');
-    expectTypeOf<Parameters<typeof markdownKind.resolveContent>>().toEqualTypeOf<
-      [z.infer<typeof markdownResourceContentSchema>]
-    >();
-    expect(markdownKind.resolveContent(NOTES.content)).toEqual({
-      kind: markdownKind.id,
-      source: 'Notes',
-    });
+    expectTypeOf<ReturnType<typeof markdownKind.resolveContent>>().not.toHaveProperty('via');
+    expectTypeOf<ReturnType<typeof imageKind.resolveContent>>().not.toHaveProperty('via');
+    expectTypeOf<ReturnType<typeof spaceKind.resolveContent>>().not.toHaveProperty('via');
+    expectTypeOf<ReturnType<typeof urKind.resolveContent>>().not.toHaveProperty('via');
+    expectTypeOf<ReturnType<typeof referenceKind.resolveContent>>().toEqualTypeOf<never>();
+    for (const doc of OWN)
+      expect(resolveContent(doc, () => undefined)).toHaveProperty('via', 'self');
+  });
+
+  it('never asks the Reference kind to resolve content, which it has none of', () => {
+    expect(() => referenceKind.resolveContent({ target: TARGET })).toThrow();
   });
 });
 

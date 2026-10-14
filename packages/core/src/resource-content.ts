@@ -30,15 +30,14 @@ export interface ContentFacts {
 /** A Resource's own content: never its content Target's (ADR 0070). */
 export type OwnResourceContent = ResourceContent & { readonly via: 'self' };
 
-/**
- * Whether an author may change this content here: the Resource's own, of a
- * kind whose content is authored. When it may, the content is the Resource's
- * own; when it may not, nothing is ruled out, since own content of a kind no
- * author changes answers no too. That holds for content typed as the whole
- * `ResourceContent`: content already typed as own would narrow to `never` on no.
- */
-export function authorsContent(content: ResourceContent): content is OwnResourceContent {
-  return content.via === 'self' && contentFacts(content).authored;
+/** Whether this content is the Resource's own rather than its content Target's. */
+export function isOwnContent(content: ResourceContent): content is OwnResourceContent {
+  return content.via === 'self';
+}
+
+/** Whether an author may change this content here: the Resource's own, of a kind whose content is authored. */
+export function authorsContent(content: ResourceContent): boolean {
+  return isOwnContent(content) && contentFacts(content).authored;
 }
 
 /** Whether this content draws a Map inside its Resource. */

@@ -2,6 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   authorsContent,
+  isOwnContent,
   embedsMap,
   drawsContentArea,
   uuidSchema,
@@ -49,14 +50,13 @@ describe('content facts', () => {
     );
   });
 
-  it('narrows to the Resource’s own content, and rules nothing out when it answers no', () => {
-    const narrowed = (content: ResourceContent) => {
-      if (authorsContent(content)) return expectTypeOf(content).toEqualTypeOf<OwnResourceContent>();
-      return expectTypeOf(content).toEqualTypeOf<ResourceContent>();
-    };
-    for (const content of [...contents('self'), ...contents('target'), UNRESOLVED])
-      narrowed(content);
+  it('narrows to the Resource’s own content exactly when it is its own', () => {
+    for (const content of [...contents('self'), ...contents('target'), UNRESOLVED]) {
+      expect(isOwnContent(content)).toBe(content.via === 'self');
+      if (isOwnContent(content)) expectTypeOf(content).toEqualTypeOf<OwnResourceContent>();
+    }
     expectTypeOf<OwnResourceContent['via']>().toEqualTypeOf<'self'>();
+    expectTypeOf(authorsContent).returns.toEqualTypeOf<boolean>();
   });
 
   it('answers Map embedding and content area regardless of via', () => {

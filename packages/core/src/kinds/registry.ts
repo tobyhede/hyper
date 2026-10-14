@@ -119,9 +119,7 @@ type Reached<Resolved> = Resolved extends unknown ? Resolved & { readonly via: C
  * What a Resource's content is, as its kind resolves it. `unresolved` answers
  * only states intake refuses: a content Target that is missing or may not be one.
  */
-export type ResourceContent =
-  | Reached<Exclude<ResolvedByKind[KindId], { readonly kind: ContentUnresolved['kind'] }>>
-  | ContentUnresolved;
+export type ResourceContent = Reached<ResolvedByKind[KindId]> | ContentUnresolved;
 
 /** What a Resource shows when its content Target is missing or may not be one: nothing. */
 export const UNRESOLVED_CONTENT: ContentUnresolved = { kind: 'unresolved', via: 'target' };
@@ -225,20 +223,19 @@ const resolveContentOf = <K extends KindId>(
   const resolved: ResolvedByKind[KindId] = KIND_MODULES[resource.kind].resolveContent(
     resource.content,
   );
-  return resolved.kind === UNRESOLVED_CONTENT.kind ? UNRESOLVED_CONTENT : { ...resolved, via };
+  return { ...resolved, via };
 };
 
 /**
  * What a Resource draws as its content, with at most one Target lookup: its
  * own, or the content Target's its kind names (ADR 0070), which the result says
- * and no kind module does. A missing Resource, a missing Target and a Target
- * that may not be one are the states intake refuses, and resolve as unresolved.
+ * and no kind module does. A missing Target and a Target that may not be one
+ * are the states intake refuses, and resolve as unresolved.
  */
 export const resolveContent = (
-  resource: KindedResource | undefined,
+  resource: KindedResource,
   resourceOf: (id: UUID) => KindedResource | undefined,
 ): ResourceContent => {
-  if (resource === undefined) return UNRESOLVED_CONTENT;
   const targetId = contentTarget(resource);
   if (targetId === undefined) return resolveContentOf(resource, 'self');
   const target = resourceOf(targetId);

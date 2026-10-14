@@ -1,7 +1,6 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
 import { uuidSchema } from '../uuid';
-import type { ContentUnresolved } from '../resource-content';
 import { defineKind } from './kind-module';
 
 /** A Reference Resource's content: a pointer to the resource whose content it shows. */
@@ -31,8 +30,14 @@ export const referenceKind = defineKind({
     mayBeTarget: false,
     ownsReferencedSpaces: false,
   },
-  /** A Reference reached as a Target shows nothing: intake refuses a Reference to a Reference. */
-  resolveContent: (): Omit<ContentUnresolved, 'via'> => ({ kind: 'unresolved' }),
+  /**
+   * Never asked: a Reference names a content Target, so its own content is
+   * never resolved, and it may not be a Target, so the registry answers
+   * unresolved before reaching it.
+   */
+  resolveContent: (): never => {
+    throw new Error('A Reference Resource has no content of its own to resolve.');
+  },
   resourceReferences: (content) => [content.target],
   contentTarget: (content) => content.target,
 });
