@@ -27,8 +27,16 @@ export interface ContentFacts {
   readonly drawsContentArea: boolean;
 }
 
-/** Whether an author may change this content here: the Resource's own, of a kind whose content is authored. */
-export function authorsContent(content: ResourceContent): boolean {
+/** A Resource's own content: never its content Target's (ADR 0070). */
+export type OwnResourceContent = ResourceContent & { readonly via: 'self' };
+
+/**
+ * Whether an author may change this content here: the Resource's own, of a
+ * kind whose content is authored. When it may, the content is the Resource's
+ * own; when it may not, nothing is ruled out, since own content of a kind no
+ * author changes answers no too.
+ */
+export function authorsContent(content: ResourceContent): content is OwnResourceContent {
   return content.via === 'self' && contentFacts(content).authored;
 }
 

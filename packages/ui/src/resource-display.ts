@@ -1,13 +1,11 @@
-import type { ResourceContent } from '@project/core';
+import type { OwnResourceContent, ResourceContent } from '@project/core';
 import type { KindEditByKind } from './kinds/registry';
 
 /** The kinds whose own content an author edits in its content area: each kind that declares an edit. */
 export type EditedKind = keyof KindEditByKind;
 
 /** A Resource's own content of one kind: never a Target's, reached by reference. */
-export type OwnContent<K extends EditedKind> = Extract<ResourceContent, { readonly kind: K }> & {
-  readonly via: 'self';
-};
+export type OwnContent<K extends EditedKind> = Extract<OwnResourceContent, { readonly kind: K }>;
 
 /** The edit running in an Open Resource's content area, one arm per kind that declares one. */
 type ContentEditing = {

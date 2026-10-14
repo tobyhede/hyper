@@ -63,7 +63,7 @@ export function beginReplacing<D extends ResourceDisplay>(
   return {
     shown: 'editing',
     kind: imageKind.id,
-    content: { ...content, via: 'self' },
+    content,
     edit: replacer,
   };
 }

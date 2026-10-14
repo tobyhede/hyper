@@ -85,7 +85,7 @@ export function beginEditing<D extends ResourceDisplay>(
   return {
     shown: 'editing',
     kind: markdownKind.id,
-    content: { ...content, via: 'self' },
+    content,
     edit: { editor, autoFocus },
   };
 }

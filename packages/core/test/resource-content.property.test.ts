@@ -1,11 +1,12 @@
 import fc from 'fast-check';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   authorsContent,
   embedsMap,
   drawsContentArea,
   uuidSchema,
   type ContentVia,
+  type OwnResourceContent,
   type ResourceContent,
 } from '../src/index';
 
@@ -46,6 +47,16 @@ describe('content facts', () => {
         expect(offered).toBe(content.via === 'self' && content.kind !== 'ur');
       }),
     );
+  });
+
+  it('narrows to the Resource’s own content, and rules nothing out when it answers no', () => {
+    const narrowed = (content: ResourceContent) => {
+      if (authorsContent(content)) return expectTypeOf(content).toEqualTypeOf<OwnResourceContent>();
+      return expectTypeOf(content).toEqualTypeOf<ResourceContent>();
+    };
+    for (const content of [...contents('self'), ...contents('target'), UNRESOLVED])
+      narrowed(content);
+    expectTypeOf<OwnResourceContent['via']>().toEqualTypeOf<'self'>();
   });
 
   it('answers Map embedding and content area regardless of via', () => {
