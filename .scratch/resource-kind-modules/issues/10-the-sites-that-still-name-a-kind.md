@@ -1,6 +1,6 @@
 # 10 — The sites that still name a kind outside the modules
 
-Status: ready-for-human
+Status: resolved
 
 **Why:** ADR 0128 says a kind is declared in its module and named nowhere else. Tickets 08 and 09 routed the dispatches and made the module the parser of its content, but adding a kind still edits files outside `kinds/`, and the reviews of the stack found that tickets 08 and 09 overstated how much was done. This ticket records what is unbuilt, so nothing claims it is.
 
@@ -22,7 +22,7 @@ The enforcement is an import ban: outside `kinds/`, no file may import a name a 
 ## The unbuilt gaps
 
 - **Content commands** (candidate C): routed by C (2026-10-13). `ContentAction`, the closed union of one command per kind, is gone: each kind's core module declares whether its content is `authored`, each view half names its `contentCommand`, and the display holds one `editing` arm per kind, so neither `resource-display.ts` nor `CanvasResource` and `ResourceNode` choose by kind. What still names a kind is listed under C below.
-- **Content reached through a Reference**: `ContentVia` names `ReferenceKindId`. It is a feature of the Reference kind alone today, but a second kind that may reach another's content would have to edit the core.
+- **Content reached through a Reference**: routed by [issue 12](12-the-registry-says-where-content-came-from.md) (2026-10-14). `ContentVia` named `ReferenceKindId`; it is now `'self' | 'target'`, said by the registry from a kind's content Target and by no kind module, and unresolved content is the registry's. [Issue 13](13-checking-authorship-narrows-the-content.md) made `authorsContent` a type guard to the Resource's own content.
 - **Creation** (candidate E): routed by [issue 11](11-each-kind-declares-its-create.md). Each kind's app half declares its Command Dock Create, and the Dock draws an opaque list.
 - **The Space selection** (candidate F): routed by F (2026-10-13). `sql-space-repository.ts` and `space-resource-planning.ts` read a Space Resource's view through the core registry's `spaceSelection`, and the deletion plan changes it through `selectSpaceView`, so neither compares it by kind.
 - **Decoration contexts**: routed by D (2026-10-13). Each kind's context type sits in its own app module, and the app registry derives the context they read together from its table of decorations, so it names no kind's context or field; a field two kinds read with different types fails to compile there.
@@ -54,7 +54,21 @@ Each is grilled with Toby before it is built; candidate A became ticket 09.
 - **E — each kind declares its creation input.** Built as issue 11, with no creation mode: each kind's app half owns its Create.
 - **F — the Space selection inside the Space module.** Selection reads and comparisons behind the Space kind's module.
   **Built (2026-10-13):** a kind whose content shows a view of another Space declares `selection` (`of`, `select`, `frame`; `SpaceSelection` in `kind-module.ts`), and the Space kind is the one that does. The registry answers `spaceSelection`, `selectSpaceView` and `frameSpaceView`, and `SpaceView` and `SpaceFraming` are kind-neutral types in `kind-module.ts`. The SQL fast path, the Map and Graph deletion plan and the canvas's selection and framing completions read and change the view through them, so their kind comparisons are gone, and the Space rail, its context commands and the framing helper take a `SpaceView` and leave the import ban's exemptions. `select` drops a framing when the Map changes, the rule the deletion plan and the canvas each kept on their own. `ui`'s `spaceViewOf` reads a display state and stays with candidate C.
-- **G — registry pass-throughs** (speculative): functions in the registries that only forward to a module.
-- **H — stable content identity** (speculative).
+- **G — registry pass-throughs** (speculative): functions in the registries that only forward to a module. Dropped (Toby, 2026-10-13).
+- **H — stable content identity** (speculative). Dropped (Toby, 2026-10-13).
 
 **Acceptance:** each gap above is routed or deliberately kept with its reason, and the counts reach what remains.
+
+## Answer
+
+Resolved 2026-10-14. Every gap above is routed or kept with its reason: B, C, D and F were built (2026-10-13), E was built as issue 11, content provenance was routed by issues 12 and 13, and G and H were dropped as speculative. [`../kind-sites.md`](../kind-sites.md) was checked row by row against the code on 2026-10-14 and lists every site still counted; `test/unit/kind-ids-in-modules.test.ts` and the import ban hold the counts to it, and both lists only shrink.
+
+What stays, deliberately, and why:
+
+- **Features of one kind alone.** The Space Resource's embedded Map, portal, menu, Enter and Dock glyph; the Ur Resource's Shape menu; the Image Resource's stored images and natural size (ADR 0106, ADR 0118); the kinds a Reference badge sits on. Each exists for its kind and has no second kind to route among.
+- **Creation outside the Command Dock.** Keyboard add, paste and drop stayed out of issue 11's scope, so a new Image document, the image-URL rule on paste, a new Reference Resource and Create Reference's glyph still name their kind; the Space Resource lifecycle's create (ADR 0074) names Space.
+- **Content commands still counted after C.** The Markdown body's completion guard and Replace's Image guards.
+- **Package surfaces.** `packages/core/src/index.ts` and `packages/ui/src/index.ts` re-export each kind module.
+- **The `resource-has-references` sentence** in `packages/app/src/authoring-refusal.ts` still says "Reference Resources", because only the Reference kind declares Resource references.
+
+A string literal standing for one kind is still seen by neither guard; `kind-sites.md` says so under "What is not covered by any mechanism".

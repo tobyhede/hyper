@@ -1,6 +1,6 @@
 # 14 — Close issue 10
 
-Status: ready-for-agent
+Status: resolved
 
 **Why:** once 12 lands, every gap issue 10 records is routed or deliberately kept, but the ticket, the site table, AGENTS.md and the spec still say the work is open.
 
@@ -8,6 +8,10 @@ Status: ready-for-agent
 
 **Blocked by:** 12 — The registry says where content came from; 13 — Checking authorship narrows the content.
 
-- [ ] Issue 10 is `Status: resolved` with an Answer that satisfies its own acceptance.
-- [ ] Every row of `../kind-sites.md` names a line on main that still names a kind, and the kind-ids scan and import ban agree with it.
-- [ ] AGENTS.md and `../spec.md` no longer call issue 10 open.
+- [x] Issue 10 is `Status: resolved` with an Answer that satisfies its own acceptance.
+- [x] Every row of `../kind-sites.md` names a line on main that still names a kind, and the kind-ids scan and import ban agree with it.
+- [x] AGENTS.md and `../spec.md` no longer call issue 10 open.
+
+## Answer
+
+Built (2026-10-14). Issue 10 is resolved with an Answer listing what was routed and what stays, each with its reason. `../kind-sites.md` was checked row by row: the Space Resource targets row (no longer naming `spaceKind`) is gone and seven drifted line numbers are corrected. The ADR 0128 entry in AGENTS.md now reads "built", points at `kind-sites.md` for the sites kept, and no longer cites issue 10 as open; the spec's "Not met" note says the same.

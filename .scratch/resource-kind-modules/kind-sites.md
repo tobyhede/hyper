@@ -1,6 +1,6 @@
 # Sites outside `kinds/` that name a Resource kind
 
-Read on 2026-10-12, when ticket 10 was filed, and refreshed on 2026-10-13 after candidates B, C, D and F; line numbers are the latter's. Issue 11 removed the Command Dock's Create sites (`CommandDockResources.tsx`, `command-dock-chrome.ts`, `dock-chrome.ts`'s Create routing and availability, and `InputFreeResourceKind`): each kind's app half now declares its Create.
+Read on 2026-10-12, when ticket 10 was filed, refreshed on 2026-10-13 after candidates B, C, D and F, and checked row by row on 2026-10-14 after issues 12 and 13; line numbers are the last's. Issue 11 removed the Command Dock's Create sites (`CommandDockResources.tsx`, `command-dock-chrome.ts`, `dock-chrome.ts`'s Create routing and availability, and `InputFreeResourceKind`): each kind's app half now declares its Create.
 
 Categories: **one-kind** = a feature that exists for that kind alone; **registry** = a dispatch among kinds that belongs in a registry; **C** = content command (Edit/Replace/author-space-view); **E** = creation; **F** = Space Resource selection; **display** = display state or glyph.
 
@@ -20,8 +20,7 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/space-authoring.ts:115 | `imageKind.id`: new Image Resource document | image | E | space-authoring.ts |
 | packages/app/src/space-authoring.ts:1244 | `imageKind.id`: Replace refuses another kind | image | C | space-authoring.ts |
 | packages/app/src/space-authoring.ts:1318 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
-| packages/app/src/space-resource-targets.ts:171 | `spaceKind.id`: Space Resources referencing a Meta entry | space | one-kind | space-resource-targets.ts |
-| packages/persistence/src/space-resource-planning.ts:333 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
+| packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
 | src/aggregate-directory/images.ts:145 | `imageKind.id`: stored image travels with its Resource | image | one-kind | src/aggregate-directory/images.ts |
 
 `packages/app/src/resource-deletion.ts` no longer reaches a module id: Delete routes by `kindFlags(kind).ownsReferencedSpaces` (G02).
@@ -31,16 +30,16 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | file:line | what it names | kind | category | G19 exemption |
 |---|---|---|---|---|
 | packages/core/src/index.ts:11-15 | `export *` of each kind module | all | package surface | core/src/index.ts |
-| packages/core/src/types.ts:47 | `imageNaturalSizeSchema` -> `ImageNaturalSize` | image | one-kind | types.ts |
+| packages/core/src/types.ts:46 | `imageNaturalSizeSchema` -> `ImageNaturalSize` | image | one-kind | types.ts |
 | packages/ui/src/index.ts:17-19 | re-exports `beginEditing`, `beginReplacing`, `isSpaceOperations`, `spaceViewOf` | markdown, image, space | package surface | ui/src/index.ts |
 | packages/ui/src/icons.tsx:263 | `ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>` | reference | display (kinds a Reference badge sits on) | icons.tsx |
-| packages/ui/src/CanvasResource.tsx:302 | `isSpaceOperations`: the Space rail and portal | space | one-kind (portal) | CanvasResource.tsx |
-| packages/ui/src/CanvasResource.tsx:340 | `isUrOperations`: Shape menu | ur | one-kind | CanvasResource.tsx |
+| packages/ui/src/CanvasResource.tsx:301 | `isSpaceOperations`: the Space rail and portal | space | one-kind (portal) | CanvasResource.tsx |
+| packages/ui/src/CanvasResource.tsx:342 | `isUrOperations`: Shape menu | ur | one-kind | CanvasResource.tsx |
 | packages/react-flow-adapter/src/ResourceNode.tsx:334 | `isSpaceOperations(...).portal.editing` keeps the toolbar | space | one-kind | ResourceNode.tsx |
 | packages/persistence/src/http-protocol.ts:759 | `isAcceptedImageUrl`: stored image URL | image | one-kind (image-URL rule) | http-protocol.ts |
 | packages/persistence/src/images.ts:28,31 | `isStoredImageId`, `STORED_IMAGE_COLLECTION_PATH` | image | one-kind | persistence/src/images.ts |
-| packages/app/src/components/SpaceCanvas.tsx:1014,1659 | `spaceViewOf(...).view.framing` | space | one-kind (the Space kind's embedded Map) | SpaceCanvas.tsx |
-| packages/app/src/components/SpaceCanvas.tsx:1371 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
+| packages/app/src/components/SpaceCanvas.tsx:1015,1660 | `spaceViewOf(...).view.framing` | space | one-kind (the Space kind's embedded Map) | SpaceCanvas.tsx |
+| packages/app/src/components/SpaceCanvas.tsx:1372 | `isAcceptedImageUrl`: paste creates an Image Resource | image | E (image-URL rule) | SpaceCanvas.tsx |
 | packages/app/src/embedded-open-space-resource.ts:214 | `spaceViewOf` | space | one-kind (the Space kind's embedded Map) | embedded-open-space-resource.ts |
 | packages/app/src/image-replacement.ts:113-114 | `isAcceptedImageUrl`, `IMAGE_URL_UNSUPPORTED` | image | C (image-URL rule) | image-replacement.ts |
 | packages/app/src/space-authoring.ts:113 | `Extract<ResourceDocument, { kind: ImageKindId }>` | image | E | space-authoring.ts |
