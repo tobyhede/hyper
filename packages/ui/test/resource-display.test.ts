@@ -15,7 +15,7 @@ const view: SpaceView = {
   framing: undefined,
 };
 
-const via = fc.constantFrom('self' as const, 'reference' as const);
+const via = fc.constantFrom('self' as const, 'target' as const);
 
 const content: fc.Arbitrary<ResourceContent> = fc.oneof(
   fc.record({ kind: fc.constant('markdown' as const), source: fc.string(), via }),
@@ -27,7 +27,7 @@ const content: fc.Arbitrary<ResourceContent> = fc.oneof(
   }),
   fc.record({ kind: fc.constant('space' as const), view: fc.constant(view), via }),
   fc.record({ kind: fc.constant('ur' as const), via }),
-  fc.constant({ kind: 'unresolved' as const, via: 'reference' as const }),
+  fc.constant({ kind: 'unresolved' as const, via: 'target' as const }),
 );
 
 const editor: CanvasResourceBodyEditor = { onComplete: () => 'completed', onEnd: () => undefined };
@@ -86,7 +86,7 @@ describe('the display states only a Resource’s own content enters', () => {
   });
 
   it('neither edits nor replaces an Open Ur Resource, its own or a Target’s', () => {
-    for (const reached of ['self', 'reference'] as const) {
+    for (const reached of ['self', 'target'] as const) {
       const open: ResourceDisplay = { shown: 'open', content: { kind: 'ur', via: reached } };
       expect(beginEditing(open, editor, true)).toBe(open);
       expect(beginReplacing(open, replacer)).toBe(open);
@@ -104,7 +104,7 @@ describe('the display states only a Resource’s own content enters', () => {
 
 describe('the Space view a display shows', () => {
   it('answers the view and how it was reached for an Open Space', () => {
-    for (const reached of ['self', 'reference'] as const)
+    for (const reached of ['self', 'target'] as const)
       expect(
         spaceViewOf({ shown: 'open', content: { kind: 'space', view, via: reached } }),
       ).toEqual({ view, via: reached });

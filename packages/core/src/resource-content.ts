@@ -1,15 +1,18 @@
-import type { ReferenceKindId } from './kinds/reference';
 import { contentFacts, type ResourceContent } from './kinds/registry';
 
 export type { ResourceContent } from './kinds/registry';
 
-/** Whether content is the Resource's own or reached through a Reference Resource (ADR 0070). */
-export type ContentVia = 'self' | ReferenceKindId;
+/**
+ * Whether content is the Resource's own or its content Target's, the Resource
+ * a kind shows the content of (ADR 0070). The registry says which, from the
+ * kind's content Target; no kind module says it.
+ */
+export type ContentVia = 'self' | 'target';
 
-/** No content: what a Reference Resource shows when its Target is missing or is itself a Reference. */
-export interface ReferenceContentUnresolved {
+/** No content: what a Resource shows when its content Target is missing or may not be one. */
+export interface ContentUnresolved {
   readonly kind: 'unresolved';
-  readonly via: ReferenceKindId;
+  readonly via: 'target';
 }
 
 /** What a kind's content lets an author do and how it is laid out (ADR 0114). */
@@ -24,9 +27,17 @@ export interface ContentFacts {
   readonly drawsContentArea: boolean;
 }
 
+/** A Resource's own content: never its content Target's (ADR 0070). */
+export type OwnResourceContent = ResourceContent & { readonly via: 'self' };
+
+/** Whether this content is the Resource's own rather than its content Target's. */
+export function isOwnContent(content: ResourceContent): content is OwnResourceContent {
+  return content.via === 'self';
+}
+
 /** Whether an author may change this content here: the Resource's own, of a kind whose content is authored. */
 export function authorsContent(content: ResourceContent): boolean {
-  return content.via === 'self' && contentFacts(content).authored;
+  return isOwnContent(content) && contentFacts(content).authored;
 }
 
 /** Whether this content draws a Map inside its Resource. */

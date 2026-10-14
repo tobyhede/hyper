@@ -1,11 +1,13 @@
 import fc from 'fast-check';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   authorsContent,
+  isOwnContent,
   embedsMap,
   drawsContentArea,
   uuidSchema,
   type ContentVia,
+  type OwnResourceContent,
   type ResourceContent,
 } from '../src/index';
 
@@ -16,9 +18,9 @@ const contents = (via: ContentVia): ResourceContent[] => [
   { kind: 'space', view: { spaceId: id, map: id, graph: id, framing: undefined }, via },
   { kind: 'ur', via },
 ];
-const UNRESOLVED: ResourceContent = { kind: 'unresolved', via: 'reference' };
+const UNRESOLVED: ResourceContent = { kind: 'unresolved', via: 'target' };
 
-const viaArbitrary = fc.constantFrom<ContentVia>('self', 'reference');
+const viaArbitrary = fc.constantFrom<ContentVia>('self', 'target');
 const contentArbitrary: fc.Arbitrary<ResourceContent> = fc.oneof(
   fc.record({ kind: fc.constant('markdown' as const), source: fc.string(), via: viaArbitrary }),
   fc.record({
@@ -42,10 +44,19 @@ describe('content facts', () => {
     fc.assert(
       fc.property(contentArbitrary, (content) => {
         const offered = authorsContent(content);
-        // `unresolved` is always `via: 'reference'`, so `via` alone excludes it.
+        // `unresolved` is always `via: 'target'`, so `via` alone excludes it.
         expect(offered).toBe(content.via === 'self' && content.kind !== 'ur');
       }),
     );
+  });
+
+  it('narrows to the Resource’s own content exactly when it is its own', () => {
+    for (const content of [...contents('self'), ...contents('target'), UNRESOLVED]) {
+      expect(isOwnContent(content)).toBe(content.via === 'self');
+      if (isOwnContent(content)) expectTypeOf(content).toEqualTypeOf<OwnResourceContent>();
+    }
+    expectTypeOf<OwnResourceContent['via']>().toEqualTypeOf<'self'>();
+    expectTypeOf(authorsContent).returns.toEqualTypeOf<boolean>();
   });
 
   it('answers Map embedding and content area regardless of via', () => {

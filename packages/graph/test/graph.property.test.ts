@@ -357,7 +357,7 @@ describe('resolved content, over generated Spaces of every kind', () => {
           if (target === undefined) throw new Error('intake accepted a missing Target');
           expect(resolveResourceContent(space, resource)).toStrictEqual({
             ...resolveResourceContent(space, target),
-            via: 'reference',
+            via: 'target',
           });
         }
       }),

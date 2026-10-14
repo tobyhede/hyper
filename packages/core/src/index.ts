@@ -25,6 +25,7 @@ export {
   lifetimeSpaceReferences,
   mayBeTarget,
   DEFAULT_KIND,
+  UNRESOLVED_CONTENT,
   newDefaultResourceDocument,
   newResourceDocument,
   resolveContent,

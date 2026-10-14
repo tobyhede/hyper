@@ -50,8 +50,8 @@ export const isSpaceOperations = (operations: {
 
 /**
  * The Space view an Open Resource shows, and whether it is the
- * Resource's own or its Target's. A Space reached through a Reference Resource
- * is drawn read-only (ADR 0070). A Closed display shows no Space.
+ * Resource's own or its content Target's. A Space reached through a content
+ * Target is drawn read-only (ADR 0070). A Closed display shows no Space.
  */
 export function spaceViewOf(
   display: ResourceDisplay,

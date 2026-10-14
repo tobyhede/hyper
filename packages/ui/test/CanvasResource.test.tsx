@@ -35,14 +35,14 @@ it('takes a Reference Resource’s content-area layout from its Target, includin
     graphColor: '#ffc53d',
   };
   const { rerender } = render(
-    <CanvasResource {...props} display={opened({ kind: 'ur', via: 'reference' })} />,
+    <CanvasResource {...props} display={opened({ kind: 'ur', via: 'target' })} />,
   );
   const resource = screen.getByRole('article', { name: 'A' });
   expect(resource).not.toHaveAttribute('data-content-area');
   rerender(
     <CanvasResource
       {...props}
-      display={opened({ kind: 'markdown', source: 'Target body', via: 'reference' })}
+      display={opened({ kind: 'markdown', source: 'Target body', via: 'target' })}
     />,
   );
   expect(resource).toHaveAttribute('data-content-area', 'true');
@@ -459,7 +459,7 @@ describe('CanvasResource kind and interaction state', () => {
         display={opened({
           kind: 'image',
           url: FIGURE_URL,
-          via: 'reference',
+          via: 'target',
         })}
         state="selected"
         title="Figure, again"
@@ -491,7 +491,7 @@ describe('CanvasResource kind and interaction state', () => {
         display={opened({
           kind: 'image',
           url: FIGURE_URL,
-          via: 'reference',
+          via: 'target',
         })}
         state="selected"
         title="Figure"
@@ -510,7 +510,7 @@ describe('CanvasResource kind and interaction state', () => {
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
         onOpenChange={() => 'completed'}
-        display={opened({ kind: 'unresolved', via: 'reference' })}
+        display={opened({ kind: 'unresolved', via: 'target' })}
         state="rest"
         title="Dangling"
         graphColor="#ffc53d"
@@ -1109,12 +1109,12 @@ describe('CanvasResource Title ladder', () => {
       [{ kind: 'markdown' }, CLOSED_DISPLAY],
       [{ kind: 'markdown' }, opened({ kind: 'markdown', source: '', via: 'self' })],
       [{ kind: 'reference' }, CLOSED_DISPLAY],
-      [{ kind: 'reference' }, opened({ kind: 'markdown', source: '', via: 'reference' })],
+      [{ kind: 'reference' }, opened({ kind: 'markdown', source: '', via: 'target' })],
       [{ kind: 'space' }, CLOSED_DISPLAY],
       [{ kind: 'space' }, opened(SPACE_CONTENT)],
       [{ kind: 'ur' }, CLOSED_DISPLAY],
       [{ kind: 'ur' }, opened({ kind: 'ur', via: 'self' })],
-      [{ kind: 'reference' }, opened({ kind: 'ur', via: 'reference' })],
+      [{ kind: 'reference' }, opened({ kind: 'ur', via: 'target' })],
     ];
 
     for (const [kindOperations, display] of cases) {
@@ -1902,7 +1902,7 @@ describe('CanvasResource Close fade', () => {
         display={opened({
           kind: 'image',
           url: FIGURE_URL,
-          via: 'reference',
+          via: 'target',
         })}
         state="rest"
         title="A"
@@ -2009,7 +2009,7 @@ describe('CanvasResource Ur Resource', () => {
       <CanvasResource
         kindOperations={{ kind: 'reference' }}
         onOpenChange={() => 'completed'}
-        display={opened({ kind: 'ur', via: 'reference' })}
+        display={opened({ kind: 'ur', via: 'target' })}
         state="selected"
         title="Gateway, again"
         graphColor="#ffc53d"

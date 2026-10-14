@@ -313,7 +313,7 @@ describe('projectResourceNodes', () => {
       open: true,
       display: {
         shown: 'open',
-        content: { kind: 'markdown', source: '## Authored once', via: 'reference' },
+        content: { kind: 'markdown', source: '## Authored once', via: 'target' },
       },
     });
   });
@@ -390,7 +390,7 @@ describe('projectResourceNodes display', () => {
     });
     expect(display(referenceId, { openResourceIds })).toStrictEqual({
       shown: 'open',
-      content: { kind: 'image', url, via: 'reference' },
+      content: { kind: 'image', url, via: 'target' },
     });
   });
 });

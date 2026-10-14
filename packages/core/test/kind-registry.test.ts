@@ -5,7 +5,9 @@ import {
   isKindId,
   isRegisteredKind,
   newResourceDocument,
+  resolveContent,
   startsEmpty,
+  UNRESOLVED_CONTENT,
   resourceReferences,
   type EmptyCreatableKindId,
   type ResourceDocument,
@@ -56,6 +58,44 @@ describe("a kind's content Target", () => {
 
   it('is read for the Reference kind', () => {
     expect(REPRESENTATIVE.map((doc) => contentTarget(doc))).toContain(TARGET);
+  });
+});
+
+describe('where resolved content came from', () => {
+  const OWN = REPRESENTATIVE.filter((doc) => contentTarget(doc) === undefined);
+  const NOTES = { kind: markdownKind.id, content: { source: 'Notes' } } as const;
+  const RECAP = { kind: referenceKind.id, content: { target: TARGET } } as const;
+
+  it.each(OWN)('is the Resource itself when its kind names no Target: $kind $title', (doc) => {
+    expect(resolveContent(doc, () => undefined).via).toBe('self');
+  });
+
+  it('is the Target when its kind names one', () => {
+    expect(resolveContent(RECAP, () => NOTES)).toEqual({
+      kind: markdownKind.id,
+      source: 'Notes',
+      via: 'target',
+    });
+  });
+
+  it('is the Target when the Target cannot be reached, and names no kind', () => {
+    expect(resolveContent(RECAP, () => undefined)).toEqual(UNRESOLVED_CONTENT);
+    expect(resolveContent(RECAP, () => RECAP)).toEqual(UNRESOLVED_CONTENT);
+    expect(UNRESOLVED_CONTENT).toEqual({ kind: 'unresolved', via: 'target' });
+  });
+
+  it('is not said by any kind module', () => {
+    expectTypeOf<ReturnType<typeof markdownKind.resolveContent>>().not.toHaveProperty('via');
+    expectTypeOf<ReturnType<typeof imageKind.resolveContent>>().not.toHaveProperty('via');
+    expectTypeOf<ReturnType<typeof spaceKind.resolveContent>>().not.toHaveProperty('via');
+    expectTypeOf<ReturnType<typeof urKind.resolveContent>>().not.toHaveProperty('via');
+    expectTypeOf<ReturnType<typeof referenceKind.resolveContent>>().toEqualTypeOf<never>();
+    for (const doc of OWN)
+      expect(resolveContent(doc, () => undefined)).toHaveProperty('via', 'self');
+  });
+
+  it('never asks the Reference kind to resolve content, which it has none of', () => {
+    expect(() => referenceKind.resolveContent({ target: TARGET })).toThrow();
   });
 });
 

@@ -1,6 +1,5 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
-import type { ContentVia } from '../resource-content';
 import { defineKind, type KindFileCodec } from './kind-module';
 
 /** A Markdown Resource's content: the source its author wrote, which its file holds as the body. */
@@ -14,7 +13,6 @@ const MARKDOWN_KIND_ID = 'markdown';
 export interface MarkdownContent {
   readonly kind: typeof MARKDOWN_KIND_ID;
   readonly source: string;
-  readonly via: ContentVia;
 }
 
 /** The media type of a Markdown Resource's sidecar. */
@@ -98,10 +96,9 @@ export const markdownKind = defineKind({
     ownsReferencedSpaces: false,
   },
   facts: { authored: true, embedsMap: false, drawsContentArea: true },
-  resolveContent: (content, via): MarkdownContent => ({
+  resolveContent: (content): MarkdownContent => ({
     kind: MARKDOWN_KIND_ID,
     source: content.source,
-    via,
   }),
   canonicalContent: (content) => ({ source: content.source.replace(/\r\n?/g, '\n') }),
   file: markdownFile,

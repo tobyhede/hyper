@@ -127,7 +127,7 @@ describe('resolveResourceContent', () => {
     [
       'a Reference Resource to Markdown',
       TO_MARKDOWN,
-      { kind: 'markdown', source: 'Some notes.\n', via: 'reference' },
+      { kind: 'markdown', source: 'Some notes.\n', via: 'target' },
     ],
     [
       'a Reference Resource to an image',
@@ -135,15 +135,15 @@ describe('resolveResourceContent', () => {
       {
         kind: 'image',
         url: 'https://example.com/harbour.png',
-        via: 'reference',
+        via: 'target',
       },
     ],
     [
       'a Reference Resource to a Space',
       TO_SPACE,
-      { kind: 'space', view: framedView, via: 'reference' },
+      { kind: 'space', view: framedView, via: 'target' },
     ],
-    ['a Reference Resource to an Ur Resource', TO_UR, { kind: 'ur', via: 'reference' }],
+    ['a Reference Resource to an Ur Resource', TO_UR, { kind: 'ur', via: 'target' }],
   ])('resolves %s', (_, id, expected) => {
     expect(resolveResourceContent(space, of(id))).toStrictEqual(expected);
   });
@@ -165,7 +165,7 @@ describe('resolveResourceContent', () => {
     );
     expect(resolveResourceContent(refusedByIntake([dangling]), dangling)).toStrictEqual({
       kind: 'unresolved',
-      via: 'reference',
+      via: 'target',
     });
   });
 
@@ -175,7 +175,7 @@ describe('resolveResourceContent', () => {
     const second = reference('00000000-0000-4000-8000-000000000085', 'Second', first.id);
     expect(resolveResourceContent(refusedByIntake([target, first, second]), second)).toStrictEqual({
       kind: 'unresolved',
-      via: 'reference',
+      via: 'target',
     });
   });
 });

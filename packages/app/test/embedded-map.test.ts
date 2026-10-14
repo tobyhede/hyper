@@ -403,7 +403,7 @@ describe('an embedded production projection', () => {
         kind: 'reference',
         display: {
           shown: 'open',
-          content: { kind: 'markdown', source: 'Target content', via: 'reference' },
+          content: { kind: 'markdown', source: 'Target content', via: 'target' },
         },
       },
     });

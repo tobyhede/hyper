@@ -1,4 +1,4 @@
-import { authorsContent, imageKind, type ImageContent } from '@project/core';
+import { authorsContent, isOwnContent, imageKind, type ImageContent } from '@project/core';
 import type { ImageReplaceEditor } from '../ImageReplaceTarget';
 import type { ResourceDisplay } from '../resource-display';
 import { ImageIcon, ReplaceImageIcon } from '../icons';
@@ -59,11 +59,12 @@ export function beginReplacing<D extends ResourceDisplay>(
 ): D | Extract<ResourceDisplay, { readonly kind: typeof imageKind.id }> {
   if (display.shown !== 'open') return display;
   const content = display.content;
-  if (!authorsContent(content) || content.kind !== imageKind.id) return display;
+  if (!isOwnContent(content) || !authorsContent(content) || content.kind !== imageKind.id)
+    return display;
   return {
     shown: 'editing',
     kind: imageKind.id,
-    content: { ...content, via: 'self' },
+    content,
     edit: replacer,
   };
 }
