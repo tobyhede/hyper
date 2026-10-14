@@ -63,14 +63,13 @@ export interface SpaceLookup {
 }
 
 /**
- * What `resource` draws as its content. Markdown, Image, Space and Ur Resources
- * answer their own with `via: 'self'`; a Reference Resource answers its
- * Target's with `via: 'reference'`, following one hop (ADR 0009).
+ * What `resource` draws as its content: its own with `via: 'self'`, or, when
+ * its kind names a content Target, the Target's with `via: 'target'`,
+ * following one hop (ADR 0009).
  *
  * Total: it takes the Resource rather than an id, so there is nothing to not
  * find. `unresolved` answers the two states intake refuses and the lookup's
- * type cannot rule out: a missing Target, and a Target that is itself a
- * Reference Resource.
+ * type cannot rule out: a missing Target, and a Target that may not be one.
  */
 export function resolveResourceContent(space: Space, resource: Resource): ResourceContent {
   return resolveContent(resource, (id) => space.lookup.resource(id));

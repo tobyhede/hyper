@@ -228,18 +228,14 @@ const KIND_MODULE_IMPORTS = {
 const KIND_FEATURE_FILES = [
   // The core's surface, which re-exports every kind module.
   'packages/core/src/index.ts',
-  // Content reached through a Reference Resource names the Reference kind as the way it was reached.
-  'packages/core/src/resource-content.ts',
   // An Image Resource's natural size, as a type.
   'packages/core/src/types.ts',
   // The UI surface, which re-exports the kind view functions the application's one-kind features call.
   'packages/ui/src/index.ts',
   // The kinds a Reference badge sits on are every kind but Reference; the flag saying so is a runtime boolean, so no type reads it.
   'packages/ui/src/icons.tsx',
-  // A Space Resource's portal, an Ur Resource's Shape menu, and a Reference Resource's unreachable Target.
+  // A Space Resource's portal and an Ur Resource's Shape menu.
   'packages/ui/src/CanvasResource.tsx',
-  // A Reference Resource's unreachable Target, presented.
-  'packages/ui/src/PresentedResource.tsx',
   // A Space Resource's portal editing keeps its toolbar drawn.
   'packages/react-flow-adapter/src/ResourceNode.tsx',
   // A stored image's URL is held to what an Image Resource may record.

@@ -470,7 +470,7 @@ function Instance({
         content: {
           kind: 'markdown',
           source: 'Markdown content',
-          via: kind === 'reference' ? 'reference' : 'self',
+          via: kind === 'reference' ? 'target' : 'self',
         },
       }
     : CLOSED_DISPLAY;
@@ -599,7 +599,7 @@ export const OpenReference: Story = () => {
         content={{
           kind: 'markdown',
           source: '## Strategies\n\nNo strategy is privileged.',
-          via: 'reference',
+          via: 'target',
         }}
         nodeSize={open ? openFrame : closedFrame}
         stageClassName="inv-resource-node-stage--large"

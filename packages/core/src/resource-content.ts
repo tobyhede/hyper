@@ -1,15 +1,18 @@
-import type { ReferenceKindId } from './kinds/reference';
 import { contentFacts, type ResourceContent } from './kinds/registry';
 
 export type { ResourceContent } from './kinds/registry';
 
-/** Whether content is the Resource's own or reached through a Reference Resource (ADR 0070). */
-export type ContentVia = 'self' | ReferenceKindId;
+/**
+ * Whether content is the Resource's own or its content Target's, the Resource
+ * a kind shows the content of (ADR 0070). The registry says which, from the
+ * kind's content Target; no kind module says it.
+ */
+export type ContentVia = 'self' | 'target';
 
-/** No content: what a Reference Resource shows when its Target is missing or is itself a Reference. */
-export interface ReferenceContentUnresolved {
+/** No content: what a Resource shows when its content Target is missing or may not be one. */
+export interface ContentUnresolved {
   readonly kind: 'unresolved';
-  readonly via: ReferenceKindId;
+  readonly via: 'target';
 }
 
 /** What a kind's content lets an author do and how it is laid out (ADR 0114). */

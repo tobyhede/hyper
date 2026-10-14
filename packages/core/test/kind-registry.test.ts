@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   KIND_IDS,
@@ -5,14 +6,17 @@ import {
   isKindId,
   isRegisteredKind,
   newResourceDocument,
+  resolveContent,
   startsEmpty,
+  UNRESOLVED_CONTENT,
   resourceReferences,
   type EmptyCreatableKindId,
   type ResourceDocument,
 } from '../src/kinds/registry';
 import { uuidSchema } from '../src/schema';
 import { imageKind } from '../src/kinds/image';
-import { markdownKind } from '../src/kinds/markdown';
+import { markdownKind, type markdownResourceContentSchema } from '../src/kinds/markdown';
+import type { KindResolvedContent } from '../src/kinds/kind-module';
 import { referenceKind } from '../src/kinds/reference';
 import { spaceKind } from '../src/kinds/space';
 import { urKind } from '../src/kinds/ur';
@@ -56,6 +60,41 @@ describe("a kind's content Target", () => {
 
   it('is read for the Reference kind', () => {
     expect(REPRESENTATIVE.map((doc) => contentTarget(doc))).toContain(TARGET);
+  });
+});
+
+describe('where resolved content came from', () => {
+  const OWN = REPRESENTATIVE.filter((doc) => contentTarget(doc) === undefined);
+  const NOTES = { kind: markdownKind.id, content: { source: 'Notes' } } as const;
+  const RECAP = { kind: referenceKind.id, content: { target: TARGET } } as const;
+
+  it.each(OWN)('is the Resource itself when its kind names no Target: $kind $title', (doc) => {
+    expect(resolveContent(doc, () => undefined).via).toBe('self');
+  });
+
+  it('is the Target when its kind names one', () => {
+    expect(resolveContent(RECAP, () => NOTES)).toEqual({
+      kind: markdownKind.id,
+      source: 'Notes',
+      via: 'target',
+    });
+  });
+
+  it('is the Target when the Target cannot be reached, and names no kind', () => {
+    expect(resolveContent(RECAP, () => undefined)).toEqual(UNRESOLVED_CONTENT);
+    expect(resolveContent(RECAP, () => RECAP)).toEqual(UNRESOLVED_CONTENT);
+    expect(UNRESOLVED_CONTENT).toEqual({ kind: 'unresolved', via: 'target' });
+  });
+
+  it('is not said by any kind module', () => {
+    expectTypeOf<KindResolvedContent>().not.toHaveProperty('via');
+    expectTypeOf<Parameters<typeof markdownKind.resolveContent>>().toEqualTypeOf<
+      [z.infer<typeof markdownResourceContentSchema>]
+    >();
+    expect(markdownKind.resolveContent(NOTES.content)).toEqual({
+      kind: markdownKind.id,
+      source: 'Notes',
+    });
   });
 });
 

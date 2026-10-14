@@ -1,6 +1,5 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
-import type { ContentVia } from '../resource-content';
 import { defineKind } from './kind-module';
 
 /** The Ur kind's id, declared before its module because the content it resolves to names it. */
@@ -9,7 +8,6 @@ const UR_KIND_ID = 'ur';
 /** What an Ur Resource's content resolves to: nothing, reached one way or the other. */
 export interface UrContent {
   readonly kind: typeof UR_KIND_ID;
-  readonly via: ContentVia;
 }
 
 /** An Ur Resource's content, which is nothing (ADR 0113). */
@@ -30,7 +28,7 @@ export const urKind = defineKind({
     ownsReferencedSpaces: false,
   },
   facts: { authored: false, embedsMap: false, drawsContentArea: false },
-  resolveContent: (_content, via): UrContent => ({ kind: UR_KIND_ID, via }),
+  resolveContent: (): UrContent => ({ kind: UR_KIND_ID }),
   newContent: {},
 });
 

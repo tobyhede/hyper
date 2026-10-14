@@ -63,7 +63,7 @@ function fixtureContent(
     case 'markdown':
       return { kind: 'markdown', source, via: 'self' };
     case 'reference':
-      return { kind: 'markdown', source, via: 'reference' };
+      return { kind: 'markdown', source, via: 'target' };
     case 'space':
       return {
         kind: 'space',

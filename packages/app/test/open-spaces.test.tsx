@@ -374,7 +374,7 @@ describe('Open Spaces', () => {
     const content: ResourceContent = {
       kind: 'space',
       view: { spaceId: OTHER_ID, map: MAP_ID, graph: GRAPH_ONE, framing: undefined },
-      via: 'reference',
+      via: 'target',
     };
     const reference = (open: boolean): ResourceFlowNode => ({
       id: MINTED_RESOURCE_ID,

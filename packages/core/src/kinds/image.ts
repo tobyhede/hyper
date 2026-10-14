@@ -1,6 +1,5 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
-import type { ContentVia } from '../resource-content';
 import { defineKind } from './kind-module';
 
 /** The refusal code for an image URL an Image Resource may not hold; the application owns the wording. */
@@ -77,7 +76,6 @@ const IMAGE_KIND_ID = 'image';
 export interface ImageContent {
   readonly kind: typeof IMAGE_KIND_ID;
   readonly url: string;
-  readonly via: ContentVia;
 }
 
 /**
@@ -94,7 +92,7 @@ export const imageKind = defineKind({
     ownsReferencedSpaces: false,
   },
   facts: { authored: true, embedsMap: false, drawsContentArea: true },
-  resolveContent: (content, via): ImageContent => ({ kind: IMAGE_KIND_ID, url: content.url, via }),
+  resolveContent: (content): ImageContent => ({ kind: IMAGE_KIND_ID, url: content.url }),
 });
 
 /** The Image kind's id. */

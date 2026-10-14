@@ -16,9 +16,9 @@ const contents = (via: ContentVia): ResourceContent[] => [
   { kind: 'space', view: { spaceId: id, map: id, graph: id, framing: undefined }, via },
   { kind: 'ur', via },
 ];
-const UNRESOLVED: ResourceContent = { kind: 'unresolved', via: 'reference' };
+const UNRESOLVED: ResourceContent = { kind: 'unresolved', via: 'target' };
 
-const viaArbitrary = fc.constantFrom<ContentVia>('self', 'reference');
+const viaArbitrary = fc.constantFrom<ContentVia>('self', 'target');
 const contentArbitrary: fc.Arbitrary<ResourceContent> = fc.oneof(
   fc.record({ kind: fc.constant('markdown' as const), source: fc.string(), via: viaArbitrary }),
   fc.record({
@@ -42,7 +42,7 @@ describe('content facts', () => {
     fc.assert(
       fc.property(contentArbitrary, (content) => {
         const offered = authorsContent(content);
-        // `unresolved` is always `via: 'reference'`, so `via` alone excludes it.
+        // `unresolved` is always `via: 'target'`, so `via` alone excludes it.
         expect(offered).toBe(content.via === 'self' && content.kind !== 'ur');
       }),
     );

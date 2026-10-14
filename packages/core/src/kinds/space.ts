@@ -1,6 +1,5 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import { z } from 'zod';
-import type { ContentVia } from '../resource-content';
 import type { UUID } from '../types';
 import { uuidSchema } from '../uuid';
 import { defineKind, type SpaceView } from './kind-module';
@@ -54,7 +53,6 @@ const SPACE_KIND_ID = 'space';
 export interface SpaceContent {
   readonly kind: typeof SPACE_KIND_ID;
   readonly view: SpaceView;
-  readonly via: ContentVia;
 }
 
 /** What a Space Resource's selection is checked against: the Space kind's own check's reading of its target Space. */
@@ -125,10 +123,9 @@ export const spaceKind = defineKind({
     ownsReferencedSpaces: true,
   },
   facts: { authored: true, embedsMap: true, drawsContentArea: false },
-  resolveContent: (content, via): SpaceContent => ({
+  resolveContent: (content): SpaceContent => ({
     kind: SPACE_KIND_ID,
     view: viewOf(content),
-    via,
   }),
   spaceReferences: (content) => [content.spaceId],
   selection: {

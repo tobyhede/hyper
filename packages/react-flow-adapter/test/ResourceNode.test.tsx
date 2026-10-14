@@ -232,7 +232,7 @@ function ownContent(kind: ResourceNodeData['kind'], source: string, url: string)
     case 'image':
       return { kind: 'image', url, via: 'self' };
     case 'reference':
-      return { kind: 'markdown', source, via: 'reference' };
+      return { kind: 'markdown', source, via: 'target' };
     case 'space':
       return {
         kind: 'space',
@@ -561,7 +561,7 @@ describe('ResourceNode draws what the display shows', () => {
           title: 'Harbour, again',
           open: true,
           selected: true,
-          content: { kind: 'image', url: FIGURE, via: 'reference' },
+          content: { kind: 'image', url: FIGURE, via: 'target' },
           onOpenChange: vi.fn(),
         })}
       />,
@@ -583,7 +583,7 @@ describe('ResourceNode draws what the display shows', () => {
         {...props({
           kind: 'reference',
           open: true,
-          content: { kind: 'unresolved', via: 'reference' },
+          content: { kind: 'unresolved', via: 'target' },
         })}
       />,
     );
@@ -673,7 +673,7 @@ describe('ResourceNode Ur Resource', () => {
           title: 'Gateway, again',
           open: true,
           selected: true,
-          content: { kind: 'ur', via: 'reference' },
+          content: { kind: 'ur', via: 'target' },
           onOpenChange: vi.fn(),
         })}
       />,

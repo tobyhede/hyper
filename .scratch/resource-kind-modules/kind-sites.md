@@ -31,14 +31,11 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | file:line | what it names | kind | category | G19 exemption |
 |---|---|---|---|---|
 | packages/core/src/index.ts:11-15 | `export *` of each kind module | all | package surface | core/src/index.ts |
-| packages/core/src/resource-content.ts:7,12 | `ReferenceKindId` in `ContentVia` and unresolved content | reference | one-kind (content reached through a Reference) | resource-content.ts |
 | packages/core/src/types.ts:47 | `imageNaturalSizeSchema` -> `ImageNaturalSize` | image | one-kind | types.ts |
 | packages/ui/src/index.ts:17-19 | re-exports `beginEditing`, `beginReplacing`, `isSpaceOperations`, `spaceViewOf` | markdown, image, space | package surface | ui/src/index.ts |
 | packages/ui/src/icons.tsx:263 | `ResourceBaseKind = Exclude<Resource['kind'], ReferenceKindId>` | reference | display (kinds a Reference badge sits on) | icons.tsx |
 | packages/ui/src/CanvasResource.tsx:302 | `isSpaceOperations`: the Space rail and portal | space | one-kind (portal) | CanvasResource.tsx |
 | packages/ui/src/CanvasResource.tsx:340 | `isUrOperations`: Shape menu | ur | one-kind | CanvasResource.tsx |
-| packages/ui/src/CanvasResource.tsx:367 | `UNRESOLVED_CONTENT.kind` | reference | display state | CanvasResource.tsx |
-| packages/ui/src/PresentedResource.tsx:52 | `UNRESOLVED_CONTENT.kind` | reference | display state | PresentedResource.tsx |
 | packages/react-flow-adapter/src/ResourceNode.tsx:334 | `isSpaceOperations(...).portal.editing` keeps the toolbar | space | one-kind | ResourceNode.tsx |
 | packages/persistence/src/http-protocol.ts:759 | `isAcceptedImageUrl`: stored image URL | image | one-kind (image-URL rule) | http-protocol.ts |
 | packages/persistence/src/images.ts:28,31 | `isStoredImageId`, `STORED_IMAGE_COLLECTION_PATH` | image | one-kind | persistence/src/images.ts |
@@ -55,6 +52,7 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 - `packages/app/src/canvas-resource-decoration.ts`: the Space-only context fields, `SpaceResourceDocument` among them, moved into `packages/app/src/kinds/space.ts` (G20), so the file imports no kind module's export.
 - `packages/app/src/resource-deletion.ts`: routes by the lifetime flag (G02).
 - Candidate C (2026-10-13): `ContentAction` and its literals, the `replacing` display state, `CanvasResource`'s Replace label and glyph, and the literal checks in `canvas-resource-authoring.ts`, `SpaceCanvas.tsx`, `embedded-open-space-resource.ts` and `ResourceNode.tsx`. `resource-display.ts` left the exemptions.
+- Issue 12 (2026-10-14): content provenance is `'self' | 'target'`, said by the registry and no kind module, and unresolved content is the registry's, so `resource-content.ts` names no kind and `PresentedResource.tsx` and `CanvasResource.tsx` read `UNRESOLVED_CONTENT` from it. `resource-content.ts` and `PresentedResource.tsx` left the exemptions.
 
 ## What is not covered by any mechanism
 

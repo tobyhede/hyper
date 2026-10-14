@@ -68,7 +68,7 @@ describe('PresentedResource', () => {
         content={{
           kind: 'image',
           url: 'https://example.com/h.png',
-          via: 'reference',
+          via: 'target',
         }}
       />,
     );
@@ -112,7 +112,7 @@ describe('PresentedResource', () => {
    * alone, as a title slide; a Reference Resource to one draws the same.
    */
   it('presents an Ur Resource as a title slide, itself or through a Reference Resource', () => {
-    for (const via of ['self', 'reference'] as const) {
+    for (const via of ['self', 'target'] as const) {
       const { container, unmount } = render(
         <PresentedResource title={'Gateway\nthe one way in'} content={{ kind: 'ur', via }} />,
       );
@@ -129,7 +129,7 @@ describe('PresentedResource', () => {
 
   it('presents an unresolved Target as a notice, not an empty document', () => {
     const { container } = render(
-      <PresentedResource title="Dangling" content={{ kind: 'unresolved', via: 'reference' }} />,
+      <PresentedResource title="Dangling" content={{ kind: 'unresolved', via: 'target' }} />,
     );
 
     expect(screen.getByRole('heading', { name: 'Dangling' })).toBeInTheDocument();

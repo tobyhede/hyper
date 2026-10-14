@@ -58,7 +58,7 @@ const spaceDisplay = (
         content: {
           kind: 'space',
           view: { ...target, graph: GRAPH, framing: undefined },
-          via: kind === 'reference' ? 'reference' : 'self',
+          via: kind === 'reference' ? 'target' : 'self',
         },
       }
     : CLOSED_DISPLAY;

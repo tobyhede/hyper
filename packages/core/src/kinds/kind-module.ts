@@ -1,6 +1,6 @@
 /* v8 ignore next -- V8 attributes ESM module initialization to this import as a function. */
 import type { z } from 'zod';
-import type { ContentFacts, ContentVia } from '../resource-content';
+import type { ContentFacts } from '../resource-content';
 import type {
   SpaceSelectionTarget,
   SpaceSelectionProblem,
@@ -100,10 +100,9 @@ export interface SpaceSelection<Content> {
   ) => SpaceSelectionProblem | undefined;
 }
 
-/** What a kind's content resolves to: tagged with a kind, and reached `via` its own Resource or a Reference. */
+/** What a kind's content resolves to, tagged with a kind. Whether it is the Resource's own is the registry's to say. */
 export interface KindResolvedContent {
   readonly kind: string;
-  readonly via: ContentVia;
 }
 
 /**
@@ -125,8 +124,8 @@ export interface KindModule<
    */
   readonly contentSchema: z.ZodType<Content, z.ZodTypeDef, unknown>;
   readonly flags: KindFlags;
-  /** What this kind's content resolves to, reached `via` its own Resource or a Reference. */
-  readonly resolveContent: (content: Content, via: ContentVia) => Resolved;
+  /** What this kind's content resolves to, however the Resource showing it reached it. */
+  readonly resolveContent: (content: Content) => Resolved;
   /** The Resources this content references, which intake resolves. */
   readonly resourceReferences: (content: Content) => readonly UUID[];
   /** The Resource whose content this one shows, when it shows another's (ADR 0070). */
