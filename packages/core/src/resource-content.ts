@@ -34,7 +34,8 @@ export type OwnResourceContent = ResourceContent & { readonly via: 'self' };
  * Whether an author may change this content here: the Resource's own, of a
  * kind whose content is authored. When it may, the content is the Resource's
  * own; when it may not, nothing is ruled out, since own content of a kind no
- * author changes answers no too.
+ * author changes answers no too. That holds for content typed as the whole
+ * `ResourceContent`: content already typed as own would narrow to `never` on no.
  */
 export function authorsContent(content: ResourceContent): content is OwnResourceContent {
   return content.via === 'self' && contentFacts(content).authored;

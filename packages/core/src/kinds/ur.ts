@@ -5,7 +5,7 @@ import { defineKind } from './kind-module';
 /** The Ur kind's id, declared before its module because the content it resolves to names it. */
 const UR_KIND_ID = 'ur';
 
-/** What an Ur Resource's content resolves to: nothing, reached one way or the other. */
+/** What an Ur Resource's content resolves to: nothing but its kind. */
 export interface UrContent {
   readonly kind: typeof UR_KIND_ID;
 }
