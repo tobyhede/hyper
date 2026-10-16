@@ -498,11 +498,18 @@
       // startup, so `isHistoryPosition` must accept a value before it has a
       // shape. It is a named predicate returning the named `HistoryPosition`,
       // and passes the other two rules unaided.
+      // `packages/app/src/browser-presentation-channel.ts` is the same category
+      // again: a `MessageEvent`'s `data` is typed `any` and was written by
+      // another window, perhaps running another build, so its named
+      // predicates must accept a value before it has a shape. Each returns a
+      // named contract from `presentation-link.ts`, and the file passes the
+      // other two rules unaided.
       "files": [
         "scripts/check-typescript-toolchain.ts",
         "test/unit/check-typescript-toolchain.test.ts",
         "scripts/ui-catalog.ts",
-        "packages/app/src/browser-history.ts"
+        "packages/app/src/browser-history.ts",
+        "packages/app/src/browser-presentation-channel.ts"
       ],
       "rules": {
         "anti-slop/no-unknown-parameters": "off"
