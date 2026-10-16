@@ -120,3 +120,7 @@ export type {
 } from './space-aggregate';
 
 export { outgoingEdges, graphStartResource } from './traversal';
+
+// The Presentation Notes Graph a talk finds by title, and the notes it holds (ADR 0129).
+export { presentationNotes } from './presentation-notes';
+export type { PresentationNotes } from './presentation-notes';
