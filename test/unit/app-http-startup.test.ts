@@ -34,9 +34,11 @@ const mintingIds =
  * host that refuses fullscreen, which `createSpaceStartup` requires.
  */
 /** A startup whose every address opens a Space, as every one this file resolves does. */
-const opening = (
-  startup: SpaceStartup,
-): { readonly resolve: (pathname: string) => Promise<OpenedApplicationStartup> } => ({
+interface OpeningStartup {
+  readonly resolve: (pathname: string) => Promise<OpenedApplicationStartup>;
+}
+
+const opening = (startup: SpaceStartup): OpeningStartup => ({
   resolve: async (pathname) => {
     const result = await startup.resolve(pathname);
     if (result.kind !== 'opened')

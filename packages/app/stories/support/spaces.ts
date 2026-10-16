@@ -1152,3 +1152,85 @@ export const stageSnapshot: SpaceSnapshot = {
 };
 
 export const stageSpace: Space = loaded(loadSpaceSnapshot(stageSnapshot));
+
+const notesId = (n: number): UUID =>
+  uuidSchema.parse(`00000000-0000-4000-8000-0000000009${n.toString(16).padStart(2, '0')}`);
+
+/** The Resources of the talk the Notes window stories follow, and of its notes. */
+export const notesIds = {
+  map: notesId(0),
+  talk: notesId(1),
+  notes: notesId(2),
+  welcome: notesId(0x10),
+  demo: notesId(0x11),
+  architecture: notesId(0x12),
+  questions: notesId(0x13),
+  outage: notesId(0x20),
+  thanks: notesId(0x21),
+  backup: notesId(0x22),
+} as const;
+
+const markdownResource = (id: UUID, title: string, source: string) =>
+  ({ id, document: { title, kind: 'markdown', content: { source } } }) as const;
+
+/**
+ * A talk that forks after its welcome and rejoins for questions, with a
+ * Presentation Notes Graph naming it (ADR 0129): two notes for the welcome,
+ * placed one above the other, one for the demo, and none for the rest.
+ */
+export const notesSnapshot: SpaceSnapshot = {
+  id: notesId(0xff),
+  document: {
+    version: 1,
+    title: 'Launch',
+    defaultMap: notesIds.map,
+    maps: [
+      {
+        id: notesIds.map,
+        title: 'Launch',
+        kind: 'positioned',
+        positions: {
+          [notesIds.welcome]: { x: 0, y: 0, open: false },
+          [notesIds.demo]: { x: 420, y: -200, open: false },
+          [notesIds.architecture]: { x: 420, y: 200, open: false },
+          [notesIds.questions]: { x: 840, y: 0, open: false },
+          [notesIds.outage]: { x: 0, y: 400, open: false },
+          [notesIds.thanks]: { x: 0, y: 700, open: false },
+          [notesIds.backup]: { x: 420, y: 400, open: false },
+        },
+        graphs: [
+          {
+            id: notesIds.talk,
+            title: 'Launch talk',
+            edges: [
+              { from: notesIds.welcome, to: notesIds.demo },
+              { from: notesIds.welcome, to: notesIds.architecture },
+              { from: notesIds.demo, to: notesIds.questions },
+              { from: notesIds.architecture, to: notesIds.questions },
+            ],
+          },
+          {
+            id: notesIds.notes,
+            title: 'Launch talk Presentation Notes',
+            edges: [
+              { from: notesIds.welcome, to: notesIds.thanks },
+              { from: notesIds.welcome, to: notesIds.outage },
+              { from: notesIds.demo, to: notesIds.backup },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  resources: [
+    markdownResource(notesIds.welcome, 'Welcome', 'Launching the new store.'),
+    markdownResource(notesIds.demo, 'Demo', 'A live walk through checkout.'),
+    markdownResource(notesIds.architecture, 'Architecture', 'How a write reaches every replica.'),
+    markdownResource(notesIds.questions, 'Questions', 'Ask anything.'),
+    markdownResource(notesIds.outage, 'Open with the outage', 'Tell the March outage story first.'),
+    markdownResource(notesIds.thanks, 'Thank the team', 'Name the on-call rota.'),
+    markdownResource(notesIds.backup, 'Backup video', 'If the demo fails, play the recording.'),
+  ],
+};
+
+export const notesSpace: Space = loaded(loadSpaceSnapshot(notesSnapshot));

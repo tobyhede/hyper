@@ -11,6 +11,14 @@ export interface DestinationOpening {
   readonly presentationResourceId: ResourceId | null;
 }
 
+/** A Space opened at its default Map, with nothing open or presenting. */
+const atDefaultMap = (space: Space): DestinationOpening => ({
+  selection: requireDefaultMap(space),
+  resourceId: null,
+  graphId: null,
+  presentationResourceId: null,
+});
+
 /** Translate a resolved product destination into the application state it opens. */
 export function destinationOpening(
   space: Space,
@@ -19,13 +27,9 @@ export function destinationOpening(
   // A Notes window's address names the Space alone; a window that opens the
   // Space at it, rather than a Notes window, opens the Space as its own
   // address would.
-  if (destination.kind === 'space' || destination.kind === 'notes') {
-    return {
-      selection: requireDefaultMap(space),
-      resourceId: null,
-      graphId: null,
-      presentationResourceId: null,
-    };
+  if (destination.kind === 'notes') return atDefaultMap(space);
+  if (destination.kind === 'space') {
+    return atDefaultMap(space);
   }
   if (destination.kind === 'map') {
     return {

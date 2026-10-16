@@ -6,6 +6,18 @@ import { NotesWindow } from './NotesWindow';
 /** How often the elapsed time is redrawn. */
 const TICK_MS = 1000;
 
+/** The clock's ticks, as a store React reads the time from. */
+const everySecond = (tick: () => void) => {
+  const timer = setInterval(tick, TICK_MS);
+  return () => clearInterval(timer);
+};
+
+/** When the timer was last reset, and in which presentation. */
+interface TimerReset {
+  readonly startedAt: number;
+  readonly at: number;
+}
+
 export interface NotesWindowApplicationProps {
   readonly notes: NotesWindowModel;
   /** The time now, in milliseconds since the Unix epoch, on the clock the presentation's start was read from. */
@@ -23,17 +35,12 @@ export function NotesWindowApplication({ notes, now }: NotesWindowApplicationPro
   const presenting = state.kind === 'presenting';
   const startedAt = presenting ? state.view.startedAt : null;
 
-  // A reset is this window's alone. A new presentation starts the count again.
-  const [resetAt, setResetAt] = useState<number | null>(null);
-  useEffect(() => setResetAt(null), [startedAt]);
-  const [time, setTime] = useState(now);
-  useEffect(() => {
-    if (!presenting) return;
-    setTime(now());
-    const timer = setInterval(() => setTime(now()), TICK_MS);
-    return () => clearInterval(timer);
-  }, [presenting, now]);
-  const from = resetAt ?? startedAt ?? time;
+  // A reset is this window's alone, and belongs to the presentation it was
+  // pressed in: a new presentation starts the count again.
+  const [reset, setReset] = useState<TimerReset | null>(null);
+  const second = useSyncExternalStore(everySecond, () => Math.floor(now() / TICK_MS));
+  const time = second * TICK_MS;
+  const from = reset !== null && reset.startedAt === startedAt ? reset.at : (startedAt ?? time);
 
   // Leaving presenting belongs to the presenting window, and this is already
   // a Notes window: Escape and S do nothing here.
@@ -49,8 +56,10 @@ export function NotesWindowApplication({ notes, now }: NotesWindowApplicationPro
   return (
     <NotesWindow
       state={state}
-      elapsed={time - from}
-      onResetTimer={() => setResetAt(now())}
+      elapsed={Math.max(0, time - from)}
+      onResetTimer={() => {
+        if (startedAt !== null) setReset({ startedAt, at: now() });
+      }}
       onAdvance={notes.advance}
       onRetreat={notes.retreat}
       onSelectBranch={notes.selectBranch}

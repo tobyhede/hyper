@@ -23,7 +23,6 @@
 .notes-window__talk {
   margin: 0;
   font-size: 1.25rem;
-  font-weight: 600;
 }
 
 .notes-window__timer {
@@ -74,7 +73,7 @@
   max-height: 10rem;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 0.5rem;
+  border-radius: var(--radius-chrome-sm);
   padding: 0.5rem;
   font-size: 0.75rem;
 }
