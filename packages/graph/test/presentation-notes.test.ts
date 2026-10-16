@@ -150,11 +150,15 @@ describe('presentationNotes: the notes for a Resource', () => {
       [slide, firstNote],
       [slide, secondNote],
     ]);
-    const map = mapOf([notes], {
+    const placed = mapOf([notes], {
       [firstNote]: { x: 300, y: 200 },
       [secondNote]: { x: 100, y: 200 },
       [thirdNote]: { x: 0, y: 100 },
     });
-    expect(presentationNotes(map, talk, slide).notes).toEqual([thirdNote, secondNote, firstNote]);
+    expect(presentationNotes(placed, talk, slide).notes).toEqual([
+      thirdNote,
+      secondNote,
+      firstNote,
+    ]);
   });
 });

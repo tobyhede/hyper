@@ -68,7 +68,7 @@ const byStrength = (a: Candidate, b: Candidate): number =>
   a.naming - b.naming || a.rank - b.rank || a.order - b.order;
 
 /**
- * The Presentation Notes Graph for `talk` on `map`, the Graphs passed over for
+ * The Presentation Notes Graph for `talk` on the `shown` Map, the Graphs passed over for
  * it, and the notes `resourceId` reaches in it.
  *
  * A title naming the talk beats a bare marker; then "Presentation Notes" beats
@@ -77,12 +77,12 @@ const byStrength = (a: Candidate, b: Candidate): number =>
  * then left edge, and by Edge order where two sit at the same point.
  */
 export function presentationNotes(
-  map: Map,
+  shown: Map,
   talk: Graph,
   resourceId: ResourceId,
 ): PresentationNotes {
   const talkWords = words(talk.title);
-  const ranked = map.graphs
+  const ranked = shown.graphs
     .flatMap((graph, order) =>
       graph.id === talk.id ? [] : (candidate(talkWords, graph, order) ?? []),
     )
@@ -93,7 +93,7 @@ export function presentationNotes(
   const targets = [...new Set(outgoingEdges(chosen.graph, resourceId).map((edge) => edge.to))];
   // Intake refuses an Edge whose endpoint the Map does not place, so every
   // target has a position; the fallback only satisfies the index type.
-  const at = (id: ResourceId) => map.positions[id] ?? { x: 0, y: 0 };
+  const at = (id: ResourceId) => shown.positions[id] ?? { x: 0, y: 0 };
   const notes = targets.sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x);
   return { graph: chosen.graph, passedOver: passed.map((entry) => entry.graph), notes };
 }
