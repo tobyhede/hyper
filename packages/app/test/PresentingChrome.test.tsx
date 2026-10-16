@@ -38,6 +38,7 @@ const chrome = (props: Partial<PresentingChromeProps> = {}) => (
     onSelectBranch={() => undefined}
     onAdvance={() => undefined}
     onRetreat={() => undefined}
+    onOpenNotes={() => undefined}
     onExit={() => undefined}
     onCopyLink={() => undefined}
     {...props}
@@ -231,16 +232,16 @@ describe('PresentingChrome', () => {
   /** Only the commands the presenter can actually run from where they are. */
   it('lists the keyboard commands currently available and no others', () => {
     const { rerender } = render(chrome({ moves: movesTo(['B', 'C'], 0), canRetreat: true }));
-    expect(guidance()).toEqual(['↑↓choose', '→go', '←back', 'Escoverview']);
+    expect(guidance()).toEqual(['↑↓choose', '→go', '←back', 'Snotes', 'Escoverview']);
 
     rerender(chrome({ moves: movesTo(['B'], 0), canRetreat: false }));
-    expect(guidance()).toEqual(['→go', 'Escoverview']);
+    expect(guidance()).toEqual(['→go', 'Snotes', 'Escoverview']);
 
     rerender(chrome({ moves: [], canRetreat: true }));
-    expect(guidance()).toEqual(['←back', 'Escoverview']);
+    expect(guidance()).toEqual(['←back', 'Snotes', 'Escoverview']);
 
     rerender(chrome({ moves: [], canRetreat: false }));
-    expect(guidance()).toEqual(['Escoverview']);
+    expect(guidance()).toEqual(['Snotes', 'Escoverview']);
   });
 
   /**

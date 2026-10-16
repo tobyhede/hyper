@@ -31,7 +31,12 @@ export type ProductDestination =
       readonly mapId: UUID;
       readonly graphId: GraphId;
       readonly resourceId: ResourceId;
-    };
+    }
+  /**
+   * A Notes window over the Space (ADR 0129). It addresses a Space and not a
+   * position: the position is whatever the presenting window it follows is at.
+   */
+  | { readonly kind: 'notes'; readonly spaceId: UUID };
 
 export type ProductDestinationResolution =
   | { readonly kind: 'outside' }
@@ -52,6 +57,7 @@ export type ProductDestinationSnapshotResolution =
 export const productDestinationPath = (destination: ProductDestination): string => {
   const space = `/spaces/${encodeCompactUuid(destination.spaceId)}`;
   if (destination.kind === 'space') return space;
+  if (destination.kind === 'notes') return `${space}/notes`;
   if (destination.kind === 'resource')
     return `${space}/resources/${encodeCompactUuid(destination.resourceId)}`;
   if (destination.kind === 'graph') {
@@ -74,6 +80,7 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
   const segments = pathname.split('/');
   if (
     segments.length !== 3 &&
+    segments.length !== 4 &&
     segments.length !== 5 &&
     segments.length !== 7 &&
     segments.length !== 9
@@ -84,6 +91,8 @@ const parseProductDestination = (pathname: string): ProductDestination | undefin
   const spaceId = decodeCompactUuid(segments[2] ?? '');
   if (spaceId === undefined) return undefined;
   if (segments.length === 3) return { kind: 'space', spaceId };
+  if (segments.length === 4)
+    return segments[3] === 'notes' ? { kind: 'notes', spaceId } : undefined;
   if (segments[3] === 'resources' && segments.length === 5) {
     const resourceId = decodeCompactUuid(segments[4] ?? '');
     return resourceId === undefined ? undefined : { kind: 'resource', spaceId, resourceId };

@@ -8,6 +8,7 @@ import { createResourceControl, unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { heldImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { mintingIds } from './minting';
 import { stubResizeObserver } from './resize-observer';
 
@@ -113,6 +114,7 @@ it('withdraws the canvas Space’s navigation and authoring while an only-drawn 
   );
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: held.images,
     backend,
     metaSpaceId: META_ID,

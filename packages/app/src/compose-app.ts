@@ -10,6 +10,7 @@ import { createDeleteConfirmation, type DeleteConfirmation } from './delete-conf
 import { createResourceDeletion, type ResourceDeletion } from './resource-deletion';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 import { createNavigation, type Navigation } from './navigation';
+import { presentingLink, type PresentationLinks, type PresentingLink } from './presentation-link';
 import type { RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
@@ -107,6 +108,11 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
   readonly connections?: ((collaborators: EdgeCollaborators) => ConnectionCompletion) | undefined;
   /** Coordinated Space Resource deletion for the Delete Resource interaction. */
   readonly spaceResources?: SpaceResourceAuthoring | undefined;
+  /**
+   * The browser the presentation link reaches Notes windows through (ADR 0129).
+   * Absent, this composition's presentations are linked to nothing.
+   */
+  readonly presentations?: PresentationLinks | undefined;
 }
 
 /** The pair a connection completion is written in terms of. */
@@ -129,6 +135,8 @@ export interface AppCore {
 }
 
 export interface ComposedApp extends AppCore {
+  /** This Space's side of the link to the Notes windows following it (ADR 0129). */
+  readonly presentation: PresentingLink;
   /**
    * Create Image Resources from one gesture's files or URL, over this Space's
    * image sources and Authoring.
@@ -208,6 +216,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     reportObserverError,
     connections,
     spaceResources,
+    presentations,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -257,6 +266,15 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   });
   return {
     ...core,
+    presentation:
+      presentations === undefined
+        ? { connect: () => () => undefined }
+        : presentingLink({
+            navigation,
+            spaceId: () => currentSpace().id,
+            links: presentations,
+            newId,
+          }),
     createImageResources: (origin, target) =>
       createImageResources({ images, authoring }, origin, target),
     pickImages: images.pick,

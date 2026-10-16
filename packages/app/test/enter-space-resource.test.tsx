@@ -10,6 +10,7 @@ import { expectMenuGroups } from './menu-assertions';
 import { selectResource } from './resource-selection';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
 
 /**
@@ -177,6 +178,7 @@ async function mount(): Promise<OpenSpaces> {
   );
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,

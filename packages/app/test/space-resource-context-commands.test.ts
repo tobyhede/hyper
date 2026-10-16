@@ -8,6 +8,7 @@ import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
@@ -93,6 +94,7 @@ async function setup(available = true) {
   );
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend,
     metaSpaceId: META,

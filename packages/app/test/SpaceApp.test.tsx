@@ -44,6 +44,7 @@ import { CANVAS } from '../src/space-authoring';
 import type { MapSurface } from '../src/map-surface';
 import type { MapView } from '../src/map-view';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -146,6 +147,7 @@ it('offers Exit on a Space opened by its own address, which has no opener', asyn
   );
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
@@ -193,6 +195,7 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
   );
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,

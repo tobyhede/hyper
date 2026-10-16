@@ -8,6 +8,7 @@ import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { mintingIds } from './minting';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_A = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -328,6 +329,7 @@ describe('an Image Resource gesture the author moves away from', () => {
   it('creates nothing when the Map the gesture was made on is gone', async () => {
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
+      presentations: unlinkedPresentations,
       images: unusedImageSources,
       backend: new MemorySpaceBackend(SPACE_ID, [
         { snapshot: twoMaps, revision: 0n, exportedRevision: null },

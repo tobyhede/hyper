@@ -6,6 +6,7 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { Application } from '../src/components/Application';
 import { createOpenSpaces } from '../src/open-spaces';
 import type { Fullscreen } from '../src/presenting-fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { stubResizeObserver } from './resize-observer';
@@ -73,6 +74,7 @@ it('asks the fullscreen Open Spaces was composed with when the Dock presents', a
     },
     history: recordingHistory(),
     fullscreen,
+    presentations: unlinkedPresentations,
   });
   const opened = await spaces.open(SPACE_ID);
 

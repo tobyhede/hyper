@@ -27,6 +27,7 @@ import { mintingIds } from './minting';
 import { heldImageSources, unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -186,6 +187,7 @@ const setup = (
     history,
     openSpaces: createOpenSpaces({
       fullscreen: refusingFullscreen,
+      presentations: unlinkedPresentations,
       images,
       backend,
       metaSpaceId: META_ID,
@@ -1467,6 +1469,7 @@ describe('Open Spaces', () => {
       const reported: unknown[] = [];
       const spaces = createOpenSpaces({
         fullscreen: refusingFullscreen,
+        presentations: unlinkedPresentations,
         images: unusedImageSources,
         backend,
         metaSpaceId: META_ID,

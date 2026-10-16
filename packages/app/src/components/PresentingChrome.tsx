@@ -25,6 +25,8 @@ export interface PresentingChromeProps {
   onExit: () => void;
   /** Copy the exact Map, Graph and Resource currently being presented. */
   onCopyLink: () => void;
+  /** Open a Notes window following this presentation, the S key's command (ADR 0129). */
+  onOpenNotes: () => void;
 }
 
 /**
@@ -61,6 +63,7 @@ function availableCommands(
   if (moves.length > 1) commands.push({ keys: ['↑', '↓'], action: 'choose' });
   if (moves.length > 0) commands.push({ keys: ['→'], action: 'go' });
   if (canRetreat) commands.push({ keys: ['←'], action: 'back' });
+  commands.push({ keys: ['S'], action: 'notes' });
   commands.push({ keys: ['Esc'], action: 'overview' });
   return commands;
 }
@@ -94,6 +97,7 @@ export function PresentingChrome({
   onRetreat,
   onExit,
   onCopyLink,
+  onOpenNotes,
 }: PresentingChromeProps) {
   const selectedIndex = moves.findIndex((move) => move.selected);
   const selected = moves[selectedIndex];
@@ -243,6 +247,10 @@ export function PresentingChrome({
         </div>
 
         <div className="flex items-center gap-3 @max-3xl:flex-wrap @max-3xl:justify-between">
+          <Button variant="secondary" aria-keyshortcuts="S" onClick={onOpenNotes}>
+            Notes window
+          </Button>
+
           <Button variant="secondary" onClick={onCopyLink}>
             Copy link to this presentation point
           </Button>

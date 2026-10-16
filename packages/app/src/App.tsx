@@ -10,11 +10,13 @@ import {
 import { ReactFlowProvider } from '@xyflow/react';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
+import { productDestinationPath } from '@project/http';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
 import { resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
+import { openIndependently } from './open-independently';
 import { presentingFullscreen, type Fullscreen } from './presenting-fullscreen';
 import type { DestinationOpening } from './destination-opening';
 import { useOpenSpacesStanding } from './open-spaces-context';
@@ -79,6 +81,17 @@ export const createApp = (
     navigation.openGraph(navigation.getState().selectedMapId, openingGraphId);
   }
 
+  /**
+   * Open a Notes window following this Space's presentation (ADR 0129).
+   *
+   * Called within the click or key press, because a browser opens a window
+   * only inside a user activation. A Notes window follows over the
+   * presentation link, so it needs no handle on this one.
+   */
+  const openNotes = (): void => {
+    openIndependently(productDestinationPath({ kind: 'notes', spaceId: currentSpaceId() }));
+  };
+
   const presentation = presentingFullscreen(fullscreen, {
     presenting: () => navigation.getState().mode === 'presenting',
     subscribe: navigation.subscribe,
@@ -133,6 +146,7 @@ export const createApp = (
     const presenting = navigationState.mode === 'presenting';
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
     useEffect(() => presentation.connect(), []);
+    useEffect(() => composition.presentation.connect(), []);
     const { addressedResourceId, destinationNotFound } = useAddressedResource(
       browserLocation,
       useRenderAdapter,
@@ -188,6 +202,7 @@ export const createApp = (
       retreat: navigation.retreat,
       selectBranch: navigation.selectBranch,
       exitPresenting: navigation.exitPresenting,
+      openNotes,
     });
     const { chrome: dockChrome, onChromeContinuationLand } = useDockChrome(
       opened,
@@ -392,6 +407,7 @@ export const createApp = (
               onAdvance={navigation.advance}
               onRetreat={navigation.retreat}
               onExit={navigation.exitPresenting}
+              onOpenNotes={openNotes}
               onCopyLink={() => {
                 if (activeGraphId === null) return;
                 // `void`: presenting chrome's Copy link is a plain button with

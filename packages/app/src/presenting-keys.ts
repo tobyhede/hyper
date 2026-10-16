@@ -6,6 +6,8 @@ export interface TraversalCommands {
   readonly retreat: () => void;
   readonly selectBranch: (delta: number) => void;
   readonly exitPresenting: () => void;
+  /** Open a Notes window following this presentation (ADR 0129). */
+  readonly openNotes: () => void;
 }
 
 /** The keys a focused control acts on by itself, with no listener's help. */
@@ -87,11 +89,13 @@ function activatesFocusedControl(event: KeyboardEvent): boolean {
  * a copy of it in a story fixture would prove the copy (ADR 0052).
  */
 export function usePresentingKeys(active: boolean, commands: TraversalCommands): void {
-  const { advance, retreat, selectBranch, exitPresenting } = commands;
+  const { advance, retreat, selectBranch, exitPresenting, openNotes } = commands;
   useEffect(() => {
     if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (activatesFocusedControl(event) || insideAModalSurface(event)) return;
+      // A modified S is the browser's or the system's (Save, say), never ours.
+      const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
       const handler = {
         ArrowRight: advance,
         ' ': advance,
@@ -99,6 +103,8 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
         ArrowUp: () => selectBranch(-1),
         ArrowDown: () => selectBranch(1),
         Escape: exitPresenting,
+        s: plain ? openNotes : undefined,
+        S: plain ? openNotes : undefined,
       }[event.key];
       if (!handler) return;
       event.preventDefault();
@@ -106,5 +112,5 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active, advance, retreat, selectBranch, exitPresenting]);
+  }, [active, advance, retreat, selectBranch, exitPresenting, openNotes]);
 }

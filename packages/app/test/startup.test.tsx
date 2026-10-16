@@ -10,6 +10,7 @@ import { recordingHistory } from './browser-history';
 import { startApplication } from '../src/startup';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -40,6 +41,7 @@ it('opens once under StrictMode and mounts without interpreting the browser path
   const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,
@@ -89,6 +91,7 @@ it('draws the starting view until the opening settles, then the opened Space', a
   const backend = MemorySpaceBackend.asMeta({ snapshot, revision: 0n, exportedRevision: null });
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend,
     metaSpaceId: SPACE_ID,

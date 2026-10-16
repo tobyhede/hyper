@@ -1,6 +1,7 @@
 import { uuidSchema, type UUID } from '@project/core';
 import type {
   PresentationChannel,
+  PresentationLinks,
   PresentationPresence,
   PresentationCommand,
   PresentationMessage,
@@ -13,6 +14,22 @@ export interface NativeBroadcastChannel {
   postMessage(message: PresentationMessage): void;
   addEventListener(type: 'message', listener: (event: Pick<MessageEvent, 'data'>) => void): void;
   removeEventListener(type: 'message', listener: (event: Pick<MessageEvent, 'data'>) => void): void;
+  close(): void;
+}
+
+/** The part of `window` the links read. `window` satisfies it. */
+export interface NativePresentationWindow {
+  addEventListener(type: 'pagehide', listener: () => void): void;
+  removeEventListener(type: 'pagehide', listener: () => void): void;
+}
+
+/** What `main.tsx` hands the links: the browser's channel constructor, window and clock. */
+export interface NativePresentationBrowser {
+  readonly openChannel: (name: string) => NativeBroadcastChannel;
+  readonly window: NativePresentationWindow;
+  readonly now: () => number;
+  /** `navigator.locks`, which a browser without Web Locks lacks. */
+  readonly locks: NativeLocks | undefined;
 }
 
 const isId = (value: unknown): value is UUID => uuidSchema.safeParse(value).success;
@@ -112,6 +129,31 @@ export function createBrowserPresentationChannel(
       native.addEventListener('message', heard);
       return () => native.removeEventListener('message', heard);
     },
+    close: () => native.close(),
+  };
+}
+
+/**
+ * The presentation link's browser, as `main.tsx` names it: one
+ * `BroadcastChannel` per Space, `pagehide` for a window going away, the wall
+ * clock every window shares, and Web Locks for a window that goes without a
+ * word.
+ */
+export function createBrowserPresentationLinks({
+  openChannel,
+  window,
+  now,
+  locks,
+}: NativePresentationBrowser): PresentationLinks {
+  return {
+    open: (spaceId) =>
+      createBrowserPresentationChannel(openChannel(presentationChannelName(spaceId))),
+    now,
+    leaving: (listener) => {
+      window.addEventListener('pagehide', listener);
+      return () => window.removeEventListener('pagehide', listener);
+    },
+    presence: createBrowserPresentationPresence(locks),
   };
 }
 

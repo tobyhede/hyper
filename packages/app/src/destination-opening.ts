@@ -16,7 +16,10 @@ export function destinationOpening(
   space: Space,
   destination: ProductDestination,
 ): DestinationOpening {
-  if (destination.kind === 'space') {
+  // A Notes window's address names the Space alone; a window that opens the
+  // Space at it, rather than a Notes window, opens the Space as its own
+  // address would.
+  if (destination.kind === 'space' || destination.kind === 'notes') {
     return {
       selection: requireDefaultMap(space),
       resourceId: null,

@@ -30,6 +30,7 @@ function nativeChannel() {
     postMessage: (message) => posted.push(message),
     addEventListener: (_type, listener) => listeners.add(listener),
     removeEventListener: (_type, listener) => listeners.delete(listener),
+    close: () => listeners.clear(),
   };
   const deliver = (data: Sent): void => {
     for (const listener of listeners) listener({ data });

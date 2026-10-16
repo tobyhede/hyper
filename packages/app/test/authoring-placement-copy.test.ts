@@ -11,6 +11,7 @@ import { node, settled } from './render-adapter-fixtures';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 
 /**
  * Authored placement has one home, the session's snapshot. Every assertion
@@ -186,6 +187,7 @@ describe('Entering draws the entered Map’s geometry', () => {
     ]);
     const spaces = createOpenSpaces({
       fullscreen: refusingFullscreen,
+      presentations: unlinkedPresentations,
       images: unusedImageSources,
       backend,
       metaSpaceId: META_ID,
