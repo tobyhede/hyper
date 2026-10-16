@@ -18,6 +18,7 @@ const commands = () => ({
   selectBranch: vi.fn(),
   exitPresenting: vi.fn(),
   openNotes: vi.fn(),
+  toggleNotes: vi.fn(),
 });
 
 function Presenting({
@@ -70,6 +71,18 @@ describe('the global Presenting keys', () => {
     fireEvent.keyDown(document.body, { key: 's', metaKey: true });
 
     expect(traversal.openNotes).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows or hides the rehearsal notes on N, and leaves a modified N to the browser', () => {
+    const traversal = commands();
+    render(<Presenting traversal={traversal} />);
+
+    fireEvent.keyDown(document.body, { key: 'n' });
+    fireEvent.keyDown(document.body, { key: 'N', shiftKey: true });
+    fireEvent.keyDown(document.body, { key: 'n', ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: 'n', altKey: true });
+
+    expect(traversal.toggleNotes).toHaveBeenCalledTimes(2);
   });
 
   it('binds nothing while a traversal is not the resource on screen', () => {

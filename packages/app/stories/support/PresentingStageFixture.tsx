@@ -1,12 +1,16 @@
 import { useCallback } from 'react';
+import type { Space } from '@project/graph';
 // Through the package's own subpath imports, as `#components/*` already is.
 import { canRetreat } from '#src/navigation';
 import { usePresentingKeys } from '#src/presenting-keys';
+import { useRehearsalNotes } from '#src/rehearsal-notes';
 import { PresentingStage } from '#components/PresentingStage';
 import { useStoryNavigation } from './navigation';
 import { stageSpace } from './spaces';
 
 export interface PresentingStageFixtureProps {
+  /** The Space presented, the Stage Space unless a story names another. */
+  readonly space?: Space;
   /** How many production `advance()` calls the story opens with, to reach a later Resource. */
   readonly advances?: number;
   /** How wide the box the Stage fills is: a layout constraint and nothing more. */
@@ -29,11 +33,12 @@ export interface PresentingStageFixtureProps {
  * decides.
  */
 export function PresentingStageFixture({
+  space = stageSpace,
   advances = 0,
   width = '100%',
   height = '100vh',
 }: PresentingStageFixtureProps) {
-  const readSpace = useCallback(() => stageSpace, []);
+  const readSpace = useCallback(() => space, [space]);
   const { navigation, state } = useStoryNavigation(readSpace, (composed) => {
     composed.present();
     for (let step = 0; step < advances; step += 1) composed.advance();
@@ -41,12 +46,14 @@ export function PresentingStageFixture({
   const presenting = state.mode === 'presenting';
   // A story opens no second window, as its Copy link writes no clipboard.
   const openNotes = useCallback(() => undefined, []);
+  const rehearsalNotes = useRehearsalNotes(presenting);
   usePresentingKeys(presenting, {
     advance: navigation.advance,
     retreat: navigation.retreat,
     selectBranch: navigation.selectBranch,
     exitPresenting: navigation.exitPresenting,
     openNotes,
+    toggleNotes: rehearsalNotes.toggle,
   });
   const resourceId = navigation.activeResourceId();
 
@@ -54,7 +61,9 @@ export function PresentingStageFixture({
     <div className="relative overflow-hidden" style={{ width, height }}>
       {presenting && resourceId !== null && (
         <PresentingStage
-          space={stageSpace}
+          space={space}
+          mapId={state.selectedMapId}
+          graphId={state.activeGraphId}
           resourceId={resourceId}
           moves={navigation.moves()}
           canRetreat={canRetreat(state)}
@@ -64,6 +73,8 @@ export function PresentingStageFixture({
           onExit={navigation.exitPresenting}
           onCopyLink={() => undefined}
           onOpenNotes={openNotes}
+          notesShown={rehearsalNotes.shown}
+          onToggleNotes={rehearsalNotes.toggle}
         />
       )}
     </div>

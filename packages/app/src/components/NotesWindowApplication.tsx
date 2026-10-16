@@ -43,7 +43,7 @@ export function NotesWindowApplication({ notes, now }: NotesWindowApplicationPro
   const from = reset !== null && reset.startedAt === startedAt ? reset.at : (startedAt ?? time);
 
   // Leaving presenting belongs to the presenting window, and this is already
-  // a Notes window: Escape and S do nothing here.
+  // a Notes window: Escape, S and N do nothing here.
   const nothing = useCallback(() => undefined, []);
   usePresentingKeys(presenting, {
     advance: notes.advance,
@@ -51,6 +51,7 @@ export function NotesWindowApplication({ notes, now }: NotesWindowApplicationPro
     selectBranch: notes.selectBranch,
     exitPresenting: nothing,
     openNotes: nothing,
+    toggleNotes: nothing,
   });
 
   return (

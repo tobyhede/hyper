@@ -178,6 +178,22 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'open the Notes window',
   },
   {
+    module: 'packages/app/src/presenting-keys.ts',
+    sourceKey: 'n',
+    occurrence: 1,
+    key: 'N',
+    surface: 'Presenting',
+    behaviour: 'show or hide the rehearsal notes under the Stage',
+  },
+  {
+    module: 'packages/app/src/presenting-keys.ts',
+    sourceKey: 'N',
+    occurrence: 1,
+    key: 'Shift+N',
+    surface: 'Presenting',
+    behaviour: 'show or hide the rehearsal notes under the Stage',
+  },
+  {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
     sourceKey: 'Backspace',
     occurrence: 1,

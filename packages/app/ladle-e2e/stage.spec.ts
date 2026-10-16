@@ -18,7 +18,7 @@ const stage = (page: Page) => page.getByTestId('stage');
 const frame = (page: Page) => page.getByTestId('stage-frame');
 const body = (page: Page) => stage(page).getByRole('region', { name: 'Presented Resource' });
 const presentedName = (page: Page) =>
-  stage(page).getByTestId('resource-content').locator('.resource__title');
+  frame(page).getByTestId('resource-content').locator('.resource__title');
 
 /** A picture many times the size of any frame the Stage draws. */
 const OVERSIZED = { width: 4000, height: 3000 } as const;
@@ -140,5 +140,31 @@ test(
     expect(Math.abs(name.y + name.height / 2 - (box.y + box.height / 2))).toBeLessThanOrEqual(
       tolerance,
     );
+  },
+);
+
+test(
+  'N shows the notes under the chrome, they follow the traversal, and N hides them',
+  { tag: '@parity:stage-shows-rehearsal-notes-under-the-chrome' },
+  async ({ page }) => {
+    await page.goto(story('rehearsal-notes'));
+    await expect(presentedName(page)).toHaveText('Welcome');
+    const notes = stage(page).getByRole('region', { name: 'Rehearsal notes' });
+    const toggle = stage(page).getByRole('button', { name: 'Rehearsal notes' });
+    const noteNames = notes.getByTestId('resource-content').locator('.resource__title');
+    await expect(notes).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await page.keyboard.press('n');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(noteNames).toHaveText(['Open with the outage', 'Thank the team']);
+
+    await page.keyboard.press('ArrowRight');
+    await expect(presentedName(page)).toHaveText('Demo');
+    await expect(noteNames).toHaveText(['Backup video']);
+
+    await toggle.click();
+    await expect(notes).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   },
 );

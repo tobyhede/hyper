@@ -5,6 +5,7 @@ import type { Space } from '@project/graph';
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canRetreat } from '#src/navigation';
 import { usePresentingKeys } from '#src/presenting-keys';
+import { useRehearsalNotes } from '#src/rehearsal-notes';
 import { PresentingChrome } from '#components/PresentingChrome';
 import { useStoryNavigation } from './navigation';
 import { traversalSpace } from './spaces';
@@ -64,12 +65,14 @@ export function PresentingChromeFixture({
   const presenting = state.mode === 'presenting';
   // A story opens no second window, as its Copy link writes no clipboard.
   const openNotes = useCallback(() => undefined, []);
+  const rehearsalNotes = useRehearsalNotes(presenting);
   usePresentingKeys(presenting, {
     advance: navigation.advance,
     retreat: navigation.retreat,
     selectBranch: navigation.selectBranch,
     exitPresenting: navigation.exitPresenting,
     openNotes,
+    toggleNotes: rehearsalNotes.toggle,
   });
 
   return (
@@ -90,6 +93,8 @@ export function PresentingChromeFixture({
           onExit={navigation.exitPresenting}
           onCopyLink={() => undefined}
           onOpenNotes={openNotes}
+          notesShown={rehearsalNotes.shown}
+          onToggleNotes={rehearsalNotes.toggle}
         />
       )}
     </div>

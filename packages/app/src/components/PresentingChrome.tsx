@@ -27,6 +27,10 @@ export interface PresentingChromeProps {
   onCopyLink: () => void;
   /** Open a Notes window following this presentation, the S key's command (ADR 0129). */
   onOpenNotes: () => void;
+  /** Whether the notes are shown under the Stage, for rehearsing on one screen. */
+  notesShown: boolean;
+  /** Show or hide the notes under the Stage, the N key's command. */
+  onToggleNotes: () => void;
 }
 
 /**
@@ -64,6 +68,7 @@ function availableCommands(
   if (moves.length > 0) commands.push({ keys: ['→'], action: 'go' });
   if (canRetreat) commands.push({ keys: ['←'], action: 'back' });
   commands.push({ keys: ['S'], action: 'notes' });
+  commands.push({ keys: ['N'], action: 'rehearse' });
   commands.push({ keys: ['Esc'], action: 'overview' });
   return commands;
 }
@@ -98,6 +103,8 @@ export function PresentingChrome({
   onExit,
   onCopyLink,
   onOpenNotes,
+  notesShown,
+  onToggleNotes,
 }: PresentingChromeProps) {
   const selectedIndex = moves.findIndex((move) => move.selected);
   const selected = moves[selectedIndex];
@@ -249,6 +256,15 @@ export function PresentingChrome({
         <div className="flex items-center gap-3 @max-3xl:flex-wrap @max-3xl:justify-between">
           <Button variant="secondary" aria-keyshortcuts="S" onClick={onOpenNotes}>
             Notes window
+          </Button>
+
+          <Button
+            variant={notesShown ? 'default' : 'secondary'}
+            aria-pressed={notesShown}
+            aria-keyshortcuts="N"
+            onClick={onToggleNotes}
+          >
+            Rehearsal notes
           </Button>
 
           <Button variant="secondary" onClick={onCopyLink}>

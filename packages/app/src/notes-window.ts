@@ -1,4 +1,4 @@
-import type { ResourceContent, ResourceId, UUID } from '@project/core';
+import type { GraphId, MapId, ResourceContent, ResourceId, UUID } from '@project/core';
 import { presentationNotes, resolveResourceContent, type Space } from '@project/graph';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import {
@@ -20,16 +20,23 @@ export interface NotesMove extends NotesResource {
   readonly selected: boolean;
 }
 
-/** What the Notes window shows while the presentation it follows lasts. */
-export interface NotesView {
+/**
+ * The notes a talk's Presentation Notes Graph holds for one of its Resources,
+ * as the Notes window and the rehearsal notes under the Stage both draw them.
+ */
+export interface PresentedNotes {
   /** The Title of the Graph being presented. */
   readonly talk: string;
-  readonly presented: NotesResource;
   /** The Presentation Notes Graph's Title, or `null` when the talk has none. */
   readonly notesGraph: string | null;
   /** The Titles of the other Graphs that also read as notes, which were passed over. */
   readonly passedOver: readonly string[];
   readonly notes: readonly NotesResource[];
+}
+
+/** What the Notes window shows while the presentation it follows lasts. */
+export interface NotesView extends PresentedNotes {
+  readonly presented: NotesResource;
   readonly moves: readonly NotesMove[];
   readonly canRetreat: boolean;
   readonly startedAt: number;
@@ -43,29 +50,46 @@ const drawn = (space: Space, resourceId: ResourceId): NotesResource | undefined 
 };
 
 /**
+ * The notes for `resourceId` while `graphId` is presented on `mapId`, or
+ * `undefined` when the Space does not hold what those name.
+ */
+export function presentedNotes(
+  space: Space,
+  mapId: MapId,
+  graphId: GraphId,
+  resourceId: ResourceId,
+): PresentedNotes | undefined {
+  const shown = space.lookup.map(mapId)?.map;
+  const talk = space.lookup.graph(graphId)?.graph;
+  if (shown === undefined || talk === undefined) return undefined;
+  const found = presentationNotes(shown, talk, resourceId);
+  const notes = found.notes.flatMap((id) => drawn(space, id) ?? []);
+  if (notes.length !== found.notes.length) return undefined;
+  return {
+    talk: talk.title,
+    notesGraph: found.graph?.title ?? null,
+    passedOver: found.passedOver.map((graph) => graph.title),
+    notes,
+  };
+}
+
+/**
  * What a presentation's snapshot shows, read against the Notes window's own
  * copy of the Space, or `undefined` when that copy does not hold what the
  * snapshot names, which means it is out of date.
  */
 export function notesView(space: Space, snapshot: PresentationSnapshot): NotesView | undefined {
-  const shown = space.lookup.map(snapshot.mapId)?.map;
-  const talk = space.lookup.graph(snapshot.graphId)?.graph;
+  const notes = presentedNotes(space, snapshot.mapId, snapshot.graphId, snapshot.resourceId);
   const presented = drawn(space, snapshot.resourceId);
-  if (shown === undefined || talk === undefined || presented === undefined) return undefined;
-  const found = presentationNotes(shown, talk, snapshot.resourceId);
-  const notes = found.notes.flatMap((id) => drawn(space, id) ?? []);
+  if (notes === undefined || presented === undefined) return undefined;
   const moves = snapshot.moves.flatMap(({ resourceId, selected }) => {
     const target = drawn(space, resourceId);
     return target === undefined ? [] : [{ ...target, selected }];
   });
-  if (notes.length !== found.notes.length || moves.length !== snapshot.moves.length)
-    return undefined;
+  if (moves.length !== snapshot.moves.length) return undefined;
   return {
-    talk: talk.title,
+    ...notes,
     presented,
-    notesGraph: found.graph?.title ?? null,
-    passedOver: found.passedOver.map((graph) => graph.title),
-    notes,
     moves,
     canRetreat: snapshot.canRetreat,
     startedAt: snapshot.startedAt,
