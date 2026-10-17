@@ -123,7 +123,7 @@ export interface PresentingLinkDependencies {
    * The presentation under way, or `null` while not presenting, as the
    * presenting window answers it. The link mints no identity of its own.
    */
-  readonly current: () => Presentation | null;
+  readonly presentation: () => Presentation | null;
 }
 
 export interface PresentingLink {
@@ -143,9 +143,9 @@ interface Posted extends Presentation {
  * A presentation the presenting window starts is posted with the identity and
  * start time it was given; every Navigation change while it lasts publishes a
  * snapshot; the presenting window answering another presentation, or none,
- * publishes that it ended. A
- * Notes window announcing itself is answered with the current snapshot, and a
- * command naming this window's presentation is applied through Navigation.
+ * publishes that it ended. A Notes window announcing itself is answered with
+ * the current snapshot, and a command naming this window's presentation is
+ * applied through Navigation.
  * Anything else is ignored: a command for another window's presentation, or
  * one arriving while this window is not presenting.
  */
@@ -153,7 +153,7 @@ export function presentingLink({
   navigation,
   spaceId,
   links,
-  current: presentationNow,
+  presentation: presentationUnderWay,
 }: PresentingLinkDependencies): PresentingLink {
   let current: Posted | null = null;
   let channel: PresentationChannel | null = null;
@@ -193,7 +193,7 @@ export function presentingLink({
   };
 
   const onNavigation = (): void => {
-    const presentation = presentationNow();
+    const presentation = presentationUnderWay();
     if (current !== null && current.id !== presentation?.id) end();
     if (presentation === null) return;
     // Held before the first snapshot is posted, so a Notes window that hears

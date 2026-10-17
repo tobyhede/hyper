@@ -186,6 +186,48 @@ describe('the presenting window', () => {
     });
   });
 
+  it('starts afresh when an Edit adopts another Graph that holds the presented Resource', () => {
+    const { navigation, window, at } = presentingWindow(
+      mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
+    );
+    window.present();
+    window.commands.advance();
+    window.commands.advance();
+    expect(navigation.activeResourceId()).toBe(CLOSING);
+    window.commands.toggleNotes();
+
+    at(2_000);
+    navigation.continueInMap(MAP_ID, ENCORE);
+
+    expect(navigation.getState().mode).toBe('presenting');
+    expect(window.getState()).toEqual({
+      presentation: { id: SECOND_PRESENTATION, startedAt: 2_000 },
+      rehearsalNotesShown: false,
+    });
+  });
+
+  it('keeps the presentation when an Edit adopts the same Map and Graph', () => {
+    const { navigation, window } = presentingWindow(mintingIds(FIRST_PRESENTATION));
+    window.present();
+    window.commands.toggleNotes();
+
+    navigation.continueInMap(MAP_ID, TALK);
+
+    expect(window.getState()).toEqual({
+      presentation: { id: FIRST_PRESENTATION, startedAt: 1_000 },
+      rehearsalNotesShown: true,
+    });
+  });
+
+  it('stops following Navigation once disposed', () => {
+    const { window } = presentingWindow(mintingIds(FIRST_PRESENTATION));
+    window.dispose();
+
+    window.present();
+
+    expect(window.getState()).toEqual({ presentation: null, rehearsalNotesShown: false });
+  });
+
   it('hides the rehearsal notes again on a second toggle', () => {
     const { window } = presentingWindow(mintingIds(FIRST_PRESENTATION));
     window.present();

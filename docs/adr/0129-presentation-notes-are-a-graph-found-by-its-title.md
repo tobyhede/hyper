@@ -12,7 +12,7 @@ Notes are read in a **Notes window**: a second window with its own product URL t
 
 ## When a presentation starts
 
-A presentation starts when presenting begins from the overview, and when a reopening while presenting moves to a different Map or Graph, because that is a different talk. It ends when presenting is left, or when such a reopening starts the next one. A reopening of a Resource on the same Map and Graph while presenting stays inside the same presentation; browser Back and Forward through the talk's history are that case. At the start of each presentation the rehearsal notes start hidden and the talk timer and the identity the Notes window follows start afresh; a reopening within a presentation changes none of them.
+A presentation starts when presenting begins from the overview, and when anything while presenting moves to a different Map or Graph, a reopening or an Edit adopting another Map, because that is a different talk. It ends when presenting is left, or when such a move starts the next one. A reopening of a Resource on the same Map and Graph while presenting stays inside the same presentation; browser Back and Forward through the talk's history are that case. At the start of each presentation the rehearsal notes start hidden and the talk timer and the identity the Notes window follows start afresh; a reopening within a presentation changes none of them.
 
 ## Why a convention
 

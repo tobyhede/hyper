@@ -118,8 +118,8 @@ export function canRetreat(state: NavigationState): boolean {
  * presents, or `null` when it is not presenting (ADR 0129).
  *
  * A presentation starts when this changes to a value it did not hold: when
- * presenting begins, and when a reopening while presenting moves to another Map
- * or Graph, which is another talk. A reopening on the same Map and Graph, as
+ * presenting begins, and when anything while presenting moves to another Map
+ * or Graph, a reopening or an Edit adopting another Map, which is another talk. A reopening on the same Map and Graph, as
  * browser Back and Forward through the talk are, stays in the presentation.
  * The presenting window reads this rule once, for the rehearsal notes, the
  * talk timer and the presentation link (`presenting-window.ts`).

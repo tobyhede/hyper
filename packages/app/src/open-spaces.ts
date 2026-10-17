@@ -585,6 +585,7 @@ export function createOpenSpaces({
         reportObserverError: report,
         spaceResources,
         presentations,
+        now: presentations.now,
         fullscreen,
       }),
       spaceResources,
@@ -834,6 +835,7 @@ export function createOpenSpaces({
     target.app.surface.dispose();
     target.app.deleteConfirmation.dispose();
     target.app.authoring.dispose();
+    target.app.presenting.dispose();
     retired.add(target);
     compositions.delete(spaceId);
 

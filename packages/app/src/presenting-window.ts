@@ -33,6 +33,8 @@ export interface PresentingWindow {
   readonly commands: TraversalCommands;
   /** Follow fullscreen and link Notes windows until the returned function is called. */
   readonly connect: () => () => void;
+  /** Stop following Navigation, as the composition that holds it is disposed. */
+  readonly dispose: () => void;
 }
 
 export interface PresentingWindowDependencies {
@@ -70,9 +72,10 @@ interface Under {
  * to one presentation, so a new one shows them hidden without anything
  * resetting them, and they are never stored in the Space or the browser.
  *
- * Read on demand rather than only when Navigation notifies, because the link
- * asks for the presentation while Navigation is notifying, and must not depend
- * on hearing Navigation after this does.
+ * A presentation is minted when Navigation notifies, never by reading the
+ * state. The link asks for the presentation while Navigation is notifying, so
+ * whichever of the two hears Navigation first brings the presentation up to
+ * date, and the other finds it so.
  */
 export function createPresentingWindow({
   navigation,
@@ -87,7 +90,8 @@ export function createPresentingWindow({
   let rehearsing: UUID | null = null;
   let answered: PresentingWindowState = { presentation: null, rehearsalNotesShown: false };
 
-  const current = (): Presentation | null => {
+  /** Bring the presentation up to date with Navigation, and answer it. */
+  const follow = (): Presentation | null => {
     const scope = presentationScope(navigation.getState());
     if (scope === null) under = null;
     else if (under === null || !samePresentation(under.scope, scope))
@@ -95,8 +99,9 @@ export function createPresentingWindow({
     return under?.presentation ?? null;
   };
 
-  const getState = (): PresentingWindowState => {
-    const presentation = current();
+  /** The state for the presentation already followed. Mints nothing. */
+  const settle = (): PresentingWindowState => {
+    const presentation = under?.presentation ?? null;
     const rehearsalNotesShown = presentation !== null && rehearsing === presentation.id;
     if (
       answered.presentation !== presentation ||
@@ -106,12 +111,16 @@ export function createPresentingWindow({
     return answered;
   };
 
-  const observable = createObservableState(getState(), reportObserverError);
+  // A presentation already under way when this is composed, as one opened
+  // from its product URL is, starts here.
+  follow();
+  const observable = createObservableState(settle(), reportObserverError);
   const announce = (): void => {
-    const next = getState();
+    follow();
+    const next = settle();
     if (next !== observable.getState()) observable.publish(next);
   };
-  navigation.subscribe(announce);
+  const stopNavigation = navigation.subscribe(announce);
 
   const fullscreenPairing = presentingFullscreen(fullscreen, {
     presenting: () => navigation.getState().mode === 'presenting',
@@ -122,7 +131,12 @@ export function createPresentingWindow({
   const notesLink =
     link === undefined
       ? undefined
-      : presentingLink({ navigation, spaceId: link.spaceId, links: link.links, current });
+      : presentingLink({
+          navigation,
+          spaceId: link.spaceId,
+          links: link.links,
+          presentation: follow,
+        });
 
   const commands: TraversalCommands = {
     advance: navigation.advance,
@@ -131,7 +145,7 @@ export function createPresentingWindow({
     exitPresenting: navigation.exitPresenting,
     openNotes,
     toggleNotes: () => {
-      const presentation = current();
+      const presentation = under?.presentation ?? null;
       if (presentation === null) return;
       rehearsing = rehearsing === presentation.id ? null : presentation.id;
       announce();
@@ -139,7 +153,7 @@ export function createPresentingWindow({
   };
 
   return {
-    getState,
+    getState: observable.getState,
     subscribe: observable.subscribe,
     present: fullscreenPairing.present,
     commands,
@@ -150,6 +164,10 @@ export function createPresentingWindow({
         stopLink?.();
         stopFullscreen();
       };
+    },
+    dispose: () => {
+      stopNavigation();
+      observable.clearSubscribers();
     },
   };
 }

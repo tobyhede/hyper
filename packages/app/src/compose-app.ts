@@ -123,8 +123,9 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    */
   readonly fullscreen?: Fullscreen | undefined;
   /**
-   * Reads when each presentation starts (ADR 0109). The clock `presentations`
-   * shares with the Notes windows when it is given, and `Date.now` otherwise.
+   * Reads when each presentation starts (ADR 0109): the clock `presentations`
+   * shares with the Notes windows. `createOpenSpaces` supplies both, as it
+   * supplies `newId`; `Date.now` answers only for a composition given neither.
    */
   readonly now?: (() => number) | undefined;
 }
@@ -243,7 +244,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     spaceResources,
     presentations,
     fullscreen = NO_FULLSCREEN,
-    now = presentations?.now ?? Date.now,
+    now = Date.now,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
