@@ -72,6 +72,25 @@ export interface PresentationChannel {
   readonly subscribe: (listener: (message: PresentationMessage) => void) => () => void;
 }
 
+/**
+ * Whether a presentation's presenting window is still there, as the browser
+ * knows it rather than as the window says.
+ *
+ * A presenting window that closes says its presentation ended, but one that
+ * crashes says nothing. The browser lets go of what a window held however it
+ * went, so the presenting window holds its presentation's presence and a Notes
+ * window watches it.
+ */
+export interface PresentationPresence {
+  /** Hold the presentation's presence until the returned function is called. */
+  readonly hold: (presentationId: UUID) => () => void;
+  /**
+   * Call `gone` once no window holds the presentation's presence, until the
+   * returned function is called.
+   */
+  readonly watch: (presentationId: UUID, gone: () => void) => () => void;
+}
+
 export interface PresentingLinkDependencies {
   readonly navigation: Navigation;
   readonly spaceId: () => UUID;
@@ -80,6 +99,7 @@ export interface PresentingLinkDependencies {
   readonly newId: () => UUID;
   /** The time now, in milliseconds since the Unix epoch, as `Date.now` answers (ADR 0109). */
   readonly now: () => number;
+  readonly presence: PresentationPresence;
 }
 
 export interface PresentingLink {
@@ -90,6 +110,8 @@ export interface PresentingLink {
 interface Presentation {
   readonly id: UUID;
   readonly startedAt: number;
+  /** Lets go of the presentation's presence. */
+  readonly release: () => void;
 }
 
 /**
@@ -108,6 +130,7 @@ export function presentingLink({
   channel,
   newId,
   now,
+  presence,
 }: PresentingLinkDependencies): PresentingLink {
   let current: Presentation | null = null;
 
@@ -137,6 +160,7 @@ export function presentingLink({
   const end = (): void => {
     if (current === null) return;
     channel.post({ version: 1, kind: 'ended', presentationId: current.id });
+    current.release();
     current = null;
   };
 
@@ -145,7 +169,12 @@ export function presentingLink({
       end();
       return;
     }
-    current ??= { id: newId(), startedAt: now() };
+    if (current === null) {
+      // Held before the first snapshot is posted, so a Notes window that
+      // hears it always finds the presence held.
+      const id = newId();
+      current = { id, startedAt: now(), release: presence.hold(id) };
+    }
     publish(current);
   };
 
@@ -209,13 +238,39 @@ const NOT_PRESENTING: FollowedPresentation = { kind: 'not-presenting' };
  * It follows one presentation: the latest-started of those it hears. Snapshots
  * of any other are ignored, and its commands name the one it follows, so with
  * two windows presenting the same Space it drives only one. When that one
- * ends it announces itself again, and binds to whichever presentation answers.
+ * ends, by saying so or by its window going without a word, it announces
+ * itself again, and binds to whichever presentation answers.
  */
 export function followPresentation(
   channel: PresentationChannel,
+  presence: PresentationPresence,
   reportObserverError: ObserverErrorReporter,
 ): PresentationFollower {
   const observable = createObservableState(NOT_PRESENTING, reportObserverError);
+  let watched: { readonly presentationId: UUID; readonly stop: () => void } | null = null;
+
+  const unwatch = (): void => {
+    watched?.stop();
+    watched = null;
+  };
+
+  const ended = (presentationId: UUID): void => {
+    const state = observable.getState();
+    if (state.kind !== 'presenting' || state.snapshot.presentationId !== presentationId) return;
+    unwatch();
+    observable.publish(NOT_PRESENTING);
+    channel.post({ version: 1, kind: 'announce' });
+  };
+
+  const follow = (snapshot: PresentationSnapshot): void => {
+    observable.publish({ kind: 'presenting', snapshot });
+    if (watched?.presentationId === snapshot.presentationId) return;
+    unwatch();
+    const { presentationId } = snapshot;
+    const stop = presence.watch(presentationId, () => ended(presentationId));
+    // A presence already gone ended the presentation, and unwatched, inside `watch`.
+    if (observable.getState().kind === 'presenting') watched = { presentationId, stop };
+  };
 
   const command = (sent: PresentationCommand): void => {
     const state = observable.getState();
@@ -236,17 +291,10 @@ export function followPresentation(
         state.kind === 'not-presenting' ||
         snapshot.presentationId === state.snapshot.presentationId ||
         snapshot.startedAt > state.snapshot.startedAt;
-      if (follows) observable.publish({ kind: 'presenting', snapshot });
+      if (follows) follow(snapshot);
       return;
     }
-    if (
-      message.kind === 'ended' &&
-      state.kind === 'presenting' &&
-      message.presentationId === state.snapshot.presentationId
-    ) {
-      observable.publish(NOT_PRESENTING);
-      channel.post({ version: 1, kind: 'announce' });
-    }
+    if (message.kind === 'ended') ended(message.presentationId);
   };
 
   return {
@@ -258,10 +306,14 @@ export function followPresentation(
     // What a window heard before it last disconnected may have ended since, so
     // connecting starts from "not presenting" and asks afresh.
     connect: () => {
+      unwatch();
       if (observable.getState().kind !== 'not-presenting') observable.publish(NOT_PRESENTING);
       const stop = channel.subscribe(onMessage);
       channel.post({ version: 1, kind: 'announce' });
-      return stop;
+      return () => {
+        stop();
+        unwatch();
+      };
     },
   };
 }

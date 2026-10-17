@@ -12,6 +12,7 @@ import {
   type PresentationChannel,
   type PresentationFollower,
   type PresentationMessage,
+  type PresentationPresence,
 } from '../src/presentation-link';
 import { mintingIds } from './minting';
 
@@ -95,6 +96,56 @@ function channelHub() {
   };
 }
 
+/**
+ * Presence held and watched as Web Locks hold and watch it: a presentation is
+ * gone once no window holds it, and a window that vanishes, as a crashed tab
+ * does, lets go of everything it held without running any of its own code.
+ */
+function presenceHub() {
+  const held = new Map<UUID, Set<number>>();
+  const watching = new Map<UUID, Set<() => void>>();
+  let windows = 0;
+  const letGo = (presentationId: UUID, owner: number): void => {
+    const holders = held.get(presentationId);
+    holders?.delete(owner);
+    if (holders !== undefined && holders.size > 0) return;
+    held.delete(presentationId);
+    const gone = [...(watching.get(presentationId) ?? [])];
+    watching.delete(presentationId);
+    for (const notify of gone) notify();
+  };
+  return {
+    join: (): PresentationPresence & { readonly vanish: () => void } => {
+      const owner = windows++;
+      return {
+        hold: (presentationId) => {
+          held.set(presentationId, (held.get(presentationId) ?? new Set()).add(owner));
+          return () => letGo(presentationId, owner);
+        },
+        watch: (presentationId, gone) => {
+          if (!held.has(presentationId)) {
+            gone();
+            return () => undefined;
+          }
+          const watchers = watching.get(presentationId) ?? new Set();
+          watching.set(presentationId, watchers.add(gone));
+          return () => watchers.delete(gone);
+        },
+        vanish: () => {
+          for (const [presentationId, holders] of [...held])
+            if (holders.has(owner)) letGo(presentationId, owner);
+        },
+      };
+    },
+  };
+}
+
+/** Presence for a test whose windows never go without saying so: never gone. */
+const steadyPresence = (): PresentationPresence => ({
+  hold: () => () => undefined,
+  watch: () => () => undefined,
+});
+
 const throwObserverError: ObserverErrorReporter = (error) => {
   throw error;
 };
@@ -104,6 +155,7 @@ function presentingWindow(
   channel: PresentationChannel,
   newId: () => UUID,
   now: () => number = () => 0,
+  presence: PresentationPresence = steadyPresence(),
 ) {
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const { navigation, currentSpace } = composeCore({
@@ -115,13 +167,17 @@ function presentingWindow(
     channel,
     newId,
     now,
+    presence,
   });
   const disconnect = link.connect();
   return { navigation, disconnect };
 }
 
-function notesWindow(channel: PresentationChannel) {
-  const follower = followPresentation(channel, throwObserverError);
+function notesWindow(
+  channel: PresentationChannel,
+  presence: PresentationPresence = steadyPresence(),
+) {
+  const follower = followPresentation(channel, presence, throwObserverError);
   const disconnect = follower.connect();
   return { follower, disconnect };
 }
@@ -258,11 +314,39 @@ describe('the presentation link', () => {
     expect(shown(follower)).toBeNull();
   });
 
+  it('shows "not presenting" when the presenting window vanishes without a word', () => {
+    const join = channelHub();
+    const presence = presenceHub();
+    const stagePresence = presence.join();
+    // A crashed window neither speaks nor answers.
+    const stageChannel = join();
+    let crashed = false;
+    const stage = presentingWindow(
+      {
+        post: (message) => {
+          if (!crashed) stageChannel.post(message);
+        },
+        subscribe: stageChannel.subscribe,
+      },
+      mintingIds(FIRST_PRESENTATION),
+      () => 0,
+      stagePresence,
+    );
+    const { follower } = notesWindow(join(), presence.join());
+    stage.navigation.present();
+    expect(shown(follower)).toBe(OPENING);
+
+    crashed = true;
+    stagePresence.vanish();
+
+    expect(shown(follower)).toBeNull();
+  });
+
   it('forgets a presentation that ended while the Notes window was disconnected', () => {
     const join = channelHub();
     const stage = presentingWindow(join(), mintingIds(FIRST_PRESENTATION));
     const notes = join();
-    const follower = followPresentation(notes, throwObserverError);
+    const follower = followPresentation(notes, steadyPresence(), throwObserverError);
     const disconnect = follower.connect();
     stage.navigation.present();
 

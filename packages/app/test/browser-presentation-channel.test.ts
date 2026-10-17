@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type UUID } from '@project/core';
 import {
   createBrowserPresentationChannel,
+  createBrowserPresentationPresence,
   presentationChannelName,
   type NativeBroadcastChannel,
+  type NativeLocks,
 } from '../src/browser-presentation-channel';
 import type { PresentationMessage } from '../src/presentation-link';
 
@@ -132,5 +134,108 @@ describe('the browser presentation channel', () => {
 
   it('names one channel per Space', () => {
     expect(presentationChannelName(uuid(2))).not.toBe(presentationChannelName(uuid(3)));
+  });
+});
+
+/**
+ * Exclusive locks granted as the Web Locks API grants them: in request order,
+ * one holder at a time, held until the holder's callback settles, and a
+ * request aborted before it is granted rejected and never granted.
+ */
+function nativeLocks() {
+  const queues = new Map<string, { run: () => void; signal: AbortSignal | undefined }[]>();
+  const busy = new Set<string>();
+  const next = (name: string): void => {
+    const queue = queues.get(name) ?? [];
+    const waiting = queue.shift();
+    if (waiting === undefined) {
+      busy.delete(name);
+      return;
+    }
+    busy.add(name);
+    waiting.run();
+  };
+  const locks: NativeLocks = {
+    request: (name, { signal }, callback) =>
+      new Promise((resolve, reject) => {
+        const run = (): void => {
+          void Promise.resolve(callback()).then(() => {
+            resolve(undefined);
+            next(name);
+          });
+        };
+        const queue = queues.get(name) ?? [];
+        queues.set(name, queue);
+        const entry = { run, signal };
+        signal?.addEventListener('abort', () => {
+          const at = queue.indexOf(entry);
+          if (at === -1) return;
+          queue.splice(at, 1);
+          reject(new DOMException('Aborted', 'AbortError'));
+        });
+        queue.push(entry);
+        if (!busy.has(name)) next(name);
+      }),
+  };
+  return locks;
+}
+
+/** Let granted locks run and released ones pass on. */
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe('the browser presentation presence', () => {
+  it('finds a presentation gone once its presenting window lets go', async () => {
+    const locks = nativeLocks();
+    const presenting = createBrowserPresentationPresence(locks);
+    const notes = createBrowserPresentationPresence(locks);
+    const release = presenting.hold(uuid(1));
+    let gone = false;
+    notes.watch(uuid(1), () => (gone = true));
+    await settled();
+    expect(gone).toBe(false);
+
+    release();
+    await settled();
+
+    expect(gone).toBe(true);
+  });
+
+  it('finds nothing gone once the Notes window stops watching', async () => {
+    const locks = nativeLocks();
+    const release = createBrowserPresentationPresence(locks).hold(uuid(1));
+    let gone = false;
+    const stop = createBrowserPresentationPresence(locks).watch(uuid(1), () => (gone = true));
+    await settled();
+
+    stop();
+    release();
+    await settled();
+
+    expect(gone).toBe(false);
+  });
+
+  it('watches each presentation apart', async () => {
+    const locks = nativeLocks();
+    const presenting = createBrowserPresentationPresence(locks);
+    const release = presenting.hold(uuid(1));
+    presenting.hold(uuid(2));
+    const gone: UUID[] = [];
+    const notes = createBrowserPresentationPresence(locks);
+    notes.watch(uuid(1), () => gone.push(uuid(1)));
+    notes.watch(uuid(2), () => gone.push(uuid(2)));
+
+    release();
+    await settled();
+
+    expect(gone).toEqual([uuid(1)]);
+  });
+
+  it('never finds a presentation gone where the browser has no Web Locks', async () => {
+    const presence = createBrowserPresentationPresence(undefined);
+    presence.hold(uuid(1))();
+    let gone = false;
+    presence.watch(uuid(1), () => (gone = true));
+    await settled();
+    expect(gone).toBe(false);
   });
 });

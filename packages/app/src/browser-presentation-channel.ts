@@ -1,6 +1,7 @@
 import { uuidSchema, type UUID } from '@project/core';
 import type {
   PresentationChannel,
+  PresentationPresence,
   PresentationCommand,
   PresentationMessage,
   PresentationSnapshot,
@@ -110,6 +111,61 @@ export function createBrowserPresentationChannel(
       };
       native.addEventListener('message', heard);
       return () => native.removeEventListener('message', heard);
+    },
+  };
+}
+
+/** The part of the Web Locks API the adapter uses. `navigator.locks` satisfies it. */
+export interface NativeLocks {
+  request(
+    name: string,
+    options: { readonly signal?: AbortSignal },
+    callback: () => Promise<undefined> | undefined,
+  ): Promise<void>;
+}
+
+/** The name of the lock a presenting window holds for one presentation. */
+export const presentationPresenceName = (presentationId: UUID): string =>
+  `hyper-presenting:${presentationId}`;
+
+/** Presence where the browser offers none to watch: never gone. */
+const steadyPresence: PresentationPresence = {
+  hold: () => () => undefined,
+  watch: () => () => undefined,
+};
+
+/**
+ * The one adapter over the browser's Web Locks for presentation presence (ADR
+ * 0129).
+ *
+ * The presenting window holds an exclusive lock named for its presentation
+ * until the presentation ends. A Notes window asks for the same lock: the
+ * browser grants it only once no window holds it, which is the moment the
+ * presentation is gone, and the Notes window lets go at once. The browser
+ * releases a window's locks however the window goes, so a crashed presenting
+ * window is noticed as surely as a closed one. Where the browser has no Web
+ * Locks, nothing is ever gone and a closed window's `ended` is all there is.
+ */
+export function createBrowserPresentationPresence(
+  locks: NativeLocks | undefined,
+): PresentationPresence {
+  if (locks === undefined) return steadyPresence;
+  return {
+    hold: (presentationId) => {
+      const held = Promise.withResolvers<undefined>();
+      void locks.request(presentationPresenceName(presentationId), {}, () => held.promise);
+      return () => held.resolve(undefined);
+    },
+    watch: (presentationId, gone) => {
+      const stopped = new AbortController();
+      locks
+        .request(presentationPresenceName(presentationId), { signal: stopped.signal }, () => {
+          if (!stopped.signal.aborted) gone();
+          return undefined;
+        })
+        // Stopping before the lock is granted rejects the request; nothing is gone.
+        .catch(() => undefined);
+      return () => stopped.abort();
     },
   };
 }
