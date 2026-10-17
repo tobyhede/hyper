@@ -262,6 +262,11 @@ test(
     await page.keyboard.press('ArrowRight');
     await expect(presentedName(page)).toHaveText('Demo');
     await expect(rehearsalNames).toHaveText(['Backup video']);
+    await page.keyboard.press('n');
+    await expect(rehearsal).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.press('n');
+    await expect(rehearsalNames).toHaveText(['Backup video']);
 
     // Leaving and presenting again starts with them hidden.
     await page.keyboard.press('Escape');
@@ -273,5 +278,8 @@ test(
 
     await toggle.click();
     await expect(rehearsalNames).toHaveText(['Open with the outage', 'Thank the team']);
+    await toggle.click();
+    await expect(rehearsal).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   },
 );

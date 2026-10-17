@@ -163,6 +163,12 @@ test(
     await expect(presentedName(page)).toHaveText('Demo');
     await expect(noteNames).toHaveText(['Backup video']);
 
+    await page.keyboard.press('n');
+    await expect(notes).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await toggle.click();
+    await expect(noteNames).toHaveText(['Backup video']);
     await toggle.click();
     await expect(notes).toHaveCount(0);
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');

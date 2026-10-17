@@ -85,6 +85,20 @@ describe('the global Presenting keys', () => {
     expect(traversal.toggleNotes).toHaveBeenCalledTimes(2);
   });
 
+  it('toggles the rehearsal notes once for a held N, and opens one Notes window for a held S', () => {
+    const traversal = commands();
+    render(<Presenting traversal={traversal} />);
+
+    fireEvent.keyDown(document.body, { key: 'n' });
+    fireEvent.keyDown(document.body, { key: 'n', repeat: true });
+    fireEvent.keyDown(document.body, { key: 'n', repeat: true });
+    fireEvent.keyDown(document.body, { key: 's' });
+    fireEvent.keyDown(document.body, { key: 's', repeat: true });
+
+    expect(traversal.toggleNotes).toHaveBeenCalledTimes(1);
+    expect(traversal.openNotes).toHaveBeenCalledTimes(1);
+  });
+
   it('binds nothing while a traversal is not the resource on screen', () => {
     const traversal = commands();
     render(<Presenting active={false} traversal={traversal} />);

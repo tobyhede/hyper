@@ -96,8 +96,9 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
     if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (activatesFocusedControl(event) || insideAModalSurface(event)) return;
-      // A modified S or N is the browser's or the system's (Save, New), never ours.
-      const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
+      // A modified S or N is the browser's or the system's (Save, New), never ours,
+      // and a held one acts once: a toggle repeated by the keyboard would flicker.
+      const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.repeat;
       const handler = {
         ArrowRight: advance,
         ' ': advance,
