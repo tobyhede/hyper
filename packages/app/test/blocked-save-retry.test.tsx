@@ -7,6 +7,7 @@ import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { stubResizeObserver } from './resize-observer';
 
 /**
@@ -98,6 +99,7 @@ const blockedSequence = async () => {
   );
   const openSpaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,
@@ -172,6 +174,7 @@ const blockedTarget = async () => {
   );
   const openSpaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend,
     metaSpaceId: META_ID,

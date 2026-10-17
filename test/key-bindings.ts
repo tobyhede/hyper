@@ -162,6 +162,22 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'leave presentation',
   },
   {
+    module: 'packages/app/src/presenting-keys.ts',
+    sourceKey: 's',
+    occurrence: 1,
+    key: 'S',
+    surface: 'Presenting',
+    behaviour: 'open the Notes window',
+  },
+  {
+    module: 'packages/app/src/presenting-keys.ts',
+    sourceKey: 'S',
+    occurrence: 1,
+    key: 'Shift+S',
+    surface: 'Presenting',
+    behaviour: 'open the Notes window',
+  },
+  {
     module: 'packages/app/src/components/SpaceCanvas.tsx',
     sourceKey: 'Backspace',
     occurrence: 1,

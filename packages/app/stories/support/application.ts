@@ -5,6 +5,7 @@ import type { ImageSources } from '#src/image-creation';
 import { createOpenSpaces, type OpenSpace, type OpenSpaces } from '#src/open-spaces';
 import { storelessImages } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 
 /** Fixture data, an isolated history adapter and a host that refuses fullscreen; all session behavior is production's. */
 export function storySpaces(
@@ -28,6 +29,7 @@ export function storySpaces(
     newId: newUuid,
     images,
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     history: {
       pathname: () => pathname,
       href: () => `https://example.test${pathname}`,

@@ -22,6 +22,7 @@ import { composeApp, type ComposedApp } from './compose-app';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 import type { ImageSources } from './image-creation';
 import type { Fullscreen } from './presenting-fullscreen';
+import type { PresentationLinks } from './presentation-link';
 import {
   createSpaceResourceLifecycle,
   type SpaceResourceAuthoring,
@@ -255,6 +256,13 @@ export interface OpenSpacesOptions {
    * lose fullscreen without anything saying so.
    */
   readonly fullscreen: Fullscreen;
+  /**
+   * The browser every composed Space's presentations reach Notes windows
+   * through (ADR 0129), required with no default for the reason `fullscreen`
+   * is: `main.tsx` supplies the one adapter over `BroadcastChannel`, and a test
+   * or a story supplies one of its own.
+   */
+  readonly presentations: PresentationLinks;
   readonly reportObserverError?: ObserverErrorReporter;
 }
 
@@ -377,6 +385,7 @@ export function createOpenSpaces({
   history,
   images,
   fullscreen,
+  presentations,
   reportObserverError,
 }: OpenSpacesOptions): OpenSpaces {
   const report: ObserverErrorReporter =
@@ -582,6 +591,7 @@ export function createOpenSpaces({
         newId,
         reportObserverError: report,
         spaceResources,
+        presentations,
       }),
       spaceResources,
     };

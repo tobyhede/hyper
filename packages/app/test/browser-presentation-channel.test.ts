@@ -30,6 +30,7 @@ function nativeChannel() {
     postMessage: (message) => posted.push(message),
     addEventListener: (_type, listener) => listeners.add(listener),
     removeEventListener: (_type, listener) => listeners.delete(listener),
+    close: () => listeners.clear(),
   };
   const deliver = (data: Sent): void => {
     for (const listener of listeners) listener({ data });
@@ -228,6 +229,22 @@ describe('the browser presentation presence', () => {
     await settled();
 
     expect(gone).toEqual([uuid(1)]);
+  });
+
+  it('holds on quietly when the browser refuses the lock', async () => {
+    let unhandled = 0;
+    const listen = (): void => void (unhandled += 1);
+    process.on('unhandledRejection', listen);
+    const refusing: NativeLocks = {
+      request: () => Promise.reject(new DOMException('Refused', 'InvalidStateError')),
+    };
+    try {
+      createBrowserPresentationPresence(refusing).hold(uuid(1))();
+      await settled();
+      expect(unhandled).toBe(0);
+    } finally {
+      process.off('unhandledRejection', listen);
+    }
   });
 
   it('never finds a presentation gone where the browser has no Web Locks', async () => {

@@ -11,12 +11,13 @@ import { usePresentingKeys, type TraversalCommands } from '../src/presenting-key
  * running one command while the browser runs another on the same press.
  */
 
-/** The four operations, each a spy — inferred, so a call is still inspectable. */
+/** The five operations, each a spy — inferred, so a call is still inspectable. */
 const commands = () => ({
   advance: vi.fn(),
   retreat: vi.fn(),
   selectBranch: vi.fn(),
   exitPresenting: vi.fn(),
+  openNotes: vi.fn(),
 });
 
 function Presenting({
@@ -57,6 +58,18 @@ describe('the global Presenting keys', () => {
     expect(traversal.retreat).toHaveBeenCalledTimes(1);
     expect(traversal.selectBranch.mock.calls).toEqual([[-1], [1]]);
     expect(traversal.exitPresenting).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens a Notes window on S, and leaves a modified S to the browser', () => {
+    const traversal = commands();
+    render(<Presenting traversal={traversal} />);
+
+    fireEvent.keyDown(document.body, { key: 's' });
+    fireEvent.keyDown(document.body, { key: 'S', shiftKey: true });
+    fireEvent.keyDown(document.body, { key: 's', ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: 's', metaKey: true });
+
+    expect(traversal.openNotes).toHaveBeenCalledTimes(2);
   });
 
   it('binds nothing while a traversal is not the resource on screen', () => {

@@ -424,6 +424,7 @@ test(
     await expect(moves).toHaveAccessibleName('Go to B');
     await expect(page.getByTestId('presenting-keys').getByRole('listitem')).toHaveText([
       '→go',
+      'Snotes',
       'Escoverview',
     ]);
 
@@ -764,6 +765,7 @@ test.describe('at a phone width', () => {
       await expect(page.getByTestId('presenting-keys').getByRole('listitem')).toHaveText([
         '→go',
         '←back',
+        'Snotes',
         'Escoverview',
       ]);
 

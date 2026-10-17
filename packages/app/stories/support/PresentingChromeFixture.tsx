@@ -62,11 +62,14 @@ export function PresentingChromeFixture({
     for (let step = 0; step < advances; step += 1) composed.advance();
   });
   const presenting = state.mode === 'presenting';
+  // A story opens no second window, as its Copy link writes no clipboard.
+  const openNotes = useCallback(() => undefined, []);
   usePresentingKeys(presenting, {
     advance: navigation.advance,
     retreat: navigation.retreat,
     selectBranch: navigation.selectBranch,
     exitPresenting: navigation.exitPresenting,
+    openNotes,
   });
 
   return (
@@ -86,6 +89,7 @@ export function PresentingChromeFixture({
           onRetreat={navigation.retreat}
           onExit={navigation.exitPresenting}
           onCopyLink={() => undefined}
+          onOpenNotes={openNotes}
         />
       )}
     </div>

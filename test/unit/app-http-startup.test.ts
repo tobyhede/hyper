@@ -4,8 +4,10 @@ import { MemorySpaceBackend, type SpaceBackend } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
 import { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 import { createSpaceStartup, type SpaceStartup } from '../../packages/app/src/space';
+import type { OpenedApplicationStartup } from '../../packages/app/src/startup';
 import { recordingHistory } from '../../packages/app/test/browser-history';
 import { refusingFullscreen } from '../../packages/app/test/fullscreen';
+import { unlinkedPresentations } from '../../packages/app/test/presentations';
 
 /** A request that initializes no Space mints nothing, so any mint is a failure here. */
 const mintsNothing = (): UUID => {
@@ -31,8 +33,22 @@ const mintingIds =
  * which is what a seam required below the composition root is for — and a
  * host that refuses fullscreen, which `createSpaceStartup` requires.
  */
+/** A startup whose every address opens a Space, as every one this file resolves does. */
+interface OpeningStartup {
+  readonly resolve: (pathname: string) => Promise<OpenedApplicationStartup>;
+}
+
+const opening = (startup: SpaceStartup): OpeningStartup => ({
+  resolve: async (pathname) => {
+    const result = await startup.resolve(pathname);
+    if (result.kind !== 'opened')
+      throw new Error(`${pathname} opened a Notes window, not a Space.`);
+    return result;
+  },
+});
+
 const startupOver = (backend: SpaceBackend, newId: () => UUID = newUuid): SpaceStartup =>
-  createSpaceStartup(refusingFullscreen, backend, newId, recordingHistory());
+  createSpaceStartup(refusingFullscreen, unlinkedPresentations, backend, newId, recordingHistory());
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
@@ -123,7 +139,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     });
-    const startup = startupOver(backend, mintingIds(MAP_ID, GRAPH_ID));
+    const startup = startupOverOpening(backend, mintingIds(MAP_ID, GRAPH_ID));
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
@@ -135,7 +151,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('opens the Space named by the compact product-route id through HTTP', async () => {
-    const startup = startupFor(mintingIds(MAP_ID, GRAPH_ID), SPACE_ID, snapshot());
+    const startup = startupForOpening(mintingIds(MAP_ID, GRAPH_ID), SPACE_ID, snapshot());
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
@@ -147,7 +163,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('fails when the product-route id no longer resolves', async () => {
-    const startup = startupFor(
+    const startup = startupForOpening(
       mintsNothing,
       OTHER_SPACE_ID,
       snapshot(OTHER_SPACE_ID, OTHER_RESOURCE_ID, 'Other space'),
@@ -159,7 +175,12 @@ describe('HTTP space startup composition', () => {
   });
 
   it('opens the exact named Space when several are stored', async () => {
-    const startup = startupFor(mintsNothing, SPACE_ID, metaReferencingOther(), otherSnapshot());
+    const startup = startupForOpening(
+      mintsNothing,
+      SPACE_ID,
+      metaReferencingOther(),
+      otherSnapshot(),
+    );
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),
@@ -169,7 +190,12 @@ describe('HTTP space startup composition', () => {
   });
 
   it('names the Meta Space from the aggregate it loaded while Meta is not open', async () => {
-    const startup = startupFor(mintsNothing, SPACE_ID, metaReferencingOther(), otherSnapshot());
+    const startup = startupForOpening(
+      mintsNothing,
+      SPACE_ID,
+      metaReferencingOther(),
+      otherSnapshot(),
+    );
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'space', spaceId: OTHER_SPACE_ID }),
@@ -200,7 +226,7 @@ describe('HTTP space startup composition', () => {
     const backend = new FlakyAggregateBackend(SPACE_ID, [
       { snapshot: snapshot(), revision: 0n, exportedRevision: null },
     ]);
-    const startup = startupOver(backend);
+    const startup = startupOverOpening(backend);
     const destination = productDestinationPath({ kind: 'space', spaceId: SPACE_ID });
 
     await expect(startup.resolve(destination)).rejects.toThrow('aggregate transport exploded');
@@ -212,7 +238,7 @@ describe('HTTP space startup composition', () => {
   });
 
   it('rejects a malformed compact product-route id', async () => {
-    const startup = startupFor(mintsNothing, SPACE_ID, snapshot());
+    const startup = startupForOpening(mintsNothing, SPACE_ID, snapshot());
 
     await expect(startup.resolve('/spaces/not-a-compact-uuid')).rejects.toThrow(
       'The product URL is malformed.',
@@ -243,7 +269,7 @@ describe('HTTP space startup composition', () => {
     };
     const backend = MemorySpaceBackend.asMeta(loaded);
     const loadSpace = vi.spyOn(backend, 'loadSpace');
-    const startup = startupOver(backend);
+    const startup = startupOverOpening(backend);
 
     const result = await startup.resolve(
       productDestinationPath({
@@ -263,7 +289,7 @@ describe('HTTP space startup composition', () => {
     const loaded = { snapshot: snapshot(), revision: 0n, exportedRevision: null };
     const backend = MemorySpaceBackend.asMeta(loaded);
     const loadSpace = vi.spyOn(backend, 'loadSpace');
-    const startup = startupOver(backend);
+    const startup = startupOverOpening(backend);
     const destination = productDestinationPath({ kind: 'space', spaceId: SPACE_ID });
 
     const first = await startup.resolve(destination);
@@ -296,7 +322,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
+    const startup = startupOverOpening(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'graph', spaceId: SPACE_ID, graphId: GRAPH_ID }),
@@ -343,7 +369,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
+    const startup = startupOverOpening(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
       productDestinationPath({
@@ -388,7 +414,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
+    const startup = startupOverOpening(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
       productDestinationPath({
@@ -443,7 +469,7 @@ describe('HTTP space startup composition', () => {
       revision: 0n,
       exportedRevision: null,
     };
-    const startup = startupOver(MemorySpaceBackend.asMeta(loaded));
+    const startup = startupOverOpening(MemorySpaceBackend.asMeta(loaded));
 
     const result = await startup.resolve(
       productDestinationPath({ kind: 'resource', spaceId: SPACE_ID, resourceId: omittedId }),
@@ -454,5 +480,38 @@ describe('HTTP space startup composition', () => {
     expect(
       result.opened.app.currentSpace().lookup.map(mapId)?.map.positions[omittedId],
     ).toBeUndefined();
+  });
+});
+
+function startupOverOpening(...args: Parameters<typeof startupOver>) {
+  return opening(startupOver(...args));
+}
+
+function startupForOpening(...args: Parameters<typeof startupFor>) {
+  return opening(startupFor(...args));
+}
+
+describe('a Notes window address', () => {
+  it('opens a Notes window over the addressed Space, and no Space composition', async () => {
+    const startup = startupFor(mintsNothing, SPACE_ID, metaReferencingOther(), otherSnapshot());
+
+    const result = await startup.resolve(
+      productDestinationPath({ kind: 'notes', spaceId: OTHER_SPACE_ID }),
+    );
+
+    expect(result.kind).toBe('notes');
+  });
+
+  it('refuses a Notes window over a Space the store does not hold', async () => {
+    const startup = startupFor(mintsNothing, SPACE_ID, snapshot());
+
+    await expect(
+      startup.resolve(
+        productDestinationPath({
+          kind: 'notes',
+          spaceId: uuidSchema.parse('00000000-0000-4000-8000-000000000099'),
+        }),
+      ),
+    ).rejects.toThrow('The product URL does not resolve.');
   });
 });

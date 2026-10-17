@@ -70,6 +70,26 @@ export type PresentationMessage =
 export interface PresentationChannel {
   readonly post: (message: PresentationMessage) => void;
   readonly subscribe: (listener: (message: PresentationMessage) => void) => () => void;
+  /** Leave the channel. Nothing is heard and nothing can be posted after. */
+  readonly close: () => void;
+}
+
+/**
+ * What the link needs of the browser, injected from `main.tsx` with no default,
+ * as `Fullscreen` is (ADR 0109).
+ */
+export interface PresentationLinks {
+  /** Open this window's end of one Space's channel. */
+  readonly open: (spaceId: UUID) => PresentationChannel;
+  /** The time now, in milliseconds since the Unix epoch, as `Date.now` answers. */
+  readonly now: () => number;
+  /**
+   * Call `listener` when this window is going away, before it goes. A window
+   * closing runs no teardown of its own, so this is the presenting window's
+   * last chance to say its presentation ended.
+   */
+  readonly leaving: (listener: () => void) => () => void;
+  readonly presence: PresentationPresence;
 }
 
 /**
@@ -94,12 +114,9 @@ export interface PresentationPresence {
 export interface PresentingLinkDependencies {
   readonly navigation: Navigation;
   readonly spaceId: () => UUID;
-  readonly channel: PresentationChannel;
+  readonly links: PresentationLinks;
   /** Mints each presentation's identity when presenting starts (ADR 0109). */
   readonly newId: () => UUID;
-  /** The time now, in milliseconds since the Unix epoch, as `Date.now` answers (ADR 0109). */
-  readonly now: () => number;
-  readonly presence: PresentationPresence;
 }
 
 export interface PresentingLink {
@@ -127,12 +144,11 @@ interface Presentation {
 export function presentingLink({
   navigation,
   spaceId,
-  channel,
+  links,
   newId,
-  now,
-  presence,
 }: PresentingLinkDependencies): PresentingLink {
   let current: Presentation | null = null;
+  let channel: PresentationChannel | null = null;
 
   const snapshot = (presentation: Presentation): PresentationSnapshot | null => {
     const state = navigation.getState();
@@ -154,14 +170,18 @@ export function presentingLink({
 
   const publish = (presentation: Presentation): void => {
     const published = snapshot(presentation);
-    if (published !== null) channel.post({ version: 1, kind: 'presenting', snapshot: published });
+    if (published !== null) channel?.post({ version: 1, kind: 'presenting', snapshot: published });
   };
 
   const end = (): void => {
     if (current === null) return;
-    channel.post({ version: 1, kind: 'ended', presentationId: current.id });
+    // Forgotten before it is announced: a Notes window hearing the end asks
+    // again at once, and this window must not answer for a presentation it
+    // has just ended.
+    const ended = current.id;
     current.release();
     current = null;
+    channel?.post({ version: 1, kind: 'ended', presentationId: ended });
   };
 
   const onNavigation = (): void => {
@@ -173,7 +193,7 @@ export function presentingLink({
       // Held before the first snapshot is posted, so a Notes window that
       // hears it always finds the presence held.
       const id = newId();
-      current = { id, startedAt: now(), release: presence.hold(id) };
+      current = { id, startedAt: links.now(), release: links.presence.hold(id) };
     }
     publish(current);
   };
@@ -201,15 +221,21 @@ export function presentingLink({
 
   return {
     connect: () => {
+      const opened = links.open(spaceId());
+      channel = opened;
       const stopNavigation = navigation.subscribe(onNavigation);
-      const stopChannel = channel.subscribe(onMessage);
+      const stopChannel = opened.subscribe(onMessage);
+      const stopLeaving = links.leaving(end);
       // A presentation opened from its product URL is presenting before the
       // link connects, and is published at once.
       onNavigation();
       return () => {
         stopNavigation();
         stopChannel();
+        stopLeaving();
         end();
+        opened.close();
+        channel = null;
       };
     },
   };

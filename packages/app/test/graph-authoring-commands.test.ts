@@ -25,6 +25,7 @@ import { CANVAS, type AuthoringResult } from '../src/space-authoring';
 import { recordingHistory } from './browser-history';
 import { unusedImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 
 const id = (suffix: string) =>
   uuidSchema.parse(`00000000-0000-4000-8000-${suffix.padStart(12, '0')}`);
@@ -108,6 +109,7 @@ const openSpaces = (
 ) =>
   createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: unusedImageSources,
     backend: new MemorySpaceBackend(
       META,

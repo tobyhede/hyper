@@ -63,6 +63,23 @@ describe('product destinations', () => {
     );
   });
 
+  it('formats and resolves a Notes window over a Space, and only over a Space it holds', async () => {
+    const notes = `/spaces/${encodeCompactUuid(SPACE_ID)}/notes`;
+    const missing = uuidSchema.parse('00000000-0000-4000-8000-000000000099');
+
+    expect(productDestinationPath({ kind: 'notes', spaceId: SPACE_ID })).toBe(notes);
+    await expect(resolveProductDestination(loader(), notes)).resolves.toMatchObject({
+      kind: 'resolved',
+      destination: { kind: 'notes', spaceId: SPACE_ID },
+    });
+    await expect(
+      resolveProductDestination(loader(), `/spaces/${encodeCompactUuid(missing)}/notes`),
+    ).resolves.toEqual({ kind: 'unresolved' });
+    await expect(
+      resolveProductDestination(loader(), `/spaces/${encodeCompactUuid(SPACE_ID)}/speaker`),
+    ).resolves.toEqual({ kind: 'malformed' });
+  });
+
   it('formats and resolves canonical and contextual Resource destinations', async () => {
     const canonical = `/spaces/${encodeCompactUuid(SPACE_ID)}/resources/${encodeCompactUuid(RESOURCE_ID)}`;
     const contextual = `/spaces/${encodeCompactUuid(SPACE_ID)}/maps/${encodeCompactUuid(MAP_ID)}/resources/${encodeCompactUuid(RESOURCE_ID)}`;

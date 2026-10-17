@@ -1,4 +1,5 @@
-import { HttpSpaceBackend } from '@project/http';
+import { HttpSpaceBackend, productAddress } from '@project/http';
+import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
 import type { SpaceBackend } from '@project/persistence';
 import type { HistoryApi } from './browser-location';
@@ -6,13 +7,15 @@ import { createBrowserHistory } from './browser-history';
 import { pickImagesInBrowser } from './browser-file-picker';
 import type { ImageSources } from './image-creation';
 import type { Fullscreen } from './presenting-fullscreen';
-import type { OpenedApplicationStartup } from './startup';
+import type { PresentationLinks } from './presentation-link';
+import type { ApplicationStartupResult } from './startup';
+import { createNotesWindow } from './notes-window';
 import { createOpenSpaces, type OpenSpaces } from './open-spaces';
 
 export type { OpenSpace } from './open-spaces';
 
 export interface SpaceStartup {
-  resolve(pathname: string): Promise<OpenedApplicationStartup>;
+  resolve(pathname: string): Promise<ApplicationStartupResult>;
 }
 
 /**
@@ -63,8 +66,9 @@ const browserImageSources = (): ImageSources => {
 /**
  * Compose browser startup around one fixed persistence backend.
  *
- * `fullscreen` is required with no default: `main.tsx` names `document` and
- * hands it the one adapter over it, and a test supplies a host of its own.
+ * `fullscreen` and `presentations` are required with no default: `main.tsx`
+ * names `document`, `window` and `BroadcastChannel` and hands each to its one
+ * adapter, and a test supplies hosts of its own.
  *
  * The other four seams default together and for one reason: this is the composition
  * root, and it is where the ambient browser, the ambient generator and the real
@@ -72,6 +76,7 @@ const browserImageSources = (): ImageSources => {
  */
 export const createSpaceStartup = (
   fullscreen: Fullscreen,
+  presentations: PresentationLinks,
   backend: SpaceBackend = new HttpSpaceBackend(),
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
@@ -94,6 +99,7 @@ export const createSpaceStartup = (
         history,
         images,
         fullscreen,
+        presentations,
       });
     });
     owner = opening;
@@ -107,6 +113,30 @@ export const createSpaceStartup = (
   };
   return {
     resolve: async (pathname) => {
+      const address = productAddress(pathname);
+      if (address.kind === 'addressed' && address.destination.kind === 'notes') {
+        const { spaceId } = address.destination;
+        const load = async (): Promise<Space | undefined> => {
+          const loaded = await backend.loadSpace(spaceId);
+          if (loaded === undefined) return undefined;
+          const read = loadSpaceSnapshot(loaded.snapshot);
+          if (!read.ok) throw new Error(read.errors.map((error) => error.message).join('; '));
+          return read.space;
+        };
+        const space = await load();
+        if (space === undefined) throw new Error('The product URL does not resolve.');
+        return {
+          kind: 'notes',
+          notes: createNotesWindow({
+            spaceId,
+            space,
+            reload: load,
+            links: presentations,
+            reportObserverError: (error) => console.error('Notes window observer failed', error),
+          }),
+          now: presentations.now,
+        };
+      }
       const spaces = await openSpaces();
       const { opened, opening } = await spaces.openPath(pathname);
       return {

@@ -3,6 +3,8 @@ import type { OpenSpace, OpenSpaces } from './open-spaces';
 import { OpenSpacesApplication } from './components/OpenSpacesApplication';
 import type { DestinationOpening } from './destination-opening';
 import { StartupFailure } from './components/StartupFailure';
+import { NotesWindowApplication } from './components/NotesWindowApplication';
+import type { NotesWindow } from './notes-window';
 
 export interface ApplicationRoot {
   render(children: ReactNode): void;
@@ -22,7 +24,15 @@ export interface OpenedApplicationStartup {
   opening?: DestinationOpening | undefined;
 }
 
-export type ApplicationStartupResult = OpenedApplicationStartup;
+/** A Notes window, which opens no Space composition: it follows another window's (ADR 0129). */
+export interface NotesApplicationStartup {
+  kind: 'notes';
+  notes: NotesWindow;
+  /** The clock the presenting windows read their presentations' start from. */
+  now: () => number;
+}
+
+export type ApplicationStartupResult = OpenedApplicationStartup | NotesApplicationStartup;
 
 export type ApplicationStartupResolver = () => Promise<ApplicationStartupResult>;
 
@@ -42,11 +52,15 @@ export const startApplication = async (
     const startup = await resolveStartup();
     root.render(
       <StrictMode>
-        <OpenSpacesApplication
-          spaces={startup.spaces}
-          initial={startup.opened}
-          opening={startup.opening}
-        />
+        {startup.kind === 'notes' ? (
+          <NotesWindowApplication notes={startup.notes} now={startup.now} />
+        ) : (
+          <OpenSpacesApplication
+            spaces={startup.spaces}
+            initial={startup.opened}
+            opening={startup.opening}
+          />
+        )}
       </StrictMode>,
     );
   } catch (error) {

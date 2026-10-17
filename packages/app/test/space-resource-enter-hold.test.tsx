@@ -8,6 +8,7 @@ import { unavailable } from './command-dock';
 import { recordingHistory } from './browser-history';
 import { heldImageSources } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 import { selectResource } from './resource-selection';
 import { mintingIds } from './minting';
 import { stubResizeObserver } from './resize-observer';
@@ -119,6 +120,7 @@ it('withdraws a Space Resource’s rail, Enter with it, while an only-drawn Spac
   );
   const spaces = createOpenSpaces({
     fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
     images: held.images,
     backend,
     metaSpaceId: META_ID,

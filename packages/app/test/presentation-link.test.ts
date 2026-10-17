@@ -11,9 +11,9 @@ import {
   presentingLink,
   type PresentationChannel,
   type PresentationFollower,
-  type PresentationMessage,
   type PresentationPresence,
 } from '../src/presentation-link';
+import { channelHub } from './presentation-channels';
 import { mintingIds } from './minting';
 
 const uuid = (n: number): UUID =>
@@ -68,33 +68,6 @@ const snapshot: SpaceSnapshot = {
     document: { title: `Slide ${index}`, kind: 'markdown', content: { source: '' } },
   })),
 };
-
-/**
- * Windows on one Space's channel, joined as `BroadcastChannel` joins them: each
- * hears every other window's messages and never its own.
- */
-function channelHub() {
-  const listeners = new Set<{
-    readonly owner: number;
-    readonly listener: (message: PresentationMessage) => void;
-  }>();
-  let windows = 0;
-  return (): PresentationChannel => {
-    const owner = windows++;
-    return {
-      post: (message) => {
-        for (const entry of [...listeners]) {
-          if (entry.owner !== owner) entry.listener(structuredClone(message));
-        }
-      },
-      subscribe: (listener) => {
-        const entry = { owner, listener };
-        listeners.add(entry);
-        return () => listeners.delete(entry);
-      },
-    };
-  };
-}
 
 /**
  * Presence held and watched as Web Locks hold and watch it: a presentation is
@@ -157,6 +130,7 @@ function presentingWindow(
   now: () => number = () => 0,
   presence: PresentationPresence = steadyPresence(),
 ) {
+  const leaving = new Set<() => void>();
   const loaded = { snapshot, revision: 0n, exportedRevision: null };
   const { navigation, currentSpace } = composeCore({
     spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded),
@@ -164,13 +138,23 @@ function presentingWindow(
   const link = presentingLink({
     navigation,
     spaceId: () => currentSpace().id,
-    channel,
+    links: {
+      open: () => channel,
+      now,
+      leaving: (listener) => {
+        leaving.add(listener);
+        return () => leaving.delete(listener);
+      },
+      presence,
+    },
     newId,
-    now,
-    presence,
   });
   const disconnect = link.connect();
-  return { navigation, disconnect };
+  /** The page going away, which runs no teardown of its own. */
+  const leave = (): void => {
+    for (const listener of [...leaving]) listener();
+  };
+  return { navigation, disconnect, leave };
 }
 
 function notesWindow(
@@ -327,6 +311,7 @@ describe('the presentation link', () => {
           if (!crashed) stageChannel.post(message);
         },
         subscribe: stageChannel.subscribe,
+        close: stageChannel.close,
       },
       mintingIds(FIRST_PRESENTATION),
       () => 0,
@@ -353,6 +338,17 @@ describe('the presentation link', () => {
     disconnect();
     stage.navigation.exitPresenting();
     follower.connect();
+
+    expect(shown(follower)).toBeNull();
+  });
+
+  it('shows "not presenting" when the presenting page goes away without leaving presenting', () => {
+    const join = channelHub();
+    const stage = presentingWindow(join(), mintingIds(FIRST_PRESENTATION));
+    const { follower } = notesWindow(join());
+    stage.navigation.present();
+
+    stage.leave();
 
     expect(shown(follower)).toBeNull();
   });

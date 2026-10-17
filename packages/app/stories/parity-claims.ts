@@ -616,6 +616,34 @@ export const parityClaims: readonly ParityClaim[] = [
     claim: 'A narrow chrome keeps the choices in their own row above Back, guidance and Overview.',
   },
   {
+    id: 'notes-window-draws-notes-in-map-order-and-every-move',
+    storyFile: 'components/notes-window.stories.tsx',
+    storyExport: 'Fork',
+    claim:
+      'The Notes window names the Graph its notes come from and draws the presented Resource’s notes top to bottom as they sit on the Map, and a preview of every move from it with the selected one marked.',
+  },
+  {
+    id: 'notes-window-drives-the-presentation',
+    storyFile: 'components/notes-window.stories.tsx',
+    storyExport: 'OneNote',
+    claim:
+      'A move pressed in the Notes window, or the Stage’s own arrow keys pressed there, moves the presentation it follows, and the Notes window then draws the notes of the Resource arrived at.',
+  },
+  {
+    id: 'notes-window-marks-the-end-and-a-resource-without-notes',
+    storyFile: 'components/notes-window.stories.tsx',
+    storyExport: 'End',
+    claim:
+      'At a Resource with no notes and no moves, the Notes window says there are no notes for it and that the talk ends here, and still offers Back.',
+  },
+  {
+    id: 'notes-window-waits-while-nothing-presents',
+    storyFile: 'components/notes-window.stories.tsx',
+    storyExport: 'NotPresenting',
+    claim:
+      'While no window presents its Space, the Notes window says it is not presenting and draws no timer and no controls.',
+  },
+  {
     id: 'stage-frames-the-largest-16-9-above-the-chrome',
     storyFile: 'components/stage.stories.tsx',
     storyExport: 'LongRead',

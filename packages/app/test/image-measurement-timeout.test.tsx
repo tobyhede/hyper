@@ -5,6 +5,7 @@ import { MemorySpaceBackend } from '@project/persistence';
 import { createSpaceStartup } from '../src/space';
 import { recordingHistory } from './browser-history';
 import { refusingFullscreen } from './fullscreen';
+import { unlinkedPresentations } from './presentations';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
@@ -40,10 +41,18 @@ async function browserMeasurement() {
     revision: 0n,
     exportedRevision: null,
   });
-  const startup = createSpaceStartup(refusingFullscreen, backend, newUuid, recordingHistory());
-  const { opened } = await startup.resolve(
+  const startup = createSpaceStartup(
+    refusingFullscreen,
+    unlinkedPresentations,
+    backend,
+    newUuid,
+    recordingHistory(),
+  );
+  const resolved = await startup.resolve(
     productDestinationPath({ kind: 'space', spaceId: SPACE_ID }),
   );
+  if (resolved.kind !== 'opened') throw new Error('A Space address opens the Space.');
+  const { opened } = resolved;
   vi.useFakeTimers();
   /** Measured as the startup composed it: an Image Resource created from a URL, read back for its natural size. */
   const measure = async (url: string): Promise<ImageNaturalSize | undefined> => {

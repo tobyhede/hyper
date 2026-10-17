@@ -39,11 +39,14 @@ export function PresentingStageFixture({
     for (let step = 0; step < advances; step += 1) composed.advance();
   });
   const presenting = state.mode === 'presenting';
+  // A story opens no second window, as its Copy link writes no clipboard.
+  const openNotes = useCallback(() => undefined, []);
   usePresentingKeys(presenting, {
     advance: navigation.advance,
     retreat: navigation.retreat,
     selectBranch: navigation.selectBranch,
     exitPresenting: navigation.exitPresenting,
+    openNotes,
   });
   const resourceId = navigation.activeResourceId();
 
@@ -60,6 +63,7 @@ export function PresentingStageFixture({
           onRetreat={navigation.retreat}
           onExit={navigation.exitPresenting}
           onCopyLink={() => undefined}
+          onOpenNotes={openNotes}
         />
       )}
     </div>
