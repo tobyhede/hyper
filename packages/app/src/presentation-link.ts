@@ -1,6 +1,12 @@
 import type { GraphId, MapId, ResourceId, UUID } from '@project/core';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
-import { canRetreat, type Navigation } from './navigation';
+import {
+  canRetreat,
+  presentationScope,
+  samePresentation,
+  type Navigation,
+  type PresentationScope,
+} from './navigation';
 
 /**
  * The presenting window and the Notes windows following it, joined over one
@@ -126,6 +132,7 @@ export interface PresentingLink {
 
 interface Presentation {
   readonly id: UUID;
+  readonly scope: PresentationScope;
   readonly startedAt: number;
   /** Lets go of the presentation's presence. */
   readonly release: () => void;
@@ -134,8 +141,10 @@ interface Presentation {
 /**
  * The presenting window's side of the link.
  *
- * Presenting starting mints a presentation; every Navigation change while it
- * lasts publishes a snapshot; leaving presenting publishes that it ended. A
+ * A presentation starting mints its identity and start time; every Navigation
+ * change while it lasts publishes a snapshot; leaving presenting, or a
+ * reopening that moves to another Map or Graph, publishes that it ended. When
+ * a presentation starts is `presentationScope`'s rule. A
  * Notes window announcing itself is answered with the current snapshot, and a
  * command naming this window's presentation is applied through Navigation.
  * Anything else is ignored: a command for another window's presentation, or
@@ -185,15 +194,14 @@ export function presentingLink({
   };
 
   const onNavigation = (): void => {
-    if (navigation.getState().mode !== 'presenting') {
-      end();
-      return;
-    }
+    const scope = presentationScope(navigation.getState());
+    if (current !== null && !samePresentation(current.scope, scope)) end();
+    if (scope === null) return;
     if (current === null) {
       // Held before the first snapshot is posted, so a Notes window that
       // hears it always finds the presence held.
       const id = newId();
-      current = { id, startedAt: links.now(), release: links.presence.hold(id) };
+      current = { id, scope, startedAt: links.now(), release: links.presence.hold(id) };
     }
     publish(current);
   };

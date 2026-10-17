@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { Space } from '@project/graph';
 // Through the package's own subpath imports, as `#components/*` already is.
-import { canRetreat } from '#src/navigation';
+import { canRetreat, presentationScope } from '#src/navigation';
 import { usePresentingKeys } from '#src/presenting-keys';
 import { useRehearsalNotes } from '#src/rehearsal-notes';
 import { PresentingStage } from '#components/PresentingStage';
@@ -46,7 +46,7 @@ export function PresentingStageFixture({
   const presenting = state.mode === 'presenting';
   // A story opens no second window, as its Copy link writes no clipboard.
   const openNotes = useCallback(() => undefined, []);
-  const rehearsalNotes = useRehearsalNotes(presenting);
+  const rehearsalNotes = useRehearsalNotes(presentationScope(state));
   usePresentingKeys(presenting, {
     advance: navigation.advance,
     retreat: navigation.retreat,

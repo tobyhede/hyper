@@ -107,6 +107,37 @@ export function canRetreat(state: NavigationState): boolean {
   return state.mode === 'presenting' && state.traversalHistory.length > 1;
 }
 
+/**
+ * The presentation a navigation state is in, named by the Map and Graph it
+ * presents, or `null` when it is not presenting (ADR 0129).
+ *
+ * A presentation starts when this changes to a value it did not hold: when
+ * presenting begins, and when a reopening while presenting moves to another Map
+ * or Graph, which is another talk. A reopening on the same Map and Graph, as
+ * browser Back and Forward through the talk are, stays in the presentation.
+ * The rehearsal notes, the talk timer and the presentation link all read this
+ * one rule.
+ */
+export interface PresentationScope {
+  readonly mapId: MapId;
+  readonly graphId: GraphId | null;
+}
+
+export function presentationScope(state: NavigationState): PresentationScope | null {
+  return state.mode === 'presenting'
+    ? { mapId: state.selectedMapId, graphId: state.activeGraphId }
+    : null;
+}
+
+/** Whether two scopes are the same presentation, or both not presenting. */
+export function samePresentation(
+  a: PresentationScope | null,
+  b: PresentationScope | null,
+): boolean {
+  if (a === null || b === null) return a === b;
+  return a.mapId === b.mapId && a.graphId === b.graphId;
+}
+
 /** Navigation through the current working Space, independent of any UI framework. */
 export interface Navigation {
   readonly getState: () => NavigationState;

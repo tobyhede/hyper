@@ -283,3 +283,31 @@ test(
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   },
 );
+
+test('browser Back mid-talk keeps the rehearsal notes shown and the Notes window following', async ({
+  page,
+}) => {
+  const spaceId = await seedTalk(page);
+  await page.goto(presentPath(spaceId, ids.welcome));
+  await expect(presentedName(page)).toHaveText('Welcome');
+  const notes = await openNotesWindow(page, spaceId);
+  await expect(presenting(notes, 'Welcome')).toBeVisible();
+  const rehearsal = stage(page).getByRole('region', { name: 'Rehearsal notes' });
+  const rehearsalNames = rehearsal.getByTestId('resource-content').locator('.resource__title');
+
+  await page.keyboard.press('n');
+  await page.keyboard.press('ArrowRight');
+  await expect(presentedName(page)).toHaveText('Demo');
+  await expect(rehearsalNames).toHaveText(['Backup video']);
+  await expect(presenting(notes, 'Demo')).toBeVisible();
+
+  // Back reopens the talk at the Resource before, which is the same presentation.
+  await page.goBack();
+  await expect(presentedName(page)).toHaveText('Welcome');
+  await expect(rehearsalNames).toHaveText(['Open with the outage', 'Thank the team']);
+  await expect(presenting(notes, 'Welcome')).toBeVisible();
+
+  // And the Notes window still drives it.
+  await movesOf(notes).getByRole('button', { name: 'Go to Demo' }).click();
+  await expect(presentedName(page)).toHaveText('Demo');
+});

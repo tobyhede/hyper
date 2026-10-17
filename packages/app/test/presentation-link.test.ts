@@ -22,6 +22,7 @@ const uuid = (n: number): UUID =>
 const SPACE_ID = uuid(1);
 const MAP_ID = uuid(2);
 const TALK = uuid(3);
+const ENCORE = uuid(4);
 const OPENING = uuid(10);
 const LEFT = uuid(11);
 const RIGHT = uuid(12);
@@ -58,6 +59,7 @@ const snapshot: SpaceSnapshot = {
               { from: RIGHT, to: CLOSING },
             ],
           },
+          { id: ENCORE, title: 'Encore', edges: [{ from: CLOSING, to: OPENING }] },
         ],
       },
     ],
@@ -236,6 +238,63 @@ describe('the presentation link', () => {
 
     const state = follower.getState();
     expect(state.kind === 'presenting' && state.snapshot.startedAt).toBe(5_000);
+  });
+
+  it('keeps one presentation across a reopening of the same Map and Graph', () => {
+    const join = channelHub();
+    let time = 1_000;
+    const stage = presentingWindow(join(), mintingIds(FIRST_PRESENTATION), () => time);
+    const { follower } = notesWindow(join());
+    stage.navigation.present();
+    stage.navigation.advance();
+
+    time = 2_000;
+    stage.navigation.openPresentation(MAP_ID, TALK, OPENING);
+
+    const state = follower.getState();
+    expect(state.kind === 'presenting' && state.snapshot.resourceId).toBe(OPENING);
+    expect(state.kind === 'presenting' && state.snapshot.presentationId).toBe(FIRST_PRESENTATION);
+    expect(state.kind === 'presenting' && state.snapshot.startedAt).toBe(1_000);
+  });
+
+  it('starts a new presentation when a reopening changes Graph', () => {
+    const join = channelHub();
+    let time = 1_000;
+    const stage = presentingWindow(
+      join(),
+      mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
+      () => time,
+    );
+    const { follower } = notesWindow(join());
+    stage.navigation.present();
+
+    time = 2_000;
+    stage.navigation.openPresentation(MAP_ID, ENCORE, CLOSING);
+
+    const state = follower.getState();
+    expect(state.kind === 'presenting' && state.snapshot.graphId).toBe(ENCORE);
+    expect(state.kind === 'presenting' && state.snapshot.presentationId).toBe(SECOND_PRESENTATION);
+    expect(state.kind === 'presenting' && state.snapshot.startedAt).toBe(2_000);
+  });
+
+  it('starts a new presentation after leaving presenting and presenting again', () => {
+    const join = channelHub();
+    let time = 1_000;
+    const stage = presentingWindow(
+      join(),
+      mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
+      () => time,
+    );
+    const { follower } = notesWindow(join());
+    stage.navigation.present();
+    stage.navigation.exitPresenting();
+
+    time = 2_000;
+    stage.navigation.present();
+
+    const state = follower.getState();
+    expect(state.kind === 'presenting' && state.snapshot.presentationId).toBe(SECOND_PRESENTATION);
+    expect(state.kind === 'presenting' && state.snapshot.startedAt).toBe(2_000);
   });
 
   it('follows one of two presenting windows and drives only that one', () => {

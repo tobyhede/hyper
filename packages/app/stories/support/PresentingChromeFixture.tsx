@@ -3,7 +3,7 @@ import type { Space } from '@project/graph';
 // Through the package's own subpath imports, as `#components/*` already is: a
 // story sits two directories above `src`, and climbing there by relative path is
 // how a package boundary gets crossed without naming one (AGENTS.md).
-import { canRetreat } from '#src/navigation';
+import { canRetreat, presentationScope } from '#src/navigation';
 import { usePresentingKeys } from '#src/presenting-keys';
 import { useRehearsalNotes } from '#src/rehearsal-notes';
 import { PresentingChrome } from '#components/PresentingChrome';
@@ -65,7 +65,7 @@ export function PresentingChromeFixture({
   const presenting = state.mode === 'presenting';
   // A story opens no second window, as its Copy link writes no clipboard.
   const openNotes = useCallback(() => undefined, []);
-  const rehearsalNotes = useRehearsalNotes(presenting);
+  const rehearsalNotes = useRehearsalNotes(presentationScope(state));
   usePresentingKeys(presenting, {
     advance: navigation.advance,
     retreat: navigation.retreat,
