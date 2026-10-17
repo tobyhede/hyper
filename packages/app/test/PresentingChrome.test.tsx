@@ -39,6 +39,8 @@ const chrome = (props: Partial<PresentingChromeProps> = {}) => (
     onAdvance={() => undefined}
     onRetreat={() => undefined}
     onOpenNotes={() => undefined}
+    notesShown={false}
+    onToggleNotes={() => undefined}
     onExit={() => undefined}
     onCopyLink={() => undefined}
     {...props}
@@ -150,6 +152,23 @@ describe('PresentingChrome', () => {
     expect(onCopyLink).toHaveBeenCalledOnce();
   });
 
+  it('shows whether the rehearsal notes are on, and toggles them through its own command', () => {
+    const onToggleNotes = vi.fn();
+    const { rerender } = render(chrome({ onToggleNotes }));
+    const toggle = screen.getByRole('button', { name: 'Rehearsal notes' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle).toHaveAttribute('aria-keyshortcuts', 'N');
+
+    fireEvent.click(toggle);
+    expect(onToggleNotes).toHaveBeenCalledOnce();
+
+    rerender(chrome({ onToggleNotes, notesShown: true }));
+    expect(screen.getByRole('button', { name: 'Rehearsal notes' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
   it('guards its chrome controls from React Flow Space-key canvas panning', () => {
     render(chrome());
 
@@ -232,16 +251,16 @@ describe('PresentingChrome', () => {
   /** Only the commands the presenter can actually run from where they are. */
   it('lists the keyboard commands currently available and no others', () => {
     const { rerender } = render(chrome({ moves: movesTo(['B', 'C'], 0), canRetreat: true }));
-    expect(guidance()).toEqual(['↑↓choose', '→go', '←back', 'Snotes', 'Escoverview']);
+    expect(guidance()).toEqual(['↑↓choose', '→go', '←back', 'Snotes', 'Nrehearse', 'Escoverview']);
 
     rerender(chrome({ moves: movesTo(['B'], 0), canRetreat: false }));
-    expect(guidance()).toEqual(['→go', 'Snotes', 'Escoverview']);
+    expect(guidance()).toEqual(['→go', 'Snotes', 'Nrehearse', 'Escoverview']);
 
     rerender(chrome({ moves: [], canRetreat: true }));
-    expect(guidance()).toEqual(['←back', 'Snotes', 'Escoverview']);
+    expect(guidance()).toEqual(['←back', 'Snotes', 'Nrehearse', 'Escoverview']);
 
     rerender(chrome({ moves: [], canRetreat: false }));
-    expect(guidance()).toEqual(['Snotes', 'Escoverview']);
+    expect(guidance()).toEqual(['Snotes', 'Nrehearse', 'Escoverview']);
   });
 
   /**

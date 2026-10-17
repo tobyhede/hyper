@@ -644,6 +644,13 @@ export const parityClaims: readonly ParityClaim[] = [
       'While no window presents its Space, the Notes window says it is not presenting and draws no timer and no controls.',
   },
   {
+    id: 'stage-shows-rehearsal-notes-under-the-chrome',
+    storyFile: 'components/stage.stories.tsx',
+    storyExport: 'RehearsalNotes',
+    claim:
+      'Rehearsal notes start hidden; N or the Rehearsal notes button shows the presented Resource’s notes under the presenting chrome, they follow the traversal, and pressing either again hides them.',
+  },
+  {
     id: 'stage-frames-the-largest-16-9-above-the-chrome',
     storyFile: 'components/stage.stories.tsx',
     storyExport: 'LongRead',

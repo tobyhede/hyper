@@ -31,7 +31,7 @@ test(
 
     // Only the commands available from here. Nothing to choose between and
     // nowhere to go back to, so neither is claimed.
-    await expect(guidance(page)).toHaveText(['→go', 'Snotes', 'Escoverview']);
+    await expect(guidance(page)).toHaveText(['→go', 'Snotes', 'Nrehearse', 'Escoverview']);
     await expect(page.getByRole('button', { name: 'Back' })).toHaveCount(0);
     await expect(page.getByTestId('exit-presenting')).toBeVisible();
   },
@@ -87,7 +87,13 @@ test(
       'Choose Failure modes',
       'Choose Operating notes, rollback and the on-call runbook',
     ]);
-    await expect(guidance(page)).toHaveText(['↑↓choose', '→go', 'Snotes', 'Escoverview']);
+    await expect(guidance(page)).toHaveText([
+      '↑↓choose',
+      '→go',
+      'Snotes',
+      'Nrehearse',
+      'Escoverview',
+    ]);
 
     await page.getByRole('button', { name: 'Choose Failure modes' }).click();
 
@@ -121,7 +127,7 @@ test(
     await expect(announced).toHaveAttribute('aria-live', 'polite');
     await expect(announced).toContainText('End of Graph');
     await expect(page.getByTestId('presenting-moves')).toHaveCount(0);
-    await expect(guidance(page)).toHaveText(['←back', 'Snotes', 'Escoverview']);
+    await expect(guidance(page)).toHaveText(['←back', 'Snotes', 'Nrehearse', 'Escoverview']);
 
     await page.getByRole('button', { name: 'Back' }).click();
 
@@ -149,7 +155,13 @@ test(
     // Below the choices rather than beside them, and still carrying its label.
     expect(overviewBox.y).toBeGreaterThanOrEqual(choicesBox.y + choicesBox.height);
     await expect(overview).toHaveText('Overview');
-    await expect(guidance(page)).toHaveText(['↑↓choose', '→go', 'Snotes', 'Escoverview']);
+    await expect(guidance(page)).toHaveText([
+      '↑↓choose',
+      '→go',
+      'Snotes',
+      'Nrehearse',
+      'Escoverview',
+    ]);
 
     // The choices are not collapsed into a menu, and not wrapped into a block
     // over the presented Resource either: one bounded row that scrolls.

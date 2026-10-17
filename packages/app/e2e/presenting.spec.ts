@@ -425,6 +425,7 @@ test(
     await expect(page.getByTestId('presenting-keys').getByRole('listitem')).toHaveText([
       '→go',
       'Snotes',
+      'Nrehearse',
       'Escoverview',
     ]);
 
@@ -766,6 +767,7 @@ test.describe('at a phone width', () => {
         '→go',
         '←back',
         'Snotes',
+        'Nrehearse',
         'Escoverview',
       ]);
 

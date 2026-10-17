@@ -142,7 +142,7 @@ export function stageBody(page: Page): Locator {
 
 /** The Resource being presented, as the Stage draws it. */
 export function presentedResource(page: Page): Locator {
-  return stage(page).getByTestId('resource-content');
+  return stageFrame(page).getByTestId('resource-content');
 }
 
 /** The name the Stage draws for the Resource being presented. */

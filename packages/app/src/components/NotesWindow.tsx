@@ -8,6 +8,7 @@ import {
   PresentedResource,
   Separator,
 } from '@project/ui';
+import { PresentedNotesList } from './PresentedNotesList';
 import {
   elapsedLabel,
   type NotesMove,
@@ -98,7 +99,7 @@ function Presenting({ view, onAdvance, onRetreat, onSelectBranch }: PresentingPr
         Presenting <strong>{titleName(view.presented.title)}</strong>
       </p>
       <section className="notes-window__section" aria-label="Notes">
-        <Notes view={view} />
+        <PresentedNotesList notes={view} />
       </section>
       <Separator />
       <section className="notes-window__section" aria-label="Moves">
@@ -133,35 +134,6 @@ function Presenting({ view, onAdvance, onRetreat, onSelectBranch }: PresentingPr
           </span>
         </div>
       </section>
-    </>
-  );
-}
-
-function Notes({ view }: { readonly view: NotesView }) {
-  if (view.notesGraph === null) {
-    return (
-      <Alert>
-        <AlertTitle>No notes for {titleName(view.talk)}</AlertTitle>
-        <AlertDescription>
-          Notes come from a Graph on this Map titled “{titleName(view.talk)} Presentation Notes”, or
-          just “Notes”, with an Edge from each Resource to its notes.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-  return (
-    <>
-      <p className="notes-window__quiet">
-        From {view.notesGraph}
-        {view.passedOver.length > 0 ? `, passing over ${view.passedOver.join(', ')}` : ''}
-      </p>
-      {view.notes.length === 0 ? (
-        <p className="notes-window__quiet">No notes for this Resource.</p>
-      ) : (
-        view.notes.map((note) => (
-          <PresentedResource key={note.resourceId} title={note.title} content={note.content} />
-        ))
-      )}
     </>
   );
 }

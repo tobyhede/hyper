@@ -8,6 +8,8 @@ export interface TraversalCommands {
   readonly exitPresenting: () => void;
   /** Open a Notes window following this presentation (ADR 0129). */
   readonly openNotes: () => void;
+  /** Show or hide the notes under the Stage, for rehearsing on one screen (ADR 0129). */
+  readonly toggleNotes: () => void;
 }
 
 /** The keys a focused control acts on by itself, with no listener's help. */
@@ -89,13 +91,14 @@ function activatesFocusedControl(event: KeyboardEvent): boolean {
  * a copy of it in a story fixture would prove the copy (ADR 0052).
  */
 export function usePresentingKeys(active: boolean, commands: TraversalCommands): void {
-  const { advance, retreat, selectBranch, exitPresenting, openNotes } = commands;
+  const { advance, retreat, selectBranch, exitPresenting, openNotes, toggleNotes } = commands;
   useEffect(() => {
     if (!active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (activatesFocusedControl(event) || insideAModalSurface(event)) return;
-      // A modified S is the browser's or the system's (Save, say), never ours.
-      const plain = !event.ctrlKey && !event.metaKey && !event.altKey;
+      // A modified S or N is the browser's or the system's (Save, New), never ours,
+      // and a held one acts once: a toggle repeated by the keyboard would flicker.
+      const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.repeat;
       const handler = {
         ArrowRight: advance,
         ' ': advance,
@@ -105,6 +108,8 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
         Escape: exitPresenting,
         s: plain ? openNotes : undefined,
         S: plain ? openNotes : undefined,
+        n: plain ? toggleNotes : undefined,
+        N: plain ? toggleNotes : undefined,
       }[event.key];
       if (!handler) return;
       event.preventDefault();
@@ -112,5 +117,5 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active, advance, retreat, selectBranch, exitPresenting, openNotes]);
+  }, [active, advance, retreat, selectBranch, exitPresenting, openNotes, toggleNotes]);
 }

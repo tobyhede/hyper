@@ -2,7 +2,7 @@
 // gate that fails a test if React Flow logged a warning while it ran.
 import { encodeCompactUuid, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { expect, test, type Locator, type Page } from './fixtures';
-import { presentedName, stage } from './graph';
+import { presentControl, presentedName, stage } from './graph';
 import { SEEDED_GRAPH_ID, SEEDED_MAP_ID, seedPositionedMap } from './seed';
 
 // The Notes window (ADR 0129) is a second window of the same browser, joined
@@ -243,3 +243,43 @@ test('the Notes window shows "not presenting" when the presenting window crashes
 
   await expect(notesWindow(notes).getByText('Not presenting')).toBeVisible();
 });
+
+test(
+  'N shows the notes under the Stage to rehearse on one screen, and they start hidden every time',
+  { tag: '@parity:stage-shows-rehearsal-notes-under-the-chrome' },
+  async ({ page }) => {
+    const spaceId = await seedTalk(page);
+    await page.goto(presentPath(spaceId, ids.welcome));
+    await expect(presentedName(page)).toHaveText('Welcome');
+    const rehearsal = stage(page).getByRole('region', { name: 'Rehearsal notes' });
+    const toggle = stage(page).getByRole('button', { name: 'Rehearsal notes' });
+    const rehearsalNames = rehearsal.getByTestId('resource-content').locator('.resource__title');
+    await expect(rehearsal).toHaveCount(0);
+
+    await page.keyboard.press('n');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(rehearsalNames).toHaveText(['Open with the outage', 'Thank the team']);
+    await page.keyboard.press('ArrowRight');
+    await expect(presentedName(page)).toHaveText('Demo');
+    await expect(rehearsalNames).toHaveText(['Backup video']);
+    await page.keyboard.press('n');
+    await expect(rehearsal).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.press('n');
+    await expect(rehearsalNames).toHaveText(['Backup video']);
+
+    // Leaving and presenting again starts with them hidden.
+    await page.keyboard.press('Escape');
+    await expect(stage(page)).toHaveCount(0);
+    await presentControl(page).click();
+    await expect(stage(page)).toBeVisible();
+    await expect(rehearsal).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await toggle.click();
+    await expect(rehearsalNames).toHaveText(['Open with the outage', 'Thank the team']);
+    await toggle.click();
+    await expect(rehearsal).toHaveCount(0);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  },
+);

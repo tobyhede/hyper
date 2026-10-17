@@ -1,5 +1,6 @@
 import type { Story } from '@ladle/react';
 import { PresentingStageFixture } from '../support/PresentingStageFixture';
+import { notesSpace } from '../support/spaces';
 
 export default { title: 'Components/Stage' };
 
@@ -23,3 +24,7 @@ Picture.meta = { iframed: true };
 /** An Ur Resource: its name alone, centred in the frame. */
 export const TitleSlide: Story = () => <PresentingStageFixture advances={2} />;
 TitleSlide.meta = { iframed: true };
+
+/** A talk with a Presentation Notes Graph, for rehearsing with its notes under the Stage. */
+export const RehearsalNotes: Story = () => <PresentingStageFixture space={notesSpace} />;
+RehearsalNotes.meta = { iframed: true };

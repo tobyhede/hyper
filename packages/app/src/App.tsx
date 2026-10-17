@@ -16,6 +16,7 @@ import type { OpenSpace } from './open-spaces';
 import { resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
+import { useRehearsalNotes } from './rehearsal-notes';
 import { openIndependently } from './open-independently';
 import { presentingFullscreen, type Fullscreen } from './presenting-fullscreen';
 import type { DestinationOpening } from './destination-opening';
@@ -197,12 +198,14 @@ export const createApp = (
     const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);
     const nameOnCreation = useNameOnCreation(continuation);
     // Inactive Spaces keep their traversal mounted without receiving global keys.
+    const rehearsalNotes = useRehearsalNotes(presenting);
     usePresentingKeys(active && presenting, {
       advance: navigation.advance,
       retreat: navigation.retreat,
       selectBranch: navigation.selectBranch,
       exitPresenting: navigation.exitPresenting,
       openNotes,
+      toggleNotes: rehearsalNotes.toggle,
     });
     const { chrome: dockChrome, onChromeContinuationLand } = useDockChrome(
       opened,
@@ -400,6 +403,8 @@ export const createApp = (
           {presenting && activeResourceId !== null && (
             <PresentingStage
               space={space}
+              mapId={selectedMapId}
+              graphId={activeGraphId}
               resourceId={activeResourceId}
               moves={moves}
               canRetreat={canRetreat(navigationState)}
@@ -408,6 +413,8 @@ export const createApp = (
               onRetreat={navigation.retreat}
               onExit={navigation.exitPresenting}
               onOpenNotes={openNotes}
+              notesShown={rehearsalNotes.shown}
+              onToggleNotes={rehearsalNotes.toggle}
               onCopyLink={() => {
                 if (activeGraphId === null) return;
                 // `void`: presenting chrome's Copy link is a plain button with
