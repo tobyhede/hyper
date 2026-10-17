@@ -145,6 +145,9 @@ export const createApp = (
     // until the Space or the selected Map changes").
     const { selectedMapId, activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
+    // The Graph being presented, which presenting always has: `null` says only
+    // that Navigation is not presenting.
+    const presentedGraphId = presenting ? navigationState.activeGraphId : null;
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
     useEffect(() => presentation.connect(), []);
     useEffect(() => composition.presentation.connect(), []);
@@ -400,11 +403,11 @@ export const createApp = (
             )}
           </div>
 
-          {presenting && activeResourceId !== null && (
+          {presentedGraphId !== null && activeResourceId !== null && (
             <PresentingStage
               space={space}
               mapId={selectedMapId}
-              graphId={activeGraphId}
+              graphId={presentedGraphId}
               resourceId={activeResourceId}
               moves={moves}
               canRetreat={canRetreat(navigationState)}
@@ -416,7 +419,6 @@ export const createApp = (
               notesShown={rehearsalNotes.shown}
               onToggleNotes={rehearsalNotes.toggle}
               onCopyLink={() => {
-                if (activeGraphId === null) return;
                 // `void`: presenting chrome's Copy link is a plain button with
                 // no label to swap, so it has nothing to do with the outcome
                 // beyond the alert `copyProductDestination` already renders.
@@ -424,7 +426,7 @@ export const createApp = (
                   kind: 'presentation',
                   spaceId: space.id,
                   mapId: selectedMapId,
-                  graphId: activeGraphId,
+                  graphId: presentedGraphId,
                   resourceId: activeResourceId,
                 });
               }}

@@ -162,7 +162,7 @@ export function presentingLink({
   const snapshot = (presentation: Presentation): PresentationSnapshot | null => {
     const state = navigation.getState();
     const resourceId = navigation.activeResourceId();
-    if (state.activeGraphId === null || resourceId === null) return null;
+    if (state.mode !== 'presenting' || resourceId === null) return null;
     return {
       presentationId: presentation.id,
       startedAt: presentation.startedAt,
