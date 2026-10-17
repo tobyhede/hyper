@@ -168,3 +168,22 @@ test(
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   },
 );
+
+test('the rehearsal notes start at the top for each Resource presented', async ({ page }) => {
+  // Short enough that each Resource's notes overflow the bounded strip.
+  await page.setViewportSize({ width: 1280, height: 240 });
+  await page.goto(story('rehearsal-notes'));
+  await expect(presentedName(page)).toHaveText('Welcome');
+  await page.keyboard.press('n');
+  const notes = stage(page).getByRole('region', { name: 'Rehearsal notes' });
+  const scrollTop = () => notes.evaluate((strip) => strip.scrollTop);
+  await notes.evaluate((strip) => strip.scrollTo({ top: strip.scrollHeight }));
+  await expect.poll(scrollTop).toBeGreaterThan(0);
+
+  await page.keyboard.press('ArrowRight');
+  await expect(presentedName(page)).toHaveText('Demo');
+  await expect(notes.evaluate((strip) => strip.scrollHeight > strip.clientHeight)).resolves.toBe(
+    true,
+  );
+  expect(await scrollTop()).toBe(0);
+});

@@ -48,7 +48,8 @@ export function PresentingStage({
         <>
           <PresentingChrome {...chrome} />
           {notes === undefined ? null : (
-            <section className="rehearsal-notes" aria-label="Rehearsal notes">
+            // Keyed by the Resource, so each Resource's notes open scrolled to the top.
+            <section key={resourceId} className="rehearsal-notes" aria-label="Rehearsal notes">
               <PresentedNotesList notes={notes} />
             </section>
           )}
