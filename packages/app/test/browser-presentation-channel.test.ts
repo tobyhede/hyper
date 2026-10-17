@@ -231,6 +231,22 @@ describe('the browser presentation presence', () => {
     expect(gone).toEqual([uuid(1)]);
   });
 
+  it('holds on quietly when the browser refuses the lock', async () => {
+    let unhandled = 0;
+    const listen = (): void => void (unhandled += 1);
+    process.on('unhandledRejection', listen);
+    const refusing: NativeLocks = {
+      request: () => Promise.reject(new DOMException('Refused', 'InvalidStateError')),
+    };
+    try {
+      createBrowserPresentationPresence(refusing).hold(uuid(1))();
+      await settled();
+      expect(unhandled).toBe(0);
+    } finally {
+      process.off('unhandledRejection', listen);
+    }
+  });
+
   it('never finds a presentation gone where the browser has no Web Locks', async () => {
     const presence = createBrowserPresentationPresence(undefined);
     presence.hold(uuid(1))();

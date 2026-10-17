@@ -195,7 +195,10 @@ export function createBrowserPresentationPresence(
   return {
     hold: (presentationId) => {
       const held = Promise.withResolvers<undefined>();
-      void locks.request(presentationPresenceName(presentationId), {}, () => held.promise);
+      locks
+        .request(presentationPresenceName(presentationId), {}, () => held.promise)
+        // A refused lock leaves the presentation unwatched; presenting goes on.
+        .catch(() => undefined);
       return () => held.resolve(undefined);
     },
     watch: (presentationId, gone) => {
