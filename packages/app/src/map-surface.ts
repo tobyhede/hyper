@@ -113,10 +113,13 @@ export function createMapSurface(
   const state = (): SpaceAuthoringState => {
     const current = context();
     const presentingResourceId = current.kind === 'canvas' ? current.presentingResourceId : null;
+    // The canvas context comes from Navigation's address, which names a
+    // presented Resource only while presenting, and presenting always has a
+    // Graph; the second test narrows the address's Graph to say so.
     return {
       ...app.authoring.getState(),
       navigation:
-        presentingResourceId === null
+        presentingResourceId === null || current.graphId === null
           ? { mode: 'overview', selectedMapId: current.mapId, activeGraphId: current.graphId }
           : {
               mode: 'presenting',

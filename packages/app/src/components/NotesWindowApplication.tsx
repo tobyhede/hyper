@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import type { UUID } from '@project/core';
 import type { NotesWindow as NotesWindowModel } from '../notes-window';
 import { usePresentingKeys } from '../presenting-keys';
 import { NotesWindow } from './NotesWindow';
@@ -14,7 +15,7 @@ const everySecond = (tick: () => void) => {
 
 /** When the timer was last reset, and in which presentation. */
 interface TimerReset {
-  readonly startedAt: number;
+  readonly presentationId: UUID;
   readonly at: number;
 }
 
@@ -34,13 +35,15 @@ export function NotesWindowApplication({ notes, now }: NotesWindowApplicationPro
   const state = useSyncExternalStore(notes.subscribe, notes.getState);
   const presenting = state.kind === 'presenting';
   const startedAt = presenting ? state.view.startedAt : null;
+  const presentationId = presenting ? state.view.presentationId : null;
 
   // A reset is this window's alone, and belongs to the presentation it was
   // pressed in: a new presentation starts the count again.
   const [reset, setReset] = useState<TimerReset | null>(null);
   const second = useSyncExternalStore(everySecond, () => Math.floor(now() / TICK_MS));
   const time = second * TICK_MS;
-  const from = reset !== null && reset.startedAt === startedAt ? reset.at : (startedAt ?? time);
+  const from =
+    reset !== null && reset.presentationId === presentationId ? reset.at : (startedAt ?? time);
 
   // Leaving presenting belongs to the presenting window, and this is already
   // a Notes window: Escape, S and N do nothing here.
@@ -59,7 +62,7 @@ export function NotesWindowApplication({ notes, now }: NotesWindowApplicationPro
       state={state}
       elapsed={Math.max(0, time - from)}
       onResetTimer={() => {
-        if (startedAt !== null) setReset({ startedAt, at: now() });
+        if (presentationId !== null) setReset({ presentationId, at: now() });
       }}
       onAdvance={notes.advance}
       onRetreat={notes.retreat}

@@ -12,7 +12,7 @@ export interface PresentingStageProps extends PresentingChromeProps {
   /** The Map the presentation is on, which places the notes. */
   readonly mapId: MapId;
   /** The Graph being presented, whose Presentation Notes Graph holds the notes. */
-  readonly graphId: GraphId | null;
+  readonly graphId: GraphId;
   /** The Resource Navigation is presenting. */
   readonly resourceId: ResourceId;
 }
@@ -36,10 +36,7 @@ export function PresentingStage({
 }: PresentingStageProps) {
   const resource = space.lookup.resource(resourceId);
   if (resource === undefined) return null;
-  const notes =
-    chrome.notesShown && graphId !== null
-      ? presentedNotes(space, mapId, graphId, resourceId)
-      : undefined;
+  const notes = chrome.notesShown ? presentedNotes(space, mapId, graphId, resourceId) : undefined;
   return (
     <Stage
       label="Presented Resource"

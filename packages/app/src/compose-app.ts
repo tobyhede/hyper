@@ -10,7 +10,11 @@ import { createDeleteConfirmation, type DeleteConfirmation } from './delete-conf
 import { createResourceDeletion, type ResourceDeletion } from './resource-deletion';
 import type { SpaceResourceAuthoring } from './space-resource-lifecycle';
 import { createNavigation, type Navigation } from './navigation';
-import { presentingLink, type PresentationLinks, type PresentingLink } from './presentation-link';
+import type { PresentationLinks } from './presentation-link';
+import type { Fullscreen } from './presenting-fullscreen';
+import { createPresentingWindow, type PresentingWindow } from './presenting-window';
+import { openIndependently } from './open-independently';
+import { productDestinationPath } from '@project/http';
 import type { RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
@@ -113,7 +117,26 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * Absent, this composition's presentations are linked to nothing.
    */
   readonly presentations?: PresentationLinks | undefined;
+  /**
+   * What Present asks to put fullscreen. Absent, presenting never asks, as a
+   * browser that refuses every request would answer.
+   */
+  readonly fullscreen?: Fullscreen | undefined;
+  /**
+   * Reads when each presentation starts (ADR 0109): the clock `presentations`
+   * shares with the Notes windows. `createOpenSpaces` supplies both, as it
+   * supplies `newId`; `Date.now` answers only for a composition given neither.
+   */
+  readonly now?: (() => number) | undefined;
 }
+
+/** A fullscreen no request is ever granted, for a composition given none. */
+const NO_FULLSCREEN: Fullscreen = {
+  enter: () => Promise.resolve(false),
+  exit: () => undefined,
+  active: () => false,
+  subscribe: () => () => undefined,
+};
 
 /** The pair a connection completion is written in terms of. */
 export interface EdgeCollaborators {
@@ -135,8 +158,11 @@ export interface AppCore {
 }
 
 export interface ComposedApp extends AppCore {
-  /** This Space's side of the link to the Notes windows following it (ADR 0129). */
-  readonly presentation: PresentingLink;
+  /**
+   * This Space's presentation as its presenting window holds it: identity,
+   * rehearsal notes, the Notes window, fullscreen and the link (ADR 0129).
+   */
+  readonly presenting: PresentingWindow;
   /**
    * Create Image Resources from one gesture's files or URL, over this Space's
    * image sources and Authoring.
@@ -217,6 +243,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     connections,
     spaceResources,
     presentations,
+    fullscreen = NO_FULLSCREEN,
+    now = Date.now,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -266,15 +294,23 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
   });
   return {
     ...core,
-    presentation:
-      presentations === undefined
-        ? { connect: () => () => undefined }
-        : presentingLink({
-            navigation,
-            spaceId: () => currentSpace().id,
-            links: presentations,
-            newId,
-          }),
+    presenting: createPresentingWindow({
+      navigation,
+      newId,
+      now,
+      fullscreen,
+      // Called within the click or key press, because a browser opens a window
+      // only inside a user activation. A Notes window follows over the link,
+      // so it needs no handle on this one.
+      openNotes: () => {
+        openIndependently(productDestinationPath({ kind: 'notes', spaceId: currentSpace().id }));
+      },
+      link:
+        presentations === undefined
+          ? undefined
+          : { spaceId: () => currentSpace().id, links: presentations },
+      reportObserverError: compositionReporter,
+    }),
     createImageResources: (origin, target) =>
       createImageResources({ images, authoring }, origin, target),
     pickImages: images.pick,

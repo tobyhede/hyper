@@ -39,6 +39,8 @@ export interface NotesView extends PresentedNotes {
   readonly presented: NotesResource;
   readonly moves: readonly NotesMove[];
   readonly canRetreat: boolean;
+  /** Which presentation this is, as the presenting window minted it. */
+  readonly presentationId: UUID;
   readonly startedAt: number;
 }
 
@@ -92,6 +94,7 @@ export function notesView(space: Space, snapshot: PresentationSnapshot): NotesVi
     presented,
     moves,
     canRetreat: snapshot.canRetreat,
+    presentationId: snapshot.presentationId,
     startedAt: snapshot.startedAt,
   };
 }

@@ -7,7 +7,6 @@ import type { DestinationOpening } from '../src/destination-opening';
 import type { OpenSpace } from '../src/open-spaces';
 import { mountSpaceApp, type SpaceAppRenderer } from '../src/SpaceApp';
 import { recordingHistory } from './browser-history';
-import { refusingFullscreen } from './fullscreen';
 
 /**
  * Mount one Space the way Open Spaces opens one: the session's browser location
@@ -28,6 +27,6 @@ export const mountSpace = (
     isNavigationHeld: () => opened.app.imageReplacement.getState(),
   });
   browserLocation.follow(opened.app);
-  mountSpaceApp(opened, browserLocation, refusingFullscreen, render, opening);
+  mountSpaceApp(opened, browserLocation, render, opening);
   return browserLocation;
 };

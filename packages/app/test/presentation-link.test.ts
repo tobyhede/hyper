@@ -6,9 +6,10 @@ import {
   type ObserverErrorReporter,
 } from '@project/persistence';
 import { composeCore } from '../src/compose-app';
+import { createPresentingWindow } from '../src/presenting-window';
+import { refusingFullscreen } from './fullscreen';
 import {
   followPresentation,
-  presentingLink,
   type PresentationChannel,
   type PresentationFollower,
   type PresentationPresence,
@@ -22,6 +23,7 @@ const uuid = (n: number): UUID =>
 const SPACE_ID = uuid(1);
 const MAP_ID = uuid(2);
 const TALK = uuid(3);
+const ENCORE = uuid(4);
 const OPENING = uuid(10);
 const LEFT = uuid(11);
 const RIGHT = uuid(12);
@@ -58,6 +60,7 @@ const snapshot: SpaceSnapshot = {
               { from: RIGHT, to: CLOSING },
             ],
           },
+          { id: ENCORE, title: 'Encore', edges: [{ from: CLOSING, to: OPENING }] },
         ],
       },
     ],
@@ -135,21 +138,27 @@ function presentingWindow(
   const { navigation, currentSpace } = composeCore({
     spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded),
   });
-  const link = presentingLink({
+  const presenting = createPresentingWindow({
     navigation,
-    spaceId: () => currentSpace().id,
-    links: {
-      open: () => channel,
-      now,
-      leaving: (listener) => {
-        leaving.add(listener);
-        return () => leaving.delete(listener);
-      },
-      presence,
-    },
     newId,
+    now,
+    fullscreen: refusingFullscreen,
+    openNotes: () => undefined,
+    link: {
+      spaceId: () => currentSpace().id,
+      links: {
+        open: () => channel,
+        now,
+        leaving: (listener) => {
+          leaving.add(listener);
+          return () => leaving.delete(listener);
+        },
+        presence,
+      },
+    },
+    reportObserverError: throwObserverError,
   });
-  const disconnect = link.connect();
+  const disconnect = presenting.connect();
   /** The page going away, which runs no teardown of its own. */
   const leave = (): void => {
     for (const listener of [...leaving]) listener();
@@ -236,6 +245,63 @@ describe('the presentation link', () => {
 
     const state = follower.getState();
     expect(state.kind === 'presenting' && state.snapshot.startedAt).toBe(5_000);
+  });
+
+  it('keeps one presentation across a reopening of the same Map and Graph', () => {
+    const join = channelHub();
+    let time = 1_000;
+    const stage = presentingWindow(join(), mintingIds(FIRST_PRESENTATION), () => time);
+    const { follower } = notesWindow(join());
+    stage.navigation.present();
+    stage.navigation.advance();
+
+    time = 2_000;
+    stage.navigation.openPresentation(MAP_ID, TALK, OPENING);
+
+    const state = follower.getState();
+    expect(state.kind === 'presenting' && state.snapshot.resourceId).toBe(OPENING);
+    expect(state.kind === 'presenting' && state.snapshot.presentationId).toBe(FIRST_PRESENTATION);
+    expect(state.kind === 'presenting' && state.snapshot.startedAt).toBe(1_000);
+  });
+
+  it('starts a new presentation when a reopening changes Graph', () => {
+    const join = channelHub();
+    let time = 1_000;
+    const stage = presentingWindow(
+      join(),
+      mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
+      () => time,
+    );
+    const { follower } = notesWindow(join());
+    stage.navigation.present();
+
+    time = 2_000;
+    stage.navigation.openPresentation(MAP_ID, ENCORE, CLOSING);
+
+    const state = follower.getState();
+    expect(state.kind === 'presenting' && state.snapshot.graphId).toBe(ENCORE);
+    expect(state.kind === 'presenting' && state.snapshot.presentationId).toBe(SECOND_PRESENTATION);
+    expect(state.kind === 'presenting' && state.snapshot.startedAt).toBe(2_000);
+  });
+
+  it('starts a new presentation after leaving presenting and presenting again', () => {
+    const join = channelHub();
+    let time = 1_000;
+    const stage = presentingWindow(
+      join(),
+      mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
+      () => time,
+    );
+    const { follower } = notesWindow(join());
+    stage.navigation.present();
+    stage.navigation.exitPresenting();
+
+    time = 2_000;
+    stage.navigation.present();
+
+    const state = follower.getState();
+    expect(state.kind === 'presenting' && state.snapshot.presentationId).toBe(SECOND_PRESENTATION);
+    expect(state.kind === 'presenting' && state.snapshot.startedAt).toBe(2_000);
   });
 
   it('follows one of two presenting windows and drives only that one', () => {

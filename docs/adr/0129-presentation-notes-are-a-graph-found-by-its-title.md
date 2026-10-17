@@ -10,6 +10,10 @@ When several Graphs match, a title naming the talk beats a bare marker; then "Pr
 
 Notes are read in a **Notes window**: a second window with its own product URL that follows whichever window is presenting the Space. The presenting window keeps sole ownership of Navigation. The Notes window renders what the presenting window publishes and sends it the same traversal commands a key press on the Stage would.
 
+## When a presentation starts
+
+A presentation starts when presenting begins from the overview, and when anything while presenting moves to a different Map or Graph, a reopening or an Edit adopting another Map, because that is a different talk. It ends when presenting is left, or when such a move starts the next one. A reopening of a Resource on the same Map and Graph while presenting stays inside the same presentation; browser Back and Forward through the talk's history are that case. At the start of each presentation the rehearsal notes start hidden and the talk timer and the identity the Notes window follows start afresh; a reopening within a presentation changes none of them.
+
 ## Why a convention
 
 The Space's model stays as it is. Notes need no field on the Resource, no new kind, no link from one Graph to another and no change to the Space or Resource file formats. Every capability notes need already exists: Resources of any kind to hold them, Edges to attach them, a Map to arrange them on, and editors to write them. An author who never makes a notes Graph presents exactly as before.

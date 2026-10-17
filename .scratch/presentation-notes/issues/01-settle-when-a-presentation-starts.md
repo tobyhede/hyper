@@ -4,12 +4,12 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #388.
 
 **Spec:** `.scratch/presentation-notes/spec.md`. **Context:** ADR 0129, which does not yet state this rule. **Decisions:** on 2026-10-17 the user chose that Back mid-talk keeps the rehearsal notes showing. On the same day they chose that a reopening which changes Map or Graph starts a new presentation, because it is a different talk.
 
-- [ ] ADR 0129 states when a presentation starts and ends, with the same-Map-and-Graph rule for reopening.
-- [ ] The places that restate the old reset say the new rule: the spec's "Rehearsal notes" item, the rehearsal notes paragraph in `docs/agents/rendering.md`, and the comment on `useRehearsalNotes`.
-- [ ] A test proves the rehearsal notes stay shown across a reopening of the same Map and Graph while presenting, and start off after leaving presenting and presenting again, and after a reopening that changes Graph.
-- [ ] A test proves the talk timer and the presentation identity the Notes window follows carry on across a reopening of the same Map and Graph, and change on a new presentation, including one started by a change of Graph.
-- [ ] An application test proves browser Back mid-talk keeps the rehearsal notes shown and the Notes window following.
+- [x] ADR 0129 states when a presentation starts and ends, with the same-Map-and-Graph rule for reopening.
+- [x] The places that restate the old reset say the new rule: the spec's "Rehearsal notes" item, the rehearsal notes paragraph in `docs/agents/rendering.md`, and the comment on `useRehearsalNotes`.
+- [x] A test proves the rehearsal notes stay shown across a reopening of the same Map and Graph while presenting, and start off after leaving presenting and presenting again, and after a reopening that changes Graph.
+- [x] A test proves the talk timer and the presentation identity the Notes window follows carry on across a reopening of the same Map and Graph, and change on a new presentation, including one started by a change of Graph.
+- [x] An application test proves browser Back mid-talk keeps the rehearsal notes shown and the Notes window following.

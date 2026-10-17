@@ -44,6 +44,12 @@ export type NavigationState =
   | (NavigationBase & { readonly mode: 'overview' })
   | (NavigationBase & {
       readonly mode: 'presenting';
+      /**
+       * Presenting always has a Graph, and it holds the presented Resource:
+       * every operation that publishes presenting checks both, so no reader
+       * asks for a missing one.
+       */
+      readonly activeGraphId: GraphId;
       readonly traversalHistory: TraversalHistory;
       readonly branchIndex: number;
     });
@@ -105,6 +111,37 @@ function presentedResource(state: NavigationState): ResourceId | null {
  */
 export function canRetreat(state: NavigationState): boolean {
   return state.mode === 'presenting' && state.traversalHistory.length > 1;
+}
+
+/**
+ * The presentation a navigation state is in, named by the Map and Graph it
+ * presents, or `null` when it is not presenting (ADR 0129).
+ *
+ * A presentation starts when this changes to a value it did not hold: when
+ * presenting begins, and when anything while presenting moves to another Map
+ * or Graph, a reopening or an Edit adopting another Map, which is another talk. A reopening on the same Map and Graph, as
+ * browser Back and Forward through the talk are, stays in the presentation.
+ * The presenting window reads this rule once, for the rehearsal notes, the
+ * talk timer and the presentation link (`presenting-window.ts`).
+ */
+export interface PresentationScope {
+  readonly mapId: MapId;
+  readonly graphId: GraphId;
+}
+
+export function presentationScope(state: NavigationState): PresentationScope | null {
+  return state.mode === 'presenting'
+    ? { mapId: state.selectedMapId, graphId: state.activeGraphId }
+    : null;
+}
+
+/** Whether two scopes are the same presentation, or both not presenting. */
+export function samePresentation(
+  a: PresentationScope | null,
+  b: PresentationScope | null,
+): boolean {
+  if (a === null || b === null) return a === b;
+  return a.mapId === b.mapId && a.graphId === b.graphId;
 }
 
 /** Navigation through the current working Space, independent of any UI framework. */
@@ -232,11 +269,6 @@ export function createNavigation(
     openedState(initialMapId, resolveMap(initialSpace, initialMapId)),
     options.reportObserverError ?? reportToConsole,
   );
-  // Whatever navigation is doing, it goes on doing: a change to the fields both
-  // modes share cannot name `mode`, so it can neither start nor end a traversal.
-  const setState = (change: Partial<NavigationBase>): void => {
-    observable.publish({ ...observable.getState(), ...change });
-  };
   const activeResourceId = (): ResourceId | null => presentedResource(observable.getState());
 
   return {
@@ -294,10 +326,21 @@ export function createNavigation(
       if (activeGraphId !== null && !mapShowsGraph(resolved, activeGraphId)) {
         throw new Error(`The adopted Map does not show the active Graph ${activeGraphId}.`);
       }
-      setState({
-        selectedMapId: selection,
-        activeGraphId,
-      });
+      const state = observable.getState();
+      // A traversal goes on only over a Graph that holds the Resource it is
+      // presenting; otherwise adopting the Map ends it, as `activateGraph`
+      // does, rather than leave presenting with no Graph to traverse.
+      if (
+        state.mode === 'presenting' &&
+        activeGraphId !== null &&
+        graphResourceIds(currentSpace(), activeGraphId).includes(
+          currentResource(state.traversalHistory),
+        )
+      ) {
+        observable.publish({ ...state, selectedMapId: selection, activeGraphId });
+        return;
+      }
+      observable.publish({ selectedMapId: selection, activeGraphId, mode: 'overview' });
     },
     openGraph: (selection, graphId) => {
       const space = currentSpace();
@@ -404,13 +447,14 @@ export function createNavigation(
     // presented — cyclic ones included (ADR 0032).
     present: () => {
       const state = observable.getState();
-      const owned =
-        state.activeGraphId === null ? undefined : currentSpace().lookup.graph(state.activeGraphId);
-      if (owned === undefined) return;
+      const graphId = state.activeGraphId;
+      const owned = graphId === null ? undefined : currentSpace().lookup.graph(graphId);
+      if (graphId === null || owned === undefined) return;
       const start = graphStartResource(owned.graph);
       if (start === undefined) return;
       observable.publish({
-        ...baseOf(state),
+        selectedMapId: state.selectedMapId,
+        activeGraphId: graphId,
         mode: 'presenting',
         traversalHistory: [start],
         branchIndex: 0,

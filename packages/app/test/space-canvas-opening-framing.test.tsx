@@ -14,7 +14,6 @@ import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
 import { mountSettled } from './settled-mount';
 import { unusedImageSources } from './image-sources';
-import { refusingFullscreen } from './fullscreen';
 import { CLOSED_DISPLAY } from '@project/ui';
 import { stubResizeObserver } from './resize-observer';
 import { canvasReading, IDLE_PLACEMENT } from './map-surfaces';
@@ -166,7 +165,6 @@ describe('opening framing on a mounted canvas', () => {
         href: unused,
         dispose: unused,
       },
-      fullscreen: refusingFullscreen,
     };
 
     const { surface } = app;
@@ -270,7 +268,6 @@ describe('opening framing on a mounted canvas', () => {
         href: unused,
         dispose: unused,
       },
-      fullscreen: refusingFullscreen,
     };
 
     const { surface } = app;
