@@ -1,0 +1,48 @@
+# Asks Claude for a code review of a pull request: fires the code-review
+# routine, whose session reviews the pull request this run names (its URL and
+# number, in the turn appended to the session). It runs when a pull request is
+# opened, reopened or marked ready for review, and never on a draft.
+# Dependabot's pull requests and those from forks are skipped: they are not
+# given the repository's secrets. The job is kept out of `ci.yml` so the `ci`
+# gate does not depend on it.
+#
+# Secret: CLAUDE_ROUTINE_TOKEN, the routine's bearer token.
+name: Code review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions: {}
+
+jobs:
+  request:
+    if: >-
+      ${{ !github.event.pull_request.draft
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository }}
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fire the code-review routine
+        env:
+          CLAUDE_ROUTINE_TOKEN: ${{ secrets.CLAUDE_ROUTINE_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$CLAUDE_ROUTINE_TOKEN" ]; then
+            echo "::error::CLAUDE_ROUTINE_TOKEN is empty: add it as a repository secret under Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          # jq writes the body, so nothing in the pull request's fields can break the JSON.
+          body=$(jq -n --arg url "$PR_URL" --arg number "$PR_NUMBER" --arg repo "$REPO" \
+            '{text: "Review pull request #\($number) in \($repo): \($url)"}')
+          # A stall or a 5xx is retried; a refusal (4xx) fails at once, its reply in the log.
+          curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 --retry 3 -X POST \
+            https://api.anthropic.com/v1/claude_code/routines/trig_01DVcmTPJ9yJwRYLoDjPuV3B/fire \
+            -H "Authorization: Bearer $CLAUDE_ROUTINE_TOKEN" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+            -H "Content-Type: application/json" \
+            -d "$body"
