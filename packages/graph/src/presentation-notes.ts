@@ -22,11 +22,17 @@ export interface PresentationNotes {
  * A title as words: compatibility-normalised, case-folded, and split on every
  * run of anything that is neither a letter nor a digit. Title Line breaks are
  * separators like any other, so how a Title is broken changes nothing.
+ *
+ * JavaScript has no case folding, and `toLowerCase` alone leaves "ß" apart
+ * from "SS". Upper-casing first applies the full mappings that fold expands,
+ * so "Straße" and "STRASSE" are one word.
  */
 const words = (title: string): readonly string[] =>
   title
     .normalize('NFKC')
+    .toUpperCase()
     .toLowerCase()
+    .normalize('NFKC')
     .split(/[^\p{L}\p{N}]+/u)
     .filter((word) => word.length > 0);
 

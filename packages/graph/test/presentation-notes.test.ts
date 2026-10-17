@@ -85,6 +85,15 @@ describe('presentationNotes: which Graph holds the notes', () => {
     expect(chosen([title])).toBeNull();
   });
 
+  it.each([
+    ['Straße', 'STRASSE Notes'],
+    ['STRASSE', 'Straße Notes'],
+    ['Σίσυφος', 'ΣΊΣΥΦΟΣ Notes'],
+  ])('case-folds the talk %j to match %j', (talkTitle, title) => {
+    const folded = graph(talkTitle, [[slide, next]]);
+    expect(presentationNotes(mapOf([notesGraph(title)]), folded, slide).graph?.title).toBe(title);
+  });
+
   it('finds none on a Map holding no other Graph', () => {
     expect(presentationNotes(mapOf([]), talk, slide)).toEqual({
       graph: null,
