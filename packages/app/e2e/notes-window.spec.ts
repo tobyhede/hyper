@@ -223,3 +223,23 @@ test(
     await expect(notesWindow(notes).getByText('Not presenting')).toBeVisible();
   },
 );
+
+test('the Notes window shows "not presenting" when the presenting window crashes', async ({
+  page,
+}) => {
+  const spaceId = await seedTalk(page);
+  const notes = await openNotesWindow(page, spaceId);
+  await page.goto(presentPath(spaceId, ids.welcome));
+  await expect(presentedName(page)).toHaveText('Welcome');
+  await expect(presenting(notes, 'Welcome')).toBeVisible();
+
+  // A crashed renderer runs no `pagehide` and posts nothing; only the browser
+  // letting go of its Web Lock can tell the Notes window. The crash takes the
+  // target down before it can answer, so the command's reply never comes.
+  const crashed = page.waitForEvent('crash');
+  const devtools = await page.context().newCDPSession(page);
+  void devtools.send('Page.crash').catch(() => undefined);
+  await crashed;
+
+  await expect(notesWindow(notes).getByText('Not presenting')).toBeVisible();
+});

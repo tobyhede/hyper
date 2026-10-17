@@ -27,6 +27,7 @@ const linksOver = (channel: PresentationChannel, now: () => number) => ({
   open: () => channel,
   now,
   leaving: () => () => undefined,
+  presence: { hold: () => () => undefined, watch: () => () => undefined },
 });
 
 /**
