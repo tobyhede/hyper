@@ -24,12 +24,14 @@ export interface PresentationNotes {
  * separators like any other, so how a Title is broken changes nothing.
  *
  * JavaScript has no case folding, and `toLowerCase` alone leaves "ß" apart
- * from "SS". Upper-casing first applies the full mappings that fold expands,
- * so "Straße" and "STRASSE" are one word.
+ * from "SS". Lower, upper, then lower again applies the full mappings that
+ * folding expands, capital "ẞ" included, so "Straße", "STRAẞE" and "STRASSE"
+ * are one word.
  */
 const words = (title: string): readonly string[] =>
   title
     .normalize('NFKC')
+    .toLowerCase()
     .toUpperCase()
     .toLowerCase()
     .normalize('NFKC')
@@ -97,8 +99,10 @@ export function presentationNotes(
   if (chosen === undefined) return { graph: null, passedOver: [], notes: [] };
 
   const targets = [...new Set(outgoingEdges(chosen.graph, resourceId).map((edge) => edge.to))];
-  // Intake refuses an Edge whose endpoint the Map does not place, so every
-  // target has a position; the fallback only satisfies the index type.
+  // Intake refuses an Edge whose endpoint the Map does not place
+  // (space-intake.test.ts, "refuses an endpoint naming a resource only a
+  // second map holds"), so every target has a position; the fallback only
+  // satisfies the index type.
   const at = (id: ResourceId) => shown.positions[id] ?? { x: 0, y: 0 };
   const notes = targets.sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x);
   return { graph: chosen.graph, passedOver: passed.map((entry) => entry.graph), notes };

@@ -4,7 +4,7 @@ Status: accepted
 Refines: 0123
 Related: 0024, 0040, 0081, 0109, 0111
 
-A presentation's notes are ordinary Resources, connected to the Resources they annotate by an ordinary Graph on the same Map. That Graph, the **Presentation Notes Graph**, is found by its title, not by anything stored: a Graph whose title reads as the talk Graph's title followed by a marker, or as a marker alone. The markers are "Presentation Notes", "Notes", and "Presentation" followed by at least one more word. Titles are compared as words, after NFKC normalisation and case folding, with every run of characters that are neither letters nor digits, Title Line breaks included, counted as one separator.
+A presentation's notes are ordinary Resources, connected to the Resources they annotate by an ordinary Graph on the same Map. That Graph, the **Presentation Notes Graph**, is found by its title, not by anything stored: a Graph whose title reads as the talk Graph's title followed by a marker, or as a marker alone. The markers are "Presentation Notes" (also written "PresentationNotes"), "Notes", and "Presentation" followed by at least one more word. Titles are compared as words, after NFKC normalisation and case folding, with every run of characters that are neither letters nor digits, Title Line breaks included, counted as one separator.
 
 When several Graphs match, a title naming the talk beats a bare marker; then "Presentation Notes" beats "Notes", which beats "Presentation" and more; then the Map's Graph order. A Graph is never its own notes. A note is any Resource the Active Resource reaches by an Edge of the Presentation Notes Graph, and several notes are ordered by where they sit on the Map, top edge then left edge.
 

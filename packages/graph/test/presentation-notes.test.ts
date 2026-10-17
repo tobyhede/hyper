@@ -88,6 +88,7 @@ describe('presentationNotes: which Graph holds the notes', () => {
   it.each([
     ['Straße', 'STRASSE Notes'],
     ['STRASSE', 'Straße Notes'],
+    ['STRAẞE', 'STRASSE Notes'],
     ['Σίσυφος', 'ΣΊΣΥΦΟΣ Notes'],
   ])('case-folds the talk %j to match %j', (talkTitle, title) => {
     const folded = graph(talkTitle, [[slide, next]]);
