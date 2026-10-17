@@ -281,6 +281,51 @@ describe('the Notes window', () => {
     expect(titles(notes, 'notes')).toEqual(['Thank everyone', 'Then']);
   });
 
+  it('reloads again for a Resource it does not hold that is named while a reload is pending', async () => {
+    const join = channelHub();
+    const navigation = presentingWindow(join(), mintingIds(uuid(100)));
+    // The Notes window loaded before Right was added, and its first reload
+    // reads the store before the Edit lands too.
+    const withoutRight: SpaceSnapshot = {
+      ...snapshot,
+      document: {
+        ...snapshot.document,
+        maps: snapshot.document.maps?.map((m) => ({
+          ...m,
+          positions: Object.fromEntries(Object.entries(m.positions).filter(([id]) => id !== RIGHT)),
+          graphs: m.graphs.map((graph) => ({
+            ...graph,
+            edges: graph.edges.filter(({ to }) => to !== RIGHT),
+          })),
+        })),
+      },
+      resources: snapshot.resources.filter((resource) => resource.id !== RIGHT),
+    };
+    let stored = withoutRight;
+    const pending: (() => void)[] = [];
+    const notes = createNotesWindow({
+      spaceId: SPACE_ID,
+      space: spaceOf(withoutRight),
+      reload: () => {
+        const read = spaceOf(stored);
+        return new Promise((resolve) => pending.push(() => resolve(read)));
+      },
+      links: linksOver(join()),
+      reportObserverError: throwObserverError,
+    });
+    notes.connect();
+
+    navigation.present();
+    stored = snapshot;
+    notes.selectBranch(1);
+    while (pending.length > 0) {
+      pending.shift()?.();
+      await settled();
+    }
+
+    expect(titles(notes, 'moves')).toEqual(['Left', 'Right']);
+  });
+
   it('carries when the presentation started', async () => {
     const join = channelHub();
     const navigation = presentingWindow(join(), mintingIds(uuid(100)));
