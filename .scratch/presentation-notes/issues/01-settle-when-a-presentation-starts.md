@@ -6,7 +6,7 @@
 
 **Status:** ready-for-agent
 
-**Spec:** `.scratch/presentation-notes/spec.md`. **Context:** ADR 0129, which does not yet state this rule. **Decisions:** on 2026-10-17 the user chose that Back mid-talk keeps the rehearsal notes showing. That a change of Map or Graph starts a new presentation is this ticket's default, because it is a different talk; change it here before the tests pin it.
+**Spec:** `.scratch/presentation-notes/spec.md`. **Context:** ADR 0129, which does not yet state this rule. **Decisions:** on 2026-10-17 the user chose that Back mid-talk keeps the rehearsal notes showing. On the same day they chose that a reopening which changes Map or Graph starts a new presentation, because it is a different talk.
 
 - [ ] ADR 0129 states when a presentation starts and ends, with the same-Map-and-Graph rule for reopening.
 - [ ] The places that restate the old reset say the new rule: the spec's "Rehearsal notes" item, the rehearsal notes paragraph in `docs/agents/rendering.md`, and the comment on `useRehearsalNotes`.
