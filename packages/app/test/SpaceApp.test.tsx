@@ -741,7 +741,6 @@ describe('Space app failure reporting', () => {
       mountSpaceApp(
         { id: runtime(valid).id, session, app, spaceResources },
         createBrowserLocation(recordingHistory(), { isNavigationHeld: () => false }),
-        refusingFullscreen,
         (view) => {
           render(view);
         },

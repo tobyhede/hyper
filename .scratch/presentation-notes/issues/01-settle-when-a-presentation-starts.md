@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #388.
 
 **Spec:** `.scratch/presentation-notes/spec.md`. **Context:** ADR 0129, which does not yet state this rule. **Decisions:** on 2026-10-17 the user chose that Back mid-talk keeps the rehearsal notes showing. On the same day they chose that a reopening which changes Map or Graph starts a new presentation, because it is a different talk.
 

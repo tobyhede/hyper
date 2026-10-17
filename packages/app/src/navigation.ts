@@ -121,8 +121,8 @@ export function canRetreat(state: NavigationState): boolean {
  * presenting begins, and when a reopening while presenting moves to another Map
  * or Graph, which is another talk. A reopening on the same Map and Graph, as
  * browser Back and Forward through the talk are, stays in the presentation.
- * The rehearsal notes, the talk timer and the presentation link all read this
- * one rule.
+ * The presenting window reads this rule once, for the rehearsal notes, the
+ * talk timer and the presentation link (`presenting-window.ts`).
  */
 export interface PresentationScope {
   readonly mapId: MapId;

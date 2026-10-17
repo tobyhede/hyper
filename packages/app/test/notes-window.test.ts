@@ -8,11 +8,9 @@ import {
 } from '@project/persistence';
 import { composeCore } from '../src/compose-app';
 import { createNotesWindow, elapsedLabel, type NotesWindow } from '../src/notes-window';
-import {
-  presentingLink,
-  type PresentationChannel,
-  type PresentationLinks,
-} from '../src/presentation-link';
+import type { PresentationChannel, PresentationLinks } from '../src/presentation-link';
+import { createPresentingWindow } from '../src/presenting-window';
+import { refusingFullscreen } from './fullscreen';
 import { mintingIds } from './minting';
 import { channelHub } from './presentation-channels';
 
@@ -112,11 +110,17 @@ function presentingWindow(channel: PresentationChannel, newId: () => UUID) {
   const { navigation, currentSpace } = composeCore({
     spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded),
   });
-  presentingLink({
+  const links = linksOver(channel, () => 7_000);
+  createPresentingWindow({
     navigation,
-    spaceId: () => currentSpace().id,
-    links: linksOver(channel, () => 7_000),
     newId,
+    now: links.now,
+    fullscreen: refusingFullscreen,
+    openNotes: () => undefined,
+    link: { spaceId: () => currentSpace().id, links },
+    reportObserverError: (error) => {
+      throw error;
+    },
   }).connect();
   return navigation;
 }

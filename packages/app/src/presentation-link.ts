@@ -1,12 +1,7 @@
 import type { GraphId, MapId, ResourceId, UUID } from '@project/core';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
-import {
-  canRetreat,
-  presentationScope,
-  samePresentation,
-  type Navigation,
-  type PresentationScope,
-} from './navigation';
+import { canRetreat, type Navigation } from './navigation';
+import type { Presentation } from './presenting-window';
 
 /**
  * The presenting window and the Notes windows following it, joined over one
@@ -87,7 +82,10 @@ export interface PresentationChannel {
 export interface PresentationLinks {
   /** Open this window's end of one Space's channel. */
   readonly open: (spaceId: UUID) => PresentationChannel;
-  /** The time now, in milliseconds since the Unix epoch, as `Date.now` answers. */
+  /**
+   * The time now, in milliseconds since the Unix epoch, as `Date.now` answers:
+   * the clock every window shares, which a Notes window times a presentation by.
+   */
   readonly now: () => number;
   /**
    * Call `listener` when this window is going away, before it goes. A window
@@ -121,8 +119,11 @@ export interface PresentingLinkDependencies {
   readonly navigation: Navigation;
   readonly spaceId: () => UUID;
   readonly links: PresentationLinks;
-  /** Mints each presentation's identity when presenting starts (ADR 0109). */
-  readonly newId: () => UUID;
+  /**
+   * The presentation under way, or `null` while not presenting, as the
+   * presenting window answers it. The link mints no identity of its own.
+   */
+  readonly current: () => Presentation | null;
 }
 
 export interface PresentingLink {
@@ -130,10 +131,8 @@ export interface PresentingLink {
   readonly connect: () => () => void;
 }
 
-interface Presentation {
-  readonly id: UUID;
-  readonly scope: PresentationScope;
-  readonly startedAt: number;
+/** A presentation the link has posted, and the presence it holds for it. */
+interface Posted extends Presentation {
   /** Lets go of the presentation's presence. */
   readonly release: () => void;
 }
@@ -141,10 +140,10 @@ interface Presentation {
 /**
  * The presenting window's side of the link.
  *
- * A presentation starting mints its identity and start time; every Navigation
- * change while it lasts publishes a snapshot; leaving presenting, or a
- * reopening that moves to another Map or Graph, publishes that it ended. When
- * a presentation starts is `presentationScope`'s rule. A
+ * A presentation the presenting window starts is posted with the identity and
+ * start time it was given; every Navigation change while it lasts publishes a
+ * snapshot; the presenting window answering another presentation, or none,
+ * publishes that it ended. A
  * Notes window announcing itself is answered with the current snapshot, and a
  * command naming this window's presentation is applied through Navigation.
  * Anything else is ignored: a command for another window's presentation, or
@@ -154,12 +153,12 @@ export function presentingLink({
   navigation,
   spaceId,
   links,
-  newId,
+  current: presentationNow,
 }: PresentingLinkDependencies): PresentingLink {
-  let current: Presentation | null = null;
+  let current: Posted | null = null;
   let channel: PresentationChannel | null = null;
 
-  const snapshot = (presentation: Presentation): PresentationSnapshot | null => {
+  const snapshot = (presentation: Posted): PresentationSnapshot | null => {
     const state = navigation.getState();
     const resourceId = navigation.activeResourceId();
     if (state.mode !== 'presenting' || resourceId === null) return null;
@@ -177,7 +176,7 @@ export function presentingLink({
     };
   };
 
-  const publish = (presentation: Presentation): void => {
+  const publish = (presentation: Posted): void => {
     const published = snapshot(presentation);
     if (published !== null) channel?.post({ version: 1, kind: 'presenting', snapshot: published });
   };
@@ -194,15 +193,12 @@ export function presentingLink({
   };
 
   const onNavigation = (): void => {
-    const scope = presentationScope(navigation.getState());
-    if (current !== null && !samePresentation(current.scope, scope)) end();
-    if (scope === null) return;
-    if (current === null) {
-      // Held before the first snapshot is posted, so a Notes window that
-      // hears it always finds the presence held.
-      const id = newId();
-      current = { id, scope, startedAt: links.now(), release: links.presence.hold(id) };
-    }
+    const presentation = presentationNow();
+    if (current !== null && current.id !== presentation?.id) end();
+    if (presentation === null) return;
+    // Held before the first snapshot is posted, so a Notes window that hears
+    // it always finds the presence held.
+    current ??= { ...presentation, release: links.presence.hold(presentation.id) };
     publish(current);
   };
 

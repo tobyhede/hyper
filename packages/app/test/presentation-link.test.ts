@@ -6,9 +6,10 @@ import {
   type ObserverErrorReporter,
 } from '@project/persistence';
 import { composeCore } from '../src/compose-app';
+import { createPresentingWindow } from '../src/presenting-window';
+import { refusingFullscreen } from './fullscreen';
 import {
   followPresentation,
-  presentingLink,
   type PresentationChannel,
   type PresentationFollower,
   type PresentationPresence,
@@ -137,21 +138,27 @@ function presentingWindow(
   const { navigation, currentSpace } = composeCore({
     spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded),
   });
-  const link = presentingLink({
+  const presenting = createPresentingWindow({
     navigation,
-    spaceId: () => currentSpace().id,
-    links: {
-      open: () => channel,
-      now,
-      leaving: (listener) => {
-        leaving.add(listener);
-        return () => leaving.delete(listener);
-      },
-      presence,
-    },
     newId,
+    now,
+    fullscreen: refusingFullscreen,
+    openNotes: () => undefined,
+    link: {
+      spaceId: () => currentSpace().id,
+      links: {
+        open: () => channel,
+        now,
+        leaving: (listener) => {
+          leaving.add(listener);
+          return () => leaving.delete(listener);
+        },
+        presence,
+      },
+    },
+    reportObserverError: throwObserverError,
   });
-  const disconnect = link.connect();
+  const disconnect = presenting.connect();
   /** The page going away, which runs no teardown of its own. */
   const leave = (): void => {
     for (const listener of [...leaving]) listener();

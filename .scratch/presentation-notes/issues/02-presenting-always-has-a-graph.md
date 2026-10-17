@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Settle when a presentation starts), which adds reopening tests over the same Navigation fixtures this ticket retypes.
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #388.
 
 **Spec:** `.scratch/presentation-notes/spec.md`. **Review:** candidate 3 of the 2026-10-17 architecture review of Presentation Notes on main.
 

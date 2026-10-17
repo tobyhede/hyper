@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { newUuid } from '@project/core';
 // Through the package's own subpath imports, as `#components/*` already is.
 import { createNotesWindow } from '#src/notes-window';
-import { presentingLink, type PresentationChannel } from '#src/presentation-link';
+import type { PresentationChannel } from '#src/presentation-link';
 import { NotesWindowApplication } from '#components/NotesWindowApplication';
 import { useStoryNavigation } from './navigation';
+import { useStoryPresentingWindow } from './presenting-window';
 import { channelHub } from './presentations';
 import { notesSpace } from './spaces';
 
@@ -59,15 +59,10 @@ export function NotesWindowFixture({ presenting = true, advances = 0 }: NotesWin
       reportObserverError: (error) => console.error('Notes window story observer failed', error),
     }),
   );
-  useEffect(
-    () =>
-      presentingLink({
-        navigation,
-        spaceId: () => notesSpace.id,
-        links: linksOver(stage, () => STARTED_AT),
-        newId: newUuid,
-      }).connect(),
-    [navigation, stage],
-  );
+  const { presentingWindow } = useStoryPresentingWindow(navigation, {
+    startedAt: STARTED_AT,
+    link: { spaceId: () => notesSpace.id, links: linksOver(stage, () => STARTED_AT) },
+  });
+  useEffect(() => presentingWindow.connect(), [presentingWindow]);
   return <NotesWindowApplication notes={notes} now={() => NOW} />;
 }

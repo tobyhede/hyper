@@ -4,7 +4,7 @@
 
 **Blocked by:** 01 (Settle when a presentation starts), 02 (The Active Graph is never empty while presenting).
 
-**Status:** ready-for-agent
+**Status:** resolved — delivered in PR #388.
 
 **Spec:** `.scratch/presentation-notes/spec.md`. **Review:** candidate 1 of the 2026-10-17 architecture review of Presentation Notes on main.
 
