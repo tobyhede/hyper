@@ -222,6 +222,14 @@ _Avoid_: deck, slide, step, slideshow, playback, present mode (that is a mode na
 The surface presenting draws on, in place of the canvas: the Active Resource's content, filling the screen. The Stage draws a Resource by its kind, never by how the Resource is placed, sized, shaped or Opened on a Map — those are the Map's, and the audience does not see the Map. The Stage offers no authoring: to change what a presentation can reach, the author leaves presenting, changes the Map or Graph, and presents again. Leaving presenting returns to the canvas exactly as it was left, because presenting never moved it.
 _Avoid_: slide (retired with deck), viewer, presenter view, canvas (the canvas is where a Map is drawn and authored, and presenting no longer draws there).
 
+**Presentation Notes Graph**:
+The Graph on a talk's Map that holds the talk's notes, found by its title and never stored: the talk Graph's title followed by "Presentation Notes", "Notes" or "Presentation" and more, or one of those alone. Its Edges run from a Resource of the talk to that Resource's notes, which are ordinary Resources of any kind. It is otherwise an ordinary Graph, and a Graph is never its own notes. How a title is matched and which of several wins is in ADR 0129.
+_Avoid_: speaker notes, notes field, notes Resource (a note is a Resource like any other, reached by an Edge of this Graph).
+
+**Notes window**:
+A second window that follows whichever window is presenting a Space, showing the notes for the Active Resource, the moves from it with a preview of each, and the time elapsed. It drives the presentation with the same traversal commands as the Stage, but it owns no Navigation and offers no authoring.
+_Avoid_: presenter view (on the Stage's list), speaker view, speaker window, console.
+
 **Graph navigation**:
 Moving keyboard focus through the Active Graph while working in its Map. It uses the same fork, merge, cycle, and backtracking rules as Presenting but remains a separate transient interaction rather than an audience-facing presentation.
 _Avoid_: overview traversal, browsing, walking.

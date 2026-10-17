@@ -143,6 +143,7 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0024](0024-presenting-is-traversing-a-route.md) | To present is to traverse a Graph. There is no deck. |
 | [0043](0043-a-camera-command-is-issued-never-awaited.md) | A camera command is issued and never awaited. |
 | [0123](0123-presenting-draws-on-its-own-stage-not-on-the-canvas.md) | Presenting draws the Active Resource on its own Stage over an inert canvas, by kind and never by placement, size, Shape or Open. The Stage offers no authoring (supersedes 0027 and 0044). |
+| [0129](0129-presentation-notes-are-a-graph-found-by-its-title.md) | A presentation's notes are Resources linked by a Presentation Notes Graph on the same Map, found by its title (the talk's title plus "Presentation Notes", "Notes" or "Presentation …", or a marker alone) and read in a Notes window that follows the presenting window (refines 0123). |
 | [0033](0033-route-authoring-uses-spatial-route-coloured-handles.md) | Graph authoring uses spatial handles coloured as the active Graph. |
 | [0090](0090-seeking-handles-reveal-by-proximity-and-eligibility.md) | Seeking-end authoring handles reveal only on Things near the pointer that `edgeEligibility` would accept. |
 | [0091](0091-context-deletion-relocates-every-space-thing.md) | Deleting a Diagram or Graph atomically relocates every Space Thing that selected it. |
