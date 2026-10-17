@@ -130,7 +130,10 @@ export function createNotesWindow({
   const observable = createObservableState(NOT_PRESENTING, reportObserverError);
   let space = initial;
   let follower: ReturnType<typeof followPresentation> | null = null;
-  let reloading: Promise<void> | null = null;
+  let reloading = false;
+  // Asked for while a reload was pending: that reload may have read the store
+  // before the Edit this one is for, so another follows it.
+  let reloadAgain = false;
 
   // The presentation this window last drew. A new one reloads the Space
   // first, so an Edit made since the last talk is drawn in this one.
@@ -145,14 +148,22 @@ export function createNotesWindow({
   };
 
   const refresh = (): void => {
-    reloading ??= reload()
+    if (reloading) {
+      reloadAgain = true;
+      return;
+    }
+    reloading = true;
+    void reload()
       .then((reloaded) => {
         if (reloaded !== undefined) space = reloaded;
       })
       .catch(reportObserverError)
       .finally(() => {
-        reloading = null;
-        redraw();
+        reloading = false;
+        if (reloadAgain) {
+          reloadAgain = false;
+          refresh();
+        } else redraw();
       });
   };
 
@@ -166,10 +177,9 @@ export function createNotesWindow({
       refresh();
       return;
     }
-    if (reloading !== null) return;
     const view = notesView(space, followed.snapshot);
     if (view === undefined) refresh();
-    else observable.publish({ kind: 'presenting', view });
+    else if (!reloading) observable.publish({ kind: 'presenting', view });
   };
 
   return {

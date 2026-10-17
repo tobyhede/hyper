@@ -241,6 +241,46 @@ describe('the Notes window', () => {
     expect(titles(notes, 'notes')).toEqual(['Thank everyone', 'Then']);
   });
 
+  it('reloads again for a presentation that starts while an earlier reload is pending', async () => {
+    const join = channelHub();
+    const navigation = presentingWindow(join(), mintingIds(uuid(100), uuid(101)));
+    let stored = snapshot;
+    // Each reload reads the store when it is asked, and answers when released.
+    const pending: (() => void)[] = [];
+    const notes = createNotesWindow({
+      spaceId: SPACE_ID,
+      space: spaceOf(snapshot),
+      reload: () => {
+        const read = spaceOf(stored);
+        return new Promise((resolve) => pending.push(() => resolve(read)));
+      },
+      links: linksOver(join()),
+      reportObserverError: throwObserverError,
+    });
+    notes.connect();
+    const releaseAll = async () => {
+      while (pending.length > 0) {
+        pending.shift()?.();
+        await settled();
+      }
+    };
+
+    navigation.present();
+    navigation.exitPresenting();
+    stored = {
+      ...snapshot,
+      resources: snapshot.resources.map((resource) =>
+        resource.id === UPPER_NOTE
+          ? markdown(UPPER_NOTE, 'Thank everyone', 'Hosts and crew')
+          : resource,
+      ),
+    };
+    navigation.present();
+    await releaseAll();
+
+    expect(titles(notes, 'notes')).toEqual(['Thank everyone', 'Then']);
+  });
+
   it('carries when the presentation started', async () => {
     const join = channelHub();
     const navigation = presentingWindow(join(), mintingIds(uuid(100)));
