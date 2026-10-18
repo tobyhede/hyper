@@ -170,6 +170,24 @@ describe('the presenting window', () => {
     });
   });
 
+  it('starts afresh, with the rehearsal notes hidden, when Present restarts the talk', () => {
+    const { navigation, window, at } = presentingWindow(
+      mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
+    );
+    window.present();
+    window.commands.advance();
+    window.commands.toggleNotes();
+
+    at(2_000);
+    window.present();
+
+    expect(navigation.activeResourceId()).toBe(OPENING);
+    expect(window.getState()).toEqual({
+      presentation: { id: SECOND_PRESENTATION, startedAt: 2_000 },
+      rehearsalNotesShown: false,
+    });
+  });
+
   it('starts afresh, with the rehearsal notes hidden, when a reopening changes Graph', () => {
     const { navigation, window, at } = presentingWindow(
       mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
@@ -226,6 +244,29 @@ describe('the presenting window', () => {
     window.present();
 
     expect(window.getState()).toEqual({ presentation: null, rehearsalNotesShown: false });
+  });
+
+  it('stops linking Notes windows once disposed, and links none after', () => {
+    const join = channelHub();
+    const presence = { hold: () => () => undefined, watch: () => () => undefined };
+    const links: PresentationLinks = {
+      open: () => join(),
+      now: () => 0,
+      leaving: () => () => undefined,
+      presence,
+    };
+    const { navigation, window } = presentingWindow(mintingIds(FIRST_PRESENTATION), {
+      link: { spaceId: () => SPACE_ID, links },
+    });
+    const follower = followPresentation(join(), presence, throwObserverError);
+    follower.connect();
+    window.connect();
+
+    window.dispose();
+    window.connect();
+    navigation.present();
+
+    expect(follower.getState().kind).not.toBe('presenting');
   });
 
   it('hides the rehearsal notes again on a second toggle', () => {

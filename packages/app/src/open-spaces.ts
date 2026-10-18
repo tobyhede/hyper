@@ -585,7 +585,6 @@ export function createOpenSpaces({
         reportObserverError: report,
         spaceResources,
         presentations,
-        now: presentations.now,
         fullscreen,
       }),
       spaceResources,

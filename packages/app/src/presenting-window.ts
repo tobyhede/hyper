@@ -27,13 +27,19 @@ export interface PresentingWindowState {
 export interface PresentingWindow {
   readonly getState: () => PresentingWindowState;
   readonly subscribe: (listener: () => void) => () => void;
-  /** Start presenting and, within the same activation, ask for fullscreen. */
+  /**
+   * Start presenting, or restart the talk as a new presentation, and within the
+   * same activation ask for fullscreen.
+   */
   readonly present: () => void;
   /** What the presenting keys and the Stage's chrome do. */
   readonly commands: TraversalCommands;
   /** Follow fullscreen and link Notes windows until the returned function is called. */
   readonly connect: () => () => void;
-  /** Stop following Navigation, as the composition that holds it is disposed. */
+  /**
+   * Stop following Navigation, fullscreen and Notes windows, as the
+   * composition that holds it is disposed. It connects nothing after.
+   */
   readonly dispose: () => void;
 }
 
@@ -67,8 +73,9 @@ interface Under {
  * presentation link, behind one state and one set of commands.
  *
  * The one place a presentation starts. It starts when `presentationScope`
- * changes to a value it did not hold, and only here are its identity and start
- * time minted; the link posts what this hands it. The rehearsal notes belong
+ * changes to a value it did not hold, or when Present restarts the talk while
+ * presenting, and only here are its identity and start time minted; the link
+ * posts what this hands it. The rehearsal notes belong
  * to one presentation, so a new one shows them hidden without anything
  * resetting them, and they are never stored in the Space or the browser.
  *
@@ -88,14 +95,21 @@ export function createPresentingWindow({
 }: PresentingWindowDependencies): PresentingWindow {
   let under: Under | null = null;
   let rehearsing: UUID | null = null;
+  // Present pressed while presenting restarts the talk without changing its
+  // scope, so the next presentation followed is a new one.
+  let restarting = false;
+  let disposed = false;
+  const connections = new Set<() => void>();
   let answered: PresentingWindowState = { presentation: null, rehearsalNotesShown: false };
 
   /** Bring the presentation up to date with Navigation, and answer it. */
   const follow = (): Presentation | null => {
     const scope = presentationScope(navigation.getState());
     if (scope === null) under = null;
-    else if (under === null || !samePresentation(under.scope, scope))
+    else if (restarting || under === null || !samePresentation(under.scope, scope)) {
       under = { scope, presentation: { id: newId(), startedAt: now() } };
+      restarting = false;
+    }
     return under?.presentation ?? null;
   };
 
@@ -155,17 +169,30 @@ export function createPresentingWindow({
   return {
     getState: observable.getState,
     subscribe: observable.subscribe,
-    present: fullscreenPairing.present,
+    present: () => {
+      restarting = navigation.getState().mode === 'presenting';
+      try {
+        fullscreenPairing.present();
+      } finally {
+        restarting = false;
+      }
+    },
     commands,
     connect: () => {
+      if (disposed) return () => undefined;
       const stopFullscreen = fullscreenPairing.connect();
       const stopLink = notesLink?.connect();
-      return () => {
+      const disconnect = () => {
+        if (!connections.delete(disconnect)) return;
         stopLink?.();
         stopFullscreen();
       };
+      connections.add(disconnect);
+      return disconnect;
     },
     dispose: () => {
+      disposed = true;
+      for (const disconnect of [...connections]) disconnect();
       stopNavigation();
       observable.clearSubscribers();
     },

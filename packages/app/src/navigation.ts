@@ -117,12 +117,14 @@ export function canRetreat(state: NavigationState): boolean {
  * The presentation a navigation state is in, named by the Map and Graph it
  * presents, or `null` when it is not presenting (ADR 0129).
  *
- * A presentation starts when this changes to a value it did not hold: when
- * presenting begins, and when anything while presenting moves to another Map
- * or Graph, a reopening or an Edit adopting another Map, which is another talk. A reopening on the same Map and Graph, as
+ * A presentation starts when this changes to a value it did not hold. That
+ * happens when presenting begins, and when a reopening or an Edit moves the
+ * talk to another Map or Graph. A reopening on the same Map and Graph, as
  * browser Back and Forward through the talk are, stays in the presentation.
- * The presenting window reads this rule once, for the rehearsal notes, the
- * talk timer and the presentation link (`presenting-window.ts`).
+ * Present while presenting also starts one, which the presenting window
+ * decides, since the scope does not change. It reads this rule once, for the
+ * rehearsal notes, the talk timer and the presentation link
+ * (`presenting-window.ts`).
  */
 export interface PresentationScope {
   readonly mapId: MapId;
@@ -153,7 +155,7 @@ export interface Navigation {
   readonly openFresh: (selection: MapId) => void;
   /**
    * Adopt a Map created by an Edit, and the Active Graph that goes with it,
-   * without interrupting the current navigation.
+   * keeping the current navigation wherever that Graph allows.
    *
    * The two arrive together because under ADR 0040 they are one answer: a Map
    * owns its Graphs, so the Graph a Map opens on is a fact about that Map
@@ -293,7 +295,8 @@ export function createNavigation(
     },
     // Resolve first so navigation can never name a Map the current Space
     // does not hold. Unlike explicit selection, adopting the Map an Edit just
-    // created is not navigation and must not interrupt a traversal.
+    // created is not navigation, so it keeps a traversal wherever the Graph it
+    // hands over still holds the presented Resource.
     //
     // **The Active Graph arrives with the Map rather than surviving it.**
     // Under ADR 0040 a Map owns its Graphs, so the two are one answer.
@@ -309,12 +312,10 @@ export function createNavigation(
     //
     // **Do not re-resolve instead of refusing.** Falling back to
     // the adopted Map's own Active Graph moves the emphasis without being
-    // asked, and this call is the one that must not interrupt a traversal: the
-    // history being presented belongs to the Graph that was active, so silently
-    // naming another strands `moves()` on Edges out of Resources nothing is
-    // presenting. Refusing leaves the traversal exactly as it was. Taking the
-    // Graph as an argument is not that repair — the caller states its answer and
-    // is held to it, rather than having one invented for it.
+    // asked, which the caller never chose. Refusing leaves the traversal
+    // exactly as it was. Taking the Graph as an argument is not that repair —
+    // the caller states its answer and is held to it, rather than having one
+    // invented for it.
     //
     // Its only caller is Edit completion, which cannot reach the refusal: the
     // pair it passes is the Map it wrote and that Map's own `activeGraph`,
@@ -327,18 +328,28 @@ export function createNavigation(
         throw new Error(`The adopted Map does not show the active Graph ${activeGraphId}.`);
       }
       const state = observable.getState();
-      // A traversal goes on only over a Graph that holds the Resource it is
-      // presenting; otherwise adopting the Map ends it, as `activateGraph`
-      // does, rather than leave presenting with no Graph to traverse.
-      if (
-        state.mode === 'presenting' &&
-        activeGraphId !== null &&
-        graphResourceIds(currentSpace(), activeGraphId).includes(
-          currentResource(state.traversalHistory),
-        )
-      ) {
-        observable.publish({ ...state, selectedMapId: selection, activeGraphId });
-        return;
+      // While presenting, the Edit's Graph decides what becomes of the
+      // traversal. The same Graph keeps it whole. Another Graph that holds the
+      // presented Resource goes on from that Resource alone, because the
+      // history was walked over the Graph before it and Back would leave the
+      // talk. A Graph without the Resource, or none, ends presenting, as
+      // `activateGraph` does.
+      if (state.mode === 'presenting' && activeGraphId !== null) {
+        if (activeGraphId === state.activeGraphId) {
+          observable.publish({ ...state, selectedMapId: selection });
+          return;
+        }
+        const presented = currentResource(state.traversalHistory);
+        if (graphResourceIds(currentSpace(), activeGraphId).includes(presented)) {
+          observable.publish({
+            selectedMapId: selection,
+            activeGraphId,
+            mode: 'presenting',
+            traversalHistory: [presented],
+            branchIndex: 0,
+          });
+          return;
+        }
       }
       observable.publish({ selectedMapId: selection, activeGraphId, mode: 'overview' });
     },

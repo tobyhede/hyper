@@ -122,12 +122,6 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * browser that refuses every request would answer.
    */
   readonly fullscreen?: Fullscreen | undefined;
-  /**
-   * Reads when each presentation starts (ADR 0109): the clock `presentations`
-   * shares with the Notes windows. `createOpenSpaces` supplies both, as it
-   * supplies `newId`; `Date.now` answers only for a composition given neither.
-   */
-  readonly now?: (() => number) | undefined;
 }
 
 /** A fullscreen no request is ever granted, for a composition given none. */
@@ -244,7 +238,6 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     spaceResources,
     presentations,
     fullscreen = NO_FULLSCREEN,
-    now = Date.now,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -297,7 +290,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     presenting: createPresentingWindow({
       navigation,
       newId,
-      now,
+      // Each presentation starts on the clock its Notes windows time it by.
+      now: presentations?.now ?? Date.now,
       fullscreen,
       // Called within the click or key press, because a browser opens a window
       // only inside a user activation. A Notes window follows over the link,
