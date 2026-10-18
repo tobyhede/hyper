@@ -24,6 +24,7 @@ const NOTES = uuid(4);
 const OPENING = uuid(10);
 const LEFT = uuid(11);
 const RIGHT = uuid(12);
+const FURTHER = uuid(13);
 const LOWER_NOTE = uuid(20);
 const UPPER_NOTE = uuid(21);
 const LEFT_NOTE = uuid(22);
@@ -85,6 +86,24 @@ const snapshot: SpaceSnapshot = {
   ],
 };
 
+/** The talk after an Edit that adds Further as the one move from Left. */
+const withFurther: SpaceSnapshot = {
+  ...snapshot,
+  document: {
+    ...snapshot.document,
+    maps: snapshot.document.maps?.map((m) => ({
+      ...m,
+      positions: { ...m.positions, [FURTHER]: { x: 600, y: -100, open: false } },
+      graphs: m.graphs.map((graph) =>
+        graph.id === TALK
+          ? { ...graph, edges: [...graph.edges, { from: LEFT, to: FURTHER }] }
+          : graph,
+      ),
+    })),
+  },
+  resources: [...snapshot.resources, markdown(FURTHER, 'Further', 'One more step')],
+};
+
 const spaceOf = (opened: SpaceSnapshot): Space => {
   const loaded = loadSpaceSnapshot(opened);
   if (!loaded.ok) throw new Error('The fixture is not a valid Space.');
@@ -105,8 +124,12 @@ const linksOver = (
   presence: { hold: () => () => undefined, watch: () => () => undefined },
 });
 
-function presentingWindow(channel: PresentationChannel, newId: () => UUID) {
-  const loaded = { snapshot, revision: 0n, exportedRevision: null };
+function presentingWindow(
+  channel: PresentationChannel,
+  newId: () => UUID,
+  opened: SpaceSnapshot = snapshot,
+) {
+  const loaded = { snapshot: opened, revision: 0n, exportedRevision: null };
   const { navigation, currentSpace } = composeCore({
     spaceSession: openSpaceSession(MemorySpaceBackend.asMeta(loaded), loaded),
   });
@@ -285,32 +308,19 @@ describe('the Notes window', () => {
     expect(titles(notes, 'notes')).toEqual(['Thank everyone', 'Then']);
   });
 
-  it('reloads again for a Resource it does not hold that is named while a reload is pending', async () => {
+  it('reloads again for a Resource first named while a reload is pending', async () => {
     const join = channelHub();
-    const navigation = presentingWindow(join(), mintingIds(uuid(100)));
-    // The Notes window loaded before Right was added, and its first reload
-    // reads the store before the Edit lands too.
-    const withoutRight: SpaceSnapshot = {
-      ...snapshot,
-      document: {
-        ...snapshot.document,
-        maps: snapshot.document.maps?.map((m) => ({
-          ...m,
-          positions: Object.fromEntries(Object.entries(m.positions).filter(([id]) => id !== RIGHT)),
-          graphs: m.graphs.map((graph) => ({
-            ...graph,
-            edges: graph.edges.filter(({ to }) => to !== RIGHT),
-          })),
-        })),
-      },
-      resources: snapshot.resources.filter((resource) => resource.id !== RIGHT),
-    };
-    let stored = withoutRight;
+    const navigation = presentingWindow(join(), mintingIds(uuid(100)), withFurther);
+    // The Notes window loaded before the Edit that added Further, and its
+    // first reload reads the store before that Edit lands too.
+    let stored = snapshot;
     const pending: (() => void)[] = [];
+    let reloads = 0;
     const notes = createNotesWindow({
       spaceId: SPACE_ID,
-      space: spaceOf(withoutRight),
+      space: spaceOf(snapshot),
       reload: () => {
+        reloads += 1;
         const read = spaceOf(stored);
         return new Promise((resolve) => pending.push(() => resolve(read)));
       },
@@ -320,14 +330,18 @@ describe('the Notes window', () => {
     notes.connect();
 
     navigation.present();
-    stored = snapshot;
-    notes.selectBranch(1);
-    while (pending.length > 0) {
-      pending.shift()?.();
-      await settled();
-    }
+    stored = withFurther;
+    navigation.advance();
+    expect(pending).toHaveLength(1);
 
-    expect(titles(notes, 'moves')).toEqual(['Left', 'Right']);
+    pending.shift()?.();
+    await settled();
+    expect(pending).toHaveLength(1);
+
+    pending.shift()?.();
+    await settled();
+    expect(reloads).toBe(2);
+    expect(titles(notes, 'moves')).toEqual(['Further']);
   });
 
   it('carries when the presentation started', async () => {
