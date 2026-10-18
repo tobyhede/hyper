@@ -457,6 +457,76 @@ it('takes the adopted Map’s own Active Graph over the one that was emphasised'
 });
 
 /**
+ * Presenting always has a Graph that holds the presented Resource, so adopting
+ * a Map whose Graph would break that leaves presenting rather than keeping a
+ * traversal over a Graph that is not there or does not reach it.
+ */
+describe('adopting a Map while presenting', () => {
+  it('leaves presenting when the adopted Map hands over no Active Graph', () => {
+    const navigation = navigationFor(fixture, MAP);
+    navigation.present();
+
+    navigation.continueInMap(MAP, null);
+
+    expect(navigation.getState()).toEqual({
+      selectedMapId: MAP,
+      activeGraphId: null,
+      mode: 'overview',
+    });
+  });
+
+  it('leaves presenting when the adopted Graph does not hold the presented Resource', () => {
+    const navigation = navigationFor(fixture, MAP);
+    navigation.present();
+    expect(navigation.activeResourceId()).toBe(RESOURCE_A);
+
+    navigation.continueInMap(MAP, GRAPH_TWO);
+
+    expect(navigation.getState()).toEqual({
+      selectedMapId: MAP,
+      activeGraphId: GRAPH_TWO,
+      mode: 'overview',
+    });
+  });
+
+  it('goes on from the presented Resource alone when the adopted Graph is another that holds it', () => {
+    const navigation = navigationFor(fixture, MAP);
+    navigation.present();
+    navigation.advance();
+    expect(traversalHistoryOf(navigation.getState())).toEqual([RESOURCE_A, RESOURCE_B]);
+
+    navigation.continueInMap(MAP, GRAPH_TWO);
+
+    expect(navigation.getState()).toEqual({
+      selectedMapId: MAP,
+      activeGraphId: GRAPH_TWO,
+      mode: 'presenting',
+      traversalHistory: [RESOURCE_B],
+      branchIndex: 0,
+    });
+    expect(canRetreat(navigation.getState())).toBe(false);
+  });
+
+  it('keeps the traversal whole when the adopted Graph is the one presented', () => {
+    const navigation = navigationFor(fixture, MAP);
+    navigation.present();
+    navigation.advance();
+    const before = navigation.getState();
+
+    navigation.continueInMap(MAP, GRAPH_ONE);
+
+    expect(navigation.getState()).toEqual(before);
+    expect(traversalHistoryOf(navigation.getState())).toBe(traversalHistoryOf(before));
+  });
+
+  it('says by its type that presenting has an Active Graph', () => {
+    const state = navigationFor(fixture, MAP).getState();
+    if (state.mode !== 'presenting') return;
+    expectTypeOf(state.activeGraphId).toEqualTypeOf<GraphId>();
+  });
+});
+
+/**
  * A Map draws only the Graphs it owns, so an Edit handing over a Map and a
  * Graph that Map does not own has named a pair Navigation may not hold — the
  * Active Graph would ride into the next Edit as that Map's `activeGraph`, which
@@ -718,16 +788,17 @@ describe('the address Navigation answers', () => {
 
   it('answers the adopted Map and the Graph handed with it after continueInMap', () => {
     const navigation = navigationFor(fixture, MAP);
+    navigation.activateGraph(GRAPH_TWO);
     navigation.present();
     const presented = navigation.activeResourceId();
 
-    navigation.continueInMap(FIRST_MAP, GRAPH_THREE);
+    navigation.continueInMap(MAP, GRAPH_ONE);
 
     // Adopting a Map must not interrupt a traversal, so the presented Resource
     // is still part of the address it answers.
     expect(addressOf(navigation)).toEqual({
-      selectedMapId: FIRST_MAP,
-      activeGraphId: GRAPH_THREE,
+      selectedMapId: MAP,
+      activeGraphId: GRAPH_ONE,
       presentingResourceId: presented,
     });
   });

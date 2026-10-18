@@ -44,6 +44,12 @@ export type NavigationState =
   | (NavigationBase & { readonly mode: 'overview' })
   | (NavigationBase & {
       readonly mode: 'presenting';
+      /**
+       * Presenting always has a Graph, and it holds the presented Resource:
+       * every operation that publishes presenting checks both, so no reader
+       * asks for a missing one.
+       */
+      readonly activeGraphId: GraphId;
       readonly traversalHistory: TraversalHistory;
       readonly branchIndex: number;
     });
@@ -107,6 +113,39 @@ export function canRetreat(state: NavigationState): boolean {
   return state.mode === 'presenting' && state.traversalHistory.length > 1;
 }
 
+/**
+ * The presentation a navigation state is in, named by the Map and Graph it
+ * presents, or `null` when it is not presenting (ADR 0129).
+ *
+ * A presentation starts when this changes to a value it did not hold. That
+ * happens when presenting begins, and when a reopening or an Edit moves the
+ * talk to another Map or Graph. A reopening on the same Map and Graph, as
+ * browser Back and Forward through the talk are, stays in the presentation.
+ * Present while presenting also starts one, which the presenting window
+ * decides, since the scope does not change. It reads this rule once, for the
+ * rehearsal notes, the talk timer and the presentation link
+ * (`presenting-window.ts`).
+ */
+export interface PresentationScope {
+  readonly mapId: MapId;
+  readonly graphId: GraphId;
+}
+
+export function presentationScope(state: NavigationState): PresentationScope | null {
+  return state.mode === 'presenting'
+    ? { mapId: state.selectedMapId, graphId: state.activeGraphId }
+    : null;
+}
+
+/** Whether two scopes are the same presentation, or both not presenting. */
+export function samePresentation(
+  a: PresentationScope | null,
+  b: PresentationScope | null,
+): boolean {
+  if (a === null || b === null) return a === b;
+  return a.mapId === b.mapId && a.graphId === b.graphId;
+}
+
 /** Navigation through the current working Space, independent of any UI framework. */
 export interface Navigation {
   readonly getState: () => NavigationState;
@@ -116,7 +155,7 @@ export interface Navigation {
   readonly openFresh: (selection: MapId) => void;
   /**
    * Adopt a Map created by an Edit, and the Active Graph that goes with it,
-   * without interrupting the current navigation.
+   * keeping the current navigation wherever that Graph allows.
    *
    * The two arrive together because under ADR 0040 they are one answer: a Map
    * owns its Graphs, so the Graph a Map opens on is a fact about that Map
@@ -232,11 +271,6 @@ export function createNavigation(
     openedState(initialMapId, resolveMap(initialSpace, initialMapId)),
     options.reportObserverError ?? reportToConsole,
   );
-  // Whatever navigation is doing, it goes on doing: a change to the fields both
-  // modes share cannot name `mode`, so it can neither start nor end a traversal.
-  const setState = (change: Partial<NavigationBase>): void => {
-    observable.publish({ ...observable.getState(), ...change });
-  };
   const activeResourceId = (): ResourceId | null => presentedResource(observable.getState());
 
   return {
@@ -261,7 +295,8 @@ export function createNavigation(
     },
     // Resolve first so navigation can never name a Map the current Space
     // does not hold. Unlike explicit selection, adopting the Map an Edit just
-    // created is not navigation and must not interrupt a traversal.
+    // created is not navigation, so it keeps a traversal wherever the Graph it
+    // hands over still holds the presented Resource.
     //
     // **The Active Graph arrives with the Map rather than surviving it.**
     // Under ADR 0040 a Map owns its Graphs, so the two are one answer.
@@ -277,12 +312,10 @@ export function createNavigation(
     //
     // **Do not re-resolve instead of refusing.** Falling back to
     // the adopted Map's own Active Graph moves the emphasis without being
-    // asked, and this call is the one that must not interrupt a traversal: the
-    // history being presented belongs to the Graph that was active, so silently
-    // naming another strands `moves()` on Edges out of Resources nothing is
-    // presenting. Refusing leaves the traversal exactly as it was. Taking the
-    // Graph as an argument is not that repair — the caller states its answer and
-    // is held to it, rather than having one invented for it.
+    // asked, which the caller never chose. Refusing leaves the traversal
+    // exactly as it was. Taking the Graph as an argument is not that repair —
+    // the caller states its answer and is held to it, rather than having one
+    // invented for it.
     //
     // Its only caller is Edit completion, which cannot reach the refusal: the
     // pair it passes is the Map it wrote and that Map's own `activeGraph`,
@@ -294,10 +327,31 @@ export function createNavigation(
       if (activeGraphId !== null && !mapShowsGraph(resolved, activeGraphId)) {
         throw new Error(`The adopted Map does not show the active Graph ${activeGraphId}.`);
       }
-      setState({
-        selectedMapId: selection,
-        activeGraphId,
-      });
+      const state = observable.getState();
+      // While presenting, the Edit's Graph decides what becomes of the
+      // traversal. The same Graph keeps it whole. Another Graph that holds the
+      // presented Resource goes on from that Resource alone, because the
+      // history was walked over the Graph before it and Back would leave the
+      // talk. A Graph without the Resource, or none, ends presenting, as
+      // `activateGraph` does.
+      if (state.mode === 'presenting' && activeGraphId !== null) {
+        if (activeGraphId === state.activeGraphId) {
+          observable.publish({ ...state, selectedMapId: selection });
+          return;
+        }
+        const presented = currentResource(state.traversalHistory);
+        if (graphResourceIds(currentSpace(), activeGraphId).includes(presented)) {
+          observable.publish({
+            selectedMapId: selection,
+            activeGraphId,
+            mode: 'presenting',
+            traversalHistory: [presented],
+            branchIndex: 0,
+          });
+          return;
+        }
+      }
+      observable.publish({ selectedMapId: selection, activeGraphId, mode: 'overview' });
     },
     openGraph: (selection, graphId) => {
       const space = currentSpace();
@@ -404,13 +458,14 @@ export function createNavigation(
     // presented — cyclic ones included (ADR 0032).
     present: () => {
       const state = observable.getState();
-      const owned =
-        state.activeGraphId === null ? undefined : currentSpace().lookup.graph(state.activeGraphId);
-      if (owned === undefined) return;
+      const graphId = state.activeGraphId;
+      const owned = graphId === null ? undefined : currentSpace().lookup.graph(graphId);
+      if (graphId === null || owned === undefined) return;
       const start = graphStartResource(owned.graph);
       if (start === undefined) return;
       observable.publish({
-        ...baseOf(state),
+        selectedMapId: state.selectedMapId,
+        activeGraphId: graphId,
         mode: 'presenting',
         traversalHistory: [start],
         branchIndex: 0,

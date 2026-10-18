@@ -849,8 +849,8 @@ export function createSpaceAuthoring({
    *
    * **Re-resolving here is not the repair `continueInMap` refuses.** That
    * call declines to invent an Active Graph because its caller states one and is
-   * held to it, and because inventing one would interrupt a traversal of the
-   * Graph that was active. Neither holds here: no caller stated anything — the
+   * held to it, and because inventing one would move the emphasis off the
+   * Graph that was active unasked. Neither holds here: no caller stated anything — the
    * Space was replaced out from under this one — and the structure the traversal
    * belonged to is the structure that is gone. `selectMap` is what says so,
    * the same operation an author spends to land on a Map's own Active Graph,

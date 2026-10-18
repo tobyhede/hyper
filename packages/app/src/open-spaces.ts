@@ -220,13 +220,6 @@ export interface OpenSpaces {
    * the one model that knows how many Spaces there are.
    */
   readonly browserLocation: BrowserLocation;
-  /**
-   * The browser's fullscreen, which every `App` hands its presentation.
-   *
-   * One for the session for the reason `browserLocation` is: there is one
-   * document to put fullscreen.
-   */
-  readonly fullscreen: Fullscreen;
 }
 
 export interface OpenSpacesOptions {
@@ -592,6 +585,7 @@ export function createOpenSpaces({
         reportObserverError: report,
         spaceResources,
         presentations,
+        fullscreen,
       }),
       spaceResources,
     };
@@ -840,6 +834,7 @@ export function createOpenSpaces({
     target.app.surface.dispose();
     target.app.deleteConfirmation.dispose();
     target.app.authoring.dispose();
+    target.app.presenting.dispose();
     retired.add(target);
     compositions.delete(spaceId);
 
@@ -1021,6 +1016,5 @@ export function createOpenSpaces({
     exit,
     spaceResources,
     browserLocation,
-    fullscreen,
   };
 }

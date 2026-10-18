@@ -5,9 +5,9 @@ import type { Space } from '@project/graph';
 // how a package boundary gets crossed without naming one (AGENTS.md).
 import { canRetreat } from '#src/navigation';
 import { usePresentingKeys } from '#src/presenting-keys';
-import { useRehearsalNotes } from '#src/rehearsal-notes';
 import { PresentingChrome } from '#components/PresentingChrome';
 import { useStoryNavigation } from './navigation';
+import { useStoryPresentingWindow } from './presenting-window';
 import { traversalSpace } from './spaces';
 
 export interface PresentingChromeFixtureProps {
@@ -63,17 +63,9 @@ export function PresentingChromeFixture({
     for (let step = 0; step < advances; step += 1) composed.advance();
   });
   const presenting = state.mode === 'presenting';
-  // A story opens no second window, as its Copy link writes no clipboard.
-  const openNotes = useCallback(() => undefined, []);
-  const rehearsalNotes = useRehearsalNotes(presenting);
-  usePresentingKeys(presenting, {
-    advance: navigation.advance,
-    retreat: navigation.retreat,
-    selectBranch: navigation.selectBranch,
-    exitPresenting: navigation.exitPresenting,
-    openNotes,
-    toggleNotes: rehearsalNotes.toggle,
-  });
+  const { presentingWindow, state: presentingState } = useStoryPresentingWindow(navigation);
+  const { commands } = presentingWindow;
+  usePresentingKeys(presenting, commands);
 
   return (
     <div
@@ -87,14 +79,14 @@ export function PresentingChromeFixture({
           // written out again here is one this story could go on asserting after
           // `App` had changed it.
           canRetreat={canRetreat(state)}
-          onSelectBranch={navigation.selectBranch}
-          onAdvance={navigation.advance}
-          onRetreat={navigation.retreat}
-          onExit={navigation.exitPresenting}
+          onSelectBranch={commands.selectBranch}
+          onAdvance={commands.advance}
+          onRetreat={commands.retreat}
+          onExit={commands.exitPresenting}
           onCopyLink={() => undefined}
-          onOpenNotes={openNotes}
-          notesShown={rehearsalNotes.shown}
-          onToggleNotes={rehearsalNotes.toggle}
+          onOpenNotes={commands.openNotes}
+          notesShown={presentingState.rehearsalNotesShown}
+          onToggleNotes={commands.toggleNotes}
         />
       )}
     </div>

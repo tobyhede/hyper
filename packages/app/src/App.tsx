@@ -10,15 +10,11 @@ import {
 import { ReactFlowProvider } from '@xyflow/react';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
-import { productDestinationPath } from '@project/http';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
 import { resourceSizeVars } from './resource';
 import { canRetreat } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
-import { useRehearsalNotes } from './rehearsal-notes';
-import { openIndependently } from './open-independently';
-import { presentingFullscreen, type Fullscreen } from './presenting-fullscreen';
 import type { DestinationOpening } from './destination-opening';
 import { useOpenSpacesStanding } from './open-spaces-context';
 import { useAddressedResource } from './addressed-resource';
@@ -45,7 +41,6 @@ import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/She
 export const createApp = (
   opened: OpenSpace,
   browserLocation: BrowserLocation,
-  fullscreen: Fullscreen,
   opening?: DestinationOpening,
 ) => {
   const { app: composition, session: spaceSession, spaceResources } = opened;
@@ -82,23 +77,7 @@ export const createApp = (
     navigation.openGraph(navigation.getState().selectedMapId, openingGraphId);
   }
 
-  /**
-   * Open a Notes window following this Space's presentation (ADR 0129).
-   *
-   * Called within the click or key press, because a browser opens a window
-   * only inside a user activation. A Notes window follows over the
-   * presentation link, so it needs no handle on this one.
-   */
-  const openNotes = (): void => {
-    openIndependently(productDestinationPath({ kind: 'notes', spaceId: currentSpaceId() }));
-  };
-
-  const presentation = presentingFullscreen(fullscreen, {
-    presenting: () => navigation.getState().mode === 'presenting',
-    subscribe: navigation.subscribe,
-    present: navigation.present,
-    exitPresenting: navigation.exitPresenting,
-  });
+  const presentingWindow = composition.presenting;
 
   function App() {
     const [drawnClipboardFailures, setDrawnClipboardFailures] = useState<
@@ -145,9 +124,15 @@ export const createApp = (
     // until the Space or the selected Map changes").
     const { selectedMapId, activeGraphId } = navigationState;
     const presenting = navigationState.mode === 'presenting';
+    // The Graph being presented, which presenting always has: `null` says only
+    // that Navigation is not presenting.
+    const presentedGraphId = presenting ? navigationState.activeGraphId : null;
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
-    useEffect(() => presentation.connect(), []);
-    useEffect(() => composition.presentation.connect(), []);
+    useEffect(() => presentingWindow.connect(), []);
+    const { rehearsalNotesShown } = useSyncExternalStore(
+      presentingWindow.subscribe,
+      presentingWindow.getState,
+    );
     const { addressedResourceId, destinationNotFound } = useAddressedResource(
       browserLocation,
       useRenderAdapter,
@@ -198,15 +183,7 @@ export const createApp = (
     const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);
     const nameOnCreation = useNameOnCreation(continuation);
     // Inactive Spaces keep their traversal mounted without receiving global keys.
-    const rehearsalNotes = useRehearsalNotes(presenting);
-    usePresentingKeys(active && presenting, {
-      advance: navigation.advance,
-      retreat: navigation.retreat,
-      selectBranch: navigation.selectBranch,
-      exitPresenting: navigation.exitPresenting,
-      openNotes,
-      toggleNotes: rehearsalNotes.toggle,
-    });
+    usePresentingKeys(active && presenting, presentingWindow.commands);
     const { chrome: dockChrome, onChromeContinuationLand } = useDockChrome(
       opened,
       browserLocation,
@@ -216,7 +193,7 @@ export const createApp = (
         projection,
         activeGraphId,
         presenting,
-        present: presentation.present,
+        present: presentingWindow.present,
         active,
         persistence: sessionState.persistence,
         replacementEpoch,
@@ -400,23 +377,22 @@ export const createApp = (
             )}
           </div>
 
-          {presenting && activeResourceId !== null && (
+          {presentedGraphId !== null && activeResourceId !== null && (
             <PresentingStage
               space={space}
               mapId={selectedMapId}
-              graphId={activeGraphId}
+              graphId={presentedGraphId}
               resourceId={activeResourceId}
               moves={moves}
               canRetreat={canRetreat(navigationState)}
-              onSelectBranch={navigation.selectBranch}
-              onAdvance={navigation.advance}
-              onRetreat={navigation.retreat}
-              onExit={navigation.exitPresenting}
-              onOpenNotes={openNotes}
-              notesShown={rehearsalNotes.shown}
-              onToggleNotes={rehearsalNotes.toggle}
+              onSelectBranch={presentingWindow.commands.selectBranch}
+              onAdvance={presentingWindow.commands.advance}
+              onRetreat={presentingWindow.commands.retreat}
+              onExit={presentingWindow.commands.exitPresenting}
+              onOpenNotes={presentingWindow.commands.openNotes}
+              notesShown={rehearsalNotesShown}
+              onToggleNotes={presentingWindow.commands.toggleNotes}
               onCopyLink={() => {
-                if (activeGraphId === null) return;
                 // `void`: presenting chrome's Copy link is a plain button with
                 // no label to swap, so it has nothing to do with the outcome
                 // beyond the alert `copyProductDestination` already renders.
@@ -424,7 +400,7 @@ export const createApp = (
                   kind: 'presentation',
                   spaceId: space.id,
                   mapId: selectedMapId,
-                  graphId: activeGraphId,
+                  graphId: presentedGraphId,
                   resourceId: activeResourceId,
                 });
               }}

@@ -15,9 +15,7 @@ function SpaceApplication({
   readonly spaces: OpenSpaces;
   readonly opening?: DestinationOpening | undefined;
 }) {
-  const [App] = useState(() =>
-    createApp(entry, spaces.browserLocation, spaces.fullscreen, opening),
-  );
+  const [App] = useState(() => createApp(entry, spaces.browserLocation, opening));
   return <App />;
 }
 
