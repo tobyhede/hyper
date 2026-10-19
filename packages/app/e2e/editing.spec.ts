@@ -1156,7 +1156,8 @@ test(
     expect(mark.x + mark.width).toBeGreaterThan(innerBox.x + innerBox.width);
     expect(mark.y + mark.height).toBeGreaterThan(innerBox.y + innerBox.height);
     await expect(markLocator).toHaveCSS('translate', '1px 1px');
-    await expect(markLocator).toHaveCSS('background-color', 'rgb(0, 0, 0)');
+    // The mark is drawn in the Resource's ink, `--canvas-resource-ink-color`.
+    await expect(markLocator).toHaveCSS('background-color', 'rgb(11, 13, 17)');
 
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
