@@ -8,7 +8,8 @@ A static copy of the application can show a talk that lives in a public GitHub r
 ## The decision
 
 - **GitHub is the only source.** There is no packed file and no build step that copies the talk. `ref` defaults to the repository's default branch and `path` to its root. The location resolves to a commit once per page: a branch costs one API call to resolve, and listing the tree at that commit costs one more. The files Importing reads are then fetched at that commit from `raw.githubusercontent.com`, which the API's rate limit does not govern. Public repositories only, and no token is ever used.
-- **A resolved branch is rewritten to its commit** in the page's address, so a reload, a shared link and the Notes window all read the same commit.
+- **Every successful mount records its complete resolved source in the address,** including the repository, directory and commit SHA, even when the location came from the build-time default. `history.replaceState` updates `source` only when it differs. A reload, a shared link and the Notes window all read the same commit after the deployment default changes. The bare domain opens the current deployment default.
+- **Mounted presentation communication is scoped by resolved repository, directory, commit and Space ID.** Two revisions sharing a Space ID on the same origin cannot follow or control each other. Windows of the same resolved source and Space keep the existing presentation-following behavior.
 - **One build, with an optional default.** A build-time setting names a default GitHub location. A `source` query parameter overrides it, and every product URL keeps the parameter. The talk's own domain is that build with its default pinned to a commit, so each load costs one API call and a deploy means bumping that commit. With no default and no parameter, the page asks for a location.
 - **The seam is the browser's `SpaceBackend`.** Mounting gives `createSpaceStartup` an `HttpSpaceBackend` whose `fetch` dispatches to the Space HTTP application in the page, over a memory repository holding the read aggregate. The same intake, commit decision, working-space loader and destination resolution answer every request, so a mounted talk behaves like a Running one.
 - **The directory reader has a pure core.** It reads an aggregate from a map of relative paths to bytes, with no `node:` import. The filesystem shell under root `src/` feeds it from disk, and the GitHub source feeds it from fetched blobs. Anything the CLI refuses, the browser refuses in the same words.
@@ -33,6 +34,8 @@ A static copy of the application can show a talk that lives in a public GitHub r
 - **Implementing `SpaceBackend` over `MemorySpaceBackend` directly.** It skips the whole-aggregate check, the working-space loader and the image store, so a mounted Space would behave differently from a Running one.
 - **Reusing the `read-only` Map surface policy for the whole session.** It withholds Present and selection, as above.
 - **Ephemeral Edits in the tab.** They look like work that is then lost.
+- **Leaving an inherited default out of a copied URL.** It would make the destination depend on a later deployment rather than preserve the revision the reader shared.
+- **Scoping mounted Notes communication only by Space ID.** Revisions preserve Space IDs, so presenting one revision could redirect the Notes window of another.
 - **A token or a proxy for private repositories.**
 
 ## Cost accepted
