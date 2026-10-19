@@ -3,6 +3,7 @@ import { TooltipProvider } from '@project/ui';
 import '@xyflow/react/dist/style.css';
 import '../src/styles.css';
 import '../src/tailwind.css';
+import '../src/theme-dark.css';
 
 /** Load the same providers and stylesheets used by production compositions. */
 export const Provider: GlobalProvider = ({ children }) => (

@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import './tailwind.css';
+import './theme-dark.css';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
 import { createSpaceStartup } from './space';
