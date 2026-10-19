@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The canvas Resource draws on its own cream paper, warmer and lighter than the
- * chrome's, so its text roles are separate tokens rather than the chrome's
- * `--foreground` and `--muted-foreground`. Separate means they can drift: a
- * colour picked against chrome paper can land on cream and stay green through
+ * The canvas Resource draws on its own paper, cream in the sand theme and a
+ * violet a step off the canvas in the dark one, so its text roles are separate
+ * tokens rather than the chrome's `--foreground` and `--muted-foreground`.
+ * Separate means they can drift: a colour picked against chrome paper can land
+ * on the Resource's face and stay green through
  * every other check — `canvas-resource.spec.ts` asserts that the refusal message
  * says the right words, never that it can be read.
  *

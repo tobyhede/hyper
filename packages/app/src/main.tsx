@@ -1,8 +1,8 @@
 import { createRoot } from 'react-dom/client';
 import './tailwind.css';
-import './theme-dark.css';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
+import './theme-dark.css';
 import { createSpaceStartup } from './space';
 import { Application } from './components/Application';
 import { createBrowserFullscreen } from './browser-fullscreen';

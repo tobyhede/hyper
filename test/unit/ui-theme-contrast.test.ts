@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { buttonVariants } from '@project/ui';
+import { GRAPH_PALETTE } from '@project/graph';
+import { buttonVariants, FALLBACK_GRAPH_COLOR } from '@project/ui';
 
 const theme = readFileSync(new URL('../../packages/app/src/tailwind.css', import.meta.url), 'utf8');
 
@@ -72,6 +73,26 @@ describe.each(THEMES)('semantic theme contrast ($theme)', ({ variables: themeVar
         resolveColor(themeVariables, `--${role}-foreground`),
       ),
     ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Status colours have no `-foreground` partner: they are drawn as text on
+  // the chrome's paper.
+  it.each(['destructive', 'success'])('%s reads at WCAG AA on chrome paper', (role) => {
+    expect(
+      contrast(resolveColor(themeVariables, `--${role}`), resolveColor(themeVariables, '--card')),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+// A Graph's colour is stored with the Graph, chosen against sand, and is drawn
+// unchanged on the dark canvas. WCAG 2.2 1.4.11 asks 3:1 of a graphical object
+// against what is next to it; on sand most light slots sit far below that,
+// which is why this is asked of the dark canvas alone.
+describe('Graph colours on the Neon Glitch canvas', () => {
+  const darkVariables = THEMES[1].variables;
+
+  it.each([...GRAPH_PALETTE, FALLBACK_GRAPH_COLOR])('%s reaches 3:1 on the canvas', (color) => {
+    expect(contrast(color, resolveColor(darkVariables, '--background'))).toBeGreaterThanOrEqual(3);
   });
 });
 
