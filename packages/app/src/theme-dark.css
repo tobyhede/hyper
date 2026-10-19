@@ -1,9 +1,9 @@
 /*
  * **Neon Glitch: the dark theme.** The same semantic tokens `tailwind.css`
- * declares, restated for a reader whose system asks for dark. Nothing outside
- * this file and the popup that portals out of it (`resource-search-combobox.css`)
- * learns that a second theme exists: every control, menu and Resource already
- * reads its colour off a token, so redefining the tokens is the whole switch.
+ * declares, restated for a reader whose system asks for dark. Every control,
+ * menu and Resource already reads its colour off a token, so redefining the
+ * tokens is the whole switch; the rules after the tokens add the theme's own
+ * effects.
  *
  * It follows `prefers-color-scheme` alone, which is also what Tailwind v4's
  * `dark:` variant follows, so the registry components' own `dark:` classes turn
@@ -12,13 +12,16 @@
  * The canvas is near-black violet and the Resource is ink-lined in cyan; the
  * chrome's one emphasis is magenta. A Graph's colour is still the only colour
  * that carries meaning, so the two neons stay on the chrome and the Resource's
- * frame, never on an Edge. `test/unit/ui-theme-contrast.test.ts` and
- * `test/unit/canvas-resource-contrast.test.ts` hold every text pair here to AA,
- * as they hold the sand theme's.
+ * frame, never on an Edge. `test/unit/ui-theme-contrast.test.ts` holds each
+ * `--role`/`--role-foreground` pair, `--destructive` and `--success` on chrome
+ * paper, and every Graph palette colour on the canvas;
+ * `test/unit/canvas-resource-contrast.test.ts` holds the Resource's text roles
+ * on both its faces. Both check this theme as they check the sand one.
  *
- * The glitch is decoration on titles only. Prose, menus, fields and status text
- * are drawn clean, and the slicing animation runs only under the pointer and
- * only when the reader has not asked for reduced motion.
+ * The glitch is decoration. Titles carry a still one-pixel split, and the
+ * animated burst runs on the Resource's frame, which nothing clips, only under
+ * the pointer and only when the reader has not asked for reduced motion. Prose,
+ * menus, fields and status text are drawn clean.
  */
 @media (prefers-color-scheme: dark) {
   :root {
@@ -74,8 +77,10 @@
     /* The theme's own effects, named so the applied properties below read them
        off a token as every structural value here does. */
     --neon-resource-hover-glow: 0 0 18px rgb(0 240 255 / 35%);
+    --neon-frame-glitch-wide: -4px 0 0 rgb(0 240 255 / 80%), 4px 0 0 rgb(255 43 214 / 80%);
+    --neon-frame-glitch-skew: 3px 2px 0 rgb(0 240 255 / 80%), -3px -2px 0 rgb(255 43 214 / 80%);
+    --neon-frame-glitch-hot: -5px 0 0 rgb(245 255 59 / 60%), 5px 0 0 rgb(255 43 214 / 80%);
     --neon-title-split: -1px 0 rgb(0 240 255 / 55%), 1px 0 rgb(255 43 214 / 55%);
-    --neon-edge-glow: drop-shadow(0 0 3px rgb(255 255 255 / 35%));
     --neon-scanlines: repeating-linear-gradient(
       to bottom,
       rgb(255 255 255 / 3.5%) 0,
@@ -94,12 +99,14 @@
     background-image: var(--neon-scanlines), var(--neon-canvas-haze);
   }
 
-  .react-flow__edge-path {
-    filter: var(--neon-edge-glow);
-  }
-
   .canvas-resource[data-state='rest']:hover {
     box-shadow: var(--neon-resource-hover-glow);
+  }
+
+  /* Black in the sand theme, where it is the Resource's ink; here it takes the
+     cyan ink so the corner is still seen on a dark face. */
+  .rf-resource-node__resize-mark {
+    background: var(--canvas-resource-ink-color);
   }
 
   .canvas-resource__title-line[data-role='title'],
@@ -109,41 +116,32 @@
 }
 
 @media (prefers-color-scheme: dark) and (prefers-reduced-motion: no-preference) {
-  .canvas-resource:hover .canvas-resource__title-line[data-role='title'],
-  .command-dock__space .command-dock__name:hover {
+  .canvas-resource[data-state='rest']:hover {
     animation: neon-glitch 2.4s steps(1) infinite;
   }
 }
 
-/* Short bursts on a long cycle: the split jumps wide, slices sideways and
-   settles, and most of the cycle is the resting split, so a title held under
-   the pointer is still read rather than watched. */
+/* Short bursts on a long cycle: the frame's split jumps wide, skews and
+   settles, and most of the cycle is the resting glow, so a Resource held under
+   the pointer is still read rather than watched. The frame rather than the
+   title, because a title line clips its own overflow and would cut the split
+   off at its ends. */
 @keyframes neon-glitch {
   0%,
   78%,
   100% {
-    text-shadow: var(--neon-title-split);
-    translate: 0;
+    box-shadow: var(--neon-resource-hover-glow);
   }
 
   80% {
-    text-shadow:
-      -3px 0 rgb(0 240 255 / 80%),
-      3px 0 rgb(255 43 214 / 80%);
-    translate: 1px 0;
+    box-shadow: var(--neon-frame-glitch-wide);
   }
 
   84% {
-    text-shadow:
-      2px 1px rgb(0 240 255 / 80%),
-      -2px -1px rgb(255 43 214 / 80%);
-    translate: -1px 0;
+    box-shadow: var(--neon-frame-glitch-skew);
   }
 
   88% {
-    text-shadow:
-      -4px 0 rgb(245 255 59 / 60%),
-      4px 0 rgb(255 43 214 / 80%);
-    translate: 0;
+    box-shadow: var(--neon-frame-glitch-hot);
   }
 }

@@ -290,8 +290,7 @@ test(
     expect(mark.y - box.y).toBe(33);
     expect(mark.x + mark.width - (before.x + before.width)).toBe(5);
     expect(mark.y + mark.height - (before.y + before.height)).toBe(5);
-    // The mark is drawn in the Resource's ink, `--canvas-resource-ink-color`.
-    await expect(markLocator).toHaveCSS('background-color', 'rgb(11, 13, 17)');
+    await expect(markLocator).toHaveCSS('background-color', 'rgb(0, 0, 0)');
 
     // The interactive control stays inside the Resource so its invisible state
     // cannot receive an unannounced touch over the pane. Only its inert mark

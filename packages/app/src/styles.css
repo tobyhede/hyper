@@ -241,7 +241,7 @@ body {
   transform-origin: right bottom;
   width: 20px;
   height: 20px;
-  background: var(--canvas-resource-ink-color);
+  background: #000;
   border: var(--resize-mark-border-width) solid var(--canvas-resource-ink-color);
   opacity: 0;
   pointer-events: none;
