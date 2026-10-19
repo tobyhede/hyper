@@ -4,15 +4,28 @@ import { buttonVariants } from '@project/ui';
 
 const theme = readFileSync(new URL('../../packages/app/src/tailwind.css', import.meta.url), 'utf8');
 
-const variables = new Map(
-  [...theme.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map((match) => [match[1]!, match[2]!]),
+// The dark theme restates the semantic roles, so it is read after the sand
+// theme and its declarations win, as they do in the browser.
+const darkTheme = readFileSync(
+  new URL('../../packages/app/src/theme-dark.css', import.meta.url),
+  'utf8',
 );
 
-const resolveColor = (name: string): string => {
-  const value = variables.get(name);
+const variablesOf = (css: string): ReadonlyMap<string, string> =>
+  new Map([...css.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map((match) => [match[1]!, match[2]!]));
+
+const variables = variablesOf(theme);
+
+const THEMES = [
+  { theme: 'sand', variables },
+  { theme: 'Neon Glitch', variables: variablesOf(`${theme}\n${darkTheme}`) },
+] as const;
+
+const resolveColor = (themeVariables: ReadonlyMap<string, string>, name: string): string => {
+  const value = themeVariables.get(name);
   if (value === undefined) throw new Error(`Missing theme variable ${name}`);
   const reference = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
-  return reference === undefined ? value : resolveColor(reference);
+  return reference === undefined ? value : resolveColor(themeVariables, reference);
 };
 
 const luminance = (hex: string): number => {
@@ -42,19 +55,27 @@ const rolesWithForeground = [...variables.keys()]
   .map((name) => name.slice(2))
   .sort();
 
-describe('semantic theme contrast', () => {
+describe.each(THEMES)('semantic theme contrast ($theme)', ({ variables: themeVariables }) => {
   it('background supports normal text at WCAG AA contrast', () => {
     expect(
-      contrast(resolveColor('--background'), resolveColor('--foreground')),
+      contrast(
+        resolveColor(themeVariables, '--background'),
+        resolveColor(themeVariables, '--foreground'),
+      ),
     ).toBeGreaterThanOrEqual(4.5);
   });
 
   it.each(rolesWithForeground)('%s supports normal text at WCAG AA contrast', (role) => {
     expect(
-      contrast(resolveColor(`--${role}`), resolveColor(`--${role}-foreground`)),
+      contrast(
+        resolveColor(themeVariables, `--${role}`),
+        resolveColor(themeVariables, `--${role}-foreground`),
+      ),
     ).toBeGreaterThanOrEqual(4.5);
   });
+});
 
+describe('semantic theme', () => {
   // Asked of the classes `Button` actually resolves rather than of any file's
   // text, so the assertion cannot keep alive a stylesheet rule no module emits.
   it('uses the semantic foreground token for primary buttons', () => {

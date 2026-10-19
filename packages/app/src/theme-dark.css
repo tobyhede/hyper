@@ -1,0 +1,149 @@
+/*
+ * **Neon Glitch: the dark theme.** The same semantic tokens `tailwind.css`
+ * declares, restated for a reader whose system asks for dark. Nothing outside
+ * this file and the popup that portals out of it (`resource-search-combobox.css`)
+ * learns that a second theme exists: every control, menu and Resource already
+ * reads its colour off a token, so redefining the tokens is the whole switch.
+ *
+ * It follows `prefers-color-scheme` alone, which is also what Tailwind v4's
+ * `dark:` variant follows, so the registry components' own `dark:` classes turn
+ * over with these tokens rather than on a separate signal.
+ *
+ * The canvas is near-black violet and the Resource is ink-lined in cyan; the
+ * chrome's one emphasis is magenta. A Graph's colour is still the only colour
+ * that carries meaning, so the two neons stay on the chrome and the Resource's
+ * frame, never on an Edge. `test/unit/ui-theme-contrast.test.ts` and
+ * `test/unit/canvas-resource-contrast.test.ts` hold every text pair here to AA,
+ * as they hold the sand theme's.
+ *
+ * The glitch is decoration on titles only. Prose, menus, fields and status text
+ * are drawn clean, and the slicing animation runs only under the pointer and
+ * only when the reader has not asked for reduced motion.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: #07060d;
+    --foreground: #e8f7ff;
+    --card: #110e21;
+    --card-foreground: var(--foreground);
+    --popover: var(--card);
+    --popover-foreground: var(--foreground);
+    --primary: #ff2bd6;
+    --primary-foreground: #12001a;
+    --secondary: #1c1838;
+    --secondary-foreground: var(--foreground);
+    --muted: var(--secondary);
+    /* Clears AA on all three of its grounds: 7.71:1 on chrome paper, 6.91:1
+       on muted and 8.21:1 on the canvas. */
+    --muted-foreground: #a49ee0;
+    --accent: #241e48;
+    --accent-foreground: var(--foreground);
+    --destructive: #ff4d6d;
+    --success: #39ff88;
+    --border: #3b2f73;
+    --input: var(--border);
+    --ring: #00f0ff;
+
+    --xy-background-color: var(--background);
+    --xy-background-pattern-color: #2a1f4a;
+    --xy-minimap-background-color: var(--card);
+    --xy-minimap-mask-background-color: rgb(7 6 13 / 60%);
+    --xy-minimap-node-background-color: #2a2450;
+    --xy-attribution-background-color: rgb(17 14 33 / 60%);
+
+    --canvas-resource-ink-color: #00f0ff;
+    --canvas-resource-face-rest: #0d0b1a;
+    --canvas-resource-face-active: #16122b;
+    --canvas-resource-title-color: #f2fbff;
+    --canvas-resource-muted-color: #a8a3dc;
+    --canvas-resource-error-color: #ff5c7a;
+    --canvas-resource-shadow-dragging: 7px 7px 0 var(--primary), 0 0 28px rgb(0 240 255 / 45%);
+    --canvas-resource-shadow-selected:
+      0 0 0 var(--canvas-resource-selected-ring-width) var(--primary),
+      0 0 24px rgb(255 43 214 / 55%);
+
+    --shadow-chrome-elevated:
+      var(--shadow-chrome-elevated-offset) var(--shadow-chrome-elevated-offset) 0 var(--primary),
+      0 0 32px rgb(255 43 214 / 25%);
+    --shadow-chrome-lifted:
+      var(--shadow-chrome-lifted-offset) var(--shadow-chrome-lifted-offset) 0 var(--primary),
+      0 0 40px rgb(255 43 214 / 35%);
+
+    /* The theme's own effects, named so the applied properties below read them
+       off a token as every structural value here does. */
+    --neon-resource-hover-glow: 0 0 18px rgb(0 240 255 / 35%);
+    --neon-title-split: -1px 0 rgb(0 240 255 / 55%), 1px 0 rgb(255 43 214 / 55%);
+    --neon-edge-glow: drop-shadow(0 0 3px rgb(255 255 255 / 35%));
+    --neon-scanlines: repeating-linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 3.5%) 0,
+      rgb(255 255 255 / 3.5%) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    --neon-canvas-haze:
+      radial-gradient(ellipse at 15% 0%, rgb(255 43 214 / 14%), transparent 55%),
+      radial-gradient(ellipse at 90% 100%, rgb(0 240 255 / 10%), transparent 50%);
+  }
+
+  /* Under the Resources, never over them: the scanlines and haze are painted on
+     React Flow's background layer, so no Resource's text sits behind them. */
+  .react-flow__background {
+    background-image: var(--neon-scanlines), var(--neon-canvas-haze);
+  }
+
+  .react-flow__edge-path {
+    filter: var(--neon-edge-glow);
+  }
+
+  .canvas-resource[data-state='rest']:hover {
+    box-shadow: var(--neon-resource-hover-glow);
+  }
+
+  .canvas-resource__title-line[data-role='title'],
+  .command-dock__space .command-dock__name {
+    text-shadow: var(--neon-title-split);
+  }
+}
+
+@media (prefers-color-scheme: dark) and (prefers-reduced-motion: no-preference) {
+  .canvas-resource:hover .canvas-resource__title-line[data-role='title'],
+  .command-dock__space .command-dock__name:hover {
+    animation: neon-glitch 2.4s steps(1) infinite;
+  }
+}
+
+/* Short bursts on a long cycle: the split jumps wide, slices sideways and
+   settles, and most of the cycle is the resting split, so a title held under
+   the pointer is still read rather than watched. */
+@keyframes neon-glitch {
+  0%,
+  78%,
+  100% {
+    text-shadow: var(--neon-title-split);
+    translate: 0;
+  }
+
+  80% {
+    text-shadow:
+      -3px 0 rgb(0 240 255 / 80%),
+      3px 0 rgb(255 43 214 / 80%);
+    translate: 1px 0;
+  }
+
+  84% {
+    text-shadow:
+      2px 1px rgb(0 240 255 / 80%),
+      -2px -1px rgb(255 43 214 / 80%);
+    translate: -1px 0;
+  }
+
+  88% {
+    text-shadow:
+      -4px 0 rgb(245 255 59 / 60%),
+      4px 0 rgb(255 43 214 / 80%);
+    translate: 0;
+  }
+}

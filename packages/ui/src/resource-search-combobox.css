@@ -42,6 +42,20 @@
   box-shadow: none;
 }
 
+/* The same paper in the dark theme (`packages/app/src/theme-dark.css`): the
+   Resource's dark face, its title ink and its muted ink, so the popup still
+   reads as the Resource it chooses. */
+@media (prefers-color-scheme: dark) {
+  [data-resource-search-combobox] {
+    --foreground: #f2fbff;
+    --popover: #16122b;
+    --accent: #241e48;
+    --muted-foreground: #a8a3dc;
+    --csc-divider: #3b2f73;
+    --csc-refused-foreground: #8f89c4;
+  }
+}
+
 [data-resource-search-combobox] [data-slot='combobox-list'] {
   max-height: 15rem;
   padding: 0;
