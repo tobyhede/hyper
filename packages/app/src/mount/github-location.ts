@@ -2,9 +2,10 @@
  * A GitHub location, `github:owner/repo@ref/path` (ADR 0130), as written and as
  * resolved.
  *
- * `@ref` and `/path` are each optional. The ref runs from `@` to the next `/`,
- * so a ref cannot itself contain `/`: a branch named `feature/x` is addressed by
- * its commit SHA instead. The path is relative to the repository root, and every
+ * `@ref` and `/path` are each optional. The repository ends at the first `@`,
+ * and the ref runs from there to the next `/`, so a ref may contain `@` (as in
+ * `release@beta`) but not `/`: a branch named `feature/x` is addressed by its
+ * commit SHA instead. The path is relative to the repository root, and every
  * segment of it is a name: no empty, `.` or `..` segment is accepted.
  */
 export interface GitHubLocation {
@@ -40,7 +41,11 @@ const SCHEME = 'github:';
 /** GitHub's own rule for a user or organisation name, less its length limit. */
 const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
 const REPO = /^[A-Za-z0-9._-]+$/;
-const REF = /^[^\s/@:~^?*[\\]+$/;
+/**
+ * A ref, by the characters git-check-ref-format refuses: `@` is allowed inside
+ * one, but not a ref that is exactly `@` or one containing `@{`.
+ */
+const REF = /^(?!@$)(?!.*@\{)[^\s/:~^?*[\\]+$/;
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/i;
 

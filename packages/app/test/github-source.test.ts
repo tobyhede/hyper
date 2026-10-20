@@ -37,6 +37,8 @@ interface FakeGitHubOptions {
   readonly truncated?: boolean;
   /** Every API request answers this status with `x-ratelimit-remaining: 0`. */
   readonly rateLimitStatus?: 403 | 429;
+  /** Every API request answers this instead, with `x-ratelimit-remaining` 59 unless it sets one. */
+  readonly apiFailure?: ApiFailure;
   /** A repository path whose raw request answers 500. */
   readonly failingBlob?: string;
   /**
@@ -48,6 +50,14 @@ interface FakeGitHubOptions {
   readonly holdRaw?: boolean;
   /** Repository paths GitHub lists as symbolic links (mode `120000`). */
   readonly symlinks?: ReadonlySet<string>;
+  /** Sizes GitHub lists for repository paths in place of their bytes' length. */
+  readonly listedSizes?: ReadonlyMap<string, number>;
+}
+
+interface ApiFailure {
+  readonly status: number;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly body?: string;
 }
 
 interface BlobFailure {
@@ -73,6 +83,8 @@ interface TreeEntry {
   readonly mode: string;
   readonly type: 'tree' | 'blob';
   readonly sha: string;
+  /** Listed for a blob only. */
+  readonly size?: number;
 }
 
 /** The bodies of the REST answers this fake gives: a commit, a tree, or an error. */
@@ -91,6 +103,7 @@ const json = (status: number, body: ApiBody): Response =>
 const treeEntries = (
   files: ReadonlyMap<string, Uint8Array>,
   symlinks: ReadonlySet<string>,
+  listedSizes: ReadonlyMap<string, number>,
 ): TreeEntry[] => {
   const directories = new Set<string>();
   for (const path of files.keys()) {
@@ -106,11 +119,12 @@ const treeEntries = (
       type: 'tree',
       sha: COMMIT,
     })),
-    ...[...files.keys()].map((path): TreeEntry => ({
+    ...[...files].map(([path, bytes]): TreeEntry => ({
       path,
       mode: symlinks.has(path) ? '120000' : '100644',
       type: 'blob',
       sha: COMMIT,
+      size: listedSizes.get(path) ?? bytes.length,
     })),
   ].sort((left, right) => (left.path < right.path ? -1 : 1));
 };
@@ -123,10 +137,12 @@ const fakeGitHub = ({
   files,
   truncated = false,
   rateLimitStatus,
+  apiFailure,
   failingBlob,
   blobFailures = new Map(),
   holdRaw = false,
   symlinks = new Set(),
+  listedSizes = new Map(),
 }: FakeGitHubOptions): FakeGitHub => {
   const requests: Request[] = [];
   const failuresAnswered = new Map<string, number>();
@@ -147,6 +163,12 @@ const fakeGitHub = ({
           headers: { 'x-ratelimit-remaining': '0' },
         });
       }
+      if (apiFailure !== undefined) {
+        return new Response(apiFailure.body ?? '', {
+          status: apiFailure.status,
+          headers: { 'x-ratelimit-remaining': '59', ...apiFailure.headers },
+        });
+      }
       if (!url.startsWith(`${API}/`)) return json(404, { message: 'Not Found' });
       const commit = /\/commits\/([^/?]+)$/.exec(url);
       if (commit !== null) {
@@ -158,7 +180,7 @@ const fakeGitHub = ({
       const tree = /\/git\/trees\/([0-9a-f]{40})\?recursive=1$/.exec(url);
       if (tree !== null) {
         return tree[1] === COMMIT
-          ? json(200, { sha: COMMIT, tree: treeEntries(files, symlinks), truncated })
+          ? json(200, { sha: COMMIT, tree: treeEntries(files, symlinks, listedSizes), truncated })
           : json(404, { message: 'Not Found' });
       }
       return json(404, { message: 'Not Found' });
@@ -377,6 +399,38 @@ describe('readGitHubAggregate', () => {
     },
   );
 
+  it.each([
+    ['a 429 with requests remaining', { status: 429 }],
+    ['a 403 naming a Retry-After', { status: 403, headers: { 'retry-after': '60' } }],
+    [
+      'a 403 whose message names a secondary rate limit',
+      {
+        status: 403,
+        body: '{"message":"You have exceeded a secondary rate limit. Please wait a few minutes before you try again."}',
+      },
+    ],
+  ])('answers %s as a rate limit', async (_description, apiFailure: ApiFailure) => {
+    const github = fakeGitHub({ files: fixtureFiles, apiFailure });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'rate-limited' } });
+  });
+
+  it('answers a plain 403 as a failed request', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      apiFailure: { status: 403, body: '{"message":"Resource not accessible"}' },
+    });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'request-failed', url: `${API}/commits/HEAD`, status: 403 },
+    });
+  });
+
   it('answers a 403 with requests remaining as a failed request, not a rate limit', async () => {
     const forbidden: typeof fetch = () =>
       Promise.resolve(
@@ -458,6 +512,44 @@ describe('readGitHubAggregate', () => {
     expect(waits).toEqual([3000]);
   });
 
+  it.each([
+    ['an empty Retry-After as absent', '', 1000],
+    ['a non-numeric Retry-After as absent', 'soon', 1000],
+    ['a Retry-After beyond ten seconds as ten seconds', '3600', 10000],
+  ])('reads %s', async (_description, retryAfter, expected) => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 429, retryAfter }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result.ok).toBe(true);
+    expect(waits).toEqual([expected]);
+  });
+
+  it('waits until the HTTP-date a Retry-After names', async () => {
+    const now = Date.UTC(2026, 9, 20, 12, 0, 0);
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([
+        ['hyper.json', [{ status: 503, retryAfter: new Date(now + 5000).toUTCString() }]],
+      ]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(
+      `github:${OWNER}/${REPO}`,
+      github.fetch,
+      wait,
+      () => now,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(waits).toEqual([5000]);
+  });
+
   it('fails a blob that still fails after its one retry, naming it', async () => {
     const github = fakeGitHub({
       files: fixtureFiles,
@@ -498,6 +590,25 @@ describe('readGitHubAggregate', () => {
 
     expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
     expect(github.peakRawInFlight()).toBe(8);
+  });
+
+  it('refuses a scanned file listed over 25 MiB before fetching any blob', async () => {
+    const size = 25 * 1024 * 1024 + 1;
+    const github = fakeGitHub({
+      files: under('talks/pgdu', fixtureFiles),
+      listedSizes: new Map([['talks/pgdu/hyper.json', size]]),
+    });
+
+    const result = await readGitHubAggregate(
+      `github:${OWNER}/${REPO}@main/talks/pgdu`,
+      github.fetch,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-too-large', path: 'hyper.json', size },
+    });
+    expect(github.rawRequests()).toEqual([]);
   });
 
   it('never reads a scanned path that is a symbolic link', async () => {
