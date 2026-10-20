@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import {
@@ -708,5 +708,85 @@ describe('scannedAggregatePaths', () => {
     expect(scannedAggregatePaths(await filesUnder(root))).toEqual(
       await scannedAggregateFiles(root),
     );
+  });
+});
+
+/*
+ * A link is how an author shares one file between directories, so a file
+ * entry that is a symbolic link to a regular file is read and owned like the
+ * file it names, and a link that names nothing is not a file at all.
+ */
+describe('a file that is a symbolic link, on disk', () => {
+  /** Write `text` to a file outside `root` and link `path` under `root` to it. */
+  const linkTo = async (root: string, path: string, text: string): Promise<void> => {
+    const target = join(await makeTemporaryDirectory(), 'target');
+    await writeFile(target, text);
+    await mkdir(join(root, path, '..'), { recursive: true });
+    await symlink(target, join(root, path));
+  };
+
+  it('reads a Space whose space.json is a link to a regular file', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await linkTo(
+      root,
+      `${META_SPACE_ID}/space.json`,
+      JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Linked' }),
+    );
+
+    const aggregate = await readAggregate(root, countingIds());
+
+    expect(aggregate.spaces.map(({ document }) => document.title)).toEqual(['Linked']);
+  });
+
+  it('reads a Resource file that is a link to a regular file', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
+    for (const [name, text] of Object.entries(
+      markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
+    )) {
+      await linkTo(root, `${META_SPACE_ID}/resources/${name}`, text);
+    }
+
+    const aggregate = await readAggregate(root, countingIds());
+
+    expect(aggregate.spaces[0]?.resources.map(({ id }) => id)).toEqual([RESOURCE_ID]);
+  });
+
+  it('lists a linked hyper.json, space.json and Resource file as files Export owns', async () => {
+    const root = await makeTemporaryDirectory();
+    await linkTo(
+      root,
+      AGGREGATE_FILE_NAME,
+      JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }),
+    );
+    await linkTo(
+      root,
+      `${META_SPACE_ID}/space.json`,
+      JSON.stringify({ version: 1, title: 'Meta' }),
+    );
+    for (const [name, text] of Object.entries(
+      markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
+    )) {
+      await linkTo(root, `${META_SPACE_ID}/resources/${name}`, text);
+    }
+
+    expect(await scannedAggregateFiles(root)).toEqual([
+      AGGREGATE_FILE_NAME,
+      `${META_SPACE_ID}/space.json`,
+      `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
+      `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
+    ]);
+    expect((await readAggregate(root, countingIds())).metaSpaceId).toBe(META_SPACE_ID);
+  });
+
+  it('lists no dangling link, and no Space whose space.json is one', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await mkdir(join(root, META_SPACE_ID));
+    await symlink(join(root, 'nowhere.json'), join(root, META_SPACE_ID, 'space.json'));
+
+    expect(await scannedAggregateFiles(root)).toEqual([AGGREGATE_FILE_NAME]);
   });
 });
