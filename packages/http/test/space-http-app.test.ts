@@ -493,7 +493,7 @@ describe('Space HTTP reads', () => {
   // state, on PostgreSQL — `loadAggregate` runs at READ COMMITTED in two
   // statements, so a rival host's commit landing between them can make a
   // healthy store look like "Spaces without Meta" for an instant
-  // (`src/http/space-host.ts`'s `readAggregate`, which this handler mirrors
+  // (`packages/aggregate/src/space-host.ts`'s `readAggregate`, which this handler mirrors
   // rather than imports — `@project/http` cannot reach across the package
   // boundary into `src/`). So a first invariant failure is re-read once
   // before it answers anything.
@@ -520,7 +520,7 @@ describe('Space HTTP reads', () => {
 
   // Broken stored state and an unreachable database are told apart by type
   // (`isAggregateInvariant`, which walks the cause chain), the way
-  // `src/http/space-host.ts` does for `GET /` — an invariant failure
+  // `packages/aggregate/src/space-host.ts` does for `GET /` — an invariant failure
   // that survives the re-read above is a permanent defect no retry cures
   // (500), everything else is temporary (503). The second case is carried
   // only on `cause`, because the driver does not always rethrow what a

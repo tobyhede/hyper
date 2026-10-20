@@ -1,6 +1,6 @@
 import type { UUID } from '@project/core';
 import { classifyStoredFailure } from '@project/persistence';
-import type { SpaceRepository } from '../persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 import { defaultContentAggregate } from './default-content';
 
 /**

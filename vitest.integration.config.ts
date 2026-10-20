@@ -6,6 +6,7 @@ const resolve = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
+      '@project/aggregate': resolve('./packages/aggregate/src/index.ts'),
       '@project/core': resolve('./packages/core/src/index.ts'),
       '@project/graph': resolve('./packages/graph/src/index.ts'),
       '@project/http': resolve('./packages/http/src/index.ts'),

@@ -1,5 +1,5 @@
 import { newUuid } from '@project/core';
-import { createSpaceHost } from '../../src/http/space-host';
+import { createSpaceHost } from '@project/aggregate';
 import { E2eMemorySpaceRepository } from '../../test/support/e2e-memory-space-repository';
 import { readAggregate } from '../../src/aggregate-directory';
 

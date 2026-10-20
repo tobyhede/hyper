@@ -15,7 +15,7 @@ import {
   type StoredImage,
 } from '@project/persistence';
 import { expect, it } from 'vitest';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 import type { SqlStore } from '../../src/persistence/sql-store';
 
 /**

@@ -232,7 +232,7 @@ export const resolveProductDestination = async (
  * What a host answers for a product address it owns, ahead of the SPA fallback.
  *
  * Declared here because the seam has two sides and neither can typecheck the
- * other: the Node host composes the answer (`src/http/space-host.ts`) and the
+ * other: the Node host composes the answer (`packages/aggregate/src/space-host.ts`) and the
  * Vite plugin writes it onto a `ServerResponse`, importing this by relative
  * path because a Vite config externalizes bare specifiers. Do not declare a
  * copy on either side: two copies drift apart.

@@ -129,6 +129,25 @@ const NODE_BUILTIN_PATTERN = {
 };
 
 /**
+ * The same ban for `@project/aggregate`, which a mounted page reaches (ADR 0130):
+ * the filesystem shell stays under root `src/`.
+ * `test/unit/aggregate-package-browser-safe.test.ts` reads the package's
+ * sources for the same thing.
+ */
+const AGGREGATE_NODE_MESSAGE =
+  '@project/aggregate is browser-safe: read the filesystem in root src/ and pass the bytes in.';
+
+const AGGREGATE_NODE_BUILTINS = NODE_BUILTIN_NAMES.map((name) => ({
+  name,
+  message: AGGREGATE_NODE_MESSAGE,
+}));
+
+const AGGREGATE_NODE_BUILTIN_PATTERN = {
+  group: NODE_BUILTIN_PATTERN.group,
+  message: AGGREGATE_NODE_MESSAGE,
+};
+
+/**
  * The mirror of ESCAPE_PATTERN, for code *outside* `packages/`. Server code and
  * root-level tests reach a workspace package by `@project/*` like everything
  * else; a relative path into its `src/` resolves a module the package never
@@ -552,6 +571,40 @@ export default tseslint.config(
         {
           paths: [...RENDER_ONLY, ...REACT],
           patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, REACT_DOM_PATTERN],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/aggregate/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            ...RENDER_ONLY,
+            ...REACT,
+            ...AGGREGATE_NODE_BUILTINS,
+            { name: 'vite', message: '@project/aggregate is independent of Vite hosts.' },
+            {
+              name: '@project/app',
+              message: '@project/aggregate is independent of app composition.',
+            },
+          ],
+          patterns: [
+            ESCAPE_PATTERN,
+            RENDER_ONLY_PATTERN,
+            REACT_DOM_PATTERN,
+            AGGREGATE_NODE_BUILTIN_PATTERN,
+            {
+              group: ['vite/*', '@project/app/*'],
+              message: '@project/aggregate is independent of Vite and app composition.',
+            },
+            {
+              group: ['@prisma-next/*'],
+              message: '@project/aggregate depends on its repository interface, not a database.',
+            },
+          ],
         },
       ],
     },

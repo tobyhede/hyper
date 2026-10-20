@@ -15,7 +15,7 @@ import { uuidSchema } from '@project/core';
 import type { LoadedSpace } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 import { directoryTree } from '../support/stored-images';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');

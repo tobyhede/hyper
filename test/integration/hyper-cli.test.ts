@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import {
-  AGGREGATE_FILE_NAME,
   readSingleSpace,
   writeSpaceDirectory as writeLoadedSpaceDirectory,
 } from '../../src/aggregate-directory';

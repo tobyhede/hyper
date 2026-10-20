@@ -6,13 +6,12 @@ import {
   aggregateFiles,
   assertExportableDestination,
   loadReferencedImages,
-  readAggregateFiles,
   rejectSymbolicLinks,
   scannedAggregateFiles,
   writeInPlace,
   type DirectoryFiles,
 } from '../aggregate-directory';
-import type { SpaceRepository } from '../persistence/space-repository';
+import { type SpaceRepository, readAggregateFiles } from '@project/aggregate';
 
 /** One Space whose bytes landed but whose projected revision was not recorded. */
 export interface UnrecordedExport {

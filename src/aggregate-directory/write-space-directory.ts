@@ -8,7 +8,7 @@ import {
 } from '@project/core';
 import { Placement, serializeResource } from '@project/graph';
 import type { LoadedSpace } from '@project/persistence';
-import { compareOrdinal } from '../ordinal';
+import { compareOrdinal } from '@project/aggregate';
 import { discoverResourceFiles, isMissingFile } from './space-directory';
 import { writeInPlace } from './write-in-place';
 

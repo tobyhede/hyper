@@ -9,7 +9,7 @@ import {
   problemCatalogue,
 } from '@project/persistence';
 import { afterAll, describe, expect, it } from 'vitest';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { Contract } from '../../src/prisma/contract.d';
 import { postgresOptionsFor } from '../../src/prisma/db';

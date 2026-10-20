@@ -15,7 +15,7 @@ import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';
 import { openSqliteRepository } from '../support/sqlite-harness';
 import { postgresTestDatabase } from '../support/postgres-database';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 
 const repositoryWithAggregateReads = (
   repository: SpaceRepository,

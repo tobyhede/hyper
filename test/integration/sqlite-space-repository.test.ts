@@ -7,7 +7,7 @@ import {
 import postgres from '@prisma-next/postgres/runtime';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 import type { SqlTables } from '../../src/persistence/sql-store';
 import type { Contract as PostgresContract } from '../../src/prisma/contract.d';
 import postgresContractJson from '../../src/prisma/contract.json' with { type: 'json' };

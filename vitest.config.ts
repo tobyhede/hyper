@@ -18,6 +18,7 @@ export default defineConfig({
      * fail to collect.
      */
     alias: {
+      '@project/aggregate': resolve('./packages/aggregate/src/index.ts'),
       '@project/core': resolve('./packages/core/src/index.ts'),
       '@project/graph': resolve('./packages/graph/src/index.ts'),
       '@project/http': resolve('./packages/http/src/index.ts'),
@@ -109,6 +110,7 @@ export default defineConfig({
          * at what holds rather than chased.
          */
         'packages/graph/src/**': { statements: 94, branches: 90, functions: 95 },
+        'packages/aggregate/src/**': { statements: 97, branches: 93, functions: 100 },
         'packages/http/src/**': { statements: 98, branches: 94, functions: 96 },
         'packages/persistence/src/**': { statements: 95, branches: 90, functions: 95 },
       },
