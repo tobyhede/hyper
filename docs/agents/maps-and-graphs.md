@@ -61,7 +61,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 
 - **R14. Every new Space is created complete:** `Map 1`, an empty Active `Graph 1`, `defaultMap`, and the first Resource placed, persisted atomically. It never needs initialization. ([0080], [0018])
 - **R15. A stored or imported Space may have no Map, and so no Graph.** That is valid stored state (A5). ([0079], [0041], [0015])
-- **R16. First working load initializes a mapless Space.** Before returning, the first complete working-state read persists one atomic Edit: an empty `Map 1`, its empty Active `Graph 1`, and `defaultMap`. Existing Resources are **not** placed and no strategy seeds them, because nothing authored says where they go; they stay in the Resources View. ([0079], [0080])
+- **R16. First working load initializes a mapless Space.** Before returning, the first complete working-state read persists one atomic Edit: an empty `Map 1`, its empty Active `Graph 1`, and `defaultMap`. Existing Resources are **not** placed and no strategy seeds them, because nothing authored says where they go; they stay in the Resources View. In a mounted page (ADR 0130) this Edit is made by the in-page host while it answers the read, and lasts as long as the page. ([0079], [0080], [0130])
 - **R17. A Space with Maps but no default records its first Map** in authored order, and creates nothing. ([0079], [0080])
 - **R18. One server-side boundary initializes.** Direct opening, Entering, rendering an Open Space Resource, and making a link target working all use it. Listing, import completion, export and reference validation read stored state and never initialize. ([0079], [0080])
 - **R19. Initialization commits before the Space becomes working.** A conflict reloads, and accepts a competing initialization if one exists; otherwise the normal retry follows. Any other failure stops the Space opening. ([0079], [0080])
@@ -238,3 +238,4 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0128]: ../adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md
 [0106]: ../adr/0106-an-image-resource-owns-a-url-not-bytes.md
 [0114]: ../adr/0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md
+[0130]: ../adr/0130-mounting-reads-an-aggregate-from-github-into-a-read-only-page.md
