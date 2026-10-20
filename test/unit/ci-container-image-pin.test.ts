@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /*
- * The Playwright image pin lives in more than one job — `e2e` and `ladle`
- * both declare it — and nothing in the workflow makes the copies agree. The
+ * The Playwright image pin lives in more than one job — `e2e`, `ladle` and
+ * `mount` each declare it — and nothing in the workflow makes the copies agree. The
  * `.node-version` guard cannot: it compares the Node major, and that is
  * identical across Playwright image versions. So a bump that moves one pin and
  * forgets the other leaves the second job silently running the old image, and
@@ -72,7 +72,7 @@ describe('ci.yml container jobs', () => {
   it('are found by the scan', () => {
     expect(containerJobs.length).toBeGreaterThan(0);
     expect(containerJobs.map((entry) => entry.job)).toEqual(
-      expect.arrayContaining(['e2e', 'ladle']),
+      expect.arrayContaining(['e2e', 'ladle', 'mount']),
     );
   });
 
@@ -92,10 +92,10 @@ describe('ci.yml container jobs', () => {
   it('overlay the repository Node pin without replacing the Playwright image', () => {
     const nodeVersionConsumers = workflow.match(/node-version-file: \.node-version/g) ?? [];
 
-    // static-checks, coverage, postgres, sqlite, e2e and ladle each consume
+    // static-checks, coverage, postgres, sqlite, e2e, ladle and mount each consume
     // the one exact runtime pin. The first two are the halves `pnpm verify` is
     // split into for CI, so splitting it added a consumer rather than moving one.
-    expect(nodeVersionConsumers).toHaveLength(6);
+    expect(nodeVersionConsumers).toHaveLength(7);
     expect(workflow).not.toContain("The image's Node must satisfy .node-version");
   });
 

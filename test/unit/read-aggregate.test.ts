@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import {
@@ -426,6 +426,21 @@ describe.each(READERS)('$name', ({ read }) => {
     expect(thrown.diagnostics.join('\n')).toContain(second);
   });
 
+  it('names an image directory holding a space.json once, as an image, never as a Space', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
+    await writeSpace(root, 'images', JSON.stringify({ version: 1, title: 'Not a Space' }));
+
+    const thrown = await captureError(() => read(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(join(root, 'images', 'space.json'));
+    expect(thrown.diagnostics[0]).not.toContain('Space UUID');
+  });
+
   /*
    * Reading identifies; it validates nothing about how the Spaces relate. Meta
    * rooting is `loadSpaceAggregate`'s, asked once over the whole collection by
@@ -559,6 +574,77 @@ describe.each(READERS)('$name', ({ read }) => {
  * directory's files, for a source that lists files rather than walking a
  * directory (ADR 0130).
  */
+/**
+ * A document refused outright is reported as that, ahead of a file beside it
+ * that could not be read, and one Space's unreadable file does not hide another
+ * Space's parse diagnostic: the refusal is decided from the space file alone.
+ */
+describe('a file that could not be read', () => {
+  const refusedDocument = JSON.stringify({ version: 2, title: 'Pre-release talk' });
+  const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
+
+  it('is reported after the refusal of its Space, beside every other Space’s diagnostic', async () => {
+    const thrown = await captureError(() =>
+      readAggregateFiles(
+        '/talk',
+        new Map([
+          [AGGREGATE_FILE_NAME, encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }))],
+          [`${META_SPACE_ID}/space.json`, encode(refusedDocument)],
+          [`${OTHER_SPACE_ID}/space.json`, encode('{ invalid other')],
+        ]),
+        countingIds(),
+        new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
+      ),
+    );
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(2);
+    expect(thrown.diagnostics[0]).toContain('version 2');
+    expect(thrown.diagnostics[1]).toContain(`/talk/${OTHER_SPACE_ID}/space.json`);
+  });
+
+  it('is a discovery failure naming it when its Space reads otherwise', async () => {
+    const thrown = await captureError(() =>
+      readAggregateFiles(
+        '/talk',
+        new Map([
+          [AGGREGATE_FILE_NAME, encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }))],
+          [`${META_SPACE_ID}/space.json`, encode(JSON.stringify({ version: 1, title: 'Meta' }))],
+        ]),
+        countingIds(),
+        new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
+      ),
+    );
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toEqual([`/talk/${META_SPACE_ID}/a.md: EACCES: permission denied`]);
+  });
+
+  // Root ignores the mode bits and reads the file anyway, which would fail this
+  // rather than exercise it.
+  it.skipIf(process.getuid?.() === 0)('is reported the same way from disk', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    const meta = await writeSpace(root, META_SPACE_ID, refusedDocument);
+    await writeSpace(root, OTHER_SPACE_ID, '{ invalid other');
+    await writeFile(join(meta, 'a.md'), 'A body\n');
+    await chmod(join(meta, 'a.md'), 0o000);
+
+    const thrown = await captureError(() => readAggregate(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(2);
+    expect(thrown.diagnostics[0]).toContain('version 2');
+    expect(thrown.diagnostics[1]).toContain(join(root, OTHER_SPACE_ID, 'space.json'));
+  });
+});
+
 describe('scannedAggregatePaths', () => {
   /** An Aggregate directory beside unrelated material, as a repository may hold it. */
   const MIXED_DIRECTORY = [
@@ -580,6 +666,7 @@ describe('scannedAggregatePaths', () => {
     'images/a.png',
     'images/.hidden.png',
     'images/drafts/b.png',
+    'images/space.json',
   ];
 
   it("keeps hyper.json, each Space directory's files and the visible images, in read order", () => {
@@ -591,6 +678,7 @@ describe('scannedAggregatePaths', () => {
       `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
       `${OTHER_SPACE_ID}/space.json`,
       'images/a.png',
+      'images/space.json',
     ]);
   });
 
@@ -602,6 +690,12 @@ describe('scannedAggregatePaths', () => {
         `sibling/${AGGREGATE_FILE_NAME}`,
       ]),
     ).toEqual([]);
+  });
+
+  it('reads images/ as images only, even when it holds a space.json', () => {
+    expect(
+      scannedAggregatePaths([AGGREGATE_FILE_NAME, 'images/space.json', 'images/a.png']),
+    ).toEqual([AGGREGATE_FILE_NAME, 'images/a.png', 'images/space.json']);
   });
 
   it('names the same files the filesystem scan finds on disk', async () => {

@@ -14,7 +14,7 @@ Status: resolved
 **Acceptance:**
 
 - `wrangler deploy --dry-run` succeeds on a built tree.
-- A local `wrangler dev` of the build answers a deep product URL with the application.
+- A local `wrangler dev` of the build answers a deep product URL with the application and with 06's Content Security Policy header.
 
 ## Answer
 
@@ -29,4 +29,4 @@ Checked on a stand-in tree (an `index.html`, one hashed asset and a `_headers`),
 - `pnpm exec wrangler dev --port 8787` answered `/`, `/spaces/x/maps/y` and `/spaces/x/maps/y?source=x` with 200 and `index.html`, with and without `Sec-Fetch-Mode: navigate`; the hashed asset with 200 as `text/javascript`; and applied `_headers` to every response.
 - `scripts/cloudflare-build.sh` under Node 26.8.1 installed, then stopped at `Command "build:mount" not found`, as expected before 06. Under Node 22 it refused with the `.node-version` message.
 
-Waits on 06: the same two wrangler checks on the real `pnpm build:mount` tree.
+On 06's real `pnpm build:mount` tree (`VITE_HYPER_DEFAULT_SOURCE=github:tobyhede/talks@main`): `wrangler deploy --dry-run` read 8 files from `packages/app/dist-mount`, reported no bindings and exited 0, and `wrangler dev` answered `/spaces/x/maps/y?source=github:o/r` with 200, `text/html`, 06's `content-security-policy` and `x-content-type-options: nosniff`.

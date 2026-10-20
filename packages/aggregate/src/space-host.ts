@@ -141,9 +141,9 @@ export const createSpaceHost = (
         //
         // `GET /api/aggregate` (`packages/http/src/index.ts`) does the same
         // resource on the same rule, independently, because `@project/http` cannot
-        // import this module: it re-reads once on an invariant failure — the
-        // package boundary means it re-implements `readAggregate` above rather
-        // than sharing it — answers 200 if the retry succeeds, and otherwise
+        // import this module: this package depends on it, so the reverse import
+        // would be a cycle. It re-reads once on an invariant failure — it
+        // re-implements `readAggregate` above rather than sharing it — answers 200 if the retry succeeds, and otherwise
         // answers whichever error it is left with by the same three arms.
         // `space-http-app.test.ts`'s "re-reads once on an invariant failure and
         // answers 200 when the retry succeeds" and the aggregate cases beside it

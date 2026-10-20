@@ -83,6 +83,17 @@ const CONTINUATION_IMPORT = {
   message: 'Where an Edit continues is the surface’s decision, not this module’s.',
 };
 
+/**
+ * `@project/aggregate` carries the aggregate lifecycle doors ADR 0078 keeps off
+ * the browser's seam, so within `app` only a Mount's source, which reads an
+ * Aggregate directory into a store (ADR 0130), and the tests import it.
+ */
+const APP_AGGREGATE_IMPORT = {
+  name: '@project/aggregate',
+  message:
+    'Only a Mount (packages/app/src/mount/) imports @project/aggregate: its aggregate lifecycle stays off the browser seam (ADR 0130, ADR 0078).',
+};
+
 const AUTHORING_COMMANDS_MESSAGE =
   'Authoring commands import no continuation, React or DOM: where the caret goes is the surface’s.';
 
@@ -286,6 +297,7 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/dist-http/**',
+      '**/dist-mount/**',
       // `ladle build` output is gitignored, but flat ESLint config does not
       // read `.gitignore` and would otherwise lint the generated bundles.
       'packages/app/build/**',
@@ -463,6 +475,20 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
+          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, APP_AGGREGATE_IMPORT],
+          patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
+        },
+      ],
+    },
+  },
+  // A Mount's source and the tests may import `@project/aggregate`; this
+  // restates the `app` zone above without that ban.
+  {
+    files: ['packages/app/src/mount/**/*.{ts,tsx}', 'packages/app/test/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
           paths: UI_IMPLEMENTATION_DEPENDENCIES,
           patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
         },
@@ -487,6 +513,7 @@ export default tseslint.config(
         {
           paths: [
             ...UI_IMPLEMENTATION_DEPENDENCIES,
+            APP_AGGREGATE_IMPORT,
             CONTINUATION_IMPORT,
             ...AUTHORING_COMMANDS_REACT,
           ],
@@ -517,7 +544,7 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          paths: UI_IMPLEMENTATION_DEPENDENCIES,
+          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, APP_AGGREGATE_IMPORT],
           patterns: [
             ESCAPE_PATTERN,
             APP_UI_IMPLEMENTATION_PATTERN,

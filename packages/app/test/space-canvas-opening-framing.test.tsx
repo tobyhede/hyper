@@ -163,6 +163,7 @@ describe('opening framing on a mounted canvas', () => {
         chooseMap: unused,
         activateGraph: unused,
         href: unused,
+        reportArrivalNotFound: unused,
         dispose: unused,
       },
     };
@@ -266,6 +267,7 @@ describe('opening framing on a mounted canvas', () => {
         chooseMap: unused,
         activateGraph: unused,
         href: unused,
+        reportArrivalNotFound: unused,
         dispose: unused,
       },
     };
