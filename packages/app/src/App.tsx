@@ -286,8 +286,9 @@ export const createApp = (
             decision is the surface's. This is not a cue: it is hidden, and what
             it carries is the revision, which is the *Space's* rather than any
             surface's. It sits beside the canvas for exactly that reason.
-            A mounted session never commits, so it has none (ADR 0130). */}
-        {composition.mounted ? null : (
+            A settled mounted session stores nothing, so it has none (ADR
+            0130); a refused write in one is reported here as anywhere else. */}
+        {composition.mounted && sessionState.persistence.kind === 'settled' ? null : (
           <span
             hidden
             aria-hidden="true"

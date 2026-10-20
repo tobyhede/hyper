@@ -41,7 +41,7 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         options.history,
         browserImageSources(backend, displayImage),
         displayImage,
-        true,
+        { mounted: true },
       );
       return { startup, metaSpaceId };
     }));
