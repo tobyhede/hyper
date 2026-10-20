@@ -10,6 +10,7 @@ import {
 } from './components/empty';
 import { Skeleton } from './components/skeleton';
 import { ImageIcon } from './icons';
+import { useImageDisplay } from './image-display';
 import './resource-image.css';
 
 export interface ResourceImageProps {
@@ -31,9 +32,12 @@ export interface ResourceImageProps {
  * the URL.
  *
  * How the load went is a fact about this mount, not the Space, so a caller that
- * changes the URL keys this on it to try again.
+ * changes the URL keys this on it to try again. The picture is drawn from where
+ * the application's {@link useImageDisplay} resolver says the URL is, and the
+ * failed-image state names the URL the Resource owns.
  */
 export function ResourceImage({ url, name, onReplace }: ResourceImageProps) {
+  const display = useImageDisplay();
   const [loadState, setLoadState] = useState<'loading' | 'loaded' | 'failed'>('loading');
   const picture = useRef<HTMLImageElement>(null);
   // A picture the browser already holds is complete as it mounts, but its load
@@ -81,7 +85,7 @@ export function ResourceImage({ url, name, onReplace }: ResourceImageProps) {
         ref={picture}
         className="resource-image__picture"
         data-loading={loadState === 'loading' ? '' : undefined}
-        src={url}
+        src={display(url)}
         alt={name}
         draggable={false}
         onLoad={() => setLoadState('loaded')}

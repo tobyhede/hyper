@@ -32,6 +32,10 @@ const NOT_THE_KIND = new Map<string, ReadonlyMap<string, readonly string[]>>([
       ],
       ['packages/app/src/destination-opening.ts', ["if (destination.kind === 'space') {"]],
       [
+        'packages/app/src/mount/mounted-startup.ts',
+        ["const meta = productDestinationPath({ kind: 'space', spaceId: metaSpaceId });"],
+      ],
+      [
         'packages/app/src/dock-chrome.ts',
         ["onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),"],
       ],

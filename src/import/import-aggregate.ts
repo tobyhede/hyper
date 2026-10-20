@@ -27,7 +27,7 @@ export type AggregateImportResult =
    * The Spaces travel with the errors because intake reports a bad Space by its
    * position in the collection it was handed, and a position means nothing to
    * someone holding a directory. The renderer resolves it back to the Space's
-   * own id (`src/cli/aggregate-refusal.ts`).
+   * own id (`packages/aggregate/src/aggregate-refusal.ts`).
    */
   | {
       kind: 'aggregate-refused';

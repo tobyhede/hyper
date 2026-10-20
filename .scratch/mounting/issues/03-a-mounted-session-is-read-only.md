@@ -16,3 +16,7 @@ Status: ready-for-agent
 - `authoring-availability` tests: the mounted answer offers Present, Enter, Exit and navigation, and offers no Edit.
 - A test over 02's composition shows that a write sent to the backend is refused.
 - A component or story test shows the mark, with no persistence status beside it.
+
+## Answer
+
+- The in-page write refusal was built in 02: `packages/app/src/mount/mount.ts` answers every request but `GET` and `HEAD` `forbidden` (403), and `packages/app/test/mount.test.tsx` holds that a commit and an image upload store nothing.
