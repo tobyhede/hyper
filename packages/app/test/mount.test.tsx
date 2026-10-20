@@ -141,6 +141,19 @@ describe('mounting an aggregate in the page', () => {
     expect(history.pathname()).toBe(META_PATH);
   });
 
+  it('reads GitHub again on a resolve after one whose read failed', async () => {
+    const github = fakeGitHub({ files: fixtureFiles() });
+    let offline = true;
+    const once: typeof fetch = (input, init) =>
+      offline ? Promise.reject(new TypeError('Failed to fetch')) : github.fetch(input, init);
+    const startup = mountedStartup(fixtureFiles(), { github: { ...github, fetch: once } });
+
+    await expect(startup.resolve('/')).rejects.toThrow();
+    offline = false;
+
+    expect(opened(await startup.resolve('/')).app.currentSpace().id).toBe(META_SPACE_ID);
+  });
+
   it('opens a read-only session, marked so and with no persistence status', async () => {
     const container = await render(() => mountedStartup(fixtureFiles()).resolve('/'));
 

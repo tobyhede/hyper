@@ -50,7 +50,7 @@ interface Mounted {
 
 /**
  * Browser startup over a GitHub location mounted in the page (ADR 0130): the
- * location is read and mounted once, on the first resolve, and the
+ * location is read and mounted once, on the first resolve that succeeds, and the
  * application then opens over the mounted backend exactly as it opens over a
  * host.
  *
@@ -90,7 +90,11 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         { mounted: true },
       );
       return { startup, backend, metaSpaceId, pinned, resolved: read.aggregate.location };
-    })());
+    })().catch((error: unknown) => {
+      // A failed read or a refusal is not kept, so a later resolve reads again.
+      mounting = undefined;
+      throw error;
+    }));
   return {
     resolve: async (pathname) => {
       const { startup, backend, metaSpaceId, pinned, resolved } = await mount();

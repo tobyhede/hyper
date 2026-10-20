@@ -137,9 +137,8 @@ describe('readGitHubAggregate', () => {
       expectNoCredentials(github);
     });
 
-    it("finds the selected directory's tree in its parent and lists only that tree", async () => {
+    it("lists only the selected directory's tree, by its path at the commit, in one call", async () => {
       const github = fakeGitHub({ files: repository });
-      const selectedSha = /\/([0-9a-f]{40})\?recursive=1$/;
 
       const result = await readGitHubAggregate(
         `github:${OWNER}/${REPO}@${COMMIT}/${SELECTED}`,
@@ -147,14 +146,10 @@ describe('readGitHubAggregate', () => {
       );
 
       expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
-      const [contents, tree, ...rest] = github.apiRequests();
-      expect(contents).toBe(`${API}/contents/talks?ref=${COMMIT}`);
-      expect(tree).toMatch(new RegExp(`^${API}/git/trees/[0-9a-f]{40}\\?recursive=1$`));
-      expect(selectedSha.exec(tree ?? '')?.[1]).not.toBe(COMMIT);
-      expect(rest).toEqual([]);
+      expect(github.apiRequests()).toEqual([`${API}/git/trees/${COMMIT}:${SELECTED}?recursive=1`]);
     });
 
-    it("finds a directory at the repository's root in the root's listing", async () => {
+    it("lists a directory at the repository's root by its path at the commit", async () => {
       const github = fakeGitHub({ files: under('pgdu', fixtureFiles) });
 
       const result = await readGitHubAggregate(
@@ -163,8 +158,7 @@ describe('readGitHubAggregate', () => {
       );
 
       expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
-      expect(github.apiRequests()[0]).toBe(`${API}/contents?ref=${COMMIT}`);
-      expect(github.apiRequests()).toHaveLength(2);
+      expect(github.apiRequests()).toEqual([`${API}/git/trees/${COMMIT}:pgdu?recursive=1`]);
       expect(github.rawRequests()).toEqual(sorted(under('pgdu', fixtureFiles).keys()));
     });
 
@@ -414,6 +408,50 @@ describe('readGitHubAggregate', () => {
       failure: { kind: 'blob-failed', path: 'hyper.json', status: 500 },
     });
     expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(2);
+  });
+
+  it('retries a blob whose fetch threw once, and mounts', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ throws: true }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+    expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(2);
+    expect(waits).toEqual([1000]);
+  });
+
+  it('fails a blob whose fetch still throws after its one retry, naming it', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ throws: true }, { throws: true }]]]),
+    });
+    const { wait } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'blob-failed', path: 'hyper.json' } });
+  });
+
+  it('cancels the blobs in flight once one fails, answering the first failure', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      holdRaw: true,
+      blobFailures: new Map([['hyper.json', [{ status: 404 }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-failed', path: 'hyper.json', status: 404 },
+    });
+    expect(github.cancelledRaw()).toBeGreaterThan(0);
+    expect(waits).toEqual([]);
   });
 
   it('does not retry a blob that is not there', async () => {

@@ -781,6 +781,23 @@ describe('a file that is a symbolic link, on disk', () => {
     expect((await readAggregate(root, countingIds())).metaSpaceId).toBe(META_SPACE_ID);
   });
 
+  it('leaves a link in images/ to the author: neither admitted nor owned by Export', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
+    const image = await admitted(pngBytes(7));
+    const target = join(await makeTemporaryDirectory(), 'picture.png');
+    await writeFile(target, image.bytes);
+    await mkdir(join(root, 'images'));
+    await symlink(target, join(root, 'images', `${image.id}.png`));
+
+    expect(await scannedAggregateFiles(root)).toEqual([
+      AGGREGATE_FILE_NAME,
+      `${META_SPACE_ID}/space.json`,
+    ]);
+    expect((await readAggregate(root, countingIds())).images).toEqual([]);
+  });
+
   it('lists no dangling link, and no Space whose space.json is one', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
