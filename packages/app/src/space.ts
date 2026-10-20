@@ -73,6 +73,10 @@ const browserImageSources = (): ImageSources => {
  * The other four seams default together and for one reason: this is the composition
  * root, and it is where the ambient browser, the ambient generator and the real
  * transport — for Spaces and for images — are named. Everything below takes each of them required.
+ *
+ * `mounted` says the session is Mounting an aggregate (ADR 0130), so no Space
+ * it opens offers an Edit. It defaults to `false`: only a mount composition
+ * sets it.
  */
 export const createSpaceStartup = (
   fullscreen: Fullscreen,
@@ -81,6 +85,7 @@ export const createSpaceStartup = (
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
   images: ImageSources = browserImageSources(),
+  mounted = false,
 ): SpaceStartup => {
   let owner: Promise<OpenSpaces> | undefined;
   const openSpaces = (): Promise<OpenSpaces> => {
@@ -100,6 +105,7 @@ export const createSpaceStartup = (
         images,
         fullscreen,
         presentations,
+        mounted,
       });
     });
     owner = opening;

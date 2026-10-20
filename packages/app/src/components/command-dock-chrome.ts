@@ -96,7 +96,14 @@ export interface DockChrome {
   readonly canvas: DockCanvas;
   readonly graph: DockGraph;
   readonly resources: DockResources;
-  readonly persistence: DockPersistence;
+  /**
+   * The persistence report, or `null` in a mounted session (ADR 0130).
+   *
+   * A mounted session never commits, so it has no persistence state to report,
+   * `Persisted` included. The Dock draws its read-only mark instead, which is
+   * not a persistence status: it says the session offers no Edit at all.
+   */
+  readonly persistence: DockPersistence | null;
 }
 
 /** What went wrong, which is the only report persistence ever gives. */

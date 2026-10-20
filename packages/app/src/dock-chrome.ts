@@ -455,23 +455,26 @@ export function useDockChrome(
         reportBreak,
       }),
     },
-    persistence: {
-      state: persistence,
-      active,
-      onRetry: authoring.retryPersistence,
-      // Entered rather than opened in a new tab, so the blocking Space is where
-      // the author stands while resolving it.
-      onOpenSpace:
-        spaces === null
-          ? null
-          : (spaceId, title) => {
-              void commandOutcomes.run('space-enter', async () => spaces.enter(spaceId), {
-                subject: title,
-              });
-            },
-      onAcceptRemote: authoring.acceptStoredSpace,
-      onKeepLocal: authoring.keepLocalWork,
-    },
+    // A mounted session never commits, so it reports no persistence state.
+    persistence: app.mounted
+      ? null
+      : {
+          state: persistence,
+          active,
+          onRetry: authoring.retryPersistence,
+          // Entered rather than opened in a new tab, so the blocking Space is where
+          // the author stands while resolving it.
+          onOpenSpace:
+            spaces === null
+              ? null
+              : (spaceId, title) => {
+                  void commandOutcomes.run('space-enter', async () => spaces.enter(spaceId), {
+                    subject: title,
+                  });
+                },
+          onAcceptRemote: authoring.acceptStoredSpace,
+          onKeepLocal: authoring.keepLocalWork,
+        },
   };
   return { chrome, onChromeContinuationLand };
 }

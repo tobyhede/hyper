@@ -477,6 +477,7 @@ export function useCanvasResourceAuthoring({
   const sharedContext = useMemo(
     () => ({
       authorOnCanvas: availability.authorOnCanvas,
+      resourceActions: availability.resourceActions,
       bodyEditing,
       bodyEditorResourceId,
       editableResourceIds,
@@ -492,6 +493,7 @@ export function useCanvasResourceAuthoring({
     }),
     [
       availability.authorOnCanvas,
+      availability.resourceActions,
       bodyEditing,
       bodyEditorResourceId,
       editableResourceIds,
@@ -533,7 +535,8 @@ export function useCanvasResourceAuthoring({
     deleteConfirmation,
     completeSpaceResourceSelection,
     portalEditing,
-    onPortalEditingChange,
+    // An Open Space Resource offers its Edit only where one may begin.
+    onPortalEditingChange: availability.embeddedMapEdit ? onPortalEditingChange : undefined,
     contextNotices,
     onContextEditingChange,
     onContextReport,

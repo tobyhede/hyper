@@ -107,6 +107,8 @@ export function surfaceAvailability(
         selectNodes: false,
         navigate: false,
         replaceSession: false,
+        resourceActions: false,
+        embeddedMapEdit: false,
       };
 }
 

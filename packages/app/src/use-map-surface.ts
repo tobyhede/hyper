@@ -52,6 +52,9 @@ export function useMapSurface(
       ...facts,
       ...renderedFacts(canvasRendering),
       replacingImage: ownReplacement || anyReplacement,
+      // A session-wide answer the composition carries, so a drawing of
+      // another mounted Space answers it too.
+      mounted: app.mounted,
     },
     state.replacementEpoch,
   );

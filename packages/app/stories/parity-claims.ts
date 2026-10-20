@@ -529,6 +529,15 @@ export const parityClaims: readonly ParityClaim[] = [
       'While an Image Resource’s replacement is held, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed.',
   },
   {
+    id: 'command-dock-marks-a-mounted-session-read-only',
+    storyFile: 'space/command-dock.stories.tsx',
+    storyExport: 'Mounted',
+    claim:
+      'A mounted session draws the read-only mark in the Dock and no persistence state beside it, offers no rename and no Create, and keeps Present and the Space, Map and Graph choices available.',
+    applicationEvidence:
+      'No application host mounts an aggregate yet: the in-page mount composition that sets `mounted` is `.scratch/mounting/issues/02-mount-an-aggregate-in-the-page.md`, and its end-to-end proof is the Mounting Playwright project the spec names. Until then the session is composed with `mounted` through `createOpenSpaces`, which `packages/app/test/mounted-session.test.tsx` drives through the production application.',
+  },
+  {
     id: 'command-dock-fits-a-narrow-container',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Narrow',

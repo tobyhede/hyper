@@ -1240,6 +1240,46 @@ test(
 );
 
 /**
+ * A mounted session is read-only (ADR 0130): the Dock says so with its own
+ * mark, reports no persistence state, and withholds every Edit while keeping
+ * what reads.
+ */
+test(
+  'a mounted session draws the read-only mark and withholds every Edit the Dock offers',
+  { tag: '@parity:command-dock-marks-a-mounted-session-read-only' },
+  async ({ page }) => {
+    await page.goto(story('mounted'));
+
+    await expect(surface(page).getByText('Read-only', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('persistence-status')).toHaveCount(0);
+    await expect(page.getByText('Persisted')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+
+    for (const create of await surface(page)
+      .getByRole('button', { name: /^Create / })
+      .all()) {
+      await expect(create).toHaveAttribute('aria-disabled', 'true');
+    }
+    await expect(surface(page).getByRole('button', { name: /^Present/ })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+
+    const maps = await disclose(page, 'Map: Collection 1');
+    for (const edit of ['New Map', 'Rename']) {
+      await expect(maps.getByRole('menuitem', { name: edit, exact: true })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
+    }
+    await expect(maps.getByRole('menuitemradio', { name: 'Collection 2' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  },
+);
+
+/**
  * The Dock docks to its **container's** edges, and the container is the
  * viewport-sized canvas — so every story is framed, and Ladle's own toolbar
  * would otherwise land on top of the surface under test. Proven by driving real
