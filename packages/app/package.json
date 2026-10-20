@@ -18,6 +18,7 @@
     "dev:roadmap": "vite --mode roadmap --port 5176 --strictPort",
     "http-server:build": "vite build --config http-server-build.config.ts",
     "build": "tsc -p tsconfig.json --noEmit && pnpm http-server:build && vite build",
+    "build:mount": "vite build --config vite.mount.config.ts",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "ladle": "ladle serve",

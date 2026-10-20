@@ -41,13 +41,13 @@ export const uncataloguedComponents = [
       'Isolated single-Space mounting adapter, reached only by `packages/app/test/space-mounting.ts`. Startup mounts `OpenSpacesApplication` for every host, so no story renders this and an import edge would be the only evidence catalogue coverage could rest on.',
   },
   {
-    module: 'packages/app/src/components/GitHubLocationForm.tsx',
-    reason:
-      'Without a consumer until the static mount entry (`.scratch/mounting/issues/06`) renders it for a page with no `source` parameter and no build-time default, so no production state reaches it yet. It composes `Field`, `FieldLabel`, `Input`, `FieldDescription`, `FieldError` and `Button` from `@project/ui` and hand-rolls no behaviour; `packages/app/test/GitHubLocationForm.test.tsx` holds what it does.',
-  },
-  {
     module: 'packages/app/src/main.tsx',
     reason: 'The browser entry point: one `createRoot` call and startup composition.',
+  },
+  {
+    module: 'packages/app/src/mount-main.tsx',
+    reason:
+      'The mount entry point (ADR 0130): one `createRoot` call and the mount composition, rendering `GitHubLocationForm` when the page has no location to mount.',
   },
   {
     module: 'packages/react-flow-adapter/src/ResourceNode.tsx',

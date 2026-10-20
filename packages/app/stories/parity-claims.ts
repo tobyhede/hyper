@@ -534,8 +534,6 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'Mounted',
     claim:
       'A mounted session draws the read-only mark in the Dock and no persistence state beside it, offers no rename and no Create, and keeps Present and the Space, Map and Graph choices available.',
-    applicationEvidence:
-      'No `packages/app/e2e` test carries this claim, because those hosts serve a stored repository and none mounts an aggregate. The story composes the session with `mounted` through `createOpenSpaces`, as `createMountedStartup` (`packages/app/src/mount/mounted-startup.ts`) composes every mounted session. `packages/app/test/mount.test.tsx` opens a mounted aggregate through that startup and finds the mark with no persistence status, and `packages/app/test/mounted-session.test.tsx` drives each gate through the production application, mounted and unmounted.',
   },
   {
     id: 'command-dock-fits-a-narrow-container',
@@ -975,5 +973,12 @@ export const parityClaims: readonly ParityClaim[] = [
     storyExport: 'SelectedMap',
     claim:
       'An Open Space Resource’s Graph list marks each row with the same legend mark, in the colour and head shape the target draws that Graph’s Edges in, and its Map list carries no mark.',
+  },
+  {
+    id: 'github-location-form-refuses-a-location-that-does-not-read',
+    storyFile: 'components/github-location-form.stories.tsx',
+    storyExport: 'Asking',
+    claim:
+      'A mounted page asking for its GitHub location refuses one that does not read, beside the field with the parser’s reason and the field marked invalid, keeping what was typed; a location that reads clears the refusal and opens.',
   },
 ] as const;

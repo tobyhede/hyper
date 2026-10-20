@@ -29,6 +29,8 @@
     ".ladle/components.tsx",
     "vite.config.ts",
     "vite.sqlite.config.ts",
+    "vite.mount.config.ts",
+    "mount-headers.ts",
     "vite-space-http-plugin.ts",
     "http-server-build.config.ts",
     "ladle-vite.config.ts"

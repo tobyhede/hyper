@@ -16,6 +16,7 @@ import { stubResizeObserver } from './resize-observer';
 
 const META_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const MISSING_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 const IMAGE_ID = 'fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
 
 /** The fixture names every identity it holds, so mounting it mints none. */
@@ -37,6 +38,11 @@ const recordingObjectUrls = () => {
 
 const PINNED = `github:${OWNER}/${REPO}@${COMMIT}`;
 const META_PATH = productDestinationPath({ kind: 'space', spaceId: META_SPACE_ID });
+const MISSING_MAP_PATH = productDestinationPath({
+  kind: 'map',
+  spaceId: META_SPACE_ID,
+  mapId: uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'),
+});
 
 const location = (input: string): GitHubLocation => {
   const parsed = parseGitHubLocation(input);
@@ -316,5 +322,56 @@ describe('mounting an aggregate in the page', () => {
     expect(container).toHaveTextContent(
       `${PINNED} does not directly contain hyper.json, so it is not an Aggregate directory.`,
     );
+  });
+
+  /**
+   * A static host answers every path with the application, so the
+   * application answers an address that names nothing with its "not found"
+   * destination over the Meta Space, rather than failing to start (ADR 0130).
+   */
+  it.each([
+    ['an unresolved Map', MISSING_MAP_PATH],
+    ['a malformed Space', '/spaces/not-a-compact-uuid'],
+    ['a path outside product addressing', '/talk'],
+  ])('answers %s with the Meta Space and the not-found report', async (_, path) => {
+    const history = recordingHistory(`${path}?source=${PINNED}`);
+
+    const result = await mountedStartup(fixtureFiles(), { history, source: PINNED }).resolve(path);
+
+    if (result.kind !== 'opened') throw new Error('The address opens a Space.');
+    expect(result.opened.app.currentSpace().id).toBe(META_SPACE_ID);
+    expect(result.spaces.browserLocation.getState().destinationNotFound).toBe(true);
+    expect(history.writes).toEqual([]);
+  });
+
+  it('fails startup on a Notes address for a missing Space', async () => {
+    const path = productDestinationPath({ kind: 'notes', spaceId: MISSING_SPACE_ID });
+
+    await expect(
+      mountedStartup(fixtureFiles(), { history: recordingHistory(path), source: PINNED }).resolve(
+        path,
+      ),
+    ).rejects.toThrow('The product URL does not resolve.');
+  });
+
+  it('answers /index.html as the root', async () => {
+    const history = recordingHistory('/index.html');
+
+    const result = await mountedStartup(fixtureFiles(), { history }).resolve('/index.html');
+
+    if (result.kind !== 'opened') throw new Error('The address opens a Space.');
+    expect(result.spaces.browserLocation.getState().destinationNotFound).toBe(false);
+    expect(history.writes).toEqual([{ method: 'replace', path: `${META_PATH}?source=${PINNED}` }]);
+  });
+
+  it('draws the not-found report over the Meta Space', async () => {
+    const path = MISSING_MAP_PATH;
+    const history = recordingHistory(`${path}?source=${PINNED}`);
+
+    const container = await render(() =>
+      mountedStartup(fixtureFiles(), { history, source: PINNED }).resolve(path),
+    );
+
+    expect(await within(container).findByText('Destination not found')).toBeInTheDocument();
   });
 });

@@ -1,6 +1,8 @@
 node_modules/
 dist/
 packages/app/dist-http/
+# `pnpm build:mount`'s static application for Mounting (ADR 0130).
+packages/app/dist-mount/
 # `ladle build`'s static output — the surface inventory as a hostable site.
 packages/app/build/
 .DS_Store

@@ -1,5 +1,10 @@
 import type { UUID } from '@project/core';
-import { productDestinationPath } from '@project/http';
+import {
+  productAddress,
+  productDestinationPath,
+  resolveProductDestination,
+  type HttpSpaceBackend,
+} from '@project/http';
 import type { HistoryApi } from '../browser-location';
 import type { PresentationLinks } from '../presentation-link';
 import type { Fullscreen } from '../presenting-fullscreen';
@@ -37,6 +42,7 @@ export interface MountedStartupOptions extends Pick<AggregateMount, 'newId' | 'c
 
 interface Mounted {
   readonly startup: SpaceStartup;
+  readonly backend: HttpSpaceBackend;
   readonly metaSpaceId: UUID;
   /** The complete resolved location, as `source` names it. */
   readonly pinned: string;
@@ -54,7 +60,9 @@ interface Mounted {
  * the complete resolved location in `source`, so a reload, a copied link and a
  * Notes window read the same commit. The root resolves here, in the client, to
  * the Meta Space's address, as the Space host's redirect does on a server, and
- * the one write that moves the address there pins the source as well.
+ * the one write that moves the address there pins the source as well. An
+ * address that names nothing opens the Meta Space under the application's
+ * "not found" report, where a server would answer 404.
  */
 export const createMountedStartup = (options: MountedStartupOptions): SpaceStartup => {
   const { history } = options;
@@ -83,7 +91,7 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         displayImage,
         { mounted: true },
       );
-      return { startup, metaSpaceId, pinned, resolved: read.aggregate.location };
+      return { startup, backend, metaSpaceId, pinned, resolved: read.aggregate.location };
     })();
     mounting = attempt;
     // A failed read or a refusal is not kept, so a later resolve reads again.
@@ -94,14 +102,33 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
   };
   return {
     resolve: async (pathname) => {
-      const { startup, metaSpaceId, pinned, resolved } = await mount();
-      if (pathname !== '/') {
-        pinSource(history, resolved);
+      const { startup, backend, metaSpaceId, pinned, resolved } = await mount();
+      const meta = productDestinationPath({ kind: 'space', spaceId: metaSpaceId });
+      // A static host may serve the application at `/index.html` as well as
+      // at the root, and both mean the root.
+      if (pathname === '/' || pathname === '/index.html') {
+        history.replace(withSource(meta, pinned));
+        return await startup.resolve(meta);
+      }
+      pinSource(history, resolved);
+      // A Notes window follows a presenting window, so one over a missing
+      // Space has nothing to follow and fails startup as it does on a host.
+      const address = productAddress(pathname);
+      if (address.kind === 'addressed' && address.destination.kind === 'notes') {
         return await startup.resolve(pathname);
       }
-      const meta = productDestinationPath({ kind: 'space', spaceId: metaSpaceId });
-      history.replace(withSource(meta, pinned));
-      return await startup.resolve(meta);
+      const resolution = await resolveProductDestination(
+        { loadSpace: (spaceId) => backend.loadSpace(spaceId) },
+        pathname,
+      );
+      if (resolution.kind === 'resolved') return await startup.resolve(pathname);
+      // A static host answers every path with the application, so an address
+      // that names nothing is answered here: the Meta Space, with the
+      // application's "not found" report over it and the address left as the
+      // reader typed it, until their first move corrects it.
+      const result = await startup.resolve(meta);
+      if (result.kind === 'opened') result.spaces.browserLocation.reportArrivalNotFound();
+      return result;
     },
   };
 };

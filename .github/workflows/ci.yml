@@ -533,9 +533,58 @@ jobs:
             test-results/
           retention-days: 7
 
+  mount:
+    needs: reuse-pr-ci
+    if: ${{ !cancelled() && needs.reuse-pr-ci.outputs.should_skip != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The static build for Mounting (ADR 0130), end to end: `pnpm e2e:mount`
+    # builds it with `pnpm build:mount`, serves it from a static server with
+    # single-page fallback under the build's own `_headers`, and answers GitHub
+    # from the tracked fixture by route interception. Its own job for the
+    # reason `ladle` is one: a red static build is a different diagnosis from a
+    # red application, and `pnpm e2e`'s hosts are Vite servers, not a build.
+    #
+    # Every environment decision is the `e2e` job's, made for the reasons its
+    # comments give: the same image pinned by tag *and* digest (a bump moves
+    # this third copy too), `--ipc=host`, `--init`, and `setup-node` overlaying
+    # `.node-version`. The cache key and the artifact name are its own, for the
+    # reasons `ladle`'s comments give.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
+      options: --ipc=host --init
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - name: Resolve the pnpm store
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-mount-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-mount-${{ runner.os }}-
+      - run: pnpm install --frozen-lockfile
+
+      # Builds the static application itself, so there is no build step here.
+      - run: pnpm e2e:mount
+
+      - if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mount-playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   ci:
     name: CI passed
-    needs: [reuse-pr-ci, static-checks, coverage, postgres, sqlite, e2e, ladle]
+    needs: [reuse-pr-ci, static-checks, coverage, postgres, sqlite, e2e, ladle, mount]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -563,13 +612,14 @@ jobs:
           SQLITE: ${{ needs.sqlite.result }}
           E2E: ${{ needs.e2e.result }}
           LADLE: ${{ needs.ladle.result }}
+          MOUNT: ${{ needs.mount.result }}
         run: |
           if [ "$REUSED" = "true" ]; then
             echo "All CI gates were reused from a successful run for the same Git tree."
             exit 0
           fi
 
-          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$SQLITE" "$E2E" "$LADLE"; do
+          for result in "$STATIC_CHECKS" "$COVERAGE" "$POSTGRES" "$SQLITE" "$E2E" "$LADLE" "$MOUNT"; do
             if [ "$result" != "success" ]; then
               echo "A required CI job did not succeed: $result"
               exit 1
