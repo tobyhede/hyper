@@ -6,7 +6,7 @@ import {
   type MalformedGitHubLocation,
   type ResolvedGitHubLocation,
 } from './github-location';
-import { scannedAggregatePaths } from './scanned-aggregate-paths';
+import { scannedAggregatePaths } from '@project/aggregate';
 
 /**
  * The GitHub source (ADR 0130): a GitHub location read into the files of the
