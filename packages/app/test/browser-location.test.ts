@@ -12,6 +12,7 @@ import { createBrowserHistory } from '../src/browser-history';
 import { createBrowserLocation, NavigationUnavailableError } from '../src/browser-location';
 import { composeApp } from '../src/compose-app';
 import { pinSource } from '../src/mount/mount-source';
+import { sourceParameter, withSource } from '../src/source-parameter';
 import { recordingHistory, standInBrowser } from './browser-history';
 import type { ImageSources } from '../src/image-creation';
 import { heldImageSources, unusedImageSources } from './image-sources';
@@ -585,6 +586,15 @@ const sourced = (path: string, source = SOURCE): string => `${path}?source=${sou
  * makes carries the parameter and no destination resolver ever reads it.
  */
 describe('the mounted source in the address', () => {
+  it('reads a literal + in the source as itself, as a hand-typed ref spells it', () => {
+    expect(sourceParameter('https://hyper.test/?source=github:o/r@v1.0+build')).toBe(
+      'github:o/r@v1.0+build',
+    );
+    expect(sourceParameter(`https://hyper.test/${withSource('', 'github:o/r@v1.0+build')}`)).toBe(
+      'github:o/r@v1.0+build',
+    );
+  });
+
   it('survives a Map move', () => {
     const app = compose();
     const history = recordingHistory(sourced(mapPath(MAP_ID)));
