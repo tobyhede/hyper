@@ -34,6 +34,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
+      "@project/aggregate": ["./packages/aggregate/src/index.ts"],
       "@project/core": ["./packages/core/src/index.ts"],
       "@project/graph": ["./packages/graph/src/index.ts"],
       "@project/http": ["./packages/http/src/index.ts"],

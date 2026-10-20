@@ -290,7 +290,7 @@ describe('SQLite HTTP runtime', () => {
 
   // A real, non-mocked case of the "not JSON" flavour, driven
   // through composition rather than a stubbed repository. Both of the host's
-  // `classifyStoredFailure` calls (`src/http/space-host.ts`'s `readAggregate`
+  // `classifyStoredFailure` calls (`packages/aggregate/src/space-host.ts`'s `readAggregate`
   // re-reads once rather than rethrowing; the root's catch classifies) are
   // exercised for it: the read fails identically every time this row is behind
   // it, so `GET /` answers `internal-error` — a permanent defect. The retry/give-up policy is held by

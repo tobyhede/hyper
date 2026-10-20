@@ -2,7 +2,7 @@ import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { RepositoryCommitResult } from '@project/persistence';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 import { createPostgresDatabase, type PostgresDatabase } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { clearHyperContent } from '../support/clear-hyper-content';

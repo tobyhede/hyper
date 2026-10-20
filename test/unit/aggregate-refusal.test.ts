@@ -1,7 +1,7 @@
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import type { SpaceAggregateError } from '@project/graph';
 import { describe, expect, it } from 'vitest';
-import { describeAggregateRefusal } from '../../src/cli/aggregate-refusal';
+import { describeAggregateRefusal } from '@project/aggregate';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const TARGET_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');

@@ -23,7 +23,7 @@ describe('http server build config', () => {
 
   it('resolves every `@project/*` alias to a real file regardless of cwd', () => {
     const alias = resolved.resolve?.alias ?? {};
-    expect(Object.keys(alias)).toHaveLength(4);
+    expect(Object.keys(alias)).toHaveLength(5);
     for (const [name, target] of Object.entries(alias)) {
       expect(isAbsolute(target), `${name} is absolute`).toBe(true);
       expect(existsSync(target), `${name} -> ${target}`).toBe(true);

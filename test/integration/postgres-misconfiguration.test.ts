@@ -1,7 +1,7 @@
 import postgres from '@prisma-next/postgres/runtime';
 import { classifyStoredFailure, PersistenceUnavailableError } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { Contract } from '../../src/prisma/contract.d';
 import { configuredDatabaseUrl, postgresOptionsFor } from '../../src/prisma/db';

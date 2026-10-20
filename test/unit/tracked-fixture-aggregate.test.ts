@@ -8,7 +8,7 @@ import { isImageId } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importFixture } from '../support/import-fixture';
 import { exportAggregate } from '../../src/export/export-aggregate';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 

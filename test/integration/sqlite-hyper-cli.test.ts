@@ -3,14 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  AGGREGATE_FILE_NAME,
-  writeSpaceDirectory as writeLoadedSpaceDirectory,
-} from '../../src/aggregate-directory';
+import { writeSpaceDirectory as writeLoadedSpaceDirectory } from '../../src/aggregate-directory';
 import { runHyper } from '../../src/cli/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { runHyperScript } from '../support/hyper-command';

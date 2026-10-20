@@ -10,7 +10,7 @@ import {
   type SpaceCommit,
 } from '@project/persistence';
 import { expect } from 'vitest';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 
 /*
  * Memory and the one SQL repository (ADR 0095) run the same commit decision,

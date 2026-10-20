@@ -3,7 +3,7 @@ import { newUuid } from '@project/core';
 import { runDatabaseCli } from '../../src/cli/database-entry';
 import type { DatabaseCommand } from '../../src/cli/arguments';
 import type { DatabaseTarget } from '../../src/database/database-target';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 
 /**
  * Opening the target and running the command are two phases with two

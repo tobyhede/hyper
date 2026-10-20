@@ -1,6 +1,6 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
 import { newSpace, parseResourceFiles } from '@project/graph';
-import type { AggregateInput } from '../persistence/space-repository';
+import type { AggregateInput } from '@project/aggregate';
 
 /**
  * The aggregate a repository is initialized from — ADR 0077's **Default

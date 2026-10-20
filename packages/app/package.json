@@ -27,6 +27,7 @@
     "dev:sqlite": "vite --config vite.sqlite.config.ts --port 5177 --strictPort"
   },
   "dependencies": {
+    "@project/aggregate": "workspace:*",
     "@project/core": "workspace:*",
     "@project/graph": "workspace:*",
     "@project/http": "workspace:*",
@@ -36,6 +37,7 @@
     "@xyflow/react": "12.11.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "zod": "^3.23.8",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

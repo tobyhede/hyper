@@ -28,13 +28,13 @@ import {
   type StoredImage,
 } from '@project/persistence';
 import { isDeepStrictEqual } from 'node:util';
-import { classifyInitializedAggregate } from './aggregate-lifecycle';
+import { classifyInitializedAggregate } from '@project/aggregate';
 import type {
   AggregateInput,
   InitializeAggregateResult,
   ReplaceAggregateResult,
   SpaceRepository,
-} from './space-repository';
+} from '@project/aggregate';
 import { type SqlLoadedSpaceRow, type SqlStore, type SqlTables } from './sql-store';
 
 class SnapshotValidationError extends Error {}

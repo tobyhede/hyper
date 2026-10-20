@@ -16,7 +16,8 @@ import { fileURLToPath } from 'node:url';
 import { newUuid, uuidSchema, type SpaceSnapshot } from '@project/core';
 import { HttpSpaceBackend } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
+import { AGGREGATE_FILE_NAME } from '@project/aggregate';
+import { readSingleSpace } from '../../src/aggregate-directory';
 import {
   RUN_QUIET_MILLISECONDS,
   initAggregate,

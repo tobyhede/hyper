@@ -136,7 +136,7 @@ const problem = (
  * own detail: 503 would tell the client to wait out something this code has
  * no evidence will pass, such as a wrong password. Every route that reads or
  * writes the stored seam answers by it — the collection and single-Space reads
- * included. `src/http/space-host.ts` answers `GET /` by the same
+ * included. `packages/aggregate/src/space-host.ts` answers `GET /` by the same
  * three arms; it cannot share this helper across the package boundary.
  */
 const storedFailureProblem = (context: Context, error: unknown) => {
@@ -551,7 +551,7 @@ export const createSpaceHttpApp = (
         // snapshot — so a rival host's commit landing between them can make a
         // healthy store look like "Spaces without Meta" for an instant. So it
         // is re-read once before letting an invariant failure stand — the
-        // same rule `src/http/space-host.ts`'s `readAggregate` applies for
+        // same rule `packages/aggregate/src/space-host.ts`'s `readAggregate` applies for
         // `GET /`, mirrored here rather than shared, because `@project/http`
         // cannot import across the package boundary into `src/`.
         let loaded;

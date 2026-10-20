@@ -8,11 +8,7 @@ import {
 } from '@project/core';
 import { decodeCommitRequest } from '@project/persistence';
 import { describe, expect, it } from 'vitest';
-import {
-  describeSchemaFailure,
-  identifySpace,
-  SpaceIdentityError,
-} from '../../src/aggregate-directory';
+import { describeSchemaFailure, identifySpace, SpaceIdentityError } from '@project/aggregate';
 
 /**
  * What is pinned is the shape of the rejection a client reads, not import
@@ -23,7 +19,7 @@ import {
  * codec throws prose, not Zod" forbids. Pin the shape, not Zod's wording, which
  * is version-dependent.
  *
- * The CLI's door is `identifySpace` (`src/aggregate-directory/identify-space.ts`),
+ * The CLI's door is `identifySpace` (`packages/aggregate/src/identify-space.ts`),
  * which raises `SpaceIdentityError` carrying the summary `describeSchemaFailure`
  * writes. Two functions format that summary — `describeSchemaFailure` and
  * `decodeSnapshot` in `packages/persistence/src/http-protocol.ts` — because
