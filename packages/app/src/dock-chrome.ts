@@ -455,26 +455,29 @@ export function useDockChrome(
         reportBreak,
       }),
     },
-    // A mounted session never commits, so it reports no persistence state.
-    persistence: app.mounted
-      ? null
-      : {
-          state: persistence,
-          active,
-          onRetry: authoring.retryPersistence,
-          // Entered rather than opened in a new tab, so the blocking Space is where
-          // the author stands while resolving it.
-          onOpenSpace:
-            spaces === null
-              ? null
-              : (spaceId, title) => {
-                  void commandOutcomes.run('space-enter', async () => spaces.enter(spaceId), {
-                    subject: title,
-                  });
-                },
-          onAcceptRemote: authoring.acceptStoredSpace,
-          onKeepLocal: authoring.keepLocalWork,
-        },
+    readOnly: app.mounted,
+    // A mounted session stores nothing, so it does not report `Persisted`; a
+    // refused write is reported as anywhere else.
+    persistence:
+      app.mounted && persistence.kind === 'settled'
+        ? null
+        : {
+            state: persistence,
+            active,
+            onRetry: authoring.retryPersistence,
+            // Entered rather than opened in a new tab, so the blocking Space is where
+            // the author stands while resolving it.
+            onOpenSpace:
+              spaces === null
+                ? null
+                : (spaceId, title) => {
+                    void commandOutcomes.run('space-enter', async () => spaces.enter(spaceId), {
+                      subject: title,
+                    });
+                  },
+            onAcceptRemote: authoring.acceptStoredSpace,
+            onKeepLocal: authoring.keepLocalWork,
+          },
   };
   return { chrome, onChromeContinuationLand };
 }
