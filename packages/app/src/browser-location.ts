@@ -11,6 +11,7 @@ import {
 import type { DestinationOpening } from './destination-opening';
 import { resolveMap } from './map-resolution';
 import { navigationAddress } from './navigation';
+import { sourceParameter, withSource } from './source-parameter';
 
 /**
  * The whole of what this application asks a browser for.
@@ -158,6 +159,14 @@ export function createBrowserLocation(
     observable.publish({ addressedResourceId, destinationNotFound });
   };
 
+  /**
+   * A destination's product path, with the mounted page's `source` carried
+   * after it when the current location has one (ADR 0130). Destinations
+   * resolve the pathname alone, so carrying it changes no decision.
+   */
+  const addressOf = (destination: ProductDestination): string =>
+    withSource(productDestinationPath(destination), sourceParameter(history.href()));
+
   const positionOf = (app: ComposedApp): AddressedPosition => ({
     ...navigationAddress(app.navigation.getState()),
     addressedResourceId,
@@ -200,7 +209,7 @@ export function createBrowserLocation(
     // resource every caller has to remember.
     destinationNotFound = false;
     syncedUnresolved = false;
-    const path = productDestinationPath(decision.destination);
+    const path = addressOf(decision.destination);
     if (decision.kind === 'push') history.push(path);
     else history.replace(path);
   };
@@ -446,7 +455,7 @@ export function createBrowserLocation(
     },
     chooseMap,
     activateGraph,
-    href: (destination) => new URL(productDestinationPath(destination), history.href()).href,
+    href: (destination) => new URL(addressOf(destination), history.href()).href,
     dispose: () => {
       restorationRequest += 1;
       releasePopState();

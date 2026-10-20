@@ -136,6 +136,23 @@ describe('the browser presentation channel', () => {
   it('names one channel per Space', () => {
     expect(presentationChannelName(uuid(2))).not.toBe(presentationChannelName(uuid(3)));
   });
+
+  it('keeps a server session on the name it has always had', () => {
+    expect(presentationChannelName(uuid(2))).toBe(
+      'hyper-presentation:00000000-0000-4000-8000-000000000002',
+    );
+  });
+
+  it('names two mounted revisions of one Space apart', () => {
+    const first = `github:tobyhede/talk@${'a'.repeat(40)}/slides`;
+    const second = `github:tobyhede/talk@${'b'.repeat(40)}/slides`;
+
+    expect(presentationChannelName(uuid(2), first)).not.toBe(
+      presentationChannelName(uuid(2), second),
+    );
+    expect(presentationChannelName(uuid(2), first)).not.toBe(presentationChannelName(uuid(2)));
+    expect(presentationChannelName(uuid(2), first)).toBe(presentationChannelName(uuid(2), first));
+  });
 });
 
 /**

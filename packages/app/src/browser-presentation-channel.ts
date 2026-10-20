@@ -30,6 +30,11 @@ export interface NativePresentationBrowser {
   readonly now: () => number;
   /** `navigator.locks`, which a browser without Web Locks lacks. */
   readonly locks: NativeLocks | undefined;
+  /**
+   * The complete resolved GitHub location a mounted session read, which scopes
+   * its channels by revision. Absent for a server session.
+   */
+  readonly scope?: string;
 }
 
 const isId = (value: unknown): value is UUID => uuidSchema.safeParse(value).success;
@@ -106,8 +111,16 @@ const isPresentationMessage = (value: unknown): value is PresentationMessage => 
   }
 };
 
-/** The name of the channel every window on one Space's presentation shares. */
-export const presentationChannelName = (spaceId: UUID): string => `hyper-presentation:${spaceId}`;
+/**
+ * The name of the channel every window on one Space's presentation shares.
+ *
+ * A mounted session also names its `scope`, the complete resolved GitHub
+ * location it read, so two revisions of one Space on one origin, which share
+ * the Space's ID, cannot follow or control each other (ADR 0130). A server
+ * session has no scope and keeps the name it has always had.
+ */
+export const presentationChannelName = (spaceId: UUID, scope?: string): string =>
+  scope === undefined ? `hyper-presentation:${spaceId}` : `hyper-presentation:${spaceId}@${scope}`;
 
 /**
  * The one adapter over the browser's `BroadcastChannel` for the presentation
@@ -144,10 +157,11 @@ export function createBrowserPresentationLinks({
   window,
   now,
   locks,
+  scope,
 }: NativePresentationBrowser): PresentationLinks {
   return {
     open: (spaceId) =>
-      createBrowserPresentationChannel(openChannel(presentationChannelName(spaceId))),
+      createBrowserPresentationChannel(openChannel(presentationChannelName(spaceId, scope))),
     now,
     leaving: (listener) => {
       window.addEventListener('pagehide', listener);
