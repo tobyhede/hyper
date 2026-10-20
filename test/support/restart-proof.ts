@@ -3,9 +3,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { encodeCompactUuid, type SpaceSnapshot, type UUID } from '@project/core';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { exportAggregate } from '../../src/export/export-aggregate';
-import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
 import { dragBy, nodeByTitle, positionOf, settled } from '../../packages/app/e2e/graph';
 
 /**

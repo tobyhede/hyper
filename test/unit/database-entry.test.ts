@@ -6,7 +6,7 @@ import {
   DatabaseTargetConfigurationError,
   type DatabaseTarget,
 } from '../../src/database/database-target';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 
 const exportCommand: DatabaseCommand = {
   verb: 'export',

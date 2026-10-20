@@ -32,6 +32,10 @@ const NOT_THE_KIND = new Map<string, ReadonlyMap<string, readonly string[]>>([
       ],
       ['packages/app/src/destination-opening.ts', ["if (destination.kind === 'space') {"]],
       [
+        'packages/app/src/mount/mounted-startup.ts',
+        ["const meta = productDestinationPath({ kind: 'space', spaceId: metaSpaceId });"],
+      ],
+      [
         'packages/app/src/dock-chrome.ts',
         ["onCopyLink: runEntityCommand({ kind: 'space' }, COPY_LINK_ACTION_ID),"],
       ],
@@ -67,10 +71,10 @@ const NOT_THE_KIND = new Map<string, ReadonlyMap<string, readonly string[]>>([
       ],
       ['packages/ui/src/icons.tsx', ['data-icon="space"']],
       [
-        'src/aggregate-directory/identify-space.ts',
+        'packages/aggregate/src/identify-space.ts',
         [".map((issue) => `${issue.path.join('.') || 'space'} ${issue.message.toLowerCase()}`)"],
       ],
-      ['src/http/space-host.ts', ["kind: 'space',"]],
+      ['packages/aggregate/src/space-host.ts', ["kind: 'space',"]],
     ]),
   ],
 ]);

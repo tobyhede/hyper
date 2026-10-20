@@ -1,11 +1,11 @@
 # 04 — Read an aggregate from GitHub
 
-Status: ready-for-agent
+Status: resolved
 
 **What to build:** the GitHub source. It turns a GitHub location into the path-to-bytes map that 01's core reads (ADR 0130).
 
 - Parse `github:owner/repo@ref/path`. `ref` defaults to the repository's default branch and `path` to its root. The ref runs from `@` to the next `/`, so it never contains `/`: a slashed branch is addressed by its commit SHA or a tag, and `github:owner/repo/path` selects a directory on the default branch.
-- A `ref` that is not a 40-character SHA is resolved to a commit with one REST call. The tree of `path` at that SHA is listed with one REST call (`git/trees/<tree>?recursive=1`): at the root `<tree>` is the SHA, and a subdirectory's tree is found first with one call to the Contents API on its parent (`contents/<parent>?ref=<sha>`), so a large repository is never listed whole. Only the paths Importing scans are kept, relative to `path`. Each one is fetched from `raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`.
+- A `ref` that is not a 40-character SHA is resolved to a commit with one REST call. The tree of `path` at that SHA is listed with one REST call (`git/trees/<tree>?recursive=1`): at the root `<tree>` is the SHA, and for a subdirectory it is `<sha>:<path>`, so a large repository is never listed whole. Only the paths Importing scans are kept, relative to `path`. Each one is fetched from `raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`.
 - The selected `path` must directly contain `hyper.json`; its directory is the base for every aggregate file. `hyper.json` names Meta and does not list files. Apply the existing Import discovery rules within that directory, without recursively searching for aggregates. Unrelated repository material and sibling aggregates are outside the mount.
 - Only regular-file tree entries are read. A symbolic link (mode `120000`) and a submodule are left out, as the disk reader leaves out links. A Git LFS pointer is read as the pointer, so a picture stored with LFS is refused as not an image.
 - Blobs are fetched with bounded concurrency, and one answered 429 or 5xx is retried once after its `Retry-After` or a short delay. A blob that still fails fails the mount, naming its path.
@@ -18,3 +18,13 @@ Status: ready-for-agent
 **Acceptance:** tests over an injected `fetch` that answers the ref, tree and blob requests from `packages/app/fixture`. They cover default ref and path, ref resolution to a SHA, a SHA ref costing no resolution call, path scoping, files outside the scanned set never fetched, a truncated tree, rate-limit, not-found and malformed-location failures, a slashed ref read up to its first `/`, a symbolic link left out, and a throttled blob retried once.
 
 A mixed-repository fixture places the selected aggregate beside unrelated files, an unrelated directory and a second aggregate. Only the selected aggregate's scanned files are fetched, and it mounts normally. A missing `hyper.json` at the selected path is refused even when a descendant or sibling contains one.
+
+## Answer
+
+Built in `packages/app/src/mount/`, with no `node:` import:
+
+- `github-location.ts`: `parseGitHubLocation(input)` reads `github:owner/repo[@ref][/path]` into `{ owner, repo, ref, path }` (`ref` undefined for the default branch, `path` `''` for the root) or a `malformed-location` failure. `formatGitHubLocation` writes a resolved location back as `github:owner/repo@<sha>[/path]`, for 05 to pin. A ref runs to the next `/`, so a ref that contains `/` is addressed by its SHA. `isCommitSha` tells a full 40-hex SHA.
+- `github-source.ts`: `readGitHubAggregate(input, fetch)` answers `{ ok: true, aggregate: { location, files } }` or `{ ok: false, failure }`. `files` is a `ReadonlyMap<string, Uint8Array>` keyed by path relative to the selected directory, and `location` is the complete resolved location with its commit SHA. A non-SHA ref costs one `commits/<ref>` call, and the default branch is `commits/HEAD`. A SHA ref costs none. The tree is one `git/trees/<tree>?recursive=1` call, `<tree>` being `<sha>:<path>` for a subdirectory, and each kept file is fetched from `raw.githubusercontent.com` at the SHA. The failures are `malformed-location`, `rate-limited` (403 or 429 with `x-ratelimit-remaining: 0`), `not-found` (404 or 422 from the API), `missing-aggregate-file` (the selected directory does not directly contain `hyper.json`), `truncated-tree`, `request-failed` (any other API status, an unparseable body, or no response) and `blob-failed` (naming the file). No credential is sent, and `fetch` is a parameter. Symbolic links and submodules in the tree are never kept.
+- Which files are kept is `scannedAggregatePaths` from `@project/aggregate` (ticket 01), the same rule the disk shell scans by.
+
+The tests are `packages/app/test/github-location.test.ts` and `packages/app/test/github-source.test.ts`, over an injected `fetch` that fakes GitHub from `packages/app/fixture`, including the mixed repository. "Mounts normally" is held as the selected aggregate's files equalling the tracked fixture's, because the mount seam (02) is not built yet.

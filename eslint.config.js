@@ -83,6 +83,17 @@ const CONTINUATION_IMPORT = {
   message: 'Where an Edit continues is the surface’s decision, not this module’s.',
 };
 
+/**
+ * `@project/aggregate` carries the aggregate lifecycle doors ADR 0078 keeps off
+ * the browser's seam, so within `app` only a Mount's source, which reads an
+ * Aggregate directory into a store (ADR 0130), and the tests import it.
+ */
+const APP_AGGREGATE_IMPORT = {
+  name: '@project/aggregate',
+  message:
+    'Only a Mount (packages/app/src/mount/) imports @project/aggregate: its aggregate lifecycle stays off the browser seam (ADR 0130, ADR 0078).',
+};
+
 const AUTHORING_COMMANDS_MESSAGE =
   'Authoring commands import no continuation, React or DOM: where the caret goes is the surface’s.';
 
@@ -126,6 +137,25 @@ const NODE_BUILTINS = NODE_BUILTIN_NAMES.map((name) => ({ name, message: NODE_ME
 const NODE_BUILTIN_PATTERN = {
   group: ['node:*', ...NODE_BUILTIN_NAMES.map((name) => `${name}/*`)],
   message: NODE_MESSAGE,
+};
+
+/**
+ * The same ban for `@project/aggregate`, which a mounted page reaches (ADR 0130):
+ * the filesystem shell stays under root `src/`.
+ * `test/unit/aggregate-package-browser-safe.test.ts` reads the package's
+ * sources for the same thing.
+ */
+const AGGREGATE_NODE_MESSAGE =
+  '@project/aggregate is browser-safe: read the filesystem in root src/ and pass the bytes in.';
+
+const AGGREGATE_NODE_BUILTINS = NODE_BUILTIN_NAMES.map((name) => ({
+  name,
+  message: AGGREGATE_NODE_MESSAGE,
+}));
+
+const AGGREGATE_NODE_BUILTIN_PATTERN = {
+  group: NODE_BUILTIN_PATTERN.group,
+  message: AGGREGATE_NODE_MESSAGE,
 };
 
 /**
@@ -444,6 +474,20 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
+          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, APP_AGGREGATE_IMPORT],
+          patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
+        },
+      ],
+    },
+  },
+  // A Mount's source and the tests may import `@project/aggregate`; this
+  // restates the `app` zone above without that ban.
+  {
+    files: ['packages/app/src/mount/**/*.{ts,tsx}', 'packages/app/test/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
           paths: UI_IMPLEMENTATION_DEPENDENCIES,
           patterns: [ESCAPE_PATTERN, APP_UI_IMPLEMENTATION_PATTERN],
         },
@@ -468,6 +512,7 @@ export default tseslint.config(
         {
           paths: [
             ...UI_IMPLEMENTATION_DEPENDENCIES,
+            APP_AGGREGATE_IMPORT,
             CONTINUATION_IMPORT,
             ...AUTHORING_COMMANDS_REACT,
           ],
@@ -498,7 +543,7 @@ export default tseslint.config(
       'no-restricted-imports': [
         'error',
         {
-          paths: UI_IMPLEMENTATION_DEPENDENCIES,
+          paths: [...UI_IMPLEMENTATION_DEPENDENCIES, APP_AGGREGATE_IMPORT],
           patterns: [
             ESCAPE_PATTERN,
             APP_UI_IMPLEMENTATION_PATTERN,
@@ -552,6 +597,40 @@ export default tseslint.config(
         {
           paths: [...RENDER_ONLY, ...REACT],
           patterns: [ESCAPE_PATTERN, RENDER_ONLY_PATTERN, REACT_DOM_PATTERN],
+        },
+      ],
+    },
+  },
+  {
+    files: ['packages/aggregate/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            ...RENDER_ONLY,
+            ...REACT,
+            ...AGGREGATE_NODE_BUILTINS,
+            { name: 'vite', message: '@project/aggregate is independent of Vite hosts.' },
+            {
+              name: '@project/app',
+              message: '@project/aggregate is independent of app composition.',
+            },
+          ],
+          patterns: [
+            ESCAPE_PATTERN,
+            RENDER_ONLY_PATTERN,
+            REACT_DOM_PATTERN,
+            AGGREGATE_NODE_BUILTIN_PATTERN,
+            {
+              group: ['vite/*', '@project/app/*'],
+              message: '@project/aggregate is independent of Vite and app composition.',
+            },
+            {
+              group: ['@prisma-next/*'],
+              message: '@project/aggregate depends on its repository interface, not a database.',
+            },
+          ],
         },
       ],
     },

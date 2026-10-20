@@ -416,6 +416,7 @@ describe('useAuthoringAvailability', () => {
     presenting: false,
     spaceOnCanvas: true,
     editingEmbeddedMap: false,
+    mounted: false,
   };
   const withheld = authoringAvailability({
     ...facts,
@@ -645,6 +646,7 @@ describe('useDockChrome', () => {
       editingChromeTitle: false,
       spaceOnCanvas: true,
       editingEmbeddedMap: false,
+      mounted: false,
     });
     const containingSpaceId = () => SPACE_ID;
     const reportBreak = () => undefined;

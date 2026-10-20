@@ -1,8 +1,12 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
 import type { SpaceAggregateError } from '@project/graph';
 import type { LoadedSpace, StoredImage } from '@project/persistence';
-import type { AggregateInput, SpaceRepository } from '../persistence/space-repository';
-import { readAggregate, type AggregateDirectoryContents } from '../aggregate-directory';
+import {
+  type AggregateInput,
+  type SpaceRepository,
+  type AggregateDirectoryContents,
+} from '@project/aggregate';
+import { readAggregate } from '../aggregate-directory';
 
 /**
  * What became of a complete aggregate import.
@@ -23,7 +27,7 @@ export type AggregateImportResult =
    * The Spaces travel with the errors because intake reports a bad Space by its
    * position in the collection it was handed, and a position means nothing to
    * someone holding a directory. The renderer resolves it back to the Space's
-   * own id (`src/cli/aggregate-refusal.ts`).
+   * own id (`packages/aggregate/src/aggregate-refusal.ts`).
    */
   | {
       kind: 'aggregate-refused';

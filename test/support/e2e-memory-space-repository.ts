@@ -1,5 +1,5 @@
 import type { RepositoryCommitResult, SpaceCommit } from '@project/persistence';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 
 /** In-process repository used behind the real HTTP seam in database-free tests. */
 export class E2eMemorySpaceRepository extends MemorySpaceRepository {

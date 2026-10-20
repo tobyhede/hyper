@@ -16,8 +16,9 @@ import type { SpaceAggregateError } from '@project/graph';
  * deliberately does not do this: it writes one short sentence for a person
  * looking at the canvas the fault is already visible on. A CLI author is
  * looking at a directory instead, so the id *is* the useful part. Two audiences,
- * two renderings, and neither is the other's to reuse — `app` is browser-side
- * and `src/` could not import it in any case.
+ * two renderings, and neither is the other's to reuse. A mounted aggregate
+ * that is refused is that second audience too (ADR 0130): its author holds the
+ * directory, so the mount reports in these words (`packages/app/src/mount/`).
  *
  * `snapshotIndex` is resolved against the Spaces that were read, because the
  * index is an artifact of how intake walked them and means nothing to someone

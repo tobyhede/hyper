@@ -2,6 +2,7 @@ import { HttpSpaceBackend, productAddress } from '@project/http';
 import { loadSpaceSnapshot, type Space } from '@project/graph';
 import { newUuid, type ImageNaturalSize, type UUID } from '@project/core';
 import type { SpaceBackend } from '@project/persistence';
+import { displayImageAsAuthored, type ImageDisplay } from '@project/ui';
 import type { HistoryApi } from './browser-location';
 import { createBrowserHistory } from './browser-history';
 import { pickImagesInBrowser } from './browser-file-picker';
@@ -53,15 +54,19 @@ const measureInBrowser = (url: string): Promise<ImageNaturalSize | undefined> =>
     picture.src = url;
   });
 
-/** The host's image store over HTTP, and the browser measuring what it loads and choosing files. */
-const browserImageSources = (): ImageSources => {
-  const host = new HttpSpaceBackend();
-  return {
-    store: (image) => host.storeImage(image),
-    measure: measureInBrowser,
-    pick: pickImagesInBrowser,
-  };
-};
+/**
+ * The host's image store over HTTP, and the browser measuring what it loads and
+ * choosing files. A picture is measured where `displayImage` draws it from, so
+ * a measurement loads what the Resource will show.
+ */
+export const browserImageSources = (
+  host: HttpSpaceBackend = new HttpSpaceBackend(),
+  displayImage: ImageDisplay = displayImageAsAuthored,
+): ImageSources => ({
+  store: (image) => host.storeImage(image),
+  measure: (url) => measureInBrowser(displayImage(url)),
+  pick: pickImagesInBrowser,
+});
 
 /**
  * Compose browser startup around one fixed persistence backend.
@@ -70,9 +75,17 @@ const browserImageSources = (): ImageSources => {
  * names `document`, `window` and `BroadcastChannel` and hands each to its one
  * adapter, and a test supplies hosts of its own.
  *
- * The other four seams default together and for one reason: this is the composition
+ * The other five seams default together and for one reason: this is the composition
  * root, and it is where the ambient browser, the ambient generator and the real
  * transport — for Spaces and for images — are named. Everything below takes each of them required.
+ *
+ * `displayImage` is where a picture is drawn from; a host serves its own stored
+ * images, so the default draws every URL as authored, and a mounted aggregate
+ * supplies its own (ADR 0130, `mount/mounted-startup.ts`).
+ *
+ * `session.mounted` says the session is Mounting an aggregate (ADR 0130), so
+ * no Space it opens offers an Edit. It is named rather than positional, and
+ * defaults to `false`: only a mount composition sets it.
  */
 export const createSpaceStartup = (
   fullscreen: Fullscreen,
@@ -81,6 +94,8 @@ export const createSpaceStartup = (
   newId: () => UUID = newUuid,
   history: HistoryApi = browserHistory(),
   images: ImageSources = browserImageSources(),
+  displayImage: ImageDisplay = displayImageAsAuthored,
+  { mounted = false }: { readonly mounted?: boolean } = {},
 ): SpaceStartup => {
   let owner: Promise<OpenSpaces> | undefined;
   const openSpaces = (): Promise<OpenSpaces> => {
@@ -100,6 +115,7 @@ export const createSpaceStartup = (
         images,
         fullscreen,
         presentations,
+        mounted,
       });
     });
     owner = opening;
@@ -135,6 +151,7 @@ export const createSpaceStartup = (
             reportObserverError: (error) => console.error('Notes window observer failed', error),
           }),
           now: presentations.now,
+          displayImage,
         };
       }
       const spaces = await openSpaces();
@@ -144,6 +161,7 @@ export const createSpaceStartup = (
         opened,
         spaces,
         opening,
+        displayImage,
       };
     },
   };

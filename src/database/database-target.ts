@@ -1,4 +1,4 @@
-import type { SpaceRepository } from '../persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 
 export interface OpenedDatabaseTarget {
   readonly repository: SpaceRepository;

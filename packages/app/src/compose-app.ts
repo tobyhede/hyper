@@ -122,6 +122,11 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * browser that refuses every request would answer.
    */
   readonly fullscreen?: Fullscreen | undefined;
+  /**
+   * Whether this Space is composed in a mounted session (ADR 0130), which
+   * offers no Edit (`authoring-availability.ts`). Absent, it is not.
+   */
+  readonly mounted?: boolean | undefined;
 }
 
 /** A fullscreen no request is ever granted, for a composition given none. */
@@ -205,6 +210,8 @@ export interface ComposedApp extends AppCore {
    * supplies none, so a drawn Map always receives a function (ADR 0109).
    */
   readonly reportObserverError: ObserverErrorReporter;
+  /** Whether this Space is composed in a mounted session, answered as taken. */
+  readonly mounted: boolean;
 }
 
 /**
@@ -238,6 +245,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     spaceResources,
     presentations,
     fullscreen = NO_FULLSCREEN,
+    mounted = false,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -322,5 +330,6 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     deleteConfirmation,
     resourceDeletion,
     reportObserverError: compositionReporter,
+    mounted,
   };
 }
