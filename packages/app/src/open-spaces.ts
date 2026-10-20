@@ -593,6 +593,7 @@ export function createOpenSpaces({
         presentations,
         fullscreen,
         mounted,
+        addressOf: browserLocation.href,
       }),
       spaceResources,
     };

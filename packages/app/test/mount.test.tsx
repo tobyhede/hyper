@@ -1,12 +1,14 @@
 import { act, waitFor, within } from '@testing-library/react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { uuidSchema, type UUID } from '@project/core';
 import { productDestinationPath } from '@project/http';
+import { parseGitHubLocation, type GitHubLocation } from '../src/mount/github-location';
 import { mountAggregate } from '../src/mount/mount';
 import { createMountedStartup } from '../src/mount/mounted-startup';
 import { startApplication, type ApplicationStartupResult } from '../src/startup';
-import { recordingHistory } from './browser-history';
+import { ORIGIN, recordingHistory, type RecordingHistory } from './browser-history';
+import { COMMIT, fakeGitHub, OWNER, REPO, type FakeGitHub } from './fake-github';
 import { fixtureFiles } from './fixture-files';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
@@ -33,18 +35,46 @@ const recordingObjectUrls = () => {
   };
 };
 
+const PINNED = `github:${OWNER}/${REPO}@${COMMIT}`;
+const META_PATH = productDestinationPath({ kind: 'space', spaceId: META_SPACE_ID });
+
+const location = (input: string): GitHubLocation => {
+  const parsed = parseGitHubLocation(input);
+  if (!parsed.ok) throw new Error(parsed.failure.reason);
+  return parsed.location;
+};
+
+interface MountedStartupSeams {
+  readonly history?: RecordingHistory;
+  readonly objectUrls?: ReturnType<typeof recordingObjectUrls>;
+  /** The location the page mounts, as `resolveMountSource` answered it. */
+  readonly source?: string;
+  readonly github?: FakeGitHub;
+  /** Every scope the mounted session's presentation links were built for. */
+  readonly scopes?: string[];
+}
+
+/** A mounted startup over a fake GitHub serving `files` as its repository's root. */
 const mountedStartup = (
   files: ReadonlyMap<string, Uint8Array>,
-  history = recordingHistory(),
-  objectUrls = recordingObjectUrls(),
+  {
+    history = recordingHistory(),
+    objectUrls = recordingObjectUrls(),
+    source = `github:${OWNER}/${REPO}`,
+    github = fakeGitHub({ files }),
+    scopes = [],
+  }: MountedStartupSeams = {},
 ) =>
   createMountedStartup({
-    name: 'fixture',
-    files,
+    location: location(source),
+    fetch: github.fetch,
     newId: mintsNothing,
     createObjectUrl: objectUrls.createObjectUrl,
     fullscreen: refusingFullscreen,
-    presentations: unlinkedPresentations,
+    presentations: (scope) => {
+      scopes.push(scope);
+      return unlinkedPresentations;
+    },
     history,
   });
 
@@ -94,7 +124,7 @@ afterAll(() => vi.unstubAllGlobals());
 describe('mounting an aggregate in the page', () => {
   it('opens the Meta Space with its Resources at the root, and moves the address to it', async () => {
     const history = recordingHistory('/');
-    const startup = mountedStartup(fixtureFiles(), history);
+    const startup = mountedStartup(fixtureFiles(), { history });
 
     const space = opened(await startup.resolve('/')).app.currentSpace();
 
@@ -103,9 +133,7 @@ describe('mounting an aggregate in the page', () => {
     expect(space.resources.map(({ title }) => title)).toEqual(
       expect.arrayContaining(['A', 'B', 'C', 'D', 'E']),
     );
-    expect(history.pathname()).toBe(
-      productDestinationPath({ kind: 'space', spaceId: META_SPACE_ID }),
-    );
+    expect(history.pathname()).toBe(META_PATH);
   });
 
   it('opens a read-only session, marked so and with no persistence status', async () => {
@@ -117,15 +145,13 @@ describe('mounting an aggregate in the page', () => {
 
   it('shows the reader’s diagnostics for a directory that is not an aggregate', async () => {
     const files = fixtureFiles();
-    files.delete('hyper.json');
+    files.set('hyper.json', new TextEncoder().encode('not json'));
 
     const container = await render(() => mountedStartup(files).resolve('/'));
 
     expect(container).toHaveTextContent('Application could not start');
-    expect(container).toHaveTextContent('fixture is not an Aggregate directory:');
-    expect(container).toHaveTextContent(
-      'fixture/hyper.json: a canonical aggregate directory must contain hyper.json',
-    );
+    expect(container).toHaveTextContent(`${PINNED} is not an Aggregate directory:`);
+    expect(container).toHaveTextContent(`${PINNED}/hyper.json`);
   });
 
   it('shows Import’s diagnostics for an aggregate that is refused', async () => {
@@ -184,7 +210,7 @@ describe('mounting an aggregate in the page', () => {
   it('draws a stored image from an object URL over the mounted bytes', async () => {
     const files = fixtureFiles();
     const objectUrls = recordingObjectUrls();
-    const startup = mountedStartup(files, recordingHistory(), objectUrls);
+    const startup = mountedStartup(files, { objectUrls });
 
     const container = await render(() =>
       startup.resolve(productDestinationPath({ kind: 'space', spaceId: DEEP_DIVE_ID })),
@@ -199,5 +225,80 @@ describe('mounting an aggregate in the page', () => {
     const [picture] = objectUrls.made;
     expect(picture?.type).toBe('image/png');
     expect(await bytesOf(picture ?? new Blob())).toEqual(files.get(`images/${IMAGE_ID}.png`));
+  });
+
+  it('pins the commit a branch resolves to in the address, keeping the path', async () => {
+    const history = recordingHistory(`${META_PATH}?source=github:${OWNER}/${REPO}@main`);
+
+    await mountedStartup(fixtureFiles(), {
+      history,
+      source: `github:${OWNER}/${REPO}@main`,
+    }).resolve(META_PATH);
+
+    expect(history.writes).toEqual([{ method: 'replace', path: `${META_PATH}?source=${PINNED}` }]);
+  });
+
+  it('pins a build-time default at the root in the one write that moves to the Meta Space', async () => {
+    const history = recordingHistory('/');
+
+    await mountedStartup(fixtureFiles(), { history }).resolve('/');
+
+    expect(history.writes).toEqual([{ method: 'replace', path: `${META_PATH}?source=${PINNED}` }]);
+  });
+
+  it('writes nothing to an address that already names the commit', async () => {
+    const history = recordingHistory(`${META_PATH}?source=${PINNED}`);
+
+    await mountedStartup(fixtureFiles(), { history, source: PINNED }).resolve(META_PATH);
+
+    expect(history.writes).toEqual([]);
+  });
+
+  it('scopes its presentation links by the resolved location', async () => {
+    const scopes: string[] = [];
+
+    await mountedStartup(fixtureFiles(), {
+      scopes,
+      source: `github:${OWNER}/${REPO}@main`,
+    }).resolve('/');
+
+    expect(scopes).toEqual([PINNED]);
+  });
+
+  it('opens a Notes window on the same pinned source', async () => {
+    const open = vi.fn();
+    vi.stubGlobal('open', open);
+    const history = recordingHistory('/');
+    const app = opened(await mountedStartup(fixtureFiles(), { history }).resolve('/')).app;
+
+    app.presenting.commands.openNotes();
+
+    const notes = productDestinationPath({ kind: 'notes', spaceId: META_SPACE_ID });
+    expect(open).toHaveBeenCalledWith(
+      `${ORIGIN}${notes}?source=${PINNED}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  });
+
+  it('shows a rate-limited GitHub answer as its failure', async () => {
+    const files = fixtureFiles();
+    const github = fakeGitHub({ files, rateLimitStatus: 403 });
+
+    const container = await render(() => mountedStartup(files, { github }).resolve('/'));
+
+    expect(container).toHaveTextContent('Application could not start');
+    expect(container).toHaveTextContent('GitHub’s limit on requests without a token is used up');
+  });
+
+  it('shows a location whose directory holds no hyper.json as its failure', async () => {
+    const files = fixtureFiles();
+    files.delete('hyper.json');
+
+    const container = await render(() => mountedStartup(files).resolve('/'));
+
+    expect(container).toHaveTextContent(
+      `${PINNED} does not directly contain hyper.json, so it is not an Aggregate directory.`,
+    );
   });
 });

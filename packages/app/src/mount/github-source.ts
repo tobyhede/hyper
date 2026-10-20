@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  formatGitHubLocation,
   isCommitSha,
   parseGitHubLocation,
   type GitHubLocation,
@@ -122,13 +123,21 @@ const fetchBlob = async (
   }
 };
 
+/** Read a GitHub location as written: parse it, then {@link readGitHubLocation}. */
 export const readGitHubAggregate = async (
   input: string,
   fetch: typeof globalThis.fetch,
 ): Promise<GitHubSourceResult> => {
   const parsed = parseGitHubLocation(input);
   if (!parsed.ok) return parsed;
-  const location = parsed.location;
+  return await readGitHubLocation(parsed.location, fetch);
+};
+
+/** Read the Aggregate directory a parsed GitHub location selects, at the commit its ref names. */
+export const readGitHubLocation = async (
+  location: GitHubLocation,
+  fetch: typeof globalThis.fetch,
+): Promise<GitHubSourceResult> => {
   const { owner, repo, ref, path } = location;
   const api = `https://api.github.com/repos/${owner}/${repo}`;
 
@@ -175,4 +184,31 @@ export const readGitHubAggregate = async (
     files.set(file, blob.value);
   }
   return { ok: true, aggregate: { location: resolved, files } };
+};
+
+/** A location as it was given, before its ref resolved. */
+const formatGivenLocation = ({ owner, repo, ref, path }: GitHubLocation): string =>
+  `github:${owner}/${repo}${ref === undefined ? '' : `@${ref}`}${path === '' ? '' : `/${path}`}`;
+
+const withStatus = (status: number | undefined): string =>
+  status === undefined ? 'with no response' : `with HTTP ${status}`;
+
+/** A GitHub source's failure, in the sentence the application's startup failure shows. */
+export const describeGitHubSourceFailure = (failure: GitHubSourceFailure): string => {
+  switch (failure.kind) {
+    case 'malformed-location':
+      return `${failure.input} is not a GitHub location: ${failure.reason}.`;
+    case 'rate-limited':
+      return 'GitHub’s limit on requests without a token is used up for this network. Try again within the hour, or open a location pinned to a commit, which costs one request.';
+    case 'not-found':
+      return `${formatGivenLocation(failure.location)} was not found: GitHub has no public repository, ref or commit by that name.`;
+    case 'missing-aggregate-file':
+      return `${formatGitHubLocation(failure.location)} does not directly contain hyper.json, so it is not an Aggregate directory.`;
+    case 'truncated-tree':
+      return `GitHub listed only part of the tree at ${formatGitHubLocation(failure.location)}, so its aggregate cannot be read whole.`;
+    case 'request-failed':
+      return `The GitHub request ${failure.url} failed ${withStatus(failure.status)}.`;
+    case 'blob-failed':
+      return `${failure.path} could not be fetched from GitHub: the request failed ${withStatus(failure.status)}.`;
+  }
 };

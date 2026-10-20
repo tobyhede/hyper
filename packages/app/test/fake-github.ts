@@ -1,0 +1,147 @@
+/**
+ * A public GitHub repository answering the requests a GitHub source makes, from
+ * files held in memory: the shared fake behind the GitHub source's and the
+ * mount composition's tests.
+ */
+
+export const COMMIT = '0123456789abcdef0123456789abcdef01234567';
+export const OWNER = 'tobyhede';
+export const REPO = 'talks';
+
+export interface FakeGitHubOptions {
+  /** The repository's files at `COMMIT`, by repository-relative path. */
+  readonly files: ReadonlyMap<string, Uint8Array>;
+  readonly truncated?: boolean;
+  /** Every API request answers this status with `x-ratelimit-remaining: 0`. */
+  readonly rateLimitStatus?: 403 | 429;
+  /** A repository path whose raw request answers 500. */
+  readonly failingBlob?: string;
+}
+
+export interface FakeGitHub {
+  readonly fetch: typeof fetch;
+  readonly requests: Request[];
+  readonly apiRequests: () => string[];
+  readonly rawRequests: () => string[];
+}
+
+export const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
+export const RAW = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${COMMIT}/`;
+
+/** The fields of GitHub's tree entries a GitHub source reads, and its blob SHA. */
+interface TreeEntry {
+  readonly path: string;
+  readonly mode: string;
+  readonly type: 'tree' | 'blob';
+  readonly sha: string;
+}
+
+/** The bodies of the REST answers this fake gives: a commit, a tree, or an error. */
+type ApiBody =
+  | { readonly sha: string }
+  | { readonly sha: string; readonly tree: readonly TreeEntry[]; readonly truncated: boolean }
+  | { readonly message: string };
+
+const json = (status: number, body: ApiBody): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json', 'x-ratelimit-remaining': '59' },
+  });
+
+/** The tree GitHub lists for `files`: every blob, and every directory holding one. */
+const treeEntries = (files: ReadonlyMap<string, Uint8Array>): TreeEntry[] => {
+  const directories = new Set<string>();
+  for (const path of files.keys()) {
+    const segments = path.split('/');
+    for (let index = 1; index < segments.length; index += 1) {
+      directories.add(segments.slice(0, index).join('/'));
+    }
+  }
+  return [
+    ...[...directories].map((path): TreeEntry => ({
+      path,
+      mode: '040000',
+      type: 'tree',
+      sha: COMMIT,
+    })),
+    ...[...files.keys()].map((path): TreeEntry => ({
+      path,
+      mode: '100644',
+      type: 'blob',
+      sha: COMMIT,
+    })),
+  ].sort((left, right) => (left.path < right.path ? -1 : 1));
+};
+
+/**
+ * A public repository with one commit, reachable from `main` (the default
+ * branch) and the tag `v1`, answering the three requests a GitHub source makes.
+ */
+export const fakeGitHub = ({
+  files,
+  truncated = false,
+  rateLimitStatus,
+  failingBlob,
+}: FakeGitHubOptions): FakeGitHub => {
+  const requests: Request[] = [];
+  const refs = new Map([
+    ['HEAD', COMMIT],
+    ['main', COMMIT],
+    ['v1', COMMIT],
+  ]);
+
+  const answer = (request: Request): Response => {
+    const url = request.url;
+    if (url.startsWith('https://api.github.com/')) {
+      if (rateLimitStatus !== undefined) {
+        return new Response('{"message":"API rate limit exceeded"}', {
+          status: rateLimitStatus,
+          headers: { 'x-ratelimit-remaining': '0' },
+        });
+      }
+      if (!url.startsWith(`${API}/`)) return json(404, { message: 'Not Found' });
+      const commit = /\/commits\/([^/?]+)$/.exec(url);
+      if (commit !== null) {
+        const sha = refs.get(decodeURIComponent(commit[1] ?? ''));
+        return sha === undefined
+          ? json(422, { message: 'No commit found for SHA' })
+          : json(200, { sha });
+      }
+      const tree = /\/git\/trees\/([0-9a-f]{40})\?recursive=1$/.exec(url);
+      if (tree !== null) {
+        return tree[1] === COMMIT
+          ? json(200, { sha: COMMIT, tree: treeEntries(files), truncated })
+          : json(404, { message: 'Not Found' });
+      }
+      return json(404, { message: 'Not Found' });
+    }
+    if (url.startsWith(RAW)) {
+      const path = decodeURIComponent(url.slice(RAW.length));
+      if (path === failingBlob) return new Response('', { status: 500 });
+      const bytes = files.get(path);
+      return bytes === undefined
+        ? new Response('404: Not Found', { status: 404 })
+        : new Response(new Uint8Array(bytes), { status: 200 });
+    }
+    return new Response('', { status: 404 });
+  };
+
+  const fakeFetch: typeof fetch = (input, init) => {
+    const request = new Request(input, init);
+    requests.push(request);
+    return Promise.resolve(answer(request));
+  };
+
+  return {
+    fetch: fakeFetch,
+    requests,
+    apiRequests: () =>
+      requests.map(({ url }) => url).filter((url) => url.startsWith('https://api.github.com/')),
+    rawRequests: () =>
+      requests
+        .map(({ url }) => url)
+        .filter((url) => url.startsWith(RAW))
+        .map((url) => decodeURIComponent(url.slice(RAW.length)))
+        .sort(),
+  };
+};
