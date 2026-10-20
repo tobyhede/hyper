@@ -1,6 +1,6 @@
 import { newUuid } from '@project/core';
 import { establishMetaSpace } from '../../src/startup/database-startup';
-import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
+import { createSpaceHost, type SpaceHostApplication } from '@project/aggregate';
 import { E2eMemorySpaceRepository } from './e2e-memory-space-repository';
 import { importFixture, importSpaceDirectory } from './import-fixture';
 

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 export const workspaceAliases = () => {
   const here = (path: string): string => fileURLToPath(new URL(path, import.meta.url));
   return {
+    '@project/aggregate': here('../aggregate/src/index.ts'),
     '@project/core': here('../core/src/index.ts'),
     '@project/graph': here('../graph/src/index.ts'),
     '@project/http': here('../http/src/index.ts'),

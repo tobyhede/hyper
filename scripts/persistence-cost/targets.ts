@@ -2,7 +2,7 @@ import { copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import postgres from '@prisma-next/postgres/runtime';
 import sqlite from '@prisma-next/sqlite/runtime';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { Contract as PostgresContract } from '../../src/prisma/contract.d';
 import { postgresOptionsFor } from '../../src/prisma/db';
@@ -11,7 +11,7 @@ import type { Contract as SqliteContract } from '../../src/sqlite/contract.d';
 import sqliteContractJson from '../../src/sqlite/contract.json' with { type: 'json' };
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
 import { clearSqlContent } from '../../test/support/clear-sql-content';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 import { migrateSqliteFile } from '../../test/support/sqlite-harness';
 
 /*

@@ -1,7 +1,7 @@
 import type { LoadedSpace, StoredSpaceRepository } from '@project/persistence';
 import { expectTypeOf, it } from 'vitest';
 import type { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import type { SpaceRepository } from '@project/aggregate';
 import type { E2eMemorySpaceRepository } from '../support/e2e-memory-space-repository';
 
 // `Handle`/`Order` are the database-specific type parameters `SqlStore`

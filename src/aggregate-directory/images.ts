@@ -1,39 +1,16 @@
 import type { Dirent } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { compareOrdinal, IMAGES_DIRECTORY_NAME } from '@project/aggregate';
 import { imageKind, type SpaceSnapshot } from '@project/core';
 import {
-  admitImage,
   IMAGE_COLLECTION_PATH,
   isImageId,
   type ImageId,
-  type ImageMediaType,
   type ImageStore,
   type StoredImage,
 } from '@project/persistence';
-import { compareOrdinal } from '../ordinal';
-import { AggregateDirectoryError, isMissingFile } from './space-directory';
-
-/**
- * The directory inside an Aggregate directory that carries the bytes of the
- * stored images its Resources show (ADR 0118).
- */
-export const IMAGES_DIRECTORY_NAME = 'images';
-
-const EXTENSIONS = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-} as const satisfies Record<ImageMediaType, string>;
-
-/**
- * An image's file name: its content id, which is also the last segment of its
- * stored URL, and the extension of the format its bytes are. The same picture
- * always has the same name, so it is written once and never churns.
- */
-export const imageFileName = ({ id, mediaType }: StoredImage): string =>
-  `${id}.${EXTENSIONS[mediaType]}`;
+import { isMissingFile } from './space-directory';
 
 /** The entries of `images/`, or `undefined` when there is no such directory. */
 const listImagesDirectory = async (directory: string): Promise<readonly Dirent[] | undefined> => {
@@ -55,70 +32,6 @@ const imageFileNames = (entries: readonly Dirent[]): readonly string[] =>
     .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
     .map(({ name }) => name)
     .sort(compareOrdinal);
-
-/**
- * Admit one image file's bytes by the rule storing an uploaded picture uses,
- * and insist it is named for its content. Import's reader and Export's
- * in-memory check both admit through this.
- */
-export const admitImageFile = async (
-  path: string,
-  name: string,
-  bytes: Uint8Array<ArrayBuffer>,
-): Promise<StoredImage> => {
-  const admission = await admitImage(bytes);
-  if (admission.kind === 'refused') {
-    throw new AggregateDirectoryError('parsing', [
-      `${path}: not an image the host stores (${admission.code})`,
-    ]);
-  }
-  const expected = imageFileName(admission.image);
-  if (name !== expected) {
-    throw new AggregateDirectoryError('parsing', [
-      `${path}: an image file must be named for its content, ${expected}`,
-    ]);
-  }
-  return admission.image;
-};
-
-const readImageFile = async (path: string, name: string): Promise<StoredImage> => {
-  let bytes: Uint8Array<ArrayBuffer>;
-  try {
-    bytes = new Uint8Array(await readFile(path));
-  } catch (error) {
-    throw new AggregateDirectoryError('discovery', [`${path}: ${String(error)}`]);
-  }
-  return admitImageFile(path, name, bytes);
-};
-
-/**
- * Admit every image file in an Aggregate directory's `images/`, by the same
- * rule storing an uploaded picture uses. A file that is not an image the host
- * stores, or is not named for its content, is a failure of the directory: a
- * misnamed file would be stored under a URL no Resource shows.
- *
- * Every file is read before failures are answered, and each failure is the
- * caller's to gather beside the Spaces' own.
- */
-export const readAggregateImages = async (
-  directory: string,
-): Promise<{
-  readonly images: readonly StoredImage[];
-  readonly failures: readonly unknown[];
-}> => {
-  const names = imageFileNames((await listImagesDirectory(directory)) ?? []);
-  const results = await Promise.allSettled(
-    names.map((name) => readImageFile(join(directory, IMAGES_DIRECTORY_NAME, name), name)),
-  );
-  return {
-    images: results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])),
-    // SAFETY: PromiseRejectedResult.reason is typed `any` by lib.es; asserting
-    // `unknown` stops that `any` from propagating into `failures`.
-    failures: results.flatMap((result) =>
-      result.status === 'rejected' ? [result.reason as unknown] : [],
-    ),
-  };
-};
 
 const STORED_IMAGE_PREFIX = `${IMAGE_COLLECTION_PATH}/`;
 

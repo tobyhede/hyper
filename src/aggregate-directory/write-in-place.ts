@@ -1,6 +1,6 @@
 import { lstat, mkdir, open, readFile, rename, rm, rmdir, type FileHandle } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import { compareOrdinal } from '../ordinal';
+import { compareOrdinal } from '@project/aggregate';
 import { isMissingFile } from './space-directory';
 
 /**

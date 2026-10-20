@@ -6,7 +6,7 @@ import type { LoadedSpace, StoredImage } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { exportAggregate } from '../../src/export/export-aggregate';
 import { captureError } from '../support/capture-error';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 import { admitted, directoryTree, pngBytes, showing } from '../support/stored-images';
 
 const SPACE_ID = uuidSchema.parse('a0000000-0000-4000-8000-000000000001');

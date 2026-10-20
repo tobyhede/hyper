@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { AGGREGATE_FILE_VERSION, type ResourceFileDocument, type UUID } from '@project/core';
-import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
+import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 
 /** One Space directory inside a canonical aggregate, written from raw bytes. */
 export interface SpaceDirectory {

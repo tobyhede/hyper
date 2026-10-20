@@ -1,15 +1,19 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { uuidSchema, type UUID } from '@project/core';
-import { afterEach, describe, expect, it } from 'vitest';
+import { join, relative } from 'node:path';
 import {
   AGGREGATE_FILE_NAME,
   AggregateDirectoryError,
-  readAggregate,
-} from '../../src/aggregate-directory';
+  readAggregateFiles,
+  scannedAggregatePaths,
+  type AggregateDirectoryContents,
+} from '@project/aggregate';
+import { uuidSchema, type UUID } from '@project/core';
+import { afterEach, describe, expect, it } from 'vitest';
+import { readAggregate, scannedAggregateFiles } from '../../src/aggregate-directory';
 import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
+import { admitted, pngBytes } from '../support/stored-images';
 
 const META_SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const OTHER_SPACE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -63,13 +67,48 @@ const writeResources = async (
   }
 };
 
+/** Every regular file under `root`, at any depth, by path relative to it with `/` between segments. */
+const filesUnder = async (root: string): Promise<readonly string[]> =>
+  (await readdir(root, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(root, join(entry.parentPath, entry.name)));
+
+/**
+ * Every file under `root` with its bytes, whether Import reads it or not, so
+ * the in-memory reader is the one deciding what to read.
+ */
+const allFilesUnder = async (root: string): Promise<ReadonlyMap<string, Uint8Array>> =>
+  new Map(
+    await Promise.all(
+      (await filesUnder(root)).map(
+        async (path) => [path, new Uint8Array(await readFile(join(root, path)))] as const,
+      ),
+    ),
+  );
+
+/**
+ * The two ways an aggregate is read: from disk, and from a map of its files'
+ * bytes, the way a mounted page reads one (ADR 0130). Every case below runs
+ * through both, so they cannot come to disagree.
+ */
+const READERS: readonly {
+  readonly name: string;
+  readonly read: (root: string, newId: () => UUID) => Promise<AggregateDirectoryContents>;
+}[] = [
+  { name: 'readAggregate, from disk', read: readAggregate },
+  {
+    name: 'readAggregateFiles, from an in-memory map',
+    read: async (root, newId) => readAggregateFiles(root, await allFilesUnder(root), newId),
+  },
+];
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
   );
 });
 
-describe('readAggregate', () => {
+describe.each(READERS)('$name', ({ read }) => {
   it('reads every immediate Space directory, taking each identity from its name', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
@@ -80,7 +119,7 @@ describe('readAggregate', () => {
     );
     await writeSpace(root, OTHER_SPACE_ID, JSON.stringify({ version: 1, title: 'Ordinary' }));
 
-    const aggregate = await readAggregate(root, countingIds());
+    const aggregate = await read(root, countingIds());
 
     expect(aggregate.metaSpaceId).toBe(META_SPACE_ID);
     // Ordinal order by directory name, which is the Space id — the same order
@@ -102,7 +141,7 @@ describe('readAggregate', () => {
       JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Meta' }),
     );
 
-    const thrown = await captureError(() => readAggregate(root, countingIds()));
+    const thrown = await captureError(() => read(root, countingIds()));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -114,7 +153,7 @@ describe('readAggregate', () => {
     const root = await makeTemporaryDirectory();
     await writeFile(join(root, AGGREGATE_FILE_NAME), JSON.stringify({ version: 1 }));
 
-    const thrown = await captureError(() => readAggregate(root, countingIds()));
+    const thrown = await captureError(() => read(root, countingIds()));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -129,7 +168,7 @@ describe('readAggregate', () => {
       JSON.stringify({ version: 2, metaSpaceId: META_SPACE_ID }),
     );
 
-    const thrown = await captureError(() => readAggregate(root, countingIds()));
+    const thrown = await captureError(() => read(root, countingIds()));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -149,7 +188,7 @@ describe('readAggregate', () => {
       JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Meta' }),
     );
 
-    const thrown = await captureError(() => readAggregate(root, countingIds()));
+    const thrown = await captureError(() => read(root, countingIds()));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -173,7 +212,7 @@ describe('readAggregate', () => {
       JSON.stringify({ version: 1, title: 'Meta' }),
     );
 
-    const thrown = await captureError(() => readAggregate(root, countingIds()));
+    const thrown = await captureError(() => read(root, countingIds()));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -190,7 +229,7 @@ describe('readAggregate', () => {
       JSON.stringify({ version: 1, id: OTHER_SPACE_ID, title: 'Confused' }),
     );
 
-    const thrown = await captureError(() => readAggregate(root, countingIds()));
+    const thrown = await captureError(() => read(root, countingIds()));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -214,7 +253,7 @@ describe('readAggregate', () => {
     await writeFile(join(root, 'notes', 'README.md'), '# Notes\n');
     await writeFile(join(root, 'untouched.txt'), 'kept\n');
 
-    const aggregate = await readAggregate(root, countingIds());
+    const aggregate = await read(root, countingIds());
 
     expect(aggregate.spaces.map(({ id }) => id)).toEqual([META_SPACE_ID]);
   });
@@ -233,7 +272,7 @@ describe('readAggregate', () => {
       JSON.stringify({ version: 1, id: OTHER_SPACE_ID, title: 'Nested' }),
     );
 
-    const aggregate = await readAggregate(root, countingIds());
+    const aggregate = await read(root, countingIds());
 
     expect(aggregate.spaces.map(({ id }) => id)).toEqual([META_SPACE_ID]);
   });
@@ -260,7 +299,7 @@ describe('readAggregate', () => {
     );
     await writeResources(directory, markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'));
 
-    const aggregate = await readAggregate(root, countingIds());
+    const aggregate = await read(root, countingIds());
 
     const [space] = aggregate.spaces;
     if (space === undefined) throw new Error('No Space was read');
@@ -285,7 +324,7 @@ describe('readAggregate', () => {
       [`${RESOURCE_ID}.json`]: JSON.stringify({ title: 'Opening', kind: 'ur', content: {} }),
     });
 
-    const thrown = await captureError(() => readAggregate(root, countingIds()));
+    const thrown = await captureError(() => read(root, countingIds()));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
@@ -306,7 +345,7 @@ describe('readAggregate', () => {
    * directory handed the same generator twice could put `…0001` on either
    * Space's Map.
    *
-   * `readAggregate` is asked twice over the same bytes with a fresh counter each
+   * The reader is asked twice over the same bytes with a fresh counter each
    * time: the two answers have to agree, which is what "from the bytes alone"
    * means. A single run cannot catch this — it passes whichever way the race
    * lands.
@@ -354,10 +393,10 @@ describe('readAggregate', () => {
       }
     }
 
-    const first = await readAggregate(root, countingIds());
-    const second = await readAggregate(root, countingIds());
+    const first = await read(root, countingIds());
+    const second = await read(root, countingIds());
 
-    const mintedBySpace = (aggregate: Awaited<ReturnType<typeof readAggregate>>) =>
+    const mintedBySpace = (aggregate: Awaited<ReturnType<typeof read>>) =>
       aggregate.spaces.map(({ id, document }) => [id, document.maps?.[0]?.id]);
     expect(mintedBySpace(first)).toEqual(mintedBySpace(second));
     // And the ordinal order is the one it follows: META sorts before OTHER, so
@@ -379,12 +418,27 @@ describe('readAggregate', () => {
     await writeFile(join(first, 'space.json'), '{ invalid first');
     await writeFile(join(second, 'space.json'), '{ invalid second');
 
-    const thrown = await captureError(() => readAggregate(root, countingIds()));
+    const thrown = await captureError(() => read(root, countingIds()));
 
     expect(thrown).toBeInstanceOf(AggregateDirectoryError);
     if (!(thrown instanceof AggregateDirectoryError)) return;
     expect(thrown.diagnostics.join('\n')).toContain(first);
     expect(thrown.diagnostics.join('\n')).toContain(second);
+  });
+
+  it('names an image directory holding a space.json once, as an image, never as a Space', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
+    await writeSpace(root, 'images', JSON.stringify({ version: 1, title: 'Not a Space' }));
+
+    const thrown = await captureError(() => read(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.diagnostics).toHaveLength(1);
+    expect(thrown.diagnostics[0]).toContain(join(root, 'images', 'space.json'));
+    expect(thrown.diagnostics[0]).not.toContain('Space UUID');
   });
 
   /*
@@ -403,7 +457,7 @@ describe('readAggregate', () => {
       JSON.stringify({ version: 1, id: OTHER_SPACE_ID, title: 'Only' }),
     );
 
-    const aggregate = await readAggregate(root, countingIds());
+    const aggregate = await read(root, countingIds());
 
     expect(aggregate.metaSpaceId).toBe(META_SPACE_ID);
     expect(aggregate.spaces.map(({ id }) => id)).toEqual([OTHER_SPACE_ID]);
@@ -439,7 +493,7 @@ describe('readAggregate', () => {
     );
 
     const thrown = await captureError(() =>
-      readAggregate(root, () => {
+      read(root, () => {
         throw new Error('Canonical export wrote an entity with no id');
       }),
     );
@@ -470,7 +524,7 @@ describe('readAggregate', () => {
       }),
     );
 
-    const aggregate = await readAggregate(root, countingIds());
+    const aggregate = await read(root, countingIds());
 
     const resource = aggregate.spaces[0]?.resources[0];
     expect(resource?.id).toBe(RESOURCE_ID);
@@ -478,5 +532,261 @@ describe('readAggregate', () => {
       kind: 'space',
       content: { spaceId: OTHER_SPACE_ID, map: META_SPACE_ID, graph: OTHER_SPACE_ID },
     });
+  });
+
+  it('admits each visible image file in images/, ignoring dotfiles and subdirectories', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
+    const image = await admitted(pngBytes(7));
+    await mkdir(join(root, 'images', 'drafts'), { recursive: true });
+    await writeFile(join(root, 'images', `${image.id}.png`), image.bytes);
+    await writeFile(join(root, 'images', '.DS_Store'), 'not an image');
+    await writeFile(join(root, 'images', 'drafts', 'notes.txt'), 'not an image');
+
+    const aggregate = await read(root, countingIds());
+
+    expect(aggregate.images).toEqual([image]);
+  });
+
+  it('refuses an image file not named for its content, naming it', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
+    await mkdir(join(root, 'images'));
+    await writeFile(join(root, 'images', 'harbour.png'), pngBytes(7));
+
+    const thrown = await captureError(() => read(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toEqual([
+      expect.stringContaining(
+        `${join(root, 'images', 'harbour.png')}: an image file must be named for its content`,
+      ),
+    ]);
+  });
+});
+
+/**
+ * The paths Importing reads, decided once over a list of an Aggregate
+ * directory's files, for a source that lists files rather than walking a
+ * directory (ADR 0130).
+ */
+/**
+ * A document refused outright is reported as that, ahead of a file beside it
+ * that could not be read, and one Space's unreadable file does not hide another
+ * Space's parse diagnostic: the refusal is decided from the space file alone.
+ */
+describe('a file that could not be read', () => {
+  const refusedDocument = JSON.stringify({ version: 2, title: 'Pre-release talk' });
+  const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
+
+  it('is reported after the refusal of its Space, beside every other Space’s diagnostic', async () => {
+    const thrown = await captureError(() =>
+      readAggregateFiles(
+        '/talk',
+        new Map([
+          [AGGREGATE_FILE_NAME, encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }))],
+          [`${META_SPACE_ID}/space.json`, encode(refusedDocument)],
+          [`${OTHER_SPACE_ID}/space.json`, encode('{ invalid other')],
+        ]),
+        countingIds(),
+        new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
+      ),
+    );
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(2);
+    expect(thrown.diagnostics[0]).toContain('version 2');
+    expect(thrown.diagnostics[1]).toContain(`/talk/${OTHER_SPACE_ID}/space.json`);
+  });
+
+  it('is a discovery failure naming it when its Space reads otherwise', async () => {
+    const thrown = await captureError(() =>
+      readAggregateFiles(
+        '/talk',
+        new Map([
+          [AGGREGATE_FILE_NAME, encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }))],
+          [`${META_SPACE_ID}/space.json`, encode(JSON.stringify({ version: 1, title: 'Meta' }))],
+        ]),
+        countingIds(),
+        new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
+      ),
+    );
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toEqual([`/talk/${META_SPACE_ID}/a.md: EACCES: permission denied`]);
+  });
+
+  // Root ignores the mode bits and reads the file anyway, which would fail this
+  // rather than exercise it.
+  it.skipIf(process.getuid?.() === 0)('is reported the same way from disk', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    const meta = await writeSpace(root, META_SPACE_ID, refusedDocument);
+    await writeSpace(root, OTHER_SPACE_ID, '{ invalid other');
+    await writeFile(join(meta, 'a.md'), 'A body\n');
+    await chmod(join(meta, 'a.md'), 0o000);
+
+    const thrown = await captureError(() => readAggregate(root, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toHaveLength(2);
+    expect(thrown.diagnostics[0]).toContain('version 2');
+    expect(thrown.diagnostics[1]).toContain(join(root, OTHER_SPACE_ID, 'space.json'));
+  });
+});
+
+describe('scannedAggregatePaths', () => {
+  /** An Aggregate directory beside unrelated material, as a repository may hold it. */
+  const MIXED_DIRECTORY = [
+    'README.md',
+    'package.json',
+    AGGREGATE_FILE_NAME,
+    `${META_SPACE_ID}/space.json`,
+    `${META_SPACE_ID}/notes.md`,
+    `${META_SPACE_ID}/assets.json`,
+    `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
+    `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
+    `${META_SPACE_ID}/resources/picture.png`,
+    `${META_SPACE_ID}/resources/drafts/old.json`,
+    `${OTHER_SPACE_ID}/space.json`,
+    'notes/README.md',
+    'notes/resources/x.json',
+    `sibling/${AGGREGATE_FILE_NAME}`,
+    `sibling/${OTHER_SPACE_ID}/space.json`,
+    'images/a.png',
+    'images/.hidden.png',
+    'images/drafts/b.png',
+    'images/space.json',
+  ];
+
+  it("keeps hyper.json, each Space directory's files and the visible images, in read order", () => {
+    expect(scannedAggregatePaths([...MIXED_DIRECTORY].reverse())).toEqual([
+      AGGREGATE_FILE_NAME,
+      `${META_SPACE_ID}/space.json`,
+      `${META_SPACE_ID}/notes.md`,
+      `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
+      `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
+      `${OTHER_SPACE_ID}/space.json`,
+      'images/a.png',
+      'images/space.json',
+    ]);
+  });
+
+  it('keeps nothing of a Space directory without a space.json, and no hyper.json it lacks', () => {
+    expect(
+      scannedAggregatePaths([
+        `${META_SPACE_ID}/notes.md`,
+        `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
+        `sibling/${AGGREGATE_FILE_NAME}`,
+      ]),
+    ).toEqual([]);
+  });
+
+  it('reads images/ as images only, even when it holds a space.json', () => {
+    expect(
+      scannedAggregatePaths([AGGREGATE_FILE_NAME, 'images/space.json', 'images/a.png']),
+    ).toEqual([AGGREGATE_FILE_NAME, 'images/a.png', 'images/space.json']);
+  });
+
+  it('names the same files the filesystem scan finds on disk', async () => {
+    const root = await makeTemporaryDirectory();
+    for (const path of MIXED_DIRECTORY) {
+      await mkdir(join(root, path, '..'), { recursive: true });
+      await writeFile(join(root, path), '{}');
+    }
+
+    expect(scannedAggregatePaths(await filesUnder(root))).toEqual(
+      await scannedAggregateFiles(root),
+    );
+  });
+});
+
+/*
+ * A link is how an author shares one file between directories, so a file
+ * entry that is a symbolic link to a regular file is read and owned like the
+ * file it names, and a link that names nothing is not a file at all.
+ */
+describe('a file that is a symbolic link, on disk', () => {
+  /** Write `text` to a file outside `root` and link `path` under `root` to it. */
+  const linkTo = async (root: string, path: string, text: string): Promise<void> => {
+    const target = join(await makeTemporaryDirectory(), 'target');
+    await writeFile(target, text);
+    await mkdir(join(root, path, '..'), { recursive: true });
+    await symlink(target, join(root, path));
+  };
+
+  it('reads a Space whose space.json is a link to a regular file', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await linkTo(
+      root,
+      `${META_SPACE_ID}/space.json`,
+      JSON.stringify({ version: 1, id: META_SPACE_ID, title: 'Linked' }),
+    );
+
+    const aggregate = await readAggregate(root, countingIds());
+
+    expect(aggregate.spaces.map(({ document }) => document.title)).toEqual(['Linked']);
+  });
+
+  it('reads a Resource file that is a link to a regular file', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
+    for (const [name, text] of Object.entries(
+      markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
+    )) {
+      await linkTo(root, `${META_SPACE_ID}/resources/${name}`, text);
+    }
+
+    const aggregate = await readAggregate(root, countingIds());
+
+    expect(aggregate.spaces[0]?.resources.map(({ id }) => id)).toEqual([RESOURCE_ID]);
+  });
+
+  it('lists a linked hyper.json, space.json and Resource file as files Export owns', async () => {
+    const root = await makeTemporaryDirectory();
+    await linkTo(
+      root,
+      AGGREGATE_FILE_NAME,
+      JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }),
+    );
+    await linkTo(
+      root,
+      `${META_SPACE_ID}/space.json`,
+      JSON.stringify({ version: 1, title: 'Meta' }),
+    );
+    for (const [name, text] of Object.entries(
+      markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n'),
+    )) {
+      await linkTo(root, `${META_SPACE_ID}/resources/${name}`, text);
+    }
+
+    expect(await scannedAggregateFiles(root)).toEqual([
+      AGGREGATE_FILE_NAME,
+      `${META_SPACE_ID}/space.json`,
+      `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
+      `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
+    ]);
+    expect((await readAggregate(root, countingIds())).metaSpaceId).toBe(META_SPACE_ID);
+  });
+
+  it('lists no dangling link, and no Space whose space.json is one', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    await mkdir(join(root, META_SPACE_ID));
+    await symlink(join(root, 'nowhere.json'), join(root, META_SPACE_ID, 'space.json'));
+
+    expect(await scannedAggregateFiles(root)).toEqual([AGGREGATE_FILE_NAME]);
   });
 });

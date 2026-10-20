@@ -67,10 +67,10 @@ const NOT_THE_KIND = new Map<string, ReadonlyMap<string, readonly string[]>>([
       ],
       ['packages/ui/src/icons.tsx', ['data-icon="space"']],
       [
-        'src/aggregate-directory/identify-space.ts',
+        'packages/aggregate/src/identify-space.ts',
         [".map((issue) => `${issue.path.join('.') || 'space'} ${issue.message.toLowerCase()}`)"],
       ],
-      ['src/http/space-host.ts', ["kind: 'space',"]],
+      ['packages/aggregate/src/space-host.ts', ["kind: 'space',"]],
     ]),
   ],
 ]);

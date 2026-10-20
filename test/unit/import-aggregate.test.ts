@@ -13,20 +13,20 @@ import type {
 } from '@project/persistence';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importAggregate } from '../../src/import/import-aggregate';
-import { AggregateDirectoryError } from '../../src/aggregate-directory';
-import type {
-  AggregateInput,
-  InitializeAggregateResult,
-  ReplaceAggregateResult,
-  SpaceRepository,
-} from '../../src/persistence/space-repository';
+import {
+  type AggregateInput,
+  type InitializeAggregateResult,
+  type ReplaceAggregateResult,
+  type SpaceRepository,
+  AggregateDirectoryError,
+} from '@project/aggregate';
 import {
   markdownResourceFiles,
   resourceFiles,
   writeAggregateInto,
   type SpaceDirectory,
 } from '../support/aggregate-directory';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 import { captureError } from '../support/capture-error';
 import { admitted, jpegBytes, pngBytes } from '../support/stored-images';
 

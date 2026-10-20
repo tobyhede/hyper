@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema } from '@project/core';
 import type { DatabaseTarget, OpenedDatabaseTarget } from '../../src/database/database-target';
-import { AGGREGATE_FILE_NAME } from '../../src/aggregate-directory';
+import { AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { runHyper } from '../../src/cli/run';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';

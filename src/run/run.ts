@@ -1,12 +1,16 @@
 import { readdir } from 'node:fs/promises';
 import type { UUID } from '@project/core';
 import type { RepositoryCommitResult, SpaceCommit } from '@project/persistence';
-import { AggregateDirectoryError, isMissingFile } from '../aggregate-directory';
+import { isMissingFile } from '../aggregate-directory';
 import { describeAggregateRefusal } from '../cli/aggregate-refusal';
 import { exportAggregate } from '../export/export-aggregate';
-import { createSpaceHost, type SpaceHostApplication } from '../http/space-host';
+import {
+  createSpaceHost,
+  type SpaceHostApplication,
+  AggregateDirectoryError,
+} from '@project/aggregate';
 import { importAggregate } from '../import/import-aggregate';
-import { MemorySpaceRepository } from '../persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 import { establishMetaSpace } from '../startup/database-startup';
 
 /**

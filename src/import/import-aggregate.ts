@@ -1,8 +1,12 @@
 import type { SpaceSnapshot, UUID } from '@project/core';
 import type { SpaceAggregateError } from '@project/graph';
 import type { LoadedSpace, StoredImage } from '@project/persistence';
-import type { AggregateInput, SpaceRepository } from '../persistence/space-repository';
-import { readAggregate, type AggregateDirectoryContents } from '../aggregate-directory';
+import {
+  type AggregateInput,
+  type SpaceRepository,
+  type AggregateDirectoryContents,
+} from '@project/aggregate';
+import { readAggregate } from '../aggregate-directory';
 
 /**
  * What became of a complete aggregate import.
