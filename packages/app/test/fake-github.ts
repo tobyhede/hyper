@@ -11,7 +11,10 @@ export const REPO = 'talks';
 export interface FakeGitHubOptions {
   /** The repository's files at `COMMIT`, by repository-relative path. */
   readonly files: ReadonlyMap<string, Uint8Array>;
+  /** Whether the whole repository's tree, listed at `COMMIT`, is truncated. */
   readonly truncated?: boolean;
+  /** Repository-relative directories whose own trees are listed truncated. */
+  readonly truncatedDirectories?: ReadonlySet<string>;
   /** Every API request answers this status with `x-ratelimit-remaining: 0`. */
   readonly rateLimitStatus?: 403 | 429;
   /** Every API request answers this instead, with `x-ratelimit-remaining` 59 unless it sets one. */
@@ -64,10 +67,21 @@ interface TreeEntry {
   readonly size?: number;
 }
 
-/** The bodies of the REST answers this fake gives: a commit, a tree, or an error. */
+/** The fields of GitHub's Contents API entries a GitHub source reads, and one it ignores. */
+interface ContentsEntry {
+  readonly name: string;
+  readonly path: string;
+  readonly sha: string;
+  readonly type: 'dir' | 'file';
+  readonly url: string;
+}
+
+/** The bodies of the REST answers this fake gives: a commit, a tree, a listing, or an error. */
 type ApiBody =
   | { readonly sha: string }
   | { readonly sha: string; readonly tree: readonly TreeEntry[]; readonly truncated: boolean }
+  | readonly ContentsEntry[]
+  | ContentsEntry
   | { readonly message: string };
 
 const json = (status: number, body: ApiBody): Response =>
@@ -76,12 +90,8 @@ const json = (status: number, body: ApiBody): Response =>
     headers: { 'content-type': 'application/json', 'x-ratelimit-remaining': '59' },
   });
 
-/** The tree GitHub lists for `files`: every blob, and every directory holding one. */
-const treeEntries = (
-  files: ReadonlyMap<string, Uint8Array>,
-  symlinks: ReadonlySet<string>,
-  listedSizes: ReadonlyMap<string, number>,
-): TreeEntry[] => {
+/** Every directory holding one of `files`, by repository-relative path. */
+const directoriesOf = (files: ReadonlyMap<string, Uint8Array>): string[] => {
   const directories = new Set<string>();
   for (const path of files.keys()) {
     const segments = path.split('/');
@@ -89,30 +99,84 @@ const treeEntries = (
       directories.add(segments.slice(0, index).join('/'));
     }
   }
+  return [...directories].sort();
+};
+
+/** A tree SHA for the directory at `index` among `directoriesOf`, distinct from `COMMIT`. */
+const directorySha = (index: number): string => index.toString(16).padStart(40, 'd');
+
+/**
+ * The tree GitHub lists under `directory` (`''` for the repository's root):
+ * every blob and every directory holding one, by path relative to it.
+ */
+const treeEntries = (
+  files: ReadonlyMap<string, Uint8Array>,
+  directory: string,
+  shas: ReadonlyMap<string, string>,
+  symlinks: ReadonlySet<string>,
+  listedSizes: ReadonlyMap<string, number>,
+): TreeEntry[] => {
+  const prefix = directory === '' ? '' : `${directory}/`;
+  const relativeTo = (path: string): string[] =>
+    path.startsWith(prefix) ? [path.slice(prefix.length)] : [];
   return [
-    ...[...directories].map((path): TreeEntry => ({
-      path,
-      mode: '040000',
-      type: 'tree',
-      sha: COMMIT,
-    })),
-    ...[...files].map(([path, bytes]): TreeEntry => ({
-      path,
-      mode: symlinks.has(path) ? '120000' : '100644',
-      type: 'blob',
-      sha: COMMIT,
-      size: listedSizes.get(path) ?? bytes.length,
-    })),
+    ...[...shas].flatMap(([path, sha]) =>
+      relativeTo(path).map((relativePath): TreeEntry => ({
+        path: relativePath,
+        mode: '040000',
+        type: 'tree',
+        sha,
+      })),
+    ),
+    ...[...files].flatMap(([path, bytes]) =>
+      relativeTo(path).map((relativePath): TreeEntry => ({
+        path: relativePath,
+        mode: symlinks.has(path) ? '120000' : '100644',
+        type: 'blob',
+        sha: COMMIT,
+        size: listedSizes.get(path) ?? bytes.length,
+      })),
+    ),
   ].sort((left, right) => (left.path < right.path ? -1 : 1));
 };
 
 /**
+ * What the Contents API answers for the repository path `path` (`''` for the
+ * root): a directory's immediate entries, a file's own entry, or nothing.
+ */
+const contentsOf = (
+  files: ReadonlyMap<string, Uint8Array>,
+  path: string,
+  shas: ReadonlyMap<string, string>,
+): readonly ContentsEntry[] | ContentsEntry | undefined => {
+  const entry = (entryPath: string, type: 'dir' | 'file', sha: string): ContentsEntry => ({
+    name: entryPath.split('/').at(-1) ?? entryPath,
+    path: entryPath,
+    sha,
+    type,
+    url: `${API}/contents/${entryPath}?ref=${COMMIT}`,
+  });
+  if (files.has(path)) return entry(path, 'file', COMMIT);
+  if (path !== '' && !shas.has(path)) return undefined;
+  const prefix = path === '' ? '' : `${path}/`;
+  const isChild = (candidate: string): boolean =>
+    candidate.startsWith(prefix) && !candidate.slice(prefix.length).includes('/');
+  return [
+    ...[...shas]
+      .filter(([candidate]) => isChild(candidate))
+      .map(([candidate, sha]) => entry(candidate, 'dir', sha)),
+    ...[...files.keys()].filter(isChild).map((candidate) => entry(candidate, 'file', COMMIT)),
+  ];
+};
+
+/**
  * A public repository with one commit, reachable from `main` (the default
- * branch) and the tag `v1`, answering the three requests a GitHub source makes.
+ * branch) and the tag `v1`, answering the requests a GitHub source makes.
  */
 export const fakeGitHub = ({
   files,
   truncated = false,
+  truncatedDirectories = new Set(),
   rateLimitStatus,
   apiFailure,
   failingBlob,
@@ -125,6 +189,8 @@ export const fakeGitHub = ({
   const failuresAnswered = new Map<string, number>();
   let rawInFlight = 0;
   let peakRawInFlight = 0;
+  const shas = new Map(directoriesOf(files).map((path, index) => [path, directorySha(index)]));
+  const directoryOfSha = new Map([...shas].map(([path, sha]) => [sha, path]));
   const refs = new Map([
     ['HEAD', COMMIT],
     ['main', COMMIT],
@@ -156,9 +222,22 @@ export const fakeGitHub = ({
       }
       const tree = /\/git\/trees\/([0-9a-f]{40})\?recursive=1$/.exec(url);
       if (tree !== null) {
-        return tree[1] === COMMIT
-          ? json(200, { sha: COMMIT, tree: treeEntries(files, symlinks, listedSizes), truncated })
-          : json(404, { message: 'Not Found' });
+        const sha = tree[1] ?? '';
+        const directory = sha === COMMIT ? '' : directoryOfSha.get(sha);
+        if (directory === undefined) return json(404, { message: 'Not Found' });
+        return json(200, {
+          sha,
+          tree: treeEntries(files, directory, shas, symlinks, listedSizes),
+          truncated: directory === '' ? truncated : truncatedDirectories.has(directory),
+        });
+      }
+      const contents = /\/contents(?:\/([^?]*))?\?ref=([0-9a-f]{40})$/.exec(url);
+      if (contents !== null) {
+        const listing =
+          contents[2] === COMMIT
+            ? contentsOf(files, decodeURIComponent(contents[1] ?? ''), shas)
+            : undefined;
+        return listing === undefined ? json(404, { message: 'Not Found' }) : json(200, listing);
       }
       return json(404, { message: 'Not Found' });
     }

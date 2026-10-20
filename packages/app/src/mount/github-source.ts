@@ -14,8 +14,10 @@ import { AGGREGATE_FILE_NAME, scannedAggregatePaths } from '@project/aggregate';
  * Aggregate directory it selects.
  *
  * A ref that is not a commit SHA costs one REST call to resolve, and a missing
- * one resolves `HEAD`, the default branch. Listing the tree at the commit costs
- * one more. An API answer that is GitHub's primary or secondary rate limit is
+ * one resolves `HEAD`, the default branch. A selected subdirectory costs one
+ * more, listing its parent's contents to find the directory's own tree, so
+ * that only that tree is listed rather than the whole repository's. Listing the
+ * tree, recursively, costs one more. An API answer that is GitHub's primary or secondary rate limit is
  * answered as one. The selected directory must directly contain `hyper.json`;
  * within it only the files Importing reads are kept. If the tree lists any of
  * them larger than `MAX_BLOB_BYTES`, nothing is fetched; otherwise each is
@@ -44,7 +46,7 @@ export type GitHubSourceFailure =
   | { readonly kind: 'not-found'; readonly location: GitHubLocation }
   /** The selected directory does not directly contain `hyper.json`. */
   | { readonly kind: 'missing-aggregate-file'; readonly location: ResolvedGitHubLocation }
-  /** GitHub listed only part of the tree at the commit. */
+  /** GitHub listed only part of the selected directory's tree at the commit. */
   | { readonly kind: 'truncated-tree'; readonly location: ResolvedGitHubLocation }
   /** An API request failed for another reason: `status` is absent when no response came. */
   | { readonly kind: 'request-failed'; readonly url: string; readonly status?: number }
@@ -57,7 +59,18 @@ export type GitHubSourceResult =
   | { readonly ok: true; readonly aggregate: GitHubAggregate }
   | { readonly ok: false; readonly failure: GitHubSourceFailure };
 
-const commitSchema = z.object({ sha: z.string().regex(/^[0-9a-f]{40}$/) });
+const shaPattern = /^[0-9a-f]{40}$/;
+
+const commitSchema = z.object({ sha: z.string().regex(shaPattern) });
+
+/**
+ * A Contents API answer: a directory's entries, or a single entry when the
+ * path is not a directory.
+ */
+const contentsSchema = z.union([
+  z.array(z.object({ path: z.string(), sha: z.string().regex(shaPattern), type: z.string() })),
+  z.object({ type: z.string() }),
+]);
 
 const treeSchema = z.object({
   truncated: z.boolean(),
@@ -232,6 +245,31 @@ const fetchBlobs = async (
   return failure === undefined ? { ok: true, value: files } : fail(failure);
 };
 
+/**
+ * The SHA of the tree at the selected directory: the commit itself for the
+ * repository's root, otherwise the entry its parent's contents list for it. A
+ * parent that is not there, or that lists no directory at the path, means the
+ * directory holds no aggregate; the commit has already resolved, so it is not
+ * answered as not found.
+ */
+const selectedTree = async (
+  fetch: typeof globalThis.fetch,
+  api: string,
+  location: GitHubLocation,
+  resolved: ResolvedGitHubLocation,
+): Promise<Step<string>> => {
+  const { sha, path } = resolved;
+  if (path === '') return { ok: true, value: sha };
+  const missing = fail<string>({ kind: 'missing-aggregate-file', location: resolved });
+  const parent = path.split('/').slice(0, -1).join('/');
+  const contents = parent === '' ? `${api}/contents` : `${api}/contents/${encodePath(parent)}`;
+  const listing = await requestApi(fetch, `${contents}?ref=${sha}`, location, contentsSchema);
+  if (!listing.ok) return listing.failure.kind === 'not-found' ? missing : listing;
+  if (!Array.isArray(listing.value)) return missing;
+  const directory = listing.value.find((entry) => entry.path === path && entry.type === 'dir');
+  return directory === undefined ? missing : { ok: true, value: directory.sha };
+};
+
 /** Read a GitHub location as written: parse it, then {@link readGitHubLocation}. */
 export const readGitHubAggregate = async (
   input: string,
@@ -269,17 +307,22 @@ export const readGitHubLocation = async (
   }
   const resolved: ResolvedGitHubLocation = { owner, repo, sha, path };
 
-  const tree = await requestApi(fetch, `${api}/git/trees/${sha}?recursive=1`, location, treeSchema);
+  const treeSha = await selectedTree(fetch, api, location, resolved);
+  if (!treeSha.ok) return treeSha;
+  const tree = await requestApi(
+    fetch,
+    `${api}/git/trees/${treeSha.value}?recursive=1`,
+    location,
+    treeSchema,
+  );
   if (!tree.ok) return tree;
   if (tree.value.truncated)
     return { ok: false, failure: { kind: 'truncated-tree', location: resolved } };
 
-  const prefix = path === '' ? '' : `${path}/`;
+  // The tree is the selected directory's, so its paths are relative to it.
   const listedSizes = new Map(
     tree.value.tree.flatMap((entry): [string, number | undefined][] =>
-      entry.type === 'blob' && entry.mode !== SYMLINK_MODE && entry.path.startsWith(prefix)
-        ? [[entry.path.slice(prefix.length), entry.size]]
-        : [],
+      entry.type === 'blob' && entry.mode !== SYMLINK_MODE ? [[entry.path, entry.size]] : [],
     ),
   );
   const directoryFiles = [...listedSizes.keys()];
@@ -294,6 +337,7 @@ export const readGitHubLocation = async (
       return { ok: false, failure: { kind: 'blob-too-large', path: file, size } };
     }
   }
+  const prefix = path === '' ? '' : `${path}/`;
   const files = await fetchBlobs(fetch, wait, now, resolved, prefix, scanned);
   if (!files.ok) return files;
   return { ok: true, aggregate: { location: resolved, files: files.value } };

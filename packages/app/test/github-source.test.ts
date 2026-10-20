@@ -137,10 +137,72 @@ describe('readGitHubAggregate', () => {
       expectNoCredentials(github);
     });
 
+    it("finds the selected directory's tree in its parent and lists only that tree", async () => {
+      const github = fakeGitHub({ files: repository });
+      const selectedSha = /\/([0-9a-f]{40})\?recursive=1$/;
+
+      const result = await readGitHubAggregate(
+        `github:${OWNER}/${REPO}@${COMMIT}/${SELECTED}`,
+        github.fetch,
+      );
+
+      expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+      const [contents, tree, ...rest] = github.apiRequests();
+      expect(contents).toBe(`${API}/contents/talks?ref=${COMMIT}`);
+      expect(tree).toMatch(new RegExp(`^${API}/git/trees/[0-9a-f]{40}\\?recursive=1$`));
+      expect(selectedSha.exec(tree ?? '')?.[1]).not.toBe(COMMIT);
+      expect(rest).toEqual([]);
+    });
+
+    it("finds a directory at the repository's root in the root's listing", async () => {
+      const github = fakeGitHub({ files: under('pgdu', fixtureFiles) });
+
+      const result = await readGitHubAggregate(
+        `github:${OWNER}/${REPO}@${COMMIT}/pgdu`,
+        github.fetch,
+      );
+
+      expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+      expect(github.apiRequests()[0]).toBe(`${API}/contents?ref=${COMMIT}`);
+      expect(github.apiRequests()).toHaveLength(2);
+      expect(github.rawRequests()).toEqual(sorted(under('pgdu', fixtureFiles).keys()));
+    });
+
+    it("mounts a directory whose own tree is whole although the repository's is truncated", async () => {
+      const github = fakeGitHub({ files: repository, truncated: true });
+
+      const result = await readGitHubAggregate(
+        `github:${OWNER}/${REPO}@main/${SELECTED}`,
+        github.fetch,
+      );
+
+      expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+    });
+
+    it('refuses a directory whose own tree is truncated', async () => {
+      const github = fakeGitHub({ files: repository, truncatedDirectories: new Set([SELECTED]) });
+
+      const result = await readGitHubAggregate(
+        `github:${OWNER}/${REPO}@main/${SELECTED}`,
+        github.fetch,
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        failure: {
+          kind: 'truncated-tree',
+          location: { owner: OWNER, repo: REPO, sha: COMMIT, path: SELECTED },
+        },
+      });
+      expect(github.rawRequests()).toEqual([]);
+    });
+
     it.each([
       ['the repository root, whose descendants hold one', ''],
       ['a parent of the aggregate', '/talks'],
       ['a directory that is not there', '/talks/missing'],
+      ['a directory whose parent is not there', '/talks/missing/deeper'],
+      ['a directory inside a file', `/${SELECTED}/hyper.json/deeper`],
       ['a file rather than a directory', `/${SELECTED}/hyper.json`],
     ])('refuses a selected directory without hyper.json: %s', async (_description, suffix) => {
       const github = fakeGitHub({ files: repository });
