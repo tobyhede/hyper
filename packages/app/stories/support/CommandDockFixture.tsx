@@ -23,6 +23,7 @@ export type DockScenario =
   | 'default'
   | 'new-space'
   | 'presenting'
+  | 'mounted'
   | 'replacing'
   | 'save-failed'
   | 'save-rejected'
@@ -220,7 +221,7 @@ export async function openDockStory(scenario: DockScenario) {
   const spaces =
     scenario === 'replacing'
       ? storySpaces(metaSnapshot.id, snapshots, control, heldImageSources().images)
-      : storySpaces(metaSnapshot.id, snapshots, control);
+      : storySpaces(metaSnapshot.id, snapshots, control, undefined, scenario === 'mounted');
   await spaces.open(metaSnapshot.id);
   await spaces.enter(platformSnapshot.id);
   await spaces.enter(designSystemSnapshot.id);

@@ -169,6 +169,7 @@ export {
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,
+  ReadOnlyIcon,
   StopPresentingIcon,
 } from './icons';
 export type { ResourceBaseKind } from './icons';

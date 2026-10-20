@@ -257,6 +257,11 @@ export interface OpenSpacesOptions {
    */
   readonly presentations: PresentationLinks;
   readonly reportObserverError?: ObserverErrorReporter;
+  /**
+   * Whether this session is Mounting an aggregate (ADR 0130): every Space it
+   * composes offers no Edit. Absent, it is not.
+   */
+  readonly mounted?: boolean | undefined;
 }
 
 interface ValidatedLoadedSpace {
@@ -380,6 +385,7 @@ export function createOpenSpaces({
   fullscreen,
   presentations,
   reportObserverError,
+  mounted,
 }: OpenSpacesOptions): OpenSpaces {
   const report: ObserverErrorReporter =
     reportObserverError ?? console.error.bind(console, 'Open Spaces observer failed');
@@ -586,6 +592,7 @@ export function createOpenSpaces({
         spaceResources,
         presentations,
         fullscreen,
+        mounted,
       }),
       spaceResources,
     };

@@ -41,7 +41,9 @@ export interface AuthoringInProgress {
    * applied (`.scratch/image-resource/issues/05-an-author-replaces-the-image.md`,
    * "Other actions while a replacement runs"; ADR 0112), wherever it began:
    * every answer is withdrawn except `editResourceBody`, which is what keeps
-   * the replacement's own target mounted to show its answer. Several Edits
+   * the replacement's own target mounted to show its answer, and
+   * `embeddedMapEdit`, a control left drawn over an embedding that is itself
+   * withdrawn. Several Edits
    * move the address as well as authoring — New Map and New Graph continue in
    * what they create, and deleting the selected Map reselects — so authoring
    * and navigation are withdrawn together rather than one at a time.
@@ -106,6 +108,18 @@ export interface AuthoringInProgress {
    * together, where a report through a callback prop would land an effect late.
    */
   readonly editingEmbeddedMap: boolean;
+  /**
+   * The session is Mounting an aggregate, which nothing can make durable
+   * (ADR 0130), so every Edit is withheld whatever else is in progress.
+   *
+   * Not a fact about what is in progress but about the whole session, and
+   * deliberately not the `read-only` Map surface policy
+   * (`map-surface-policy.ts`): that policy withholds Present and every node
+   * gesture, which would leave a mounted talk unpresentable and its Space
+   * Resources impossible to Enter. A mounted session keeps selecting,
+   * navigating and Present.
+   */
+  readonly mounted: boolean;
 }
 
 /** What each authoring operation answers to the surfaces that offer it. */
@@ -162,9 +176,66 @@ export interface AuthoringAvailability {
    * and is not asked this.
    */
   readonly replaceSession: boolean;
+  /**
+   * A selected Resource's rail may draw its Actions menu.
+   *
+   * The menu holds the Resource's addresses and a Space Resource's Enter as
+   * well as its Edits, each of which answers to its own availability above. So
+   * it is `authorOnCanvas` everywhere but a mounted session, where the Edits
+   * are withheld and the rest of the menu stays reachable.
+   */
+  readonly resourceActions: boolean;
+  /**
+   * An Open Space Resource may offer its Edit, which puts the Map it embeds
+   * in Edit. Withheld in a mounted session, and by the Map surface policy on
+   * every drawing but the canvas's own Map (`surfaceAvailability`); anywhere
+   * else the embedding's own answers, `authorInEmbeddedMap` among them,
+   * withdraw what it authors.
+   */
+  readonly embeddedMapEdit: boolean;
 }
 
+/** Every answer withheld: what a drawing that takes no gesture answers. */
+export const NOTHING_AVAILABLE: AuthoringAvailability = {
+  resourcesView: false,
+  chromeTitleEdit: false,
+  entityEdits: false,
+  deleteResource: false,
+  present: false,
+  addResource: false,
+  createMap: false,
+  authorOnCanvas: false,
+  authorInEmbeddedMap: false,
+  editResourceBody: false,
+  connectOnCanvas: false,
+  dragNodes: false,
+  selectNodes: false,
+  navigate: false,
+  replaceSession: false,
+  resourceActions: false,
+  embeddedMapEdit: false,
+};
+
 export function authoringAvailability(inProgress: AuthoringInProgress): AuthoringAvailability {
+  const available = availabilityBesideMounting(inProgress);
+  if (!inProgress.mounted) return available;
+  // A mounted session starts from nothing and names what reads, so an answer
+  // added later is withheld here until it is named: selecting, navigating and
+  // Present, each as the rest of the session answers it, and the rail's
+  // Actions menu where the canvas would draw it, for its addresses and a Space
+  // Resource's Enter.
+  return {
+    ...NOTHING_AVAILABLE,
+    present: available.present,
+    selectNodes: available.selectNodes,
+    navigate: available.navigate,
+    replaceSession: available.replaceSession,
+    resourceActions: available.authorOnCanvas,
+  };
+}
+
+/** Every answer as it stands in a session that is not mounted. */
+function availabilityBesideMounting(inProgress: AuthoringInProgress): AuthoringAvailability {
   const availability = availabilityBesideReplacement(inProgress);
   if (!inProgress.replacingImage) return availability;
   // The running replacement's target is a live content editor, so it keeps the
@@ -184,7 +255,11 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
     selectNodes: false,
     navigate: false,
     replaceSession: false,
+    resourceActions: false,
     editResourceBody: availability.editResourceBody,
+    // The Edit control of an Open Space Resource stays drawn, as it is beside
+    // every other withdrawal; the embedding it would edit is withdrawn above.
+    embeddedMapEdit: availability.embeddedMapEdit,
   };
 }
 
@@ -410,6 +485,11 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
   const navigate = true;
   const replaceSession = true;
 
+  /** The rail's Actions menu goes where the rail's other controls go. */
+  const resourceActions = authorOnCanvas;
+  /** Withheld by a mounted session, and by the surface policy off the canvas. */
+  const embeddedMapEdit = true;
+
   return {
     resourcesView,
     chromeTitleEdit,
@@ -426,5 +506,7 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
     selectNodes,
     navigate,
     replaceSession,
+    resourceActions,
+    embeddedMapEdit,
   };
 }

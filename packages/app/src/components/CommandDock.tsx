@@ -49,12 +49,14 @@ import {
   type RefObject,
 } from 'react';
 import {
+  Badge,
   CommandToolbar,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  ReadOnlyIcon,
   ToolbarButton,
 } from '@project/ui';
 import { canRetry } from '@project/persistence';
@@ -680,6 +682,25 @@ function PersistenceReport({
 }
 
 /**
+ * That this session offers no Edit (ADR 0130), drawn where a mounted session
+ * would otherwise report persistence.
+ *
+ * **A mark, not a command and not a status region.** It is a `Badge`, so it is
+ * text in the strip that no arrow key stops on and nothing announces unasked:
+ * a mounted session's read-only state is a fact about the whole session that
+ * does not change while it is open, so there is nothing to announce. It trails
+ * the clusters because it qualifies all of them.
+ */
+function ReadOnlyMark() {
+  return (
+    <Badge variant="outline">
+      <ReadOnlyIcon data-icon="inline-start" aria-hidden="true" />
+      Read-only
+    </Badge>
+  );
+}
+
+/**
  * The Command Dock, docked to a slot and draggable between them.
  *
  * **The JSX below is the same in every orientation.** The edge derives one
@@ -724,12 +745,14 @@ export function CommandDock({
           presenting={chrome.graph.presenting}
           label="Command Dock"
           report={
-            <PersistenceReport
-              persistence={chrome.persistence}
-              edge={dock.edge}
-              navigate={chrome.navigate}
-              replaceSession={chrome.replaceSession}
-            />
+            chrome.persistence === null ? null : (
+              <PersistenceReport
+                persistence={chrome.persistence}
+                edge={dock.edge}
+                navigate={chrome.navigate}
+                replaceSession={chrome.replaceSession}
+              />
+            )
           }
         >
           {/* Space | Map Graph | Resources.
@@ -765,6 +788,12 @@ export function CommandDock({
           />
           <Divider orientation={divider} />
           <ResourcesControl resources={chrome.resources} side={side} />
+          {chrome.readOnly ? (
+            <>
+              <Divider orientation={divider} />
+              <ReadOnlyMark />
+            </>
+          ) : null}
         </Dock>
       </DockRenamingContext.Provider>
     </DockDisclosureContext.Provider>

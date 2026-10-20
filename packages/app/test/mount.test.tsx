@@ -1,4 +1,4 @@
-import { act, waitFor } from '@testing-library/react';
+import { act, waitFor, within } from '@testing-library/react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { uuidSchema, type UUID } from '@project/core';
@@ -106,6 +106,13 @@ describe('mounting an aggregate in the page', () => {
     expect(history.pathname()).toBe(
       productDestinationPath({ kind: 'space', spaceId: META_SPACE_ID }),
     );
+  });
+
+  it('opens a read-only session, marked so and with no persistence status', async () => {
+    const container = await render(() => mountedStartup(fixtureFiles()).resolve('/'));
+
+    expect(await within(container).findByText('Read-only')).toBeInTheDocument();
+    expect(within(container).queryByTestId('persistence-status')).toBeNull();
   });
 
   it('shows the reader’s diagnostics for a directory that is not an aggregate', async () => {
