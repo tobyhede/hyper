@@ -7,6 +7,10 @@ import {
 } from '@project/persistence';
 import { composeCore } from '../src/compose-app';
 import { createPresentingWindow } from '../src/presenting-window';
+import {
+  createBrowserPresentationLinks,
+  type NativeBroadcastChannel,
+} from '../src/browser-presentation-channel';
 import { refusingFullscreen } from './fullscreen';
 import {
   followPresentation,
@@ -453,5 +457,79 @@ describe('the presentation link', () => {
     });
 
     expect(stage.navigation.activeResourceId()).toBe(OPENING);
+  });
+});
+
+/**
+ * Channels joined by name, as `BroadcastChannel` joins them on one origin:
+ * each hears every other channel of the same name and never itself.
+ */
+function namedChannels() {
+  const joined = new Set<{
+    readonly name: string;
+    readonly listeners: Set<(event: Pick<MessageEvent, 'data'>) => void>;
+  }>();
+  return (name: string): NativeBroadcastChannel => {
+    const self = { name, listeners: new Set<(event: Pick<MessageEvent, 'data'>) => void>() };
+    joined.add(self);
+    return {
+      postMessage: (message) => {
+        for (const other of [...joined]) {
+          if (other === self || other.name !== name) continue;
+          for (const listener of [...other.listeners]) listener({ data: structuredClone(message) });
+        }
+      },
+      addEventListener: (_type, listener) => self.listeners.add(listener),
+      removeEventListener: (_type, listener) => self.listeners.delete(listener),
+      close: () => joined.delete(self),
+    };
+  };
+}
+
+describe('mounted revisions of one Space on one origin', () => {
+  const FIRST = `github:tobyhede/talk@${'a'.repeat(40)}`;
+  const SECOND = `github:tobyhede/talk@${'b'.repeat(40)}`;
+
+  /** One window's end of the Space's channel, on an origin whose channels `openChannel` joins. */
+  const windowOn = (openChannel: (name: string) => NativeBroadcastChannel, scope: string) =>
+    createBrowserPresentationLinks({
+      openChannel,
+      window: { addEventListener: () => undefined, removeEventListener: () => undefined },
+      now: () => 0,
+      locks: undefined,
+      scope,
+    }).open(SPACE_ID);
+
+  it('follows and controls only the presentation of its own revision', () => {
+    const origin = namedChannels();
+    const first = presentingWindow(windowOn(origin, FIRST), mintingIds(FIRST_PRESENTATION));
+    const second = presentingWindow(windowOn(origin, SECOND), mintingIds(SECOND_PRESENTATION));
+    const firstNotes = notesWindow(windowOn(origin, FIRST)).follower;
+    const secondNotes = notesWindow(windowOn(origin, SECOND)).follower;
+
+    first.navigation.present();
+    expect(shown(firstNotes)).toBe(OPENING);
+    expect(shown(secondNotes)).toBeNull();
+
+    second.navigation.present();
+    second.navigation.advance();
+    expect(shown(secondNotes)).toBe(LEFT);
+    expect(shown(firstNotes)).toBe(OPENING);
+
+    firstNotes.selectBranch(1);
+    firstNotes.advance();
+    expect(first.navigation.activeResourceId()).toBe(RIGHT);
+    expect(second.navigation.activeResourceId()).toBe(LEFT);
+  });
+
+  it('keeps following between windows of the same revision', () => {
+    const origin = namedChannels();
+    const stage = presentingWindow(windowOn(origin, FIRST), mintingIds(FIRST_PRESENTATION));
+    const { follower } = notesWindow(windowOn(origin, FIRST));
+
+    stage.navigation.present();
+    stage.navigation.advance();
+
+    expect(shown(follower)).toBe(LEFT);
   });
 });

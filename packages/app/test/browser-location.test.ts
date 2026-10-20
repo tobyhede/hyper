@@ -11,6 +11,8 @@ import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import { createBrowserHistory } from '../src/browser-history';
 import { createBrowserLocation, NavigationUnavailableError } from '../src/browser-location';
 import { composeApp } from '../src/compose-app';
+import { pinSource } from '../src/mount/mount-source';
+import { sourceParameter, withSource } from '../src/source-parameter';
 import { recordingHistory, standInBrowser } from './browser-history';
 import type { ImageSources } from '../src/image-creation';
 import { heldImageSources, unusedImageSources } from './image-sources';
@@ -563,6 +565,233 @@ describe('the browser location', () => {
     location.follow(app);
 
     expect(location.getState().addressedResourceId).toBe(RESOURCE_B);
+    location.dispose();
+  });
+});
+
+const COMMIT = 'a'.repeat(40);
+const LATER_COMMIT = 'b'.repeat(40);
+/** A complete resolved GitHub location, as a successful mount writes it. */
+const SOURCE = `github:tobyhede/talk@${COMMIT}/slides`;
+const OTHER_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000010');
+const ENTERED_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000011');
+const ENTERED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012');
+
+/** A product path with the mounted source carried after it. */
+const sourced = (path: string, source = SOURCE): string => `${path}?source=${source}`;
+
+/**
+ * A mounted page names its GitHub location in the `source` query parameter
+ * (ADR 0130). Product URLs are otherwise unchanged, so every write the location
+ * makes carries the parameter and no destination resolver ever reads it.
+ */
+describe('the mounted source in the address', () => {
+  it('reads a literal + in the source as itself, as a hand-typed ref spells it', () => {
+    expect(sourceParameter('https://hyper.test/?source=github:o/r@v1.0+build')).toBe(
+      'github:o/r@v1.0+build',
+    );
+    expect(sourceParameter(`https://hyper.test/${withSource('', 'github:o/r@v1.0+build')}`)).toBe(
+      'github:o/r@v1.0+build',
+    );
+  });
+
+  it('survives a Map move', () => {
+    const app = compose();
+    const history = recordingHistory(sourced(mapPath(MAP_ID)));
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+
+    location.chooseMap(OTHER_MAP_ID);
+
+    expect(history.writes).toEqual([{ method: 'push', path: sourced(mapPath(OTHER_MAP_ID)) }]);
+    location.dispose();
+  });
+
+  it('survives a Graph move', () => {
+    const app = compose();
+    const history = recordingHistory(sourced(mapPath(MAP_ID)));
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+
+    location.activateGraph(SECOND_GRAPH_ID);
+
+    expect(history.writes).toEqual([
+      { method: 'push', path: sourced(mapGraphPath(MAP_ID, SECOND_GRAPH_ID)) },
+    ]);
+    location.dispose();
+  });
+
+  it('survives Present', () => {
+    const app = compose();
+    const history = recordingHistory(sourced(mapPath(MAP_ID)));
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+
+    app.navigation.present();
+
+    expect(history.writes).toEqual([{ method: 'push', path: sourced(presentationPath) }]);
+    location.dispose();
+  });
+
+  it('survives Enter into another Space', () => {
+    const app = compose();
+    const entered = compose({
+      id: OTHER_SPACE_ID,
+      document: {
+        version: 1,
+        title: 'Entered',
+        maps: [
+          {
+            id: ENTERED_MAP_ID,
+            title: 'Map',
+            kind: 'positioned',
+            positions: {},
+            graphs: [{ id: ENTERED_GRAPH_ID, title: 'Graph', edges: [] }],
+          },
+        ],
+        defaultMap: ENTERED_MAP_ID,
+      },
+      resources: [],
+    });
+    const history = recordingHistory(sourced(mapPath(MAP_ID)));
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+
+    location.activate(entered);
+
+    expect(history.writes).toEqual([
+      {
+        method: 'push',
+        path: sourced(
+          productDestinationPath({ kind: 'map', spaceId: OTHER_SPACE_ID, mapId: ENTERED_MAP_ID }),
+        ),
+      },
+    ]);
+    location.dispose();
+  });
+
+  it('survives a browser traversal, which resolves the path alone', () => {
+    const app = compose();
+    const history = recordingHistory(sourced(mapPath(MAP_ID)));
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+    location.chooseMap(OTHER_MAP_ID);
+
+    history.popTo(sourced(mapPath(MAP_ID)));
+    expect(app.navigation.getState().selectedMapId).toBe(MAP_ID);
+    expect(location.getState().destinationNotFound).toBe(false);
+    location.activateGraph(SECOND_GRAPH_ID);
+
+    expect(history.writes).toEqual([
+      { method: 'push', path: sourced(mapPath(OTHER_MAP_ID)) },
+      { method: 'push', path: sourced(mapGraphPath(MAP_ID, SECOND_GRAPH_ID)) },
+    ]);
+    location.dispose();
+  });
+
+  it('survives Back and Forward in the native adapter', () => {
+    const app = compose();
+    const stand = standInBrowser({ path: sourced(mapPath(MAP_ID)) });
+    const history = createBrowserHistory(stand.browser);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+    location.chooseMap(OTHER_MAP_ID);
+
+    stand.back();
+    stand.settle();
+    expect(history.href()).toBe(new URL(sourced(mapPath(MAP_ID)), history.href()).href);
+    stand.forward();
+    stand.settle();
+
+    expect(app.navigation.getState().selectedMapId).toBe(OTHER_MAP_ID);
+    expect(history.href()).toBe(new URL(sourced(mapPath(OTHER_MAP_ID)), history.href()).href);
+    location.dispose();
+  });
+
+  it('carries the source into a copied link', () => {
+    const app = compose();
+    const history = recordingHistory(sourced(mapPath(MAP_ID)));
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+
+    expect(location.href({ kind: 'map', spaceId: SPACE_ID, mapId: OTHER_MAP_ID })).toBe(
+      `https://space.test${sourced(mapPath(OTHER_MAP_ID))}`,
+    );
+    location.dispose();
+  });
+
+  it('carries only the source, dropping any other query', () => {
+    const app = compose();
+    const history = recordingHistory(`${sourced(mapPath(MAP_ID))}&utm=feed`);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+
+    location.chooseMap(OTHER_MAP_ID);
+
+    expect(history.writes).toEqual([{ method: 'push', path: sourced(mapPath(OTHER_MAP_ID)) }]);
+    location.dispose();
+  });
+});
+
+const resolved = (sha: string) => ({ owner: 'tobyhede', repo: 'talk', sha, path: 'slides' });
+
+describe('pinning the mounted source', () => {
+  it('replaces a branch location with its commit exactly once', () => {
+    const history = recordingHistory(sourced(mapPath(MAP_ID), 'github:tobyhede/talk@main/slides'));
+
+    pinSource(history, resolved(COMMIT));
+    pinSource(history, resolved(COMMIT));
+
+    expect(history.writes).toEqual([{ method: 'replace', path: sourced(mapPath(MAP_ID)) }]);
+  });
+
+  it('writes nothing when the address already names the commit', () => {
+    const history = recordingHistory(sourced(mapPath(MAP_ID)));
+
+    pinSource(history, resolved(COMMIT));
+
+    expect(history.writes).toEqual([]);
+  });
+
+  it('writes nothing when the address names the commit in its encoded spelling', () => {
+    const history = recordingHistory(`${mapPath(MAP_ID)}?source=${encodeURIComponent(SOURCE)}`);
+
+    pinSource(history, resolved(COMMIT));
+
+    expect(history.writes).toEqual([]);
+  });
+
+  it('writes a build-time default into the address as a pinned source', () => {
+    const history = recordingHistory(mapPath(MAP_ID));
+
+    pinSource(history, resolved(COMMIT));
+
+    expect(history.writes).toEqual([{ method: 'replace', path: sourced(mapPath(MAP_ID)) }]);
+  });
+
+  it('replaces a source that names another commit', () => {
+    const history = recordingHistory(
+      sourced(mapPath(MAP_ID), `github:tobyhede/talk@${LATER_COMMIT}/slides`),
+    );
+
+    pinSource(history, resolved(COMMIT));
+
+    expect(history.writes).toEqual([{ method: 'replace', path: sourced(mapPath(MAP_ID)) }]);
+  });
+
+  it('is carried by every later move the location makes', () => {
+    const app = compose();
+    const history = recordingHistory(mapPath(MAP_ID));
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+    pinSource(history, resolved(COMMIT));
+
+    location.chooseMap(OTHER_MAP_ID);
+
+    expect(history.writes).toEqual([
+      { method: 'replace', path: sourced(mapPath(MAP_ID)) },
+      { method: 'push', path: sourced(mapPath(OTHER_MAP_ID)) },
+    ]);
     location.dispose();
   });
 });

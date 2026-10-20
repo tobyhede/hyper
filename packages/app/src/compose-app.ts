@@ -14,7 +14,7 @@ import type { PresentationLinks } from './presentation-link';
 import type { Fullscreen } from './presenting-fullscreen';
 import { createPresentingWindow, type PresentingWindow } from './presenting-window';
 import { openIndependently } from './open-independently';
-import { productDestinationPath } from '@project/http';
+import { productDestinationPath, type ProductDestination } from '@project/http';
 import type { RenderAdapter } from './render-adapter';
 import { requireDefaultMap } from './map-resolution';
 import { createWorkingSpaceReader } from './snapshot';
@@ -127,6 +127,13 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    * offers no Edit (`authoring-availability.ts`). Absent, it is not.
    */
   readonly mounted?: boolean | undefined;
+  /**
+   * The address a destination opened in a new browsing context is given: the
+   * browser location's `href`, which carries a mounted page's `source` (ADR
+   * 0130), so a Notes window mounts the revision its presenting window shows.
+   * Absent, the bare product path.
+   */
+  readonly addressOf?: ((destination: ProductDestination) => string) | undefined;
 }
 
 /** A fullscreen no request is ever granted, for a composition given none. */
@@ -246,6 +253,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     presentations,
     fullscreen = NO_FULLSCREEN,
     mounted = false,
+    addressOf = productDestinationPath,
   } = dependencies;
   const core = composeCore(dependencies);
   const { currentSpace, navigation } = core;
@@ -305,7 +313,7 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
       // only inside a user activation. A Notes window follows over the link,
       // so it needs no handle on this one.
       openNotes: () => {
-        openIndependently(productDestinationPath({ kind: 'notes', spaceId: currentSpace().id }));
+        openIndependently(addressOf({ kind: 'notes', spaceId: currentSpace().id }));
       },
       link:
         presentations === undefined
