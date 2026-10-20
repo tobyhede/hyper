@@ -13,18 +13,19 @@ import { AGGREGATE_FILE_NAME, scannedAggregatePaths } from '@project/aggregate';
  * Aggregate directory it selects.
  *
  * A ref that is not a commit SHA costs one REST call to resolve, and a missing
- * one resolves `HEAD`, the default branch. A selected subdirectory costs one
- * more, listing its parent's contents to find the directory's own tree, so
- * that only that tree is listed rather than the whole repository's. Listing the
- * tree, recursively, costs one more. An API answer that is GitHub's primary or secondary rate limit is
- * answered as one. The selected directory must directly contain `hyper.json`;
+ * one resolves `HEAD`, the default branch. Listing the selected directory's
+ * tree, recursively, costs one more: the commit's own tree for the
+ * repository's root, otherwise the tree at `<commit>:<path>`, so that only that
+ * tree is listed rather than the whole repository's. An API answer that is
+ * GitHub's primary or secondary rate limit is answered as one. The selected directory must directly contain `hyper.json`;
  * within it only the files Importing reads are kept. If the tree lists any of
  * them larger than `MAX_BLOB_BYTES`, nothing is fetched; otherwise each is
  * fetched at the commit from `raw.githubusercontent.com`, at most
- * `BLOB_CONCURRENCY` at once. A blob answering 429 (that host throttling its
- * reader) or 5xx is asked for once more, after the delay its `Retry-After`
- * names in seconds or as an HTTP-date, capped at `MAX_RETRY_MS`, or
- * `DEFAULT_RETRY_MS` without a readable one. No token or other credential is
+ * `BLOB_CONCURRENCY` at once, and the first that fails cancels those in
+ * flight. A blob answering 429 (that host throttling its reader) or 5xx, or
+ * whose fetch throws, is asked for once more, after the delay its
+ * `Retry-After` names in seconds or as an HTTP-date, capped at `MAX_RETRY_MS`,
+ * or `DEFAULT_RETRY_MS` without a readable one. No token or other credential is
  * ever sent.
  *
  * Every failure is answered as a value naming what failed. What to tell a
@@ -61,15 +62,6 @@ export type GitHubSourceResult =
 const shaPattern = /^[0-9a-f]{40}$/;
 
 const commitSchema = z.object({ sha: z.string().regex(shaPattern) });
-
-/**
- * A Contents API answer: a directory's entries, or a single entry when the
- * path is not a directory.
- */
-const contentsSchema = z.union([
-  z.array(z.object({ path: z.string(), sha: z.string().regex(shaPattern), type: z.string() })),
-  z.object({ type: z.string() }),
-]);
 
 const treeSchema = z.object({
   truncated: z.boolean(),
@@ -201,24 +193,40 @@ const fetchBlob = async (
   { owner, repo, sha }: ResolvedGitHubLocation,
   repositoryPath: string,
   path: string,
+  signal: AbortSignal,
 ): Promise<Step<Uint8Array>> => {
   const url = `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${encodePath(repositoryPath)}`;
-  try {
-    let response = await fetch(url, { credentials: 'omit' });
-    if (isRetryable(response.status)) {
-      await wait(retryDelay(response, now));
-      response = await fetch(url, { credentials: 'omit' });
+  const failed = (status?: number): Step<Uint8Array> =>
+    fail(
+      status === undefined ? { kind: 'blob-failed', path } : { kind: 'blob-failed', path, status },
+    );
+  const request = async (): Promise<Response | undefined> => {
+    try {
+      return await fetch(url, { credentials: 'omit', signal });
+    } catch {
+      return undefined;
     }
-    if (!response.ok) return fail({ kind: 'blob-failed', path, status: response.status });
+  };
+  let response = await request();
+  if (signal.aborted) return failed();
+  if (response === undefined || isRetryable(response.status)) {
+    // A retry once the blobs are cancelled throws at once, failing below.
+    await wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now));
+    response = await request();
+  }
+  if (response === undefined) return failed();
+  if (!response.ok) return failed(response.status);
+  try {
     return { ok: true, value: new Uint8Array(await response.arrayBuffer()) };
   } catch {
-    return fail({ kind: 'blob-failed', path });
+    return failed();
   }
 };
 
 /**
  * Every scanned file's blob, fetched `BLOB_CONCURRENCY` at a time. The first
- * failure stops further fetches from starting and is the answer.
+ * failure is the answer: it stops further fetches from starting and cancels
+ * those in flight.
  */
 const fetchBlobs = async (
   fetch: typeof globalThis.fetch,
@@ -230,43 +238,28 @@ const fetchBlobs = async (
 ): Promise<Step<Map<string, Uint8Array>>> => {
   const files = new Map<string, Uint8Array>();
   const pending = [...scanned];
+  const cancel = new AbortController();
   let failure: GitHubSourceFailure | undefined;
   const worker = async (): Promise<void> => {
     for (let file = pending.shift(); file !== undefined; file = pending.shift()) {
-      const blob = await fetchBlob(fetch, wait, now, location, `${prefix}${file}`, file);
+      const blob = await fetchBlob(
+        fetch,
+        wait,
+        now,
+        location,
+        `${prefix}${file}`,
+        file,
+        cancel.signal,
+      );
       if (!blob.ok) {
         failure ??= blob.failure;
         pending.length = 0;
+        cancel.abort();
       } else files.set(file, blob.value);
     }
   };
   await Promise.all(Array.from({ length: BLOB_CONCURRENCY }, worker));
   return failure === undefined ? { ok: true, value: files } : fail(failure);
-};
-
-/**
- * The SHA of the tree at the selected directory: the commit itself for the
- * repository's root, otherwise the entry its parent's contents list for it. A
- * parent that is not there, or that lists no directory at the path, means the
- * directory holds no aggregate; the commit has already resolved, so it is not
- * answered as not found.
- */
-const selectedTree = async (
-  fetch: typeof globalThis.fetch,
-  api: string,
-  location: GitHubLocation,
-  resolved: ResolvedGitHubLocation,
-): Promise<Step<string>> => {
-  const { sha, path } = resolved;
-  if (path === '') return { ok: true, value: sha };
-  const missing = fail<string>({ kind: 'missing-aggregate-file', location: resolved });
-  const parent = path.split('/').slice(0, -1).join('/');
-  const contents = parent === '' ? `${api}/contents` : `${api}/contents/${encodePath(parent)}`;
-  const listing = await requestApi(fetch, `${contents}?ref=${sha}`, location, contentsSchema);
-  if (!listing.ok) return listing.failure.kind === 'not-found' ? missing : listing;
-  if (!Array.isArray(listing.value)) return missing;
-  const directory = listing.value.find((entry) => entry.path === path && entry.type === 'dir');
-  return directory === undefined ? missing : { ok: true, value: directory.sha };
 };
 
 export const readGitHubAggregate = async (
@@ -296,15 +289,20 @@ export const readGitHubAggregate = async (
   }
   const resolved: ResolvedGitHubLocation = { owner, repo, sha, path };
 
-  const treeSha = await selectedTree(fetch, api, location, resolved);
-  if (!treeSha.ok) return treeSha;
+  // A path that is not a directory at a commit that resolved holds no
+  // aggregate, so it is not answered as not found.
+  const treeish = path === '' ? sha : `${sha}:${encodePath(path)}`;
   const tree = await requestApi(
     fetch,
-    `${api}/git/trees/${treeSha.value}?recursive=1`,
+    `${api}/git/trees/${treeish}?recursive=1`,
     location,
     treeSchema,
   );
-  if (!tree.ok) return tree;
+  if (!tree.ok) {
+    return path !== '' && tree.failure.kind === 'not-found'
+      ? { ok: false, failure: { kind: 'missing-aggregate-file', location: resolved } }
+      : tree;
+  }
   if (tree.value.truncated)
     return { ok: false, failure: { kind: 'truncated-tree', location: resolved } };
 

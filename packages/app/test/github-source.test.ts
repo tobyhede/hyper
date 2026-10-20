@@ -46,10 +46,9 @@ interface ApiFailure {
   readonly body?: string;
 }
 
-interface BlobFailure {
-  readonly status: number;
-  readonly retryAfter?: string;
-}
+/** A raw answer with a status and the `Retry-After` it sends, or a fetch that throws. */
+type BlobFailure =
+  { readonly status: number; readonly retryAfter?: string } | { readonly throws: true };
 
 interface FakeGitHub {
   readonly fetch: typeof fetch;
@@ -73,21 +72,10 @@ interface TreeEntry {
   readonly size?: number;
 }
 
-/** The fields of GitHub's Contents API entries a GitHub source reads, and one it ignores. */
-interface ContentsEntry {
-  readonly name: string;
-  readonly path: string;
-  readonly sha: string;
-  readonly type: 'dir' | 'file';
-  readonly url: string;
-}
-
-/** The bodies of the REST answers this fake gives: a commit, a tree, a listing, or an error. */
+/** The bodies of the REST answers this fake gives: a commit, a tree, or an error. */
 type ApiBody =
   | { readonly sha: string }
   | { readonly sha: string; readonly tree: readonly TreeEntry[]; readonly truncated: boolean }
-  | readonly ContentsEntry[]
-  | ContentsEntry
   | { readonly message: string };
 
 const json = (status: number, body: ApiBody): Response =>
@@ -147,35 +135,6 @@ const treeEntries = (
 };
 
 /**
- * What the Contents API answers for the repository path `path` (`''` for the
- * root): a directory's immediate entries, a file's own entry, or nothing.
- */
-const contentsOf = (
-  files: ReadonlyMap<string, Uint8Array>,
-  path: string,
-  shas: ReadonlyMap<string, string>,
-): readonly ContentsEntry[] | ContentsEntry | undefined => {
-  const entry = (entryPath: string, type: 'dir' | 'file', sha: string): ContentsEntry => ({
-    name: entryPath.split('/').at(-1) ?? entryPath,
-    path: entryPath,
-    sha,
-    type,
-    url: `${API}/contents/${entryPath}?ref=${COMMIT}`,
-  });
-  if (files.has(path)) return entry(path, 'file', COMMIT);
-  if (path !== '' && !shas.has(path)) return undefined;
-  const prefix = path === '' ? '' : `${path}/`;
-  const isChild = (candidate: string): boolean =>
-    candidate.startsWith(prefix) && !candidate.slice(prefix.length).includes('/');
-  return [
-    ...[...shas]
-      .filter(([candidate]) => isChild(candidate))
-      .map(([candidate, sha]) => entry(candidate, 'dir', sha)),
-    ...[...files.keys()].filter(isChild).map((candidate) => entry(candidate, 'file', COMMIT)),
-  ];
-};
-
-/**
  * A public repository with one commit, reachable from `main` (the default
  * branch) and the tag `v1`, answering the requests a GitHub source makes.
  */
@@ -226,24 +185,30 @@ const fakeGitHub = ({
           ? json(422, { message: 'No commit found for SHA' })
           : json(200, { sha });
       }
-      const tree = /\/git\/trees\/([0-9a-f]{40})\?recursive=1$/.exec(url);
+      // A tree by its SHA, or as `<commit>:<path>`, the tree at that path.
+      const tree = /\/git\/trees\/([0-9a-f]{40})(?::([^?]+))?\?recursive=1$/.exec(url);
       if (tree !== null) {
         const sha = tree[1] ?? '';
-        const directory = sha === COMMIT ? '' : directoryOfSha.get(sha);
+        const at = tree[2] === undefined ? undefined : decodeURIComponent(tree[2]);
+        if (at !== undefined && sha === COMMIT && files.has(at)) {
+          return json(422, {
+            message: 'Invalid object requested. SHA must identify a commit or a tree.',
+          });
+        }
+        const directory =
+          at === undefined
+            ? sha === COMMIT
+              ? ''
+              : directoryOfSha.get(sha)
+            : sha === COMMIT && shas.has(at)
+              ? at
+              : undefined;
         if (directory === undefined) return json(404, { message: 'Not Found' });
         return json(200, {
-          sha,
+          sha: directory === '' ? sha : (shas.get(directory) ?? sha),
           tree: treeEntries(files, directory, shas, symlinks, listedSizes),
           truncated: directory === '' ? truncated : truncatedDirectories.has(directory),
         });
-      }
-      const contents = /\/contents(?:\/([^?]*))?\?ref=([0-9a-f]{40})$/.exec(url);
-      if (contents !== null) {
-        const listing =
-          contents[2] === COMMIT
-            ? contentsOf(files, decodeURIComponent(contents[1] ?? ''), shas)
-            : undefined;
-        return listing === undefined ? json(404, { message: 'Not Found' }) : json(200, listing);
       }
       return json(404, { message: 'Not Found' });
     }
@@ -254,6 +219,7 @@ const fakeGitHub = ({
       const failure = blobFailures.get(path)?.[answered];
       if (failure !== undefined) {
         failuresAnswered.set(path, answered + 1);
+        if ('throws' in failure) throw new TypeError('Failed to fetch');
         return new Response('', {
           status: failure.status,
           headers: failure.retryAfter === undefined ? {} : { 'retry-after': failure.retryAfter },
@@ -275,6 +241,7 @@ const fakeGitHub = ({
     peakRawInFlight = Math.max(peakRawInFlight, rawInFlight);
     await new Promise((release) => setTimeout(release, 0));
     rawInFlight -= 1;
+    if (request.signal.aborted) throw new DOMException('The request was aborted.', 'AbortError');
     return answer(request);
   };
 
@@ -411,9 +378,8 @@ describe('readGitHubAggregate', () => {
       expectNoCredentials(github);
     });
 
-    it("finds the selected directory's tree in its parent and lists only that tree", async () => {
+    it("lists only the selected directory's tree, by its path at the commit, in one call", async () => {
       const github = fakeGitHub({ files: repository });
-      const selectedSha = /\/([0-9a-f]{40})\?recursive=1$/;
 
       const result = await readGitHubAggregate(
         `github:${OWNER}/${REPO}@${COMMIT}/${SELECTED}`,
@@ -421,14 +387,10 @@ describe('readGitHubAggregate', () => {
       );
 
       expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
-      const [contents, tree, ...rest] = github.apiRequests();
-      expect(contents).toBe(`${API}/contents/talks?ref=${COMMIT}`);
-      expect(tree).toMatch(new RegExp(`^${API}/git/trees/[0-9a-f]{40}\\?recursive=1$`));
-      expect(selectedSha.exec(tree ?? '')?.[1]).not.toBe(COMMIT);
-      expect(rest).toEqual([]);
+      expect(github.apiRequests()).toEqual([`${API}/git/trees/${COMMIT}:${SELECTED}?recursive=1`]);
     });
 
-    it("finds a directory at the repository's root in the root's listing", async () => {
+    it("lists a directory at the repository's root by its path at the commit", async () => {
       const github = fakeGitHub({ files: under('pgdu', fixtureFiles) });
 
       const result = await readGitHubAggregate(
@@ -437,8 +399,7 @@ describe('readGitHubAggregate', () => {
       );
 
       expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
-      expect(github.apiRequests()[0]).toBe(`${API}/contents?ref=${COMMIT}`);
-      expect(github.apiRequests()).toHaveLength(2);
+      expect(github.apiRequests()).toEqual([`${API}/git/trees/${COMMIT}:pgdu?recursive=1`]);
       expect(github.rawRequests()).toEqual(sorted(under('pgdu', fixtureFiles).keys()));
     });
 
@@ -688,6 +649,51 @@ describe('readGitHubAggregate', () => {
       failure: { kind: 'blob-failed', path: 'hyper.json', status: 500 },
     });
     expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(2);
+  });
+
+  it('retries a blob whose fetch threw once, and mounts', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ throws: true }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+    expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(2);
+    expect(waits).toEqual([1000]);
+  });
+
+  it('fails a blob whose fetch still throws after its one retry, naming it', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ throws: true }, { throws: true }]]]),
+    });
+    const { wait } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'blob-failed', path: 'hyper.json' } });
+  });
+
+  it('cancels the blobs in flight once one fails, answering the first failure', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      holdRaw: true,
+      blobFailures: new Map([['hyper.json', [{ status: 404 }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-failed', path: 'hyper.json', status: 404 },
+    });
+    const raw = github.requests.filter(({ url }) => url.startsWith(RAW));
+    expect(raw.filter(({ signal }) => signal.aborted).length).toBeGreaterThan(0);
+    expect(waits).toEqual([]);
   });
 
   it('does not retry a blob that is not there', async () => {
