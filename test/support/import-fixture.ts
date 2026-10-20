@@ -1,13 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { newUuid, type SpaceSnapshot } from '@project/core';
-import {
-  identifySpace,
-  readAggregate,
-  readSingleSpace,
-  storedImageId,
-} from '../../src/aggregate-directory';
+import { readAggregate, readSingleSpace, storedImageId } from '../../src/aggregate-directory';
 import { importAggregateContents } from '../../src/import/import-aggregate';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import { type SpaceRepository, identifySpace } from '@project/aggregate';
 import type { ImageId, LoadedSpace } from '@project/persistence';
 
 const fixtureDirectory = fileURLToPath(new URL('../../packages/app/fixture', import.meta.url));

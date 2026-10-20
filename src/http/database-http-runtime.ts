@@ -2,7 +2,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { newUuid } from '@project/core';
 import type { DatabaseTarget } from '../database/database-target';
 import { establishMetaSpace, retryMetaSpaceEstablishment } from '../startup/database-startup';
-import { createSpaceHost, type SpaceHostApplication } from './space-host';
+import { createSpaceHost, type SpaceHostApplication } from '@project/aggregate';
 
 const reportEstablishmentFailure = (cause: unknown): void => {
   console.error('Failed to establish the Meta Space at startup', cause);

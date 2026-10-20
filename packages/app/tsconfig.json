@@ -10,6 +10,7 @@
     // `e2e`, `example` and the two Vite files at the package root, which have no
     // common root but the package itself. Nothing is above `app` to escape to.
     "paths": {
+      "@project/aggregate": ["../aggregate/src/index.ts"],
       "@project/core": ["../core/src/index.ts"],
       "@project/graph": ["../graph/src/index.ts"],
       "@project/http": ["../http/src/index.ts"],

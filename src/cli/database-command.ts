@@ -3,8 +3,7 @@ import { describeError } from './describe-error';
 import { describeAggregateRefusal } from './aggregate-refusal';
 import { exportAggregate } from '../export/export-aggregate';
 import { importAggregate, type AggregateImportResult } from '../import/import-aggregate';
-import { AggregateDirectoryError } from '../aggregate-directory';
-import type { SpaceRepository } from '../persistence/space-repository';
+import { type SpaceRepository, AggregateDirectoryError } from '@project/aggregate';
 import type { DatabaseCommand } from './arguments';
 import type { CliIo } from './io';
 

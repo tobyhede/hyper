@@ -27,6 +27,7 @@
     "dev:sqlite": "vite --config vite.sqlite.config.ts --port 5177 --strictPort"
   },
   "dependencies": {
+    "@project/aggregate": "workspace:*",
     "@project/core": "workspace:*",
     "@project/graph": "workspace:*",
     "@project/http": "workspace:*",

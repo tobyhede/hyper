@@ -26,11 +26,11 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spaceHttpPlugin } from '../../packages/app/vite-space-http-plugin';
 import { send } from '../support/raw-http-request';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { createDatabaseHttpApp } from '../../src/http/database-http-runtime';
-import { createSpaceHost, type SpaceHostApplication } from '../../src/http/space-host';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
+import { createSpaceHost, type SpaceHostApplication } from '@project/aggregate';
+import type { SpaceRepository } from '@project/aggregate';
 
 /** A request that initializes no Space mints nothing, so any mint is a failure here. */
 const mintsNothing = (): UUID => {

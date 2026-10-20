@@ -4,7 +4,8 @@ import { join, relative } from 'node:path';
 import { uuidSchema } from '@project/core';
 import { loadSpace } from '@project/graph';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AggregateDirectoryError, readSingleSpace } from '../../src/aggregate-directory';
+import { AggregateDirectoryError } from '@project/aggregate';
+import { readSingleSpace } from '../../src/aggregate-directory';
 import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
 

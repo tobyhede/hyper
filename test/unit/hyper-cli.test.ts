@@ -21,14 +21,14 @@ import type { DatabaseCommand, RunCommand } from '../../src/cli/arguments';
 import type { CliIo } from '../../src/cli/io';
 import { runHyper } from '../../src/cli/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
-import type { SpaceRepository } from '../../src/persistence/space-repository';
-import { AGGREGATE_FILE_NAME, readSingleSpace } from '../../src/aggregate-directory';
+import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
+import { readSingleSpace } from '../../src/aggregate-directory';
 import {
   markdownResourceFiles,
   writeAggregateInto,
   type SpaceDirectory,
 } from '../support/aggregate-directory';
-import { MemorySpaceRepository } from '../../src/persistence/memory-space-repository';
+import { MemorySpaceRepository } from '@project/aggregate';
 import { runCommand } from '../support/hyper-command';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');

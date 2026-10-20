@@ -15,7 +15,7 @@ import {
   type HyperProblemCode,
 } from '@project/persistence';
 import type { UUID } from '@project/core';
-import type { SpaceRepository } from '../persistence/space-repository';
+import type { SpaceRepository } from './space-repository';
 
 export type SpaceHostApplication = SpaceHttpApp & ProductRequestResolver;
 
