@@ -158,6 +158,13 @@ const waitWithTimer: Wait = (ms) =>
     setTimeout(resolve, ms);
   });
 
+/** Resolves once the signal aborts: a wait raced against it ends at the cancellation. */
+const untilCancelled = (signal: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    if (signal.aborted) resolve();
+    else signal.addEventListener('abort', () => resolve(), { once: true });
+  });
+
 const isRetryable = (status: number): boolean => status === 429 || status >= 500;
 
 /** The longest a blob's retry waits, whatever its `Retry-After` asks for. */
@@ -212,7 +219,10 @@ const fetchBlob = async (
   if (signal.aborted) return failed();
   if (response === undefined || isRetryable(response.status)) {
     // A retry once the blobs are cancelled throws at once, failing below.
-    await wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now));
+    await Promise.race([
+      wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now)),
+      untilCancelled(signal),
+    ]);
     response = await request();
   }
   if (response === undefined) return failed();
