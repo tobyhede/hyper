@@ -1,5 +1,6 @@
 import type { UUID } from '@project/core';
 import {
+  productAddress,
   productDestinationPath,
   resolveProductDestination,
   type HttpSpaceBackend,
@@ -103,11 +104,19 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
     resolve: async (pathname) => {
       const { startup, backend, metaSpaceId, pinned, resolved } = await mount();
       const meta = productDestinationPath({ kind: 'space', spaceId: metaSpaceId });
-      if (pathname === '/') {
+      // A static host may serve the application at `/index.html` as well as
+      // at the root, and both mean the root.
+      if (pathname === '/' || pathname === '/index.html') {
         history.replace(withSource(meta, pinned));
         return await startup.resolve(meta);
       }
       pinSource(history, resolved);
+      // A Notes window follows a presenting window, so one over a missing
+      // Space has nothing to follow and fails startup as it does on a host.
+      const address = productAddress(pathname);
+      if (address.kind === 'addressed' && address.destination.kind === 'notes') {
+        return await startup.resolve(pathname);
+      }
       const resolution = await resolveProductDestination(
         { loadSpace: (spaceId) => backend.loadSpace(spaceId) },
         pathname,

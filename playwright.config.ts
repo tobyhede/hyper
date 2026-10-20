@@ -8,7 +8,7 @@ import { NEW_SPACE_PROJECT } from './packages/app/e2e/projects';
 const NEW_SPACE_SPEC = /new-space\.spec\.ts/;
 // The mount spec drives the static build, which `playwright.mount.config.ts`
 // builds and serves; no Vite host here could answer it.
-const MOUNT_SPEC = /mount\.spec\.ts/;
+const MOUNT_SPEC = /(^|[\\/])mount\.spec\.ts$/;
 
 export default defineConfig({
   testDir: './packages/app/e2e',

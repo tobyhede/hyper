@@ -24,9 +24,19 @@ const MEDIA_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.js', 'text/javascript; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
+  ['.map', 'application/json'],
+  ['.json', 'application/json'],
+  ['.webmanifest', 'application/manifest+json'],
+  ['.txt', 'text/plain; charset=utf-8'],
   ['.svg', 'image/svg+xml'],
   ['.png', 'image/png'],
-  ['.json', 'application/json'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.gif', 'image/gif'],
+  ['.webp', 'image/webp'],
+  ['.avif', 'image/avif'],
+  ['.ico', 'image/x-icon'],
+  ['.woff', 'font/woff'],
   ['.woff2', 'font/woff2'],
 ]);
 
@@ -57,10 +67,11 @@ const matches = (pattern: string, pathname: string): boolean =>
 
 const rules = parseHeaders(await readFile(path.join(directory, '_headers'), 'utf8'));
 
+/** The build's file at `pathname`, or `undefined` for the single-page fallback, a malformed escape among them. */
 const fileAt = async (pathname: string): Promise<string | undefined> => {
-  const file = path.join(directory, path.normalize(decodeURIComponent(pathname)));
-  if (!file.startsWith(`${directory}${path.sep}`)) return undefined;
   try {
+    const file = path.join(directory, path.normalize(decodeURIComponent(pathname)));
+    if (!file.startsWith(`${directory}${path.sep}`)) return undefined;
     return (await stat(file)).isFile() ? file : undefined;
   } catch {
     return undefined;
