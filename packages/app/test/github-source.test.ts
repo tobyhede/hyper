@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readGitHubAggregate } from '../src/mount/github-source';
+import { readGitHubAggregate, type Wait } from '../src/mount/github-source';
 import { fixtureFiles as readFixtureFiles } from './fixture-files';
 import { API, COMMIT, fakeGitHub, OWNER, REPO, type FakeGitHub } from './fake-github';
 
@@ -10,6 +10,24 @@ const under = (prefix: string, files: ReadonlyMap<string, Uint8Array>): Map<stri
   new Map([...files].map(([path, bytes]) => [`${prefix}/${path}`, bytes]));
 
 const text = (value: string): Uint8Array => new TextEncoder().encode(value);
+
+interface RecordingWait {
+  readonly wait: Wait;
+  /** Every delay `wait` was asked for, in milliseconds. */
+  readonly waits: number[];
+}
+
+/** A `wait` that resolves at once and records every delay it was asked for. */
+const recordingWait = (): RecordingWait => {
+  const waits: number[] = [];
+  return {
+    waits,
+    wait: (ms) => {
+      waits.push(ms);
+      return Promise.resolve();
+    },
+  };
+};
 
 const expectNoCredentials = (github: FakeGitHub): void => {
   for (const request of github.requests) {
@@ -203,12 +221,97 @@ describe('readGitHubAggregate', () => {
   it('names the file whose fetch failed', async () => {
     const github = fakeGitHub({ files: fixtureFiles, failingBlob: 'hyper.json' });
 
-    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+    const result = await readGitHubAggregate(
+      `github:${OWNER}/${REPO}`,
+      github.fetch,
+      recordingWait().wait,
+    );
 
     expect(result).toEqual({
       ok: false,
       failure: { kind: 'blob-failed', path: 'hyper.json', status: 500 },
     });
+  });
+
+  it('retries a blob GitHub throttled once, and mounts', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 429 }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+    expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(2);
+    expect(waits).toEqual([1000]);
+  });
+
+  it('waits the Retry-After seconds a throttled blob names before retrying it', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 503, retryAfter: '3' }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result.ok).toBe(true);
+    expect(waits).toEqual([3000]);
+  });
+
+  it('fails a blob that still fails after its one retry, naming it', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 500 }, { status: 500 }]]]),
+    });
+    const { wait } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-failed', path: 'hyper.json', status: 500 },
+    });
+    expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(2);
+  });
+
+  it('does not retry a blob that is not there', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 404 }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-failed', path: 'hyper.json', status: 404 },
+    });
+    expect(waits).toEqual([]);
+  });
+
+  it('fetches at most eight blobs at once', async () => {
+    expect(fixtureFiles.size).toBeGreaterThan(8);
+    const github = fakeGitHub({ files: fixtureFiles, holdRaw: true });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+    expect(github.peakRawInFlight()).toBe(8);
+  });
+
+  it('never reads a scanned path that is a symbolic link', async () => {
+    const linkPath =
+      '00000000-0000-4000-8000-000000000060/resources/00000000-0000-4000-8000-0000000000aa.json';
+    const files = new Map([...fixtureFiles, [linkPath, text('../../../etc/passwd')]]);
+    const github = fakeGitHub({ files, symlinks: new Set([linkPath]) });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(github.rawRequests()).not.toContain(linkPath);
+    expect(result.ok && result.aggregate.files.has(linkPath)).toBe(false);
   });
 
   it('answers a network failure as a failed request', async () => {

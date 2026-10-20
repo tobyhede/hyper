@@ -16,6 +16,20 @@ export interface FakeGitHubOptions {
   readonly rateLimitStatus?: 403 | 429;
   /** A repository path whose raw request answers 500. */
   readonly failingBlob?: string;
+  /**
+   * Answers a repository path's first raw requests give, in order, before it
+   * answers normally: a status, with the `Retry-After` seconds it sends.
+   */
+  readonly blobFailures?: ReadonlyMap<string, readonly BlobFailure[]>;
+  /** Every raw answer is held until a later macrotask, so requests overlap. */
+  readonly holdRaw?: boolean;
+  /** Repository paths GitHub lists as symbolic links (mode `120000`). */
+  readonly symlinks?: ReadonlySet<string>;
+}
+
+interface BlobFailure {
+  readonly status: number;
+  readonly retryAfter?: string;
 }
 
 export interface FakeGitHub {
@@ -23,6 +37,8 @@ export interface FakeGitHub {
   readonly requests: Request[];
   readonly apiRequests: () => string[];
   readonly rawRequests: () => string[];
+  /** The most raw requests that were awaiting their answers at once. */
+  readonly peakRawInFlight: () => number;
 }
 
 export const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
@@ -49,7 +65,10 @@ const json = (status: number, body: ApiBody): Response =>
   });
 
 /** The tree GitHub lists for `files`: every blob, and every directory holding one. */
-const treeEntries = (files: ReadonlyMap<string, Uint8Array>): TreeEntry[] => {
+const treeEntries = (
+  files: ReadonlyMap<string, Uint8Array>,
+  symlinks: ReadonlySet<string>,
+): TreeEntry[] => {
   const directories = new Set<string>();
   for (const path of files.keys()) {
     const segments = path.split('/');
@@ -66,7 +85,7 @@ const treeEntries = (files: ReadonlyMap<string, Uint8Array>): TreeEntry[] => {
     })),
     ...[...files.keys()].map((path): TreeEntry => ({
       path,
-      mode: '100644',
+      mode: symlinks.has(path) ? '120000' : '100644',
       type: 'blob',
       sha: COMMIT,
     })),
@@ -82,8 +101,14 @@ export const fakeGitHub = ({
   truncated = false,
   rateLimitStatus,
   failingBlob,
+  blobFailures = new Map(),
+  holdRaw = false,
+  symlinks = new Set(),
 }: FakeGitHubOptions): FakeGitHub => {
   const requests: Request[] = [];
+  const failuresAnswered = new Map<string, number>();
+  let rawInFlight = 0;
+  let peakRawInFlight = 0;
   const refs = new Map([
     ['HEAD', COMMIT],
     ['main', COMMIT],
@@ -110,7 +135,7 @@ export const fakeGitHub = ({
       const tree = /\/git\/trees\/([0-9a-f]{40})\?recursive=1$/.exec(url);
       if (tree !== null) {
         return tree[1] === COMMIT
-          ? json(200, { sha: COMMIT, tree: treeEntries(files), truncated })
+          ? json(200, { sha: COMMIT, tree: treeEntries(files, symlinks), truncated })
           : json(404, { message: 'Not Found' });
       }
       return json(404, { message: 'Not Found' });
@@ -118,6 +143,15 @@ export const fakeGitHub = ({
     if (url.startsWith(RAW)) {
       const path = decodeURIComponent(url.slice(RAW.length));
       if (path === failingBlob) return new Response('', { status: 500 });
+      const answered = failuresAnswered.get(path) ?? 0;
+      const failure = blobFailures.get(path)?.[answered];
+      if (failure !== undefined) {
+        failuresAnswered.set(path, answered + 1);
+        return new Response('', {
+          status: failure.status,
+          headers: failure.retryAfter === undefined ? {} : { 'retry-after': failure.retryAfter },
+        });
+      }
       const bytes = files.get(path);
       return bytes === undefined
         ? new Response('404: Not Found', { status: 404 })
@@ -126,10 +160,15 @@ export const fakeGitHub = ({
     return new Response('', { status: 404 });
   };
 
-  const fakeFetch: typeof fetch = (input, init) => {
+  const fakeFetch: typeof fetch = async (input, init) => {
     const request = new Request(input, init);
     requests.push(request);
-    return Promise.resolve(answer(request));
+    if (!holdRaw || !request.url.startsWith(RAW)) return answer(request);
+    rawInFlight += 1;
+    peakRawInFlight = Math.max(peakRawInFlight, rawInFlight);
+    await new Promise((release) => setTimeout(release, 0));
+    rawInFlight -= 1;
+    return answer(request);
   };
 
   return {
@@ -143,5 +182,6 @@ export const fakeGitHub = ({
         .filter((url) => url.startsWith(RAW))
         .map((url) => decodeURIComponent(url.slice(RAW.length)))
         .sort(),
+    peakRawInFlight: () => peakRawInFlight,
   };
 };
