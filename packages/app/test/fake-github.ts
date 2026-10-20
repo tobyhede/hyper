@@ -40,10 +40,9 @@ export interface ApiFailure {
   readonly body?: string;
 }
 
-interface BlobFailure {
-  readonly status: number;
-  readonly retryAfter?: string;
-}
+/** A raw answer with a status and the `Retry-After` it sends, or a fetch that throws. */
+type BlobFailure =
+  { readonly status: number; readonly retryAfter?: string } | { readonly throws: true };
 
 export interface FakeGitHub {
   readonly fetch: typeof fetch;
@@ -52,6 +51,8 @@ export interface FakeGitHub {
   readonly rawRequests: () => string[];
   /** The most raw requests that were awaiting their answers at once. */
   readonly peakRawInFlight: () => number;
+  /** How many raw requests were cancelled while awaiting their answers. */
+  readonly cancelledRaw: () => number;
 }
 
 export const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
@@ -67,21 +68,10 @@ interface TreeEntry {
   readonly size?: number;
 }
 
-/** The fields of GitHub's Contents API entries a GitHub source reads, and one it ignores. */
-interface ContentsEntry {
-  readonly name: string;
-  readonly path: string;
-  readonly sha: string;
-  readonly type: 'dir' | 'file';
-  readonly url: string;
-}
-
-/** The bodies of the REST answers this fake gives: a commit, a tree, a listing, or an error. */
+/** The bodies of the REST answers this fake gives: a commit, a tree, or an error. */
 type ApiBody =
   | { readonly sha: string }
   | { readonly sha: string; readonly tree: readonly TreeEntry[]; readonly truncated: boolean }
-  | readonly ContentsEntry[]
-  | ContentsEntry
   | { readonly message: string };
 
 const json = (status: number, body: ApiBody): Response =>
@@ -141,35 +131,6 @@ const treeEntries = (
 };
 
 /**
- * What the Contents API answers for the repository path `path` (`''` for the
- * root): a directory's immediate entries, a file's own entry, or nothing.
- */
-const contentsOf = (
-  files: ReadonlyMap<string, Uint8Array>,
-  path: string,
-  shas: ReadonlyMap<string, string>,
-): readonly ContentsEntry[] | ContentsEntry | undefined => {
-  const entry = (entryPath: string, type: 'dir' | 'file', sha: string): ContentsEntry => ({
-    name: entryPath.split('/').at(-1) ?? entryPath,
-    path: entryPath,
-    sha,
-    type,
-    url: `${API}/contents/${entryPath}?ref=${COMMIT}`,
-  });
-  if (files.has(path)) return entry(path, 'file', COMMIT);
-  if (path !== '' && !shas.has(path)) return undefined;
-  const prefix = path === '' ? '' : `${path}/`;
-  const isChild = (candidate: string): boolean =>
-    candidate.startsWith(prefix) && !candidate.slice(prefix.length).includes('/');
-  return [
-    ...[...shas]
-      .filter(([candidate]) => isChild(candidate))
-      .map(([candidate, sha]) => entry(candidate, 'dir', sha)),
-    ...[...files.keys()].filter(isChild).map((candidate) => entry(candidate, 'file', COMMIT)),
-  ];
-};
-
-/**
  * A public repository with one commit, reachable from `main` (the default
  * branch) and the tag `v1`, answering the requests a GitHub source makes.
  */
@@ -220,24 +181,30 @@ export const fakeGitHub = ({
           ? json(422, { message: 'No commit found for SHA' })
           : json(200, { sha });
       }
-      const tree = /\/git\/trees\/([0-9a-f]{40})\?recursive=1$/.exec(url);
+      // A tree by its SHA, or as `<commit>:<path>`, the tree at that path.
+      const tree = /\/git\/trees\/([0-9a-f]{40})(?::([^?]+))?\?recursive=1$/.exec(url);
       if (tree !== null) {
         const sha = tree[1] ?? '';
-        const directory = sha === COMMIT ? '' : directoryOfSha.get(sha);
+        const at = tree[2] === undefined ? undefined : decodeURIComponent(tree[2]);
+        if (at !== undefined && sha === COMMIT && files.has(at)) {
+          return json(422, {
+            message: 'Invalid object requested. SHA must identify a commit or a tree.',
+          });
+        }
+        const directory =
+          at === undefined
+            ? sha === COMMIT
+              ? ''
+              : directoryOfSha.get(sha)
+            : sha === COMMIT && shas.has(at)
+              ? at
+              : undefined;
         if (directory === undefined) return json(404, { message: 'Not Found' });
         return json(200, {
-          sha,
+          sha: directory === '' ? sha : (shas.get(directory) ?? sha),
           tree: treeEntries(files, directory, shas, symlinks, listedSizes),
           truncated: directory === '' ? truncated : truncatedDirectories.has(directory),
         });
-      }
-      const contents = /\/contents(?:\/([^?]*))?\?ref=([0-9a-f]{40})$/.exec(url);
-      if (contents !== null) {
-        const listing =
-          contents[2] === COMMIT
-            ? contentsOf(files, decodeURIComponent(contents[1] ?? ''), shas)
-            : undefined;
-        return listing === undefined ? json(404, { message: 'Not Found' }) : json(200, listing);
       }
       return json(404, { message: 'Not Found' });
     }
@@ -248,6 +215,7 @@ export const fakeGitHub = ({
       const failure = blobFailures.get(path)?.[answered];
       if (failure !== undefined) {
         failuresAnswered.set(path, answered + 1);
+        if ('throws' in failure) throw new TypeError('Failed to fetch');
         return new Response('', {
           status: failure.status,
           headers: failure.retryAfter === undefined ? {} : { 'retry-after': failure.retryAfter },
@@ -261,14 +229,22 @@ export const fakeGitHub = ({
     return new Response('', { status: 404 });
   };
 
+  let cancelledRaw = 0;
+  // The signal is read here rather than handed to `Request`, which refuses a
+  // signal from another realm (jsdom's, under Node's `Request`).
   const fakeFetch: typeof fetch = async (input, init) => {
-    const request = new Request(input, init);
+    const { signal, ...sent } = init ?? {};
+    const request = new Request(input, sent);
     requests.push(request);
     if (!holdRaw || !request.url.startsWith(RAW)) return answer(request);
     rawInFlight += 1;
     peakRawInFlight = Math.max(peakRawInFlight, rawInFlight);
     await new Promise((release) => setTimeout(release, 0));
     rawInFlight -= 1;
+    if (signal?.aborted === true) {
+      cancelledRaw += 1;
+      throw new DOMException('The request was aborted.', 'AbortError');
+    }
     return answer(request);
   };
 
@@ -284,5 +260,6 @@ export const fakeGitHub = ({
         .map((url) => decodeURIComponent(url.slice(RAW.length)))
         .sort(),
     peakRawInFlight: () => peakRawInFlight,
+    cancelledRaw: () => cancelledRaw,
   };
 };
