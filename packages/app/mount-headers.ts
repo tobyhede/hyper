@@ -15,6 +15,12 @@ import { createHash } from 'node:crypto';
  * React Flow and the startup view position by inline style, and in
  * `script-src` the hash of each inline script the page carries, which is
  * `index.html`'s startup-failure guard.
+ *
+ * No rule sets `Cache-Control`. A rule for the hashed `/assets/*` names would
+ * also reach a missing one, which the single-page fallback answers with
+ * `index.html` and 200, and `_headers` cannot match on status: the page would
+ * be cached for that asset's URL for as long as the rule said. Cloudflare's
+ * default revalidates each asset by its ETag instead.
  */
 export interface HeaderRule {
   /** A Cloudflare `_headers` path: exact, or a prefix ending in `*`. */
@@ -49,11 +55,6 @@ export const mountHeaderRules = (inlineScripts: readonly string[]): readonly Hea
       'Content-Security-Policy': contentSecurityPolicy(inlineScripts),
       'X-Content-Type-Options': 'nosniff',
     },
-  },
-  {
-    // Vite names every asset by its content's hash, so one URL never changes.
-    path: '/assets/*',
-    headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
   },
 ];
 
