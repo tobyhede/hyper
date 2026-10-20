@@ -85,6 +85,16 @@ export interface BrowserLocation {
   readonly activateGraph: (graphId: GraphId) => void;
   /** The absolute URL of a destination, for the clipboard to carry. */
   readonly href: (destination: ProductDestination) => string;
+  /**
+   * Report that the location the reader arrived at names nothing, and that the
+   * followed Space was opened in its place (ADR 0130).
+   *
+   * A host with a server answers such an address itself; a static host answers
+   * every path with the application, so a mounted startup opens the Meta
+   * Space and reports the arrival here, leaving the address as it was. The
+   * report is answered by the reader's first move, as a traversal's is.
+   */
+  readonly reportArrivalNotFound: () => void;
   readonly dispose: () => void;
 }
 
@@ -456,6 +466,10 @@ export function createBrowserLocation(
     chooseMap,
     activateGraph,
     href: (destination) => new URL(addressOf(destination), history.href()).href,
+    reportArrivalNotFound: () => {
+      destinationNotFound = true;
+      publish();
+    },
     dispose: () => {
       restorationRequest += 1;
       releasePopState();

@@ -1,0 +1,237 @@
+import { encodeCompactUuid, uuidSchema } from '@project/core';
+import { expect, test as base, type BrowserContext, type Page } from '@playwright/test';
+import { COMMIT, fakeGitHub, OWNER, REPO } from '../test/fake-github';
+import { fixtureFiles } from '../test/fixture-files';
+import {
+  dock,
+  nodeByTitle,
+  presentControl,
+  presentedName,
+  resourceControls,
+  selectCanvas,
+  settled,
+  stage,
+} from './graph';
+
+/**
+ * The static build for Mounting (ADR 0130), served as Cloudflare serves it,
+ * with every request to GitHub answered from the tracked fixture. Run by
+ * `pnpm e2e:mount` (`playwright.mount.config.ts`), whose build names
+ * `MOUNT_DEFAULT_SOURCE`, a branch of this fake repository, as its default.
+ */
+
+const META_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
+const LINKED_SPACES_MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000053');
+const PINNED = `github:${OWNER}/${REPO}@${COMMIT}`;
+const META_PATH = `/spaces/${encodeCompactUuid(META_SPACE_ID)}`;
+
+/** GitHub's CORS answer, which exposes its rate-limit headers to a page. */
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-expose-headers':
+    'ETag, Link, Location, Retry-After, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset',
+};
+
+/**
+ * Answer every request to GitHub from the fixture, for every page of the
+ * context, a Notes window included, so nothing reaches the network.
+ */
+const serveGitHub = async (
+  context: BrowserContext,
+  github = fakeGitHub({ files: fixtureFiles() }),
+): Promise<void> => {
+  await context.route(
+    /^https:\/\/(api\.github\.com|raw\.githubusercontent\.com)\//,
+    async (route) => {
+      const answer = await github.fetch(route.request().url());
+      await route.fulfill({
+        status: answer.status,
+        headers: { ...Object.fromEntries(answer.headers), ...CORS },
+        body: Buffer.from(await answer.arrayBuffer()),
+      });
+    },
+  );
+};
+
+/**
+ * Every test fails if the browser refused anything under the build's Content
+ * Security Policy, in any page of its context, so a policy that blocks part of
+ * the application is caught although nothing on screen says so.
+ */
+const test = base.extend<{ policyViolations: string[] }>({
+  policyViolations: [
+    async ({ context }, run) => {
+      const violations: string[] = [];
+      const watch = (page: Page): void => {
+        page.on('console', (message) => {
+          if (message.text().includes('Content Security Policy')) violations.push(message.text());
+        });
+      };
+      context.pages().forEach(watch);
+      context.on('page', watch);
+      await run(violations);
+      expect(violations).toEqual([]);
+    },
+    { auto: true },
+  ],
+});
+
+const openMeta = async (page: Page): Promise<void> => {
+  await page.goto('/');
+  await expect(dock(page)).toBeVisible();
+  await expect(page.locator('.react-flow__node').first()).toBeVisible();
+  await settled(page);
+};
+
+test.beforeEach(async ({ context }) => {
+  await serveGitHub(context);
+});
+
+test('/ opens the Meta Space, pinning the build’s default branch to its commit', async ({
+  page,
+}) => {
+  await openMeta(page);
+
+  await expect(page.getByTestId('space-title')).toContainText('Map fixture');
+  await expect(page).toHaveURL(`${META_PATH}?source=${PINNED}`);
+});
+
+test('a deep product URL is answered with the application under the build’s policy', async ({
+  page,
+}) => {
+  const response = await page.goto(
+    `${META_PATH}/maps/${encodeCompactUuid(LINKED_SPACES_MAP_ID)}?source=${PINNED}`,
+  );
+
+  expect(response?.status()).toBe(200);
+  const policy = response?.headers()['content-security-policy'] ?? '';
+  expect(policy).toContain("default-src 'self'");
+  expect(policy).toContain(
+    "connect-src 'self' https://api.github.com https://raw.githubusercontent.com",
+  );
+  expect(policy).toContain("img-src 'self' blob: data: https:");
+  await expect(page.getByTestId('selected-canvas')).toHaveText('Linked Spaces');
+});
+
+test('marks the session read-only and offers no Edit', async ({ page }) => {
+  await openMeta(page);
+
+  await expect(dock(page).getByText('Read-only', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('persistence-status')).toHaveCount(0);
+  for (const create of await dock(page)
+    .getByRole('button', { name: /^Create / })
+    .all()) {
+    await expect(create).toHaveAttribute('aria-disabled', 'true');
+  }
+  await resourceControls(page, nodeByTitle(page, 'A').first());
+  await expect(page.getByRole('button', { name: /^Open Resource / })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Edit Title / })).toHaveCount(0);
+  await expect(presentControl(page)).not.toHaveAttribute('aria-disabled', 'true');
+});
+
+test('a Presenting URL loads directly and survives a reload', async ({ page }) => {
+  await openMeta(page);
+  await presentControl(page).click();
+  await expect(stage(page)).toBeVisible();
+  await page.keyboard.press('ArrowRight');
+  const presented = await presentedName(page).innerText();
+  const presenting = page.url();
+  expect(presenting).toContain('/present/');
+  expect(presenting).toContain(`?source=${PINNED}`);
+
+  const direct = await page.context().newPage();
+  await direct.goto(presenting);
+  await expect(presentedName(direct)).toHaveText(presented);
+
+  await direct.reload();
+  await expect(presentedName(direct)).toHaveText(presented);
+  expect(direct.url()).toBe(presenting);
+});
+
+test('Enters a Space Resource and Exits it again', async ({ page }) => {
+  await openMeta(page);
+  await selectCanvas(page, 'Linked Spaces');
+  await settled(page);
+  await expect(page).toHaveURL(
+    `${META_PATH}/maps/${encodeCompactUuid(LINKED_SPACES_MAP_ID)}?source=${PINNED}`,
+  );
+
+  const actions = (await resourceControls(page, nodeByTitle(page, 'Presentation'))).getByRole(
+    'button',
+    { name: 'Actions for Resource Presentation' },
+  );
+  await actions.focus();
+  await actions.press('Enter');
+  await page.getByRole('menuitem', { name: 'Enter', exact: true }).click();
+  const showing = page.locator('[data-testid="space-title"]:visible');
+  await expect(showing).not.toContainText('Map fixture');
+  await expect(page).toHaveURL(new RegExp(`\\?source=${PINNED}$`));
+
+  await page.getByRole('button', { name: /^Space: / }).click({ delay: 120 });
+  await page.getByRole('menuitem', { name: 'Exit Space' }).click();
+  await expect(showing).toContainText('Map fixture');
+});
+
+test('the Notes window mounts the same commit and follows the presentation', async ({ page }) => {
+  await openMeta(page);
+  await presentControl(page).click();
+  await expect(stage(page)).toBeVisible();
+
+  const opened = page.context().waitForEvent('page');
+  await page.keyboard.press('s');
+  const notes = await opened;
+  await expect(notes).toHaveURL(new RegExp(`/notes\\?source=${PINNED}$`));
+  const notesWindow = notes.getByRole('main', { name: 'Notes window' });
+  const first = await presentedName(page).innerText();
+  await expect(notesWindow.getByText(`Presenting ${first}`, { exact: true })).toBeVisible();
+
+  await page.bringToFront();
+  await page.keyboard.press('ArrowRight');
+  const next = await presentedName(page).innerText();
+  expect(next).not.toBe(first);
+  await expect(notesWindow.getByText(`Presenting ${next}`, { exact: true })).toBeVisible();
+});
+
+test('an unknown product URL shows the "not found" destination', async ({ page }) => {
+  const missing = encodeCompactUuid(uuidSchema.parse('00000000-0000-4000-8000-0000000000ff'));
+  const unknown = `${META_PATH}/maps/${missing}?source=${PINNED}`;
+  await page.goto(unknown);
+
+  await expect(page.getByRole('alert')).toContainText('Destination not found');
+  await expect(page.getByTestId('space-title')).toContainText('Map fixture');
+  expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(unknown);
+
+  await page.goto('/talk');
+  await expect(page.getByRole('alert')).toContainText('Destination not found');
+});
+
+test('a rate-limited GitHub answer is shown as the startup failure', async ({ page, context }) => {
+  await context.unrouteAll();
+  await serveGitHub(context, fakeGitHub({ files: fixtureFiles(), rateLimitStatus: 403 }));
+
+  await page.goto('/');
+
+  await expect(page.getByText('Application could not start')).toBeVisible();
+  await expect(
+    page.getByText(/GitHub’s limit on requests without a token is used up/),
+  ).toBeVisible();
+});
+
+test(
+  'asks for a location that reads, and opens it once one does',
+  { tag: '@parity:github-location-form-refuses-a-location-that-does-not-read' },
+  async ({ page }) => {
+    await page.goto(`/?source=${OWNER}/${REPO}`);
+
+    const location = page.getByRole('textbox', { name: 'GitHub location' });
+    await expect(location).toHaveValue(`${OWNER}/${REPO}`);
+    await expect(page.getByText('a GitHub location begins with github:')).toBeVisible();
+    await expect(location).toHaveAttribute('aria-invalid', 'true');
+
+    await location.fill(`github:${OWNER}/${REPO}`);
+    await page.getByRole('button', { name: 'Open' }).click();
+
+    await expect(page.getByTestId('space-title')).toContainText('Map fixture');
+    await expect(page).toHaveURL(`${META_PATH}?source=${PINNED}`);
+  },
+);

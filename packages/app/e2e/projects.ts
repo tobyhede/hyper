@@ -57,4 +57,18 @@ export const POSTGRES_E2E_PORT = 5280;
  * each other, and still below `E2E_PORT_BASE` for the reason that one is.
  */
 export const SQLITE_E2E_PORT = 5281;
+
+/**
+ * The mount project's static server port (`playwright.mount.config.ts`).
+ *
+ * Below `E2E_PORT_BASE` for the reason the two fixed ports above are, and
+ * distinct from both so the three suites can run beside each other.
+ */
+export const MOUNT_E2E_PORT = 5282;
+
+/**
+ * The GitHub location the mount project builds as its default: a branch, so
+ * opening `/` proves the default is pinned to a commit. `mount.ts` answers it.
+ */
+export const MOUNT_DEFAULT_SOURCE = 'github:tobyhede/talks@main';
 import path from 'node:path';

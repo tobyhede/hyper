@@ -6,6 +6,9 @@ import { NEW_SPACE_PROJECT } from './packages/app/e2e/projects';
 // The PostgreSQL spec needs no ignore entry: it lives in `test/e2e/`, outside
 // this config's `testDir`, and runs from `playwright.postgres.config.ts`.
 const NEW_SPACE_SPEC = /new-space\.spec\.ts/;
+// The mount spec drives the static build, which `playwright.mount.config.ts`
+// builds and serves; no Vite host here could answer it.
+const MOUNT_SPEC = /mount\.spec\.ts/;
 
 export default defineConfig({
   testDir: './packages/app/e2e',
@@ -36,7 +39,7 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: [NEW_SPACE_SPEC],
+      testIgnore: [NEW_SPACE_SPEC, MOUNT_SPEC],
     },
     {
       name: NEW_SPACE_PROJECT,

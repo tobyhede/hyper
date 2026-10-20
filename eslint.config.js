@@ -286,6 +286,7 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/dist-http/**',
+      '**/dist-mount/**',
       // `ladle build` output is gitignored, but flat ESLint config does not
       // read `.gitignore` and would otherwise lint the generated bundles.
       'packages/app/build/**',

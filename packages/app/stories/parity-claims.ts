@@ -976,4 +976,11 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       'An Open Space Resource’s Graph list marks each row with the same legend mark, in the colour and head shape the target draws that Graph’s Edges in, and its Map list carries no mark.',
   },
+  {
+    id: 'github-location-form-refuses-a-location-that-does-not-read',
+    storyFile: 'components/github-location-form.stories.tsx',
+    storyExport: 'Asking',
+    claim:
+      'A mounted page asking for its GitHub location refuses one that does not read, beside the field with the parser’s reason and the field marked invalid, keeping what was typed; a location that reads clears the refusal and opens.',
+  },
 ] as const;
