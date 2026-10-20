@@ -109,9 +109,9 @@ const metaWithOpenSpaceResource: SpaceSnapshot = {
   ...meta,
   document: {
     ...meta.document,
-    maps: meta.document.maps?.map((map) => ({
-      ...map,
-      positions: { ...map.positions, [SPACE_RESOURCE_ID]: { x: 0, y: 40, open: true } },
+    maps: meta.document.maps?.map((m) => ({
+      ...m,
+      positions: { ...m.positions, [SPACE_RESOURCE_ID]: { x: 0, y: 40, open: true } },
     })),
   },
 };
