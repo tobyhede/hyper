@@ -9,9 +9,26 @@
  */
 const SOURCE_PARAMETER = 'source';
 
-/** The `source` parameter of an absolute URL, or `null` when it has none. */
-export const sourceParameter = (href: string): string | null =>
-  new URL(href).searchParams.get(SOURCE_PARAMETER);
+/**
+ * The `source` parameter of an absolute URL, or `null` when it has none.
+ *
+ * Read by hand rather than through `searchParams`, which decodes a `+` as a
+ * space: a ref may hold a `+`, and a hand-typed link writes it bare.
+ */
+export const sourceParameter = (href: string): string | null => {
+  for (const pair of new URL(href).search.slice(1).split('&')) {
+    const equals = pair.indexOf('=');
+    if ((equals === -1 ? pair : pair.slice(0, equals)) !== SOURCE_PARAMETER) continue;
+    const value = equals === -1 ? '' : pair.slice(equals + 1);
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      // A stray `%` is read as written, as `searchParams` reads it.
+      return value;
+    }
+  }
+  return null;
+};
 
 /**
  * A GitHub location's `:`, `/` and `@` are legal in a query (RFC 3986), so they

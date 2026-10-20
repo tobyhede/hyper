@@ -454,6 +454,27 @@ describe('readGitHubAggregate', () => {
     expect(waits).toEqual([]);
   });
 
+  it('cancels a blob waiting to retry once another fails', async () => {
+    const [, missing] = [...fixtureFiles.keys()];
+    if (missing === undefined) throw new Error('The fixture holds more than one file.');
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([
+        ['hyper.json', [{ status: 429, retryAfter: '10' }]],
+        [missing, [{ status: 404 }]],
+      ]),
+    });
+    // A wait that never ends on its own: only the cancellation ends it.
+    const waitsForever: Wait = () => new Promise(() => undefined);
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, waitsForever);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-failed', path: missing, status: 404 },
+    });
+  });
+
   it('does not retry a blob that is not there', async () => {
     const github = fakeGitHub({
       files: fixtureFiles,

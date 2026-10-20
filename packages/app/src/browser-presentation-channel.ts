@@ -34,7 +34,7 @@ export interface NativePresentationBrowser {
    * The complete resolved GitHub location a mounted session read, which scopes
    * its channels by revision. Absent for a server session.
    */
-  readonly scope?: string;
+  readonly scope?: string | undefined;
 }
 
 const isId = (value: unknown): value is UUID => uuidSchema.safeParse(value).success;
