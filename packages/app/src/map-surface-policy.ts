@@ -1,6 +1,6 @@
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import type { CanvasGestureRefusal } from './authoring-refusal';
-import type { AuthoringAvailability } from './authoring-availability';
+import { NOTHING_AVAILABLE, type AuthoringAvailability } from './authoring-availability';
 import type { EditTarget } from './space-authoring';
 
 /** A drawn Map's permission, computed once and inherited by its children. */
@@ -90,26 +90,9 @@ export function surfaceAvailability(
         ...available,
         present: available.present && permitted.present,
         authorInEmbeddedMap: available.authorInEmbeddedMap && permitted.editEmbeddedMap,
+        embeddedMapEdit: available.embeddedMapEdit && permitted.editEmbeddedMap,
       }
-    : {
-        resourcesView: false,
-        chromeTitleEdit: false,
-        entityEdits: false,
-        deleteResource: false,
-        present: false,
-        addResource: false,
-        createMap: false,
-        authorOnCanvas: false,
-        authorInEmbeddedMap: false,
-        editResourceBody: false,
-        connectOnCanvas: false,
-        dragNodes: false,
-        selectNodes: false,
-        navigate: false,
-        replaceSession: false,
-        resourceActions: false,
-        embeddedMapEdit: false,
-      };
+    : NOTHING_AVAILABLE;
 }
 
 /**

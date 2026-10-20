@@ -159,31 +159,25 @@ describe('authoring availability', () => {
   });
 
   describe('a mounted session (ADR 0130)', () => {
-    /** Every answer that is an Edit, which a mounted session never offers. */
-    const NO_EDIT = {
-      resourcesView: false,
-      chromeTitleEdit: false,
-      entityEdits: false,
-      deleteResource: false,
-      addResource: false,
-      createMap: false,
-      authorOnCanvas: false,
-      authorInEmbeddedMap: false,
-      editResourceBody: false,
-      connectOnCanvas: false,
-      dragNodes: false,
-      embeddedMapEdit: false,
-    } as const;
+    /** The answers that read rather than Edit, the only ones a mounted session may offer. */
+    const READS: readonly string[] = [
+      'present',
+      'selectNodes',
+      'navigate',
+      'replaceSession',
+      'resourceActions',
+    ];
+
+    /** Every answer it gives that is not a read, whatever the answer is called. */
+    const edits = (availability: AuthoringAvailability) =>
+      Object.entries(availability).filter(([answer]) => !READS.includes(answer));
 
     it('offers selection, navigation, Present and the rail actions that hold Enter, and no Edit', () => {
-      expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, mounted: true })).toStrictEqual({
-        ...NO_EDIT,
-        present: true,
-        selectNodes: true,
-        navigate: true,
-        replaceSession: true,
-        resourceActions: true,
-      });
+      const availability = authoringAvailability({ ...NOTHING_IN_PROGRESS, mounted: true });
+      expect(Object.fromEntries(edits(availability))).toStrictEqual(
+        Object.fromEntries(edits(ALL_AVAILABLE).map(([answer]) => [answer, false])),
+      );
+      for (const read of READS) expect(availability).toHaveProperty(read, true);
     });
 
     it('offers no Edit whatever else is in progress', () => {
@@ -196,9 +190,13 @@ describe('authoring availability', () => {
         { editingEmbeddedMap: true },
         { replacingImage: true },
       ]) {
-        expect(
-          authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress, mounted: true }),
-        ).toMatchObject(NO_EDIT);
+        const availability = authoringAvailability({
+          ...NOTHING_IN_PROGRESS,
+          ...inProgress,
+          mounted: true,
+        });
+        for (const [answer, offered] of edits(availability))
+          expect([answer, offered]).toEqual([answer, false]);
       }
     });
 

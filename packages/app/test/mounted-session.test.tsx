@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { MemorySpaceBackend } from '@project/persistence';
+import { MemorySpaceBackend, type CommitResult } from '@project/persistence';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
@@ -116,9 +116,20 @@ const metaWithOpenSpaceResource: SpaceSnapshot = {
   },
 };
 
+/** A backend that refuses every commit as the in-page application does. */
+class RefusingBackend extends MemorySpaceBackend {
+  override commit(): Promise<CommitResult> {
+    return Promise.resolve({ kind: 'permanent-failure', code: 'forbidden' });
+  }
+}
+
 /** The Meta Space opened in a session that is mounted or not, and drawn. */
-async function openMeta(mounted: boolean, root: SpaceSnapshot = meta): Promise<OpenSpace> {
-  const backend = new MemorySpaceBackend(
+async function openMeta(
+  mounted: boolean,
+  root: SpaceSnapshot = meta,
+  Backend: typeof MemorySpaceBackend = MemorySpaceBackend,
+): Promise<OpenSpace> {
+  const backend = new Backend(
     META_ID,
     [root, other].map((snapshot) => ({ snapshot, revision: 1n, exportedRevision: null })),
   );
@@ -154,6 +165,25 @@ describe('the Command Dock of a mounted session', () => {
     expect(within(dock()).getByText('Read-only')).toBeInTheDocument();
     expect(screen.queryByTestId('persistence-status')).toBeNull();
     expect(screen.queryByText('Persisted')).toBeNull();
+  });
+
+  it('reports a write the in-page application refused', async () => {
+    const initial = await openMeta(true, meta, RefusingBackend);
+
+    act(() => {
+      initial.session.submit({ ...meta, document: { ...meta.document, title: 'Renamed' } });
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('persistence-status')).toHaveAttribute(
+        'data-persistence-state',
+        'rejected',
+      ),
+    );
+    // The rejection's report is modal, so the Dock behind it is hidden from
+    // the accessibility tree; the mark is still drawn there.
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.getByText('Read-only')).toBeInTheDocument();
   });
 
   it('is not shown unmounted, where the persistence status is', async () => {
@@ -203,8 +233,11 @@ describe('the canvas of a mounted session', () => {
     await waitFor(() => expect(initial.session.getState().working.resources).toHaveLength(count));
   });
 
-  it('opens nothing from Enter on a Resource', async () => {
-    const initial = await openMeta(true);
+  it.each([
+    [false, true],
+    [true, false],
+  ])('mounted %s: Enter on a Resource opens it: %s', async (mounted, opens) => {
+    const initial = await openMeta(mounted);
     const node = nodeOf('Note');
 
     act(() => {
@@ -212,8 +245,10 @@ describe('the canvas of a mounted session', () => {
       fireEvent.keyDown(node, { key: 'Enter' });
     });
 
-    const { maps } = initial.session.getState().working.document;
-    expect(maps?.[0]?.positions[NOTE_ID]?.open).toBe(false);
+    await waitFor(() => {
+      const { maps } = initial.session.getState().working.document;
+      expect(maps?.[0]?.positions[NOTE_ID]?.open).toBe(opens);
+    });
   });
 
   it.each([
@@ -229,20 +264,26 @@ describe('the canvas of a mounted session', () => {
     expect(screen.queryByRole('button', { name: 'Edit Resource Other' }) !== null).toBe(offered);
   });
 
-  it("keeps a Space Resource's Enter, and offers none of the rail's Edits", async () => {
-    await openMeta(true);
-    await selectResource('Other');
+  it.each([
+    [false, true],
+    [true, false],
+  ])(
+    "mounted %s: keeps a Space Resource's Enter, and offers the rail's Edits: %s",
+    async (mounted, offered) => {
+      await openMeta(mounted);
+      await selectResource('Other');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Other' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource Other' }));
 
-    expect(unavailable(await screen.findByRole('menuitem', { name: 'Enter' }))).toBe(false);
-    for (const edit of [
-      'Create Reference',
-      'Connect to Resource',
-      'Remove from Map',
-      'Delete from Space',
-    ]) {
-      expect(screen.queryByRole('menuitem', { name: edit })).toBeNull();
-    }
-  });
+      expect(unavailable(await screen.findByRole('menuitem', { name: 'Enter' }))).toBe(false);
+      for (const edit of [
+        'Create Reference',
+        'Connect to Resource',
+        'Remove from Map',
+        'Delete from Space',
+      ]) {
+        expect(screen.queryByRole('menuitem', { name: edit }) !== null).toBe(offered);
+      }
+    },
+  );
 });

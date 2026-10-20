@@ -83,9 +83,9 @@ export const browserImageSources = (
  * images, so the default draws every URL as authored, and a mounted aggregate
  * supplies its own (ADR 0130, `mount/mounted-startup.ts`).
  *
- * `mounted` says the session is Mounting an aggregate (ADR 0130), so no Space
- * it opens offers an Edit. It defaults to `false`: only a mount composition
- * sets it.
+ * `session.mounted` says the session is Mounting an aggregate (ADR 0130), so
+ * no Space it opens offers an Edit. It is named rather than positional, and
+ * defaults to `false`: only a mount composition sets it.
  */
 export const createSpaceStartup = (
   fullscreen: Fullscreen,
@@ -95,7 +95,7 @@ export const createSpaceStartup = (
   history: HistoryApi = browserHistory(),
   images: ImageSources = browserImageSources(),
   displayImage: ImageDisplay = displayImageAsAuthored,
-  mounted = false,
+  { mounted = false }: { readonly mounted?: boolean } = {},
 ): SpaceStartup => {
   let owner: Promise<OpenSpaces> | undefined;
   const openSpaces = (): Promise<OpenSpaces> => {

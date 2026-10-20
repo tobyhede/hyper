@@ -149,7 +149,12 @@ describe('what each policy offers on each drawing', () => {
       policy: 'authoring',
       drawing: 'drawn',
       offers: { authoring: true, readOnly: false, editEmbeddedMap: false, present: false },
-      availability: { ...EVERYTHING, present: false, authorInEmbeddedMap: false },
+      availability: {
+        ...EVERYTHING,
+        present: false,
+        authorInEmbeddedMap: false,
+        embeddedMapEdit: false,
+      },
     },
     {
       policy: 'inert',
