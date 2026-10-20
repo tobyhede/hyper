@@ -16,6 +16,7 @@ import { stubResizeObserver } from './resize-observer';
 
 const META_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000040');
 const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
+const MISSING_SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-0000000000ff');
 const IMAGE_ID = 'fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
 
 /** The fixture names every identity it holds, so mounting it mints none. */
@@ -341,6 +342,26 @@ describe('mounting an aggregate in the page', () => {
     expect(result.opened.app.currentSpace().id).toBe(META_SPACE_ID);
     expect(result.spaces.browserLocation.getState().destinationNotFound).toBe(true);
     expect(history.writes).toEqual([]);
+  });
+
+  it('fails startup on a Notes address for a missing Space', async () => {
+    const path = productDestinationPath({ kind: 'notes', spaceId: MISSING_SPACE_ID });
+
+    await expect(
+      mountedStartup(fixtureFiles(), { history: recordingHistory(path), source: PINNED }).resolve(
+        path,
+      ),
+    ).rejects.toThrow('The product URL does not resolve.');
+  });
+
+  it('answers /index.html as the root', async () => {
+    const history = recordingHistory('/index.html');
+
+    const result = await mountedStartup(fixtureFiles(), { history }).resolve('/index.html');
+
+    if (result.kind !== 'opened') throw new Error('The address opens a Space.');
+    expect(result.spaces.browserLocation.getState().destinationNotFound).toBe(false);
+    expect(history.writes).toEqual([{ method: 'replace', path: `${META_PATH}?source=${PINNED}` }]);
   });
 
   it('draws the not-found report over the Meta Space', async () => {
