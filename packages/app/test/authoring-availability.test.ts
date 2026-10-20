@@ -20,6 +20,7 @@ const NOTHING_IN_PROGRESS: AuthoringInProgress = {
   editingChromeTitle: false,
   spaceOnCanvas: true,
   editingEmbeddedMap: false,
+  mounted: false,
 };
 
 const ALL_AVAILABLE: AuthoringAvailability = {
@@ -38,13 +39,18 @@ const ALL_AVAILABLE: AuthoringAvailability = {
   selectNodes: true,
   navigate: true,
   replaceSession: true,
+  resourceActions: true,
+  embeddedMapEdit: true,
 };
 
 describe('authoring availability', () => {
   it('withdraws other operations while replacing an image but keeps its editor mounted', () => {
     expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, replacingImage: true })).toEqual(
       Object.fromEntries(
-        Object.keys(ALL_AVAILABLE).map((key) => [key, key === 'editResourceBody']),
+        Object.keys(ALL_AVAILABLE).map((key) => [
+          key,
+          key === 'editResourceBody' || key === 'embeddedMapEdit',
+        ]),
       ),
     );
   });
@@ -63,6 +69,7 @@ describe('authoring availability', () => {
         entityEdits: false,
         deleteResource: false,
         authorOnCanvas: false,
+        resourceActions: false,
         authorInEmbeddedMap: false,
         editResourceBody: false,
         connectOnCanvas: false,
@@ -81,6 +88,7 @@ describe('authoring availability', () => {
         addResource: false,
         createMap: false,
         authorOnCanvas: false,
+        resourceActions: false,
         authorInEmbeddedMap: false,
         editResourceBody: false,
         connectOnCanvas: false,
@@ -123,6 +131,7 @@ describe('authoring availability', () => {
         addResource: false,
         createMap: false,
         authorOnCanvas: false,
+        resourceActions: false,
         authorInEmbeddedMap: false,
         connectOnCanvas: false,
       },
@@ -133,6 +142,7 @@ describe('authoring availability', () => {
       {
         ...ALL_AVAILABLE,
         authorOnCanvas: false,
+        resourceActions: false,
         authorInEmbeddedMap: false,
         connectOnCanvas: false,
       },
@@ -140,12 +150,72 @@ describe('authoring availability', () => {
     [
       'a live Resource edit inside an embedded Map',
       { editingEmbeddedMap: true },
-      { ...ALL_AVAILABLE, authorOnCanvas: false },
+      { ...ALL_AVAILABLE, authorOnCanvas: false, resourceActions: false },
     ],
   ])('withdraws what %s takes away', (_what, inProgress, expected) => {
     expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress })).toStrictEqual(
       expected,
     );
+  });
+
+  describe('a mounted session (ADR 0130)', () => {
+    /** Every answer that is an Edit, which a mounted session never offers. */
+    const NO_EDIT = {
+      resourcesView: false,
+      chromeTitleEdit: false,
+      entityEdits: false,
+      deleteResource: false,
+      addResource: false,
+      createMap: false,
+      authorOnCanvas: false,
+      authorInEmbeddedMap: false,
+      editResourceBody: false,
+      connectOnCanvas: false,
+      dragNodes: false,
+      embeddedMapEdit: false,
+    } as const;
+
+    it('offers selection, navigation, Present and the rail actions that hold Enter, and no Edit', () => {
+      expect(authoringAvailability({ ...NOTHING_IN_PROGRESS, mounted: true })).toStrictEqual({
+        ...NO_EDIT,
+        present: true,
+        selectNodes: true,
+        navigate: true,
+        replaceSession: true,
+        resourceActions: true,
+      });
+    });
+
+    it('offers no Edit whatever else is in progress', () => {
+      for (const inProgress of [
+        { editable: false },
+        { presenting: true },
+        { editingResourceTitle: true },
+        { editingChromeTitle: true },
+        { spaceOnCanvas: false },
+        { editingEmbeddedMap: true },
+        { replacingImage: true },
+      ]) {
+        expect(
+          authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress, mounted: true }),
+        ).toMatchObject(NO_EDIT);
+      }
+    });
+
+    it('withdraws the rail actions where an unmounted canvas would, so Enter is not offered off the canvas', () => {
+      for (const inProgress of [{ presenting: true }, { spaceOnCanvas: false }]) {
+        expect(
+          authoringAvailability({ ...NOTHING_IN_PROGRESS, ...inProgress, mounted: true })
+            .resourceActions,
+        ).toBe(false);
+      }
+    });
+
+    it('keeps Stop and navigation offered through a presentation', () => {
+      expect(
+        authoringAvailability({ ...NOTHING_IN_PROGRESS, presenting: true, mounted: true }),
+      ).toMatchObject({ present: true, navigate: true, selectNodes: false });
+    });
   });
 
   describe('the asymmetries', () => {

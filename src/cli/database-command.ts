@@ -1,9 +1,12 @@
 import type { UUID } from '@project/core';
 import { describeError } from './describe-error';
-import { describeAggregateRefusal } from './aggregate-refusal';
 import { exportAggregate } from '../export/export-aggregate';
 import { importAggregate, type AggregateImportResult } from '../import/import-aggregate';
-import { type SpaceRepository, AggregateDirectoryError } from '@project/aggregate';
+import {
+  type SpaceRepository,
+  AggregateDirectoryError,
+  describeAggregateRefusal,
+} from '@project/aggregate';
 import type { DatabaseCommand } from './arguments';
 import type { CliIo } from './io';
 

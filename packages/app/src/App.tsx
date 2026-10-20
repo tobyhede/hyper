@@ -285,18 +285,21 @@ export const createApp = (
             reporting the expected outcome is a slot spent on nothing — and that
             decision is the surface's. This is not a cue: it is hidden, and what
             it carries is the revision, which is the *Space's* rather than any
-            surface's. It sits beside the canvas for exactly that reason. */}
-        <span
-          hidden
-          aria-hidden="true"
-          data-testid="persistence-status"
-          data-persistence-state={sessionState.persistence.kind}
-          data-revision={String(sessionState.acknowledgedRevision)}
-        >
-          {sessionState.persistence.kind === 'settled'
-            ? 'Persisted'
-            : sessionState.persistence.kind}
-        </span>
+            surface's. It sits beside the canvas for exactly that reason.
+            A mounted session never commits, so it has none (ADR 0130). */}
+        {composition.mounted ? null : (
+          <span
+            hidden
+            aria-hidden="true"
+            data-testid="persistence-status"
+            data-persistence-state={sessionState.persistence.kind}
+            data-revision={String(sessionState.acknowledgedRevision)}
+          >
+            {sessionState.persistence.kind === 'settled'
+              ? 'Persisted'
+              : sessionState.persistence.kind}
+          </span>
+        )}
         {active ? <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} /> : null}
         {active
           ? drawnSpaces

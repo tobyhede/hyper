@@ -58,6 +58,18 @@ export const Presenting: Story = () => <CommandDockFixture scenario="presenting"
 Presenting.meta = { iframed: true };
 
 /**
+ * A mounted session (ADR 0130): the same crossing chain, read-only.
+ *
+ * The Dock trails the read-only mark and reports no persistence state, and
+ * every Edit is drawn unavailable or absent — renames, Create, the Resources
+ * list — while the Space, Map and Graph choices, Open Spaces and Present stay
+ * live. On the canvas a Resource still selects, and a Space Resource's Actions
+ * menu still offers Enter.
+ */
+export const Mounted: Story = () => <CommandDockFixture scenario="mounted" />;
+Mounted.meta = { iframed: true };
+
+/**
  * An Image Resource's replacement in flight, held for as long as the story is
  * mounted.
  *

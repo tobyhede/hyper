@@ -131,6 +131,8 @@ export type {
   ImageReplaceTargetProps,
   ImageReplacement,
 } from './ImageReplaceTarget';
+export { displayImageAsAuthored, ImageDisplayProvider, useImageDisplay } from './image-display';
+export type { ImageDisplay } from './image-display';
 export { PaletteColorPicker } from './PaletteColorPicker';
 export type { PaletteColorEntry, PaletteColorPickerProps } from './PaletteColorPicker';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
@@ -167,6 +169,7 @@ export {
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,
+  ReadOnlyIcon,
   StopPresentingIcon,
 } from './icons';
 export type { ResourceBaseKind } from './icons';

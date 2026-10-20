@@ -7,6 +7,7 @@ export {
   type AggregateFiles,
 } from './aggregate-file';
 export { classifyInitializedAggregate } from './aggregate-lifecycle';
+export { describeAggregateRefusal } from './aggregate-refusal';
 export { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
 export { imageFileName, IMAGES_DIRECTORY_NAME } from './images';
 export { MemorySpaceRepository } from './memory-space-repository';

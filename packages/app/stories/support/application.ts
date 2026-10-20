@@ -7,12 +7,17 @@ import { storelessImages } from './image-sources';
 import { refusingFullscreen } from './fullscreen';
 import { unlinkedPresentations } from './presentations';
 
-/** Fixture data, an isolated history adapter and a host that refuses fullscreen; all session behavior is production's. */
+/**
+ * Fixture data, an isolated history adapter and a host that refuses fullscreen;
+ * all session behavior is production's. `mounted` composes the read-only
+ * session Mounting opens (ADR 0130).
+ */
 export function storySpaces(
   metaSpaceId: UUID,
   snapshots: readonly SpaceSnapshot[],
   control?: MemorySpaceBackendTestControl,
   images: ImageSources = storelessImages,
+  mounted = false,
 ): OpenSpaces {
   const backend = new MemorySpaceBackend(
     metaSpaceId,
@@ -30,6 +35,7 @@ export function storySpaces(
     images,
     fullscreen: refusingFullscreen,
     presentations: unlinkedPresentations,
+    mounted,
     history: {
       pathname: () => pathname,
       href: () => `https://example.test${pathname}`,

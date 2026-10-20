@@ -2,10 +2,10 @@ import { readdir } from 'node:fs/promises';
 import type { UUID } from '@project/core';
 import type { RepositoryCommitResult, SpaceCommit } from '@project/persistence';
 import { isMissingFile } from '../aggregate-directory';
-import { describeAggregateRefusal } from '../cli/aggregate-refusal';
 import { exportAggregate } from '../export/export-aggregate';
 import {
   createSpaceHost,
+  describeAggregateRefusal,
   type SpaceHostApplication,
   AggregateDirectoryError,
 } from '@project/aggregate';
