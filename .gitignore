@@ -96,3 +96,6 @@ scripts/.check-typescript-toolchain.link.ts
 # future `packages/*/reports/`.
 /.stryker-tmp/
 /reports/
+
+# Wrangler's local state (`wrangler dev`, `wrangler deploy --dry-run`).
+.wrangler/
