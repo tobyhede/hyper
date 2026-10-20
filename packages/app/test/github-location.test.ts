@@ -24,6 +24,13 @@ describe('parseGitHubLocation', () => {
     });
   });
 
+  it('ends a ref at the next slash, so a slashed branch is addressed by SHA or tag', () => {
+    expect(parseGitHubLocation('github:o/r@feature/x/talk')).toEqual({
+      ok: true,
+      location: { owner: 'o', repo: 'r', ref: 'feature', path: 'x/talk' },
+    });
+  });
+
   it.each([
     ['', 'no scheme'],
     ['tobyhede/hyper', 'no scheme'],

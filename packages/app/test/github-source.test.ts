@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { readGitHubAggregate } from '../src/mount/github-source';
+import { readGitHubAggregate, type Wait } from '../src/mount/github-source';
 
 const FIXTURE = join(dirname(dirname(fileURLToPath(import.meta.url))), 'fixture');
 
@@ -39,6 +39,20 @@ interface FakeGitHubOptions {
   readonly rateLimitStatus?: 403 | 429;
   /** A repository path whose raw request answers 500. */
   readonly failingBlob?: string;
+  /**
+   * Answers a repository path's first raw requests give, in order, before it
+   * answers normally: a status, with the `Retry-After` seconds it sends.
+   */
+  readonly blobFailures?: ReadonlyMap<string, readonly BlobFailure[]>;
+  /** Every raw answer is held until a later macrotask, so requests overlap. */
+  readonly holdRaw?: boolean;
+  /** Repository paths GitHub lists as symbolic links (mode `120000`). */
+  readonly symlinks?: ReadonlySet<string>;
+}
+
+interface BlobFailure {
+  readonly status: number;
+  readonly retryAfter?: string;
 }
 
 interface FakeGitHub {
@@ -46,6 +60,8 @@ interface FakeGitHub {
   readonly requests: Request[];
   readonly apiRequests: () => string[];
   readonly rawRequests: () => string[];
+  /** The most raw requests that were awaiting their answers at once. */
+  readonly peakRawInFlight: () => number;
 }
 
 const API = `https://api.github.com/repos/${OWNER}/${REPO}`;
@@ -72,7 +88,10 @@ const json = (status: number, body: ApiBody): Response =>
   });
 
 /** The tree GitHub lists for `files`: every blob, and every directory holding one. */
-const treeEntries = (files: ReadonlyMap<string, Uint8Array>): TreeEntry[] => {
+const treeEntries = (
+  files: ReadonlyMap<string, Uint8Array>,
+  symlinks: ReadonlySet<string>,
+): TreeEntry[] => {
   const directories = new Set<string>();
   for (const path of files.keys()) {
     const segments = path.split('/');
@@ -89,7 +108,7 @@ const treeEntries = (files: ReadonlyMap<string, Uint8Array>): TreeEntry[] => {
     })),
     ...[...files.keys()].map((path): TreeEntry => ({
       path,
-      mode: '100644',
+      mode: symlinks.has(path) ? '120000' : '100644',
       type: 'blob',
       sha: COMMIT,
     })),
@@ -105,8 +124,14 @@ const fakeGitHub = ({
   truncated = false,
   rateLimitStatus,
   failingBlob,
+  blobFailures = new Map(),
+  holdRaw = false,
+  symlinks = new Set(),
 }: FakeGitHubOptions): FakeGitHub => {
   const requests: Request[] = [];
+  const failuresAnswered = new Map<string, number>();
+  let rawInFlight = 0;
+  let peakRawInFlight = 0;
   const refs = new Map([
     ['HEAD', COMMIT],
     ['main', COMMIT],
@@ -133,7 +158,7 @@ const fakeGitHub = ({
       const tree = /\/git\/trees\/([0-9a-f]{40})\?recursive=1$/.exec(url);
       if (tree !== null) {
         return tree[1] === COMMIT
-          ? json(200, { sha: COMMIT, tree: treeEntries(files), truncated })
+          ? json(200, { sha: COMMIT, tree: treeEntries(files, symlinks), truncated })
           : json(404, { message: 'Not Found' });
       }
       return json(404, { message: 'Not Found' });
@@ -141,6 +166,15 @@ const fakeGitHub = ({
     if (url.startsWith(RAW)) {
       const path = decodeURIComponent(url.slice(RAW.length));
       if (path === failingBlob) return new Response('', { status: 500 });
+      const answered = failuresAnswered.get(path) ?? 0;
+      const failure = blobFailures.get(path)?.[answered];
+      if (failure !== undefined) {
+        failuresAnswered.set(path, answered + 1);
+        return new Response('', {
+          status: failure.status,
+          headers: failure.retryAfter === undefined ? {} : { 'retry-after': failure.retryAfter },
+        });
+      }
       const bytes = files.get(path);
       return bytes === undefined
         ? new Response('404: Not Found', { status: 404 })
@@ -149,10 +183,15 @@ const fakeGitHub = ({
     return new Response('', { status: 404 });
   };
 
-  const fakeFetch: typeof fetch = (input, init) => {
+  const fakeFetch: typeof fetch = async (input, init) => {
     const request = new Request(input, init);
     requests.push(request);
-    return Promise.resolve(answer(request));
+    if (!holdRaw || !request.url.startsWith(RAW)) return answer(request);
+    rawInFlight += 1;
+    peakRawInFlight = Math.max(peakRawInFlight, rawInFlight);
+    await new Promise((release) => setTimeout(release, 0));
+    rawInFlight -= 1;
+    return answer(request);
   };
 
   return {
@@ -166,6 +205,25 @@ const fakeGitHub = ({
         .filter((url) => url.startsWith(RAW))
         .map((url) => decodeURIComponent(url.slice(RAW.length)))
         .sort(),
+    peakRawInFlight: () => peakRawInFlight,
+  };
+};
+
+interface RecordingWait {
+  readonly wait: Wait;
+  /** Every delay `wait` was asked for, in milliseconds. */
+  readonly waits: number[];
+}
+
+/** A `wait` that resolves at once and records every delay it was asked for. */
+const recordingWait = (): RecordingWait => {
+  const waits: number[] = [];
+  return {
+    waits,
+    wait: (ms) => {
+      waits.push(ms);
+      return Promise.resolve();
+    },
   };
 };
 
@@ -361,12 +419,97 @@ describe('readGitHubAggregate', () => {
   it('names the file whose fetch failed', async () => {
     const github = fakeGitHub({ files: fixtureFiles, failingBlob: 'hyper.json' });
 
-    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+    const result = await readGitHubAggregate(
+      `github:${OWNER}/${REPO}`,
+      github.fetch,
+      recordingWait().wait,
+    );
 
     expect(result).toEqual({
       ok: false,
       failure: { kind: 'blob-failed', path: 'hyper.json', status: 500 },
     });
+  });
+
+  it('retries a blob GitHub throttled once, and mounts', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 429 }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+    expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(2);
+    expect(waits).toEqual([1000]);
+  });
+
+  it('waits the Retry-After seconds a throttled blob names before retrying it', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 503, retryAfter: '3' }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result.ok).toBe(true);
+    expect(waits).toEqual([3000]);
+  });
+
+  it('fails a blob that still fails after its one retry, naming it', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 500 }, { status: 500 }]]]),
+    });
+    const { wait } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-failed', path: 'hyper.json', status: 500 },
+    });
+    expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(2);
+  });
+
+  it('does not retry a blob that is not there', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 404 }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-failed', path: 'hyper.json', status: 404 },
+    });
+    expect(waits).toEqual([]);
+  });
+
+  it('fetches at most eight blobs at once', async () => {
+    expect(fixtureFiles.size).toBeGreaterThan(8);
+    const github = fakeGitHub({ files: fixtureFiles, holdRaw: true });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+    expect(github.peakRawInFlight()).toBe(8);
+  });
+
+  it('never reads a scanned path that is a symbolic link', async () => {
+    const linkPath =
+      '00000000-0000-4000-8000-000000000060/resources/00000000-0000-4000-8000-0000000000aa.json';
+    const files = new Map([...fixtureFiles, [linkPath, text('../../../etc/passwd')]]);
+    const github = fakeGitHub({ files, symlinks: new Set([linkPath]) });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(github.rawRequests()).not.toContain(linkPath);
+    expect(result.ok && result.aggregate.files.has(linkPath)).toBe(false);
   });
 
   it('answers a network failure as a failed request', async () => {
