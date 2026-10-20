@@ -175,7 +175,7 @@ A strategy is either **automatic** or **positioned**. An automatic strategy comp
 _Avoid_: arrangement (applying a strategy produces no separate entity — the Resources themselves carry the positions), algorithm, engine.
 
 **Resources View**:
-An application-supplied collection of the Space's Resources absent from the selected Map. Its current rendering is a popover anchored to the Command Dock's Resources cluster, but that mounting location is not part of the collection's identity (ADR 0082).
+An application-supplied collection of the Space's Resources absent from the selected Map. Its current rendering is a popover anchored to the Command Dock's Resources cluster, but where it renders is not part of the collection's identity (ADR 0082).
 _Avoid_: Space-Resource palette, Resource panel, drawer, popover or Dock as the domain name.
 
 **Exporting**:
@@ -193,6 +193,10 @@ _Avoid_: loading, restoring, syncing; merging.
 **Running**:
 Serving an existing Aggregate directory as the working aggregate: Importing it into a fresh store, Exporting back to it after every committed edit and once more on stopping, and discarding the store when the run ends. While Running, the directory is the only durable copy, so Exporting is what makes an edit durable. The directory is expected to be under version control, which is what answers for history, undo and concurrent writers; the last write wins. A missing or empty directory is not run but refused, because it is more often a mistyped path than a new aggregate (ADR 0124).
 _Avoid_: watching, syncing, live mode, session (that is the client's edit-coalescing seam).
+
+**Mounting**:
+Reading a complete aggregate from a GitHub location (a public repository, a commit or a branch resolved to one, and a directory in it) into a store held by one browser page, and serving the application from that store, read-only (ADR 0130). Everything that reads, navigates and presents works, and nothing is an Edit: Open and Closed, selections and every other authored value stay as the directory has them. Mounting is not Importing, because it never touches a stored aggregate, and not Running, because it writes nothing back. A mounted aggregate is refused on exactly the grounds Importing refuses it.
+_Avoid_: publishing, deploying, hosting, loading (as names for the operation); mount for the React sense, which is code vocabulary.
 
 **Opening**:
 Bringing a single Resource's content up **on the Resource itself**, inside the rect it already has. A Markdown Resource opens on its Title and rendered Markdown; putting a caret in its source is a separate Edit. A Reference Resource opens on its own Title and its immutable Target's content read-only, while the Target Resource must be opened explicitly to author that content. An Image Resource opens on its image. A Space Resource opens on the Map it selects. Opening is not presenting — the canvas it happens on is still what is being worked in — and Open Markdown content reads through the same renderer used while presenting.
