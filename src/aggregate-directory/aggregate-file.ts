@@ -18,13 +18,21 @@ import { isMissingFile } from './space-directory';
 import { writeInPlace, type DirectoryFiles } from './write-in-place';
 import { spaceDirectoryFiles } from './write-space-directory';
 
+/** How many files Import reads at once, well under a process's descriptor limit. */
+const READ_CONCURRENCY = 32;
+
 /**
- * Whether a directory entry is a file Import could read: a regular file, or a
- * symbolic link whose target is one. A link that names nothing is no file.
+ * Whether a directory entry is a file Import could read: a regular file, or,
+ * where `followLinks`, a symbolic link whose target is one. A link that names
+ * nothing is no file.
  */
-const isListedFile = async (directory: string, entry: Dirent): Promise<boolean> => {
+const isListedFile = async (
+  directory: string,
+  entry: Dirent,
+  followLinks: boolean,
+): Promise<boolean> => {
   if (entry.isFile()) return true;
-  if (!entry.isSymbolicLink()) return false;
+  if (!followLinks || !entry.isSymbolicLink()) return false;
   try {
     return (await stat(join(directory, entry.name))).isFile();
   } catch (error) {
@@ -39,7 +47,9 @@ const isListedFile = async (directory: string, entry: Dirent): Promise<boolean> 
  * directory, and those in the `resources/` of each child holding a
  * `space.json`. A file is a regular file or a link to one, since Import reads
  * through a link, so a linked `hyper.json`, `space.json` or Resource file is
- * read and owned like the file it names. `images/` and a `resources/` are
+ * read and owned like the file it names. In `images/` a file is a regular file
+ * only: a link there is the author's, neither admitted nor removed. `images/`
+ * and a `resources/` are
  * listed through a link, as Import reads them, so Export sees what a link
  * would make it remove. Which of them Import does read is
  * `scannedAggregatePaths`'s to say; this only lists, so the one discovery rule
@@ -53,8 +63,11 @@ const listAggregateDirectory = async (directory: string): Promise<readonly strin
     path: string,
     entries: readonly Dirent[],
     prefix: string,
+    followLinks = true,
   ): Promise<string[]> => {
-    const listed = await Promise.all(entries.map((entry) => isListedFile(path, entry)));
+    const listed = await Promise.all(
+      entries.map((entry) => isListedFile(path, entry, followLinks)),
+    );
     return entries.filter((_, index) => listed[index]).map(({ name }) => `${prefix}${name}`);
   };
   const filesAt = async (path: string, prefix: string): Promise<string[]> =>
@@ -67,7 +80,7 @@ const listAggregateDirectory = async (directory: string): Promise<readonly strin
         .map(async ({ name }) => {
           const child = join(directory, name);
           const entries = await readdir(child, { withFileTypes: true });
-          const inside = await filesIn(child, entries, `${name}/`);
+          const inside = await filesIn(child, entries, `${name}/`, name !== IMAGES_DIRECTORY_NAME);
           const holdsSpace = inside.includes(`${name}/space.json`);
           const hasResources = entries.some((entry) => entry.name === 'resources');
           const resources =
@@ -96,8 +109,8 @@ const spaceDirectoryNames = (scanned: readonly string[]): readonly string[] =>
  *
  * The filesystem shell around `readAggregateFiles`, which parses, admits and
  * identifies whatever bytes it is given, wherever they came from. This reads
- * `hyper.json` and, when there is one, the files Import scans, and hands their
- * bytes over. A missing `hyper.json` is that reader's refusal; one that cannot
+ * `hyper.json` and, when there is one, the files Import scans,
+ * `READ_CONCURRENCY` at a time, and hands their bytes over. A missing `hyper.json` is that reader's refusal; one that cannot
  * be read is a discovery failure naming it.
  */
 export const readAggregate = async (
@@ -116,15 +129,25 @@ export const readAggregate = async (
   const paths = scannedAggregatePaths(await listAggregateDirectory(directory)).filter(
     (path) => path !== AGGREGATE_FILE_NAME,
   );
-  const reads = await Promise.allSettled(paths.map((path) => readFile(join(directory, path))));
+  const reads = new Map<string, Uint8Array | string>();
+  const pending = [...paths];
+  const reader = async (): Promise<void> => {
+    for (let path = pending.shift(); path !== undefined; path = pending.shift()) {
+      try {
+        reads.set(path, new Uint8Array(await readFile(join(directory, path))));
+      } catch (error) {
+        reads.set(path, String(error));
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: READ_CONCURRENCY }, reader));
   const files = new Map<string, Uint8Array>([[AGGREGATE_FILE_NAME, aggregateBytes]]);
   const unreadable = new Map<string, string>();
-  reads.forEach((result, index) => {
-    const path = paths[index];
-    if (path === undefined) return;
-    if (result.status === 'fulfilled') files.set(path, new Uint8Array(result.value));
-    else unreadable.set(path, String(result.reason));
-  });
+  for (const path of paths) {
+    const read = reads.get(path);
+    if (read instanceof Uint8Array) files.set(path, read);
+    else if (read !== undefined) unreadable.set(path, read);
+  }
   return readAggregateFiles(directory, files, newId, unreadable);
 };
 
