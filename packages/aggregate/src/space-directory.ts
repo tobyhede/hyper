@@ -55,7 +55,7 @@ const parseSpaceJson = (spaceFile: string, spaceText: string | undefined): Space
  * silence for a retired space-level `graphs`; and before a read failure, because
  * a document refused outright was never going to load.
  */
-const refuseDocument = (spaceFile: string, json: unknown): void => {
+const refuseDocument = (spaceFile: string, { json }: SpaceJson): void => {
   const refusal = documentRefusal(json);
   if (refusal !== null) {
     throw new AggregateDirectoryError('parsing', [`${spaceFile}: ${refusal.message}`]);
@@ -70,7 +70,7 @@ const refuseDocument = (spaceFile: string, json: unknown): void => {
  * read failure.
  */
 export const refuseSpaceDocument = (spaceFile: string, spaceText: string | undefined): void => {
-  refuseDocument(spaceFile, parseSpaceJson(spaceFile, spaceText).json);
+  refuseDocument(spaceFile, parseSpaceJson(spaceFile, spaceText));
 };
 
 /**
@@ -84,7 +84,7 @@ export const parseSingleSpace = ({
   resources: resourceFiles,
 }: SpaceDirectoryFiles): ImportSpace => {
   const spaceJson = parseSpaceJson(spaceFile, spaceText);
-  refuseDocument(spaceFile, spaceJson.json);
+  refuseDocument(spaceFile, spaceJson);
 
   const diagnostics: string[] = [];
   let parsedSpaceFile: ImportSpaceFile | undefined;
