@@ -14,4 +14,4 @@ Status: ready-for-agent
 **Acceptance:**
 
 - `wrangler deploy --dry-run` succeeds on a built tree.
-- A local `wrangler dev` of the build answers a deep product URL with the application.
+- A local `wrangler dev` of the build answers a deep product URL with the application and with 06's Content Security Policy header.
