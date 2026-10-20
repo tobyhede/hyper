@@ -788,7 +788,7 @@ export function CommandDock({
           />
           <Divider orientation={divider} />
           <ResourcesControl resources={chrome.resources} side={side} />
-          {chrome.persistence === null ? (
+          {chrome.readOnly ? (
             <>
               <Divider orientation={divider} />
               <ReadOnlyMark />

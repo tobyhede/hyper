@@ -187,33 +187,49 @@ export interface AuthoringAvailability {
   readonly resourceActions: boolean;
   /**
    * An Open Space Resource may offer its Edit, which puts the Map it embeds
-   * in Edit. Withheld only in a mounted session; anywhere else the embedding's
-   * own answers, `authorInEmbeddedMap` among them, withdraw what it authors.
+   * in Edit. Withheld in a mounted session, and by the Map surface policy on
+   * every drawing but the canvas's own Map (`surfaceAvailability`); anywhere
+   * else the embedding's own answers, `authorInEmbeddedMap` among them,
+   * withdraw what it authors.
    */
   readonly embeddedMapEdit: boolean;
 }
 
+/** Every answer withheld: what a drawing that takes no gesture answers. */
+export const NOTHING_AVAILABLE: AuthoringAvailability = {
+  resourcesView: false,
+  chromeTitleEdit: false,
+  entityEdits: false,
+  deleteResource: false,
+  present: false,
+  addResource: false,
+  createMap: false,
+  authorOnCanvas: false,
+  authorInEmbeddedMap: false,
+  editResourceBody: false,
+  connectOnCanvas: false,
+  dragNodes: false,
+  selectNodes: false,
+  navigate: false,
+  replaceSession: false,
+  resourceActions: false,
+  embeddedMapEdit: false,
+};
+
 export function authoringAvailability(inProgress: AuthoringInProgress): AuthoringAvailability {
   const available = availabilityBesideMounting(inProgress);
   if (!inProgress.mounted) return available;
-  // A mounted session withholds every Edit and keeps what reads: selecting,
-  // navigating and Present, each as the rest of the session answers it. The
-  // rail's Actions menu stays where the canvas would draw it, for its
-  // addresses and a Space Resource's Enter.
+  // A mounted session starts from nothing and names what reads, so an answer
+  // added later is withheld here until it is named: selecting, navigating and
+  // Present, each as the rest of the session answers it, and the rail's
+  // Actions menu where the canvas would draw it, for its addresses and a Space
+  // Resource's Enter.
   return {
-    ...available,
-    resourcesView: false,
-    chromeTitleEdit: false,
-    entityEdits: false,
-    deleteResource: false,
-    addResource: false,
-    createMap: false,
-    authorOnCanvas: false,
-    authorInEmbeddedMap: false,
-    editResourceBody: false,
-    connectOnCanvas: false,
-    dragNodes: false,
-    embeddedMapEdit: false,
+    ...NOTHING_AVAILABLE,
+    present: available.present,
+    selectNodes: available.selectNodes,
+    navigate: available.navigate,
+    replaceSession: available.replaceSession,
     resourceActions: available.authorOnCanvas,
   };
 }
@@ -471,7 +487,7 @@ function availabilityBesideReplacement(inProgress: AuthoringInProgress): Authori
 
   /** The rail's Actions menu goes where the rail's other controls go. */
   const resourceActions = authorOnCanvas;
-  /** Withheld only by a mounted session, in `authoringAvailability`. */
+  /** Withheld by a mounted session, and by the surface policy off the canvas. */
   const embeddedMapEdit = true;
 
   return {

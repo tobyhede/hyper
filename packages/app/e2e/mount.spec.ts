@@ -113,21 +113,25 @@ test('a deep product URL is answered with the application under the build’s po
   await expect(page.getByTestId('selected-canvas')).toHaveText('Linked Spaces');
 });
 
-test('marks the session read-only and offers no Edit', async ({ page }) => {
-  await openMeta(page);
+test(
+  'marks the session read-only and offers no Edit',
+  { tag: '@parity:command-dock-marks-a-mounted-session-read-only' },
+  async ({ page }) => {
+    await openMeta(page);
 
-  await expect(dock(page).getByText('Read-only', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('persistence-status')).toHaveCount(0);
-  for (const create of await dock(page)
-    .getByRole('button', { name: /^Create / })
-    .all()) {
-    await expect(create).toHaveAttribute('aria-disabled', 'true');
-  }
-  await resourceControls(page, nodeByTitle(page, 'A').first());
-  await expect(page.getByRole('button', { name: /^Open Resource / })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /^Edit Title / })).toHaveCount(0);
-  await expect(presentControl(page)).not.toHaveAttribute('aria-disabled', 'true');
-});
+    await expect(dock(page).getByText('Read-only', { exact: true })).toBeVisible();
+    await expect(page.getByTestId('persistence-status')).toHaveCount(0);
+    for (const create of await dock(page)
+      .getByRole('button', { name: /^Create / })
+      .all()) {
+      await expect(create).toHaveAttribute('aria-disabled', 'true');
+    }
+    await resourceControls(page, nodeByTitle(page, 'A').first());
+    await expect(page.getByRole('button', { name: /^Open Resource / })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Edit Title / })).toHaveCount(0);
+    await expect(presentControl(page)).not.toHaveAttribute('aria-disabled', 'true');
+  },
+);
 
 test('a Presenting URL loads directly and survives a reload', async ({ page }) => {
   await openMeta(page);
