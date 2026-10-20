@@ -19,14 +19,14 @@ Status: resolved
 ## Answer
 
 - `wrangler.jsonc`: `name` `hyper`, `compatibility_date` `2026-10-01`, `assets.directory` `./packages/app/dist-mount`, `assets.not_found_handling` `"single-page-application"`, `previews: {}`, no `main`. Field names checked against Cloudflare's Workers static-assets, single-page-application routing and Pages-migration (Previews) docs. Workers Builds overrides `name` with the connected Worker's (`WRANGLER_CI_OVERRIDE_NAME`, per its troubleshooting page), so a talk's Worker builds from the same file.
-- `scripts/cloudflare-build.sh`: refuses a Node that is not `.node-version`'s exact version, installs `packageManager`'s pnpm when another is on `PATH`, prints whether `VITE_HYPER_DEFAULT_SOURCE` is set, then runs `pnpm install --frozen-lockfile` and `pnpm build:mount`. The guide has Workers Builds run it with `SKIP_DEPENDENCY_INSTALL=1`.
+- `scripts/cloudflare-build.sh`: refuses a Node older than `.node-version` or of another major (`engines`), and warns on a later one; installs `packageManager`'s pnpm into a prefix of its own, first on `PATH`, when another is running, and refuses if it still is not the one running; prints whether `VITE_HYPER_DEFAULT_SOURCE` is set, then runs `pnpm install --frozen-lockfile` and `pnpm build:mount`. The guide has Workers Builds run it with `SKIP_DEPENDENCY_INSTALL=1`.
 - `wrangler` `4.147.0` is a root devDependency: the acceptance checks run it, and Workers Builds runs the Wrangler version `package.json` names. `.wrangler/` is ignored.
 - `docs/deploy-cloudflare.md` covers deploying and pointing a domain at a talk (a second Worker with its default pinned to a commit, plus a Custom Domain); the `hyper-getting-started` skill links it.
 
-Checked on a stand-in tree (an `index.html`, one hashed asset and a `_headers`), since 06's `pnpm build:mount` is not on this branch:
+First checked on a stand-in tree (an `index.html`, one hashed asset and a `_headers`), before 06's `pnpm build:mount` was merged into this branch:
 
 - `pnpm exec wrangler deploy --dry-run` read the assets directory, reported no bindings and exited 0.
 - `pnpm exec wrangler dev --port 8787` answered `/`, `/spaces/x/maps/y` and `/spaces/x/maps/y?source=x` with 200 and `index.html`, with and without `Sec-Fetch-Mode: navigate`; the hashed asset with 200 as `text/javascript`; and applied `_headers` to every response.
 - `scripts/cloudflare-build.sh` under Node 26.8.1 installed, then stopped at `Command "build:mount" not found`, as expected before 06. Under Node 22 it refused with the `.node-version` message.
 
-On 06's real `pnpm build:mount` tree (`VITE_HYPER_DEFAULT_SOURCE=github:tobyhede/talks@main`): `wrangler deploy --dry-run` read 8 files from `packages/app/dist-mount`, reported no bindings and exited 0, and `wrangler dev` answered `/spaces/x/maps/y?source=github:o/r` with 200, `text/html`, 06's `content-security-policy` and `x-content-type-options: nosniff`.
+Then on 06's real `pnpm build:mount` tree, which acceptance names (`VITE_HYPER_DEFAULT_SOURCE=github:tobyhede/talks@main`): `wrangler deploy --dry-run` read 8 files from `packages/app/dist-mount`, reported no bindings and exited 0, and `wrangler dev` answered `/spaces/x/maps/y?source=github:o/r` with 200, `text/html`, 06's `content-security-policy` and `x-content-type-options: nosniff`.
