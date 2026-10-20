@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { readGitHubAggregate, type Wait } from '../src/mount/github-source';
 import { fixtureFiles as readFixtureFiles } from './fixture-files';
-import { API, COMMIT, fakeGitHub, OWNER, REPO, type FakeGitHub } from './fake-github';
+import {
+  API,
+  COMMIT,
+  fakeGitHub,
+  OWNER,
+  REPO,
+  type ApiFailure,
+  type FakeGitHub,
+} from './fake-github';
 
 /** Every tracked fixture file, which is exactly the set Importing reads there. */
 const fixtureFiles = readFixtureFiles();
@@ -129,10 +137,72 @@ describe('readGitHubAggregate', () => {
       expectNoCredentials(github);
     });
 
+    it("finds the selected directory's tree in its parent and lists only that tree", async () => {
+      const github = fakeGitHub({ files: repository });
+      const selectedSha = /\/([0-9a-f]{40})\?recursive=1$/;
+
+      const result = await readGitHubAggregate(
+        `github:${OWNER}/${REPO}@${COMMIT}/${SELECTED}`,
+        github.fetch,
+      );
+
+      expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+      const [contents, tree, ...rest] = github.apiRequests();
+      expect(contents).toBe(`${API}/contents/talks?ref=${COMMIT}`);
+      expect(tree).toMatch(new RegExp(`^${API}/git/trees/[0-9a-f]{40}\\?recursive=1$`));
+      expect(selectedSha.exec(tree ?? '')?.[1]).not.toBe(COMMIT);
+      expect(rest).toEqual([]);
+    });
+
+    it("finds a directory at the repository's root in the root's listing", async () => {
+      const github = fakeGitHub({ files: under('pgdu', fixtureFiles) });
+
+      const result = await readGitHubAggregate(
+        `github:${OWNER}/${REPO}@${COMMIT}/pgdu`,
+        github.fetch,
+      );
+
+      expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+      expect(github.apiRequests()[0]).toBe(`${API}/contents?ref=${COMMIT}`);
+      expect(github.apiRequests()).toHaveLength(2);
+      expect(github.rawRequests()).toEqual(sorted(under('pgdu', fixtureFiles).keys()));
+    });
+
+    it("mounts a directory whose own tree is whole although the repository's is truncated", async () => {
+      const github = fakeGitHub({ files: repository, truncated: true });
+
+      const result = await readGitHubAggregate(
+        `github:${OWNER}/${REPO}@main/${SELECTED}`,
+        github.fetch,
+      );
+
+      expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
+    });
+
+    it('refuses a directory whose own tree is truncated', async () => {
+      const github = fakeGitHub({ files: repository, truncatedDirectories: new Set([SELECTED]) });
+
+      const result = await readGitHubAggregate(
+        `github:${OWNER}/${REPO}@main/${SELECTED}`,
+        github.fetch,
+      );
+
+      expect(result).toEqual({
+        ok: false,
+        failure: {
+          kind: 'truncated-tree',
+          location: { owner: OWNER, repo: REPO, sha: COMMIT, path: SELECTED },
+        },
+      });
+      expect(github.rawRequests()).toEqual([]);
+    });
+
     it.each([
       ['the repository root, whose descendants hold one', ''],
       ['a parent of the aggregate', '/talks'],
       ['a directory that is not there', '/talks/missing'],
+      ['a directory whose parent is not there', '/talks/missing/deeper'],
+      ['a directory inside a file', `/${SELECTED}/hyper.json/deeper`],
       ['a file rather than a directory', `/${SELECTED}/hyper.json`],
     ])('refuses a selected directory without hyper.json: %s', async (_description, suffix) => {
       const github = fakeGitHub({ files: repository });
@@ -178,6 +248,38 @@ describe('readGitHubAggregate', () => {
       expect(result).toEqual({ ok: false, failure: { kind: 'rate-limited' } });
     },
   );
+
+  it.each([
+    ['a 429 with requests remaining', { status: 429 }],
+    ['a 403 naming a Retry-After', { status: 403, headers: { 'retry-after': '60' } }],
+    [
+      'a 403 whose message names a secondary rate limit',
+      {
+        status: 403,
+        body: '{"message":"You have exceeded a secondary rate limit. Please wait a few minutes before you try again."}',
+      },
+    ],
+  ])('answers %s as a rate limit', async (_description, apiFailure: ApiFailure) => {
+    const github = fakeGitHub({ files: fixtureFiles, apiFailure });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'rate-limited' } });
+  });
+
+  it('answers a plain 403 as a failed request', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      apiFailure: { status: 403, body: '{"message":"Resource not accessible"}' },
+    });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'request-failed', url: `${API}/commits/HEAD`, status: 403 },
+    });
+  });
 
   it('answers a 403 with requests remaining as a failed request, not a rate limit', async () => {
     const forbidden: typeof fetch = () =>
@@ -260,6 +362,44 @@ describe('readGitHubAggregate', () => {
     expect(waits).toEqual([3000]);
   });
 
+  it.each([
+    ['an empty Retry-After as absent', '', 1000],
+    ['a non-numeric Retry-After as absent', 'soon', 1000],
+    ['a Retry-After beyond ten seconds as ten seconds', '3600', 10000],
+  ])('reads %s', async (_description, retryAfter, expected) => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([['hyper.json', [{ status: 429, retryAfter }]]]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
+
+    expect(result.ok).toBe(true);
+    expect(waits).toEqual([expected]);
+  });
+
+  it('waits until the HTTP-date a Retry-After names', async () => {
+    const now = Date.UTC(2026, 9, 20, 12, 0, 0);
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([
+        ['hyper.json', [{ status: 503, retryAfter: new Date(now + 5000).toUTCString() }]],
+      ]),
+    });
+    const { wait, waits } = recordingWait();
+
+    const result = await readGitHubAggregate(
+      `github:${OWNER}/${REPO}`,
+      github.fetch,
+      wait,
+      () => now,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(waits).toEqual([5000]);
+  });
+
   it('fails a blob that still fails after its one retry, naming it', async () => {
     const github = fakeGitHub({
       files: fixtureFiles,
@@ -300,6 +440,25 @@ describe('readGitHubAggregate', () => {
 
     expect(result.ok && result.aggregate.files).toEqual(fixtureFiles);
     expect(github.peakRawInFlight()).toBe(8);
+  });
+
+  it('refuses a scanned file listed over 25 MiB before fetching any blob', async () => {
+    const size = 25 * 1024 * 1024 + 1;
+    const github = fakeGitHub({
+      files: under('talks/pgdu', fixtureFiles),
+      listedSizes: new Map([['talks/pgdu/hyper.json', size]]),
+    });
+
+    const result = await readGitHubAggregate(
+      `github:${OWNER}/${REPO}@main/talks/pgdu`,
+      github.fetch,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'blob-too-large', path: 'hyper.json', size },
+    });
+    expect(github.rawRequests()).toEqual([]);
   });
 
   it('never reads a scanned path that is a symbolic link', async () => {
