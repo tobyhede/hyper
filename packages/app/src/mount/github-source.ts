@@ -16,7 +16,10 @@ import { scannedAggregatePaths } from '@project/aggregate';
  * one resolves `HEAD`, the default branch. Listing the tree at the commit costs
  * one more. The selected directory must directly contain `hyper.json`; within
  * it only the files Importing reads are kept, and each is fetched at the commit
- * from `raw.githubusercontent.com`. No token or other credential is ever sent.
+ * from `raw.githubusercontent.com`, at most `BLOB_CONCURRENCY` at once. A blob
+ * answering 429 (that host throttling its reader) or 5xx is asked for once
+ * more, after its `Retry-After` seconds or `DEFAULT_RETRY_MS` without one. No
+ * token or other credential is ever sent.
  *
  * Every failure is answered as a value naming what failed. What to tell a
  * reader about it is the application's to decide.
@@ -104,17 +107,42 @@ const requestApi = async <T>(
   return fail({ kind: 'request-failed', url, status: response.status });
 };
 
+/** How many blobs are fetched at once. */
+const BLOB_CONCURRENCY = 8;
+
+/** The delay before retrying a blob whose answer names none. */
+const DEFAULT_RETRY_MS = 1000;
+
+/** Suspends for `ms` milliseconds; injected so a test need not wait. */
+export type Wait = (ms: number) => Promise<void>;
+
+const waitWithTimer: Wait = (ms) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const isRetryable = (status: number): boolean => status === 429 || status >= 500;
+
+/** The delay a `Retry-After` header in seconds asks for, or the default. */
+const retryDelay = (response: Response): number => {
+  const seconds = Number(response.headers.get('retry-after') ?? Number.NaN);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : DEFAULT_RETRY_MS;
+};
+
 const fetchBlob = async (
   fetch: typeof globalThis.fetch,
+  wait: Wait,
   { owner, repo, sha }: ResolvedGitHubLocation,
   repositoryPath: string,
   path: string,
 ): Promise<Step<Uint8Array>> => {
+  const url = `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${encodePath(repositoryPath)}`;
   try {
-    const response = await fetch(
-      `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${encodePath(repositoryPath)}`,
-      { credentials: 'omit' },
-    );
+    let response = await fetch(url, { credentials: 'omit' });
+    if (isRetryable(response.status)) {
+      await wait(retryDelay(response));
+      response = await fetch(url, { credentials: 'omit' });
+    }
     if (!response.ok) return fail({ kind: 'blob-failed', path, status: response.status });
     return { ok: true, value: new Uint8Array(await response.arrayBuffer()) };
   } catch {
@@ -122,9 +150,37 @@ const fetchBlob = async (
   }
 };
 
+/**
+ * Every scanned file's blob, fetched `BLOB_CONCURRENCY` at a time. The first
+ * failure stops further fetches from starting and is the answer.
+ */
+const fetchBlobs = async (
+  fetch: typeof globalThis.fetch,
+  wait: Wait,
+  location: ResolvedGitHubLocation,
+  prefix: string,
+  scanned: readonly string[],
+): Promise<Step<Map<string, Uint8Array>>> => {
+  const files = new Map<string, Uint8Array>();
+  const pending = [...scanned];
+  let failure: GitHubSourceFailure | undefined;
+  const worker = async (): Promise<void> => {
+    for (let file = pending.shift(); file !== undefined; file = pending.shift()) {
+      const blob = await fetchBlob(fetch, wait, location, `${prefix}${file}`, file);
+      if (!blob.ok) {
+        failure ??= blob.failure;
+        pending.length = 0;
+      } else files.set(file, blob.value);
+    }
+  };
+  await Promise.all(Array.from({ length: BLOB_CONCURRENCY }, worker));
+  return failure === undefined ? { ok: true, value: files } : fail(failure);
+};
+
 export const readGitHubAggregate = async (
   input: string,
   fetch: typeof globalThis.fetch,
+  wait: Wait = waitWithTimer,
 ): Promise<GitHubSourceResult> => {
   const parsed = parseGitHubLocation(input);
   if (!parsed.ok) return parsed;
@@ -163,16 +219,7 @@ export const readGitHubAggregate = async (
   }
 
   const scanned = scannedAggregatePaths(directoryFiles);
-  const blobs = await Promise.all(
-    scanned.map(async (file) => ({
-      file,
-      blob: await fetchBlob(fetch, resolved, `${prefix}${file}`, file),
-    })),
-  );
-  const files = new Map<string, Uint8Array>();
-  for (const { file, blob } of blobs) {
-    if (!blob.ok) return blob;
-    files.set(file, blob.value);
-  }
-  return { ok: true, aggregate: { location: resolved, files } };
+  const files = await fetchBlobs(fetch, wait, resolved, prefix, scanned);
+  if (!files.ok) return files;
+  return { ok: true, aggregate: { location: resolved, files: files.value } };
 };
