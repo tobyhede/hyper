@@ -223,7 +223,8 @@ export function authoringAvailability(inProgress: AuthoringInProgress): Authorin
   // added later is withheld here until it is named: selecting, navigating and
   // Present, each as the rest of the session answers it, and the rail's
   // Actions menu where the canvas would draw it, for its addresses and a Space
-  // Resource's Enter.
+  // Resource's Enter. The Resources list is not among them: it lists what the
+  // Map does not place, and each row's one press, and its drag, is an Add.
   return {
     ...NOTHING_AVAILABLE,
     present: available.present,
