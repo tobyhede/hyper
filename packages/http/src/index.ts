@@ -137,7 +137,8 @@ const problem = (
  * no evidence will pass, such as a wrong password. Every route that reads or
  * writes the stored seam answers by it — the collection and single-Space reads
  * included. `packages/aggregate/src/space-host.ts` answers `GET /` by the same
- * three arms; it cannot share this helper across the package boundary.
+ * three arms; it cannot share this helper, because `@project/aggregate`
+ * depends on `@project/http` and the reverse import would be a package cycle.
  */
 const storedFailureProblem = (context: Context, error: unknown) => {
   switch (classifyStoredFailure(error)) {
@@ -552,8 +553,8 @@ export const createSpaceHttpApp = (
         // healthy store look like "Spaces without Meta" for an instant. So it
         // is re-read once before letting an invariant failure stand — the
         // same rule `packages/aggregate/src/space-host.ts`'s `readAggregate` applies for
-        // `GET /`, mirrored here rather than shared, because `@project/http`
-        // cannot import across the package boundary into `src/`.
+        // `GET /`, mirrored here rather than shared, because `@project/aggregate`
+        // depends on `@project/http` and the reverse import would be a cycle.
         let loaded;
         try {
           loaded = await repository.loadAggregate();
