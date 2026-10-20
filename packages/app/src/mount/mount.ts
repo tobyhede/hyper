@@ -98,13 +98,24 @@ const refuseWrite = (): Response =>
     },
   );
 
-/** Rejects once the signal aborts, carrying its reason as the cause. */
-const untilAborted = (signal: AbortSignal): Promise<never> =>
-  new Promise((_, reject) => {
-    const abort = () => reject(new Error('The request was aborted.', { cause: signal.reason }));
-    if (signal.aborted) abort();
-    else signal.addEventListener('abort', abort, { once: true });
-  });
+/**
+ * `answer`, unless the signal aborts first: then a rejection carrying its
+ * reason as the cause. The abort listener is removed once either settles, so
+ * a signal shared across requests holds none for a request that has ended.
+ */
+const untilAborted = async <T>(answer: Promise<T>, signal: AbortSignal): Promise<T> => {
+  const { promise: aborted, reject } = Promise.withResolvers<never>();
+  const abort = (): void => {
+    reject(new Error('The request was aborted.', { cause: signal.reason }));
+  };
+  if (signal.aborted) abort();
+  else signal.addEventListener('abort', abort, { once: true });
+  try {
+    return await Promise.race([answer, aborted]);
+  } finally {
+    signal.removeEventListener('abort', abort);
+  }
+};
 
 /**
  * The Space host's HTTP application, answering in the page, refusing every
@@ -121,7 +132,7 @@ const inPageFetch =
     const request = new Request(input, sent);
     if (request.method !== 'GET' && request.method !== 'HEAD') return refuseWrite();
     const answer = Promise.resolve(host.fetch(request));
-    return await (signal == null ? answer : Promise.race([answer, untilAborted(signal)]));
+    return await (signal == null ? answer : untilAborted(answer, signal));
   };
 
 /**

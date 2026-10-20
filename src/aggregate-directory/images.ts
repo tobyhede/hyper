@@ -1,7 +1,4 @@
-import type { Dirent } from 'node:fs';
-import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
-import { compareOrdinal, IMAGES_DIRECTORY_NAME } from '@project/aggregate';
+import { compareOrdinal } from '@project/aggregate';
 import { imageKind, type SpaceSnapshot } from '@project/core';
 import {
   IMAGE_COLLECTION_PATH,
@@ -10,28 +7,6 @@ import {
   type ImageStore,
   type StoredImage,
 } from '@project/persistence';
-import { isMissingFile } from './space-directory';
-
-/** The entries of `images/`, or `undefined` when there is no such directory. */
-const listImagesDirectory = async (directory: string): Promise<readonly Dirent[] | undefined> => {
-  try {
-    return await readdir(join(directory, IMAGES_DIRECTORY_NAME), { withFileTypes: true });
-  } catch (error) {
-    if (isMissingFile(error)) return undefined;
-    throw error;
-  }
-};
-
-/**
- * The visible regular files among those entries, in ordinal order. These are
- * what Import admits and so exactly what Export owns; a dotfile, a
- * directory or a link in `images/` is the author's and is left.
- */
-const imageFileNames = (entries: readonly Dirent[]): readonly string[] =>
-  entries
-    .filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
-    .map(({ name }) => name)
-    .sort(compareOrdinal);
 
 const STORED_IMAGE_PREFIX = `${IMAGE_COLLECTION_PATH}/`;
 
@@ -63,10 +38,3 @@ export const loadReferencedImages = async (
   const loaded = await Promise.all([...ids].sort(compareOrdinal).map((id) => store.loadImage(id)));
   return loaded.flatMap((image) => (image === undefined ? [] : [image]));
 };
-
-/**
- * The names of the files in `images/` that Import admits, in ordinal order:
- * what Export owns there, and so what it removes when no Resource shows one.
- */
-export const scannedImageFileNames = async (directory: string): Promise<readonly string[]> =>
-  imageFileNames((await listImagesDirectory(directory)) ?? []);
