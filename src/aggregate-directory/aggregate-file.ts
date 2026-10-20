@@ -1,5 +1,6 @@
+import type { Dirent } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   AGGREGATE_FILE_NAME,
   AggregateDirectoryError,
@@ -7,107 +8,61 @@ import {
   IMAGES_DIRECTORY_NAME,
   imageFileName,
   readAggregateFiles,
+  scannedAggregatePaths,
   spaceDirectoryId,
   type AggregateDirectoryContents,
 } from '@project/aggregate';
 import { AGGREGATE_FILE_VERSION, type AggregateFile, type UUID } from '@project/core';
 import type { LoadedAggregate, StoredImage } from '@project/persistence';
-import { scannedImageFileNames } from './images';
 import { isMissingFile } from './space-directory';
 import { writeInPlace, type DirectoryFiles } from './write-in-place';
-import { scannedSpaceFiles, spaceDirectoryFiles } from './write-space-directory';
-
-const isRegularFile = async (path: string): Promise<boolean> => {
-  try {
-    return (await stat(path)).isFile();
-  } catch (error) {
-    if (isMissingFile(error)) return false;
-    throw error;
-  }
-};
+import { spaceDirectoryFiles } from './write-space-directory';
 
 /**
- * The immediate children that are Space directories, in ordinal name order.
+ * The regular files of an Aggregate directory that Import could read, by path
+ * relative to it with `/` between segments: those directly in it, those in
+ * each child directory, and those in the `resources/` of each child holding a
+ * `space.json`. `images/` and a `resources/` are listed through a link, as
+ * Import reads them, so Export sees what a link would make it remove. Which of them Import does read is `scannedAggregatePaths`'s
+ * to say; this only lists, so the one discovery rule decides for Import and
+ * Export alike.
  *
- * A child is a Space directory because it holds a `space.json` — the same rule
- * a single Space directory is recognised by, and the one
- * `scannedAggregatePaths` applies to a list of paths. A child that holds none
- * is not an error: re-export preserves whatever else the destination carried,
- * so a directory of notes beside the Spaces has to survive a round trip rather
- * than fail one.
- *
- * Ordinal order, not the host's collation, for the reason `space-directory`
- * sorts that way: import order decides the order Spaces are written and read
- * back, so it has to come from the bytes rather than from ICU.
- *
- * Private to this module: export reaches discovery only through
- * `assertExportableDestination` and `scannedAggregateFiles`, so a second
- * discovery rule cannot drift beside the write path.
+ * A directory that cannot be listed is a discovery failure naming it.
  */
-const discoverSpaceDirectories = async (directory: string): Promise<string[]> => {
-  let entries;
+const listAggregateDirectory = async (directory: string): Promise<readonly string[]> => {
+  const filesIn = (entries: readonly Dirent[], prefix: string): string[] =>
+    entries.filter((entry) => entry.isFile()).map(({ name }) => `${prefix}${name}`);
   try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch (error) {
-    throw new AggregateDirectoryError('discovery', [String(error)]);
-  }
-
-  const children = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(directory, entry.name))
-    .sort((left, right) => compareOrdinal(basename(left), basename(right)));
-
-  try {
-    const candidates = await Promise.all(
-      children.map(async (child) => ({
-        child,
-        containsSpace: await isRegularFile(join(child, 'space.json')),
-      })),
+    const root = await readdir(directory, { withFileTypes: true });
+    const children = await Promise.all(
+      root
+        .filter((entry) => entry.isDirectory() || entry.name === IMAGES_DIRECTORY_NAME)
+        .map(async ({ name }) => {
+          const inside = await readdir(join(directory, name), { withFileTypes: true });
+          const holdsSpace = inside.some((entry) => entry.isFile() && entry.name === 'space.json');
+          const hasResources = inside.some((entry) => entry.name === 'resources');
+          const resources =
+            holdsSpace && hasResources
+              ? filesIn(
+                  await readdir(join(directory, name, 'resources'), { withFileTypes: true }),
+                  `${name}/resources/`,
+                )
+              : [];
+          return [...filesIn(inside, `${name}/`), ...resources];
+        }),
     );
-    return candidates.flatMap(({ child, containsSpace }) => (containsSpace ? [child] : []));
+    return [...filesIn(root, ''), ...children.flat()];
   } catch (error) {
     throw new AggregateDirectoryError('discovery', [String(error)]);
   }
 };
 
-/**
- * The bytes of every file Import reads in an Aggregate directory beside
- * `hyper.json`, by path relative to it: each discovered Space directory's
- * `space.json` and Resource files, and the visible files in `images/`.
- *
- * A Space directory whose files cannot be listed, or a file that cannot be
- * read, is a discovery failure naming it. Every one is gathered before any is
- * raised, so one unreadable Space does not hide the next one's problem.
- */
-const readScannedFiles = async (directory: string): Promise<DirectoryFiles> => {
-  const spaceDirectories = await discoverSpaceDirectories(directory);
-  const [listed, imageNames] = await Promise.all([
-    Promise.allSettled(
-      spaceDirectories.map(async (child) =>
-        (await scannedSpaceFiles(child)).map((path) => `${basename(child)}/${path}`),
-      ),
-    ),
-    scannedImageFileNames(directory),
-  ]);
-  const paths = [
-    ...listed.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])),
-    ...imageNames.map((name) => `${IMAGES_DIRECTORY_NAME}/${name}`),
-  ];
-  const reads = await Promise.allSettled(paths.map((path) => readFile(join(directory, path))));
-
-  const diagnostics = listed.flatMap((result) =>
-    result.status === 'rejected' ? [String(result.reason)] : [],
-  );
-  const files = new Map<string, Uint8Array>();
-  reads.forEach((result, index) => {
-    const path = paths[index];
-    if (path === undefined) return;
-    if (result.status === 'fulfilled') files.set(path, new Uint8Array(result.value));
-    else diagnostics.push(`${join(directory, path)}: ${String(result.reason)}`);
+/** The Space directories among the paths Import reads, by name, in read order. */
+const spaceDirectoryNames = (scanned: readonly string[]): readonly string[] =>
+  scanned.flatMap((path) => {
+    const [name, file, ...rest] = path.split('/');
+    return file === 'space.json' && rest.length === 0 && name !== undefined ? [name] : [];
   });
-  if (diagnostics.length > 0) throw new AggregateDirectoryError('discovery', diagnostics);
-  return files;
-};
 
 /**
  * Read a canonical aggregate directory from disk into the complete Meta-rooted
@@ -132,9 +87,19 @@ export const readAggregate = async (
     if (isMissingFile(error)) return readAggregateFiles(directory, new Map(), newId);
     throw new AggregateDirectoryError('discovery', [`${aggregatePath}: ${String(error)}`]);
   }
-  const files = new Map(await readScannedFiles(directory));
-  files.set(AGGREGATE_FILE_NAME, aggregateBytes);
-  return readAggregateFiles(directory, files, newId);
+  const paths = scannedAggregatePaths(await listAggregateDirectory(directory)).filter(
+    (path) => path !== AGGREGATE_FILE_NAME,
+  );
+  const reads = await Promise.allSettled(paths.map((path) => readFile(join(directory, path))));
+  const files = new Map<string, Uint8Array>([[AGGREGATE_FILE_NAME, aggregateBytes]]);
+  const unreadable = new Map<string, string>();
+  reads.forEach((result, index) => {
+    const path = paths[index];
+    if (path === undefined) return;
+    if (result.status === 'fulfilled') files.set(path, new Uint8Array(result.value));
+    else unreadable.set(path, String(result.reason));
+  });
+  return readAggregateFiles(directory, files, newId, unreadable);
 };
 
 const aggregateFile = (metaSpaceId: UUID): AggregateFile => ({
@@ -186,24 +151,13 @@ const directoryExists = async (path: string): Promise<boolean> => {
  * serialises to it. `hyper.json`, each discovered Space directory's
  * `space.json` and Resource files, and the visible files in `images/` — and
  * nothing else, so a file Import does not read is never Export's to remove.
- * They are the paths `scannedAggregatePaths` keeps from the directory's files,
- * in its order (`test/unit/read-aggregate.test.ts`).
+ * They are the paths `scannedAggregatePaths` keeps from the directory's
+ * listing, in its order.
  */
-export const scannedAggregateFiles = async (directory: string): Promise<readonly string[]> => {
-  if (!(await directoryExists(directory))) return [];
-  const aggregate = (await isRegularFile(join(directory, AGGREGATE_FILE_NAME)))
-    ? [AGGREGATE_FILE_NAME]
+export const scannedAggregateFiles = async (directory: string): Promise<readonly string[]> =>
+  (await directoryExists(directory))
+    ? scannedAggregatePaths(await listAggregateDirectory(directory))
     : [];
-  const spaces = await Promise.all(
-    (await discoverSpaceDirectories(directory)).map(async (child) =>
-      (await scannedSpaceFiles(child)).map((path) => `${basename(child)}/${path}`),
-    ),
-  );
-  const images = (await scannedImageFileNames(directory)).map(
-    (name) => `${IMAGES_DIRECTORY_NAME}/${name}`,
-  );
-  return [...aggregate, ...spaces.flat(), ...images];
-};
 
 /**
  * Refuse a destination holding a Space directory import could not read back,
@@ -220,9 +174,9 @@ export const scannedAggregateFiles = async (directory: string): Promise<readonly
  */
 export const assertExportableDestination = async (destination: string): Promise<void> => {
   if (!(await directoryExists(destination))) return;
-  const unreadable = (await discoverSpaceDirectories(destination)).filter(
-    (child) => spaceDirectoryId(basename(child)) === undefined,
-  );
+  const unreadable = spaceDirectoryNames(await scannedAggregateFiles(destination))
+    .filter((name) => spaceDirectoryId(name) === undefined)
+    .map((name) => join(destination, name));
   if (unreadable.length === 0) return;
   throw new Error(
     [

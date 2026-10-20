@@ -5,6 +5,7 @@ export {
   spaceDirectoryId,
   type AggregateDirectoryContents,
   type AggregateFiles,
+  type UnreadableFiles,
 } from './aggregate-file';
 export { classifyInitializedAggregate } from './aggregate-lifecycle';
 export { describeAggregateRefusal } from './aggregate-refusal';
