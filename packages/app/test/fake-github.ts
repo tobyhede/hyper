@@ -14,6 +14,8 @@ export interface FakeGitHubOptions {
   readonly truncated?: boolean;
   /** Every API request answers this status with `x-ratelimit-remaining: 0`. */
   readonly rateLimitStatus?: 403 | 429;
+  /** Every API request answers this instead, with `x-ratelimit-remaining` 59 unless it sets one. */
+  readonly apiFailure?: ApiFailure;
   /** A repository path whose raw request answers 500. */
   readonly failingBlob?: string;
   /**
@@ -25,6 +27,14 @@ export interface FakeGitHubOptions {
   readonly holdRaw?: boolean;
   /** Repository paths GitHub lists as symbolic links (mode `120000`). */
   readonly symlinks?: ReadonlySet<string>;
+  /** Sizes GitHub lists for repository paths in place of their bytes' length. */
+  readonly listedSizes?: ReadonlyMap<string, number>;
+}
+
+export interface ApiFailure {
+  readonly status: number;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly body?: string;
 }
 
 interface BlobFailure {
@@ -50,6 +60,8 @@ interface TreeEntry {
   readonly mode: string;
   readonly type: 'tree' | 'blob';
   readonly sha: string;
+  /** Listed for a blob only. */
+  readonly size?: number;
 }
 
 /** The bodies of the REST answers this fake gives: a commit, a tree, or an error. */
@@ -68,6 +80,7 @@ const json = (status: number, body: ApiBody): Response =>
 const treeEntries = (
   files: ReadonlyMap<string, Uint8Array>,
   symlinks: ReadonlySet<string>,
+  listedSizes: ReadonlyMap<string, number>,
 ): TreeEntry[] => {
   const directories = new Set<string>();
   for (const path of files.keys()) {
@@ -83,11 +96,12 @@ const treeEntries = (
       type: 'tree',
       sha: COMMIT,
     })),
-    ...[...files.keys()].map((path): TreeEntry => ({
+    ...[...files].map(([path, bytes]): TreeEntry => ({
       path,
       mode: symlinks.has(path) ? '120000' : '100644',
       type: 'blob',
       sha: COMMIT,
+      size: listedSizes.get(path) ?? bytes.length,
     })),
   ].sort((left, right) => (left.path < right.path ? -1 : 1));
 };
@@ -100,10 +114,12 @@ export const fakeGitHub = ({
   files,
   truncated = false,
   rateLimitStatus,
+  apiFailure,
   failingBlob,
   blobFailures = new Map(),
   holdRaw = false,
   symlinks = new Set(),
+  listedSizes = new Map(),
 }: FakeGitHubOptions): FakeGitHub => {
   const requests: Request[] = [];
   const failuresAnswered = new Map<string, number>();
@@ -124,6 +140,12 @@ export const fakeGitHub = ({
           headers: { 'x-ratelimit-remaining': '0' },
         });
       }
+      if (apiFailure !== undefined) {
+        return new Response(apiFailure.body ?? '', {
+          status: apiFailure.status,
+          headers: { 'x-ratelimit-remaining': '59', ...apiFailure.headers },
+        });
+      }
       if (!url.startsWith(`${API}/`)) return json(404, { message: 'Not Found' });
       const commit = /\/commits\/([^/?]+)$/.exec(url);
       if (commit !== null) {
@@ -135,7 +157,7 @@ export const fakeGitHub = ({
       const tree = /\/git\/trees\/([0-9a-f]{40})\?recursive=1$/.exec(url);
       if (tree !== null) {
         return tree[1] === COMMIT
-          ? json(200, { sha: COMMIT, tree: treeEntries(files, symlinks), truncated })
+          ? json(200, { sha: COMMIT, tree: treeEntries(files, symlinks, listedSizes), truncated })
           : json(404, { message: 'Not Found' });
       }
       return json(404, { message: 'Not Found' });

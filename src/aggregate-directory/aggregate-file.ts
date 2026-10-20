@@ -19,39 +19,65 @@ import { writeInPlace, type DirectoryFiles } from './write-in-place';
 import { spaceDirectoryFiles } from './write-space-directory';
 
 /**
- * The regular files of an Aggregate directory that Import could read, by path
- * relative to it with `/` between segments: those directly in it, those in
- * each child directory, and those in the `resources/` of each child holding a
- * `space.json`. `images/` and a `resources/` are listed through a link, as
- * Import reads them, so Export sees what a link would make it remove. Which of them Import does read is `scannedAggregatePaths`'s
- * to say; this only lists, so the one discovery rule decides for Import and
- * Export alike.
+ * Whether a directory entry is a file Import could read: a regular file, or a
+ * symbolic link whose target is one. A link that names nothing is no file.
+ */
+const isListedFile = async (directory: string, entry: Dirent): Promise<boolean> => {
+  if (entry.isFile()) return true;
+  if (!entry.isSymbolicLink()) return false;
+  try {
+    return (await stat(join(directory, entry.name))).isFile();
+  } catch (error) {
+    if (isMissingFile(error)) return false;
+    throw error;
+  }
+};
+
+/**
+ * The files of an Aggregate directory that Import could read, by path relative
+ * to it with `/` between segments: those directly in it, those in each child
+ * directory, and those in the `resources/` of each child holding a
+ * `space.json`. A file is a regular file or a link to one, since Import reads
+ * through a link, so a linked `hyper.json`, `space.json` or Resource file is
+ * read and owned like the file it names. `images/` and a `resources/` are
+ * listed through a link, as Import reads them, so Export sees what a link
+ * would make it remove. Which of them Import does read is
+ * `scannedAggregatePaths`'s to say; this only lists, so the one discovery rule
+ * decides for Import and Export alike.
  *
- * A directory that cannot be listed is a discovery failure naming it.
+ * A directory that cannot be listed, or a link whose target cannot be checked
+ * for any reason but its absence, is a discovery failure naming it.
  */
 const listAggregateDirectory = async (directory: string): Promise<readonly string[]> => {
-  const filesIn = (entries: readonly Dirent[], prefix: string): string[] =>
-    entries.filter((entry) => entry.isFile()).map(({ name }) => `${prefix}${name}`);
+  const filesIn = async (
+    path: string,
+    entries: readonly Dirent[],
+    prefix: string,
+  ): Promise<string[]> => {
+    const listed = await Promise.all(entries.map((entry) => isListedFile(path, entry)));
+    return entries.filter((_, index) => listed[index]).map(({ name }) => `${prefix}${name}`);
+  };
+  const filesAt = async (path: string, prefix: string): Promise<string[]> =>
+    filesIn(path, await readdir(path, { withFileTypes: true }), prefix);
   try {
     const root = await readdir(directory, { withFileTypes: true });
     const children = await Promise.all(
       root
         .filter((entry) => entry.isDirectory() || entry.name === IMAGES_DIRECTORY_NAME)
         .map(async ({ name }) => {
-          const inside = await readdir(join(directory, name), { withFileTypes: true });
-          const holdsSpace = inside.some((entry) => entry.isFile() && entry.name === 'space.json');
-          const hasResources = inside.some((entry) => entry.name === 'resources');
+          const child = join(directory, name);
+          const entries = await readdir(child, { withFileTypes: true });
+          const inside = await filesIn(child, entries, `${name}/`);
+          const holdsSpace = inside.includes(`${name}/space.json`);
+          const hasResources = entries.some((entry) => entry.name === 'resources');
           const resources =
             holdsSpace && hasResources
-              ? filesIn(
-                  await readdir(join(directory, name, 'resources'), { withFileTypes: true }),
-                  `${name}/resources/`,
-                )
+              ? await filesAt(join(child, 'resources'), `${name}/resources/`)
               : [];
-          return [...filesIn(inside, `${name}/`), ...resources];
+          return [...inside, ...resources];
         }),
     );
-    return [...filesIn(root, ''), ...children.flat()];
+    return [...(await filesIn(directory, root, '')), ...children.flat()];
   } catch (error) {
     throw new AggregateDirectoryError('discovery', [String(error)]);
   }

@@ -31,6 +31,13 @@ describe('parseGitHubLocation', () => {
     });
   });
 
+  it('keeps an @ inside a ref, splitting the repository at the first', () => {
+    expect(parseGitHubLocation('github:o/r@release@beta/talk')).toEqual({
+      ok: true,
+      location: { owner: 'o', repo: 'r', ref: 'release@beta', path: 'talk' },
+    });
+  });
+
   it.each([
     ['', 'no scheme'],
     ['tobyhede/hyper', 'no scheme'],
@@ -47,6 +54,8 @@ describe('parseGitHubLocation', () => {
     ['github:tobyhede/hyper@main/../secrets', 'a parent segment'],
     ['github:tobyhede/hyper@main/./talks', 'a current-directory segment'],
     ['github:tobyhede/hyper@ma in', 'whitespace in the ref'],
+    ['github:o/r@@', 'a ref that is exactly @'],
+    ['github:o/r@a@{1}', 'a ref containing @{'],
   ])('refuses %j (%s)', (input) => {
     const parsed = parseGitHubLocation(input);
     expect(parsed.ok).toBe(false);
