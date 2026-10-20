@@ -185,7 +185,6 @@ test('the Notes window mounts the same commit and follows the presentation', asy
   const first = await presentedName(page).innerText();
   await expect(notesWindow.getByText(`Presenting ${first}`, { exact: true })).toBeVisible();
 
-  await page.bringToFront();
   await page.keyboard.press('ArrowRight');
   const next = await presentedName(page).innerText();
   expect(next).not.toBe(first);
