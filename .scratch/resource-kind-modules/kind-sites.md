@@ -21,7 +21,7 @@ Categories: **one-kind** = a feature that exists for that kind alone; **registry
 | packages/app/src/space-authoring.ts:1244 | `imageKind.id`: Replace refuses another kind | image | C | space-authoring.ts |
 | packages/app/src/space-authoring.ts:1318 | `referenceKind.id`: new Reference Resource | reference | E | space-authoring.ts |
 | packages/persistence/src/space-resource-planning.ts:328 | `spaceKind.id`: new Space Resource document | space | E (lifecycle) | space-resource-planning.ts |
-| src/aggregate-directory/images.ts:145 | `imageKind.id`: stored image travels with its Resource | image | one-kind | src/aggregate-directory/images.ts |
+| src/aggregate-directory/images.ts:58 | `imageKind.id`: stored image travels with its Resource | image | one-kind | src/aggregate-directory/images.ts |
 
 `packages/app/src/resource-deletion.ts` no longer reaches a module id: Delete routes by `kindFlags(kind).ownsReferencedSpaces` (G02).
 
