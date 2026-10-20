@@ -66,8 +66,9 @@ interface Mounted {
 export const createMountedStartup = (options: MountedStartupOptions): SpaceStartup => {
   const { history } = options;
   let mounting: Promise<Mounted> | undefined;
-  const mount = (): Promise<Mounted> =>
-    (mounting ??= (async () => {
+  const mount = (): Promise<Mounted> => {
+    if (mounting !== undefined) return mounting;
+    const attempt = (async () => {
       const read = await readGitHubLocation(options.location, options.fetch);
       if (!read.ok) throw new Error(describeGitHubSourceFailure(read.failure));
       const pinned = formatGitHubLocation(read.aggregate.location);
@@ -90,11 +91,14 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         { mounted: true },
       );
       return { startup, backend, metaSpaceId, pinned, resolved: read.aggregate.location };
-    })().catch((error: unknown) => {
-      // A failed read or a refusal is not kept, so a later resolve reads again.
+    })();
+    mounting = attempt;
+    // A failed read or a refusal is not kept, so a later resolve reads again.
+    void attempt.catch(() => {
       mounting = undefined;
-      throw error;
-    }));
+    });
+    return attempt;
+  };
   return {
     resolve: async (pathname) => {
       const { startup, backend, metaSpaceId, pinned, resolved } = await mount();
