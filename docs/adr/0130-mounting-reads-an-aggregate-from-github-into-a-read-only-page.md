@@ -1,6 +1,7 @@
 # Mounting reads an aggregate from GitHub into a read-only page
 
 Status: accepted
+Refined by: 0131
 Related: 0069, 0078, 0109, 0117, 0118, 0124
 
 A static copy of the application can show a talk that lives in a public GitHub repository, with no server, database or per-talk copy of the application. **Mounting** reads a complete aggregate from a **GitHub location**, `github:owner/repo@ref/path`, when the page opens. It keeps that aggregate in a store inside the page, and the page answers its own HTTP API from that store. Everything that reads, navigates and presents works. No Edit is offered or accepted, because there is nowhere to make one durable.
