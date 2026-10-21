@@ -16,11 +16,9 @@ import { createHash } from 'node:crypto';
  * `script-src` the hash of each inline script the page carries, which is
  * `index.html`'s startup-failure guard.
  *
- * No rule sets `Cache-Control`. A rule for the hashed `/assets/*` names would
- * also reach a missing one, which the single-page fallback answers with
- * `index.html` and 200, and `_headers` cannot match on status: the page would
- * be cached for that asset's URL for as long as the rule said. Cloudflare's
- * default revalidates each asset by its ETag instead.
+ * No rule sets `Cache-Control`: a rule matches a path, never a status, and
+ * the single-page fallback answers a missing `/assets/*` name with
+ * `index.html` and 200 (`mount.spec.ts`).
  */
 export interface HeaderRule {
   /** A Cloudflare `_headers` path: exact, or a prefix ending in `*`. */
