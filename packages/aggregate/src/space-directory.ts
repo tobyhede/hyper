@@ -64,10 +64,10 @@ const refuseDocument = (spaceFile: string, { json }: SpaceJson): void => {
 
 /**
  * Refuse a space file's text whose document this version cannot read, and do
- * nothing for any other text, an unparseable one included. The filesystem
- * reader asks it when one of a Space directory's files could not be read, so
- * that a document refused outright is reported as that rather than as the
- * read failure.
+ * nothing for any other text, an unparseable one included. The aggregate
+ * reader and `readSingleSpace` ask it when one of a Space directory's files
+ * could not be read, so that a document refused outright is reported as that
+ * rather than as the read failure.
  */
 export const refuseSpaceDocument = (spaceFile: string, spaceText: string | undefined): void => {
   refuseDocument(spaceFile, parseSpaceJson(spaceFile, spaceText));
@@ -75,8 +75,8 @@ export const refuseSpaceDocument = (spaceFile: string, spaceText: string | undef
 
 /**
  * Parse one Space directory's files, already read, into the Space Import takes.
- * The filesystem reader and the in-memory one both parse through this, so a
- * file Export would write is judged by exactly the rule Import reads it by.
+ * The aggregate reader parses through this whatever its source, so a file
+ * Export would write is judged by exactly the rule Import reads it by.
  */
 export const parseSingleSpace = ({
   spaceFile,

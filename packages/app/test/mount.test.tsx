@@ -1,6 +1,7 @@
 import { act, waitFor, within } from '@testing-library/react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { mapSource } from '@project/aggregate';
 import { uuidSchema, type UUID } from '@project/core';
 import { productDestinationPath } from '@project/http';
 import { parseGitHubLocation, type GitHubLocation } from '../src/mount/github-location';
@@ -191,8 +192,7 @@ describe('mounting an aggregate in the page', () => {
 
   it('refuses every write and stores nothing', async () => {
     const mounted = await mountAggregate({
-      name: 'fixture',
-      files: fixtureFiles(),
+      source: mapSource('fixture', fixtureFiles()),
       newId: mintsNothing,
       createObjectUrl: recordingObjectUrls().createObjectUrl,
     });

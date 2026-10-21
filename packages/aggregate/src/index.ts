@@ -1,12 +1,19 @@
 export {
   AGGREGATE_FILE_NAME,
-  readAggregateFiles,
-  scannedAggregatePaths,
+  readAggregateFrom,
+  scanAggregateFrom,
   spaceDirectoryId,
   type AggregateDirectoryContents,
-  type AggregateFiles,
-  type UnreadableFiles,
+  type AggregateScan,
 } from './aggregate-file';
+export {
+  mapSource,
+  type AggregateFiles,
+  type AggregateSource,
+  type DirectoryListing,
+  type SourceListing,
+  type SourceRead,
+} from './aggregate-source';
 export { classifyInitializedAggregate } from './aggregate-lifecycle';
 export { describeAggregateRefusal } from './aggregate-refusal';
 export { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
