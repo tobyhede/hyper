@@ -2,7 +2,7 @@
 
 Status: ready-for-agent
 
-**What to build:** the GitHub source becomes an `AggregateSource` (ticket 09), so a mount refuses a directory in the CLI's words and reports every file it could not read (ADR 0131).
+**What to build:** the GitHub source becomes an `AggregateSource` (ticket 09), so a mount refuses a directory in the CLI's words and reports every file it could not read (ADR 0133).
 
 - `readGitHubLocation` resolves the ref and lists the selected directory's tree, as today, and then answers either a GitHub failure or a source over that tree. Nothing is fetched yet. Its listing answers from the tree in memory, and its bound is 8 reads at once.
 - Rate-limited, not-found, truncated-tree, request-failed and a malformed location stay GitHub failures with today's sentences.
