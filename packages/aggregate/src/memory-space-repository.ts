@@ -182,6 +182,14 @@ export class MemorySpaceRepository implements SpaceRepository {
     return Promise.resolve('stored');
   }
 
+  /**
+   * The stored image `id` names, read in place rather than copied, for a
+   * caller in the same page that draws it (`packages/app/src/mount/mount.ts`).
+   */
+  heldImage(id: ImageId): StoredImage | undefined {
+    return this.#images.get(id);
+  }
+
   loadImage(id: ImageId): Promise<StoredImage | undefined> {
     const image = this.#images.get(id);
     return Promise.resolve(

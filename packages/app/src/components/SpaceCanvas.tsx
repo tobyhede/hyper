@@ -486,7 +486,9 @@ export function SpaceCanvas({
         : (resourceId: ResourceId) =>
             resourceEntityActions(
               resourceId,
-              placedResources.some((resource) => resource.id === resourceId)
+              // Connecting is an Edit, so it goes where the canvas's authoring goes.
+              availability.authorOnCanvas &&
+                placedResources.some((resource) => resource.id === resourceId)
                 ? [
                     {
                       id: 'connect',
@@ -501,7 +503,7 @@ export function SpaceCanvas({
                   ]
                 : [],
             ),
-    [resourceEntityActions, placedResources, selectResource, mapId],
+    [resourceEntityActions, availability.authorOnCanvas, placedResources, selectResource, mapId],
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
     continuation: surface.continuation,

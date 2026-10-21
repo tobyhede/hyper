@@ -9,7 +9,7 @@ import {
   type SpaceHostApplication,
 } from '@project/aggregate';
 import { HttpSpaceBackend } from '@project/http';
-import { imagePath, type StoredImage } from '@project/persistence';
+import { IMAGE_COLLECTION_PATH, isImageId } from '@project/persistence';
 import type { ImageDisplay } from '@project/ui';
 
 /**
@@ -113,59 +113,31 @@ const inPageFetch =
     return await (signal == null ? answer : untilAborted(answer, signal));
   };
 
-/** Where each image the in-page store holds is drawn from, and how it learns of one. */
-interface ObjectUrlDisplay {
-  readonly display: ImageDisplay;
-  /** Draw this stored image from an object URL over its bytes from now on. */
-  readonly add: (image: StoredImage) => void;
-}
-
 /**
  * Where each stored image the in-page store holds is drawn from: an object URL
- * over its bytes, made the first time it is drawn and kept for the page's
- * life. Any other URL is drawn as authored, so a stored image the store holds
- * no bytes for draws as a picture that will not load (ADR 0106).
+ * over the store's own bytes, made the first time it is drawn and kept for the
+ * page's life, as a stored image is (ADR 0106). Any other URL is drawn as
+ * authored, so a stored image the store holds no bytes for draws as a picture
+ * that will not load.
  */
-const objectUrlDisplay = (createObjectUrl: (image: Blob) => string): ObjectUrlDisplay => {
-  const stored = new Map<string, StoredImage>();
+const objectUrlDisplay = (
+  repository: MemorySpaceRepository,
+  createObjectUrl: (image: Blob) => string,
+): ImageDisplay => {
+  const prefix = `${IMAGE_COLLECTION_PATH}/`;
   const made = new Map<string, string>();
-  return {
-    add: (image) => {
-      const path = imagePath(image.id);
-      if (!stored.has(path)) stored.set(path, { ...image, bytes: image.bytes.slice() });
-    },
-    display: (url) => {
-      const image = stored.get(url);
-      if (image === undefined) return url;
-      let objectUrl = made.get(url);
-      if (objectUrl === undefined) {
-        objectUrl = createObjectUrl(new Blob([image.bytes], { type: image.mediaType }));
-        made.set(url, objectUrl);
-      }
-      return objectUrl;
-    },
+  return (url) => {
+    const id = url.startsWith(prefix) ? url.slice(prefix.length) : '';
+    const image = isImageId(id) ? repository.heldImage(id) : undefined;
+    if (image === undefined) return url;
+    let objectUrl = made.get(url);
+    if (objectUrl === undefined) {
+      objectUrl = createObjectUrl(new Blob([image.bytes], { type: image.mediaType }));
+      made.set(url, objectUrl);
+    }
+    return objectUrl;
   };
 };
-
-/**
- * The in-page store, telling the display about every image it holds: one the
- * directory carried, and one an Edit in the page uploaded (ADR 0131), so each
- * is drawn from its bytes the moment it is stored.
- */
-class DisplayedImagesRepository extends MemorySpaceRepository {
-  readonly #stored: (image: StoredImage) => void;
-
-  constructor(stored: (image: StoredImage) => void) {
-    super();
-    this.#stored = stored;
-  }
-
-  override async storeImage(image: StoredImage): Promise<'stored' | 'existing'> {
-    const result = await super.storeImage(image);
-    this.#stored(image);
-    return result;
-  }
-}
 
 /**
  * Read an Aggregate directory from its source and establish a fresh in-page
@@ -188,8 +160,7 @@ export const mountAggregate = async ({
     return { ok: false, refusal: { kind: 'unreadable', diagnostics: error.diagnostics } };
   }
 
-  const images = objectUrlDisplay(createObjectUrl);
-  const repository = new DisplayedImagesRepository(images.add);
+  const repository = new MemorySpaceRepository();
   for (const image of contents.images) await repository.storeImage(image);
   const initialized = await repository.initializeAggregate({
     metaSpaceId: contents.metaSpaceId,
@@ -214,7 +185,7 @@ export const mountAggregate = async ({
     mounted: {
       metaSpaceId: contents.metaSpaceId,
       backend: new HttpSpaceBackend(IN_PAGE_ORIGIN, { fetch: inPageFetch(host) }),
-      displayImage: images.display,
+      displayImage: objectUrlDisplay(repository, createObjectUrl),
     },
   };
 };
