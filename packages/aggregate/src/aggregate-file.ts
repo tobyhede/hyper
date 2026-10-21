@@ -394,7 +394,7 @@ const aggregateContents = (
 /**
  * Read a canonical aggregate from a source into the complete Meta-rooted input
  * the persistence lifecycle takes, beside every image `images/` carries, each
- * admitted by the rule storing an uploaded picture uses (ADR 0130, ADR 0118).
+ * admitted by the rule storing an uploaded picture uses (ADR 0131, ADR 0118).
  *
  * The reader decides everything the read involves, and the source only reaches
  * the files. It lists the root, and refuses a root with no `hyper.json`. It

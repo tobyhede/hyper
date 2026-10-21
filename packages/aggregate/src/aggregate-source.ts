@@ -18,7 +18,7 @@ export type SourceRead =
   | { readonly ok: false; readonly reason: string };
 
 /**
- * Where an Aggregate directory is read from (ADR 0130). The reader decides
+ * Where an Aggregate directory is read from (ADR 0131). The reader decides
  * which directories to list and which files to read; a source only reaches
  * them, and says how many reads it allows at once.
  *

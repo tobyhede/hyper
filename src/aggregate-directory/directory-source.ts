@@ -1,5 +1,5 @@
 import type { Dirent } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { lstat, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { IMAGES_DIRECTORY_NAME, type AggregateSource } from '@project/aggregate';
 import { isMissingFile } from './space-directory';
@@ -28,6 +28,20 @@ const isListedFile = async (
 };
 
 /**
+ * Whether anything is at `path` itself, a link included: a link whose target
+ * is missing is an entry that cannot be listed, not a directory that is absent.
+ */
+const isEntry = async (path: string): Promise<boolean> => {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    // Anything but its absence leaves an entry there that could not be listed.
+    return !isMissingFile(error);
+  }
+};
+
+/**
  * An Aggregate directory on disk as a source, `READ_CONCURRENCY` reads at a
  * time.
  *
@@ -39,7 +53,9 @@ const isListedFile = async (
  * link, so the `images/` and the `resources/` the reader asks for are listed
  * as Import reads them and Export sees what a link would make it remove.
  *
- * A directory that does not exist lists empty. One that cannot be listed, or
+ * A directory that does not exist lists empty, but a link to one that does
+ * not is answered as unlistable, so a broken `resources/` or `images/` link is
+ * never read as content that was removed. One that cannot be listed, or
  * holds a link whose target cannot be checked for any reason but its absence,
  * answers why, as does a file that cannot be read.
  */
@@ -62,7 +78,9 @@ export const directorySource = (directory: string): AggregateSource => ({
         },
       };
     } catch (error) {
-      if (isMissingFile(error)) return { ok: true, listing: { files: [], directories: [] } };
+      if (isMissingFile(error) && !(await isEntry(path))) {
+        return { ok: true, listing: { files: [], directories: [] } };
+      }
       return { ok: false, reason: String(error) };
     }
   },

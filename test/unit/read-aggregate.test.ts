@@ -1141,4 +1141,28 @@ describe('a file that is a symbolic link, on disk', () => {
 
     expect(await scannedAggregateFiles(root)).toEqual([AGGREGATE_FILE_NAME]);
   });
+
+  it.each(['resources', 'images'])(
+    'refuses a %s/ that is a dangling link, naming it, rather than reading it as empty',
+    async (linked) => {
+      const root = await makeTemporaryDirectory();
+      await writeAggregateFile(root, META_SPACE_ID);
+      const meta = await writeSpace(
+        root,
+        META_SPACE_ID,
+        JSON.stringify({ version: 1, title: 'Meta' }),
+      );
+      const at = linked === 'resources' ? join(meta, 'resources') : join(root, 'images');
+      await symlink(join(root, 'nowhere'), at);
+
+      const thrown = await captureError(() => readAggregate(root, countingIds()));
+
+      expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+      if (!(thrown instanceof AggregateDirectoryError)) return;
+      expect(thrown.kind).toBe('discovery');
+      expect(thrown.diagnostics).toHaveLength(1);
+      expect(thrown.diagnostics[0]?.startsWith(`${at}: `)).toBe(true);
+      expect(thrown.diagnostics[0]).toContain('ENOENT');
+    },
+  );
 });
