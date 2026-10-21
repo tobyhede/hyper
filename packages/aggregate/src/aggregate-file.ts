@@ -74,6 +74,25 @@ interface ScannedBelowRoot {
   readonly images: readonly string[];
 }
 
+/**
+ * `listing`'s value, or the discovery refusal it raised, so a caller can wait
+ * for every listing before raising one. A fault that is not a refusal is
+ * raised as it is.
+ */
+const settledListing = async <T>(
+  listing: Promise<T>,
+): Promise<
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly refusal: AggregateDirectoryError }
+> => {
+  try {
+    return { ok: true, value: await listing };
+  } catch (error) {
+    if (error instanceof AggregateDirectoryError) return { ok: false, refusal: error };
+    throw error;
+  }
+};
+
 /** `directory`'s listing, or a discovery failure naming it when it could not be listed. */
 const listOrRefuse = async (
   source: AggregateSource,
@@ -122,19 +141,33 @@ const scanSpaceDirectory = async (
  * it through a link lists it as it would a directory. Nothing deeper is
  * listed, so a sibling aggregate or a nested `hyper.json` is never searched
  * for.
+ *
+ * Every directory is listed before a failure is raised, so each one that
+ * could not be listed is reported together, in ordinal order with `images/`
+ * last, as every file that could not be read is.
  */
 const scanBelowRoot = async (
   source: AggregateSource,
   root: DirectoryListing,
 ): Promise<ScannedBelowRoot> => {
-  const [spaces, images] = await Promise.all([
-    Promise.all(
-      root.directories
-        .filter((name) => name !== IMAGES_DIRECTORY_NAME)
-        .map((name) => scanSpaceDirectory(source, name)),
-    ),
-    listOrRefuse(source, IMAGES_DIRECTORY_NAME),
+  const names = root.directories
+    .filter((name) => name !== IMAGES_DIRECTORY_NAME)
+    .sort(compareOrdinal);
+  const [spaceResults, imagesResult] = await Promise.all([
+    Promise.all(names.map((name) => settledListing(scanSpaceDirectory(source, name)))),
+    settledListing(listOrRefuse(source, IMAGES_DIRECTORY_NAME)),
   ]);
+  const refusals = [...spaceResults, imagesResult].flatMap((result) =>
+    result.ok ? [] : [result.refusal],
+  );
+  if (refusals.length > 0 || !imagesResult.ok) {
+    throw new AggregateDirectoryError(
+      'discovery',
+      refusals.flatMap(({ diagnostics }) => diagnostics),
+    );
+  }
+  const spaces = spaceResults.flatMap((result) => (result.ok ? [result.value] : []));
+  const images = imagesResult.value;
   return {
     spaces: spaces
       .filter((space): space is ScannedSpace => space !== undefined)
@@ -197,11 +230,6 @@ const readEach = async (
   source: AggregateSource,
   paths: readonly string[],
 ): Promise<ReadonlyMap<string, SourceRead>> => {
-  if (!Number.isInteger(source.concurrency) || source.concurrency < 1) {
-    throw new RangeError(
-      `${source.name} allows ${source.concurrency} reads at once, which is not a positive integer.`,
-    );
-  }
   const reads = new Map<string, SourceRead>();
   const pending = [...paths];
   const reader = async (): Promise<void> => {
@@ -395,6 +423,13 @@ export const readAggregateFrom = async (
   source: AggregateSource,
   newId: () => UUID,
 ): Promise<AggregateDirectoryContents> => {
+  // A source that allows no read is a fault of its composition, refused before
+  // anything is listed or read rather than part-way through.
+  if (!Number.isInteger(source.concurrency) || source.concurrency < 1) {
+    throw new RangeError(
+      `${source.name} allows ${source.concurrency} reads at once, which is not a positive integer.`,
+    );
+  }
   const directory = source.name;
   const root = await listOrRefuse(source, '');
   const aggregatePath = joinPath(directory, AGGREGATE_FILE_NAME);

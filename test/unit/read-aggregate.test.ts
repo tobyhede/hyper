@@ -955,19 +955,61 @@ describe('reading from a source', () => {
     ]);
   });
 
-  it('refuses a source that allows no read at once', async () => {
+  it('refuses a source that allows no read at once, before listing or reading anything', async () => {
+    const base = mapSource(
+      '/talk',
+      new Map([
+        [AGGREGATE_FILE_NAME, encode(aggregateText)],
+        [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+      ]),
+    );
+    const reached: string[] = [];
     const source: AggregateSource = {
-      ...mapSource(
-        '/talk',
-        new Map([
-          [AGGREGATE_FILE_NAME, encode(aggregateText)],
-          [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
-        ]),
-      ),
+      ...base,
       concurrency: 0,
+      list: (directory) => {
+        reached.push(`list ${directory}`);
+        return base.list(directory);
+      },
+      read: (path) => {
+        reached.push(`read ${path}`);
+        return base.read(path);
+      },
     };
 
     await expect(readAggregateFrom(source, countingIds())).rejects.toThrow(RangeError);
+    expect(reached).toEqual([]);
+  });
+
+  it('reports every directory that could not be listed together, in ordinal order', async () => {
+    const base = mapSource(
+      '/talk',
+      new Map([
+        [AGGREGATE_FILE_NAME, encode(aggregateText)],
+        [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+        [`${OTHER_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+        ['images/a.png', pngBytes(7)],
+      ]),
+    );
+    const unlisted = new Set([OTHER_SPACE_ID, META_SPACE_ID, 'images']);
+    const source: AggregateSource = {
+      ...base,
+      list: (directory) =>
+        unlisted.has(directory)
+          ? Promise.resolve({ ok: false, reason: 'EACCES: permission denied' })
+          : base.list(directory),
+    };
+
+    const thrown = await captureError(() => readAggregateFrom(source, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toEqual([
+      `/talk/${META_SPACE_ID}: EACCES: permission denied`,
+      `/talk/${OTHER_SPACE_ID}: EACCES: permission denied`,
+      '/talk/images: EACCES: permission denied',
+    ]);
   });
 
   it('answers a read a map source holds no bytes for with its reason', async () => {
