@@ -1,3 +1,4 @@
+import { mapSource } from '@project/aggregate';
 import type { UUID } from '@project/core';
 import {
   productAddress,
@@ -74,8 +75,7 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
       if (!read.ok) throw new Error(describeGitHubSourceFailure(read.failure));
       const pinned = formatGitHubLocation(read.aggregate.location);
       const result = await mountAggregate({
-        name: pinned,
-        files: read.aggregate.files,
+        source: mapSource(pinned, read.aggregate.files),
         newId: options.newId,
         createObjectUrl: options.createObjectUrl,
       });

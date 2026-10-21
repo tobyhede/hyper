@@ -6,6 +6,7 @@ import {
   type UUID,
 } from '@project/core';
 import type { StoredImage } from '@project/persistence';
+import type { AggregateSource, DirectoryListing, SourceRead } from './aggregate-source';
 import { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
 import { admitImageFile, IMAGES_DIRECTORY_NAME } from './images';
 import { compareOrdinal } from './ordinal';
@@ -14,15 +15,6 @@ import { AggregateDirectoryError, parseSingleSpace, refuseSpaceDocument } from '
 
 /** The name of the aggregate file at the root of a canonical aggregate directory. */
 export const AGGREGATE_FILE_NAME = 'hyper.json';
-
-/** The files of an Aggregate directory, by path relative to it with `/` between segments. */
-export type AggregateFiles = ReadonlyMap<string, Uint8Array>;
-
-/**
- * The files of an Aggregate directory that were listed but could not be read,
- * by path as in {@link AggregateFiles}, each with the reason its read failed.
- */
-export type UnreadableFiles = ReadonlyMap<string, string>;
 
 /**
  * A path inside `directory`, joined as a string so the reader needs no path
@@ -68,9 +60,6 @@ const parseAggregateFile = (path: string, text: string): UUID => {
   return parsed.data.metaSpaceId;
 };
 
-/** A path's segments, split on `/`. */
-const segmentsOf = (path: string): readonly string[] => path.split('/');
-
 /** One Space directory's files Importing reads, by path inside it. */
 interface ScannedSpace {
   readonly name: string;
@@ -78,92 +67,150 @@ interface ScannedSpace {
   readonly resources: readonly string[];
 }
 
-/** What Importing reads among an Aggregate directory's files, grouped as it reads them. */
-interface ScannedAggregate {
-  readonly aggregateFile: boolean;
+/** What Importing reads beneath an Aggregate directory's root, grouped as it reads them. */
+interface ScannedBelowRoot {
   readonly spaces: readonly ScannedSpace[];
+  /** By path relative to the Aggregate directory, in ordinal order. */
   readonly images: readonly string[];
 }
 
-/**
- * Group `paths` by their top-level directory once, so the scan is linear in
- * the number of files however many Space directories there are.
- *
- * A top-level directory is a Space directory because it holds a `space.json`,
- * except `images/`, which is the image directory whatever it holds: a file
- * there is read once, as an image.
- */
-const scanAggregatePaths = (paths: Iterable<string>): ScannedAggregate => {
-  let aggregateFile = false;
-  const byDirectory = new Map<string, string[]>();
-  const images: string[] = [];
-  for (const path of new Set(paths)) {
-    if (path === AGGREGATE_FILE_NAME) {
-      aggregateFile = true;
-      continue;
-    }
-    const [first, ...rest] = segmentsOf(path);
-    if (first === undefined || first === '' || rest.length === 0) continue;
-    if (first === IMAGES_DIRECTORY_NAME) {
-      const [name] = rest;
-      if (rest.length === 1 && name !== undefined && name !== '' && !name.startsWith('.')) {
-        images.push(path);
-      }
-      continue;
-    }
-    const inside = byDirectory.get(first);
-    if (inside === undefined) byDirectory.set(first, [rest.join('/')]);
-    else inside.push(rest.join('/'));
+/** `directory`'s listing, or a discovery failure naming it when it could not be listed. */
+const listOrRefuse = async (
+  source: AggregateSource,
+  directory: string,
+): Promise<DirectoryListing> => {
+  const answer = await source.list(directory);
+  if (!answer.ok) {
+    const path = directory === '' ? source.name : joinPath(source.name, directory);
+    throw new AggregateDirectoryError('discovery', [`${path}: ${answer.reason}`]);
   }
-
-  const spaces = [...byDirectory]
-    .filter(([, inside]) => inside.includes('space.json'))
-    .map(([name, inside]) => ({
-      name,
-      resources: inside
-        .filter((file) => {
-          const parts = segmentsOf(file);
-          return (
-            (parts.length === 1 && file.endsWith('.md')) ||
-            (parts.length === 2 &&
-              parts[0] === 'resources' &&
-              (file.endsWith('.json') || file.endsWith('.md')))
-          );
-        })
-        .sort(compareOrdinal),
-    }))
-    .sort((left, right) => compareOrdinal(left.name, right.name));
-
-  return { aggregateFile, spaces, images: images.sort(compareOrdinal) };
+  return answer.listing;
 };
 
 /**
- * The paths among `paths` that Importing reads, in the order it reads them:
- * `hyper.json`; then, for each top-level directory holding a `space.json`, in
- * ordinal name order, that `space.json` followed by the `*.md` beside it and
- * the `resources/*.json` and `resources/*.md`, in ordinal order of their path
- * inside the Space directory; then the visible files directly in `images/`, in
- * ordinal order.
- *
- * `paths` are the files of one Aggregate directory, by path relative to it with
- * `/` between segments. A top-level directory without a `space.json` is not a
- * Space directory, so nothing in it is read, and nothing deeper than these is
- * read at all. `images/` is never a Space directory. A sibling aggregate, notes
- * and any other file are left out.
- *
- * This is the one discovery rule: the filesystem shell lists a directory and
- * asks it what Import reads and so what Export owns.
+ * The child directory `name` as a Space directory, or `undefined` when it
+ * holds no `space.json` and so is not one: then nothing in it is read, and its
+ * `resources/` is not listed.
  */
-export const scannedAggregatePaths = (paths: Iterable<string>): readonly string[] => {
-  const { aggregateFile, spaces, images } = scanAggregatePaths(paths);
-  return [
-    ...(aggregateFile ? [AGGREGATE_FILE_NAME] : []),
-    ...spaces.flatMap(({ name, resources }) => [
-      `${name}/space.json`,
-      ...resources.map((inside) => `${name}/${inside}`),
-    ]),
-    ...images,
-  ];
+const scanSpaceDirectory = async (
+  source: AggregateSource,
+  name: string,
+): Promise<ScannedSpace | undefined> => {
+  const inside = await listOrRefuse(source, name);
+  if (!inside.files.includes('space.json')) return undefined;
+  const resources = await listOrRefuse(source, `${name}/resources`);
+  return {
+    name,
+    resources: [
+      ...inside.files.filter((file) => file.endsWith('.md')),
+      ...resources.files
+        .filter((file) => file.endsWith('.json') || file.endsWith('.md'))
+        .map((file) => `resources/${file}`),
+    ].sort(compareOrdinal),
+  };
+};
+
+/**
+ * List what Importing reads beneath the root, given the root's listing: each
+ * child directory but `images/`, the `resources/` of each one holding a
+ * `space.json`, and `images/`.
+ *
+ * A child directory is a Space directory because it holds a `space.json`,
+ * except `images/`, which is the image directory whatever it holds: a visible
+ * file directly in it is read once, as an image. `images/` is listed whether
+ * or not the root's listing names it as a directory, so a source that reaches
+ * it through a link lists it as it would a directory. Nothing deeper is
+ * listed, so a sibling aggregate or a nested `hyper.json` is never searched
+ * for.
+ */
+const scanBelowRoot = async (
+  source: AggregateSource,
+  root: DirectoryListing,
+): Promise<ScannedBelowRoot> => {
+  const [spaces, images] = await Promise.all([
+    Promise.all(
+      root.directories
+        .filter((name) => name !== IMAGES_DIRECTORY_NAME)
+        .map((name) => scanSpaceDirectory(source, name)),
+    ),
+    listOrRefuse(source, IMAGES_DIRECTORY_NAME),
+  ]);
+  return {
+    spaces: spaces
+      .filter((space): space is ScannedSpace => space !== undefined)
+      .sort((left, right) => compareOrdinal(left.name, right.name)),
+    images: images.files
+      .filter((name) => name !== '' && !name.startsWith('.'))
+      .sort(compareOrdinal)
+      .map((name) => `${IMAGES_DIRECTORY_NAME}/${name}`),
+  };
+};
+
+/** The paths beneath the root that Importing reads, in the order it reads them. */
+const scannedPaths = ({ spaces, images }: ScannedBelowRoot): readonly string[] => [
+  ...spaces.flatMap(({ name, resources }) => [
+    `${name}/space.json`,
+    ...resources.map((inside) => `${name}/${inside}`),
+  ]),
+  ...images,
+];
+
+/** The files Importing reads in an Aggregate directory, and the Space directories among them. */
+export interface AggregateScan {
+  /** By path relative to the directory with `/` between segments, in the order Importing reads them. */
+  readonly files: readonly string[];
+  /** By name, in the order Importing reads them. */
+  readonly spaceDirectories: readonly string[];
+}
+
+/**
+ * The files Importing reads in a source's directory, in the order it reads
+ * them, found by listing alone: `hyper.json`; then, for each child directory
+ * holding a `space.json`, in ordinal name order, that `space.json` followed by
+ * the `*.md` beside it and the `resources/*.json` and `resources/*.md`, in
+ * ordinal order of their path inside the Space directory; then the visible
+ * files directly in `images/`, in ordinal order.
+ *
+ * This is the one discovery rule: `readAggregateFrom` reads what it finds, and
+ * Export owns what it finds. A child directory without a `space.json` is not a
+ * Space directory, and `images/` is never one. A sibling aggregate, notes and
+ * any other file are left out. A directory with no `hyper.json` still answers
+ * the rest, which Export owns there as well.
+ */
+export const scanAggregateFrom = async (source: AggregateSource): Promise<AggregateScan> => {
+  const root = await listOrRefuse(source, '');
+  const scanned = await scanBelowRoot(source, root);
+  return {
+    files: [
+      ...(root.files.includes(AGGREGATE_FILE_NAME) ? [AGGREGATE_FILE_NAME] : []),
+      ...scannedPaths(scanned),
+    ],
+    spaceDirectories: scanned.spaces.map(({ name }) => name),
+  };
+};
+
+/**
+ * Read every one of `paths` from `source`, no more than its `concurrency` at
+ * once, answering each path's bytes or the reason it could not be read.
+ */
+const readEach = async (
+  source: AggregateSource,
+  paths: readonly string[],
+): Promise<ReadonlyMap<string, SourceRead>> => {
+  if (!Number.isInteger(source.concurrency) || source.concurrency < 1) {
+    throw new RangeError(
+      `${source.name} allows ${source.concurrency} reads at once, which is not a positive integer.`,
+    );
+  }
+  const reads = new Map<string, SourceRead>();
+  const pending = [...paths];
+  const reader = async (): Promise<void> => {
+    for (let path = pending.shift(); path !== undefined; path = pending.shift()) {
+      reads.set(path, await source.read(path));
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(source.concurrency, paths.length) }, reader));
+  return reads;
 };
 
 /**
@@ -317,17 +364,20 @@ const aggregateContents = (
 };
 
 /**
- * Read a canonical aggregate from its files into the complete Meta-rooted input
+ * Read a canonical aggregate from a source into the complete Meta-rooted input
  * the persistence lifecycle takes, beside every image `images/` carries, each
- * admitted by the rule storing an uploaded picture uses (ADR 0118).
+ * admitted by the rule storing an uploaded picture uses (ADR 0130, ADR 0118).
  *
- * Only `scannedAggregatePaths` of the given paths is read; every other file is
- * ignored. A path in `unreadable` is one the caller listed and could not read:
- * it is reported as a discovery failure naming it, after its Space's space file
- * has been asked whether the document is refused outright, and beside every
- * other Space's diagnostics. `directory` only names the paths in diagnostics. The filesystem
- * reader feeds this from disk, and Export asks it whether the files it is about
- * to write would read back.
+ * The reader decides everything the read involves, and the source only reaches
+ * the files. It lists the root, and refuses a root with no `hyper.json`. It
+ * reads and parses `hyper.json` before anything else, so a malformed one stops
+ * the read with nothing else read. It then lists and reads what
+ * `scanAggregateFrom` finds, through one pool no wider than the source allows.
+ * A directory that could not be listed stops the read as a discovery failure
+ * naming it. A file that could not be read is reported as a discovery failure
+ * naming it, after its Space's space file has been asked whether the document
+ * is refused outright, and beside every other Space's diagnostics. Diagnostics
+ * name each file under the source's name.
  *
  * This reads and identifies; it validates nothing about how the Spaces relate.
  * Meta rooting, Space Resource targets, cross-Space Resource ownership and the
@@ -341,26 +391,31 @@ const aggregateContents = (
  * ordinal order of the Space directories' names, so the same files yield the
  * same assignment every time.
  */
-export const readAggregateFiles = async (
-  directory: string,
-  files: AggregateFiles,
+export const readAggregateFrom = async (
+  source: AggregateSource,
   newId: () => UUID,
-  unreadable: UnreadableFiles = new Map(),
 ): Promise<AggregateDirectoryContents> => {
+  const directory = source.name;
+  const root = await listOrRefuse(source, '');
   const aggregatePath = joinPath(directory, AGGREGATE_FILE_NAME);
-  const aggregateBytes = files.get(AGGREGATE_FILE_NAME);
-  if (aggregateBytes === undefined) throw missingAggregateFile(aggregatePath);
-  const metaSpaceId = parseAggregateFile(aggregatePath, textOf(aggregateBytes));
+  if (!root.files.includes(AGGREGATE_FILE_NAME)) throw missingAggregateFile(aggregatePath);
+  const aggregateRead = await source.read(AGGREGATE_FILE_NAME);
+  if (!aggregateRead.ok) {
+    throw new AggregateDirectoryError('discovery', [`${aggregatePath}: ${aggregateRead.reason}`]);
+  }
+  const metaSpaceId = parseAggregateFile(aggregatePath, textOf(aggregateRead.bytes));
 
-  const scanned = scanAggregatePaths([...files.keys(), ...unreadable.keys()]);
+  const scanned = await scanBelowRoot(source, root);
+  const read = await readEach(source, scannedPaths(scanned));
   const bytesOf = (path: string): Uint8Array => {
-    const bytes = files.get(path);
-    if (bytes === undefined) throw new Error(`${path} was scanned but has no bytes.`);
-    return bytes;
+    const answer = read.get(path);
+    if (answer?.ok !== true) throw new Error(`${path} was scanned but has no bytes.`);
+    return answer.bytes;
   };
+  const isUnreadable = (path: string): boolean => read.get(path)?.ok === false;
   const unreadableDiagnostic = (path: string): string[] => {
-    const reason = unreadable.get(path);
-    return reason === undefined ? [] : [`${joinPath(directory, path)}: ${reason}`];
+    const answer = read.get(path);
+    return answer?.ok === false ? [`${joinPath(directory, path)}: ${answer.reason}`] : [];
   };
 
   const reads: SpaceDirectoryRead[] = [];
@@ -381,7 +436,7 @@ export const readAggregateFiles = async (
         // there is to report.
         refuseSpaceDocument(
           spaceFile,
-          unreadable.has(spacePath) ? undefined : textOf(bytesOf(spacePath)),
+          isUnreadable(spacePath) ? undefined : textOf(bytesOf(spacePath)),
         );
         throw new AggregateDirectoryError('discovery', readDiagnostics);
       }
@@ -402,7 +457,7 @@ export const readAggregateFiles = async (
   const unreadableImages = scanned.images.flatMap(unreadableDiagnostic);
   const imageResults = await Promise.allSettled(
     scanned.images
-      .filter((path) => !unreadable.has(path))
+      .filter((path) => !isUnreadable(path))
       .map((path) => {
         const name = path.slice(IMAGES_DIRECTORY_NAME.length + 1);
         return admitImageFile(

@@ -4,13 +4,19 @@ import { join, relative } from 'node:path';
 import {
   AGGREGATE_FILE_NAME,
   AggregateDirectoryError,
-  readAggregateFiles,
-  scannedAggregatePaths,
+  mapSource,
+  readAggregateFrom,
+  scanAggregateFrom,
   type AggregateDirectoryContents,
+  type AggregateSource,
 } from '@project/aggregate';
 import { uuidSchema, type UUID } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
-import { readAggregate, scannedAggregateFiles } from '../../src/aggregate-directory';
+import {
+  directorySource,
+  readAggregate,
+  scannedAggregateFiles,
+} from '../../src/aggregate-directory';
 import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
 import { admitted, pngBytes } from '../support/stored-images';
@@ -75,7 +81,7 @@ const filesUnder = async (root: string): Promise<readonly string[]> =>
 
 /**
  * Every file under `root` with its bytes, whether Import reads it or not, so
- * the in-memory reader is the one deciding what to read.
+ * the reader is the one deciding what to read from a `mapSource` over them.
  */
 const allFilesUnder = async (root: string): Promise<ReadonlyMap<string, Uint8Array>> =>
   new Map(
@@ -87,20 +93,53 @@ const allFilesUnder = async (root: string): Promise<ReadonlyMap<string, Uint8Arr
   );
 
 /**
- * The two ways an aggregate is read: from disk, and from a map of its files'
- * bytes, the way a mounted page reads one (ADR 0130). Every case below runs
- * through both, so they cannot come to disagree.
+ * The two sources an aggregate is read from here: the disk, and a map of its
+ * files' bytes, the way Export reads back what it is about to write (ADR 0130).
+ * Every case below runs through both, so they cannot come to disagree.
  */
 const READERS: readonly {
   readonly name: string;
   readonly read: (root: string, newId: () => UUID) => Promise<AggregateDirectoryContents>;
 }[] = [
-  { name: 'readAggregate, from disk', read: readAggregate },
   {
-    name: 'readAggregateFiles, from an in-memory map',
-    read: async (root, newId) => readAggregateFiles(root, await allFilesUnder(root), newId),
+    name: 'readAggregateFrom a directorySource',
+    read: (root, newId) => readAggregateFrom(directorySource(root), newId),
+  },
+  {
+    name: 'readAggregateFrom a mapSource',
+    read: async (root, newId) =>
+      readAggregateFrom(mapSource(root, await allFilesUnder(root)), newId),
   },
 ];
+
+const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
+
+/** `source`, answering `reason` for each read of a path `unreadable` names. */
+const withUnreadable = (
+  source: AggregateSource,
+  unreadable: ReadonlyMap<string, string>,
+): AggregateSource => ({
+  ...source,
+  read: (path) => {
+    const reason = unreadable.get(path);
+    return reason === undefined ? source.read(path) : Promise.resolve({ ok: false, reason });
+  },
+});
+
+/** `source`, recording each path it is asked to read, in the order the reads begin. */
+const recordingReads = (source: AggregateSource) => {
+  const reads: string[] = [];
+  return {
+    reads,
+    source: {
+      ...source,
+      read: (path: string) => {
+        reads.push(path);
+        return source.read(path);
+      },
+    } satisfies AggregateSource,
+  };
+};
 
 afterEach(async () => {
   await Promise.all(
@@ -570,30 +609,32 @@ describe.each(READERS)('$name', ({ read }) => {
 });
 
 /**
- * The paths Importing reads, decided once over a list of an Aggregate
- * directory's files, for a source that lists files rather than walking a
- * directory (ADR 0130).
- */
-/**
  * A document refused outright is reported as that, ahead of a file beside it
  * that could not be read, and one Space's unreadable file does not hide another
  * Space's parse diagnostic: the refusal is decided from the space file alone.
  */
 describe('a file that could not be read', () => {
   const refusedDocument = JSON.stringify({ version: 2, title: 'Pre-release talk' });
-  const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
 
   it('is reported after the refusal of its Space, beside every other Space’s diagnostic', async () => {
     const thrown = await captureError(() =>
-      readAggregateFiles(
-        '/talk',
-        new Map([
-          [AGGREGATE_FILE_NAME, encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }))],
-          [`${META_SPACE_ID}/space.json`, encode(refusedDocument)],
-          [`${OTHER_SPACE_ID}/space.json`, encode('{ invalid other')],
-        ]),
+      readAggregateFrom(
+        withUnreadable(
+          mapSource(
+            '/talk',
+            new Map([
+              [
+                AGGREGATE_FILE_NAME,
+                encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID })),
+              ],
+              [`${META_SPACE_ID}/space.json`, encode(refusedDocument)],
+              [`${META_SPACE_ID}/a.md`, encode('A body\n')],
+              [`${OTHER_SPACE_ID}/space.json`, encode('{ invalid other')],
+            ]),
+          ),
+          new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
+        ),
         countingIds(),
-        new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
       ),
     );
 
@@ -607,14 +648,25 @@ describe('a file that could not be read', () => {
 
   it('is a discovery failure naming it when its Space reads otherwise', async () => {
     const thrown = await captureError(() =>
-      readAggregateFiles(
-        '/talk',
-        new Map([
-          [AGGREGATE_FILE_NAME, encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID }))],
-          [`${META_SPACE_ID}/space.json`, encode(JSON.stringify({ version: 1, title: 'Meta' }))],
-        ]),
+      readAggregateFrom(
+        withUnreadable(
+          mapSource(
+            '/talk',
+            new Map([
+              [
+                AGGREGATE_FILE_NAME,
+                encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID })),
+              ],
+              [
+                `${META_SPACE_ID}/space.json`,
+                encode(JSON.stringify({ version: 1, title: 'Meta' })),
+              ],
+              [`${META_SPACE_ID}/a.md`, encode('A body\n')],
+            ]),
+          ),
+          new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
+        ),
         countingIds(),
-        new Map([[`${META_SPACE_ID}/a.md`, 'EACCES: permission denied']]),
       ),
     );
 
@@ -645,7 +697,11 @@ describe('a file that could not be read', () => {
   });
 });
 
-describe('scannedAggregatePaths', () => {
+/**
+ * The files Importing reads, found by listing alone, for Export's ownership and
+ * for a source that knows its paths before it has any bytes (ADR 0130).
+ */
+describe('scanAggregateFrom', () => {
   /** An Aggregate directory beside unrelated material, as a repository may hold it. */
   const MIXED_DIRECTORY = [
     'README.md',
@@ -669,45 +725,191 @@ describe('scannedAggregatePaths', () => {
     'images/space.json',
   ];
 
-  it("keeps hyper.json, each Space directory's files and the visible images, in read order", () => {
-    expect(scannedAggregatePaths([...MIXED_DIRECTORY].reverse())).toEqual([
-      AGGREGATE_FILE_NAME,
-      `${META_SPACE_ID}/space.json`,
-      `${META_SPACE_ID}/notes.md`,
-      `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
-      `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
-      `${OTHER_SPACE_ID}/space.json`,
-      'images/a.png',
-      'images/space.json',
-    ]);
-  });
+  /** A source over `paths` with no bytes, which is all a listing needs. */
+  const listed = (paths: readonly string[]): AggregateSource =>
+    mapSource('/talk', new Map(paths.map((path) => [path, new Uint8Array()])));
 
-  it('keeps nothing of a Space directory without a space.json, and no hyper.json it lacks', () => {
-    expect(
-      scannedAggregatePaths([
+  it("finds hyper.json, each Space directory's files and the visible images, in read order", async () => {
+    expect(await scanAggregateFrom(listed([...MIXED_DIRECTORY].reverse()))).toEqual({
+      files: [
+        AGGREGATE_FILE_NAME,
+        `${META_SPACE_ID}/space.json`,
         `${META_SPACE_ID}/notes.md`,
         `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
-        `sibling/${AGGREGATE_FILE_NAME}`,
-      ]),
-    ).toEqual([]);
+        `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
+        `${OTHER_SPACE_ID}/space.json`,
+        'images/a.png',
+        'images/space.json',
+      ],
+      spaceDirectories: [META_SPACE_ID, OTHER_SPACE_ID],
+    });
   });
 
-  it('reads images/ as images only, even when it holds a space.json', () => {
+  it('finds nothing of a Space directory without a space.json, and no hyper.json it lacks', async () => {
     expect(
-      scannedAggregatePaths([AGGREGATE_FILE_NAME, 'images/space.json', 'images/a.png']),
-    ).toEqual([AGGREGATE_FILE_NAME, 'images/a.png', 'images/space.json']);
+      await scanAggregateFrom(
+        listed([
+          `${META_SPACE_ID}/notes.md`,
+          `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
+          `sibling/${AGGREGATE_FILE_NAME}`,
+        ]),
+      ),
+    ).toEqual({ files: [], spaceDirectories: [] });
   });
 
-  it('names the same files the filesystem scan finds on disk', async () => {
+  it('reads images/ as images only, even when it holds a space.json', async () => {
+    expect(
+      await scanAggregateFrom(listed([AGGREGATE_FILE_NAME, 'images/space.json', 'images/a.png'])),
+    ).toEqual({
+      files: [AGGREGATE_FILE_NAME, 'images/a.png', 'images/space.json'],
+      spaceDirectories: [],
+    });
+  });
+
+  it('finds the same files on disk as over the same files in memory', async () => {
     const root = await makeTemporaryDirectory();
     for (const path of MIXED_DIRECTORY) {
       await mkdir(join(root, path, '..'), { recursive: true });
       await writeFile(join(root, path), '{}');
     }
 
-    expect(scannedAggregatePaths(await filesUnder(root))).toEqual(
-      await scannedAggregateFiles(root),
+    const onDisk = await scanAggregateFrom(directorySource(root));
+    expect(await scanAggregateFrom(mapSource(root, await allFilesUnder(root)))).toEqual(onDisk);
+    expect(await scannedAggregateFiles(root)).toEqual(onDisk.files);
+  });
+
+  it('finds nothing in a directory that does not exist', async () => {
+    const root = await makeTemporaryDirectory();
+
+    expect(await scanAggregateFrom(directorySource(join(root, 'absent')))).toEqual({
+      files: [],
+      spaceDirectories: [],
+    });
+  });
+});
+
+/**
+ * The reader decides the order of reads and how many run at once, so a source
+ * that records them shows both (ADR 0130).
+ */
+describe('reading from a source', () => {
+  const aggregateText = JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID });
+  const metaSpaceFile = JSON.stringify({ version: 1, title: 'Meta' });
+
+  it('reads nothing past a malformed hyper.json', async () => {
+    const { source, reads } = recordingReads(
+      mapSource(
+        '/talk',
+        new Map([
+          [AGGREGATE_FILE_NAME, encode('{ malformed')],
+          [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+          ['images/a.png', pngBytes(7)],
+        ]),
+      ),
     );
+
+    const thrown = await captureError(() => readAggregateFrom(source, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('parsing');
+    expect(thrown.diagnostics).toEqual([expect.stringContaining(`/talk/${AGGREGATE_FILE_NAME}:`)]);
+    expect(reads).toEqual([AGGREGATE_FILE_NAME]);
+  });
+
+  it('reads hyper.json first, then what the scan finds, in its order', async () => {
+    const image = await admitted(pngBytes(7));
+    const files = new Map<string, Uint8Array>([
+      [AGGREGATE_FILE_NAME, encode(aggregateText)],
+      [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+      ...Object.entries(markdownResourceFiles(RESOURCE_ID, 'Opening', 'Hello.\n')).map(
+        ([name, text]): [string, Uint8Array] => [
+          `${META_SPACE_ID}/resources/${name}`,
+          encode(text),
+        ],
+      ),
+      [`images/${image.id}.png`, image.bytes],
+      ['README.md', encode('# Notes\n')],
+    ]);
+    const { source, reads } = recordingReads(mapSource('/talk', files));
+
+    await readAggregateFrom(source, countingIds());
+
+    expect(reads).toEqual([
+      AGGREGATE_FILE_NAME,
+      `${META_SPACE_ID}/space.json`,
+      `${META_SPACE_ID}/resources/${RESOURCE_ID}.json`,
+      `${META_SPACE_ID}/resources/${RESOURCE_ID}.md`,
+      `images/${image.id}.png`,
+    ]);
+    expect(reads).toEqual((await scanAggregateFrom(mapSource('/talk', files))).files);
+  });
+
+  it('never has more reads in flight than the source allows', async () => {
+    const resources = Array.from({ length: 10 }, (_, index) =>
+      uuidSchema.parse(`44444444-4444-4444-8444-${index.toString().padStart(12, '0')}`),
+    );
+    const base = mapSource(
+      '/talk',
+      new Map([
+        [AGGREGATE_FILE_NAME, encode(aggregateText)],
+        [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+        ...resources.flatMap((id) =>
+          Object.entries(markdownResourceFiles(id, 'Resource', 'Body.\n')).map(
+            ([name, text]): [string, Uint8Array] => [
+              `${META_SPACE_ID}/resources/${name}`,
+              encode(text),
+            ],
+          ),
+        ),
+      ]),
+    );
+    let inFlight = 0;
+    let most = 0;
+    const source: AggregateSource = {
+      ...base,
+      concurrency: 3,
+      read: async (path) => {
+        inFlight += 1;
+        most = Math.max(most, inFlight);
+        try {
+          // Yield, so the reads the reader has begun overlap before this one ends.
+          await Promise.resolve();
+          return await base.read(path);
+        } finally {
+          inFlight -= 1;
+        }
+      },
+    };
+
+    const aggregate = await readAggregateFrom(source, countingIds());
+
+    expect(aggregate.spaces[0]?.resources).toHaveLength(resources.length);
+    expect(most).toBe(3);
+  });
+
+  it('stops at a directory that could not be listed, naming it', async () => {
+    const base = mapSource(
+      '/talk',
+      new Map([
+        [AGGREGATE_FILE_NAME, encode(aggregateText)],
+        [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+      ]),
+    );
+    const source: AggregateSource = {
+      ...base,
+      list: (directory) =>
+        directory === META_SPACE_ID
+          ? Promise.resolve({ ok: false, reason: 'EACCES: permission denied' })
+          : base.list(directory),
+    };
+
+    const thrown = await captureError(() => readAggregateFrom(source, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toEqual([`/talk/${META_SPACE_ID}: EACCES: permission denied`]);
   });
 });
 
