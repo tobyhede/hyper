@@ -223,11 +223,13 @@ const fetchBlob = async (
       return undefined;
     }
   };
+  // Read through a call each time: the signal aborts across the awaits below.
+  const cancelled = (): boolean => signal.aborted;
   let response = await request();
-  if (signal.aborted) return failed();
+  if (cancelled()) return failed();
   if (response === undefined || isRetryable(response.status)) {
-    // A retry once the blobs are cancelled throws at once, failing below.
     await wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now), signal);
+    if (cancelled()) return failed();
     response = await request();
   }
   if (response === undefined) return failed();

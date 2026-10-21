@@ -34,6 +34,7 @@ if (source.kind === 'ask') {
     <main aria-label="Open a talk" className="flex min-h-dvh items-center">
       <GitHubLocationForm
         navigate={(url) => window.location.assign(url)}
+        href={() => window.location.href}
         failure={source.failure}
       />
     </main>,

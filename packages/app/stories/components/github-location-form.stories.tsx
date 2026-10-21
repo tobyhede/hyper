@@ -10,4 +10,10 @@ export default { title: 'Components/GitHub Location Form' };
  * parser's reason. Opening one that reads navigates the page, which the
  * application proof covers; here it goes nowhere.
  */
-export const Asking: Story = () => <GitHubLocationForm navigate={() => undefined} failure={null} />;
+export const Asking: Story = () => (
+  <GitHubLocationForm
+    navigate={() => undefined}
+    href={() => 'https://hyper.test/'}
+    failure={null}
+  />
+);

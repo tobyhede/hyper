@@ -3,7 +3,7 @@
  * (ADR 0130).
  *
  * Product URLs are unchanged by it: the browser location keeps it on every
- * product path it writes, with the rest of the current query and the hash, and
+ * product path it writes, with the rest of the current query, and
  * no destination resolver reads it, since they resolve the pathname alone
  * (`packages/app/test/browser-location.test.ts`, "the mounted source in the
  * address").
@@ -45,29 +45,35 @@ const READABLE = /%(?:3A|2F|40)/g;
 const sourcePair = (source: string): string =>
   `${SOURCE_PARAMETER}=${encodeURIComponent(source).replace(READABLE, (escaped) => decodeURIComponent(escaped))}`;
 
-/** `path` with `source` after it, or `path` alone when there is no source. */
-export const withSource = (path: string, source: string | null): string =>
-  source === null ? path : `${path}?${sourcePair(source)}`;
+/** What {@link carriedAddress} does with the current location's `source`. */
+export type SourceCarry =
+  /** Every `source` pair is carried as it was written. */
+  | 'keep'
+  /** No `source` pair is carried. */
+  | 'drop'
+  /** The first `source` pair's place is taken by this location, and the rest are dropped. */
+  | { readonly set: string };
 
 /**
- * `path` with the query and hash of the absolute URL `href` carried after it,
- * its `source` set to `source`, or left out when that is `null`.
+ * `path` with the query of the absolute URL `href` carried after it, its
+ * `source` treated as `source` says.
  *
- * Every other query parameter is kept as it was written, in its place, and a
- * `source` the query already has keeps its place with its new value.
+ * Every pair other than a `source` one is carried as it was written and in its
+ * place, empty ones included; the query is left off only when no pair is left.
+ * The hash is not carried: it names something on the page it was written on.
  */
-export const carriedAddress = (path: string, href: string, source: string | null): string => {
-  const { search, hash } = new URL(href);
+export const carriedAddress = (path: string, href: string, source: SourceCarry): string => {
   const pairs: string[] = [];
   let placed = false;
-  for (const pair of search.slice(1).split('&')) {
-    if (pair === '') continue;
-    if (nameOf(pair) !== SOURCE_PARAMETER) pairs.push(pair);
-    else if (source !== null && !placed) {
-      pairs.push(sourcePair(source));
+  const query = new URL(href).search;
+  for (const pair of query === '' ? [] : query.slice(1).split('&')) {
+    if (nameOf(pair) !== SOURCE_PARAMETER || source === 'keep') pairs.push(pair);
+    else if (source !== 'drop' && !placed) {
+      pairs.push(sourcePair(source.set));
       placed = true;
     }
   }
-  if (source !== null && !placed) pairs.push(sourcePair(source));
-  return `${path}${pairs.length === 0 ? '' : `?${pairs.join('&')}`}${hash}`;
+  if (source !== 'keep' && source !== 'drop' && !placed) pairs.push(sourcePair(source.set));
+  const carried = pairs.join('&');
+  return carried === '' ? path : `${path}?${carried}`;
 };

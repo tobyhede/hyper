@@ -11,7 +11,7 @@ import {
 import type { DestinationOpening } from './destination-opening';
 import { resolveMap } from './map-resolution';
 import { navigationAddress } from './navigation';
-import { carriedAddress, sourceParameter } from './source-parameter';
+import { carriedAddress } from './source-parameter';
 
 /**
  * The whole of what this application asks a browser for.
@@ -113,7 +113,7 @@ export interface BrowserLocationOptions {
   readonly reportObserverError?: ObserverErrorReporter;
   /**
    * Whether the session is Mounting (ADR 0130), so that every product path
-   * written carries the current location's `source` with the rest of its
+   * written carries the current location's `source` beside the rest of its
    * query. Absent, it is not, and a stray `source` on a server session's page
    * is not carried on.
    */
@@ -137,6 +137,7 @@ export function createBrowserLocation(
     carriesSource = false,
   }: BrowserLocationOptions,
 ): BrowserLocation {
+  const sourceCarry = carriesSource ? 'keep' : 'drop';
   let followed: ComposedApp | null = null;
   let unfollow: (() => void) | null = null;
   let addressedResourceId: ResourceId | null = null;
@@ -178,19 +179,13 @@ export function createBrowserLocation(
   };
 
   /**
-   * A destination's product path, with the current location's query and hash
-   * carried after it. A `source` among them is carried only in a Mounting
-   * session (ADR 0130). Destinations resolve the pathname alone, so carrying
-   * them changes no decision.
+   * A destination's product path, with the current location's query carried
+   * after it. Its `source` is carried only in a Mounting session (ADR 0130).
+   * Destinations resolve the pathname alone, so carrying it changes no
+   * decision.
    */
-  const addressOf = (destination: ProductDestination): string => {
-    const href = history.href();
-    return carriedAddress(
-      productDestinationPath(destination),
-      href,
-      carriesSource ? sourceParameter(href) : null,
-    );
-  };
+  const addressOf = (destination: ProductDestination): string =>
+    carriedAddress(productDestinationPath(destination), history.href(), sourceCarry);
 
   const positionOf = (app: ComposedApp): AddressedPosition => ({
     ...navigationAddress(app.navigation.getState()),

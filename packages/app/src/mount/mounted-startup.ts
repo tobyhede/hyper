@@ -107,7 +107,7 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
       // A static host may serve the application at `/index.html` as well as
       // at the root, and both mean the root.
       if (pathname === '/' || pathname === '/index.html') {
-        history.replace(carriedAddress(meta, history.href(), pinned));
+        history.replace(carriedAddress(meta, history.href(), { set: pinned }));
         return await startup.resolve(meta);
       }
       pinSource(history, resolved);

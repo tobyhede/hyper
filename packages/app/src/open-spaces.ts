@@ -594,9 +594,9 @@ export function createOpenSpaces({
         presentations,
         fullscreen,
         mounted,
-        // A mounted session's addresses carry its `source`; a server session
-        // keeps the bare product path.
-        addressOf: mounted ? browserLocation.href : undefined,
+        // The Notes window's address carries the query as every other address
+        // the location writes does, `source` included only when Mounting.
+        addressOf: browserLocation.href,
       }),
       spaceResources,
     };

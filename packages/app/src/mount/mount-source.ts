@@ -59,6 +59,6 @@ export const pinSource = (
 ): boolean => {
   const pinned = formatGitHubLocation(resolved);
   if (sourceParameter(history.href()) === pinned) return false;
-  history.replace(carriedAddress(history.pathname(), history.href(), pinned));
+  history.replace(carriedAddress(history.pathname(), history.href(), { set: pinned }));
   return true;
 };

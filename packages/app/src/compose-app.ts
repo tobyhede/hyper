@@ -129,9 +129,9 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
   readonly mounted?: boolean | undefined;
   /**
    * The address a destination opened in a new browsing context is given: the
-   * browser location's `href`, which carries a mounted page's `source` (ADR
-   * 0130), so a Notes window mounts the revision its presenting window shows.
-   * Absent, the bare product path.
+   * browser location's `href`, which carries the query and a mounted page's
+   * `source` (ADR 0130), so a Notes window mounts the revision its presenting
+   * window shows. Absent, the bare product path.
    */
   readonly addressOf?: ((destination: ProductDestination) => string) | undefined;
 }

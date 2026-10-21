@@ -454,8 +454,8 @@ describe('readGitHubAggregate', () => {
     expect(waits).toEqual([]);
   });
 
-  it('cancels a blob waiting to retry once another fails', async () => {
-    const [, missing] = [...fixtureFiles.keys()];
+  it('cancels a blob waiting to retry once another fails, sending no retry', async () => {
+    const missing = [...fixtureFiles.keys()].find((file) => file !== 'hyper.json');
     if (missing === undefined) throw new Error('The fixture holds more than one file.');
     const github = fakeGitHub({
       files: fixtureFiles,
@@ -474,10 +474,12 @@ describe('readGitHubAggregate', () => {
       ok: false,
       failure: { kind: 'blob-failed', path: missing, status: 404 },
     });
+    expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(1);
   });
 
   it('leaves no retry timer behind once the blobs are cancelled', async () => {
-    const [, missing] = [...fixtureFiles.keys()];
+    // A file other than hyper.json, so the retry is hyper.json's whatever order the fixture lists.
+    const missing = [...fixtureFiles.keys()].find((file) => file !== 'hyper.json');
     if (missing === undefined) throw new Error('The fixture holds more than one file.');
     const github = fakeGitHub({
       files: fixtureFiles,

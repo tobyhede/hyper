@@ -364,13 +364,13 @@ describe('mounting an aggregate in the page', () => {
     expect(history.writes).toEqual([{ method: 'replace', path: `${META_PATH}?source=${PINNED}` }]);
   });
 
-  it('keeps the rest of the query and the hash as it moves the root to the Meta Space', async () => {
+  it('keeps the rest of the query as it moves the root to the Meta Space, but not the hash', async () => {
     const history = recordingHistory('/?utm=feed#notes');
 
     await mountedStartup(fixtureFiles(), { history }).resolve('/');
 
     expect(history.writes).toEqual([
-      { method: 'replace', path: `${META_PATH}?utm=feed&source=${PINNED}#notes` },
+      { method: 'replace', path: `${META_PATH}?utm=feed&source=${PINNED}` },
     ]);
   });
 
