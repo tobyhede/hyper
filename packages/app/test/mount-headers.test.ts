@@ -48,14 +48,13 @@ describe('the static build’s headers', () => {
     expect(inlineScriptSources(html)).toEqual(['\n  first();\n', 'second();']);
   });
 
-  it('keeps hashed assets for a year and sends nosniff everywhere', () => {
-    const rules = mountHeaderRules([]);
+  it('sends nosniff everywhere', () => {
+    expect(
+      mountHeaderRules([]).find(({ path }) => path === '/*')?.headers['X-Content-Type-Options'],
+    ).toBe('nosniff');
+  });
 
-    expect(rules.find(({ path }) => path === '/assets/*')?.headers).toEqual({
-      'Cache-Control': 'public, max-age=31536000, immutable',
-    });
-    expect(rules.find(({ path }) => path === '/*')?.headers['X-Content-Type-Options']).toBe(
-      'nosniff',
-    );
+  it('leaves caching to Cloudflare, so a missing asset answered by the page is never kept', () => {
+    expect(mountHeaders([])).not.toMatch(/cache-control/i);
   });
 });

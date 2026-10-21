@@ -113,6 +113,16 @@ test('a deep product URL is answered with the application under the build’s po
   await expect(page.getByTestId('selected-canvas')).toHaveText('Linked Spaces');
 });
 
+test('a missing hashed asset is answered with the page, and nothing keeps it', async ({
+  request,
+}) => {
+  const response = await request.get('/assets/index-missing.js');
+
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('text/html');
+  expect(response.headers()['cache-control']).toBeUndefined();
+});
+
 test(
   'marks the session read-only and offers no Edit',
   { tag: '@parity:command-dock-marks-a-mounted-session-read-only' },

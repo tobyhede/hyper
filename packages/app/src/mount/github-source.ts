@@ -7,7 +7,7 @@ import {
   type MalformedGitHubLocation,
   type ResolvedGitHubLocation,
 } from './github-location';
-import { AGGREGATE_FILE_NAME, scannedAggregatePaths } from '@project/aggregate';
+import { AGGREGATE_FILE_NAME, mapSource, scanAggregateFrom } from '@project/aggregate';
 
 /**
  * The GitHub source (ADR 0130): a GitHub location read into the files of the
@@ -338,7 +338,13 @@ export const readGitHubLocation = async (
     return { ok: false, failure: { kind: 'missing-aggregate-file', location: resolved } };
   }
 
-  const scanned = scannedAggregatePaths(directoryFiles);
+  // The reader's own scan, over the listed paths alone, says which to fetch.
+  const { files: scanned } = await scanAggregateFrom(
+    mapSource(
+      formatGitHubLocation(resolved),
+      new Map(directoryFiles.map((file) => [file, new Uint8Array()])),
+    ),
+  );
   for (const file of scanned) {
     const size = listedSizes.get(file);
     if (size !== undefined && size > MAX_BLOB_BYTES) {
