@@ -676,6 +676,38 @@ describe('a file that could not be read', () => {
     expect(thrown.diagnostics).toEqual([`/talk/${META_SPACE_ID}/a.md: EACCES: permission denied`]);
   });
 
+  it('names an image that could not be read as a discovery failure', async () => {
+    const image = await admitted(pngBytes(7));
+    const path = `images/${image.id}.png`;
+    const thrown = await captureError(() =>
+      readAggregateFrom(
+        withUnreadable(
+          mapSource(
+            '/talk',
+            new Map([
+              [
+                AGGREGATE_FILE_NAME,
+                encode(JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID })),
+              ],
+              [
+                `${META_SPACE_ID}/space.json`,
+                encode(JSON.stringify({ version: 1, title: 'Meta' })),
+              ],
+              [path, image.bytes],
+            ]),
+          ),
+          new Map([[path, 'EACCES: permission denied']]),
+        ),
+        countingIds(),
+      ),
+    );
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toEqual([`/talk/${path}: EACCES: permission denied`]);
+  });
+
   // Root ignores the mode bits and reads the file anyway, which would fail this
   // rather than exercise it.
   it.skipIf(process.getuid?.() === 0)('is reported the same way from disk', async () => {
@@ -886,6 +918,65 @@ describe('reading from a source', () => {
 
     expect(aggregate.spaces[0]?.resources).toHaveLength(resources.length);
     expect(most).toBe(3);
+  });
+
+  it('names hyper.json when it could not be read, reading nothing else', async () => {
+    const { source, reads } = recordingReads(
+      withUnreadable(
+        mapSource(
+          '/talk',
+          new Map([
+            [AGGREGATE_FILE_NAME, encode(aggregateText)],
+            [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+          ]),
+        ),
+        new Map([[AGGREGATE_FILE_NAME, 'EACCES: permission denied']]),
+      ),
+    );
+
+    const thrown = await captureError(() => readAggregateFrom(source, countingIds()));
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.kind).toBe('discovery');
+    expect(thrown.diagnostics).toEqual([`/talk/${AGGREGATE_FILE_NAME}: EACCES: permission denied`]);
+    expect(reads).toEqual([AGGREGATE_FILE_NAME]);
+  });
+
+  it('names a file once under a source name ending in a slash', async () => {
+    const thrown = await captureError(() =>
+      readAggregateFrom(mapSource('/talk/', new Map()), countingIds()),
+    );
+
+    expect(thrown).toBeInstanceOf(AggregateDirectoryError);
+    if (!(thrown instanceof AggregateDirectoryError)) return;
+    expect(thrown.diagnostics).toEqual([
+      expect.stringMatching(new RegExp(`^/talk/${AGGREGATE_FILE_NAME}: `)),
+    ]);
+  });
+
+  it('refuses a source that allows no read at once', async () => {
+    const source: AggregateSource = {
+      ...mapSource(
+        '/talk',
+        new Map([
+          [AGGREGATE_FILE_NAME, encode(aggregateText)],
+          [`${META_SPACE_ID}/space.json`, encode(metaSpaceFile)],
+        ]),
+      ),
+      concurrency: 0,
+    };
+
+    await expect(readAggregateFrom(source, countingIds())).rejects.toThrow(RangeError);
+  });
+
+  it('answers a read a map source holds no bytes for with its reason', async () => {
+    const source = mapSource('/talk', new Map([[AGGREGATE_FILE_NAME, encode(aggregateText)]]));
+
+    expect(await source.read('missing.json')).toEqual({
+      ok: false,
+      reason: 'not among the files in memory',
+    });
   });
 
   it('stops at a directory that could not be listed, naming it', async () => {
