@@ -9,7 +9,7 @@ import {
 import type { HistoryApi } from '../browser-location';
 import type { PresentationLinks } from '../presentation-link';
 import type { Fullscreen } from '../presenting-fullscreen';
-import { withSource } from '../source-parameter';
+import { carriedAddress } from '../source-parameter';
 import { browserImageSources, createSpaceStartup, type SpaceStartup } from '../space';
 import {
   formatGitHubLocation,
@@ -107,7 +107,7 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
       // A static host may serve the application at `/index.html` as well as
       // at the root, and both mean the root.
       if (pathname === '/' || pathname === '/index.html') {
-        history.replace(withSource(meta, pinned));
+        history.replace(carriedAddress(meta, history.href(), pinned));
         return await startup.resolve(meta);
       }
       pinSource(history, resolved);

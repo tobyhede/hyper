@@ -1,5 +1,5 @@
 import type { HistoryApi } from '../browser-location';
-import { sourceParameter, withSource } from '../source-parameter';
+import { carriedAddress, sourceParameter } from '../source-parameter';
 import {
   formatGitHubLocation,
   parseGitHubLocation,
@@ -59,6 +59,6 @@ export const pinSource = (
 ): boolean => {
   const pinned = formatGitHubLocation(resolved);
   if (sourceParameter(history.href()) === pinned) return false;
-  history.replace(withSource(history.pathname(), pinned));
+  history.replace(carriedAddress(history.pathname(), history.href(), pinned));
   return true;
 };

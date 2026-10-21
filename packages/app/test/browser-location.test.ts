@@ -738,15 +738,34 @@ describe('the mounted source in the address', () => {
     location.dispose();
   });
 
-  it('carries only the source, dropping any other query', () => {
+  it('carries the rest of the query and the hash beside the source', () => {
     const app = compose();
-    const history = recordingHistory(`${sourced(mapPath(MAP_ID))}&utm=feed`);
+    const history = recordingHistory(`${mapPath(MAP_ID)}?utm=feed&source=${SOURCE}&x=1#notes`);
     const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
 
     location.chooseMap(OTHER_MAP_ID);
 
-    expect(history.writes).toEqual([{ method: 'push', path: sourced(mapPath(OTHER_MAP_ID)) }]);
+    expect(history.writes).toEqual([
+      { method: 'push', path: `${mapPath(OTHER_MAP_ID)}?utm=feed&source=${SOURCE}&x=1#notes` },
+    ]);
+    expect(location.href({ kind: 'map', spaceId: SPACE_ID, mapId: MAP_ID })).toBe(
+      `https://space.test${mapPath(MAP_ID)}?utm=feed&source=${SOURCE}&x=1#notes`,
+    );
+    location.dispose();
+  });
+
+  it('carries the rest of the query and the hash on a page that is not mounted, but no source', () => {
+    const app = compose();
+    const history = recordingHistory(`${mapPath(MAP_ID)}?utm=feed&source=${SOURCE}#notes`);
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+
+    location.chooseMap(OTHER_MAP_ID);
+
+    expect(history.writes).toEqual([
+      { method: 'push', path: `${mapPath(OTHER_MAP_ID)}?utm=feed#notes` },
+    ]);
     location.dispose();
   });
 });
@@ -761,6 +780,18 @@ describe('pinning the mounted source', () => {
     pinSource(history, resolved(COMMIT));
 
     expect(history.writes).toEqual([{ method: 'replace', path: sourced(mapPath(MAP_ID)) }]);
+  });
+
+  it('keeps the rest of the query and the hash as it pins', () => {
+    const history = recordingHistory(
+      `${mapPath(MAP_ID)}?utm=feed&source=github:tobyhede/talk@main/slides#notes`,
+    );
+
+    pinSource(history, resolved(COMMIT));
+
+    expect(history.writes).toEqual([
+      { method: 'replace', path: `${mapPath(MAP_ID)}?utm=feed&source=${SOURCE}#notes` },
+    ]);
   });
 
   it('writes nothing when the address already names the commit', () => {

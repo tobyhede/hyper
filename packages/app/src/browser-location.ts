@@ -11,7 +11,7 @@ import {
 import type { DestinationOpening } from './destination-opening';
 import { resolveMap } from './map-resolution';
 import { navigationAddress } from './navigation';
-import { sourceParameter, withSource } from './source-parameter';
+import { carriedAddress, sourceParameter } from './source-parameter';
 
 /**
  * The whole of what this application asks a browser for.
@@ -113,8 +113,9 @@ export interface BrowserLocationOptions {
   readonly reportObserverError?: ObserverErrorReporter;
   /**
    * Whether the session is Mounting (ADR 0130), so that every product path
-   * written carries the current location's `source`. Absent, it is not, and a
-   * stray `source` on a server session's page is not carried on.
+   * written carries the current location's `source` with the rest of its
+   * query. Absent, it is not, and a stray `source` on a server session's page
+   * is not carried on.
    */
   readonly carriesSource?: boolean | undefined;
 }
@@ -177,15 +178,19 @@ export function createBrowserLocation(
   };
 
   /**
-   * A destination's product path, with a mounted page's `source` carried
-   * after it when the current location has one (ADR 0130). Destinations
-   * resolve the pathname alone, so carrying it changes no decision.
+   * A destination's product path, with the current location's query and hash
+   * carried after it. A `source` among them is carried only in a Mounting
+   * session (ADR 0130). Destinations resolve the pathname alone, so carrying
+   * them changes no decision.
    */
-  const addressOf = (destination: ProductDestination): string =>
-    withSource(
+  const addressOf = (destination: ProductDestination): string => {
+    const href = history.href();
+    return carriedAddress(
       productDestinationPath(destination),
-      carriesSource ? sourceParameter(history.href()) : null,
+      href,
+      carriesSource ? sourceParameter(href) : null,
     );
+  };
 
   const positionOf = (app: ComposedApp): AddressedPosition => ({
     ...navigationAddress(app.navigation.getState()),
