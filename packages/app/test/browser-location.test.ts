@@ -580,6 +580,9 @@ const ENTERED_GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000012'
 /** A product path with the mounted source carried after it. */
 const sourced = (path: string, source = SOURCE): string => `${path}?source=${source}`;
 
+/** A Mounting session's options: its addresses carry the `source`. */
+const mountedOptions = { isNavigationHeld: nothingHeld, carriesSource: true };
+
 /**
  * A mounted page names its GitHub location in the `source` query parameter
  * (ADR 0130). Product URLs are otherwise unchanged, so every write the location
@@ -598,7 +601,7 @@ describe('the mounted source in the address', () => {
   it('survives a Map move', () => {
     const app = compose();
     const history = recordingHistory(sourced(mapPath(MAP_ID)));
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
 
     location.chooseMap(OTHER_MAP_ID);
@@ -610,7 +613,7 @@ describe('the mounted source in the address', () => {
   it('survives a Graph move', () => {
     const app = compose();
     const history = recordingHistory(sourced(mapPath(MAP_ID)));
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
 
     location.activateGraph(SECOND_GRAPH_ID);
@@ -624,7 +627,7 @@ describe('the mounted source in the address', () => {
   it('survives Present', () => {
     const app = compose();
     const history = recordingHistory(sourced(mapPath(MAP_ID)));
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
 
     app.navigation.present();
@@ -654,7 +657,7 @@ describe('the mounted source in the address', () => {
       resources: [],
     });
     const history = recordingHistory(sourced(mapPath(MAP_ID)));
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
 
     location.activate(entered);
@@ -673,7 +676,7 @@ describe('the mounted source in the address', () => {
   it('survives a browser traversal, which resolves the path alone', () => {
     const app = compose();
     const history = recordingHistory(sourced(mapPath(MAP_ID)));
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
     location.chooseMap(OTHER_MAP_ID);
 
@@ -693,7 +696,7 @@ describe('the mounted source in the address', () => {
     const app = compose();
     const stand = standInBrowser({ path: sourced(mapPath(MAP_ID)) });
     const history = createBrowserHistory(stand.browser);
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
     location.chooseMap(OTHER_MAP_ID);
 
@@ -711,7 +714,7 @@ describe('the mounted source in the address', () => {
   it('carries the source into a copied link', () => {
     const app = compose();
     const history = recordingHistory(sourced(mapPath(MAP_ID)));
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
 
     expect(location.href({ kind: 'map', spaceId: SPACE_ID, mapId: OTHER_MAP_ID })).toBe(
@@ -720,10 +723,25 @@ describe('the mounted source in the address', () => {
     location.dispose();
   });
 
+  it('carries no source on a page that is not mounted', () => {
+    const app = compose();
+    const history = recordingHistory(sourced(mapPath(MAP_ID)));
+    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    location.follow(app);
+
+    location.chooseMap(OTHER_MAP_ID);
+
+    expect(history.writes).toEqual([{ method: 'push', path: mapPath(OTHER_MAP_ID) }]);
+    expect(location.href({ kind: 'map', spaceId: SPACE_ID, mapId: MAP_ID })).toBe(
+      `https://space.test${mapPath(MAP_ID)}`,
+    );
+    location.dispose();
+  });
+
   it('carries only the source, dropping any other query', () => {
     const app = compose();
     const history = recordingHistory(`${sourced(mapPath(MAP_ID))}&utm=feed`);
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
 
     location.chooseMap(OTHER_MAP_ID);
@@ -782,7 +800,7 @@ describe('pinning the mounted source', () => {
   it('is carried by every later move the location makes', () => {
     const app = compose();
     const history = recordingHistory(mapPath(MAP_ID));
-    const location = createBrowserLocation(history, { isNavigationHeld: nothingHeld });
+    const location = createBrowserLocation(history, mountedOptions);
     location.follow(app);
     pinSource(history, resolved(COMMIT));
 

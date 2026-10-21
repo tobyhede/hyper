@@ -432,6 +432,7 @@ export function createOpenSpaces({
       await openPath(pathname);
     },
     isNavigationHeld: () => observable.getState().replacingImage,
+    carriesSource: mounted,
   });
 
   /**

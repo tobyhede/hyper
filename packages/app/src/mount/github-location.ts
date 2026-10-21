@@ -93,6 +93,10 @@ export const parseGitHubLocation = (input: string): GitHubLocationParse => {
   return { ok: true, location: { owner, repo, ref, path } };
 };
 
+/** A location as it was given, in the syntax `parseGitHubLocation` reads. */
+export const formatGivenGitHubLocation = ({ owner, repo, ref, path }: GitHubLocation): string =>
+  `${SCHEME}${owner}/${repo}${ref === undefined ? '' : `@${ref}`}${path === '' ? '' : `/${path}`}`;
+
 /** The complete resolved location, in the syntax `parseGitHubLocation` reads. */
 export const formatGitHubLocation = ({ owner, repo, sha, path }: ResolvedGitHubLocation): string =>
-  `${SCHEME}${owner}/${repo}@${sha}${path === '' ? '' : `/${path}`}`;
+  formatGivenGitHubLocation({ owner, repo, ref: sha, path });

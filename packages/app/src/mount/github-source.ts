@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   formatGitHubLocation,
+  formatGivenGitHubLocation,
   isCommitSha,
   parseGitHubLocation,
   type GitHubLocation,
@@ -150,19 +151,26 @@ const BLOB_CONCURRENCY = 8;
 /** The delay before retrying a blob whose answer names none. */
 const DEFAULT_RETRY_MS = 1000;
 
-/** Suspends for `ms` milliseconds; injected so a test need not wait. */
-export type Wait = (ms: number) => Promise<void>;
+/**
+ * Suspends for `ms` milliseconds, or until `signal` aborts if that is sooner;
+ * injected so a test need not wait.
+ */
+export type Wait = (ms: number, signal: AbortSignal) => Promise<void>;
 
-const waitWithTimer: Wait = (ms) =>
+/** A timer that the cancellation clears, leaving neither it nor its listener behind. */
+const waitWithTimer: Wait = (ms, signal) =>
   new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
-/** Resolves once the signal aborts: a wait raced against it ends at the cancellation. */
-const untilCancelled = (signal: AbortSignal): Promise<void> =>
-  new Promise((resolve) => {
-    if (signal.aborted) resolve();
-    else signal.addEventListener('abort', () => resolve(), { once: true });
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    const end = (): void => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', end);
+      resolve();
+    };
+    const timer = setTimeout(end, ms);
+    signal.addEventListener('abort', end, { once: true });
   });
 
 const isRetryable = (status: number): boolean => status === 429 || status >= 500;
@@ -219,10 +227,7 @@ const fetchBlob = async (
   if (signal.aborted) return failed();
   if (response === undefined || isRetryable(response.status)) {
     // A retry once the blobs are cancelled throws at once, failing below.
-    await Promise.race([
-      wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now)),
-      untilCancelled(signal),
-    ]);
+    await wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now), signal);
     response = await request();
   }
   if (response === undefined) return failed();
@@ -351,10 +356,6 @@ export const readGitHubLocation = async (
   return { ok: true, aggregate: { location: resolved, files: files.value } };
 };
 
-/** A location as it was given, before its ref resolved. */
-const formatGivenLocation = ({ owner, repo, ref, path }: GitHubLocation): string =>
-  `github:${owner}/${repo}${ref === undefined ? '' : `@${ref}`}${path === '' ? '' : `/${path}`}`;
-
 const withStatus = (status: number | undefined): string =>
   status === undefined ? 'with no response' : `with HTTP ${status}`;
 
@@ -366,7 +367,7 @@ export const describeGitHubSourceFailure = (failure: GitHubSourceFailure): strin
     case 'rate-limited':
       return 'GitHub’s limit on requests without a token is used up for this network. Try again within the hour, or open a location pinned to a commit, which costs one request.';
     case 'not-found':
-      return `${formatGivenLocation(failure.location)} was not found: GitHub has no public repository, ref or commit by that name.`;
+      return `${formatGivenGitHubLocation(failure.location)} was not found: GitHub has no public repository, ref or commit by that name.`;
     case 'missing-aggregate-file':
       return `${formatGitHubLocation(failure.location)} does not directly contain hyper.json, so it is not an Aggregate directory.`;
     case 'truncated-tree':

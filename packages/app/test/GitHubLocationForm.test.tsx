@@ -44,6 +44,16 @@ describe('asking for a GitHub location', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('withdraws the reason once the location is edited', () => {
+    const { field, submit } = ask();
+    submit('tobyhede/talk');
+
+    fireEvent.change(field, { target: { value: 'github:tobyhede/talk' } });
+
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(field).toHaveAttribute('aria-invalid', 'false');
+  });
+
   it('shows the location the address gave, and why it could not be read', () => {
     const { field } = ask({
       kind: 'malformed-location',

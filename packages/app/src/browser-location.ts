@@ -111,6 +111,12 @@ export interface BrowserLocationOptions {
    */
   readonly openPath?: (pathname: string) => Promise<void>;
   readonly reportObserverError?: ObserverErrorReporter;
+  /**
+   * Whether the session is Mounting (ADR 0130), so that every product path
+   * written carries the current location's `source`. Absent, it is not, and a
+   * stray `source` on a server session's page is not carried on.
+   */
+  readonly carriesSource?: boolean | undefined;
 }
 
 /**
@@ -127,6 +133,7 @@ export function createBrowserLocation(
     isNavigationHeld,
     openPath,
     reportObserverError = (error) => console.error('Browser location observer failed', error),
+    carriesSource = false,
   }: BrowserLocationOptions,
 ): BrowserLocation {
   let followed: ComposedApp | null = null;
@@ -170,12 +177,15 @@ export function createBrowserLocation(
   };
 
   /**
-   * A destination's product path, with the mounted page's `source` carried
+   * A destination's product path, with a mounted page's `source` carried
    * after it when the current location has one (ADR 0130). Destinations
    * resolve the pathname alone, so carrying it changes no decision.
    */
   const addressOf = (destination: ProductDestination): string =>
-    withSource(productDestinationPath(destination), sourceParameter(history.href()));
+    withSource(
+      productDestinationPath(destination),
+      carriesSource ? sourceParameter(history.href()) : null,
+    );
 
   const positionOf = (app: ComposedApp): AddressedPosition => ({
     ...navigationAddress(app.navigation.getState()),

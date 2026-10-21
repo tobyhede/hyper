@@ -27,7 +27,7 @@ export interface GitHubLocationFormProps {
  *
  * The location is read by `parseGitHubLocation`, the one parser of the syntax,
  * and a location it refuses is answered with its reason beside the field
- * rather than navigated to.
+ * rather than navigated to, until the field is edited again.
  */
 export function GitHubLocationForm({ navigate, failure }: GitHubLocationFormProps) {
   const [value, setValue] = useState(failure?.input ?? '');
@@ -62,7 +62,11 @@ export function GitHubLocationForm({ navigate, failure }: GitHubLocationFormProp
             spellCheck={false}
             aria-invalid={reason !== null}
             aria-describedby={reason === null ? descriptionId : `${descriptionId} ${errorId}`}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => {
+              setValue(event.target.value);
+              // The reason was about the location as submitted, not as it now reads.
+              setReason(null);
+            }}
           />
           <FieldDescription id={descriptionId}>
             A public repository holding an Aggregate directory. The ref and path are optional.
