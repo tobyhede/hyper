@@ -84,7 +84,7 @@ export const browserImageSources = (
  * supplies its own (ADR 0130, `mount/mounted-startup.ts`).
  *
  * `session.mounted` says the session is Mounting an aggregate (ADR 0130), so
- * no Space it opens offers an Edit. It is named rather than positional, and
+ * every Space it opens marks its Edits as lost on reload (ADR 0131). It is named rather than positional, and
  * defaults to `false`: only a mount composition sets it.
  */
 export const createSpaceStartup = (

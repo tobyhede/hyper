@@ -2,9 +2,12 @@ import { encodeCompactUuid, uuidSchema } from '@project/core';
 import { expect, test as base, type BrowserContext, type Page } from '@playwright/test';
 import { COMMIT, fakeGitHub, OWNER, REPO } from '../test/fake-github';
 import { fixtureFiles } from '../test/fixture-files';
+import { expectPictureLoaded } from './image';
 import {
+  createResource,
   dock,
   nodeByTitle,
+  openResource,
   presentControl,
   presentedName,
   resourceControls,
@@ -113,25 +116,71 @@ test('a deep product URL is answered with the application under the build’s po
   await expect(page.getByTestId('selected-canvas')).toHaveText('Linked Spaces');
 });
 
+/** A 3×2 PNG no fixture image is, so storing it is a new image in the page. */
+const UPLOADED_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAEElEQVR4nGP4z8AAQQxwFgBB0gX7h/C5SAAAAABJRU5ErkJggg==';
+
 test(
-  'marks the session read-only and offers no Edit',
-  { tag: '@parity:command-dock-marks-a-mounted-session-read-only' },
+  'marks that edits are lost on reload, takes an Edit, and loses it on reload',
+  { tag: '@parity:command-dock-marks-a-mounted-session-unsaved' },
   async ({ page }) => {
     await openMeta(page);
 
-    await expect(dock(page).getByText('Read-only', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('persistence-status')).toHaveCount(0);
+    await expect(dock(page).getByText('Edits lost on reload', { exact: true })).toBeVisible();
     for (const create of await dock(page)
       .getByRole('button', { name: /^Create / })
       .all()) {
-      await expect(create).toHaveAttribute('aria-disabled', 'true');
+      await expect(create).not.toHaveAttribute('aria-disabled', 'true');
     }
-    await resourceControls(page, nodeByTitle(page, 'A').first());
-    await expect(page.getByRole('button', { name: /^Open Resource / })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /^Edit Title / })).toHaveCount(0);
     await expect(presentControl(page)).not.toHaveAttribute('aria-disabled', 'true');
+
+    const status = page.getByTestId('persistence-status');
+    const revision = (await status.getAttribute('data-revision')) ?? '';
+    const resource = nodeByTitle(page, 'A').first();
+    await resourceControls(page, resource);
+    await expect(page.getByRole('button', { name: 'Open Resource A' })).toBeVisible();
+    await resource.getByRole('button', { name: 'Edit Title A' }).click();
+    const title = page.getByRole('textbox', { name: 'Resource title' });
+    await title.fill('Renamed A');
+    await title.press('Enter');
+
+    await expect(nodeByTitle(page, 'Renamed A').first()).toBeVisible();
+    await expect(status).not.toHaveAttribute('data-revision', revision);
+    await expect(status).toHaveText('Persisted');
+
+    await page.reload();
+    await expect(page.locator('.react-flow__node').first()).toBeVisible();
+    await settled(page);
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await expect(nodeByTitle(page, 'Renamed A')).toHaveCount(0);
   },
 );
+
+test('an image uploaded in the page is drawn from an object URL over its bytes', async ({
+  page,
+}) => {
+  await openMeta(page);
+
+  const chooser = page.waitForEvent('filechooser');
+  await createResource(page, 'Image Resource');
+  await (
+    await chooser
+  ).setFiles({
+    name: 'diagram.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(UPLOADED_PNG, 'base64'),
+  });
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await expect(title).toBeFocused();
+  const created = await title.inputValue();
+  await title.press('Escape');
+
+  const resource = nodeByTitle(page, created).first();
+  await openResource(resource, created);
+  const picture = resource.locator('img');
+  await expect(picture).toHaveAttribute('src', /^blob:/u);
+  await expectPictureLoaded(picture, 3);
+});
 
 test('a Presenting URL loads directly and survives a reload', async ({ page }) => {
   await openMeta(page);

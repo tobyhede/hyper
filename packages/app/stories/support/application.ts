@@ -9,8 +9,8 @@ import { unlinkedPresentations } from './presentations';
 
 /**
  * Fixture data, an isolated history adapter and a host that refuses fullscreen;
- * all session behavior is production's. `mounted` composes the read-only
- * session Mounting opens (ADR 0130).
+ * all session behavior is production's. `mounted` composes the session
+ * Mounting opens (ADR 0130), whose Edits are lost on reload (ADR 0131).
  */
 export function storySpaces(
   metaSpaceId: UUID,

@@ -37,8 +37,6 @@ export interface KindDecoration<K extends ResourceFlowNode['data']['kind']> {
  */
 export interface CanvasResourceDecorationContext {
   readonly authorOnCanvas: boolean;
-  /** `AuthoringAvailability.resourceActions`: the rail may draw its Actions menu. */
-  readonly resourceActions: boolean;
   readonly bodyEditing: boolean;
   readonly editableResourceIds: ReadonlySet<string>;
   readonly openResource: (resourceId: string) => 'completed' | 'retained';
@@ -217,7 +215,6 @@ export function kindDecorationMemo<Context>(
 type SharedResourceDecorationContext = Pick<
   CanvasResourceDecorationContext,
   | 'authorOnCanvas'
-  | 'resourceActions'
   | 'bodyEditing'
   | 'bodyEditorResourceId'
   | 'editableResourceIds'
@@ -294,18 +291,16 @@ export function decorateSharedResourceNode(
     };
   }
   if (context.resourceEntityActions !== undefined && resourceBelongsToWorkingSpace) {
-    // The gate every other control on the rail takes, `authorOnCanvas`, except
-    // in a mounted session, which withholds every Edit and keeps this menu for
-    // its addresses and a Space Resource's Enter — each Edit in it answers to
-    // its own availability. Otherwise a canvas that has withdrawn authoring
-    // would reinstate the one cluster that survived it. Withdrawn is `[]`,
+    // The same gate every other control on the rail takes: these commands are
+    // drawn in that rail, so a canvas that has withdrawn authoring would
+    // otherwise reinstate the one cluster that survived it. Withdrawn is `[]`,
     // never `undefined`: `CanvasResource` keeps its `EntityActions` wrapper
     // mounted for any defined list, so withdrawing authoring does not remount
     // the Resource and lose a running replacement's target. Held by
     // `canvas-resource-decoration.test.ts` ('asks for entity actions only where
     // authoring is on…') and `CanvasResource.test.tsx` ('keeps a pending
     // replacement mounted when its entity actions become unavailable').
-    patch.entityActions = context.resourceActions
+    patch.entityActions = context.authorOnCanvas
       ? context.resourceEntityActions(node.data.resourceId)
       : [];
   }

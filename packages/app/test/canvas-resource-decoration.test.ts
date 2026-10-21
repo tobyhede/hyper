@@ -120,7 +120,6 @@ type DecorationContext = CanvasResourceDecorationContext & KindDecorationContext
 
 const context = (overrides: Partial<DecorationContext> = {}): DecorationContext => ({
   authorOnCanvas: true,
-  resourceActions: true,
   bodyEditing: false,
   pickImageFiles: () => Promise.resolve([]),
   replaceResourceImage: () => Promise.resolve(null),
@@ -173,8 +172,8 @@ describe('decorateSharedResourceNode', () => {
     expect(patch.entityActions).toEqual([]);
   });
 
-  /** The menu's own gate, which a mounted session holds open while authoring is withdrawn. */
-  it('asks for entity actions only where the rail actions are offered and the Resource is the working Space’s', () => {
+  /** The menu carries Connect, so this gate also gates drawing an Edge from the keyboard. */
+  it('asks for entity actions only where authoring is on and the Resource is the working Space’s', () => {
     const groups = [[]];
     const resourceEntityActions = vi.fn(() => groups);
 
@@ -188,22 +187,16 @@ describe('decorateSharedResourceNode', () => {
     expect(
       decorateSharedResourceNode(
         projectionNode(RESOURCE_ID, 'markdown'),
-        context({ resourceEntityActions, authorOnCanvas: false, resourceActions: false }),
-      ).entityActions,
-    ).toEqual([]);
-    expect(
-      decorateSharedResourceNode(
-        projectionNode(RESOURCE_ID, 'markdown'),
         context({ resourceEntityActions, authorOnCanvas: false }),
       ).entityActions,
-    ).toBe(groups);
+    ).toEqual([]);
     expect(
       decorateSharedResourceNode(
         projectionNode(MISSING_RESOURCE_ID, 'markdown'),
         context({ resourceEntityActions }),
       ).entityActions,
     ).toBeUndefined();
-    expect(resourceEntityActions).toHaveBeenCalledTimes(2);
+    expect(resourceEntityActions).toHaveBeenCalledOnce();
   });
 
   it('withholds competing title controls while a body caret is live', () => {
@@ -220,7 +213,6 @@ describe('decorateSharedResourceNode', () => {
     const closeResource = vi.fn(() => 'completed' as const);
     const withdrawn = context({
       authorOnCanvas: false,
-      resourceActions: false,
       bodyEditing: true,
       bodyEditorResourceId: RESOURCE_ID,
       openResource,

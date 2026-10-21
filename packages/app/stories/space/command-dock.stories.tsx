@@ -58,13 +58,12 @@ export const Presenting: Story = () => <CommandDockFixture scenario="presenting"
 Presenting.meta = { iframed: true };
 
 /**
- * A mounted session (ADR 0130): the same crossing chain, read-only.
+ * A mounted session (ADR 0130, ADR 0131): the same crossing chain, authored
+ * as any session is, with its Edits kept only in the page.
  *
- * The Dock trails the read-only mark and reports no persistence state, and
- * every Edit is drawn unavailable or absent — renames, Create, the Resources
- * list — while the Space, Map and Graph choices, Open Spaces and Present stay
- * live. On the canvas a Resource still selects, and a Space Resource's Actions
- * menu still offers Enter.
+ * The Dock trails the mark that says Edits are lost on reload, and offers every
+ * Edit an unmounted session offers — renames and Create among them — beside
+ * the Space, Map and Graph choices, Open Spaces and Present.
  */
 export const Mounted: Story = () => <CommandDockFixture scenario="mounted" />;
 Mounted.meta = { iframed: true };
