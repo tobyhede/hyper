@@ -11,7 +11,7 @@ import {
   writeInPlace,
   type DirectoryFiles,
 } from '../aggregate-directory';
-import { type SpaceRepository, readAggregateFiles } from '@project/aggregate';
+import { mapSource, readAggregateFrom, type SpaceRepository } from '@project/aggregate';
 
 /** One Space whose bytes landed but whose projected revision was not recorded. */
 export interface UnrecordedExport {
@@ -85,7 +85,7 @@ const checkReadsBack = async (
       readonly errors: readonly SpaceAggregateError[];
     }
 > => {
-  const reread = await readAggregateFiles(destination, files, mintsNothing);
+  const reread = await readAggregateFrom(mapSource(destination, files), mintsNothing);
   if (reread.metaSpaceId !== metaSpaceId) {
     throw new Error(
       `Exported aggregate names Meta Space ${reread.metaSpaceId} rather than ${metaSpaceId}`,

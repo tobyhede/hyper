@@ -4,8 +4,8 @@ import {
   createSpaceHost,
   describeAggregateRefusal,
   MemorySpaceRepository,
-  readAggregateFiles,
-  type AggregateFiles,
+  readAggregateFrom,
+  type AggregateSource,
   type SpaceHostApplication,
 } from '@project/aggregate';
 import { HttpSpaceBackend } from '@project/http';
@@ -29,12 +29,10 @@ import type { ImageDisplay } from '@project/ui';
  * to GitHub, so a reload mounts the talk as it was committed.
  */
 
-/** What to mount: the files of an Aggregate directory, and what the mount is composed with. */
+/** What to mount: an Aggregate directory's source, and what the mount is composed with. */
 export interface AggregateMount {
-  /** Names the directory in diagnostics, as the CLI names the path it was given. */
-  readonly name: string;
-  /** The directory's files, by path relative to it with `/` between segments. */
-  readonly files: AggregateFiles;
+  /** Where the directory is read from, named in diagnostics as the CLI names the path it was given. */
+  readonly source: AggregateSource;
   /** The identity source for anything the directory leaves out (ADR 0109). */
   readonly newId: () => UUID;
   /** Make an object URL over a picture's bytes: `URL.createObjectURL` in a page. */
@@ -170,22 +168,21 @@ class DisplayedImagesRepository extends MemorySpaceRepository {
 }
 
 /**
- * Read an Aggregate directory's files and establish a fresh in-page store from
- * them through the aggregate lifecycle, answering what browser startup takes,
- * or why the files did not mount.
+ * Read an Aggregate directory from its source and establish a fresh in-page
+ * store from it through the aggregate lifecycle, answering what browser
+ * startup takes, or why the directory did not mount.
  *
  * Images first, as Import stores them (ADR 0118), so every stored image the
  * aggregate shows is there the moment the aggregate is.
  */
 export const mountAggregate = async ({
-  name,
-  files,
+  source,
   newId,
   createObjectUrl,
 }: AggregateMount): Promise<MountResult> => {
   let contents;
   try {
-    contents = await readAggregateFiles(name, files, newId);
+    contents = await readAggregateFrom(source, newId);
   } catch (error) {
     if (!(error instanceof AggregateDirectoryError)) throw error;
     return { ok: false, refusal: { kind: 'unreadable', diagnostics: error.diagnostics } };

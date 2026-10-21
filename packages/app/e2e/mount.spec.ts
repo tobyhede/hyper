@@ -116,6 +116,16 @@ test('a deep product URL is answered with the application under the build’s po
   await expect(page.getByTestId('selected-canvas')).toHaveText('Linked Spaces');
 });
 
+test('a missing hashed asset is answered with the page, and nothing keeps it', async ({
+  request,
+}) => {
+  const response = await request.get('/assets/index-missing.js');
+
+  expect(response.status()).toBe(200);
+  expect(response.headers()['content-type']).toContain('text/html');
+  expect(response.headers()['cache-control']).toBeUndefined();
+});
+
 /** A 3×2 PNG no fixture image is, so storing it is a new image in the page. */
 const UPLOADED_PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAEElEQVR4nGP4z8AAQQxwFgBB0gX7h/C5SAAAAABJRU5ErkJggg==';

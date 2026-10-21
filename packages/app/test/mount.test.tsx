@@ -2,6 +2,7 @@ import { Blob as NodeBlob } from 'node:buffer';
 import { act, waitFor, within } from '@testing-library/react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { mapSource } from '@project/aggregate';
 import { uuidSchema, type UUID } from '@project/core';
 import { productDestinationPath } from '@project/http';
 import { parseGitHubLocation, type GitHubLocation } from '../src/mount/github-location';
@@ -193,8 +194,7 @@ describe('mounting an aggregate in the page', () => {
   it('commits a write in the page, which a fresh mount of the same files does not hold', async () => {
     const mount = () =>
       mountAggregate({
-        name: 'fixture',
-        files: fixtureFiles(),
+        source: mapSource('fixture', fixtureFiles()),
         newId: mintsNothing,
         createObjectUrl: recordingObjectUrls().createObjectUrl,
       });
@@ -233,8 +233,7 @@ describe('mounting an aggregate in the page', () => {
   it('stores an uploaded image in the page and draws it from an object URL over its bytes', async () => {
     const objectUrls = recordingObjectUrls();
     const mounted = await mountAggregate({
-      name: 'fixture',
-      files: fixtureFiles(),
+      source: mapSource('fixture', fixtureFiles()),
       newId: mintsNothing,
       createObjectUrl: objectUrls.createObjectUrl,
     });

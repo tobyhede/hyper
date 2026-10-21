@@ -15,6 +15,10 @@ import { createHash } from 'node:crypto';
  * React Flow and the startup view position by inline style, and in
  * `script-src` the hash of each inline script the page carries, which is
  * `index.html`'s startup-failure guard.
+ *
+ * No rule sets `Cache-Control`: a rule matches a path, never a status, and
+ * the single-page fallback answers a missing `/assets/*` name with
+ * `index.html` and 200 (`mount.spec.ts`).
  */
 export interface HeaderRule {
   /** A Cloudflare `_headers` path: exact, or a prefix ending in `*`. */
@@ -49,11 +53,6 @@ export const mountHeaderRules = (inlineScripts: readonly string[]): readonly Hea
       'Content-Security-Policy': contentSecurityPolicy(inlineScripts),
       'X-Content-Type-Options': 'nosniff',
     },
-  },
-  {
-    // Vite names every asset by its content's hash, so one URL never changes.
-    path: '/assets/*',
-    headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
   },
 ];
 

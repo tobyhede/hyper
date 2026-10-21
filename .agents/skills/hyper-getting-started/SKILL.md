@@ -42,3 +42,5 @@ Work from the root of the Hyper clone. Each step ends on its completion criterio
    Done when the person has the address and has been told each point above.
 
 The full description of Running is the README's "How Running works"; the file format is `docs/aggregate-directory.md`.
+
+To show a talk on the web from its public GitHub repository, read-only and with no server, and to point a domain at it, follow `docs/deploy-cloudflare.md`.
