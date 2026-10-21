@@ -182,7 +182,7 @@ export function createBrowserLocation(
    * A destination's product path, with the current location's query carried
    * after it. Its `source` is carried only in a Mounting session (ADR 0130).
    * Destinations resolve the pathname alone, so carrying it changes no
-   * decision.
+   * decision ("survives a browser traversal, which resolves the path alone").
    */
   const addressOf = (destination: ProductDestination): string =>
     carriedAddress(productDestinationPath(destination), history.href(), sourceCarry);
