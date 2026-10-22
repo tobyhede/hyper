@@ -65,3 +65,31 @@ export const describeAggregateRefusal = (
     }
   });
 };
+
+/**
+ * Why an Aggregate directory did not become a store: its files did not read as
+ * an aggregate, or Import's intake refused the aggregate they read.
+ * `diagnostics` are the lines for each, `describeAggregateRefusal`'s for a
+ * refused aggregate.
+ */
+export interface AggregateReadRefusal {
+  readonly kind: 'unreadable' | 'aggregate-refused';
+  readonly diagnostics: readonly string[];
+}
+
+/**
+ * A refusal as the author of the directory `name` reads it, in the same words
+ * wherever the directory was read from: `pnpm hyper run`, `pnpm hyper import`
+ * and a mount (ADR 0130). No trailing newline; a stream adds its own.
+ */
+export const describeAggregateReadRefusal = (
+  refusal: AggregateReadRefusal,
+  name: string,
+): string => {
+  switch (refusal.kind) {
+    case 'unreadable':
+      return `${name} is not an Aggregate directory:\n${refusal.diagnostics.join('\n')}`;
+    case 'aggregate-refused':
+      return `Aggregate validation failed:\n${refusal.diagnostics.join('\n')}`;
+  }
+};

@@ -15,7 +15,11 @@ export {
   type SourceRead,
 } from './aggregate-source';
 export { classifyInitializedAggregate } from './aggregate-lifecycle';
-export { describeAggregateRefusal } from './aggregate-refusal';
+export {
+  describeAggregateReadRefusal,
+  describeAggregateRefusal,
+  type AggregateReadRefusal,
+} from './aggregate-refusal';
 export { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
 export { imageFileName, IMAGES_DIRECTORY_NAME } from './images';
 export { MemorySpaceRepository } from './memory-space-repository';
