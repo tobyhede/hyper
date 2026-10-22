@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatGitHubLocation, parseGitHubLocation } from '../src/mount/github-location';
+import {
+  formatGitHubLocation,
+  formatGivenGitHubLocation,
+  parseGitHubLocation,
+} from '../src/mount/github-location';
 
 describe('parseGitHubLocation', () => {
   it('reads owner, repository, ref and path', () => {
@@ -72,5 +76,20 @@ describe('formatGitHubLocation', () => {
     expect(formatGitHubLocation({ owner: 'o', repo: 'r', sha, path: '' })).toBe(
       `github:o/r@${sha}`,
     );
+  });
+});
+
+describe('formatGivenGitHubLocation', () => {
+  it('writes a location as given, round-tripping through the parser', () => {
+    for (const input of [
+      'github:o/r',
+      'github:o/r@main',
+      'github:o/r/talks/pgdu',
+      'github:o/r@release@beta/talks',
+    ]) {
+      const parsed = parseGitHubLocation(input);
+      expect(parsed.ok).toBe(true);
+      if (parsed.ok) expect(formatGivenGitHubLocation(parsed.location)).toBe(input);
+    }
   });
 });

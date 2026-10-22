@@ -9,7 +9,7 @@ import {
   Input,
 } from '@project/ui';
 import { parseGitHubLocation, type MalformedGitHubLocation } from '../mount/github-location';
-import { withSource } from '../source-parameter';
+import { carriedAddress } from '../source-parameter';
 
 export interface GitHubLocationFormProps {
   /**
@@ -17,6 +17,8 @@ export interface GitHubLocationFormProps {
    * form asks for `?source=…`, which keeps the page's path.
    */
   readonly navigate: (url: string) => void;
+  /** The page's absolute URL, whose other query parameters the location is opened with. */
+  readonly href: () => string;
   /** Why the location the page was given could not be read, or `null` when it was given none. */
   readonly failure: MalformedGitHubLocation | null;
 }
@@ -27,9 +29,9 @@ export interface GitHubLocationFormProps {
  *
  * The location is read by `parseGitHubLocation`, the one parser of the syntax,
  * and a location it refuses is answered with its reason beside the field
- * rather than navigated to.
+ * rather than navigated to, until the field is edited again.
  */
-export function GitHubLocationForm({ navigate, failure }: GitHubLocationFormProps) {
+export function GitHubLocationForm({ navigate, href, failure }: GitHubLocationFormProps) {
   const [value, setValue] = useState(failure?.input ?? '');
   const [reason, setReason] = useState(failure?.reason ?? null);
   const inputId = useId();
@@ -45,7 +47,7 @@ export function GitHubLocationForm({ navigate, failure }: GitHubLocationFormProp
       return;
     }
     setReason(null);
-    navigate(withSource('', location));
+    navigate(carriedAddress('', href(), { set: location }));
   };
 
   return (
@@ -62,7 +64,11 @@ export function GitHubLocationForm({ navigate, failure }: GitHubLocationFormProp
             spellCheck={false}
             aria-invalid={reason !== null}
             aria-describedby={reason === null ? descriptionId : `${descriptionId} ${errorId}`}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => {
+              setValue(event.target.value);
+              // The reason was about the location as submitted, not as it now reads.
+              setReason(null);
+            }}
           />
           <FieldDescription id={descriptionId}>
             A public repository holding an Aggregate directory. The ref and path are optional.

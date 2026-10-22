@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readGitHubAggregate, type Wait } from '../src/mount/github-source';
 import { fixtureFiles as readFixtureFiles } from './fixture-files';
 import {
@@ -454,8 +454,8 @@ describe('readGitHubAggregate', () => {
     expect(waits).toEqual([]);
   });
 
-  it('cancels a blob waiting to retry once another fails', async () => {
-    const [, missing] = [...fixtureFiles.keys()];
+  it('cancels a blob waiting to retry once another fails, sending no retry', async () => {
+    const missing = [...fixtureFiles.keys()].find((file) => file !== 'hyper.json');
     if (missing === undefined) throw new Error('The fixture holds more than one file.');
     const github = fakeGitHub({
       files: fixtureFiles,
@@ -465,7 +465,8 @@ describe('readGitHubAggregate', () => {
       ]),
     });
     // A wait that never ends on its own: only the cancellation ends it.
-    const waitsForever: Wait = () => new Promise(() => undefined);
+    const waitsForever: Wait = (_ms, signal) =>
+      new Promise((resolve) => signal.addEventListener('abort', () => resolve()));
 
     const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, waitsForever);
 
@@ -473,6 +474,32 @@ describe('readGitHubAggregate', () => {
       ok: false,
       failure: { kind: 'blob-failed', path: missing, status: 404 },
     });
+    expect(github.rawRequests().filter((path) => path === 'hyper.json')).toHaveLength(1);
+  });
+
+  it('leaves no retry timer behind once the blobs are cancelled', async () => {
+    // A file other than hyper.json, so the retry is hyper.json's whatever order the fixture lists.
+    const missing = [...fixtureFiles.keys()].find((file) => file !== 'hyper.json');
+    if (missing === undefined) throw new Error('The fixture holds more than one file.');
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([
+        ['hyper.json', [{ status: 429, retryAfter: '10' }]],
+        [missing, [{ status: 404 }]],
+      ]),
+    });
+    vi.useFakeTimers();
+    try {
+      const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+      expect(result).toEqual({
+        ok: false,
+        failure: { kind: 'blob-failed', path: missing, status: 404 },
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not retry a blob that is not there', async () => {
