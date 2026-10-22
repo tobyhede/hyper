@@ -123,8 +123,9 @@ export interface ComposeAppDependencies extends ComposeCoreDependencies {
    */
   readonly fullscreen?: Fullscreen | undefined;
   /**
-   * Whether this Space is composed in a mounted session (ADR 0130), which
-   * offers no Edit (`authoring-availability.ts`). Absent, it is not.
+   * Whether this Space is composed in a mounted session (ADR 0130), whose
+   * Edits are kept in the page's memory and lost on reload (ADR 0131), which
+   * the Dock marks. Absent, it is not.
    */
   readonly mounted?: boolean | undefined;
   /**

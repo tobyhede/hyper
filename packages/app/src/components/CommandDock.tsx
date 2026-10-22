@@ -56,7 +56,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  ReadOnlyIcon,
+  UnsavedIcon,
   ToolbarButton,
 } from '@project/ui';
 import { canRetry } from '@project/persistence';
@@ -682,20 +682,21 @@ function PersistenceReport({
 }
 
 /**
- * That this session offers no Edit (ADR 0130), drawn where a mounted session
- * would otherwise report persistence.
+ * That this session's Edits are kept only in the page and are lost on reload
+ * (ADR 0131): a mounted session commits to a store in the page's memory, and
+ * nothing writes back to where the talk was read from.
  *
  * **A mark, not a command and not a status region.** It is a `Badge`, so it is
  * text in the strip that no arrow key stops on and nothing announces unasked:
- * a mounted session's read-only state is a fact about the whole session that
+ * where a mounted session's Edits go is a fact about the whole session that
  * does not change while it is open, so there is nothing to announce. It trails
  * the clusters because it qualifies all of them.
  */
-function ReadOnlyMark() {
+function UnsavedMark() {
   return (
     <Badge variant="outline">
-      <ReadOnlyIcon data-icon="inline-start" aria-hidden="true" />
-      Read-only
+      <UnsavedIcon data-icon="inline-start" aria-hidden="true" />
+      Edits lost on reload
     </Badge>
   );
 }
@@ -745,14 +746,12 @@ export function CommandDock({
           presenting={chrome.graph.presenting}
           label="Command Dock"
           report={
-            chrome.persistence === null ? null : (
-              <PersistenceReport
-                persistence={chrome.persistence}
-                edge={dock.edge}
-                navigate={chrome.navigate}
-                replaceSession={chrome.replaceSession}
-              />
-            )
+            <PersistenceReport
+              persistence={chrome.persistence}
+              edge={dock.edge}
+              navigate={chrome.navigate}
+              replaceSession={chrome.replaceSession}
+            />
           }
         >
           {/* Space | Map Graph | Resources.
@@ -788,10 +787,10 @@ export function CommandDock({
           />
           <Divider orientation={divider} />
           <ResourcesControl resources={chrome.resources} side={side} />
-          {chrome.readOnly ? (
+          {chrome.unsaved ? (
             <>
               <Divider orientation={divider} />
-              <ReadOnlyMark />
+              <UnsavedMark />
             </>
           ) : null}
         </Dock>

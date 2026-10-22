@@ -9,7 +9,7 @@ import {
   type SpaceHostApplication,
 } from '@project/aggregate';
 import { HttpSpaceBackend } from '@project/http';
-import { encodeProblemDetails, imagePath, type StoredImage } from '@project/persistence';
+import { IMAGE_COLLECTION_PATH, isImageId } from '@project/persistence';
 import type { ImageDisplay } from '@project/ui';
 
 /**
@@ -23,6 +23,10 @@ import type { ImageDisplay } from '@project/ui';
  * it is in a page: the backend is the ordinary `HttpSpaceBackend`, and every
  * request it sends is answered by the Space host's own HTTP application over
  * an ordinary memory repository.
+ *
+ * Every Edit is committed to that repository and lives as long as the page
+ * (ADR 0131): nothing is kept in browser storage and nothing is written back
+ * to GitHub, so a reload mounts the talk as it was committed.
  */
 
 /** What to mount: an Aggregate directory's source, and what the mount is composed with. */
@@ -40,7 +44,7 @@ export interface MountedAggregate {
   readonly metaSpaceId: UUID;
   /** The ordinary HTTP backend, whose requests the in-page application answers. */
   readonly backend: HttpSpaceBackend;
-  /** Draws a stored image the directory carries from an object URL over its bytes. */
+  /** Draws each image the in-page store holds from an object URL over its bytes. */
   readonly displayImage: ImageDisplay;
 }
 
@@ -75,28 +79,6 @@ export const describeMountRefusal = (refusal: MountRefusal, name: string): strin
 const IN_PAGE_ORIGIN = 'https://mounted.invalid';
 
 /**
- * A mounted aggregate is read-only (ADR 0130), so the in-page application
- * answers every request that is not a read with `forbidden`, before the Space
- * host sees it: a Space commit and an image upload alike, and nothing is
- * stored.
- *
- * Refused here rather than in the repository, because the repository has to
- * accept the one write a read makes: the working-space loader establishes a
- * stored mapless Space's first Map on its first load (ADR 0079), and refusing
- * that would leave such a Space unopenable. That write stays inside the page.
- */
-const refuseWrite = (): Response =>
-  new Response(
-    JSON.stringify(
-      encodeProblemDetails('forbidden', 'This aggregate is mounted read-only; nothing is stored.'),
-    ),
-    {
-      status: 403,
-      headers: { 'Content-Type': 'application/problem+json', 'Cache-Control': 'no-store' },
-    },
-  );
-
-/**
  * `answer`, unless the signal aborts first: then a rejection carrying its
  * reason as the cause. The abort listener is removed once either settles, so
  * a signal shared across requests holds none for a request that has ended.
@@ -116,8 +98,7 @@ const untilAborted = async <T>(answer: Promise<T>, signal: AbortSignal): Promise
 };
 
 /**
- * The Space host's HTTP application, answering in the page, refusing every
- * write.
+ * The Space host's HTTP application, answering in the page.
  *
  * The caller's signal ends its wait rather than travelling on the request:
  * nothing in the host reads a request's signal, and a signal from another
@@ -128,25 +109,26 @@ const inPageFetch =
   async (input, init) => {
     const { signal, ...sent } = init ?? {};
     const request = new Request(input, sent);
-    if (request.method !== 'GET' && request.method !== 'HEAD') return refuseWrite();
     const answer = Promise.resolve(host.fetch(request));
     return await (signal == null ? answer : untilAborted(answer, signal));
   };
 
 /**
- * Where each stored image the directory carries is drawn from: an object URL
- * over its bytes, made the first time it is drawn and kept for the page's
- * life. Any other URL is drawn as authored, so a stored image the directory
- * carries no bytes for draws as a picture that will not load (ADR 0106).
+ * Where each stored image the in-page store holds is drawn from: an object URL
+ * over the store's own bytes, made the first time it is drawn and kept for the
+ * page's life, as a stored image is (ADR 0106). Any other URL is drawn as
+ * authored, so a stored image the store holds no bytes for draws as a picture
+ * that will not load.
  */
 const objectUrlDisplay = (
-  images: readonly StoredImage[],
+  repository: MemorySpaceRepository,
   createObjectUrl: (image: Blob) => string,
 ): ImageDisplay => {
-  const stored = new Map(images.map((image) => [imagePath(image.id), image]));
+  const prefix = `${IMAGE_COLLECTION_PATH}/`;
   const made = new Map<string, string>();
   return (url) => {
-    const image = stored.get(url);
+    const id = url.startsWith(prefix) ? url.slice(prefix.length) : '';
+    const image = isImageId(id) ? repository.heldImage(id) : undefined;
     if (image === undefined) return url;
     let objectUrl = made.get(url);
     if (objectUrl === undefined) {
@@ -203,7 +185,7 @@ export const mountAggregate = async ({
     mounted: {
       metaSpaceId: contents.metaSpaceId,
       backend: new HttpSpaceBackend(IN_PAGE_ORIGIN, { fetch: inPageFetch(host) }),
-      displayImage: objectUrlDisplay(contents.images, createObjectUrl),
+      displayImage: objectUrlDisplay(repository, createObjectUrl),
     },
   };
 };

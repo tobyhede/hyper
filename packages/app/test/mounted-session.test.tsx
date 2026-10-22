@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
-import { MemorySpaceBackend, type CommitResult } from '@project/persistence';
+import { MemorySpaceBackend } from '@project/persistence';
 import { createOpenSpaces, type OpenSpace } from '../src/open-spaces';
 import { OpenSpacesApplication } from '../src/components/OpenSpacesApplication';
 import { unavailable } from './command-dock';
@@ -14,10 +14,10 @@ import { mintingIds } from './minting';
 import { stubResizeObserver } from './resize-observer';
 
 /**
- * A mounted session is read-only (ADR 0130): it offers no Edit, and keeps
- * selecting, navigating, Entering and Present. Each case is answered against
- * the same Spaces unmounted as well, so a control the mounted session does not
- * draw is one the application does draw when it may.
+ * A mounted session authors as any session does (ADR 0131): its Edits are
+ * committed to the page's memory and lost on reload, which the Dock marks.
+ * Each case is answered against the same Spaces mounted and unmounted, so the
+ * two cannot drift apart.
  */
 
 const META_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -116,20 +116,9 @@ const metaWithOpenSpaceResource: SpaceSnapshot = {
   },
 };
 
-/** A backend that refuses every commit as the in-page application does. */
-class RefusingBackend extends MemorySpaceBackend {
-  override commit(): Promise<CommitResult> {
-    return Promise.resolve({ kind: 'permanent-failure', code: 'forbidden' });
-  }
-}
-
 /** The Meta Space opened in a session that is mounted or not, and drawn. */
-async function openMeta(
-  mounted: boolean,
-  root: SpaceSnapshot = meta,
-  Backend: typeof MemorySpaceBackend = MemorySpaceBackend,
-): Promise<OpenSpace> {
-  const backend = new Backend(
+async function openMeta(mounted: boolean, root: SpaceSnapshot = meta): Promise<OpenSpace> {
+  const backend = new MemorySpaceBackend(
     META_ID,
     [root, other].map((snapshot) => ({ snapshot, revision: 1n, exportedRevision: null })),
   );
@@ -158,85 +147,70 @@ const nodeOf = (name: string): HTMLElement => {
   return node;
 };
 
+const BOTH = [false, true] as const;
+
 describe('the Command Dock of a mounted session', () => {
-  it('shows the read-only mark and no persistence status', async () => {
+  it('marks that edits are lost on reload, beside the persistence status', async () => {
     await openMeta(true);
 
-    expect(within(dock()).getByText('Read-only')).toBeInTheDocument();
-    expect(screen.queryByTestId('persistence-status')).toBeNull();
-    expect(screen.queryByText('Persisted')).toBeNull();
+    expect(within(dock()).getByText('Edits lost on reload')).toBeInTheDocument();
+    expect(screen.getByTestId('persistence-status')).toHaveTextContent('Persisted');
   });
 
-  it('reports a write the in-page application refused', async () => {
-    const initial = await openMeta(true, meta, RefusingBackend);
+  it('commits an Edit, which the persistence status reports as any session’s', async () => {
+    const initial = await openMeta(true);
 
     act(() => {
       initial.session.submit({ ...meta, document: { ...meta.document, title: 'Renamed' } });
     });
 
     await waitFor(() =>
-      expect(screen.getByTestId('persistence-status')).toHaveAttribute(
-        'data-persistence-state',
-        'rejected',
-      ),
+      expect(screen.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2'),
     );
-    // The rejection's report is modal, so the Dock behind it is hidden from
-    // the accessibility tree; the mark is still drawn there.
-    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
-    expect(screen.getByText('Read-only')).toBeInTheDocument();
+    expect(screen.getByTestId('persistence-status')).toHaveTextContent('Persisted');
+    expect(initial.session.getState().working.document.title).toBe('Renamed');
   });
 
-  it('is not shown unmounted, where the persistence status is', async () => {
+  it('is not shown unmounted', async () => {
     await openMeta(false);
 
-    expect(within(dock()).queryByText('Read-only')).toBeNull();
+    expect(within(dock()).queryByText('Edits lost on reload')).toBeNull();
     expect(screen.getByTestId('persistence-status')).toHaveTextContent('Persisted');
   });
 
-  it('keeps Present and offers no Create', async () => {
-    await openMeta(true);
+  it.each(BOTH)('mounted %s: keeps Present and offers Create', async (mounted) => {
+    await openMeta(mounted);
 
     expect(unavailable(within(dock()).getByRole('button', { name: /^Present/ }))).toBe(false);
     for (const create of within(dock()).getAllByRole('button', { name: /^Create / })) {
-      expect(unavailable(create)).toBe(true);
+      expect(unavailable(create)).toBe(false);
     }
   });
 });
 
 describe('the canvas of a mounted session', () => {
-  it.each([
-    [false, true],
-    [true, false],
-  ])('mounted %s: offers Open, rename, drag and connect: %s', async (mounted, offered) => {
+  it.each(BOTH)('mounted %s: offers Open, rename, drag and connect', async (mounted) => {
     await openMeta(mounted);
     await selectResource('Note');
 
-    expect(screen.queryByRole('button', { name: 'Open Resource Note' }) !== null).toBe(offered);
-    expect(screen.queryByRole('button', { name: 'Edit Title Note' }) !== null).toBe(offered);
-    expect(nodeOf('Note').classList.contains('draggable')).toBe(offered);
+    expect(screen.getByRole('button', { name: 'Open Resource Note' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Title Note' })).toBeInTheDocument();
+    expect(nodeOf('Note').classList.contains('draggable')).toBe(true);
     const handles = nodeOf('Note').querySelectorAll('.react-flow__handle');
-    expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(
-      offered,
-    );
+    expect([...handles].some((handle) => handle.classList.contains('connectablestart'))).toBe(true);
   });
 
-  it.each([
-    [false, 3],
-    [true, 2],
-  ])('mounted %s: C on the canvas leaves %i Resources', async (mounted, count) => {
+  it.each(BOTH)('mounted %s: C on the canvas creates a Resource', async (mounted) => {
     const initial = await openMeta(mounted);
 
     act(() => {
       fireEvent.keyDown(nodeOf('Note'), { key: 'c' });
     });
 
-    await waitFor(() => expect(initial.session.getState().working.resources).toHaveLength(count));
+    await waitFor(() => expect(initial.session.getState().working.resources).toHaveLength(3));
   });
 
-  it.each([
-    [false, true],
-    [true, false],
-  ])('mounted %s: Enter on a Resource opens it: %s', async (mounted, opens) => {
+  it.each(BOTH)('mounted %s: Enter on a Resource opens it', async (mounted) => {
     const initial = await openMeta(mounted);
     const node = nodeOf('Note');
 
@@ -247,29 +221,21 @@ describe('the canvas of a mounted session', () => {
 
     await waitFor(() => {
       const { maps } = initial.session.getState().working.document;
-      expect(maps?.[0]?.positions[NOTE_ID]?.open).toBe(opens);
+      expect(maps?.[0]?.positions[NOTE_ID]?.open).toBe(true);
     });
   });
 
-  it.each([
-    [false, true],
-    [true, false],
-  ])('mounted %s: an Open Space Resource offers Edit: %s', async (mounted, offered) => {
+  it.each(BOTH)('mounted %s: an Open Space Resource offers Edit', async (mounted) => {
     await openMeta(mounted, metaWithOpenSpaceResource);
     await selectResource('Other');
 
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Close Resource Other' }) !== null).toBe(offered),
-    );
-    expect(screen.queryByRole('button', { name: 'Edit Resource Other' }) !== null).toBe(offered);
+    expect(await screen.findByRole('button', { name: 'Close Resource Other' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Resource Other' })).toBeInTheDocument();
   });
 
-  it.each([
-    [false, true],
-    [true, false],
-  ])(
-    "mounted %s: keeps a Space Resource's Enter, and offers the rail's Edits: %s",
-    async (mounted, offered) => {
+  it.each(BOTH)(
+    "mounted %s: offers a Space Resource's Enter and the rail's Edits",
+    async (mounted) => {
       await openMeta(mounted);
       await selectResource('Other');
 
@@ -282,7 +248,7 @@ describe('the canvas of a mounted session', () => {
         'Remove from Map',
         'Delete from Space',
       ]) {
-        expect(screen.queryByRole('menuitem', { name: edit }) !== null).toBe(offered);
+        expect(screen.getByRole('menuitem', { name: edit })).toBeInTheDocument();
       }
     },
   );
