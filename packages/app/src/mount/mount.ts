@@ -5,6 +5,7 @@ import {
   describeAggregateRefusal,
   MemorySpaceRepository,
   readAggregateFrom,
+  type AggregateReadRefusal,
   type AggregateSource,
   type SpaceHostApplication,
 } from '@project/aggregate';
@@ -45,28 +46,14 @@ export interface MountedAggregate {
 }
 
 /**
- * Why the files did not mount, in the two outcomes `pnpm hyper run` reports:
- * files the reader could not read as an aggregate, or an aggregate Import's
- * intake refused. `diagnostics` are the CLI's own lines for each.
+ * Why the files did not mount, in the two outcomes `pnpm hyper run` reports,
+ * worded by `describeAggregateReadRefusal` as the CLI words them.
  */
-export interface MountRefusal {
-  readonly kind: 'unreadable' | 'aggregate-refused';
-  readonly diagnostics: readonly string[];
-}
+export type MountRefusal = AggregateReadRefusal;
 
 export type MountResult =
   | { readonly ok: true; readonly mounted: MountedAggregate }
   | { readonly ok: false; readonly refusal: MountRefusal };
-
-/** A refusal in the sentence the CLI's `describeRunRefusal` writes for the same outcome. */
-export const describeMountRefusal = (refusal: MountRefusal, name: string): string => {
-  switch (refusal.kind) {
-    case 'unreadable':
-      return `${name} is not an Aggregate directory:\n${refusal.diagnostics.join('\n')}`;
-    case 'aggregate-refused':
-      return `Aggregate validation failed:\n${refusal.diagnostics.join('\n')}`;
-  }
-};
 
 /**
  * The origin the in-page requests are addressed to. `.invalid` is reserved

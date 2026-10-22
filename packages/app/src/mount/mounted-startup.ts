@@ -1,4 +1,4 @@
-import { mapSource } from '@project/aggregate';
+import { describeAggregateReadRefusal, mapSource } from '@project/aggregate';
 import type { UUID } from '@project/core';
 import {
   productAddress,
@@ -18,7 +18,7 @@ import {
 } from './github-location';
 import { describeGitHubSourceFailure, readGitHubLocation } from './github-source';
 import { pinSource } from './mount-source';
-import { describeMountRefusal, mountAggregate, type AggregateMount } from './mount';
+import { mountAggregate, type AggregateMount } from './mount';
 
 /**
  * Everything a mounted startup is composed with. Every seam is required: the
@@ -79,7 +79,7 @@ export const createMountedStartup = (options: MountedStartupOptions): SpaceStart
         newId: options.newId,
         createObjectUrl: options.createObjectUrl,
       });
-      if (!result.ok) throw new Error(describeMountRefusal(result.refusal, pinned));
+      if (!result.ok) throw new Error(describeAggregateReadRefusal(result.refusal, pinned));
       const { backend, displayImage, metaSpaceId } = result.mounted;
       const startup = createSpaceStartup(
         options.fullscreen,
