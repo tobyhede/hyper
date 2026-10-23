@@ -313,6 +313,19 @@ describe('mounting an aggregate in the page', () => {
     expect(container).toHaveTextContent('GitHub’s limit on requests without a token is used up');
   });
 
+  it('refuses a directory whose space.json is a symbolic link, as the CLI does', async () => {
+    const files = fixtureFiles();
+    const spaceFile = [...files.keys()].find((path) => path.endsWith('/space.json'));
+    if (spaceFile === undefined) throw new Error('The fixture holds a Space.');
+    const github = fakeGitHub({ files, symlinks: new Set([spaceFile]) });
+
+    const container = await render(() => mountedStartup(files, { github }).resolve('/'));
+
+    expect(container).toHaveTextContent(
+      `${PINNED}/${spaceFile}: is a symbolic link, which Hyper neither reads nor writes through`,
+    );
+  });
+
   it('shows a location whose directory holds no hyper.json as its failure', async () => {
     const files = fixtureFiles();
     files.delete('hyper.json');

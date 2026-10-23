@@ -38,6 +38,11 @@ import { AGGREGATE_FILE_NAME, mapSource, scanAggregateFrom } from '@project/aggr
 export interface GitHubAggregate {
   readonly location: ResolvedGitHubLocation;
   readonly files: ReadonlyMap<string, Uint8Array>;
+  /**
+   * The symbolic links the tree lists, by path, which are never fetched: the
+   * reader refuses one at a path Hyper owns, as it does on disk (ADR 0134).
+   */
+  readonly links: readonly string[];
 }
 
 export type GitHubSourceFailure =
@@ -341,7 +346,10 @@ export const readGitHubLocation = async (
     ),
   );
   const directoryFiles = [...listedSizes.keys()];
-  if (!directoryFiles.includes(AGGREGATE_FILE_NAME)) {
+  const links = tree.value.tree.flatMap((entry) =>
+    entry.type === 'blob' && entry.mode === SYMLINK_MODE ? [entry.path] : [],
+  );
+  if (!directoryFiles.includes(AGGREGATE_FILE_NAME) && !links.includes(AGGREGATE_FILE_NAME)) {
     return { ok: false, failure: { kind: 'missing-aggregate-file', location: resolved } };
   }
 
@@ -361,7 +369,7 @@ export const readGitHubLocation = async (
   const prefix = path === '' ? '' : `${path}/`;
   const files = await fetchBlobs(fetch, wait, now, resolved, prefix, scanned);
   if (!files.ok) return files;
-  return { ok: true, aggregate: { location: resolved, files: files.value } };
+  return { ok: true, aggregate: { location: resolved, files: files.value, links } };
 };
 
 const withStatus = (status: number | undefined): string =>

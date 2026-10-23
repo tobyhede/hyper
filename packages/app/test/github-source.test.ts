@@ -57,6 +57,7 @@ describe('readGitHubAggregate', () => {
       aggregate: {
         location: { owner: OWNER, repo: REPO, sha: COMMIT, path: '' },
         files: fixtureFiles,
+        links: [],
       },
     });
     expect(github.apiRequests()).toEqual([
@@ -131,6 +132,7 @@ describe('readGitHubAggregate', () => {
         aggregate: {
           location: { owner: OWNER, repo: REPO, sha: COMMIT, path: SELECTED },
           files: fixtureFiles,
+          links: [],
         },
       });
       expect(github.rawRequests()).toEqual(sorted(under(SELECTED, fixtureFiles).keys()));
@@ -557,6 +559,7 @@ describe('readGitHubAggregate', () => {
 
     expect(github.rawRequests()).not.toContain(linkPath);
     expect(result.ok && result.aggregate.files.has(linkPath)).toBe(false);
+    expect(result.ok && result.aggregate.links).toEqual([linkPath]);
   });
 
   it('answers a network failure as a failed request', async () => {
