@@ -33,8 +33,9 @@ import type { AggregateSource, DirectoryListing, SourceRead } from '@project/agg
  * delay its `Retry-After` names in seconds or as an HTTP-date, capped at
  * `MAX_RETRY_MS`, or `DEFAULT_RETRY_MS` without a readable one. Once a retry is
  * still throttled, no further blob is requested. Every file not fetched is a
- * read answering why, so the reader reports each one. Symbolic links and
- * submodules are never listed. No token or other credential is ever sent.
+ * read answering why, so the reader reports each one. A symbolic link is
+ * listed as a link and never fetched, and a submodule is never listed. No
+ * token or other credential is ever sent.
  *
  * Every failure is answered as a value naming what failed. What to tell a
  * reader about it is the application's to decide.
@@ -207,12 +208,13 @@ interface ListedTree {
 }
 
 /**
- * The selected directory's tree, by directory: each regular file and child
- * directory directly in it. Symbolic links and submodules are left out.
+ * The selected directory's tree, by directory: each regular file, child
+ * directory and symbolic link directly in it. Submodules are left out.
  */
 const listTree = (entries: TreeEntries): ListedTree => {
   const files = new Map<string, string[]>();
   const directories = new Map<string, Set<string>>();
+  const links = new Map<string, string[]>();
   const sizes = new Map<string, number | undefined>();
   const parentAndName = (path: string): [string, string] => {
     const slash = path.lastIndexOf('/');
@@ -228,19 +230,21 @@ const listTree = (entries: TreeEntries): ListedTree => {
   };
   for (const entry of entries) {
     if (entry.type === 'tree') addDirectory(entry.path);
-    else if (entry.type === 'blob' && entry.mode !== SYMLINK_MODE) {
+    else if (entry.type === 'blob') {
       const [parent, name] = parentAndName(entry.path);
       addDirectory(parent);
-      const listed = files.get(parent) ?? [];
+      const isLink = entry.mode === SYMLINK_MODE;
+      const byParent = isLink ? links : files;
+      const listed = byParent.get(parent) ?? [];
       listed.push(name);
-      files.set(parent, listed);
-      sizes.set(entry.path, entry.size);
+      byParent.set(parent, listed);
+      if (!isLink) sizes.set(entry.path, entry.size);
     }
   }
   const listings = new Map(
     [...directories].map(([path, children]): [string, DirectoryListing] => [
       path,
-      { files: files.get(path) ?? [], directories: [...children] },
+      { files: files.get(path) ?? [], directories: [...children], links: links.get(path) ?? [] },
     ]),
   );
   return { listings, sizes };
@@ -303,7 +307,7 @@ const treeSource = (
     list: (directory) =>
       Promise.resolve({
         ok: true,
-        listing: listings.get(directory) ?? { files: [], directories: [] },
+        listing: listings.get(directory) ?? { files: [], directories: [], links: [] },
       }),
     read,
   };

@@ -648,7 +648,7 @@ describe('readGitHubAggregate', () => {
     );
   });
 
-  it('never reads a scanned path that is a symbolic link', async () => {
+  it('refuses a symbolic link at a path Hyper owns, and never fetches it', async () => {
     const linkPath =
       '00000000-0000-4000-8000-000000000060/resources/00000000-0000-4000-8000-0000000000aa.json';
     const files = new Map([...fixtureFiles, [linkPath, text('../../../etc/passwd')]]);
@@ -656,12 +656,10 @@ describe('readGitHubAggregate', () => {
 
     const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
 
-    expect(await contentsOf(result)).toEqual(fixtureContents);
+    expect((await refusalOf(result)).diagnostics).toEqual([
+      `${PINNED}/${linkPath}: is a symbolic link, which Hyper neither reads nor writes through`,
+    ]);
     expect(github.rawRequests()).not.toContain(linkPath);
-    await expect(sourceOf(result).read(linkPath)).resolves.toEqual({
-      ok: false,
-      reason: 'not in the tree GitHub listed',
-    });
   });
 
   it('answers a network failure as a failed request', async () => {
