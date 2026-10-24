@@ -313,8 +313,8 @@ describe('Vite Hono host', () => {
     });
   });
 
-  // Broken stored state is a defect no retry cures, so the one read's invariant
-  // failure is the answer.
+  // Broken stored state is a defect no retry cures, so an invariant failure is
+  // answered from a single read.
   it('answers one invariant failure on the root with a 500 after one read', async () => {
     class BrokenRepository extends MemorySpaceRepository {
       reads = 0;

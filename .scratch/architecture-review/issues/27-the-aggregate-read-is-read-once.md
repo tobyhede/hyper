@@ -1,6 +1,6 @@
 # The aggregate is read once
 
-Status: done
+Status: ready-for-agent
 Tags: Improvement
 Blocked by: None — can start immediately. Built after the 30 October 2026 talk, by decision.
 
