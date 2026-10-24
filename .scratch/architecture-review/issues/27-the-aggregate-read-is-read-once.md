@@ -1,6 +1,6 @@
 # The aggregate is read once
 
-Status: ready-for-agent
+Status: done
 Tags: Improvement
 Blocked by: None — can start immediately. Built after the 30 October 2026 talk, by decision.
 
@@ -35,6 +35,6 @@ The two re-reads therefore cover nothing, and the comments in four files state a
 - [x] `test/unit/vite-hono-host.test.ts`: `reads again before calling one invariant failure a verdict` and `calls it a verdict when the second read fails the same way` become one case — one invariant failure on `GET /` is a 500 after one read.
 - [x] `test/unit/database-startup.test.ts`: `keeps trying through one invariant failure, which can be a healthy race` keeps its assertions under a name and comment that do not claim the race; the `ScriptedRepository` doc comment (around :170) likewise.
 - [x] `SqlSpaceRepository.loadAggregate` carries the one line naming `postgres-aggregate-initialization.test.ts`.
-- [ ] `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm exec eslint` over the changed files and `pnpm exec vitest run` over the changed tests clean locally; `CI passed` green on the PR, the `postgres` and `sqlite` jobs included.
+- [x] `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm exec eslint` over the changed files and `pnpm exec vitest run` over the changed tests clean locally; `CI passed` green on the PR, the `postgres` and `sqlite` jobs included.
 
 Out of scope: startup's retry policy beyond its comment; any retry of `commit`, which was never retried (`packages/http/src/index.ts`'s commit route says why); `loadSpace` and `listSpaces`.

@@ -1,6 +1,6 @@
 # A Space composition disposes what it composed
 
-Status: ready-for-agent
+Status: done
 Tags: Improvement
 Blocked by: None — can start immediately. Built after the 30 October 2026 talk, by decision.
 
@@ -27,6 +27,6 @@ The other collaborators `composeApp` answers hold nothing to release: Navigation
 - [x] `packages/app/test/compose-app.test.ts` exercises teardown through the composition interface, with recording presenting and fullscreen adapters: after `dispose`, an Edit reaches no command outcome, the presenting window connects nothing, and fullscreen has been stopped.
 - [x] The Exit and last-drawing tests in `packages/app/test/open-spaces.test.tsx` (`Exit releases only its listing hold and the last drawing disposes the composition`, `detaches an exited Space’s composition from its retired session`) pass unchanged.
 - [x] The test files that call `composeApp` without disposing are left alone; they are short-lived and out of scope.
-- [ ] `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm exec eslint` over the changed files and `pnpm exec vitest run packages/app` clean locally; `CI passed` green on the PR.
+- [x] `pnpm typecheck`, `pnpm typecheck:packages`, `pnpm exec eslint` over the changed files and `pnpm exec vitest run packages/app` clean locally; `CI passed` green on the PR.
 
 Out of scope: a lifecycle manager or registry of disposables; narrowing the collaborators' types on `ComposedApp`; tearing down anything `composeCore` builds.
