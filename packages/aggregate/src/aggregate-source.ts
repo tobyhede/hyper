@@ -45,9 +45,9 @@ interface MutableListing {
 
 /**
  * A source over files already in memory: Export's read-back of the files it
- * is about to write, and the tests. A
- * directory is listed by the paths beneath it, so one holding no file is not
- * there. Every read is allowed at once, since the bytes are already here.
+ * is about to write, and the tests. A directory is listed by the paths beneath
+ * it, so one holding no file is not there. Every read is allowed at once,
+ * since the bytes are already here.
  */
 export const mapSource = (name: string, files: AggregateFiles): AggregateSource => {
   const listings = new Map<string, MutableListing>();

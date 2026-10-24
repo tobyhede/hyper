@@ -552,6 +552,36 @@ describe('readGitHubAggregate', () => {
     expect(github.rawRequests()).toEqual([RESOURCE_FILE, RESOURCE_FILE]);
   });
 
+  it('waits for no retry once GitHub went on throttling while a request was in flight', async () => {
+    const github = fakeGitHub({
+      files: fixtureFiles,
+      blobFailures: new Map([
+        [RESOURCE_FILE, [{ status: 429 }, { status: 429 }]],
+        [SIDECAR_FILE, [{ status: 429 }]],
+      ]),
+    });
+    const held = Promise.withResolvers<undefined>();
+    const holdingSidecar: typeof fetch = async (input, init) => {
+      if (new Request(input).url.endsWith(SIDECAR_FILE)) await held.promise;
+      return await github.fetch(input, init);
+    };
+    const { wait, waits } = recordingWait();
+    const source = sourceOf(
+      await readGitHubAggregate(`github:${OWNER}/${REPO}`, holdingSidecar, wait),
+    );
+
+    const sidecar = source.read(SIDECAR_FILE);
+    await source.read(RESOURCE_FILE);
+    held.resolve(undefined);
+
+    expect(await sidecar).toEqual({
+      ok: false,
+      reason: 'not fetched: GitHub is throttling requests',
+    });
+    expect(waits).toEqual([1000]);
+    expect(requestsFor(github, SIDECAR_FILE)).toBe(1);
+  });
+
   it('reports every file read after GitHub went on throttling as not fetched', async () => {
     const github = fakeGitHub({
       files: fixtureFiles,

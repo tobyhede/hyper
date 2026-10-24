@@ -279,10 +279,11 @@ const treeSource = (
         `${size} bytes, over the 25 MiB a mounted file may be, so it is not fetched`,
       );
     }
-    const url = `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${encodePath(`${prefix}${file}`)}`;
     if (isThrottled()) return THROTTLED;
+    const url = `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${encodePath(`${prefix}${file}`)}`;
     let response = await request(url);
     if (response === undefined || isRetryable(response.status)) {
+      if (isThrottled()) return THROTTLED;
       await wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now));
       if (isThrottled()) return THROTTLED;
       response = await request(url);
@@ -352,9 +353,8 @@ export const readGitHubLocation = async (
     location,
     treeSchema,
   );
-  // A path that is not a directory at a commit that resolved lists empty, so
-  // the reader refuses it as holding no aggregate rather than it being not
-  // found.
+  // A path that is not a directory at a commit that resolved lists empty
+  // rather than being not found.
   let entries: TreeEntries = [];
   if (tree.ok) {
     if (tree.value.truncated)
