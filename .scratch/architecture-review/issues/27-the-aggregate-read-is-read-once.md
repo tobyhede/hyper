@@ -2,7 +2,7 @@
 
 Status: done
 Tags: Improvement
-Blocked by: None — can start immediately. Built after the 30 October 2026 talk, by decision.
+Blocked by: None. Planned for after the 30 October 2026 talk; built on 24 October 2026 at Toby's request.
 
 Surfaced by: the 24 October 2026 architecture review of `main` at `b46ea0c6`, candidate 02 ("Give Aggregate read confirmation one owner"), then settled by a grilling loop on 24 October 2026 against `main` at `953dac3`. The grilling reversed the candidate: the rule it proposed to give one owner guards a race that no longer exists, so it is deleted rather than shared.
 
