@@ -1047,11 +1047,10 @@ describe('reading from a source', () => {
 });
 
 /*
- * Export does not write or remove through a symbolic link (ADR 0119), so a
- * path Hyper owns that is one is refused where the directory is read, by the
- * reader's one rule (ADR 0134): a directory that imports is one Export can
- * write back. A link at a path Hyper does not own is the author's, and is left
- * alone.
+ * Export does not write or remove through a symbolic link, so a path Hyper
+ * owns that is one is refused where the directory is read: a directory that
+ * imports is one Export can write back. A link at a path Hyper does not own is
+ * the author's, and is left alone.
  */
 describe('a symbolic link, on disk', () => {
   const LINK_REASON = 'is a symbolic link, which Hyper neither reads nor writes through';
@@ -1166,6 +1165,9 @@ describe('a symbolic link, on disk', () => {
     await linkTo(root, `${META_SPACE_ID}/notes.txt`, 'not a Resource\n');
     await linkTo(root, `${META_SPACE_ID}/resources/draft.txt`, 'not a Resource\n');
     await linkTo(root, 'images/.hidden.png', 'not a picture\n');
+    await linkTo(root, 'images/notes', 'not a picture\n');
+    await mkdir(join(root, 'pictures'));
+    await symlink(join(root, 'pictures'), join(root, 'images', 'shared'));
     await mkdir(join(root, 'elsewhere'));
     await symlink(join(root, 'elsewhere'), join(root, 'shared'));
 
@@ -1174,6 +1176,36 @@ describe('a symbolic link, on disk', () => {
       `${META_SPACE_ID}/space.json`,
     ]);
     expect((await readAggregate(root, countingIds())).metaSpaceId).toBe(META_SPACE_ID);
+  });
+
+  it('refuses a directory named for a Space that is a link, and does not pass it over', async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    const elsewhere = await makeTemporaryDirectory();
+    await writeSpace(elsewhere, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));
+    await symlink(join(elsewhere, META_SPACE_ID), join(root, META_SPACE_ID));
+    const expected = [`${root}/${META_SPACE_ID}: ${LINK_REASON}`];
+
+    expect(await discoveryDiagnostics(() => readAggregate(root, countingIds()))).toEqual(expected);
+    expect(await discoveryDiagnostics(() => scannedAggregateFiles(root))).toEqual(expected);
+  });
+
+  it("reports a Space directory's links beside a resources/ that could not be listed", async () => {
+    const root = await makeTemporaryDirectory();
+    await writeAggregateFile(root, META_SPACE_ID);
+    const meta = await writeSpace(
+      root,
+      META_SPACE_ID,
+      JSON.stringify({ version: 1, title: 'Meta' }),
+    );
+    await linkTo(root, `${META_SPACE_ID}/notes.md`, 'beside space.json\n');
+    await writeFile(join(meta, 'resources'), 'a file, not a directory\n');
+
+    const diagnostics = await discoveryDiagnostics(() => readAggregate(root, countingIds()));
+
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics[0]).toBe(`${meta}/notes.md: ${LINK_REASON}`);
+    expect(diagnostics[1]).toMatch(new RegExp(`^${meta}/resources: .*ENOTDIR`));
   });
 
   it('refuses the same link from a source over files in memory', async () => {

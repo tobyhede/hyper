@@ -4,8 +4,7 @@ export type AggregateFiles = ReadonlyMap<string, Uint8Array>;
 /**
  * One directory of a source: the names of the files, child directories and
  * symbolic links directly in it. A link is listed as a link whatever it names,
- * and never as a file or a directory: the reader decides what one means
- * (ADR 0134).
+ * and never as a file or a directory: the reader decides what one means.
  */
 export interface DirectoryListing {
   readonly files: readonly string[];

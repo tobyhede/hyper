@@ -8,7 +8,7 @@ import {
 import type { StoredImage } from '@project/persistence';
 import type { AggregateSource, DirectoryListing, SourceRead } from './aggregate-source';
 import { describeSchemaFailure, identifySpace, SpaceIdentityError } from './identify-space';
-import { admitImageFile, IMAGES_DIRECTORY_NAME } from './images';
+import { admitImageFile, IMAGES_DIRECTORY_NAME, isImageFileName } from './images';
 import { compareOrdinal } from './ordinal';
 import type { AggregateInput } from './space-repository';
 import { AggregateDirectoryError, parseSingleSpace, refuseSpaceDocument } from './space-directory';
@@ -106,7 +106,7 @@ const listOrRefuse = async (
   return answer.listing;
 };
 
-/** Why a path Hyper owns may not be a symbolic link (ADR 0134). */
+/** Why a path Hyper owns may not be a symbolic link. */
 const LINK_REASON = 'is a symbolic link, which Hyper neither reads nor writes through';
 
 /** The links among `listing`'s that `owns` says Hyper owns, by path relative to the source. */
@@ -117,32 +117,39 @@ const ownedLinks = (
 ): readonly string[] =>
   listing.links.filter(owns).map((name) => (directory === '' ? name : `${directory}/${name}`));
 
+/** A diagnostic for each of `paths`, each a symbolic link at a path Hyper owns, in ordinal order. */
+const linkDiagnostics = (source: AggregateSource, paths: readonly string[]): readonly string[] =>
+  [...paths].sort(compareOrdinal).map((path) => `${joinPath(source.name, path)}: ${LINK_REASON}`);
+
 /**
- * Refuse every one of `paths`, each a symbolic link at a path Hyper owns, in
- * ordinal order: Export does not write through a link (ADR 0119), so a
- * directory holding one is refused where it is read rather than when it is
- * written back (ADR 0134).
+ * Refuse a directory holding a symbolic link at a path Hyper owns: Export
+ * does not write or remove through a link, so it could not write that
+ * directory back.
  */
 const refuseLinks = (source: AggregateSource, paths: readonly string[]): void => {
   if (paths.length === 0) return;
-  throw new AggregateDirectoryError(
-    'discovery',
-    [...paths].sort(compareOrdinal).map((path) => `${joinPath(source.name, path)}: ${LINK_REASON}`),
-  );
+  throw new AggregateDirectoryError('discovery', linkDiagnostics(source, paths));
 };
 
 /** Whether a file named `name` in `images/` is one Importing reads. */
 const isVisibleImage = (name: string): boolean => name !== '' && !name.startsWith('.');
 
 /**
- * The root's listing, refused when `hyper.json` or `images/` is a symbolic
- * link.
+ * The root's listing, refused when `hyper.json`, `images/` or a directory
+ * named for a Space is a symbolic link: Export writes into each of those.
  */
 const listRoot = async (source: AggregateSource): Promise<DirectoryListing> => {
   const root = await listOrRefuse(source, '');
   refuseLinks(
     source,
-    ownedLinks('', root, (name) => name === AGGREGATE_FILE_NAME || name === IMAGES_DIRECTORY_NAME),
+    ownedLinks(
+      '',
+      root,
+      (name) =>
+        name === AGGREGATE_FILE_NAME ||
+        name === IMAGES_DIRECTORY_NAME ||
+        spaceDirectoryId(name) !== undefined,
+    ),
   );
   return root;
 };
@@ -151,7 +158,9 @@ const listRoot = async (source: AggregateSource): Promise<DirectoryListing> => {
  * The child directory `name` as a Space directory, or `undefined` when it
  * holds no `space.json` and so is not one: then nothing in it is read, and its
  * `resources/` is not listed. A Space directory whose `space.json`, `*.md`,
- * `resources/` or Resource file is a symbolic link is refused, naming each.
+ * `resources/` or Resource file is a symbolic link is refused, naming each,
+ * beside a `resources/` that could not be listed. A linked `resources/` is not
+ * listed: what it holds is outside the directory.
  */
 const scanSpaceDirectory = async (
   source: AggregateSource,
@@ -166,16 +175,23 @@ const scanSpaceDirectory = async (
     inside,
     (entry) => entry === 'space.json' || entry === 'resources' || entry.endsWith('.md'),
   );
-  if (links.some((path) => path === `${name}/resources`)) refuseLinks(source, links);
-  const resources = await listOrRefuse(source, `${name}/resources`);
-  refuseLinks(source, [
-    ...links,
-    ...ownedLinks(
-      `${name}/resources`,
-      resources,
-      (entry) => entry.endsWith('.json') || entry.endsWith('.md'),
-    ),
-  ]);
+  if (links.includes(`${name}/resources`)) refuseLinks(source, links);
+  const listed = await settledListing(listOrRefuse(source, `${name}/resources`));
+  const diagnostics = [
+    ...linkDiagnostics(source, [
+      ...links,
+      ...(listed.ok
+        ? ownedLinks(
+            `${name}/resources`,
+            listed.value,
+            (entry) => entry.endsWith('.json') || entry.endsWith('.md'),
+          )
+        : []),
+    ]),
+    ...(listed.ok ? [] : listed.refusal.diagnostics),
+  ];
+  if (diagnostics.length > 0) throw new AggregateDirectoryError('discovery', diagnostics);
+  const resources = listed.ok ? listed.value : { files: [] };
   return {
     name,
     resources: [
@@ -215,7 +231,7 @@ const scanBelowRoot = async (
     Promise.all(names.map((name) => settledListing(scanSpaceDirectory(source, name)))),
     settledListing(
       listOrRefuse(source, IMAGES_DIRECTORY_NAME).then((images) => {
-        refuseLinks(source, ownedLinks(IMAGES_DIRECTORY_NAME, images, isVisibleImage));
+        refuseLinks(source, ownedLinks(IMAGES_DIRECTORY_NAME, images, isImageFileName));
         return images;
       }),
     ),

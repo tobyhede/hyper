@@ -2,6 +2,8 @@
 
 Status: resolved
 
+ADR 0134 has since replaced the link behaviour this ticket kept: a source lists a link as a link, and the reader refuses one at any path Hyper owns. The link sentences below describe what this ticket built, not what holds now.
+
 **What to build:** the directory reader takes an `AggregateSource` and decides everything a read involves, instead of taking bytes a caller has already chosen and fetched (ADR 0133, refining ADR 0130).
 
 Today each caller lists, asks `scannedAggregatePaths` what to read, reads with its own pool and its own failure policy, and hands `readAggregateFiles` a map, which scans the paths again. The two callers already refuse the same directory differently.

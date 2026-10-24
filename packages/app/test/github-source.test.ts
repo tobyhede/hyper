@@ -549,9 +549,29 @@ describe('readGitHubAggregate', () => {
     expect(github.rawRequests()).toEqual([]);
   });
 
-  it('never reads a scanned path that is a symbolic link', async () => {
+  it('refuses a symbolic link at a path Hyper owns before fetching any blob', async () => {
     const linkPath =
       '00000000-0000-4000-8000-000000000060/resources/00000000-0000-4000-8000-0000000000aa.json';
+    const files = new Map([...fixtureFiles, [linkPath, text('../../../etc/passwd')]]);
+    const github = fakeGitHub({ files, symlinks: new Set([linkPath]) });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(result).toEqual({
+      ok: false,
+      failure: {
+        kind: 'aggregate-unreadable',
+        location: { owner: OWNER, repo: REPO, sha: COMMIT, path: '' },
+        diagnostics: [
+          `github:${OWNER}/${REPO}@${COMMIT}/${linkPath}: is a symbolic link, which Hyper neither reads nor writes through`,
+        ],
+      },
+    });
+    expect(github.rawRequests()).toEqual([]);
+  });
+
+  it('leaves a symbolic link Hyper does not own unread, and mounts', async () => {
+    const linkPath = 'notes/shared.md';
     const files = new Map([...fixtureFiles, [linkPath, text('../../../etc/passwd')]]);
     const github = fakeGitHub({ files, symlinks: new Set([linkPath]) });
 
