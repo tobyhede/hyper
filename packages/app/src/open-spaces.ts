@@ -842,11 +842,7 @@ export function createOpenSpaces({
 
   const disposeComposition = (target: OpenSpace): void => {
     const spaceId = target.id;
-    target.app.commandOutcomes.dispose();
-    target.app.surface.dispose();
-    target.app.deleteConfirmation.dispose();
-    target.app.authoring.dispose();
-    target.app.presenting.dispose();
+    target.app.dispose();
     retired.add(target);
     compositions.delete(spaceId);
 
