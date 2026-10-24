@@ -8,36 +8,42 @@ import {
   type MalformedGitHubLocation,
   type ResolvedGitHubLocation,
 } from './github-location';
-import { AGGREGATE_FILE_NAME, mapSource, scanAggregateFrom } from '@project/aggregate';
+import type { AggregateSource, DirectoryListing, SourceRead } from '@project/aggregate';
 
 /**
- * The GitHub source (ADR 0130): a GitHub location read into the files of the
- * Aggregate directory it selects.
+ * The GitHub source (ADR 0130, ADR 0133): a GitHub location resolved to a
+ * commit and its selected directory's tree listed, answered as the
+ * `AggregateSource` the reader reads that directory from.
  *
  * A ref that is not a commit SHA costs one REST call to resolve, and a missing
  * one resolves `HEAD`, the default branch. Listing the selected directory's
  * tree, recursively, costs one more: the commit's own tree for the
  * repository's root, otherwise the tree at `<commit>:<path>`, so that only that
  * tree is listed rather than the whole repository's. An API answer that is
- * GitHub's primary or secondary rate limit is answered as one. The selected directory must directly contain `hyper.json`;
- * within it only the files Importing reads are kept. If the tree lists any of
- * them larger than `MAX_BLOB_BYTES`, nothing is fetched; otherwise each is
- * fetched at the commit from `raw.githubusercontent.com`, at most
- * `BLOB_CONCURRENCY` at once, and the first that fails cancels those in
- * flight. A blob answering 429 (that host throttling its reader) or 5xx, or
- * whose fetch throws, is asked for once more, after the delay its
- * `Retry-After` names in seconds or as an HTTP-date, capped at `MAX_RETRY_MS`,
- * or `DEFAULT_RETRY_MS` without a readable one. No token or other credential is
- * ever sent.
+ * GitHub's primary or secondary rate limit is answered as one. A path that is
+ * not a directory at the commit lists empty, so the reader refuses it as a
+ * directory without `hyper.json`.
+ *
+ * Nothing is fetched until the reader reads: the source lists from the tree in
+ * memory, and the reader decides which files to read, at most
+ * `BLOB_CONCURRENCY` at once. Each is fetched at the commit from
+ * `raw.githubusercontent.com`. A file the tree lists larger than
+ * `MAX_BLOB_BYTES` is not fetched. A blob answering 429 (that host throttling
+ * its reader) or 5xx, or whose fetch throws, is asked for once more, after the
+ * delay its `Retry-After` names in seconds or as an HTTP-date, capped at
+ * `MAX_RETRY_MS`, or `DEFAULT_RETRY_MS` without a readable one. Once a retry is
+ * still throttled, no further blob is requested. Every file not fetched is a
+ * read answering why, so the reader reports each one. Symbolic links and
+ * submodules are never listed. No token or other credential is ever sent.
  *
  * Every failure is answered as a value naming what failed. What to tell a
  * reader about it is the application's to decide.
  */
 
-/** The selected directory's files, by path relative to it, at one commit. */
+/** The selected directory at one commit, and the source the reader reads it from. */
 export interface GitHubAggregate {
   readonly location: ResolvedGitHubLocation;
-  readonly files: ReadonlyMap<string, Uint8Array>;
+  readonly source: AggregateSource;
 }
 
 export type GitHubSourceFailure =
@@ -46,16 +52,10 @@ export type GitHubSourceFailure =
   | { readonly kind: 'rate-limited' }
   /** The repository, or the ref or commit within it, does not exist or is not public. */
   | { readonly kind: 'not-found'; readonly location: GitHubLocation }
-  /** The selected directory does not directly contain `hyper.json`. */
-  | { readonly kind: 'missing-aggregate-file'; readonly location: ResolvedGitHubLocation }
   /** GitHub listed only part of the selected directory's tree at the commit. */
   | { readonly kind: 'truncated-tree'; readonly location: ResolvedGitHubLocation }
   /** An API request failed for another reason: `status` is absent when no response came. */
-  | { readonly kind: 'request-failed'; readonly url: string; readonly status?: number }
-  /** One of the aggregate's files is listed larger than `MAX_BLOB_BYTES`. */
-  | { readonly kind: 'blob-too-large'; readonly path: string; readonly size: number }
-  /** One of the aggregate's files could not be fetched. */
-  | { readonly kind: 'blob-failed'; readonly path: string; readonly status?: number };
+  | { readonly kind: 'request-failed'; readonly url: string; readonly status?: number };
 
 export type GitHubSourceResult =
   | { readonly ok: true; readonly aggregate: GitHubAggregate }
@@ -76,6 +76,8 @@ const treeSchema = z.object({
     }),
   ),
 });
+
+type TreeEntries = z.infer<typeof treeSchema>['tree'];
 
 /** A Git mode for a symbolic link: its raw "contents" are the link's target. */
 const SYMLINK_MODE = '120000';
@@ -151,26 +153,12 @@ const BLOB_CONCURRENCY = 8;
 /** The delay before retrying a blob whose answer names none. */
 const DEFAULT_RETRY_MS = 1000;
 
-/**
- * Suspends for `ms` milliseconds, or until `signal` aborts if that is sooner;
- * injected so a test need not wait.
- */
-export type Wait = (ms: number, signal: AbortSignal) => Promise<void>;
+/** Suspends for `ms` milliseconds; injected so a test need not wait. */
+export type Wait = (ms: number) => Promise<void>;
 
-/** A timer that the cancellation clears, leaving neither it nor its listener behind. */
-const waitWithTimer: Wait = (ms, signal) =>
+const waitWithTimer: Wait = (ms) =>
   new Promise((resolve) => {
-    if (signal.aborted) {
-      resolve();
-      return;
-    }
-    const end = (): void => {
-      clearTimeout(timer);
-      signal.removeEventListener('abort', end);
-      resolve();
-    };
-    const timer = setTimeout(end, ms);
-    signal.addEventListener('abort', end, { once: true });
+    setTimeout(resolve, ms);
   });
 
 const isRetryable = (status: number): boolean => status === 429 || status >= 500;
@@ -202,82 +190,123 @@ const retryDelay = (response: Response, now: Now): number => {
   return Math.min(delay, MAX_RETRY_MS);
 };
 
-const fetchBlob = async (
-  fetch: typeof globalThis.fetch,
-  wait: Wait,
-  now: Now,
-  { owner, repo, sha }: ResolvedGitHubLocation,
-  repositoryPath: string,
-  path: string,
-  signal: AbortSignal,
-): Promise<Step<Uint8Array>> => {
-  const url = `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${encodePath(repositoryPath)}`;
-  const failed = (status?: number): Step<Uint8Array> =>
-    fail(
-      status === undefined ? { kind: 'blob-failed', path } : { kind: 'blob-failed', path, status },
-    );
-  const request = async (): Promise<Response | undefined> => {
-    try {
-      return await fetch(url, { credentials: 'omit', signal });
-    } catch {
-      return undefined;
-    }
+const withStatus = (status: number | undefined): string =>
+  status === undefined ? 'with no response' : `with HTTP ${status}`;
+
+const unreadable = (reason: string): SourceRead => ({ ok: false, reason });
+
+const fetchFailed = (status?: number): SourceRead =>
+  unreadable(`could not be fetched from GitHub: the request failed ${withStatus(status)}`);
+
+const THROTTLED = unreadable('not fetched: GitHub is throttling requests');
+
+interface ListedTree {
+  readonly listings: ReadonlyMap<string, DirectoryListing>;
+  /** Each listed file's size, by path relative to the selected directory. */
+  readonly sizes: ReadonlyMap<string, number | undefined>;
+}
+
+/**
+ * The selected directory's tree, by directory: each regular file and child
+ * directory directly in it. Symbolic links and submodules are left out.
+ */
+const listTree = (entries: TreeEntries): ListedTree => {
+  const files = new Map<string, string[]>();
+  const directories = new Map<string, Set<string>>();
+  const sizes = new Map<string, number | undefined>();
+  const parentAndName = (path: string): [string, string] => {
+    const slash = path.lastIndexOf('/');
+    return slash === -1 ? ['', path] : [path.slice(0, slash), path.slice(slash + 1)];
   };
-  // Read through a call each time: the signal aborts across the awaits below.
-  const cancelled = (): boolean => signal.aborted;
-  let response = await request();
-  if (cancelled()) return failed();
-  if (response === undefined || isRetryable(response.status)) {
-    await wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now), signal);
-    if (cancelled()) return failed();
-    response = await request();
+  const addDirectory = (path: string): void => {
+    if (directories.has(path)) return;
+    directories.set(path, new Set());
+    if (path === '') return;
+    const [parent, name] = parentAndName(path);
+    addDirectory(parent);
+    directories.get(parent)?.add(name);
+  };
+  for (const entry of entries) {
+    if (entry.type === 'tree') addDirectory(entry.path);
+    else if (entry.type === 'blob' && entry.mode !== SYMLINK_MODE) {
+      const [parent, name] = parentAndName(entry.path);
+      addDirectory(parent);
+      const listed = files.get(parent) ?? [];
+      listed.push(name);
+      files.set(parent, listed);
+      sizes.set(entry.path, entry.size);
+    }
   }
-  if (response === undefined) return failed();
-  if (!response.ok) return failed(response.status);
-  try {
-    return { ok: true, value: new Uint8Array(await response.arrayBuffer()) };
-  } catch {
-    return failed();
-  }
+  const listings = new Map(
+    [...directories].map(([path, children]): [string, DirectoryListing] => [
+      path,
+      { files: files.get(path) ?? [], directories: [...children] },
+    ]),
+  );
+  return { listings, sizes };
 };
 
 /**
- * Every scanned file's blob, fetched `BLOB_CONCURRENCY` at a time. The first
- * failure is the answer: it stops further fetches from starting and cancels
- * those in flight.
+ * The source over a listed tree: every listing answers from memory, and each
+ * read fetches one blob, retried once, unless it is too large or GitHub has
+ * gone on throttling.
  */
-const fetchBlobs = async (
+const treeSource = (
   fetch: typeof globalThis.fetch,
   wait: Wait,
   now: Now,
   location: ResolvedGitHubLocation,
-  prefix: string,
-  scanned: readonly string[],
-): Promise<Step<Map<string, Uint8Array>>> => {
-  const files = new Map<string, Uint8Array>();
-  const pending = [...scanned];
-  const cancel = new AbortController();
-  let failure: GitHubSourceFailure | undefined;
-  const worker = async (): Promise<void> => {
-    for (let file = pending.shift(); file !== undefined; file = pending.shift()) {
-      const blob = await fetchBlob(
-        fetch,
-        wait,
-        now,
-        location,
-        `${prefix}${file}`,
-        file,
-        cancel.signal,
-      );
-      if (!blob.ok) {
-        failure ??= blob.failure;
-        pending.length = 0;
-        cancel.abort();
-      } else files.set(file, blob.value);
+  { listings, sizes }: ListedTree,
+): AggregateSource => {
+  const { owner, repo, sha, path } = location;
+  const prefix = path === '' ? '' : `${path}/`;
+  // Set once a blob is still throttled after its retry; no request follows.
+  let throttled = false;
+  // Read through a call each time: another read sets it across the awaits below.
+  const isThrottled = (): boolean => throttled;
+  const request = async (url: string): Promise<Response | undefined> => {
+    try {
+      return await fetch(url, { credentials: 'omit' });
+    } catch {
+      return undefined;
     }
   };
-  await Promise.all(Array.from({ length: BLOB_CONCURRENCY }, worker));
-  return failure === undefined ? { ok: true, value: files } : fail(failure);
+  const read = async (file: string): Promise<SourceRead> => {
+    if (!sizes.has(file)) return unreadable('not in the tree GitHub listed');
+    const size = sizes.get(file);
+    if (size !== undefined && size > MAX_BLOB_BYTES) {
+      return unreadable(
+        `${size} bytes, over the 25 MiB a mounted file may be, so it is not fetched`,
+      );
+    }
+    if (isThrottled()) return THROTTLED;
+    const url = `https://raw.githubusercontent.com/${owner}/${repo}/${sha}/${encodePath(`${prefix}${file}`)}`;
+    let response = await request(url);
+    if (response === undefined || isRetryable(response.status)) {
+      if (isThrottled()) return THROTTLED;
+      await wait(response === undefined ? DEFAULT_RETRY_MS : retryDelay(response, now));
+      if (isThrottled()) return THROTTLED;
+      response = await request(url);
+      if (response?.status === 429) throttled = true;
+    }
+    if (response === undefined) return fetchFailed();
+    if (!response.ok) return fetchFailed(response.status);
+    try {
+      return { ok: true, bytes: new Uint8Array(await response.arrayBuffer()) };
+    } catch {
+      return fetchFailed();
+    }
+  };
+  return {
+    name: formatGitHubLocation(location),
+    concurrency: BLOB_CONCURRENCY,
+    list: (directory) =>
+      Promise.resolve({
+        ok: true,
+        listing: listings.get(directory) ?? { files: [], directories: [] },
+      }),
+    read,
+  };
 };
 
 /** Read a GitHub location as written: parse it, then {@link readGitHubLocation}. */
@@ -317,8 +346,6 @@ export const readGitHubLocation = async (
   }
   const resolved: ResolvedGitHubLocation = { owner, repo, sha, path };
 
-  // A path that is not a directory at a commit that resolved holds no
-  // aggregate, so it is not answered as not found.
   const treeish = path === '' ? sha : `${sha}:${encodePath(path)}`;
   const tree = await requestApi(
     fetch,
@@ -326,46 +353,22 @@ export const readGitHubLocation = async (
     location,
     treeSchema,
   );
-  if (!tree.ok) {
-    return path !== '' && tree.failure.kind === 'not-found'
-      ? { ok: false, failure: { kind: 'missing-aggregate-file', location: resolved } }
-      : tree;
-  }
-  if (tree.value.truncated)
-    return { ok: false, failure: { kind: 'truncated-tree', location: resolved } };
+  // A path that is not a directory at a commit that resolved lists empty
+  // rather than being not found.
+  let entries: TreeEntries = [];
+  if (tree.ok) {
+    if (tree.value.truncated)
+      return { ok: false, failure: { kind: 'truncated-tree', location: resolved } };
+    entries = tree.value.tree;
+  } else if (path === '' || tree.failure.kind !== 'not-found') return tree;
 
   // The tree is the selected directory's, so its paths are relative to it.
-  const listedSizes = new Map(
-    tree.value.tree.flatMap((entry): [string, number | undefined][] =>
-      entry.type === 'blob' && entry.mode !== SYMLINK_MODE ? [[entry.path, entry.size]] : [],
-    ),
-  );
-  const directoryFiles = [...listedSizes.keys()];
-  if (!directoryFiles.includes(AGGREGATE_FILE_NAME)) {
-    return { ok: false, failure: { kind: 'missing-aggregate-file', location: resolved } };
-  }
-
-  // The reader's own scan, over the listed paths alone, says which to fetch.
-  const { files: scanned } = await scanAggregateFrom(
-    mapSource(
-      formatGitHubLocation(resolved),
-      new Map(directoryFiles.map((file) => [file, new Uint8Array()])),
-    ),
-  );
-  for (const file of scanned) {
-    const size = listedSizes.get(file);
-    if (size !== undefined && size > MAX_BLOB_BYTES) {
-      return { ok: false, failure: { kind: 'blob-too-large', path: file, size } };
-    }
-  }
-  const prefix = path === '' ? '' : `${path}/`;
-  const files = await fetchBlobs(fetch, wait, now, resolved, prefix, scanned);
-  if (!files.ok) return files;
-  return { ok: true, aggregate: { location: resolved, files: files.value } };
+  const listed = listTree(entries);
+  return {
+    ok: true,
+    aggregate: { location: resolved, source: treeSource(fetch, wait, now, resolved, listed) },
+  };
 };
-
-const withStatus = (status: number | undefined): string =>
-  status === undefined ? 'with no response' : `with HTTP ${status}`;
 
 /** A GitHub source's failure, in the sentence the application's startup failure shows. */
 export const describeGitHubSourceFailure = (failure: GitHubSourceFailure): string => {
@@ -376,15 +379,9 @@ export const describeGitHubSourceFailure = (failure: GitHubSourceFailure): strin
       return 'GitHub’s limit on requests without a token is used up for this network. Try again within the hour, or open a location pinned to a commit, which costs one request.';
     case 'not-found':
       return `${formatGivenGitHubLocation(failure.location)} was not found: GitHub has no public repository, ref or commit by that name.`;
-    case 'missing-aggregate-file':
-      return `${formatGitHubLocation(failure.location)} does not directly contain hyper.json, so it is not an Aggregate directory.`;
     case 'truncated-tree':
       return `GitHub listed only part of the tree at ${formatGitHubLocation(failure.location)}, so its aggregate cannot be read whole.`;
     case 'request-failed':
       return `The GitHub request ${failure.url} failed ${withStatus(failure.status)}.`;
-    case 'blob-failed':
-      return `${failure.path} could not be fetched from GitHub: the request failed ${withStatus(failure.status)}.`;
-    case 'blob-too-large':
-      return `${failure.path} is ${failure.size} bytes, over the 25 MiB a mounted file may be, so it is not fetched.`;
   }
 };

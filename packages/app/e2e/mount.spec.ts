@@ -279,6 +279,32 @@ test('a rate-limited GitHub answer is shown as the startup failure', async ({ pa
   ).toBeVisible();
 });
 
+test('a mount missing blobs shows every file it could not read', async ({ page, context }) => {
+  const unreadable = [
+    '00000000-0000-4000-8000-000000000060/space.json',
+    '00000000-0000-4000-8000-000000000070/space.json',
+  ];
+  await context.unrouteAll();
+  await serveGitHub(
+    context,
+    fakeGitHub({
+      files: fixtureFiles(),
+      blobFailures: new Map(unreadable.map((path) => [path, [{ status: 404 }]])),
+    }),
+  );
+
+  await page.goto('/');
+
+  await expect(page.getByText('Application could not start')).toBeVisible();
+  for (const path of unreadable) {
+    await expect(
+      page.getByText(
+        `${PINNED}/${path}: could not be fetched from GitHub: the request failed with HTTP 404`,
+      ),
+    ).toBeVisible();
+  }
+});
+
 test(
   'asks for a location that reads, and opens it once one does',
   { tag: '@parity:github-location-form-refuses-a-location-that-does-not-read' },
