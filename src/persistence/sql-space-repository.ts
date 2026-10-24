@@ -438,6 +438,11 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     );
   }
 
+  /**
+   * One consistent read under the aggregate lock, Meta row or none, so a
+   * concurrent initializer is never seen half-way and a caller reads once
+   * (`test/integration/postgres-aggregate-initialization.test.ts`).
+   */
   loadAggregate(): Promise<AggregateLoadResult> {
     return this.#naming(() => this.#store.serialise(() => this.#loadAggregateUnserialised()));
   }

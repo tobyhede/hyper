@@ -313,41 +313,9 @@ describe('Vite Hono host', () => {
     });
   });
 
-  // One `AggregateInvariantError` is not proof of broken stored state. It is
-  // also what a healthy repository shows for an instant: `loadAggregate` reads
-  // the Meta identity and the Spaces in two statements under READ COMMITTED, so
-  // a rival host committing between them reports Spaces without Meta. The retry
-  // loop requires two consecutive ones for exactly this reason, and so does the
-  // wire path: a permanent 500 from the first would tell a browser landing in
-  // that window the database was broken when a reload would have worked.
-  it('reads again before calling one invariant failure a verdict', async () => {
-    class RacingRepository extends MemorySpaceRepository {
-      reads = 0;
-
-      override loadAggregate(): ReturnType<SpaceRepository['loadAggregate']> {
-        this.reads += 1;
-        if (this.reads === 1) {
-          return Promise.reject(new AggregateInvariantError('Stored Spaces exist without Meta'));
-        }
-        return super.loadAggregate();
-      }
-    }
-    const spaceRepository = new RacingRepository(
-      [{ snapshot, revision: 0n, exportedRevision: null }],
-      SPACE_ID,
-    );
-    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const { host } = await startHost(createSpaceHost(spaceRepository, newUuid));
-
-    const response = await fetch(`${host.url}/`, { redirect: 'manual' });
-
-    expect(spaceRepository.reads).toBe(2);
-    expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe(`/spaces/${encodeCompactUuid(SPACE_ID)}`);
-    logged.mockRestore();
-  });
-
-  it('calls it a verdict when the second read fails the same way', async () => {
+  // Broken stored state is a defect no retry cures, so the one read's invariant
+  // failure is the answer.
+  it('answers one invariant failure on the root with a 500 after one read', async () => {
     class BrokenRepository extends MemorySpaceRepository {
       reads = 0;
 
@@ -365,7 +333,7 @@ describe('Vite Hono host', () => {
       headers: { Accept: 'application/problem+json' },
     });
 
-    expect(spaceRepository.reads).toBe(2);
+    expect(spaceRepository.reads).toBe(1);
     expect(decodeProblemDetails(JSON.parse(await response.text()))).toMatchObject({
       status: 500,
       detail: 'Stored repository state is not usable.',

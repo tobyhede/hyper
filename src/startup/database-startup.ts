@@ -58,16 +58,9 @@ export const META_SPACE_RETRY_MAX_DELAY_MS = 60_000;
  * 31). Only an unreachable database is worth waiting out, and one of those
  * between two others resets the count, since it says nothing about either.
  *
- * Not one, because one invariant failure is also what a healthy repository
- * looks like for an instant. On PostgreSQL `loadAggregate` reads in two
- * statements: `lockMetaIdentity` finds no Meta row, then `loadEverySpace` reads
- * Spaces — inside one transaction, but at READ COMMITTED each statement takes
- * its own snapshot — so a rival host committing between the two is reported as
- * Spaces without Meta. Two hosts against one fresh database is the ordinary way
- * to see it — a dev server and `test:integration:postgres`. The interleaving is
- * over by the next read, and stored state that is genuinely broken fails the
- * same way every time. An unclassified failure gets the same second look: a
- * one-off is not a verdict, and a defect repeats.
+ * Not one, because a one-off is not a verdict and a defect repeats: stored
+ * state that is genuinely broken fails the same way on every read, so a second
+ * attempt confirms it at the cost of one wait.
  */
 const CONFIRMING_FAILURES = 2;
 
