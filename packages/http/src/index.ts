@@ -524,16 +524,13 @@ export const createSpaceHttpApp = (
           // Space to judge a complete-aggregate commit against — so this
           // route can meet it too.
           //
-          // Neither that read nor this commit is attempted twice on an
-          // invariant failure. `commit` never raises a missing Meta identity
-          // as a thrown invariant failure — `decideCommit` answers it as a
-          // `rejected` result, not a throw (`commit-decision.ts`). The invariant
-          // failures that can reach here come from a stored row that
-          // will not parse or a revision the codec refuses, which describe
-          // corrupt stored data rather than a timing window, so a second
-          // attempt would not answer differently. Retrying a write is also
-          // not the free operation retrying a read is, so `repository.commit`
-          // is not called a second time here.
+          // `commit` is called once on an invariant failure. It never raises
+          // a missing Meta identity as a thrown invariant failure —
+          // `decideCommit` answers it as a `rejected` result, not a throw
+          // (`commit-decision.ts`). The invariant failures that can reach
+          // here come from a stored row that will not parse or a revision the
+          // codec refuses, which describe corrupt stored data rather than a
+          // timing window, so a second attempt would not answer differently.
           return storedFailureProblem(context, error);
         }
       },

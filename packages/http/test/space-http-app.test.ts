@@ -492,9 +492,9 @@ describe('Space HTTP reads', () => {
   // Broken stored state and an unreachable database are told apart by type
   // (`isAggregateInvariant`, which walks the cause chain), the way
   // `packages/aggregate/src/space-host.ts` does for `GET /`: an invariant
-  // failure is a permanent defect no retry cures (500), and it is answered from
-  // the one read. The second case is carried only on `cause`, because the
-  // driver does not always rethrow what a transaction callback threw.
+  // failure is a permanent defect no retry cures (500), answered from a single
+  // read. The second case is carried only on `cause`, because the driver does
+  // not always rethrow what a transaction callback threw.
   it.each([
     { failure: 'a direct invariant failure', error: new AggregateInvariantError('broken') },
     {

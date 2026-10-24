@@ -58,9 +58,10 @@ export const META_SPACE_RETRY_MAX_DELAY_MS = 60_000;
  * 31). Only an unreachable database is worth waiting out, and one of those
  * between two others resets the count, since it says nothing about either.
  *
- * Not one, because a one-off is not a verdict and a defect repeats: stored
- * state that is genuinely broken fails the same way on every read, so a second
- * attempt confirms it at the cost of one wait.
+ * Not one, because a failure nobody anticipated can be a one-off — a driver
+ * fault that the next connection does not repeat — and it shares the count
+ * with broken stored state. A defect fails the same way on every attempt, so
+ * a second confirms it at the cost of one wait.
  */
 const CONFIRMING_FAILURES = 2;
 

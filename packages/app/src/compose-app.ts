@@ -346,8 +346,8 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     resourceDeletion,
     reportObserverError: compositionReporter,
     mounted,
-    // Strict reverse of construction above, so a collaborator added there has
-    // its place here: each goes before what it was built over.
+    // The collaborators that hold subscriptions, in reverse of their
+    // construction above, so each goes before what it was built over.
     dispose: () => {
       presenting.dispose();
       commandOutcomes.dispose();
