@@ -27,7 +27,7 @@ const isEntry = async (path: string): Promise<boolean> => {
  *
  * A file is a regular file and a child directory a directory; a symbolic link
  * is listed as a link, whatever it names, and the reader refuses one at a path
- * Hyper owns (ADR 0134). A directory that does not exist lists empty, but one
+ * Hyper owns. A directory that does not exist lists empty, but one
  * that cannot be listed answers why, as does a file that cannot be read.
  */
 export const directorySource = (directory: string): AggregateSource => ({

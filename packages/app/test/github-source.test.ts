@@ -662,6 +662,21 @@ describe('readGitHubAggregate', () => {
     expect(github.rawRequests()).not.toContain(linkPath);
   });
 
+  it('leaves a symbolic link Hyper does not own unread, and mounts', async () => {
+    const linkPath = 'notes/shared.md';
+    const files = new Map([...fixtureFiles, [linkPath, text('../../../etc/passwd')]]);
+    const github = fakeGitHub({ files, symlinks: new Set([linkPath]) });
+
+    const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
+
+    expect(await contentsOf(result)).toEqual(fixtureContents);
+    await expect(sourceOf(result).list('notes')).resolves.toEqual({
+      ok: true,
+      listing: { files: [], directories: [], links: ['shared.md'] },
+    });
+    expect(github.rawRequests()).not.toContain(linkPath);
+  });
+
   it('answers a network failure as a failed request', async () => {
     const offline: typeof fetch = () => Promise.reject(new TypeError('Failed to fetch'));
 
