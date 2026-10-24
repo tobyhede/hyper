@@ -1,4 +1,4 @@
-import { admitImage, type ImageMediaType, type StoredImage } from '@project/persistence';
+import { admitImage, isImageId, type ImageMediaType, type StoredImage } from '@project/persistence';
 import { AggregateDirectoryError } from './space-directory';
 
 /**
@@ -21,6 +21,14 @@ const EXTENSIONS = {
  */
 export const imageFileName = ({ id, mediaType }: StoredImage): string =>
   `${id}.${EXTENSIONS[mediaType]}`;
+
+const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(Object.values(EXTENSIONS));
+
+/** Whether `name` is one `imageFileName` gives some picture: an image id and a format's extension. */
+export const isImageFileName = (name: string): boolean => {
+  const dot = name.lastIndexOf('.');
+  return dot !== -1 && isImageId(name.slice(0, dot)) && IMAGE_EXTENSIONS.has(name.slice(dot + 1));
+};
 
 /**
  * Admit one image file's bytes by the rule storing an uploaded picture uses,

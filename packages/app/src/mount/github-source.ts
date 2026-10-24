@@ -8,7 +8,14 @@ import {
   type MalformedGitHubLocation,
   type ResolvedGitHubLocation,
 } from './github-location';
-import { AGGREGATE_FILE_NAME, mapSource, scanAggregateFrom } from '@project/aggregate';
+import {
+  AGGREGATE_FILE_NAME,
+  AggregateDirectoryError,
+  describeAggregateReadRefusal,
+  mapSource,
+  scanAggregateFrom,
+  type AggregateScan,
+} from '@project/aggregate';
 
 /**
  * The GitHub source (ADR 0130): a GitHub location read into the files of the
@@ -38,6 +45,11 @@ import { AGGREGATE_FILE_NAME, mapSource, scanAggregateFrom } from '@project/aggr
 export interface GitHubAggregate {
   readonly location: ResolvedGitHubLocation;
   readonly files: ReadonlyMap<string, Uint8Array>;
+  /**
+   * The symbolic links the tree lists, by path, which are never fetched: the
+   * reader refuses one at a path Hyper owns, as it does on disk.
+   */
+  readonly links: readonly string[];
 }
 
 export type GitHubSourceFailure =
@@ -52,6 +64,12 @@ export type GitHubSourceFailure =
   | { readonly kind: 'truncated-tree'; readonly location: ResolvedGitHubLocation }
   /** An API request failed for another reason: `status` is absent when no response came. */
   | { readonly kind: 'request-failed'; readonly url: string; readonly status?: number }
+  /** The listed paths do not read as an aggregate, such as a link at a path Hyper owns. */
+  | {
+      readonly kind: 'aggregate-unreadable';
+      readonly location: ResolvedGitHubLocation;
+      readonly diagnostics: readonly string[];
+    }
   /** One of the aggregate's files is listed larger than `MAX_BLOB_BYTES`. */
   | { readonly kind: 'blob-too-large'; readonly path: string; readonly size: number }
   /** One of the aggregate's files could not be fetched. */
@@ -341,17 +359,32 @@ export const readGitHubLocation = async (
     ),
   );
   const directoryFiles = [...listedSizes.keys()];
-  if (!directoryFiles.includes(AGGREGATE_FILE_NAME)) {
+  const links = tree.value.tree.flatMap((entry) =>
+    entry.type === 'blob' && entry.mode === SYMLINK_MODE ? [entry.path] : [],
+  );
+  if (!directoryFiles.includes(AGGREGATE_FILE_NAME) && !links.includes(AGGREGATE_FILE_NAME)) {
     return { ok: false, failure: { kind: 'missing-aggregate-file', location: resolved } };
   }
 
-  // The reader's own scan, over the listed paths alone, says which to fetch.
-  const { files: scanned } = await scanAggregateFrom(
-    mapSource(
-      formatGitHubLocation(resolved),
-      new Map(directoryFiles.map((file) => [file, new Uint8Array()])),
-    ),
-  );
+  // The reader's own scan, over the listed paths alone, says which to fetch,
+  // and refuses what the reader would before any blob is requested.
+  let scan: AggregateScan;
+  try {
+    scan = await scanAggregateFrom(
+      mapSource(
+        formatGitHubLocation(resolved),
+        new Map(directoryFiles.map((file) => [file, new Uint8Array()])),
+        links,
+      ),
+    );
+  } catch (error) {
+    if (!(error instanceof AggregateDirectoryError)) throw error;
+    return {
+      ok: false,
+      failure: { kind: 'aggregate-unreadable', location: resolved, diagnostics: error.diagnostics },
+    };
+  }
+  const scanned = scan.files;
   for (const file of scanned) {
     const size = listedSizes.get(file);
     if (size !== undefined && size > MAX_BLOB_BYTES) {
@@ -361,7 +394,7 @@ export const readGitHubLocation = async (
   const prefix = path === '' ? '' : `${path}/`;
   const files = await fetchBlobs(fetch, wait, now, resolved, prefix, scanned);
   if (!files.ok) return files;
-  return { ok: true, aggregate: { location: resolved, files: files.value } };
+  return { ok: true, aggregate: { location: resolved, files: files.value, links } };
 };
 
 const withStatus = (status: number | undefined): string =>
@@ -384,6 +417,11 @@ export const describeGitHubSourceFailure = (failure: GitHubSourceFailure): strin
       return `The GitHub request ${failure.url} failed ${withStatus(failure.status)}.`;
     case 'blob-failed':
       return `${failure.path} could not be fetched from GitHub: the request failed ${withStatus(failure.status)}.`;
+    case 'aggregate-unreadable':
+      return describeAggregateReadRefusal(
+        { kind: 'unreadable', diagnostics: failure.diagnostics },
+        formatGitHubLocation(failure.location),
+      );
     case 'blob-too-large':
       return `${failure.path} is ${failure.size} bytes, over the 25 MiB a mounted file may be, so it is not fetched.`;
   }

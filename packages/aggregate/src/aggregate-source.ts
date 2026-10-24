@@ -1,10 +1,15 @@
 /** The files of an Aggregate directory, by path relative to it with `/` between segments. */
 export type AggregateFiles = ReadonlyMap<string, Uint8Array>;
 
-/** One directory of a source: the names of the files and child directories directly in it. */
+/**
+ * One directory of a source: the names of the files, child directories and
+ * symbolic links directly in it. A link is listed as a link whatever it names,
+ * and never as a file or a directory: the reader decides what one means.
+ */
 export interface DirectoryListing {
   readonly files: readonly string[];
   readonly directories: readonly string[];
+  readonly links: readonly string[];
 }
 
 /** A source's answer to listing one directory: its listing, or why it could not be listed. */
@@ -41,6 +46,7 @@ export interface AggregateSource {
 interface MutableListing {
   readonly files: string[];
   readonly directories: Set<string>;
+  readonly links: string[];
 }
 
 /**
@@ -48,28 +54,35 @@ interface MutableListing {
  * is about to write, a mounted page's fetched files, and the tests. A
  * directory is listed by the paths beneath it, so one holding no file is not
  * there. Every read is allowed at once, since the bytes are already here.
+ * `links` are the paths of symbolic links among them, which hold no bytes.
  */
-export const mapSource = (name: string, files: AggregateFiles): AggregateSource => {
+export const mapSource = (
+  name: string,
+  files: AggregateFiles,
+  links: Iterable<string> = [],
+): AggregateSource => {
   const listings = new Map<string, MutableListing>();
   const listingOf = (directory: string): MutableListing => {
     let listing = listings.get(directory);
     if (listing === undefined) {
-      listing = { files: [], directories: new Set() };
+      listing = { files: [], directories: new Set(), links: [] };
       listings.set(directory, listing);
     }
     return listing;
   };
-  for (const path of files.keys()) {
+  const place = (path: string, entries: (listing: MutableListing) => string[]): void => {
     const segments = path.split('/');
-    const file = segments.pop();
-    if (file === undefined) continue;
+    const entry = segments.pop();
+    if (entry === undefined) return;
     let directory = '';
     for (const segment of segments) {
       listingOf(directory).directories.add(segment);
       directory = directory === '' ? segment : `${directory}/${segment}`;
     }
-    listingOf(directory).files.push(file);
-  }
+    entries(listingOf(directory)).push(entry);
+  };
+  for (const path of files.keys()) place(path, (listing) => listing.files);
+  for (const path of links) place(path, (listing) => listing.links);
 
   return {
     name,
@@ -78,7 +91,11 @@ export const mapSource = (name: string, files: AggregateFiles): AggregateSource 
       const listing = listings.get(directory);
       return Promise.resolve({
         ok: true,
-        listing: { files: listing?.files ?? [], directories: [...(listing?.directories ?? [])] },
+        listing: {
+          files: listing?.files ?? [],
+          directories: [...(listing?.directories ?? [])],
+          links: listing?.links ?? [],
+        },
       });
     },
     read: (path) => {
