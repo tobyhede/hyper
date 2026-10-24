@@ -1,0 +1,147 @@
+/*
+ * **Neon Glitch: the dark theme.** The same semantic tokens `tailwind.css`
+ * declares, restated for a reader whose system asks for dark. Every control,
+ * menu and Resource already reads its colour off a token, so redefining the
+ * tokens is the whole switch; the rules after the tokens add the theme's own
+ * effects.
+ *
+ * It follows `prefers-color-scheme` alone, which is also what Tailwind v4's
+ * `dark:` variant follows, so the registry components' own `dark:` classes turn
+ * over with these tokens rather than on a separate signal.
+ *
+ * The canvas is near-black violet and the Resource is ink-lined in cyan; the
+ * chrome's one emphasis is magenta. A Graph's colour is still the only colour
+ * that carries meaning, so the two neons stay on the chrome and the Resource's
+ * frame, never on an Edge. `test/unit/ui-theme-contrast.test.ts` holds each
+ * `--role`/`--role-foreground` pair, `--destructive` and `--success` on chrome
+ * paper, and every Graph palette colour on the canvas;
+ * `test/unit/canvas-resource-contrast.test.ts` holds the Resource's text roles
+ * on both its faces. Both check this theme as they check the sand one.
+ *
+ * The glitch is decoration. Titles carry a still one-pixel split, and the
+ * animated burst runs on the Resource's frame, which nothing clips, only under
+ * the pointer and only when the reader has not asked for reduced motion. Prose,
+ * menus, fields and status text are drawn clean.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: #07060d;
+    --foreground: #e8f7ff;
+    --card: #110e21;
+    --card-foreground: var(--foreground);
+    --popover: var(--card);
+    --popover-foreground: var(--foreground);
+    --primary: #ff2bd6;
+    --primary-foreground: #12001a;
+    --secondary: #1c1838;
+    --secondary-foreground: var(--foreground);
+    --muted: var(--secondary);
+    /* Clears AA on all three of its grounds: 7.71:1 on chrome paper, 6.91:1
+       on muted and 8.21:1 on the canvas. */
+    --muted-foreground: #a49ee0;
+    --accent: #241e48;
+    --accent-foreground: var(--foreground);
+    --destructive: #ff4d6d;
+    --success: #39ff88;
+    --border: #3b2f73;
+    --input: var(--border);
+    --ring: #00f0ff;
+
+    --xy-background-color: var(--background);
+    --xy-background-pattern-color: #2a1f4a;
+    --xy-minimap-background-color: var(--card);
+    --xy-minimap-mask-background-color: rgb(7 6 13 / 60%);
+    --xy-minimap-node-background-color: #2a2450;
+    --xy-attribution-background-color: rgb(17 14 33 / 60%);
+
+    --canvas-resource-ink-color: #00f0ff;
+    --canvas-resource-face-rest: #0d0b1a;
+    --canvas-resource-face-active: #16122b;
+    --canvas-resource-title-color: #f2fbff;
+    --canvas-resource-muted-color: #a8a3dc;
+    --canvas-resource-error-color: #ff5c7a;
+    --canvas-resource-shadow-dragging: 7px 7px 0 var(--primary), 0 0 28px rgb(0 240 255 / 45%);
+    --canvas-resource-shadow-selected:
+      0 0 0 var(--canvas-resource-selected-ring-width) var(--primary),
+      0 0 24px rgb(255 43 214 / 55%);
+
+    --shadow-chrome-elevated:
+      var(--shadow-chrome-elevated-offset) var(--shadow-chrome-elevated-offset) 0 var(--primary),
+      0 0 32px rgb(255 43 214 / 25%);
+    --shadow-chrome-lifted:
+      var(--shadow-chrome-lifted-offset) var(--shadow-chrome-lifted-offset) 0 var(--primary),
+      0 0 40px rgb(255 43 214 / 35%);
+
+    /* The theme's own effects, named so the applied properties below read them
+       off a token as every structural value here does. */
+    --neon-resource-hover-glow: 0 0 18px rgb(0 240 255 / 35%);
+    --neon-frame-glitch-wide: -4px 0 0 rgb(0 240 255 / 80%), 4px 0 0 rgb(255 43 214 / 80%);
+    --neon-frame-glitch-skew: 3px 2px 0 rgb(0 240 255 / 80%), -3px -2px 0 rgb(255 43 214 / 80%);
+    --neon-frame-glitch-hot: -5px 0 0 rgb(245 255 59 / 60%), 5px 0 0 rgb(255 43 214 / 80%);
+    --neon-title-split: -1px 0 rgb(0 240 255 / 55%), 1px 0 rgb(255 43 214 / 55%);
+    --neon-scanlines: repeating-linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 3.5%) 0,
+      rgb(255 255 255 / 3.5%) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    --neon-canvas-haze:
+      radial-gradient(ellipse at 15% 0%, rgb(255 43 214 / 14%), transparent 55%),
+      radial-gradient(ellipse at 90% 100%, rgb(0 240 255 / 10%), transparent 50%);
+  }
+
+  /* Under the Resources, never over them: the scanlines and haze are painted on
+     React Flow's background layer, so no Resource's text sits behind them. */
+  .react-flow__background {
+    background-image: var(--neon-scanlines), var(--neon-canvas-haze);
+  }
+
+  .canvas-resource[data-state='rest']:hover {
+    box-shadow: var(--neon-resource-hover-glow);
+  }
+
+  /* Black in the sand theme, where it is the Resource's ink; here it takes the
+     cyan ink so the corner is still seen on a dark face. */
+  .rf-resource-node__resize-mark {
+    background: var(--canvas-resource-ink-color);
+  }
+
+  .canvas-resource__title-line[data-role='title'],
+  .command-dock__space .command-dock__name {
+    text-shadow: var(--neon-title-split);
+  }
+}
+
+@media (prefers-color-scheme: dark) and (prefers-reduced-motion: no-preference) {
+  .canvas-resource[data-state='rest']:hover {
+    animation: neon-glitch 2.4s steps(1) infinite;
+  }
+}
+
+/* Short bursts on a long cycle: the frame's split jumps wide, skews and
+   settles, and most of the cycle is the resting glow, so a Resource held under
+   the pointer is still read rather than watched. The frame rather than the
+   title, because a title line clips its own overflow and would cut the split
+   off at its ends. */
+@keyframes neon-glitch {
+  0%,
+  78%,
+  100% {
+    box-shadow: var(--neon-resource-hover-glow);
+  }
+
+  80% {
+    box-shadow: var(--neon-frame-glitch-wide);
+  }
+
+  84% {
+    box-shadow: var(--neon-frame-glitch-skew);
+  }
+
+  88% {
+    box-shadow: var(--neon-frame-glitch-hot);
+  }
+}
