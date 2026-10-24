@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0130
+Refined by: 0132
 Related: 0064, 0106, 0117, 0118
 
 A mounted talk behaves as any other session does. Every Edit is offered and accepted exactly as in a Running session, and it is committed to the memory store the page already holds (ADR 0130). Those Edits live as long as the page does: a reload mounts the talk again as it was committed to GitHub, and nothing the reader changed survives it. No browser storage keeps them, and nothing is written back to GitHub.
