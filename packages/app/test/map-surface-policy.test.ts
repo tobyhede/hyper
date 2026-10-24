@@ -111,7 +111,6 @@ const EVERYTHING: AuthoringAvailability = {
   selectNodes: true,
   navigate: true,
   replaceSession: true,
-  resourceActions: true,
   embeddedMapEdit: true,
 };
 
@@ -131,7 +130,6 @@ const NOTHING: AuthoringAvailability = {
   selectNodes: false,
   navigate: false,
   replaceSession: false,
-  resourceActions: false,
   embeddedMapEdit: false,
 };
 
@@ -202,7 +200,6 @@ describe('what each policy offers on each drawing', () => {
       selectNodes: fc.boolean(),
       navigate: fc.boolean(),
       replaceSession: fc.boolean(),
-      resourceActions: fc.boolean(),
       embeddedMapEdit: fc.boolean(),
     });
     fc.assert(

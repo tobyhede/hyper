@@ -195,7 +195,7 @@ Serving an existing Aggregate directory as the working aggregate: Importing it i
 _Avoid_: watching, syncing, live mode, session (that is the client's edit-coalescing seam).
 
 **Mounting**:
-Reading a complete aggregate from a GitHub location (a public repository, a commit or a branch resolved to one, and a directory in it) into a store held by one browser page, and serving the application from that store, read-only (ADR 0130). Everything that reads, navigates and presents works, and nothing is an Edit: Open and Closed, selections and every other authored value stay as the directory has them. Mounting is not Importing, because it never touches a stored aggregate, and not Running, because it writes nothing back. A mounted aggregate is refused on exactly the grounds Importing refuses it.
+Reading a complete aggregate from a GitHub location (a public repository, a commit or a branch resolved to one, and a directory in it) into a store held by one browser page, and serving the application from that store (ADR 0130). Everything works as in any session, Edits included, and an Edit lasts as long as the page: a reload mounts the aggregate again as it was committed (ADR 0131). Mounting is not Importing, because it never touches a stored aggregate, and not Running, because it writes nothing back. A mounted aggregate is refused on exactly the grounds Importing refuses it.
 _Avoid_: publishing, deploying, hosting, loading (as names for the operation); mount for the React sense, which is code vocabulary.
 
 **Opening**:

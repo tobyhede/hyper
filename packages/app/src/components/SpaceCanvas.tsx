@@ -486,8 +486,7 @@ export function SpaceCanvas({
         : (resourceId: ResourceId) =>
             resourceEntityActions(
               resourceId,
-              // Connecting is an Edit, so it goes where the canvas's authoring
-              // goes; the rest of the menu may stay (`resourceActions`).
+              // Connecting is an Edit, so it goes where the canvas's authoring goes.
               availability.authorOnCanvas &&
                 placedResources.some((resource) => resource.id === resourceId)
                 ? [

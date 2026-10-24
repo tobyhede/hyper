@@ -529,11 +529,11 @@ export const parityClaims: readonly ParityClaim[] = [
       'While an Image Resource’s replacement is held, Open Spaces and the Space, Map and Graph names each report aria-disabled, stay in the Dock’s arrow order and open nothing when pressed.',
   },
   {
-    id: 'command-dock-marks-a-mounted-session-read-only',
+    id: 'command-dock-marks-a-mounted-session-unsaved',
     storyFile: 'space/command-dock.stories.tsx',
     storyExport: 'Mounted',
     claim:
-      'A mounted session draws the read-only mark in the Dock and no persistence state beside it, offers no rename and no Create, and keeps Present and the Space, Map and Graph choices available.',
+      'A mounted session draws a mark in the Dock saying its Edits are lost on reload, and offers rename, Create, Present and the Space, Map and Graph choices as any session does.',
   },
   {
     id: 'command-dock-fits-a-narrow-container',

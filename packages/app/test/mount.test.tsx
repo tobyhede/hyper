@@ -1,3 +1,4 @@
+import { Blob as NodeBlob } from 'node:buffer';
 import { act, waitFor, within } from '@testing-library/react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -156,11 +157,11 @@ describe('mounting an aggregate in the page', () => {
     expect(opened(await startup.resolve('/')).app.currentSpace().id).toBe(META_SPACE_ID);
   });
 
-  it('opens a read-only session, marked so and with no persistence status', async () => {
+  it('opens a session marked that its edits are lost on reload, reporting persistence', async () => {
     const container = await render(() => mountedStartup(fixtureFiles()).resolve('/'));
 
-    expect(await within(container).findByText('Read-only')).toBeInTheDocument();
-    expect(within(container).queryByTestId('persistence-status')).toBeNull();
+    expect(await within(container).findByText('Edits lost on reload')).toBeInTheDocument();
+    expect(within(container).getByTestId('persistence-status')).toHaveTextContent('Persisted');
   });
 
   it('shows the reader’s diagnostics for a directory that is not an aggregate', async () => {
@@ -190,12 +191,14 @@ describe('mounting an aggregate in the page', () => {
     );
   });
 
-  it('refuses every write and stores nothing', async () => {
-    const mounted = await mountAggregate({
-      source: mapSource('fixture', fixtureFiles()),
-      newId: mintsNothing,
-      createObjectUrl: recordingObjectUrls().createObjectUrl,
-    });
+  it('commits a write in the page, which a fresh mount of the same files does not hold', async () => {
+    const mount = () =>
+      mountAggregate({
+        source: mapSource('fixture', fixtureFiles()),
+        newId: mintsNothing,
+        createObjectUrl: recordingObjectUrls().createObjectUrl,
+      });
+    const mounted = await mount();
     if (!mounted.ok) throw new Error('The fixture mounts.');
     const { backend } = mounted.mounted;
     const before = await backend.loadSpace(META_SPACE_ID);
@@ -205,25 +208,58 @@ describe('mounting an aggregate in the page', () => {
       ...before.snapshot,
       document: { ...before.snapshot.document, title: 'Renamed' },
     };
-    await expect(
-      backend.commit({
-        changes: [
-          {
-            kind: 'update',
-            spaceId: META_SPACE_ID,
-            snapshot: renamed,
-            expectedRevision: before.revision,
-          },
-        ],
-      }),
-    ).resolves.toEqual({ kind: 'permanent-failure', code: 'forbidden' });
-    await expect(backend.storeImage(new Blob([new Uint8Array([0x89, 0x50])]))).rejects.toThrow(
-      'HTTP 403',
-    );
+    const committed = await backend.commit({
+      changes: [
+        {
+          kind: 'update',
+          spaceId: META_SPACE_ID,
+          snapshot: renamed,
+          expectedRevision: before.revision,
+        },
+      ],
+    });
 
+    expect(committed.kind).toBe('committed');
     const after = await backend.loadSpace(META_SPACE_ID);
-    expect(after?.revision).toBe(before.revision);
-    expect(after?.snapshot.document.title).toBe('Map fixture');
+    expect(after?.revision).toBeGreaterThan(before.revision);
+    expect(after?.snapshot.document.title).toBe('Renamed');
+
+    const reloaded = await mount();
+    if (!reloaded.ok) throw new Error('The fixture mounts.');
+    const fresh = await reloaded.mounted.backend.loadSpace(META_SPACE_ID);
+    expect(fresh?.snapshot.document.title).toBe('Map fixture');
+  });
+
+  it('stores an uploaded image in the page and draws it from an object URL over its bytes', async () => {
+    const objectUrls = recordingObjectUrls();
+    const mounted = await mountAggregate({
+      source: mapSource('fixture', fixtureFiles()),
+      newId: mintsNothing,
+      createObjectUrl: objectUrls.createObjectUrl,
+    });
+    if (!mounted.ok) throw new Error('The fixture mounts.');
+    const { backend, displayImage } = mounted.mounted;
+    // A PNG signature and a tail no fixture image has: storing reads the
+    // signature and nothing else.
+    const uploaded = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x7f]);
+
+    // Uploaded as Node's own Blob, as a page uploads its own: the in-page
+    // application is Node's `Request` under test, which does not read jsdom's
+    // Blob as its bytes. jsdom's is back before anything is drawn.
+    const pageBlob = globalThis.Blob;
+    vi.stubGlobal('Blob', NodeBlob);
+    const upload = new Blob([uploaded], { type: 'image/png' });
+    vi.stubGlobal('Blob', pageBlob);
+    const stored = await backend.storeImage(upload);
+    if (stored.kind !== 'stored')
+      throw new Error(`The image was not stored: ${JSON.stringify(stored)}`);
+
+    expect(displayImage(stored.url)).toBe('blob:https://mounted.test/1');
+    expect(displayImage(stored.url)).toBe('blob:https://mounted.test/1');
+    const [picture] = objectUrls.made;
+    expect(objectUrls.made).toHaveLength(1);
+    expect(picture?.type).toBe('image/png');
+    expect(await bytesOf(picture ?? new Blob())).toEqual(uploaded);
   });
 
   it('draws a stored image from an object URL over the mounted bytes', async () => {

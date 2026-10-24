@@ -13,7 +13,6 @@ import {
   ImageUp,
   LayoutGrid,
   Link2Off,
-  Lock,
   LogIn,
   Maximize,
   Maximize2,
@@ -23,6 +22,7 @@ import {
   Play,
   Plus,
   Route,
+  SaveOff,
   Search,
   Square,
   StickyNote,
@@ -366,11 +366,8 @@ export const ShowTitleIcon = (props: ResourceActionIconProps) => <Eye size={14} 
 /** An Edge's Title is hidden at rest. */
 export const HideTitleIcon = (props: ResourceActionIconProps) => <EyeOff size={14} {...props} />;
 
-/**
- * A session that offers no Edit (ADR 0130). A lock rather than a struck-out
- * pencil: it says the Space is closed to change, not that one command is off.
- */
-export const ReadOnlyIcon = (props: ResourceActionIconProps) => <Lock size={14} {...props} />;
+/** A session whose Edits are kept only until the page reloads (ADR 0131). */
+export const UnsavedIcon = (props: ResourceActionIconProps) => <SaveOff size={14} {...props} />;
 
 /** Remove the entity the surrounding command names. */
 export const DeleteIcon = (props: ResourceActionIconProps) => <Trash2 size={14} {...props} />;

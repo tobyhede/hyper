@@ -259,7 +259,8 @@ export interface OpenSpacesOptions {
   readonly reportObserverError?: ObserverErrorReporter;
   /**
    * Whether this session is Mounting an aggregate (ADR 0130): every Space it
-   * composes offers no Edit. Absent, it is not.
+   * composes marks its Edits as lost on reload (ADR 0131), and its addresses
+   * carry the mounted `source`. Absent, it is not.
    */
   readonly mounted?: boolean | undefined;
 }

@@ -1240,25 +1240,22 @@ test(
 );
 
 /**
- * A mounted session is read-only (ADR 0130): the Dock says so with its own
- * mark, reports no persistence state, and withholds every Edit while keeping
- * what reads.
+ * A mounted session authors as any session does (ADR 0131): the Dock marks
+ * that its Edits are lost on reload, and offers every Edit beside what reads.
  */
 test(
-  'a mounted session draws the read-only mark and withholds every Edit the Dock offers',
-  { tag: '@parity:command-dock-marks-a-mounted-session-read-only' },
+  'a mounted session marks its Edits as lost on reload and offers every Edit the Dock offers',
+  { tag: '@parity:command-dock-marks-a-mounted-session-unsaved' },
   async ({ page }) => {
     await page.goto(story('mounted'));
 
-    await expect(surface(page).getByText('Read-only', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('persistence-status')).toHaveCount(0);
-    await expect(page.getByText('Persisted')).toHaveCount(0);
+    await expect(surface(page).getByText('Edits lost on reload', { exact: true })).toBeVisible();
     await expect(page.getByRole('alert')).toHaveCount(0);
 
     for (const create of await surface(page)
       .getByRole('button', { name: /^Create / })
       .all()) {
-      await expect(create).toHaveAttribute('aria-disabled', 'true');
+      await expect(create).not.toHaveAttribute('aria-disabled', 'true');
     }
     await expect(surface(page).getByRole('button', { name: /^Present/ })).not.toHaveAttribute(
       'aria-disabled',
@@ -1267,7 +1264,7 @@ test(
 
     const maps = await disclose(page, 'Map: Collection 1');
     for (const edit of ['New Map', 'Rename']) {
-      await expect(maps.getByRole('menuitem', { name: edit, exact: true })).toHaveAttribute(
+      await expect(maps.getByRole('menuitem', { name: edit, exact: true })).not.toHaveAttribute(
         'aria-disabled',
         'true',
       );

@@ -477,7 +477,6 @@ export function useCanvasResourceAuthoring({
   const sharedContext = useMemo(
     () => ({
       authorOnCanvas: availability.authorOnCanvas,
-      resourceActions: availability.resourceActions,
       bodyEditing,
       bodyEditorResourceId,
       editableResourceIds,
@@ -493,7 +492,6 @@ export function useCanvasResourceAuthoring({
     }),
     [
       availability.authorOnCanvas,
-      availability.resourceActions,
       bodyEditing,
       bodyEditorResourceId,
       editableResourceIds,
