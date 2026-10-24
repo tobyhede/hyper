@@ -489,44 +489,12 @@ describe('Space HTTP reads', () => {
     expect(logError).toHaveBeenCalledWith('Failed to load the Space aggregate', failure);
   });
 
-  // One `AggregateInvariantError` is not proof of broken stored
-  // state, on PostgreSQL — `loadAggregate` runs at READ COMMITTED in two
-  // statements, so a rival host's commit landing between them can make a
-  // healthy store look like "Spaces without Meta" for an instant
-  // (`packages/aggregate/src/space-host.ts`'s `readAggregate`, which this handler mirrors
-  // rather than imports — `@project/http` cannot reach across the package
-  // boundary into `src/`). So a first invariant failure is re-read once
-  // before it answers anything.
-  it('re-reads once on an invariant failure and answers 200 when the retry succeeds', async () => {
-    let calls = 0;
-    const response = await createSpaceHttpApp(
-      repository({
-        loadAggregate: () => {
-          calls += 1;
-          return calls === 1
-            ? Promise.reject(new AggregateInvariantError('transient'))
-            : Promise.resolve({
-                kind: 'loaded' as const,
-                aggregate: { metaSpaceId: SPACE_ID, spaces: [loaded] },
-              });
-        },
-      }),
-      { newId: mintsNothing },
-    ).request('/api/aggregate');
-
-    expect(response.status).toBe(200);
-    expect(calls).toBe(2);
-  });
-
   // Broken stored state and an unreachable database are told apart by type
   // (`isAggregateInvariant`, which walks the cause chain), the way
-  // `packages/aggregate/src/space-host.ts` does for `GET /` — an invariant failure
-  // that survives the re-read above is a permanent defect no retry cures
-  // (500), everything else is temporary (503). The second case is carried
-  // only on `cause`, because the driver does not always rethrow what a
-  // transaction callback threw. Both cases here fail identically on every
-  // call, so the re-read changes nothing about their answer — it is exercised
-  // by the case above instead.
+  // `packages/aggregate/src/space-host.ts` does for `GET /`: an invariant
+  // failure is a permanent defect no retry cures (500), answered from a single
+  // read. The second case is carried only on `cause`, because the driver does
+  // not always rethrow what a transaction callback threw.
   it.each([
     { failure: 'a direct invariant failure', error: new AggregateInvariantError('broken') },
     {
@@ -536,20 +504,21 @@ describe('Space HTTP reads', () => {
       }),
     },
   ])('answers 500 internal-error for $failure', async ({ error }) => {
+    let calls = 0;
     const response = await createSpaceHttpApp(
-      repository({ loadAggregate: () => Promise.reject(error) }),
+      repository({
+        loadAggregate: () => {
+          calls += 1;
+          return Promise.reject(error);
+        },
+      }),
       { newId: mintsNothing },
     ).request('/api/aggregate');
 
     await expectProblem(response, 'internal-error');
+    expect(calls).toBe(1);
   });
 
-  // The negative half of the re-read above: only an invariant failure earns a
-  // second read. A failure that says nothing about stored state is answered
-  // from the first one, so the call count is what holds the guard in place.
-  // Without it every aggregate failure costs two full reads against a database
-  // that is already not answering.
-  //
   // The unreachable arm is named (`PersistenceUnavailableError`)
   // rather than being whatever is not an invariant, so a failure that is
   // neither — a code defect, a driver failure nobody anticipated — is the third
@@ -567,7 +536,7 @@ describe('Space HTTP reads', () => {
       error: new TypeError('Cannot read properties of undefined'),
       code: 'internal-error' as const,
     },
-  ])('answers $failure as $code without re-reading', async ({ error, code }) => {
+  ])('answers $failure as $code', async ({ error, code }) => {
     let calls = 0;
     const logError = vi.fn();
     const response = await createSpaceHttpApp(

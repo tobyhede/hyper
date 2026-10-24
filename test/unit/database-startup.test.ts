@@ -167,9 +167,8 @@ describe('establishMetaSpace', () => {
  * A repository whose reads follow a script.
  *
  * One double rather than three, because all three cases differ only in the
- * sequence of failures a read produces: an outage, the READ COMMITTED
- * interleaving that makes a healthy repository look contradictory for exactly
- * one read, or any mixture of the two. `loadAggregate` is where establishment
+ * sequence of failures a read produces: an outage, one invariant failure that
+ * the next read does not repeat, or any mixture of the two. `loadAggregate` is where establishment
  * reaches the database first, so failing it there is the whole failure: nothing
  * is minted and nothing is written, which is what makes "the retry established
  * it" a claim about the retry rather than about a half-written repository.
@@ -294,11 +293,9 @@ describe('retryMetaSpaceEstablishment', () => {
     ]);
   });
 
-  it('keeps trying through one invariant failure, which can be a healthy race', async () => {
-    // `loadAggregate` reads the Meta identity and the Spaces in two statements
-    // under READ COMMITTED, so a rival host committing between them makes a
-    // healthy repository look contradictory for exactly one read. The next read
-    // sees both halves, which is why one of these is not a verdict.
+  it('keeps trying through one invariant failure the next read does not repeat', async () => {
+    // A one-off is not a verdict: only a second consecutive failure stops the
+    // retry, so a read that succeeds after one establishes as usual.
     const repository = new ScriptedRepository([invariant()]);
     const waits: number[] = [];
     const reported: unknown[] = [];
