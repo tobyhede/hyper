@@ -17,6 +17,8 @@ import {
   readAggregate,
   scannedAggregateFiles,
 } from '../../src/aggregate-directory';
+import { readGitHubLocation } from '../../packages/app/src/mount/github-source';
+import { COMMIT, fakeGitHub, OWNER, REPO } from '../../packages/app/test/fake-github';
 import { markdownResourceFiles, resourceFiles } from '../support/aggregate-directory';
 import { captureError } from '../support/capture-error';
 import { admitted, pngBytes } from '../support/stored-images';
@@ -93,9 +95,28 @@ const allFilesUnder = async (root: string): Promise<ReadonlyMap<string, Uint8Arr
   );
 
 /**
- * The two sources an aggregate is read from here: the disk, and a map of its
- * files' bytes, the way Export reads back what it is about to write (ADR 0130).
- * Every case below runs through both, so they cannot come to disagree.
+ * The GitHub source over a fake repository holding every file under `root` at
+ * `root`'s own path, so the source's name ends in `root` and its diagnostics
+ * name each file as the disk's do.
+ */
+const githubSourceOver = async (root: string): Promise<AggregateSource> => {
+  const path = root.replace(/^\//u, '');
+  const files = new Map(
+    [...(await allFilesUnder(root))].map(([file, bytes]) => [`${path}/${file}`, bytes] as const),
+  );
+  const read = await readGitHubLocation(
+    { owner: OWNER, repo: REPO, ref: COMMIT, path },
+    fakeGitHub({ files }).fetch,
+  );
+  if (!read.ok) throw new Error(`The fake repository answered ${read.failure.kind}.`);
+  return read.aggregate.source;
+};
+
+/**
+ * The three sources an aggregate is read from here: the disk, a map of its
+ * files' bytes, the way Export reads back what it is about to write, and
+ * GitHub, the way a mount reads it (ADR 0133). Every case below runs through
+ * all three, so they cannot come to disagree.
  */
 const READERS: readonly {
   readonly name: string;
@@ -109,6 +130,10 @@ const READERS: readonly {
     name: 'readAggregateFrom a mapSource',
     read: async (root, newId) =>
       readAggregateFrom(mapSource(root, await allFilesUnder(root)), newId),
+  },
+  {
+    name: 'readAggregateFrom the GitHub source',
+    read: async (root, newId) => readAggregateFrom(await githubSourceOver(root), newId),
   },
 ];
 

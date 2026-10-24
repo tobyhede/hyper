@@ -349,15 +349,37 @@ describe('mounting an aggregate in the page', () => {
     expect(container).toHaveTextContent('GitHub’s limit on requests without a token is used up');
   });
 
-  it('shows a location whose directory holds no hyper.json as its failure', async () => {
+  it('shows a location whose directory holds no hyper.json in the reader’s words', async () => {
     const files = fixtureFiles();
     files.delete('hyper.json');
 
     const container = await render(() => mountedStartup(files).resolve('/'));
 
+    expect(container).toHaveTextContent(`${PINNED} is not an Aggregate directory:`);
     expect(container).toHaveTextContent(
-      `${PINNED} does not directly contain hyper.json, so it is not an Aggregate directory.`,
+      `${PINNED}/hyper.json: a canonical aggregate directory must contain hyper.json`,
     );
+  });
+
+  it('shows every file GitHub would not give', async () => {
+    const files = fixtureFiles();
+    const unreadable = [
+      '00000000-0000-4000-8000-000000000060/space.json',
+      '00000000-0000-4000-8000-000000000070/space.json',
+    ];
+    const github = fakeGitHub({
+      files,
+      blobFailures: new Map(unreadable.map((path) => [path, [{ status: 404 }]])),
+    });
+
+    const container = await render(() => mountedStartup(files, { github }).resolve('/'));
+
+    expect(container).toHaveTextContent(`${PINNED} is not an Aggregate directory:`);
+    for (const path of unreadable) {
+      expect(container).toHaveTextContent(
+        `${PINNED}/${path}: could not be fetched from GitHub: the request failed with HTTP 404`,
+      );
+    }
   });
 
   /**
