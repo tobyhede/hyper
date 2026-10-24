@@ -524,16 +524,11 @@ export const createSpaceHttpApp = (
           // Space to judge a complete-aggregate commit against — so this
           // route can meet it too.
           //
-          // Unlike that read, this catch does not re-read on an invariant
-          // failure. The aggregate GET's re-read exists for one specific
-          // race: `loadAggregate` reads the Meta identity and every stored
-          // Space as two statements, so a rival commit landing between them
-          // can make a healthy store look like "Spaces without Meta" for an
-          // instant. `commit` reads that same pair inside one transaction,
-          // but never raises that race as a thrown invariant failure —
-          // `decideCommit` answers a missing Meta identity as a `rejected`
-          // result, not a throw (`commit-decision.ts`). The invariant
-          // failures that can reach here instead come from a stored row that
+          // Neither that read nor this commit is attempted twice on an
+          // invariant failure. `commit` never raises a missing Meta identity
+          // as a thrown invariant failure — `decideCommit` answers it as a
+          // `rejected` result, not a throw (`commit-decision.ts`). The invariant
+          // failures that can reach here come from a stored row that
           // will not parse or a revision the codec refuses, which describe
           // corrupt stored data rather than a timing window, so a second
           // attempt would not answer differently. Retrying a write is also
@@ -545,29 +540,13 @@ export const createSpaceHttpApp = (
     )
     .get(SPACE_AGGREGATE_PATH, async (context) => {
       try {
-        // One `AggregateInvariantError` is not proof of broken stored state:
-        // on PostgreSQL `loadAggregate` reads the Meta identity and every
-        // stored Space in two statements, and although both run inside one
-        // transaction, at READ COMMITTED each statement takes its own
-        // snapshot — so a rival host's commit landing between them can make a
-        // healthy store look like "Spaces without Meta" for an instant. So it
-        // is re-read once before letting an invariant failure stand — the
-        // same rule `packages/aggregate/src/space-host.ts`'s `readAggregate` applies for
-        // `GET /`, mirrored here rather than shared, because `@project/aggregate`
-        // depends on `@project/http` and the reverse import would be a cycle.
-        let loaded;
-        try {
-          loaded = await repository.loadAggregate();
-        } catch (error) {
-          if (classifyStoredFailure(error) !== 'broken-stored-state') throw error;
-          loaded = await repository.loadAggregate();
-        }
+        const loaded = await repository.loadAggregate();
         return context.json(encodeLoadedAggregate(loaded), 200);
       } catch (error) {
         invokeLogError(logError, 'Failed to load the Space aggregate', error);
-        // An invariant failure that survives the re-read above is a permanent
-        // defect no further retry cures; `storedFailureProblem` answers it and
-        // the other two arms.
+        // An invariant failure is a permanent defect no retry cures, and
+        // `packages/aggregate/src/space-host.ts` answers `GET /` by the same
+        // rule; `storedFailureProblem` answers it and the other two arms.
         return storedFailureProblem(context, error);
       }
     })

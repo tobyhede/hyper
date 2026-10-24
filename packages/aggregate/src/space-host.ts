@@ -62,34 +62,6 @@ const methodNotAllowed = (accept?: string): ProductResponse => {
 };
 
 /**
- * Read the aggregate, and read it again before letting one invariant failure
- * stand as the answer.
- *
- * One `AggregateInvariantError` is not proof of broken stored state. It is also
- * what a healthy repository shows for an instant: on PostgreSQL `loadAggregate`
- * reads the Meta identity and the Spaces in two statements, and although both
- * run inside one transaction, at READ COMMITTED each statement takes its own
- * snapshot — so a rival host committing between them is reported as Spaces
- * without Meta. Two hosts against one fresh database is the ordinary way to see
- * it — a dev server and `test:integration:postgres`.
- *
- * Start-up's retry already required two consecutive failures for exactly this
- * reason (`src/startup/database-startup.ts`). Drawing a permanent 500 from the
- * first left the two halves classifying the same error differently, and told a
- * browser its database was broken when a reload would have redirected. The
- * second read costs a full aggregate read, and only on a path that has already
- * failed one.
- */
-const readAggregate = async (repository: SpaceRepository): Promise<AggregateLoadResult> => {
-  try {
-    return await repository.loadAggregate();
-  } catch (error) {
-    if (classifyStoredFailure(error) !== 'broken-stored-state') throw error;
-    return await repository.loadAggregate();
-  }
-};
-
-/**
  * Compose API resources and the product paths the HTTP host owns before SPA
  * fallback.
  *
@@ -123,7 +95,7 @@ export const createSpaceHost = (
       // methods, so neither may create durable authored state.
       let loaded: AggregateLoadResult;
       try {
-        loaded = await readAggregate(repository);
+        loaded = await repository.loadAggregate();
       } catch (error) {
         // The reason travels to the operator rather than in the answer. The
         // detail is fixed prose like every other one here, so whatever a driver
@@ -142,12 +114,9 @@ export const createSpaceHost = (
         // `GET /api/aggregate` (`packages/http/src/index.ts`) does the same
         // resource on the same rule, independently, because `@project/http` cannot
         // import this module: this package depends on it, so the reverse import
-        // would be a cycle. It re-reads once on an invariant failure — it
-        // re-implements `readAggregate` above rather than sharing it — answers 200 if the retry succeeds, and otherwise
-        // answers whichever error it is left with by the same three arms.
-        // `space-http-app.test.ts`'s "re-reads once on an invariant failure and
-        // answers 200 when the retry succeeds" and the aggregate cases beside it
-        // hold that half; this branch is held by `vite-hono-host.test.ts`.
+        // would be a cycle. Each reads once and answers what that read threw
+        // by the same three arms: `space-http-app.test.ts`'s aggregate cases
+        // hold that half, and `vite-hono-host.test.ts` holds this branch.
         switch (classifyStoredFailure(error)) {
           case 'broken-stored-state':
             return problem('internal-error', 'Stored repository state is not usable.', accept);
