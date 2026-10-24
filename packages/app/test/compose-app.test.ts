@@ -208,5 +208,19 @@ describe('tearing the composition down', () => {
     ).toBe(COMMAND_DISCARDED);
     expect(composed.commandOutcomes.getState().notices.size).toBe(0);
     expect(outcomesPublished).toBe(0);
+    composed.surface.continuation.request({
+      target: { kind: 'canvas' },
+      select: false,
+      then: 'nothing',
+    });
+    expect(composed.surface.continuation.getState().pending).toBeNull();
+    composed.deleteConfirmation.arm({
+      subject: { kind: 'Resource', name: 'A' },
+      from: null,
+      description: 'A',
+      run: () => undefined,
+      focusFallback: null,
+    });
+    expect(composed.deleteConfirmation.getState().pending).toBeNull();
   });
 });
