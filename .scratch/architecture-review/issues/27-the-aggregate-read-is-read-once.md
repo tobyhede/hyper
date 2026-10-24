@@ -2,7 +2,8 @@
 
 Status: ready-for-agent
 Tags: Improvement
-Blocked by: the 30 October 2026 talk. Do not start before 31 October 2026 (decided 24 October 2026).
+Held: until after the talk on 30 October 2026; do not start before 31 October 2026 (decided 24 October 2026).
+Blocked by: the talk named on the line above, not a ticket.
 
 Surfaced by: the 24 October 2026 architecture review of `main` at `b46ea0c6`, candidate 02 ("Give Aggregate read confirmation one owner"), then settled by a grilling loop on 24 October 2026 against `main` at `953dac3`. The grilling reversed the candidate: the rule it proposed to give one owner guards a race that no longer exists, so it is deleted rather than shared.
 
