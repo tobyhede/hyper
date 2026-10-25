@@ -77,7 +77,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R26. Add Graph appends an empty Graph and activates it, in one Edit.** ([0040])
 - **R27. The last Graph of a Map cannot be deleted.** Delete Graph is not offered while the Map has one Graph (`graph-authoring-commands.ts`), and `planContextDeletion` answers unchanged when no survivor exists. There is no refusal code. Deleting the Active Graph activates the first survivor. ([0040], [0041])
 - **R28. A Map may name its opening Graph** in `activeGraph`; otherwise its first Graph opens. That fallback is a read, never a write. Intake rejects an `activeGraph` that dangles or names another Map's Graph. ([0040], [0041], [0028])
-- **R29. Activating a Graph is navigation, and it is emphasis, not filtering.** Every owned Graph is still drawn. It is deliberate, never a side effect of drawing or reading, and neither submits nor dirties, because it changes nothing authored. There is no second "selected Graph". Cost, intended: an activation is not durable until a later Edit in that Map records it (A18). ([0028], [0041], [0079])
+- **R29. Activating a Graph is navigation, and it is emphasis, not filtering.** Every owned Graph is still drawn. It is deliberate, never a side effect of drawing or reading, and neither submits nor dirties, because it changes nothing authored. There is no second "selected Graph". Cost, intended: an activation is not durable until a later Edit in that Map records it (A18). The emphasis reaches Resources: a Resource is drawn in the Active Graph's colour when it is an endpoint of one of its Edges, and otherwise recedes to half opacity, drawn in the colour of the first Graph in Map order it is in, or in ink when it is in none; nothing recedes while the Active Graph has no Edges. ([0028], [0041], [0079], [0135])
 - **R30. An empty Graph is valid and may be active, but cannot be presented until it has an Edge.** Stated in CONTEXT.md and built; no ADR states it in Graph terms ([0015] has an older form).
 
 ## 5. Membership and removal
@@ -242,3 +242,4 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0114]: ../adr/0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md
 [0130]: ../adr/0130-mounting-reads-an-aggregate-from-github-into-a-read-only-page.md
 [0131]: ../adr/0131-a-mounted-talk-is-editable-in-memory.md
+[0135]: ../adr/0135-a-resource-is-drawn-in-the-colour-of-its-graph.md
