@@ -63,7 +63,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 - **R15. A stored or imported Space may have no Map, and so no Graph.** That is valid stored state (A5). ([0079], [0041], [0015])
 - **R16. First working load initializes a mapless Space.** Before returning, the first complete working-state read persists one atomic Edit: an empty `Map 1`, its empty Active `Graph 1`, and `defaultMap`. Existing Resources are **not** placed and no strategy seeds them, because nothing authored says where they go; they stay in the Resources View. In a mounted page (ADR 0130) this Edit is made by the in-page host while it answers the read, and lasts as long as the page, as every mounted Edit does (ADR 0131). ([0079], [0080], [0130], [0131])
 - **R17. A Space with Maps but no default records its first Map** in authored order, and creates nothing. ([0079], [0080])
-- **R18. One server-side boundary initializes.** Direct opening, Entering, rendering an Open Space Resource, and making a link target working all use it. Listing, import completion, export and reference validation read stored state and never initialize. ([0079], [0080])
+- **R18. One boundary initializes in each context: the server-side one, or in a mounted page the in-page host (R16).** Direct opening, Entering, rendering an Open Space Resource, and making a link target working each use their context's boundary, mounted or not, and R19 holds at both: a mounted initialization commits to the in-page store before the Space becomes working. Listing, import completion, export and reference validation read stored state and never initialize. ([0079], [0080], [0130])
 - **R19. Initialization commits before the Space becomes working.** A conflict reloads, and accepts a competing initialization if one exists; otherwise the normal retry follows. Any other failure stops the Space opening. ([0079], [0080])
 - **R20. Newness is never inferred, and no creation marker is stored.** Content is not provenance: a one-Resource import is still an import, and the creation boundary already knows when it creates. ([0080])
 - **R21. Import does not rewrite its source Markdown;** Export is the crossing back to files. ([0079])
@@ -173,7 +173,9 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R13 | §2 | [0091] |
 | R14 | §3 | [0080], [0018] |
 | R15 | §3 | [0079], [0041], [0015] |
-| R16, R17, R18, R19 | §3 | [0079], [0080] |
+| R16 | §3 | [0079], [0080], [0130], [0131] |
+| R17, R19 | §3 | [0079], [0080] |
+| R18 | §3 | [0079], [0080], [0130] |
 | R20 | §3 | [0080] |
 | R21 | §3 | [0079] |
 | R22, R27 | §4 | [0040], [0041] |

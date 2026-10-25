@@ -1,6 +1,6 @@
 # 13 — Reconcile the Mounting docs with the contracts they touch
 
-Status: ready-for-agent
+Status: resolved
 
 **What to build:** one consistent answer from the contracts, the spec and ADR 0130 about Mounting. These are CodeRabbit's second-pass findings on #391, which were deferred so the stacked implementation would not have to be re-merged. All are docs only.
 
@@ -15,3 +15,10 @@ Status: ready-for-agent
 - R18, the spec's static-build CSP, ADR 0130's header and the three refined ADRs' headers read as above.
 - `test/unit/adr-status-blocks.test.ts` passes, holding the new links reciprocal.
 - Each of the three CodeRabbit threads on #391 (the Contents API limit, the spec's `img-src`, R18) has a reply naming the change and is resolved. The Contents API thread names #395's review fix, which lists a selected directory's tree as `<sha>:<path>` with no Contents lookup and so no 1,000-entry limit.
+
+## Answer
+
+- **R18** (`docs/agents/maps-and-graphs.md`) reads "One boundary initializes in each context: the server-side one, or in a mounted page the in-page host (R16)". Each use it lists takes its context's boundary, and R19 holds at both, a mounted initialization committing to the in-page store. It keeps what never initializes and cites [0130]. The §3 table gives R16 and R18 rows of their own with their citations.
+- **The spec's static build** (`.scratch/mounting/spec.md`) names `packages/app/mount-headers.ts` as the policy rather than restating its directives, so the two cannot drift. The spec also opens with a note that ADR 0131 and ADR 0132 govern where it still says a mount is read-only. ADR 0130's body stays as accepted, since an accepted ADR is edited only on its status lines (`workflow.md`).
+- **ADR 0130** declares `Refines: 0069, 0078, 0117`, which leave its `Related:`, and ADRs 0069, 0078 and 0117 each add 0130 to `Refined by:`. `test/unit/adr-status-blocks.test.ts` passes.
+- The three CodeRabbit threads on #391 were answered and resolved on 2026-10-24: the Contents API thread names #395's `<sha>:<path>` tree listing, and the `img-src` and R18 threads name #409.
