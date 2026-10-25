@@ -220,6 +220,11 @@ export interface ComposedApp extends AppCore {
   readonly reportObserverError: ObserverErrorReporter;
   /** Whether this Space is composed in a mounted session, answered as taken. */
   readonly mounted: boolean;
+  /**
+   * Tear down what {@link composeApp} built and subscribed, in reverse
+   * construction order. When a composition may go is its caller's question.
+   */
+  readonly dispose: () => void;
 }
 
 /**
@@ -302,26 +307,27 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     commandOutcomes,
     spaceResources,
   });
+  const presenting = createPresentingWindow({
+    navigation,
+    newId,
+    // Each presentation starts on the clock its Notes windows time it by.
+    now: presentations?.now ?? Date.now,
+    fullscreen,
+    // Called within the click or key press, because a browser opens a window
+    // only inside a user activation. A Notes window follows over the link,
+    // so it needs no handle on this one.
+    openNotes: () => {
+      openIndependently(addressOf({ kind: 'notes', spaceId: currentSpace().id }));
+    },
+    link:
+      presentations === undefined
+        ? undefined
+        : { spaceId: () => currentSpace().id, links: presentations },
+    reportObserverError: compositionReporter,
+  });
   return {
     ...core,
-    presenting: createPresentingWindow({
-      navigation,
-      newId,
-      // Each presentation starts on the clock its Notes windows time it by.
-      now: presentations?.now ?? Date.now,
-      fullscreen,
-      // Called within the click or key press, because a browser opens a window
-      // only inside a user activation. A Notes window follows over the link,
-      // so it needs no handle on this one.
-      openNotes: () => {
-        openIndependently(addressOf({ kind: 'notes', spaceId: currentSpace().id }));
-      },
-      link:
-        presentations === undefined
-          ? undefined
-          : { spaceId: () => currentSpace().id, links: presentations },
-      reportObserverError: compositionReporter,
-    }),
+    presenting,
     createImageResources: (origin, target) =>
       createImageResources({ images, authoring }, origin, target),
     pickImages: images.pick,
@@ -340,5 +346,14 @@ export function composeApp(dependencies: ComposeAppDependencies): ComposedApp {
     resourceDeletion,
     reportObserverError: compositionReporter,
     mounted,
+    // The collaborators that hold subscriptions, in reverse of their
+    // construction above, so each goes before what it was built over.
+    dispose: () => {
+      presenting.dispose();
+      commandOutcomes.dispose();
+      surface.dispose();
+      deleteConfirmation.dispose();
+      authoring.dispose();
+    },
   };
 }

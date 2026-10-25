@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { uuidSchema, type SpaceSnapshot } from '@project/core';
 import { Placement } from '@project/graph';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
+import { COMMAND_DISCARDED } from '../src/command-outcomes';
 import { composeApp, composeCore } from '../src/compose-app';
 import { createConnectionCompletion } from '../src/connection-completion';
+import type { PresentationLinks } from '../src/presentation-link';
+import type { Fullscreen } from '../src/presenting-fullscreen';
+import { channelHub } from './presentation-channels';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
 
@@ -124,5 +128,99 @@ describe('the connection completion Edge Authoring is given', () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]?.adapter).toBe(composed.adapter);
     expect(seen[0]?.authoring).toBe(composed.surface.authoring);
+  });
+});
+
+describe('tearing the composition down', () => {
+  /** A fullscreen that counts who is still following it. */
+  const recordingFullscreen = () => {
+    let following = 0;
+    const fullscreen: Fullscreen = {
+      enter: () => Promise.resolve(false),
+      exit: () => undefined,
+      active: () => false,
+      subscribe: () => {
+        following += 1;
+        return () => {
+          following -= 1;
+        };
+      },
+    };
+    return { fullscreen, following: () => following };
+  };
+
+  /** Presentation links that count the channels opened and those still open. */
+  const recordingPresentations = () => {
+    const join = channelHub();
+    let opened = 0;
+    let open = 0;
+    const presentations: PresentationLinks = {
+      open: () => {
+        opened += 1;
+        open += 1;
+        const channel = join();
+        return {
+          ...channel,
+          close: () => {
+            open -= 1;
+            channel.close();
+          },
+        };
+      },
+      now: () => 0,
+      leaving: () => () => undefined,
+      presence: { hold: () => () => undefined, watch: () => () => undefined },
+    };
+    return { presentations, opened: () => opened, open: () => open };
+  };
+
+  it('releases what it composed, and composes nothing after', () => {
+    const { fullscreen, following } = recordingFullscreen();
+    const { presentations, opened, open } = recordingPresentations();
+    const composed = composeApp({
+      images: unusedImageSources,
+      spaceSession: openSession(),
+      fullscreen,
+      presentations,
+    });
+    composed.presenting.connect();
+    expect(following()).toBeGreaterThan(0);
+    expect(open()).toBe(1);
+    let outcomesPublished = 0;
+    composed.commandOutcomes.subscribe(() => {
+      outcomesPublished += 1;
+    });
+
+    composed.dispose();
+
+    expect(following()).toBe(0);
+    expect(open()).toBe(0);
+    composed.presenting.connect();
+    expect(opened()).toBe(1);
+    expect(following()).toBe(0);
+    expect(
+      composed.commandOutcomes.run('resource-remove', () =>
+        composed.authoring.complete(CANVAS, {
+          kind: 'removed-resource-from-map',
+          resourceId: uuidSchema.parse('00000000-0000-4000-8000-000000000099'),
+        }),
+      ),
+    ).toBe(COMMAND_DISCARDED);
+    expect(composed.commandOutcomes.getState().notices.size).toBe(0);
+    expect(outcomesPublished).toBe(0);
+    composed.surface.continuation.request({
+      target: { kind: 'canvas' },
+      select: false,
+      then: 'nothing',
+    });
+    expect(composed.surface.continuation.getState().pending).toBeNull();
+    composed.deleteConfirmation.arm({
+      subject: { kind: 'Resource', name: 'A' },
+      from: null,
+      description: 'A',
+      run: () => undefined,
+      focusFallback: null,
+    });
+    expect(composed.deleteConfirmation.getState().pending).toBeNull();
   });
 });
