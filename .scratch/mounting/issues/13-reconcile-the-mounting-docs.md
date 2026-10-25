@@ -18,7 +18,7 @@ Status: resolved
 
 ## Answer
 
-- **R18** (`docs/agents/maps-and-graphs.md`) reads "One boundary initializes in each context: the server-side one, or in a mounted page the in-page host (R16)", keeps its list of what uses it and what never initializes, and cites [0130]. The §3 row of the ADR table names [0130] for R16 and R18 and [0131] for R16, which R16 already cited.
-- **The spec's static build** (`.scratch/mounting/spec.md`) gives `img-src 'self' blob: data: https:`, as `packages/app/mount-headers.ts` builds it, with `https:` and `data:` because an Image Resource may show an external URL.
+- **R18** (`docs/agents/maps-and-graphs.md`) reads "One boundary initializes in each context: the server-side one, or in a mounted page the in-page host (R16)". Each use it lists takes its context's boundary, and R19 holds at both, a mounted initialization committing to the in-page store. It keeps what never initializes and cites [0130]. The §3 table gives R16 and R18 rows of their own with their citations.
+- **The spec's static build** (`.scratch/mounting/spec.md`) names `packages/app/mount-headers.ts` as the policy rather than restating its directives, so the two cannot drift. The spec also opens with a note that ADR 0131 and ADR 0132 govern where it still says a mount is read-only. ADR 0130's body stays as accepted, since an accepted ADR is edited only on its status lines (`workflow.md`).
 - **ADR 0130** declares `Refines: 0069, 0078, 0117`, which leave its `Related:`, and ADRs 0069, 0078 and 0117 each add 0130 to `Refined by:`. `test/unit/adr-status-blocks.test.ts` passes.
-- The three CodeRabbit threads on #391 are answered and resolved on the PR that lands this.
+- The three CodeRabbit threads on #391 were answered and resolved on 2026-10-24: the Contents API thread names #395's `<sha>:<path>` tree listing, and the `img-src` and R18 threads name #409.
