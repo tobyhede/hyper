@@ -1,6 +1,6 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
-import { CLOSED_DISPLAY, bareOperations } from '@project/ui';
+import { CLOSED_DISPLAY, FALLBACK_GRAPH_COLOR, bareOperations } from '@project/ui';
 import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
@@ -25,7 +25,7 @@ import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
 import { graphHeadMarkerId } from './GraphHeadMarkers';
 
-const FALLBACK_COLOR = '#8a94a6';
+const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
 
 /**
  * Opacity of the Graphs that are not the active one, while one is. With no
@@ -233,7 +233,8 @@ export interface ResourceEmphasis {
   readonly receding: boolean;
 }
 
-const UNEMPHASISED: ResourceEmphasis = { borderColor: null, receding: false };
+/** Ink at full strength: a Resource no Graph reaches, while nothing recedes. */
+export const UNEMPHASISED: ResourceEmphasis = { borderColor: null, receding: false };
 
 /** Each Graph's head shape; a Graph missing here draws as `DEFAULT_GRAPH_HEAD_SHAPE`. */
 export type HeadShapeByGraphId = Readonly<Partial<Record<GraphId, GraphHeadShape>>>;

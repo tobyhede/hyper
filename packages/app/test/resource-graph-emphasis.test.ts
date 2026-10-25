@@ -51,7 +51,7 @@ function space(): Space {
 function emphasisUnder(activeGraphId: GraphId | null) {
   const drawn = space();
   const graphs = drawn.maps[0]?.graphs ?? [];
-  return resourceGraphEmphasis(drawn, graphs, COLORS, activeGraphId);
+  return resourceGraphEmphasis(drawn, graphs, COLORS)(activeGraphId);
 }
 
 describe('resourceGraphEmphasis (ADR 0135)', () => {

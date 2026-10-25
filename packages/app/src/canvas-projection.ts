@@ -108,6 +108,8 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
     return at === undefined ? RESOURCE_SIZE : resourceSize(at);
   });
 
+  const emphasisUnder = resourceGraphEmphasis(space, visibleGraphs, colors);
+
   return {
     strategyGraph,
     colors,
@@ -124,7 +126,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           resourceIds,
           openResourceIds,
           resourceShape: drawnResourceShape,
-          resourceEmphasis: resourceGraphEmphasis(space, visibleGraphs, colors, activeGraphId),
+          resourceEmphasis: emphasisUnder(activeGraphId),
         }),
         edges: projectGraphEdges(edges, colors, { activeGraphId, headShapes }),
       };

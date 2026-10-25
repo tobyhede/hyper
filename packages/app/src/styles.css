@@ -118,11 +118,12 @@ body {
 }
 
 /* A Resource the Active Graph does not reach recedes, and comes back to full
-   strength while it is hovered, focused, selected or being edited (ADR 0135).
+   strength while it is hovered, focused, selected, being edited or offered as
+   the end of a connection, so every anchor it shows is drawn whole (ADR 0135).
    The node wrapper is the keyboard's tab stop, so its focus counts as well as
    focus inside the Resource. */
 .rf-resource-node:not(:focus-visible)
-  > .rf-resource-node__inner[data-receding='true']:not(
+  > .rf-resource-node__inner[data-receding='true'][data-connection-seeking='none']:not(
     :hover,
     :focus-within,
     :has(> .canvas-resource:not([data-state='rest'])),
@@ -172,6 +173,12 @@ body {
   }
 
   .rf-resource-node__inner .react-flow__resize-control.rf-resource-node__resize-control {
+    transition: none;
+  }
+
+  .rf-resource-node__inner,
+  .rf-resource-node__inner > .canvas-resource,
+  .rf-resource-node__inner .canvas-resource__outline-edge {
     transition: none;
   }
 }
