@@ -2,6 +2,8 @@
 
 Status: resolved
 
+ADR 0134 has since replaced the link behaviour this ticket kept: the GitHub source lists a symbolic-link entry (`120000`) as a link and never fetches it, and the reader refuses one at any path Hyper owns. The link sentences below describe what this ticket built, not what holds now.
+
 **What to build:** the GitHub source becomes an `AggregateSource` (ticket 09), so a mount refuses a directory in the CLI's words and reports every file it could not read (ADR 0133).
 
 - `readGitHubLocation` resolves the ref and lists the selected directory's tree, as today, and then answers either a GitHub failure or a source over that tree. Nothing is fetched yet. Its listing answers from the tree in memory, and its bound is 8 reads at once.

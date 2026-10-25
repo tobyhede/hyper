@@ -126,8 +126,8 @@ const removeEmptyDirectories = async (directory: string, from: string): Promise<
  *
  * Before anything is written or removed, every path either names, and every
  * directory between it and `directory`, is refused if it is a symbolic link:
- * a scan reads through a linked directory, so a removal would otherwise delete
- * files outside `directory`.
+ * the directory can change after the reader's scan refused such links, and a
+ * removal through a link would delete files outside `directory`.
  */
 export const writeInPlace = async (
   directory: string,

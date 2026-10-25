@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { describeAggregateReadRefusal } from '@project/aggregate';
 import type { RunEvent, RunStart } from '../run/run';
 import type { RunCommand } from './arguments';
 import { describeError } from './describe-error';
@@ -28,9 +29,8 @@ export const describeRunRefusal = (
     case 'empty':
       return `${directory} holds no aggregate: it is missing or empty. To create one there: pnpm hyper init ${shellWord(directory)}\n`;
     case 'unreadable':
-      return `${directory} is not an Aggregate directory:\n${refusal.diagnostics.join('\n')}\n`;
     case 'aggregate-refused':
-      return `Aggregate validation failed:\n${refusal.diagnostics.join('\n')}\n`;
+      return `${describeAggregateReadRefusal(refusal, directory)}\n`;
   }
 };
 
