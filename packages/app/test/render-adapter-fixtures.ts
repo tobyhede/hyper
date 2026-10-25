@@ -28,6 +28,8 @@ export function node(id: string, x: number, y: number, title = id): ResourceFlow
       display: CLOSED_DISPLAY,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',
+      borderColor: null,
+      receding: false,
     },
   };
 }

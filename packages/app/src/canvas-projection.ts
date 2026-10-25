@@ -26,6 +26,7 @@ import {
 import { RESOURCE_SIZE } from './resource';
 import { activeGraphColor } from './colors';
 import { mapResources } from './map-resolution';
+import { resourceGraphEmphasis } from './resource-graph-emphasis';
 
 /**
  * What the canvas draws, derived from a Space and the Map drawing it.
@@ -123,6 +124,7 @@ export function canvasProjection(space: Space, resolved: ResolvedMap): PendingCa
           resourceIds,
           openResourceIds,
           resourceShape: drawnResourceShape,
+          resourceEmphasis: resourceGraphEmphasis(space, visibleGraphs, colors, activeGraphId),
         }),
         edges: projectGraphEdges(edges, colors, { activeGraphId, headShapes }),
       };

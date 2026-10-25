@@ -114,6 +114,21 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  transition: opacity var(--resource-hover-duration) var(--resource-hover-easing);
+}
+
+/* A Resource the Active Graph does not reach recedes, and comes back to full
+   strength while it is hovered, focused, selected or being edited (ADR 0135).
+   The node wrapper is the keyboard's tab stop, so its focus counts as well as
+   focus inside the Resource. */
+.rf-resource-node:not(:focus-visible)
+  > .rf-resource-node__inner[data-receding='true']:not(
+    :hover,
+    :focus-within,
+    :has(> .canvas-resource:not([data-state='rest'])),
+    :has(.canvas-resource[data-content-editing='true'])
+  ) {
+  opacity: 0.5;
 }
 
 /* An Open Resource is whatever rect the Map authored, so the node's own

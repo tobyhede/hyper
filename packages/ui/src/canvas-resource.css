@@ -66,7 +66,7 @@
   gap: 0;
   padding: 0;
   overflow: hidden;
-  border: var(--canvas-resource-border-width) solid var(--canvas-resource-ink);
+  border: var(--canvas-resource-border-width) solid var(--canvas-resource-border);
   border-radius: var(--canvas-resource-radius);
   background: var(--canvas-resource-face);
   background-clip: padding-box;
@@ -74,7 +74,8 @@
   transition:
     box-shadow var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease),
     transform var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease),
-    background-color var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
+    background-color var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease),
+    border-color var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
 }
 
 /* Hover is not a `data-state` value the adapter computes: it is real
@@ -464,8 +465,13 @@
 
 .canvas-resource__outline-edge {
   fill: var(--canvas-resource-face);
+  /* The Shape's outline is its border, so it takes the Graph's colour; the
+     selection ring beneath it stays ink (ADR 0135). */
+  stroke: var(--canvas-resource-border);
   stroke-width: var(--canvas-resource-border-width);
-  transition: fill var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
+  transition:
+    fill var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease),
+    stroke var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
 }
 
 /* The selection ring follows the outline (ADR 0121): the edge's geometry

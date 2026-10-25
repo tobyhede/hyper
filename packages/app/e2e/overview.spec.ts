@@ -486,6 +486,35 @@ test('selecting a graph emphasises it without hiding the others', async ({ page 
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 });
 
+test('a Resource is drawn in its Graph colour, and recedes off the Active Graph (ADR 0135)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
+  const long = await graphLegendLineStroke(page, 'Long');
+  const short = await graphLegendLineStroke(page, 'Short');
+
+  const strength = (title: string) => nodeByTitle(page, title).locator('.rf-resource-node__inner');
+  const border = (title: string) => nodeByTitle(page, title).getByTestId('resource');
+
+  // Long is active on load and reaches both.
+  await expect(border('D')).toHaveCSS('border-top-color', long);
+  await expect(strength('D')).toHaveCSS('opacity', '1');
+
+  // Short reaches B and not D: B takes Short's colour, and D recedes in Long's,
+  // the first Graph it is in.
+  await activateGraph(page, 'Short');
+  await expect(border('B')).toHaveCSS('border-top-color', short);
+  await expect(strength('B')).toHaveCSS('opacity', '1');
+  await expect(border('D')).toHaveCSS('border-top-color', long);
+  await expect(strength('D')).toHaveCSS('opacity', '0.5');
+
+  // A pointer on a receding Resource brings it back to full strength.
+  await border('D').hover();
+  await expect(strength('D')).toHaveCSS('opacity', '1');
+});
+
 test('a resource shows its title in the graph, and opens to show rendered Markdown', async ({
   page,
 }) => {
