@@ -100,7 +100,7 @@ An Edge may carry a one-line **Title**, absent unless an author writes one — n
 _Avoid_: link, connection, transition, arrow, step, relationship; label for the Edge's Title.
 
 **Active Graph**:
-The one Graph selected in the current Map — drawn emphasized, and the Graph an author's new Edges join. There is one concept here, not two: a Graph is active, and highlighting is how that is shown. A Map may name which Graph opens active; failing that it is the Map's first Graph. Changing it is a deliberate act, never a side effect of drawing or reading. A Resource the Active Graph reaches is drawn in its colour; every other Resource recedes, drawn in the colour of the first Graph it is in (ADR 0135).
+The one Graph selected in the current Map — drawn emphasized, and the Graph an author's new Edges join. There is one concept here, not two: a Graph is active, and highlighting is how that is shown. A Map may name which Graph opens active; failing that it is the Map's first Graph. Changing it is a deliberate act, never a side effect of drawing or reading. A Resource the Active Graph reaches is drawn in its colour; every other Resource is drawn in the colour of the first Graph it is in and recedes, unless the Active Graph has no Edges, when nothing recedes (ADR 0135).
 
 Activating is not itself an edit — it touches no Resource and no Graph. When an activation becomes durable is in [`docs/agents/maps-and-graphs.md`](docs/agents/maps-and-graphs.md).
 _Avoid_: selected Graph and current Graph as a second concept alongside this one, focus, mode.

@@ -122,7 +122,7 @@ body {
    the end of a connection, so every anchor it shows is drawn whole (ADR 0135).
    The node wrapper is the keyboard's tab stop, so its focus counts as well as
    focus inside the Resource. */
-.rf-resource-node:not(:focus-visible)
+.rf-resource-node:not(:focus)
   > .rf-resource-node__inner[data-receding='true'][data-connection-seeking='none']:not(
     :hover,
     :focus-within,
