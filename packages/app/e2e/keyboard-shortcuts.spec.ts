@@ -137,3 +137,43 @@ test('P and Present from Here present from the selected Resource', async ({ page
   await expect(stage(page)).toBeVisible();
   await expect(presentedName(page)).toHaveText('C');
 });
+
+/**
+ * Space reads the focused Resource in Full View over the canvas. Inside it Tab
+ * and the arrows go along the Active Graph, Escape leaves back to the Resource
+ * last read, and Enter leaves and Opens it. Reading is no Edit, so the Space's
+ * revision does not move until that Open.
+ */
+test('Space reads a Resource in Full View, walks the Active Graph and leaves', async ({ page }) => {
+  await page.goto('/');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await settled(page);
+  const persistence = page.getByTestId('persistence-status');
+  const revision = await persistence.getAttribute('data-revision');
+  await selectResource(a);
+
+  await page.keyboard.press('Space');
+  const fullView = page.getByRole('region', { name: 'Full View' });
+  await expect(fullView).toBeFocused();
+  await expect(fullView.getByRole('heading', { level: 2 })).toHaveText('A');
+  await expect(page.getByRole('toolbar', { name: 'Command Dock' })).toBeVisible();
+
+  await page.keyboard.press('Tab');
+  await expect(fullView.getByRole('heading', { level: 2 })).toHaveText('B');
+  await page.keyboard.press('Shift+Tab');
+  await expect(fullView.getByRole('heading', { level: 2 })).toHaveText('A');
+  await page.keyboard.press('Tab');
+
+  await page.keyboard.press('Escape');
+  await expect(fullView).toHaveCount(0);
+  const b = nodeByTitle(page, 'B').first();
+  await expect(b).toBeFocused();
+  await expect(persistence).toHaveAttribute('data-revision', revision ?? '');
+
+  await page.keyboard.press('Space');
+  await expect(fullView.getByRole('heading', { level: 2 })).toHaveText('B');
+  await page.keyboard.press('Enter');
+  await expect(fullView).toHaveCount(0);
+  await expect(b.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+});

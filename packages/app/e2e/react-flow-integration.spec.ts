@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures';
 import { nodeByTitle, resourceControls, selectCanvas, settled } from './graph';
 
-test('a focused Resource opens with Enter and Space', async ({ page }) => {
+test('a focused Resource opens with Enter, and Space reads it in Full View', async ({ page }) => {
   await page.goto('/');
   await selectCanvas(page, 'Collection 1');
   const resource = nodeByTitle(page, 'A').first();
@@ -22,8 +22,13 @@ test('a focused Resource opens with Enter and Space', async ({ page }) => {
   await expect(resource).toBeFocused();
   const scrollBefore = await page.evaluate(() => window.scrollY);
   await page.keyboard.press('Space');
-  await expect(resource).toContainText('entry point');
+  const fullView = page.getByRole('region', { name: 'Full View' });
+  await expect(fullView).toContainText('entry point');
+  await expect(resource).not.toContainText('entry point');
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+  await page.keyboard.press('Escape');
+  await expect(fullView).toHaveCount(0);
+  await expect(resource).toBeFocused();
 });
 
 test('the graph shows React Flow attribution', async ({ page }) => {

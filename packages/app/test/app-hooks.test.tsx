@@ -522,6 +522,7 @@ describe('useResourceRailActions', () => {
         spaces: null,
         activeGraphResourceIds: [],
         presentFrom: null,
+        showFullView: null,
       }),
     );
   };

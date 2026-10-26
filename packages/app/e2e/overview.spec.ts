@@ -636,7 +636,7 @@ test(
     await controls.getByRole('button', { name: 'Close Resource A′' }).click();
 
     await recap.focus();
-    await page.keyboard.press('Space');
+    await page.keyboard.press('Enter');
     await expect(recap.getByText('entry point')).toBeVisible();
     await recap.click({ position: { x: 8, y: 8 } });
     const resizeControl = recap.locator('.react-flow__resize-control.handle.bottom.right');

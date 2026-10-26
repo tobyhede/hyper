@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Box,
   Check,
   ChevronDown,
@@ -137,6 +138,9 @@ export const OpenIndependentlyIcon = (props: ResourceActionIconProps) => (
 export const OpenResourceIcon = (props: ResourceActionIconProps) => (
   <Maximize2 size={14} {...props} />
 );
+
+/** Read a Resource in Full View, over the canvas. Lucide `book-open`: reading, not Opening. */
+export const FullViewIcon = (props: ResourceActionIconProps) => <BookOpen size={14} {...props} />;
 
 /** Close a Resource that is open in place. */
 export const CloseResourceIcon = (props: ResourceActionIconProps) => (

@@ -15,6 +15,7 @@ import {
   EnterSpaceIcon,
   kindNaming,
   PresentIcon,
+  FullViewIcon,
   RemoveFromMapIcon,
   ResourceKindIcon,
   type EntityActionGroup,
@@ -42,6 +43,8 @@ export interface ResourceRailCommands {
   readonly enter: RailNavigation | null;
   /** Present the Active Graph from this Resource, or `null` with nothing to present from. */
   readonly present: RailPresentation | null;
+  /** Read this Resource in Full View, or `null` where no Full View is drawn. */
+  readonly fullView: (() => void) | null;
 }
 
 /** The sentence Present from Here carries while the Active Graph does not hold its Resource. */
@@ -89,7 +92,7 @@ export function resourceRailGroups(
   connect: EntityActionGroup,
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
-  const { createReference, removeFromMap, deleteFromSpace, enter, present } = commands;
+  const { createReference, removeFromMap, deleteFromSpace, enter, present, fullView } = commands;
   // A Resource no other may reference as its Target offers Create Reference
   // disabled, saying why, so referencing stays a single hop (ADR 0113).
   const terminal = kindFlags(resource.kind).mayBeTarget ? null : referenceTerminal(resource.kind);
@@ -117,8 +120,22 @@ export function resourceRailGroups(
             },
           ],
         ];
-  const presenting: EntityActionGroup =
-    present === null
+  // Reading a Resource and presenting from it, which change nothing in the Space.
+  const presenting: EntityActionGroup = [
+    ...(fullView === null
+      ? []
+      : [
+          {
+            id: 'full-view',
+            label: 'Read in Full View',
+            icon: <FullViewIcon />,
+            onSelect: (): EntityActionOutcome => {
+              fullView();
+              return 'done';
+            },
+          },
+        ]),
+    ...(present === null
       ? []
       : [
           {
@@ -132,7 +149,8 @@ export function resourceRailGroups(
               return 'done';
             },
           },
-        ];
+        ]),
+  ];
   const leaving: EntityActionGroup = [
     ...(removeFromMap === null
       ? []
@@ -220,6 +238,8 @@ export interface ResourceRailInput {
   readonly activeGraphResourceIds: readonly ResourceId[];
   /** Present the Active Graph from a Resource, or `null` where nothing presents. */
   readonly presentFrom: ((resourceId: ResourceId) => void) | null;
+  /** Read a Resource in Full View, or `null` where no Full View is drawn. */
+  readonly showFullView: ((resourceId: ResourceId) => void) | null;
   readonly editingResourceBody: boolean;
   readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
   readonly spaces: OpenSpaces | null;
@@ -267,6 +287,7 @@ export function useResourceRailActions(
     spaces,
     activeGraphResourceIds,
     presentFrom,
+    showFullView,
   }: ResourceRailInput,
 ): (resourceId: ResourceId, connect: EntityActionGroup) => readonly EntityActionGroup[] {
   const { addResource, authorOnCanvas, deleteResource, navigate, present } = availability;
@@ -322,6 +343,7 @@ export function useResourceRailActions(
                   onActiveGraph: activeGraphResourceIds.includes(resourceId),
                   run: () => presentFrom(resourceId),
                 },
+          fullView: showFullView === null ? null : () => showFullView(resourceId),
         },
       );
     },
@@ -339,6 +361,7 @@ export function useResourceRailActions(
       present,
       activeGraphResourceIds,
       presentFrom,
+      showFullView,
       authoring,
       commandOutcomes,
       currentSpace,

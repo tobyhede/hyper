@@ -139,6 +139,7 @@ export function EmbeddedMapAuthoring({
     spaces,
     activeGraphResourceIds: NOT_PRESENTED,
     presentFrom: null,
+    showFullView: null,
   });
   const selectResource = state.selectResource;
   const [connecting, setConnecting] = useState<Connecting | null>(null);

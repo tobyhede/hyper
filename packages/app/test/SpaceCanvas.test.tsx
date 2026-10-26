@@ -1,7 +1,14 @@
-import { act, createEvent, fireEvent, screen, type RenderResult } from '@testing-library/react';
+import {
+  act,
+  createEvent,
+  fireEvent,
+  screen,
+  within,
+  type RenderResult,
+} from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { resourceOpen, spaceSnapshotSchema, uuidSchema } from '@project/core';
+import { resourceOpen, spaceSnapshotSchema, uuidSchema, type ResourceId } from '@project/core';
 import { MemorySpaceBackend, openSpaceSession } from '@project/persistence';
 import {
   bareKindData,
@@ -112,6 +119,8 @@ interface Harness {
   readonly holdPolicy: (policy: MapSurfacePolicy) => void;
   /** What `P` asked to present from; only {@link RESOURCE_ID} is on the Active Graph. */
   readonly presentFrom: ReturnType<typeof vi.fn>;
+  /** The Resource Full View shows, held the way `App` holds it. */
+  readonly fullViewOf: () => string | null;
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
@@ -133,6 +142,12 @@ async function mountGraph(
   const nodesChanged = vi.fn();
   const presentFrom = vi.fn();
   const presentable = { resourceIds: [RESOURCE_ID], run: presentFrom };
+  let fullViewOf: ResourceId | null = null;
+  let rerenderGraph = (): void => undefined;
+  const show = (resourceId: ResourceId | null): void => {
+    fullViewOf = resourceId;
+    rerenderGraph();
+  };
   let nodes = initialNodes;
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
@@ -175,10 +190,13 @@ async function mountGraph(
         nameOnCreation={null}
         spaceSession={spaceSession}
         presentFrom={presentable}
+        fullView={{ resourceId: fullViewOf, show }}
       />
     </ReactFlowProvider>
   );
   const view = await mountSettled(graph());
+  // Inside whatever event or render asked for it, which is already a test boundary.
+  rerenderGraph = () => view.rerender(graph());
   return {
     view,
     opened: () => {
@@ -207,6 +225,7 @@ async function mountGraph(
       view.rerender(graph());
     },
     presentFrom,
+    fullViewOf: () => fullViewOf,
   };
 }
 
@@ -369,7 +388,7 @@ describe.each([
   });
 });
 
-it.each(['Enter', ' '])('opens a focused Reference Resource with %s', async (key) => {
+it.each(['Enter'])('opens a focused Reference Resource with %s', async (key) => {
   const reference = resourceNode('A again', REFERENCE_ID);
   reference.data.kind = 'reference';
   const { opened } = await mountGraph([reference]);
@@ -407,7 +426,7 @@ describe.each([
   ['Resource', resourceNode('A'), RESOURCE_ID],
   ['Reference Resource', resourceNode('A again', REFERENCE_ID, false, 'reference'), REFERENCE_ID],
 ] as const)('a %s held while a replacement placement resolves', (_kind, held, id) => {
-  it.each(['Enter', ' '])('opens with %s', async (key) => {
+  it.each(['Enter'])('opens with %s', async (key) => {
     const { opened } = await mountGraph([held], undefined, undefined, 'replacing');
     const focused = nodeOf(id);
     focused.focus();
@@ -421,7 +440,7 @@ describe.each([
     await mountGraph([held], undefined, undefined, 'replacing');
 
     expect(nodeOf(id)).toHaveAccessibleDescription(
-      'Press enter or space to open a Resource, tab, shift tab or the arrow keys to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to cancel.',
+      'Press enter to open a Resource, space to read it in Full View, tab, shift tab or the arrow keys to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to cancel.',
     );
   });
 });
@@ -860,6 +879,71 @@ describe('the C shortcut', () => {
     fireEvent.keyDown(slider, { key: 'c' });
 
     expect(addResource).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Space reads the focused Resource in Full View: drawn over the canvas,
+ * read-only, and left with Space or Escape back to the Resource, or with Enter
+ * into the Resource Opened on the canvas.
+ */
+describe('Full View', () => {
+  const enterFullView = async () => {
+    const harness = await mountGraph();
+    const node = nodeOf(RESOURCE_ID);
+    node.focus();
+    fireEvent.keyDown(node, { key: ' ' });
+    return harness;
+  };
+
+  it('shows the focused Resource on Space, without Opening it', async () => {
+    const { opened, fullViewOf } = await enterFullView();
+
+    expect(fullViewOf()).toBe(RESOURCE_ID);
+    const region = screen.getByRole('region', { name: 'Full View' });
+    expect(region).toHaveFocus();
+    expect(within(region).getByRole('heading', { name: 'A' })).toBeVisible();
+    expect(opened()).toEqual([]);
+  });
+
+  it.each(['Escape', ' '])('leaves on %s, back to the Resource', async (key) => {
+    const { opened, fullViewOf } = await enterFullView();
+
+    fireEvent.keyDown(screen.getByRole('region', { name: 'Full View' }), { key });
+
+    expect(fullViewOf()).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Full View' })).toBeNull();
+    expect(nodeOf(RESOURCE_ID)).toHaveFocus();
+    expect(opened()).toEqual([]);
+  });
+
+  it('leaves on Enter and Opens the Resource on the canvas', async () => {
+    const { opened, fullViewOf } = await enterFullView();
+
+    // Flushes the updates the press schedules, which land after it returns.
+    await act(() => {
+      fireEvent.keyDown(screen.getByRole('region', { name: 'Full View' }), { key: 'Enter' });
+      return Promise.resolve();
+    });
+
+    expect(fullViewOf()).toBeNull();
+    expect(opened()).toEqual([RESOURCE_ID]);
+  });
+
+  it('keeps a canvas command from running on the Map it covers', async () => {
+    const { addResource } = await enterFullView();
+
+    fireEvent.keyDown(screen.getByRole('region', { name: 'Full View' }), { key: 'c' });
+
+    expect(addResource).not.toHaveBeenCalled();
+  });
+
+  it('ends when the canvas surface is held', async () => {
+    const { fullViewOf, holdPolicy } = await enterFullView();
+
+    holdPolicy('inert');
+
+    expect(fullViewOf()).toBeNull();
   });
 });
 

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { graphResourceIds } from '@project/graph';
+import type { ResourceId } from '@project/core';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
 import type { BrowserLocation } from './browser-location';
@@ -179,6 +180,9 @@ export const createApp = (
           : graphResourceIds(space, activeGraphId),
       [space, activeGraphId],
     );
+    // Transient and read-only: no Edit, no address, nothing kept.
+    const [fullViewOf, setFullViewOf] = useState<ResourceId | null>(null);
+    const fullView = useMemo(() => ({ resourceId: fullViewOf, show: setFullViewOf }), [fullViewOf]);
     const presentFromCanvas = useMemo(
       () => ({ resourceIds: activeGraphResourceIds, run: presentingWindow.presentFrom }),
       [activeGraphResourceIds],
@@ -193,6 +197,7 @@ export const createApp = (
       spaces,
       activeGraphResourceIds,
       presentFrom: presentingWindow.presentFrom,
+      showFullView: setFullViewOf,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
     const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);
@@ -388,6 +393,7 @@ export const createApp = (
                   spaceResourceTargets={spaceResourceTargets.targets}
                   resourceEntityActions={resourceRailActions}
                   presentFrom={presentFromCanvas}
+                  fullView={fullView}
                 />
               </ReactFlowProvider>
             )}

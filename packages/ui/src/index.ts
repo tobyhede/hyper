@@ -166,6 +166,7 @@ export {
   UrIcon,
   PlusIcon,
   RemoveFromMapIcon,
+  FullViewIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,
