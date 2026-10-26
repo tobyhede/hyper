@@ -84,7 +84,7 @@ import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, pressesBinding } from '../key-bindings';
-import { graphNeighbours, stepAlongGraph, neighbourToward } from '../graph-navigation';
+import { graphNeighbours, neighbourToward, nextTabStop, type TabRun } from '../graph-navigation';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -775,17 +775,25 @@ export function SpaceCanvas({
   };
 
   // Tab and Shift+Tab walk the Active Graph from the focused Resource. With no
-  // next Resource the key stays the browser's, so the keyboard is never
-  // trapped on the canvas.
+  // next Resource, or only one this run of presses has already reached, the
+  // key stays the browser's, so the keyboard is never trapped on the canvas, a
+  // cyclic Graph's included.
+  const tabRun = useRef<TabRun<ResourceId> | null>(null);
   const tabAlongGraph = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const forward = pressesBinding(CANVAS_KEYS.navigateForward, event.nativeEvent);
     if (!forward && !pressesBinding(CANVAS_KEYS.navigateBack, event.nativeEvent)) return;
     const navigation = graphNavigationFrom(event);
     if (navigation === null) return;
-    const to = stepAlongGraph(navigation.edges, navigation.from, forward ? 'forward' : 'back');
-    if (to === undefined || navigation.elementOf(to) === null) return;
+    const step = nextTabStop(
+      tabRun.current,
+      navigation.edges,
+      navigation.from,
+      forward ? 'forward' : 'back',
+    );
+    if (step === undefined || navigation.elementOf(step.to) === null) return;
     event.preventDefault();
-    navigation.moveTo(to);
+    tabRun.current = step.run;
+    navigation.moveTo(step.to);
   };
 
   const ARROWS = [
