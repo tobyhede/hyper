@@ -92,7 +92,7 @@ Older ADRs use retired names. Read Layout or Diagram as Map, Card or Thing as Re
 ## 6. Size, Open and displacement
 
 - **R37. Size and Open/Closed are authored on the Map, independently.** A Map entry is `{ x, y, open?, size?, shape? }`. Open, Close and Resize are Edits and survive reload and export. Both fields are optional with an application default, as `shape` is (R47): an entry with no `open` is Closed and one with no `size` is the Closed Size (260×146); every reader resolves them through `resourceOpen` and `resourceSize` in `@project/core`. Add Resource and Add to Map write no size. Coupling the two made a bigger Resource a two-step gesture that also changed what it drew and moved its neighbours (A17). ([0064], [0122])
-- **R38. Only Resize and Open and expand change a size, and Open and Close change only `open`.** Opening or Closing changes what is drawn inside the Resource's rect — its Title, or its content — and never its size or any position. Edit on a Closed Resource still Opens it before placing the caret, changing no size. A Resize back to the Closed Size is an ordinary Resize and leaves an Open Resource Open; there is no magnetic Close (A26). **Open and expand** (`Shift+Enter`, or Open and Expand in the Actions menu) is one Edit, `SnapshotEdit.openAndExpand`, that Opens the Resource and Resizes it, with Open's checks first and a Resize's displacement (R40–R43); the size, floored at the Closed Size, is the one the canvas measures: a reading width of 640 or the Resource's own when wider, the height its Open content needs there and at least the Stage's 16:9 frame, both capped at the visible canvas at the current zoom. The camera then centres it at that zoom, so only the canvas's own Map offers it. ([0122], [0064], [0135])
+- **R38. Only Resize and Open and expand change a size, and Open and Close change only `open`.** Opening or Closing changes what is drawn inside the Resource's rect — its Title, or its content — and never its size or any position. Edit on a Closed Resource still Opens it before placing the caret, changing no size. A Resize back to the Closed Size is an ordinary Resize and leaves an Open Resource Open; there is no magnetic Close (A26). **Open and expand** (`Shift+Enter`, or Open and Expand in the Actions menu) is one Edit, `SnapshotEdit.openAndExpand`, that Opens the Resource and Resizes it, with Open's checks first and a Resize's displacement (R40–R43); the size, floored at the Closed Size, is the one the canvas measures: a reading width of 640 or the Resource's own when wider, the height its Open content needs there and at least the Stage's 16:9 frame, both capped at the visible canvas at the current zoom. The camera then centres it at that zoom, so only the canvas's own Map offers it. ([0122], [0064], [0137])
 - **R39. Open is offered only by a kind whose module declares it can be Open** (`canOpen`, read through `takesOpen` in `packages/core/src/schema.ts`): Markdown, Image, Space and Reference, which have content to show. The Ur module declares it cannot, an Ur Resource having no content (ADR 0113), so it offers no Open or Close — reversing ADR 0113's rejection of a kind that cannot be Opened, which rested on Open being how a size was authored — the Open Edit refuses it, and intake refuses an entry storing it Open, both as `open-requires-content` (A25). ([0122], [0113], [0128])
 - **R40. The Closed Size is the one floor for every kind, Open or Closed, and only a Resize displaces** — Open and expand's included (R38). No kind has its own minimum and no kind chooses a first-Open size: content adapts to the rect it is given — a small Open document scrolls, a picture scales down, an embedded Map fits (A24). A Resize moves the Resources its growth passes, once, writing their positions into the Map. Between Edits a drawn position *is* the authored one: a drop lands where it was dropped, with no conversion and no `move` draft, and a resize preview shows only the resizing Resource. `Placement.drawn` and `authoredPoint` must not return. Render-derived displacement coupled every position to every size, jumped, and needed a non-total inverse that misplaced drops (A13). ([0122], [0084])
 - **R41. A Resource makes room on at most one axis, decided against the subject's rect before the Resize.** The change is the new size less the old one, per axis, negative for a shrink. At or past the old right edge, a Resource takes the width change only. Otherwise, at or past the old bottom edge, it takes the height change only. Otherwise it does not move. One axis is enough to stay clear; `x` first keeps a Resource beside the subject from moving vertically; touching counts as clear. Cost: a grid no longer scales uniformly, and a Resource below the subject but not clear on `x` moves down however far left it sits (A15, A16). ([0093], [0122])
@@ -189,13 +189,13 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 | R33, R34, R36 | §5 | [0040] |
 | R35 | §5 | [0122] |
 | R37 | §6 | [0064], [0122] |
-| R38 | §6 | [0064], [0122], [0135] |
+| R38 | §6 | [0064], [0122], [0137] |
 | R39 | §6 | [0122], [0113] (reversing its rejected option), [0128] |
 | R40 | §6 | [0122], [0084] |
 | R41 | §6 | [0093], [0122] |
 | R42 | §6 | [0084], [0093], [0122] |
 | R43 | §6 | [0084] |
-| R44 | §6 | [0122], [0135] |
+| R44 | §6 | [0122], [0137] |
 | R45, R47, R49 | §7 | [0121] (R47 also [0105]; R49 also [0122]) |
 | R46 | §7 | [0121], [0113], [0128] |
 | R48 | §7 | [0121], [0110] |
@@ -238,7 +238,7 @@ The rule-to-source [inventory] accounts for every rule, rejected alternative, om
 [0113]: ../adr/0113-every-capability-is-a-resources-and-an-ur-resource-has-no-content.md
 [0121]: ../adr/0121-a-shape-is-a-maps-and-an-ur-resource-draws-it-open-and-closed.md
 [0122]: ../adr/0122-a-resources-size-is-independent-of-open.md
-[0135]: ../adr/0135-open-and-expand-opens-and-sizes-in-one-edit.md
+[0137]: ../adr/0137-open-and-expand-opens-and-sizes-in-one-edit.md
 [0128]: ../adr/0128-every-resource-kind-is-a-module-and-a-resource-file-is-json.md
 [0106]: ../adr/0106-an-image-resource-owns-a-url-not-bytes.md
 [0114]: ../adr/0114-a-reference-resource-takes-its-targets-geometry-and-withholds-only-content-actions.md

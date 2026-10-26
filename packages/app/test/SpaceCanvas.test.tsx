@@ -401,7 +401,7 @@ it.each(['Enter'])('opens a focused Reference Resource with %s', async (key) => 
 });
 
 /**
- * Shift+Enter is Open and expand (ADR 0135): one Edit that Opens the Resource
+ * Shift+Enter is Open and expand (ADR 0137): one Edit that Opens the Resource
  * at the size its content needs. jsdom lays nothing out, so the visible canvas
  * it is capped at is the Closed Size and the Edit Opens it there.
  */

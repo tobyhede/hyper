@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0084
-Refined by: 0122, 0135
+Refined by: 0122, 0137
 
 ADR 0084 kept the displacement rule it inherited: every Thing whose authored `x`
 is strictly greater than the opening Thing's takes the width growth, and

@@ -12,7 +12,7 @@ export interface Extent {
 
 /**
  * The width Open and expand gives a Resource narrower than it, so a document
- * reads at a line length rather than in the Closed Size's column (ADR 0135).
+ * reads at a line length rather than in the Closed Size's column (ADR 0137).
  */
 export const READING_WIDTH = 640;
 
@@ -34,7 +34,7 @@ export function visibleCanvasCap(viewport: Extent, zoom: number): Extent {
 }
 
 /**
- * The size Open and expand asks for (ADR 0135): the reading width, or the
+ * The size Open and expand asks for (ADR 0137): the reading width, or the
  * Resource's own when it is wider, and the height its Open content needs at
  * that width, at least the Stage's frame. Both are capped at the visible
  * canvas and floored at the Closed Size, whole units.

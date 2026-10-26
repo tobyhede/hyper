@@ -151,7 +151,7 @@ export type AuthoringCompletion =
     }
   /**
    * Open and expand: Open one Resource and Resize it to fit its content, as one
-   * Edit (ADR 0135). `size` is the fitted size, floored at the Closed Size.
+   * Edit (ADR 0137). `size` is the fitted size, floored at the Closed Size.
    */
   | {
       readonly kind: 'opened-resource-to-fit';

@@ -360,7 +360,7 @@ function resize(
 
 /**
  * Open a Resource in one Map and Resize it to the size given, as one Edit
- * (ADR 0135). The size is floored at the Closed Size on each axis, and the
+ * (ADR 0137). The size is floored at the Closed Size on each axis, and the
  * Resources clear of it move as a {@link resize} moves them. The Open checks
  * come first, so an Ur Resource is refused `open-requires-content` and nothing
  * is resized. `unchanged` only for a Resource already Open at that size.

@@ -523,7 +523,7 @@ export function SpaceCanvas({
    * into the list would withdraw the rail and the trigger the list hangs from.
    */
   /**
-   * Open and expand (ADR 0135): one Edit Opening the Resource at the size its
+   * Open and expand (ADR 0137): one Edit Opening the Resource at the size its
    * content needs, capped at what this canvas shows at the current zoom, after
    * which the camera centres it at that zoom. The camera is the canvas's own,
    * so only its own Map's Resources are given it.
