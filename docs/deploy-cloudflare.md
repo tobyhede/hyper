@@ -13,6 +13,8 @@ A **GitHub location** is `github:owner/repo@ref/path`. `@ref` defaults to the re
    - **Build variables:** `VITE_DEFAULT_SPACE_SOURCE`, if this deployment has a default talk. No other is needed.
 3. Save and deploy. The Worker answers on its `workers.dev` address.
 
+With preview builds on, a push to any other branch builds a [Preview](https://developers.cloudflare.com/workers/previews/) of the Worker, so a pull request can be tried before it merges. A Preview takes its build variables from **Settings** > **Builds** > **Previews Base**, not from Production, so give `VITE_DEFAULT_SPACE_SOURCE` there too (**Import** copies Production's), and turn on the Preview URL under **Domains** for the Preview to answer on `workers.dev`.
+
 To check a build locally first: `pnpm build:mount`, then `pnpm exec wrangler deploy --dry-run` and `pnpm exec wrangler dev --port 8787`.
 
 ## Point a domain at a talk
