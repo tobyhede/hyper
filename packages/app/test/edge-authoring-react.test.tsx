@@ -132,6 +132,8 @@ function resourceNode(id: string, x: number, title: string): ResourceFlowNode {
       display: CLOSED_DISPLAY,
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
+      borderColor: null,
+      receding: false,
     },
   };
 }

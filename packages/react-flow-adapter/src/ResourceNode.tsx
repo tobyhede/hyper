@@ -181,6 +181,7 @@ export function ResourceNode({
       | 'onBodyHeightChange'
       | 'contextNotice'
       | 'size'
+      | 'borderColor'
     >
   > = {};
   // The rect React Flow draws this Resource at, which the projection declares
@@ -189,6 +190,9 @@ export function ResourceNode({
   // Flow gives none, the Resource is drawn at the Closed Size.
   if (width !== undefined && height !== undefined) {
     canvasResourceOptionalProps.size = { width, height };
+  }
+  if (data.borderColor !== null) {
+    canvasResourceOptionalProps.borderColor = data.borderColor;
   }
   if (data.contextNotice !== undefined && data.contextNotice !== null) {
     canvasResourceOptionalProps.contextNotice = data.contextNotice;
@@ -363,6 +367,9 @@ export function ResourceNode({
       ref={inner}
       className="rf-resource-node__inner"
       data-selected={visuallySelected}
+      // Read by `styles.css`, which draws a receding Resource at half strength
+      // unless it is hovered, focused, selected or being edited (ADR 0135).
+      data-receding={data.receding}
       data-connection-in-progress={connectionInProgress}
       data-connection-seeking={offerEnd ? seeking : 'none'}
       // Whether the four anchors are also affordances. They render either way —
