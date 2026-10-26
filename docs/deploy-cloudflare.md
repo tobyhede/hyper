@@ -24,6 +24,8 @@ A talk's own domain is a second Worker connected to the same repository, with `V
 - **A branch** (`github:owner/repo@main`): the bare domain opens whatever the branch holds when the page loads, so pushing the talk publishes it, with no rebuild. Each load spends two GitHub API calls, one to resolve the branch to a commit and one for the tree, against the 60 an hour GitHub allows each unauthenticated address.
 - **A commit** (`github:owner/repo@<sha>`): the bare domain opens that commit until the variable changes, and each load spends one call (`packages/app/test/github-source.test.ts`, "spends no call resolving a ref that is already a commit SHA"). To publish a new version, set the variable to the new commit and retry the latest build from its build history.
 
+A branch spends the limit twice as fast: about 30 loads an hour from one address, such as a venue's shared network, exhausts it, and every visitor behind that address then sees the page fail to open the talk. Pin a commit for a talk many people will open from one network.
+
 The files themselves come from `raw.githubusercontent.com`, which is not the API.
 
 1. Create another Worker from this repository as in [Deploy](#deploy), with `VITE_DEFAULT_SPACE_SOURCE=github:owner/repo@<ref>` (add `/path` when `hyper.json` is not at the repository's root).
