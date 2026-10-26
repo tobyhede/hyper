@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0119, 0133
+Refined by: 0136
 
 Import and Export disagreed about links. The disk source read a link to a regular file as the file it names, so that an author could share one file between directories. Export refuses to write or remove through any link (ADR 0119). A directory with a linked `space.json` therefore imported and opened, and then every write back failed. Under `pnpm hyper run` each quiet-period write was refused and retried, and the edits were lost when the run stopped. The GitHub source dropped a linked entry without saying so.
 

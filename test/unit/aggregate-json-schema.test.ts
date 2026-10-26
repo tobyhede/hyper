@@ -140,7 +140,7 @@ const spaceCases: [string, Json][] = [
   ['a defaultMap that is not an Id', { ...space(), defaultMap: 'x' }],
 ];
 
-const hyperCases: [string, Json][] = [
+const aggregateCases: [string, Json][] = [
   ['a whole file', hyper],
   ['an unknown key', { ...hyper, spaces: [] }],
   ['version 2', { ...hyper, version: 2 }],
@@ -153,7 +153,7 @@ describe('the aggregate JSON Schemas agree with intake', () => {
     expect(spaceSchema(file)).toBe(importSpaceFileSchema.safeParse(file).success);
   });
 
-  it.each(hyperCases)('aggregate.json: %s', (_name, file) => {
+  it.each(aggregateCases)('aggregate.json: %s', (_name, file) => {
     expect(aggregateSchema(file)).toBe(aggregateFileSchema.safeParse(file).success);
   });
 

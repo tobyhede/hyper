@@ -6,7 +6,7 @@ The directory is plain files meant for git: JSON in a fixed key order, one JSON 
 
 ```
 my-talk/
-  aggregate.json                                     { "version": 1, "metaSpaceId": "2b1c9a40-…" }
+  aggregate.json                                 { "version": 1, "metaSpaceId": "2b1c9a40-…" }
   2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c/          the Meta Space
     space.json
     resources/

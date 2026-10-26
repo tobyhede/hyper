@@ -1,7 +1,7 @@
 # An Aggregate directory is rooted at `aggregate.json`
 
 Status: accepted
-Refines: 0117, 0133
+Refines: 0117, 0119, 0130, 0133, 0134
 
 The file at the root of an Aggregate directory, which names the format version and the Meta Space, is `aggregate.json`. It was named for the product, and the product is being renamed. The file's name is now the glossary's name for what it roots, so a later product rename does not touch the format.
 
@@ -9,6 +9,9 @@ The file at the root of an Aggregate directory, which names the format version a
 
 - **The root file is `aggregate.json`**, and its JSON Schema is `docs/schema/aggregate.schema.json`. Its contents are unchanged: `{ "version": 1, "metaSpaceId": "<id>" }`.
 - **No fallback.** Import, Run, Export and a mount read `aggregate.json` and nothing else. A directory holding only the earlier root file is refused as a directory with no `aggregate.json`, in the words every source already uses. An author renames the file with `git mv` in the directory's own repository; nothing else in the directory changes.
+- **The earlier file is not Export's.** Export owns what Import reads (ADR 0119), so the root file it owns is now `aggregate.json`. Exporting into a directory that still holds `hyper.json` writes `aggregate.json` beside it and leaves `hyper.json` untouched, as it leaves any file it does not own; the author removes it with `git rm`.
+- **A talk is renamed before a page that mounts it is rebuilt.** A mount (ADR 0130) reads a public repository at a pinned commit, so a deployed page keeps working until it is rebuilt from this change, and is then refused for a talk whose commit still holds `hyper.json`. The talk's repository is renamed first, and the page's default location is moved to the commit that renamed it, before the page is rebuilt. A shared link naming an older commit of such a talk is refused from then on.
+- **Ownership and links follow the name.** Every rule that named the earlier file as the root a source must hold, Export writes, or a link may not stand at (ADRs 0119, 0130, 0133, 0134) names `aggregate.json` instead.
 
 ## Why
 
