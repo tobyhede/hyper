@@ -84,7 +84,7 @@ import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, pressesBinding } from '../key-bindings';
-import { stepAlongGraph } from '../graph-navigation';
+import { nextTabStop, type TabRun } from '../graph-navigation';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -741,8 +741,10 @@ export function SpaceCanvas({
 
   // Tab and Shift+Tab walk the Active Graph from the focused Resource. Only from
   // the Resource itself: a Tab on one of its controls moves through them as
-  // usual. With no next Resource the key stays the browser's, so the keyboard
-  // is never trapped on the canvas.
+  // usual. With no next Resource, or only one this run of presses has already
+  // reached, the key stays the browser's, so the keyboard is never trapped on
+  // the canvas, a cyclic Graph's included.
+  const tabRun = useRef<TabRun<ResourceId> | null>(null);
   const navigateFromFocusedResource = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const forward = pressesBinding(CANVAS_KEYS.navigateForward, event.nativeEvent);
     if (!forward && !pressesBinding(CANVAS_KEYS.navigateBack, event.nativeEvent)) return;
@@ -757,15 +759,16 @@ export function SpaceCanvas({
         ? [{ source: subject.edge.from, target: subject.edge.to }]
         : [];
     });
-    const resourceId = stepAlongGraph(activeEdges, from, forward ? 'forward' : 'back');
-    const node = nodes.find((each) => each.data.resourceId === resourceId);
-    if (resourceId === undefined || node === undefined) return;
+    const step = nextTabStop(tabRun.current, activeEdges, from, forward ? 'forward' : 'back');
+    const node = nodes.find((each) => each.data.resourceId === step?.to);
+    if (step === undefined || node === undefined) return;
     const next = event.currentTarget.querySelector<HTMLElement>(
       `.react-flow__node[data-id="${CSS.escape(node.id)}"]`,
     );
     if (next === null) return;
     event.preventDefault();
-    selectResource(resourceId);
+    tabRun.current = step.run;
+    selectResource(step.to);
     // React Flow pans a focused Resource into view (`autoPanOnNodeFocus`).
     next.focus();
   };
