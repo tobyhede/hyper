@@ -9,7 +9,7 @@ Status: resolved
 
 ## Answer
 
-`packages/app/src/key-bindings.ts` declares `CANVAS_KEYS` and `PRESENTING_KEYS`, matches presses with `pressesBinding`, and shares one guard, `keyBelongsElsewhere`. `C`, `Enter`/`Space` (Open), `F2`, `Delete`/`Backspace` and every presenting key go through it, and the presenting chrome takes its `aria-keyshortcuts` from the table. `C` now listens on the window, so it works after a click on the Dock (`packages/app/e2e/keyboard-shortcuts.spec.ts`).
+`packages/app/src/key-bindings.ts` declares `CANVAS_KEYS` and `PRESENTING_KEYS`, matches presses with `pressesBinding`, and shares one guard, `keyBelongsElsewhere`. `C`, `Enter`/`Space` (Open), `F2`, `Delete`/`Backspace` and every presenting key go through it, and the presenting chrome takes its `aria-keyshortcuts` from the table. `C` now listens on the window, so it works while a Dock button or the canvas's Zoom out has focus (`packages/app/e2e/keyboard-shortcuts.spec.ts`).
 
 Two deviations from the spec:
 

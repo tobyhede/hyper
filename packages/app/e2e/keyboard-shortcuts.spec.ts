@@ -1,10 +1,10 @@
 import { expect, test } from './fixtures';
 import {
   nodeByTitle,
+  presentControl,
   presentedName,
   resourceActions,
   selectResource,
-  selectedCanvas,
   settled,
   stage,
 } from './graph';
@@ -21,10 +21,15 @@ test('C adds a Resource while a Dock control has focus', async ({ page }) => {
   const resources = page.locator('.react-flow__node');
   const before = await resources.count();
 
-  await selectedCanvas(page).focus();
+  // A Dock button, outside the canvas, and Zoom out, a button inside it: the
+  // canvas once answered `C` only from its own wrapper, and never from a button.
+  await presentControl(page).focus();
   await page.keyboard.press('c');
-
   await expect(resources).toHaveCount(before + 1);
+
+  await page.getByRole('button', { name: 'Zoom out' }).focus();
+  await page.keyboard.press('c');
+  await expect(resources).toHaveCount(before + 2);
 });
 
 /**
