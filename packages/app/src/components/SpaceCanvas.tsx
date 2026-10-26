@@ -109,9 +109,9 @@ import {
  */
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default':
-    'Press enter or space to open a Resource, tab, shift tab or the arrow keys to go along the Active Graph from a selected Resource, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
+    'Press enter or space to open a Resource, the arrow keys, or tab and shift tab from a selected Resource, to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
   'node.a11yDescription.keyboardDisabled':
-    'Press enter or space to open a Resource, tab, shift tab or the arrow keys to go along the Active Graph from a selected Resource, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
+    'Press enter or space to open a Resource, the arrow keys, or tab and shift tab from a selected Resource, to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
   'edge.a11yDescription.default':
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;

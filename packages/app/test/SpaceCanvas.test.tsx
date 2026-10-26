@@ -417,7 +417,7 @@ describe.each([
     await mountGraph([held], undefined, undefined, 'replacing');
 
     expect(nodeOf(id)).toHaveAccessibleDescription(
-      'Press enter or space to open a Resource, tab, shift tab or the arrow keys to go along the Active Graph from a selected Resource, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
+      'Press enter or space to open a Resource, the arrow keys, or tab and shift tab from a selected Resource, to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
     );
   });
 });
