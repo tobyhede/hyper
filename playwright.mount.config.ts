@@ -33,7 +33,7 @@ export default defineConfig({
   webServer: {
     command: `pnpm build:mount --outDir ${OUT_DIR} && pnpm exec tsx packages/app/e2e/static-server.ts packages/app/${OUT_DIR} ${MOUNT_E2E_PORT}`,
     url: `http://127.0.0.1:${MOUNT_E2E_PORT}`,
-    env: { VITE_HYPER_DEFAULT_SOURCE: MOUNT_DEFAULT_SOURCE },
+    env: { VITE_DEFAULT_SPACE_SOURCE: MOUNT_DEFAULT_SOURCE },
     reuseExistingServer: false,
     timeout: 180_000,
     // The build reports its failures on stdout, as `playwright.ladle.config.ts` explains.
