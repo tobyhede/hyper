@@ -262,7 +262,15 @@ describe('the bar is one toolbar with named groups (ADR 0073)', () => {
       'Create Ur Resource',
     ]) {
       const control = within(create).getByRole('button', { name });
-      expect(control).toHaveAttribute('title', name);
+      // The default kind is the one the canvas's C creates, so its tooltip
+      // teaches the key and the control announces it.
+      if (name === 'Create Markdown Resource') {
+        expect(control).toHaveAttribute('title', `${name} (C)`);
+        expect(control).toHaveAttribute('aria-keyshortcuts', 'C');
+      } else {
+        expect(control).toHaveAttribute('title', name);
+        expect(control).not.toHaveAttribute('aria-keyshortcuts');
+      }
       expect(control.querySelectorAll('[title]')).toHaveLength(0);
     }
   });

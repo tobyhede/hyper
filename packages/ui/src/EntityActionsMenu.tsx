@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
+import { KeyShortcutKeys, type KeyShortcut } from './KeyShortcut';
 import { EntityActionsIcon } from './icons';
 import { cn } from './lib/utils';
 
@@ -126,6 +127,11 @@ export interface EntityAction {
    * pointer and keyboard alike and keep the item in the accessibility tree.
    */
   readonly disabled?: boolean | undefined;
+  /**
+   * The key that performs this command outside the menu, drawn at the item's
+   * end and announced with `aria-keyshortcuts`, so the menu teaches the key.
+   */
+  readonly shortcut?: KeyShortcut | undefined;
   /**
    * Handed the element the menu was opened from, so a command that opens its
    * own surface has something to anchor it to once the menu closes. `null`
@@ -326,6 +332,7 @@ function EntityActionItems({
               // `h-5` — the `text-sm` line box — so the glyph centres on the
               // label's line whether or not a second line follows it.
               className="items-start"
+              aria-keyshortcuts={action.shortcut?.aria}
               onClick={() => fire(action)}
             >
               {/* `w-4` fixed rather than content-sized, so an item with no
@@ -344,6 +351,13 @@ function EntityActionItems({
                   <span className="text-xs text-muted-foreground">{action.description}</span>
                 )}
               </span>
+              {/* Hidden from the item's name, which is its command: the key is
+                  announced by `aria-keyshortcuts` above. */}
+              {action.shortcut !== undefined && (
+                <span aria-hidden="true" className="ml-auto flex h-5 items-center pl-4">
+                  <KeyShortcutKeys shortcut={action.shortcut} />
+                </span>
+              )}
             </Item>
           ))}
         </MenuGroup>

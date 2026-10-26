@@ -60,11 +60,6 @@ export const uncataloguedComponents = [
       'Deliberately without a consumer. It wraps cmdk, which ADR 0050 kept rather than migrating; `ResourceSearchCombobox` composes Base UI’s `Combobox` from `components/combobox.tsx` and does not reach this. Retiring a primitive an ADR names is a foundation decision, not a surface one.',
   },
   {
-    module: 'packages/ui/src/Dialog.tsx',
-    reason:
-      'Without a consumer since ADR 0089 retired the two Resource creation panes: `ResourcePane` composed this one and was its only caller, and a creation that completes on activation has no modal surface at all. `AlertDialog` is a separate module and still has one — the delete confirmation every deletion asks through — so what is left here is the plain modal frame, and retiring a primitive is a foundation decision rather than a surface one.',
-  },
-  {
     module: 'packages/ui/src/ResourceSearchCombobox.tsx',
     reason:
       "Without a consumer since `.scratch/edge-toolbar/issues/05` removed reconnection: the selected Edge's endpoint editor was its only caller, and moving an Edge's end is now Delete and draw again. `issues/07` chose a Connect target on `ResourcesPopover` instead, and the note `CLAUDE.md` keeps about this component now says it has no consumer and that `ResourcesPopover` is how a Resource is chosen; whether to retire it is a foundation decision rather than a surface one.",

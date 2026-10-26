@@ -205,6 +205,20 @@ export const PRESENTING_KEYS = {
   },
 } as const satisfies Record<string, KeyBinding>;
 
+/**
+ * The keys answered everywhere the application takes keys, authoring and
+ * presenting alike. `?` is Shift+/ on many layouts and a key of its own on
+ * others, so it takes any press.
+ */
+export const HELP_KEYS = {
+  showShortcuts: {
+    keys: ['?'],
+    press: 'any',
+    ariaKeyShortcuts: '?',
+    description: 'Show the keyboard shortcuts',
+  },
+} as const satisfies Record<string, KeyBinding>;
+
 function sameKey(bound: string, pressed: string): boolean {
   return bound.length === 1 ? bound.toLowerCase() === pressed.toLowerCase() : bound === pressed;
 }

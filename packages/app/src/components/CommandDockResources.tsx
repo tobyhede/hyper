@@ -6,6 +6,7 @@
 import { useContext, useEffect, useId, useRef } from 'react';
 import { DEFAULT_KIND } from '@project/core';
 import { ResourceKindIcon, resourceKindName, ToolbarButton, ToolbarGroup } from '@project/ui';
+import { CANVAS_KEYS } from '../key-bindings';
 import type { MenuSide } from '../dock-placement';
 import { RESOURCES_TRIGGER } from './command-dock-triggers';
 import { DockDisclosureContext, RESOURCES_DISCLOSURE_ID } from './command-dock-shared';
@@ -56,7 +57,15 @@ function CreatePeers({ creates }: { readonly creates: readonly DockCreate[] }) {
           size="icon"
           className="nokey"
           aria-label={`Create ${resourceKindName(kind)}`}
-          title={`Create ${resourceKindName(kind)}`}
+          // The canvas's C creates the default kind, so its button teaches it.
+          aria-keyshortcuts={
+            kind === DEFAULT_KIND ? CANVAS_KEYS.addResource.ariaKeyShortcuts : undefined
+          }
+          title={
+            kind === DEFAULT_KIND
+              ? `Create ${resourceKindName(kind)} (${CANVAS_KEYS.addResource.ariaKeyShortcuts})`
+              : `Create ${resourceKindName(kind)}`
+          }
           disabled={disabled}
           onClick={create}
         >
