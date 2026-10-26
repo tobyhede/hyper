@@ -59,13 +59,13 @@ export const CANVAS_KEYS = {
     ariaKeyShortcuts: 'F2',
     description: 'Rename the selected Resource',
   },
-  walkForward: {
+  navigateForward: {
     keys: ['Tab'],
     press: 'plain',
     ariaKeyShortcuts: 'Tab',
     description: 'Go to the next Resource along the Active Graph',
   },
-  walkBack: {
+  navigateBack: {
     keys: ['Tab'],
     press: 'shift',
     ariaKeyShortcuts: 'Shift+Tab',

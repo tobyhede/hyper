@@ -84,7 +84,7 @@ import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { CANVAS_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
-import { walkGraph } from '../graph-walk';
+import { stepAlongGraph } from '../graph-navigation';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -743,9 +743,9 @@ export function SpaceCanvas({
   // the Resource itself: a Tab on one of its controls moves through them as
   // usual. With no next Resource the key stays the browser's, so the keyboard
   // is never trapped on the canvas.
-  const walkFromFocusedResource = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const forward = pressesBinding(CANVAS_KEYS.walkForward, event.nativeEvent);
-    if (!forward && !pressesBinding(CANVAS_KEYS.walkBack, event.nativeEvent)) return;
+  const navigateFromFocusedResource = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const forward = pressesBinding(CANVAS_KEYS.navigateForward, event.nativeEvent);
+    if (!forward && !pressesBinding(CANVAS_KEYS.navigateBack, event.nativeEvent)) return;
     if (!availability.selectNodes || context.graphId === null) return;
     const focused = event.target;
     if (!(focused instanceof HTMLElement) || !focused.matches('.react-flow__node[data-id]')) return;
@@ -757,7 +757,7 @@ export function SpaceCanvas({
         ? [{ source: subject.edge.from, target: subject.edge.to }]
         : [];
     });
-    const resourceId = walkGraph(activeEdges, from, forward ? 'forward' : 'back');
+    const resourceId = stepAlongGraph(activeEdges, from, forward ? 'forward' : 'back');
     const node = nodes.find((each) => each.data.resourceId === resourceId);
     if (resourceId === undefined || node === undefined) return;
     const next = event.currentTarget.querySelector<HTMLElement>(
@@ -771,7 +771,7 @@ export function SpaceCanvas({
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    walkFromFocusedResource(event);
+    navigateFromFocusedResource(event);
     if (event.defaultPrevented) return;
     if (!pressesBinding(CANVAS_KEYS.openResource, event.nativeEvent)) return;
     if (bodyEditing) return;

@@ -54,11 +54,13 @@ describe('the binding table', () => {
   );
 
   it('tells a Shift binding from the plain one on the same key', () => {
-    expect(pressesBinding(CANVAS_KEYS.walkBack, press('Tab', { shiftKey: true }))).toBe(true);
-    expect(pressesBinding(CANVAS_KEYS.walkBack, press('Tab'))).toBe(false);
-    expect(pressesBinding(CANVAS_KEYS.walkForward, press('Tab', { shiftKey: true }))).toBe(false);
+    expect(pressesBinding(CANVAS_KEYS.navigateBack, press('Tab', { shiftKey: true }))).toBe(true);
+    expect(pressesBinding(CANVAS_KEYS.navigateBack, press('Tab'))).toBe(false);
+    expect(pressesBinding(CANVAS_KEYS.navigateForward, press('Tab', { shiftKey: true }))).toBe(
+      false,
+    );
     expect(
-      pressesBinding(CANVAS_KEYS.walkBack, press('Tab', { shiftKey: true, ctrlKey: true })),
+      pressesBinding(CANVAS_KEYS.navigateBack, press('Tab', { shiftKey: true, ctrlKey: true })),
     ).toBe(false);
   });
 
