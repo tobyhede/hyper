@@ -3,11 +3,13 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
+import { graphResourceIds } from '@project/graph';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
 import type { BrowserLocation } from './browser-location';
@@ -170,6 +172,17 @@ export const createApp = (
     });
     const { entityActions, copyProductDestination, clipboardFailure, dismissClipboardFailure } =
       useSpaceAddresses(browserLocation, space);
+    const activeGraphResourceIds = useMemo(
+      () =>
+        activeGraphId === null || space.lookup.graph(activeGraphId) === undefined
+          ? []
+          : graphResourceIds(space, activeGraphId),
+      [space, activeGraphId],
+    );
+    const presentFromCanvas = useMemo(
+      () => ({ resourceIds: activeGraphResourceIds, run: presentingWindow.presentFrom }),
+      [activeGraphResourceIds],
+    );
     const resourceRailActions = useResourceRailActions(composition, {
       space,
       map: selectedMap.map,
@@ -178,6 +191,8 @@ export const createApp = (
       editingResourceBody,
       createReferenceFrom: placement.createReferenceFrom,
       spaces,
+      activeGraphResourceIds,
+      presentFrom: presentingWindow.presentFrom,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
     const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);
@@ -372,6 +387,7 @@ export const createApp = (
                   spaceSession={spaceSession}
                   spaceResourceTargets={spaceResourceTargets.targets}
                   resourceEntityActions={resourceRailActions}
+                  presentFrom={presentFromCanvas}
                 />
               </ReactFlowProvider>
             )}

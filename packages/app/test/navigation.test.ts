@@ -378,6 +378,36 @@ it('opens a Graph destination in its named Map with one navigation publication',
   expect(space.defaultMap).toBeUndefined();
 });
 
+it('presents the Active Graph from one of its Resources with fresh Traversal history', () => {
+  const navigation = navigationFor(() => fixture(), MAP);
+  const observed: NavigationState[] = [];
+  navigation.subscribe(() => observed.push(navigation.getState()));
+
+  navigation.presentFrom(RESOURCE_B);
+
+  expect(observed).toHaveLength(1);
+  expect(navigation.getState()).toEqual({
+    selectedMapId: MAP,
+    activeGraphId: GRAPH_ONE,
+    mode: 'presenting',
+    traversalHistory: [RESOURCE_B],
+    branchIndex: 0,
+  });
+  expect(canRetreat(navigation.getState())).toBe(false);
+});
+
+it('does not present from a Resource the Active Graph does not hold', () => {
+  const navigation = navigationFor(() => fixture(), MAP);
+  const before = navigation.getState();
+  const observed: NavigationState[] = [];
+  navigation.subscribe(() => observed.push(navigation.getState()));
+
+  navigation.presentFrom(RESOURCE_C);
+
+  expect(observed).toHaveLength(0);
+  expect(navigation.getState()).toBe(before);
+});
+
 it('opens an exact presentation Resource with fresh Traversal history in one publication', () => {
   const space = fixture();
   const navigation = navigationFor(() => space, MAP);

@@ -14,6 +14,7 @@ import {
   DeleteIcon,
   EnterSpaceIcon,
   kindNaming,
+  PresentIcon,
   RemoveFromMapIcon,
   ResourceKindIcon,
   type EntityActionGroup,
@@ -39,6 +40,20 @@ export interface ResourceRailCommands {
   readonly deleteFromSpace: (() => void) | null;
   /** Enter a Space Resource's Space, or `null` without an open set to enter it in. */
   readonly enter: RailNavigation | null;
+  /** Present the Active Graph from this Resource, or `null` with nothing to present from. */
+  readonly present: RailPresentation | null;
+}
+
+/** The sentence Present from Here carries while the Active Graph does not hold its Resource. */
+export const PRESENT_OFF_GRAPH = 'This Resource is not on the Active Graph.';
+
+/**
+ * Present from Here, which is offered disabled with its reason while the
+ * Active Graph does not hold the Resource, as Create Reference is: the reader
+ * sees that the command exists and why it cannot run here.
+ */
+export interface RailPresentation extends RailNavigation {
+  readonly onActiveGraph: boolean;
 }
 
 /**
@@ -74,7 +89,7 @@ export function resourceRailGroups(
   connect: EntityActionGroup,
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
-  const { createReference, removeFromMap, deleteFromSpace, enter } = commands;
+  const { createReference, removeFromMap, deleteFromSpace, enter, present } = commands;
   // A Resource no other may reference as its Target offers Create Reference
   // disabled, saying why, so referencing stays a single hop (ADR 0113).
   const terminal = kindFlags(resource.kind).mayBeTarget ? null : referenceTerminal(resource.kind);
@@ -101,6 +116,22 @@ export function resourceRailGroups(
               onSelect: createReference,
             },
           ],
+        ];
+  const presenting: EntityActionGroup =
+    present === null
+      ? []
+      : [
+          {
+            id: 'present-from-here',
+            label: 'Present from Here',
+            icon: <PresentIcon color="currentColor" />,
+            disabled: !present.available || !present.onActiveGraph,
+            description: present.onActiveGraph ? undefined : PRESENT_OFF_GRAPH,
+            onSelect: (): EntityActionOutcome => {
+              present.run();
+              return 'done';
+            },
+          },
         ];
   const leaving: EntityActionGroup = [
     ...(removeFromMap === null
@@ -162,12 +193,19 @@ export function resourceRailGroups(
     return [
       reference.flat(),
       connect,
+      presenting,
       [...entering, ...links.filter((action) => isOpenIndependently(action.id))],
       links.filter((action) => !isOpenIndependently(action.id)),
       leaving,
     ];
   }
-  return [...reference, connect, ...addresses, ...(leaving.length > 0 ? [leaving] : [])];
+  return [
+    ...reference,
+    connect,
+    ...(presenting.length > 0 ? [presenting] : []),
+    ...addresses,
+    ...(leaving.length > 0 ? [leaving] : []),
+  ];
 }
 
 export interface ResourceRailInput {
@@ -176,8 +214,12 @@ export interface ResourceRailInput {
   readonly entityActions: (entity: SpaceEntity) => readonly EntityActionGroup[];
   readonly availability: Pick<
     AuthoringAvailability,
-    'addResource' | 'authorOnCanvas' | 'deleteResource' | 'navigate'
+    'addResource' | 'authorOnCanvas' | 'deleteResource' | 'navigate' | 'present'
   >;
+  /** The Resources the Active Graph holds, which Present from Here may start at. */
+  readonly activeGraphResourceIds: readonly ResourceId[];
+  /** Present the Active Graph from a Resource, or `null` where nothing presents. */
+  readonly presentFrom: ((resourceId: ResourceId) => void) | null;
   readonly editingResourceBody: boolean;
   readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
   readonly spaces: OpenSpaces | null;
@@ -223,9 +265,11 @@ export function useResourceRailActions(
     editingResourceBody,
     createReferenceFrom,
     spaces,
+    activeGraphResourceIds,
+    presentFrom,
   }: ResourceRailInput,
 ): (resourceId: ResourceId, connect: EntityActionGroup) => readonly EntityActionGroup[] {
-  const { addResource, authorOnCanvas, deleteResource, navigate } = availability;
+  const { addResource, authorOnCanvas, deleteResource, navigate, present } = availability;
   return useCallback(
     (resourceId: ResourceId, connect: EntityActionGroup): readonly EntityActionGroup[] => {
       const resource = space.lookup.resource(resourceId);
@@ -270,6 +314,14 @@ export function useResourceRailActions(
                     );
                   },
                 },
+          present:
+            presentFrom === null
+              ? null
+              : {
+                  available: present,
+                  onActiveGraph: activeGraphResourceIds.includes(resourceId),
+                  run: () => presentFrom(resourceId),
+                },
         },
       );
     },
@@ -284,6 +336,9 @@ export function useResourceRailActions(
       editingResourceBody,
       createReferenceFrom,
       spaces,
+      present,
+      activeGraphResourceIds,
+      presentFrom,
       authoring,
       commandOutcomes,
       currentSpace,

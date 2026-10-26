@@ -1,3 +1,5 @@
+import type { ResourceId } from '@project/core';
+
 /** The browser's fullscreen, as presenting needs it. */
 export interface Fullscreen {
   /** Ask for the whole document fullscreen, answering whether it was entered. Never rejects. */
@@ -12,12 +14,15 @@ export interface PresentingTraversal {
   readonly presenting: () => boolean;
   readonly subscribe: (listener: () => void) => () => void;
   readonly present: () => void;
+  readonly presentFrom: (resourceId: ResourceId) => void;
   readonly exitPresenting: () => void;
 }
 
 export interface PresentingFullscreen {
   /** Start presenting and, within the same activation, ask for fullscreen. */
   readonly present: () => void;
+  /** {@link present}, from one Resource of the Active Graph. */
+  readonly presentFrom: (resourceId: ResourceId) => void;
   /** Follow fullscreen and presenting until the returned function is called. */
   readonly connect: () => () => void;
 }
@@ -62,14 +67,21 @@ export function presentingFullscreen(
     entered = false;
     fullscreen.exit();
   };
+  const enterFullscreen = (): void => {
+    if (!traversal.presenting() || fullscreen.active()) return;
+    requested = true;
+    void fullscreen.enter().then((granted) => {
+      if (!granted) requested = false;
+    });
+  };
   return {
     present: () => {
       traversal.present();
-      if (!traversal.presenting() || fullscreen.active()) return;
-      requested = true;
-      void fullscreen.enter().then((granted) => {
-        if (!granted) requested = false;
-      });
+      enterFullscreen();
+    },
+    presentFrom: (resourceId) => {
+      traversal.presentFrom(resourceId);
+      enterFullscreen();
     },
     connect: () => {
       const stopFullscreen = fullscreen.subscribe(onFullscreenChange);

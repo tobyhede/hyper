@@ -112,6 +112,8 @@ interface Harness {
   readonly titleEditingChanged: ReturnType<typeof vi.fn>;
   /** Re-render with the canvas's own surface held at `policy`. */
   readonly holdPolicy: (policy: MapSurfacePolicy) => void;
+  /** What `P` asked to present from; only {@link RESOURCE_ID} is on the Active Graph. */
+  readonly presentFrom: ReturnType<typeof vi.fn>;
 }
 
 /** A SpaceCanvas whose title Edit always refuses, so a draft can be left unsettled. */
@@ -131,6 +133,8 @@ async function mountGraph(
   const placeSpace = vi.fn();
   const titleEditingChanged = vi.fn();
   const nodesChanged = vi.fn();
+  const presentFrom = vi.fn();
+  const presentable = { resourceIds: [RESOURCE_ID], run: presentFrom };
   let nodes = initialNodes;
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
@@ -172,6 +176,7 @@ async function mountGraph(
         deleteConfirmation={deleteConfirmation}
         nameOnCreation={null}
         spaceSession={spaceSession}
+        presentFrom={presentable}
       />
     </ReactFlowProvider>
   );
@@ -203,6 +208,7 @@ async function mountGraph(
       holdCanvasPolicy(surface, policy);
       view.rerender(graph());
     },
+    presentFrom,
   };
 }
 
@@ -870,6 +876,46 @@ describe('the C shortcut', () => {
     fireEvent.keyDown(slider, { key: 'c' });
 
     expect(addResource).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** `P` shares the window and the guard with `C`, and acts only on a selection it can present from. */
+describe('the P shortcut', () => {
+  it('presents from the selected Resource, from wherever focus is', async () => {
+    const { presentFrom } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+
+    fireEvent.keyDown(document.body, { key: 'p' });
+
+    expect(presentFrom).toHaveBeenCalledWith(RESOURCE_ID);
+  });
+
+  it('does nothing with no Resource selected', async () => {
+    const { presentFrom } = await mountGraph();
+
+    const press = fireEvent.keyDown(document.body, { key: 'p' });
+
+    expect(presentFrom).not.toHaveBeenCalled();
+    expect(press).toBe(true);
+  });
+
+  it('does nothing for a Resource off the Active Graph', async () => {
+    const { presentFrom } = await mountGraph([resourceNode('B', OTHER_RESOURCE_ID, true)]);
+
+    const press = fireEvent.keyDown(document.body, { key: 'p' });
+
+    expect(presentFrom).not.toHaveBeenCalled();
+    expect(press).toBe(true);
+  });
+
+  it('is a letter in the title editor and is withdrawn with a held surface', async () => {
+    const { presentFrom, holdPolicy } = await mountGraph([resourceNode('A', RESOURCE_ID, true)]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Title A' }));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Resource title' }), { key: 'p' });
+    fireEvent.keyDown(document.body, { key: 'p', metaKey: true });
+    holdPolicy('inert');
+    fireEvent.keyDown(document.body, { key: 'p' });
+
+    expect(presentFrom).not.toHaveBeenCalled();
   });
 });
 

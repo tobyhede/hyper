@@ -168,6 +168,12 @@ export interface Navigation {
   readonly openPresentation: (selection: MapId, graphId: GraphId, resourceId: ResourceId) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly present: () => void;
+  /**
+   * Present the Active Graph from one of its Resources, with fresh Traversal
+   * history. Does nothing when no Graph is active or the Active Graph does not
+   * hold the Resource.
+   */
+  readonly presentFrom: (resourceId: ResourceId) => void;
   readonly exitPresenting: () => void;
   readonly advance: () => void;
   readonly retreat: () => void;
@@ -468,6 +474,19 @@ export function createNavigation(
         activeGraphId: graphId,
         mode: 'presenting',
         traversalHistory: [start],
+        branchIndex: 0,
+      });
+    },
+    presentFrom: (resourceId) => {
+      const state = observable.getState();
+      const graphId = state.activeGraphId;
+      if (graphId === null || currentSpace().lookup.graph(graphId) === undefined) return;
+      if (!graphResourceIds(currentSpace(), graphId).includes(resourceId)) return;
+      observable.publish({
+        selectedMapId: state.selectedMapId,
+        activeGraphId: graphId,
+        mode: 'presenting',
+        traversalHistory: [resourceId],
         branchIndex: 0,
       });
     },
