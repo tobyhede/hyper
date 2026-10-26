@@ -5,6 +5,7 @@ import {
   presentedName,
   resourceActions,
   selectResource,
+  selectedCanvas,
   settled,
   stage,
 } from './graph';
