@@ -31,4 +31,4 @@ The files themselves come from `raw.githubusercontent.com`, which is not the API
 1. Create another Worker from this repository as in [Deploy](#deploy), with `VITE_DEFAULT_SPACE_SOURCE=github:owner/repo@<ref>` (add `/path` when `aggregate.json` is not at the repository's root).
 2. The Worker's **Settings** > **Domains & Routes** > **Add** > **Custom Domain**, and enter the domain. Its zone must be on Cloudflare; Cloudflare creates the DNS record and certificate.
 
-Every mounted page records the commit it read in its address, so a link someone shared keeps showing that commit after the default moves on.
+Every mounted page records the commit it read in its address, so a link someone shared keeps showing that commit after the default moves on, as long as that commit's root file is `aggregate.json`. A link to a commit that still holds `hyper.json` is refused ([ADR 0136](adr/0136-an-aggregate-directory-is-rooted-at-aggregate-json.md)).

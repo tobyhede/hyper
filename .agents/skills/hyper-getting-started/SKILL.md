@@ -19,7 +19,7 @@ Work from the root of the Hyper clone. Each step ends on its completion criterio
 
 3. **Content directory.** Ask the person where their work lives, or should live. It is any path outside the Hyper clone, for example `~/talks/rust-async`.
    - **New work:** run `pnpm hyper init <dir>`. The directory must be missing or empty; dot-entries such as `.git` and `.DS_Store` do not count, so a fresh `git init` directory is empty. It writes a new aggregate, prints `Created a new aggregate; run it with: pnpm hyper run <dir>` and exits zero without serving. A directory that is not empty is refused and nothing is written: ask the person whether they meant existing work there, or another path.
-   - **Existing work:** the directory must hold `aggregate.json` at its top. A directory holding only `space.json` is one Space, not an Aggregate directory, and is refused.
+   - **Existing work:** the directory must hold `aggregate.json` at its top. A directory holding only `space.json` is one Space, not an Aggregate directory, and is refused. One holding `hyper.json` instead of `aggregate.json` is refused too: rename the file with `git -C <dir> mv hyper.json aggregate.json` and commit it before the first run.
 
    Done when you know the absolute path and `<dir>/aggregate.json` exists.
 
