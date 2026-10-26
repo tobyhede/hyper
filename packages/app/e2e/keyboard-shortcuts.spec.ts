@@ -13,8 +13,8 @@ test('C adds a Resource while a Dock control has focus', async ({ page }) => {
   const resources = page.locator('.react-flow__node');
   const before = await resources.count();
 
-  // A Dock button, outside the canvas, and Zoom out, a button inside it: the
-  // canvas once answered `C` only from its own wrapper, and never from a button.
+  // A Dock button, outside the canvas, and Zoom out, a button inside it: `C`
+  // is answered from a focused button in either place.
   await presentControl(page).focus();
   await page.keyboard.press('c');
   await expect(resources).toHaveCount(before + 1);
