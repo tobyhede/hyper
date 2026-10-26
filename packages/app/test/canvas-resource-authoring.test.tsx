@@ -118,6 +118,8 @@ const node = (
     display: fixtureDisplay(open, kind, 'A source'),
     activeGraphId: GRAPH_ID,
     activeGraphColor: '#8a94a6',
+    borderColor: null,
+    receding: false,
   },
 });
 
@@ -885,6 +887,8 @@ describe('canvas Resource authoring, replacing an image', () => {
       },
       activeGraphId: GRAPH_ID,
       activeGraphColor: '#8a94a6',
+      borderColor: null,
+      receding: false,
     },
   };
   /** The replacer an Image Resource's running edit carries, absent at rest. */

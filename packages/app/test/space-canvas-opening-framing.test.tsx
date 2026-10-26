@@ -71,6 +71,8 @@ function resourceNode(): ResourceFlowNode {
       display: CLOSED_DISPLAY,
       activeGraphId: null,
       activeGraphColor: '#8a94a6',
+      borderColor: null,
+      receding: false,
     },
   };
 }

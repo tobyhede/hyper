@@ -397,6 +397,8 @@ describe('Open Spaces', () => {
         display: open ? { shown: 'open', content } : CLOSED_DISPLAY,
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
+        borderColor: null,
+        receding: false,
       },
     });
     const { result, rerender, unmount } = renderHook(
