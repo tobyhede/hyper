@@ -20,11 +20,14 @@
  * changes the character and never sets `shiftKey`, so the flag is the only way
  * to tell an announced `C` from Shift+C.
  *
+ * `'shift'` is the same single press with Shift held and nothing else, for the
+ * reverse of a plain binding on the same key, as Shift+Tab is of Tab.
+ *
  * `'any'` takes every press, modified or repeated. It is for a key whose command
  * means the same thing however it arrives, such as moving through a
  * presentation by holding an arrow.
  */
-export type KeyPress = 'plain' | 'any';
+export type KeyPress = 'plain' | 'shift' | 'any';
 
 export interface KeyBinding {
   /** The `KeyboardEvent.key` values that press it. A letter matches either case. */
@@ -55,6 +58,18 @@ export const CANVAS_KEYS = {
     press: 'plain',
     ariaKeyShortcuts: 'F2',
     description: 'Rename the selected Resource',
+  },
+  walkForward: {
+    keys: ['Tab'],
+    press: 'plain',
+    ariaKeyShortcuts: 'Tab',
+    description: 'Go to the next Resource along the Active Graph',
+  },
+  walkBack: {
+    keys: ['Tab'],
+    press: 'shift',
+    ariaKeyShortcuts: 'Shift+Tab',
+    description: 'Go to the previous Resource along the Active Graph',
   },
   removeSelection: {
     keys: ['Delete', 'Backspace'],
@@ -120,7 +135,10 @@ function sameKey(bound: string, pressed: string): boolean {
 export function pressesBinding(binding: KeyBinding, event: KeyboardEvent): boolean {
   if (!binding.keys.some((key) => sameKey(key, event.key))) return false;
   if (binding.press === 'any') return true;
-  return !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+  const shift = binding.press === 'shift';
+  return (
+    !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && event.shiftKey === shift
+  );
 }
 
 /** The keys a focused control acts on by itself, with no listener's help. */

@@ -1,8 +1,12 @@
 # 02: Tab walks the Active Graph
 
-Status: ready-for-agent
+Status: resolved
 
 **What to build:** With a Resource selected, `Tab` selects and focuses the next Resource along the Active Graph's first outgoing Edge, `Shift+Tab` the previous along an incoming Edge. With none, the key is left to the browser so focus leaves the canvas. The camera keeps the new selection in view.
 
 **Acceptance:** Playwright walks a fixture Graph end to end with Tab and back with Shift+Tab, and Tab at the end leaves the canvas.
 
+
+## Answer
+
+`walkGraph` (`packages/app/src/graph-walk.ts`) picks the next Resource along the Active Graph's Edges: the first outgoing one forward, the first incoming one back. `SpaceCanvas`'s wrapper handler answers `CANVAS_KEYS.walkForward`/`walkBack` only when the Resource node itself has focus, so a Tab on one of its controls moves through them as usual. It selects and focuses the next node, and React Flow's `autoPanOnNodeFocus` brings it into view. With no next Resource the key stays the browser's. Only the canvas's own Map walks: a Map drawn inside a Space Resource does not yet. Proved by `packages/app/e2e/keyboard-shortcuts.spec.ts`.

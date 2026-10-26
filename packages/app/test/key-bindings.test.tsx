@@ -33,8 +33,11 @@ const mounted = (html: string): Element => {
 };
 
 describe('the binding table', () => {
-  it.each(ALL_BINDINGS)('answers an unmodified press of each key for %s', (_name, binding) => {
-    for (const key of binding.keys) expect(pressesBinding(binding, press(key))).toBe(true);
+  it.each(ALL_BINDINGS)('answers a single press of each key for %s', (_name, binding) => {
+    const shiftKey = binding.press === 'shift';
+    for (const key of binding.keys) {
+      expect(pressesBinding(binding, press(key, { shiftKey }))).toBe(true);
+    }
   });
 
   it('answers a letter in either case, so Caps Lock is not a modifier', () => {
@@ -49,6 +52,15 @@ describe('the binding table', () => {
       }
     },
   );
+
+  it('tells a Shift binding from the plain one on the same key', () => {
+    expect(pressesBinding(CANVAS_KEYS.walkBack, press('Tab', { shiftKey: true }))).toBe(true);
+    expect(pressesBinding(CANVAS_KEYS.walkBack, press('Tab'))).toBe(false);
+    expect(pressesBinding(CANVAS_KEYS.walkForward, press('Tab', { shiftKey: true }))).toBe(false);
+    expect(
+      pressesBinding(CANVAS_KEYS.walkBack, press('Tab', { shiftKey: true, ctrlKey: true })),
+    ).toBe(false);
+  });
 
   it('takes a held or modified press for a binding that accepts any', () => {
     expect(pressesBinding(PRESENTING_KEYS.advance, press('ArrowRight', { repeat: true }))).toBe(
