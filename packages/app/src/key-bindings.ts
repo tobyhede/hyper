@@ -170,7 +170,6 @@ const OWN_KEYS_INPUT = `input:not(${[
   'color',
   'file',
   'hidden',
-  'image',
   'radio',
   'range',
   'reset',
