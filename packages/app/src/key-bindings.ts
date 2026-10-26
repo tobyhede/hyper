@@ -227,23 +227,28 @@ const EDITABLE = '[contenteditable]:not([contenteditable="false"])';
 
 /**
  * An input whose keys are text entry, or that moves its own value or caret on
- * the arrows. Every other input type is a control, as a button is: a checkbox,
- * radio or range answers Space or the arrows the browser gives it, and a
- * shortcut pressed while one has focus is still the application's.
+ * the arrows; an input with no type is a text field. Every other input type is
+ * a control, as a button is: a checkbox, radio or range answers Space or the
+ * arrows the browser gives it, and a shortcut pressed while one has focus is
+ * still the application's.
  */
-const TEXT_ENTRY = `input:not(${[
-  'button',
-  'checkbox',
-  'color',
-  'file',
-  'image',
-  'radio',
-  'range',
-  'reset',
-  'submit',
-]
-  .map((type) => `[type="${type}" i]`)
-  .join(',')})`;
+const TEXT_ENTRY = [
+  'input:not([type])',
+  ...[
+    'date',
+    'datetime-local',
+    'email',
+    'month',
+    'number',
+    'password',
+    'search',
+    'tel',
+    'text',
+    'time',
+    'url',
+    'week',
+  ].map((type) => `input[type="${type}" i]`),
+].join(',');
 
 /** What counts as a control that will act on Space or Enter. */
 const INTERACTIVE = [
