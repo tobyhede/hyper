@@ -65,7 +65,7 @@ const targetSpaceSnapshot: SpaceSnapshot = {
  * Meta, and deliberately the *later* directory name of the two.
  *
  * `d6666…` sorts after `d5555…`, so the reader meets the ordinary Space first.
- * Nothing may infer Meta from that order (ADR 0078) — `hyper.json` states it —
+ * Nothing may infer Meta from that order (ADR 0078) — `aggregate.json` states it —
  * and building the fixture this way is what makes the inference observable if it
  * ever comes back.
  */
@@ -111,7 +111,7 @@ describe('hyper CLI', () => {
   };
 
   /**
-   * A canonical aggregate directory: a versioned `hyper.json` naming Meta, plus
+   * A canonical aggregate directory: a versioned `aggregate.json` naming Meta, plus
    * one `<space-uuid>/` child per Space.
    *
    * A bare Space directory is not what the public command takes, so every
@@ -211,7 +211,7 @@ describe('hyper CLI', () => {
     });
   });
 
-  it('imports every Space of an aggregate and takes Meta from hyper.json', async () => {
+  it('imports every Space of an aggregate and takes Meta from aggregate.json', async () => {
     const directory = await makeAggregateDirectory(META_SPACE_ID, [
       targetSpaceSnapshot,
       metaSpaceSnapshot,

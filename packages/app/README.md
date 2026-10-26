@@ -1,6 +1,6 @@
 # The tracked fixture and the example
 
-`fixture/` is the complete `hyper.json` aggregate `pnpm dev:fixture` loads, and
+`fixture/` is the complete `aggregate.json` aggregate `pnpm dev:fixture` loads, and
 the one Playwright drives. It is a **test bed**, not the product demo — the
 narrative demo lives in `example/` and is kept as a single Space directory.
 
@@ -8,7 +8,7 @@ This file sits here rather than in `fixture/` on purpose. Import reads every
 `.md` beside a space file and refuses one that is not a Markdown Resource's own
 sidecar (ADR 0128), so a `README.md` in there would refuse the fixture.
 
-The fixture is Meta-rooted. `hyper.json` names Meta; ordinary Spaces live in
+The fixture is Meta-rooted. `aggregate.json` names Meta; ordinary Spaces live in
 sibling `<space-uuid>/` directories. Each Space is a directory: `space.json`
 holding structure — `version`, `id`, `title`, `maps` and `defaultMap` —
 and one JSON Resource file per resource under `resources/`, with a Markdown

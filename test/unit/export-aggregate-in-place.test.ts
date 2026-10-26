@@ -108,7 +108,7 @@ describe('Export writes in place', () => {
       // Editing B's body changes its sidecar and leaves its Resource file's bytes alone.
       editedResource: await identity(resourceFile(destination, RESOURCE_B)),
       space: await identity(join(destination, SPACE_ID, 'space.json')),
-      aggregate: await identity(join(destination, 'hyper.json')),
+      aggregate: await identity(join(destination, 'aggregate.json')),
     });
     const unchanged = await unchangedFiles();
     const changed = await identity(sidecar(destination, RESOURCE_B));
@@ -172,7 +172,7 @@ describe('Export writes in place', () => {
 
   /*
    * Hyper owns what Import reads and nothing else. A `.git` tree, a README
-   * beside `hyper.json`, a notes directory and whatever an author keeps in
+   * beside `aggregate.json`, a notes directory and whatever an author keeps in
    * `images/` that Import does not scan are neither read, copied nor touched.
    */
   it('never touches what Import does not read', async () => {
@@ -296,13 +296,15 @@ describe('Export writes in place', () => {
     await exportTo(holding(storedSpace()), destination);
     const outside = join(parent, 'outside.txt');
     await writeFile(outside, 'outside\n');
-    await symlink(outside, join(destination, '.hyper.json.hyper-write'));
-    await writeFile(join(destination, 'hyper.json'), '{}\n');
+    await symlink(outside, join(destination, '.aggregate.json.hyper-write'));
+    await writeFile(join(destination, 'aggregate.json'), '{}\n');
 
     await exportTo(holding(storedSpace()), destination);
 
     await expect(readFile(outside, 'utf8')).resolves.toBe('outside\n');
-    await expect(readFile(join(destination, 'hyper.json'), 'utf8')).resolves.toContain(SPACE_ID);
+    await expect(readFile(join(destination, 'aggregate.json'), 'utf8')).resolves.toContain(
+      SPACE_ID,
+    );
   });
 
   /*

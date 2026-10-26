@@ -80,7 +80,7 @@ const makeTemporaryDirectory = async (): Promise<string> => {
 };
 
 /**
- * Build a canonical aggregate directory: a versioned `hyper.json` naming the
+ * Build a canonical aggregate directory: a versioned `aggregate.json` naming the
  * Meta Space, and one `<space-uuid>/` child per Space. Public import takes
  * nothing else, so every import test starts here rather than at a bare Space
  * directory.

@@ -137,7 +137,7 @@ const startRunning = async (via: 'pnpm' | 'launcher') => {
 
   await outputContaining(`http://localhost:${String(port)}/`);
   const { metaSpaceId } = aggregateFileSchema.parse(
-    JSON.parse(await readFile(join(directory, 'hyper.json'), 'utf8')),
+    JSON.parse(await readFile(join(directory, 'aggregate.json'), 'utf8')),
   );
 
   /** Rename the Meta Space over HTTP, exactly as the browser commits. */
@@ -192,7 +192,7 @@ describe('pnpm hyper init', () => {
         `Created a new aggregate; run it with: pnpm hyper run ${directory}\n`,
       );
       const { metaSpaceId } = aggregateFileSchema.parse(
-        JSON.parse(await readFile(join(directory, 'hyper.json'), 'utf8')),
+        JSON.parse(await readFile(join(directory, 'aggregate.json'), 'utf8')),
       );
       expect((await readSingleSpace(join(directory, metaSpaceId))).document.title).toBe(
         'New space',
@@ -272,7 +272,7 @@ describe('pnpm hyper run', () => {
       roots.push(root);
       const directory = join(root, 'talk');
       await initAggregate(directory, newUuid);
-      const before = await readFile(join(directory, 'hyper.json'), 'utf8');
+      const before = await readFile(join(directory, 'aggregate.json'), 'utf8');
       const launcher = spawn(
         process.execPath,
         [
@@ -297,7 +297,7 @@ describe('pnpm hyper run', () => {
 
         expect(await exited, output).toBe(0);
         expect(output).toContain('Stopped');
-        expect(await readFile(join(directory, 'hyper.json'), 'utf8')).toBe(before);
+        expect(await readFile(join(directory, 'aggregate.json'), 'utf8')).toBe(before);
       } finally {
         if (launcher.exitCode === null && launcher.signalCode === null && launcher.pid) {
           process.kill(-launcher.pid, 'SIGKILL');

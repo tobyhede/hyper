@@ -16,7 +16,7 @@ import {
   type ResourceFile,
 } from '@project/graph';
 import { describe, expect, it } from 'vitest';
-import hyperFileSchema from '../../docs/schema/hyper.schema.json';
+import aggregateJsonSchema from '../../docs/schema/aggregate.schema.json';
 import idSchema from '../../docs/schema/id.schema.json';
 import envelopeSchema from '../../docs/schema/resource/envelope.schema.json';
 import imageSchema from '../../docs/schema/resource/kinds/image.schema.json';
@@ -29,8 +29,8 @@ import resourceSchema from '../../docs/schema/resource/resource.schema.json';
 import spaceFileSchema from '../../docs/schema/space.schema.json';
 
 /**
- * `docs/schema/hyper.schema.json` and `space.schema.json` publish the shapes
- * `@project/core` reads `hyper.json` and `space.json` with. Their README says
+ * `docs/schema/aggregate.schema.json` and `space.schema.json` publish the shapes
+ * `@project/core` reads `aggregate.json` and `space.json` with. Their README says
  * they refuse only what intake refuses; this holds each schema to the Zod
  * intake on the same files, so a change to either side that disagrees fails.
  */
@@ -41,7 +41,7 @@ const base = 'https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/
 const ajv = new Ajv2020({ strict: true, allErrors: true });
 ajv.addSchema([
   idSchema,
-  hyperFileSchema,
+  aggregateJsonSchema,
   spaceFileSchema,
   locatorSchema,
   envelopeSchema,
@@ -59,7 +59,7 @@ function validator(name: string) {
   return validate;
 }
 
-const hyperSchema = validator('hyper.schema.json');
+const aggregateSchema = validator('aggregate.schema.json');
 const spaceSchema = validator('space.schema.json');
 const resourceFileSchema = validator('resource/resource.schema.json');
 const locator = validator('resource/locator.schema.json');
@@ -153,11 +153,11 @@ describe('the aggregate JSON Schemas agree with intake', () => {
     expect(spaceSchema(file)).toBe(importSpaceFileSchema.safeParse(file).success);
   });
 
-  it.each(hyperCases)('hyper.json: %s', (_name, file) => {
-    expect(hyperSchema(file)).toBe(aggregateFileSchema.safeParse(file).success);
+  it.each(hyperCases)('aggregate.json: %s', (_name, file) => {
+    expect(aggregateSchema(file)).toBe(aggregateFileSchema.safeParse(file).success);
   });
 
-  it("accepts docs/aggregate-directory.md's hyper.json and space.json examples", () => {
+  it("accepts docs/aggregate-directory.md's aggregate.json and space.json examples", () => {
     const text = readFileSync(join(repoRoot, 'docs/aggregate-directory.md'), 'utf8');
     const fences = [...text.matchAll(/```json\n([\s\S]*?)```/g)].map((match) => match[1] ?? '');
     // Each example is found by the key only its file has, not by its place on the page.
@@ -168,12 +168,12 @@ describe('the aggregate JSON Schemas agree with intake', () => {
           const parsed: unknown = JSON.parse(fence);
           return parsed;
         });
-    const [hyperExample, ...otherHyper] = named('metaSpaceId');
+    const [aggregateExample, ...otherAggregates] = named('metaSpaceId');
     const [spaceExample, ...otherSpace] = named('maps');
-    expect([otherHyper, otherSpace]).toEqual([[], []]);
-    expect(hyperSchema(hyperExample)).toBe(true);
+    expect([otherAggregates, otherSpace]).toEqual([[], []]);
+    expect(aggregateSchema(aggregateExample)).toBe(true);
     expect(spaceSchema(spaceExample)).toBe(true);
-    expect(aggregateFileSchema.safeParse(hyperExample).success).toBe(true);
+    expect(aggregateFileSchema.safeParse(aggregateExample).success).toBe(true);
     expect(importSpaceFileSchema.safeParse(spaceExample).success).toBe(true);
   });
 });

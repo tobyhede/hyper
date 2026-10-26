@@ -41,7 +41,7 @@ const fixtureContents = await readAggregateFrom(mapSource('fixture', fixtureFile
 
 const PINNED = `github:${OWNER}/${REPO}@${COMMIT}`;
 
-/** A Space's resource file and Markdown sidecar in the fixture, both read after `hyper.json`. */
+/** A Space's resource file and Markdown sidecar in the fixture, both read after `aggregate.json`. */
 const RESOURCE_FILE =
   '00000000-0000-4000-8000-000000000060/resources/00000000-0000-4000-8000-000000000063.json';
 const SIDECAR_FILE =
@@ -253,10 +253,10 @@ describe('readGitHubAggregate', () => {
       ['a parent of the aggregate', '/talks'],
       ['a directory that is not there', '/talks/missing'],
       ['a directory whose parent is not there', '/talks/missing/deeper'],
-      ['a directory inside a file', `/${SELECTED}/hyper.json/deeper`],
-      ['a file rather than a directory', `/${SELECTED}/hyper.json`],
+      ['a directory inside a file', `/${SELECTED}/aggregate.json/deeper`],
+      ['a file rather than a directory', `/${SELECTED}/aggregate.json`],
     ])(
-      'answers a selected directory without hyper.json as one the reader refuses: %s',
+      'answers a selected directory without aggregate.json as one the reader refuses: %s',
       async (_description, suffix) => {
         const github = fakeGitHub({ files: repository });
 
@@ -268,7 +268,7 @@ describe('readGitHubAggregate', () => {
         const refusal = await refusalOf(result);
         expect(refusal.kind).toBe('discovery');
         expect(refusal.diagnostics).toEqual([
-          `${PINNED}${suffix}/hyper.json: a canonical aggregate directory must contain hyper.json`,
+          `${PINNED}${suffix}/aggregate.json: a canonical aggregate directory must contain aggregate.json`,
         ]);
         expect(github.rawRequests()).toEqual([]);
       },
@@ -372,8 +372,8 @@ describe('readGitHubAggregate', () => {
     expect(github.requests).toEqual([]);
   });
 
-  it('names a file whose fetch failed, retried once, reading nothing after hyper.json', async () => {
-    const github = fakeGitHub({ files: fixtureFiles, failingBlob: 'hyper.json' });
+  it('names a file whose fetch failed, retried once, reading nothing after aggregate.json', async () => {
+    const github = fakeGitHub({ files: fixtureFiles, failingBlob: 'aggregate.json' });
 
     const result = await readGitHubAggregate(
       `github:${OWNER}/${REPO}`,
@@ -384,29 +384,29 @@ describe('readGitHubAggregate', () => {
     const refusal = await refusalOf(result);
     expect(refusal.kind).toBe('discovery');
     expect(refusal.diagnostics).toEqual([
-      `${PINNED}/hyper.json: could not be fetched from GitHub: the request failed with HTTP 500`,
+      `${PINNED}/aggregate.json: could not be fetched from GitHub: the request failed with HTTP 500`,
     ]);
-    expect(github.rawRequests()).toEqual(['hyper.json', 'hyper.json']);
+    expect(github.rawRequests()).toEqual(['aggregate.json', 'aggregate.json']);
   });
 
   it('retries a blob GitHub throttled once, and reads', async () => {
     const github = fakeGitHub({
       files: fixtureFiles,
-      blobFailures: new Map([['hyper.json', [{ status: 429 }]]]),
+      blobFailures: new Map([['aggregate.json', [{ status: 429 }]]]),
     });
     const { wait, waits } = recordingWait();
 
     const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
 
     expect(await contentsOf(result)).toEqual(fixtureContents);
-    expect(requestsFor(github, 'hyper.json')).toBe(2);
+    expect(requestsFor(github, 'aggregate.json')).toBe(2);
     expect(waits).toEqual([1000]);
   });
 
   it('waits the Retry-After seconds a throttled blob names before retrying it', async () => {
     const github = fakeGitHub({
       files: fixtureFiles,
-      blobFailures: new Map([['hyper.json', [{ status: 503, retryAfter: '3' }]]]),
+      blobFailures: new Map([['aggregate.json', [{ status: 503, retryAfter: '3' }]]]),
     });
     const { wait, waits } = recordingWait();
 
@@ -423,7 +423,7 @@ describe('readGitHubAggregate', () => {
   ])('reads %s', async (_description, retryAfter, expected) => {
     const github = fakeGitHub({
       files: fixtureFiles,
-      blobFailures: new Map([['hyper.json', [{ status: 429, retryAfter }]]]),
+      blobFailures: new Map([['aggregate.json', [{ status: 429, retryAfter }]]]),
     });
     const { wait, waits } = recordingWait();
 
@@ -438,7 +438,7 @@ describe('readGitHubAggregate', () => {
     const github = fakeGitHub({
       files: fixtureFiles,
       blobFailures: new Map([
-        ['hyper.json', [{ status: 503, retryAfter: new Date(now + 5000).toUTCString() }]],
+        ['aggregate.json', [{ status: 503, retryAfter: new Date(now + 5000).toUTCString() }]],
       ]),
     });
     const { wait, waits } = recordingWait();
@@ -472,14 +472,14 @@ describe('readGitHubAggregate', () => {
   it('retries a blob whose fetch threw once, and reads', async () => {
     const github = fakeGitHub({
       files: fixtureFiles,
-      blobFailures: new Map([['hyper.json', [{ throws: true }]]]),
+      blobFailures: new Map([['aggregate.json', [{ throws: true }]]]),
     });
     const { wait, waits } = recordingWait();
 
     const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch, wait);
 
     expect(await contentsOf(result)).toEqual(fixtureContents);
-    expect(requestsFor(github, 'hyper.json')).toBe(2);
+    expect(requestsFor(github, 'aggregate.json')).toBe(2);
     expect(waits).toEqual([1000]);
   });
 
@@ -587,7 +587,7 @@ describe('readGitHubAggregate', () => {
       files: fixtureFiles,
       blobFailures: new Map(
         [...fixtureFiles.keys()]
-          .filter((path) => path !== 'hyper.json')
+          .filter((path) => path !== 'aggregate.json')
           .map((path) => [path, [{ status: 429 }, { status: 429 }]]),
       ),
     });
@@ -599,7 +599,7 @@ describe('readGitHubAggregate', () => {
     );
 
     const { diagnostics } = await refusalOf(result);
-    const requested = new Set(github.rawRequests().filter((path) => path !== 'hyper.json'));
+    const requested = new Set(github.rawRequests().filter((path) => path !== 'aggregate.json'));
     // Only the reads already in flight, eight at once, were requested, each
     // with its one retry; every file read after them was answered at once.
     expect(requested.size).toBeGreaterThan(0);
@@ -607,7 +607,7 @@ describe('readGitHubAggregate', () => {
     expect(github.rawRequests()).toHaveLength(1 + requested.size * 2);
     expect(diagnostics).toHaveLength(fixtureFiles.size - 1);
     for (const path of fixtureFiles.keys()) {
-      if (path === 'hyper.json') continue;
+      if (path === 'aggregate.json') continue;
       expect(diagnostics).toContain(
         requested.has(path)
           ? `${PINNED}/${path}: could not be fetched from GitHub: the request failed with HTTP 429`

@@ -2474,7 +2474,7 @@ describe('a Space is named once (ADR 0010)', () => {
       `const stored${RETIRED_SPACE_CAPITAL}s = await readAll();`,
       `const ${RETIRED_SPACE_UPPER}_VERSION = 1;`,
       `const ${RETIRED_SPACE_UPPER} = 'space.json';`,
-      `const SPACE_${RETIRED_SPACE_UPPER} = 'hyper.json';`,
+      `const SPACE_${RETIRED_SPACE_UPPER} = 'aggregate.json';`,
       `const DEFAULT_${RETIRED_SPACE_UPPER}S_BY_ID = new Map();`,
       `refusal: { code: '${RETIRED_SPACE}-not-found' },`,
       `return 'space-must-keep-${RETIRED_SPACE}';`,

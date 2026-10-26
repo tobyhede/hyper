@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0130
-Refined by: 0134
+Refined by: 0134, 0136
 
 ADR 0130 gave the directory reader a pure core that read an aggregate from a map of relative paths to bytes, fed by a filesystem shell and by the GitHub source, so that anything the CLI refuses the browser refuses in the same words. A map of bytes meant each caller chose and fetched the files first. Each caller therefore listed its directory, asked the core which paths Importing reads, read them with its own concurrency and its own failure policy, and checked for `hyper.json` itself. The two callers already refused the same directory differently: a missing `hyper.json` in different words, every unreadable file on the CLI but only the first in a mount, and a 25 MiB cap in a mount alone.
 

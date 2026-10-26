@@ -6,7 +6,7 @@ The directory is plain files meant for git: JSON in a fixed key order, one JSON 
 
 ```
 my-talk/
-  hyper.json                                     { "version": 1, "metaSpaceId": "2b1c9a40-…" }
+  aggregate.json                                     { "version": 1, "metaSpaceId": "2b1c9a40-…" }
   2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c/          the Meta Space
     space.json
     resources/
@@ -22,13 +22,13 @@ my-talk/
 
 The bundled example is [`packages/app/fixture`](../packages/app/fixture).
 
-## `hyper.json`
+## `aggregate.json`
 
 ```json
 { "version": 1, "metaSpaceId": "2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c" }
 ```
 
-It carries the one fact the directory cannot say for itself: **which Space is Meta**. Nothing infers that from ordering or naming ([ADR 0078](adr/0078-the-server-side-repository-owns-meta-lifecycle.md)), so a directory without `hyper.json` is not an Aggregate directory. A single Space's directory on its own, with `space.json` and no `hyper.json`, is refused. Both keys are required and no others are allowed.
+It carries the one fact the directory cannot say for itself: **which Space is Meta**. Nothing infers that from ordering or naming ([ADR 0078](adr/0078-the-server-side-repository-owns-meta-lifecycle.md)), so a directory without `aggregate.json` is not an Aggregate directory. A single Space's directory on its own, with `space.json` and no `aggregate.json`, is refused. Both keys are required and no others are allowed.
 
 There is no list of Spaces. A Space is in the aggregate because its directory is there.
 
@@ -173,7 +173,7 @@ The next Export writes every minted Id into the files.
 
 Exporting writes the directory **in place** ([ADR 0119](adr/0119-export-writes-in-place-and-git-answers-for-a-partial-write.md)). It owns exactly what Importing reads, and never reads, copies or touches anything else:
 
-- **Owned:** `hyper.json`; each Space directory's `space.json`, every `*.md` beside it, and every `resources/*.json` and `resources/*.md`; the image files in `images/`.
+- **Owned:** `aggregate.json`; each Space directory's `space.json`, every `*.md` beside it, and every `resources/*.json` and `resources/*.md`; the image files in `images/`.
 - **Kept:** any other file or directory, at the root or inside a Space directory, such as `.git`, a `README.md` at the root, notes in a `notes/` directory or a `.gitignore`.
 
 One write goes like this:
@@ -192,7 +192,7 @@ The directory itself, and each Space directory in it, is never renamed or recrea
 
 Two layers:
 
-- **Shape.** Zod schemas in `@project/core` check `hyper.json`, each `space.json` and each Resource file. The same shapes are published as JSON Schema in [`docs/schema/`](schema/README.md).
+- **Shape.** Zod schemas in `@project/core` check `aggregate.json`, each `space.json` and each Resource file. The same shapes are published as JSON Schema in [`docs/schema/`](schema/README.md).
 - **References.** `@project/graph` checks that every Edge, placement, `activeGraph`, `defaultMap` and Reference Resource `target` resolves inside its Space, that there are no duplicate Ids or duplicate Edges, and then the aggregate rules above across Spaces.
 
 `pnpm hyper run` and `pnpm hyper import` print what they refuse and exit non-zero. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.

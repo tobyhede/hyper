@@ -166,20 +166,20 @@ describe('mounting an aggregate in the page', () => {
 
   it('shows the reader’s diagnostics for a directory that is not an aggregate', async () => {
     const files = fixtureFiles();
-    files.set('hyper.json', new TextEncoder().encode('not json'));
+    files.set('aggregate.json', new TextEncoder().encode('not json'));
 
     const container = await render(() => mountedStartup(files).resolve('/'));
 
     expect(container).toHaveTextContent('Application could not start');
     expect(container).toHaveTextContent(`${PINNED} is not an Aggregate directory:`);
-    expect(container).toHaveTextContent(`${PINNED}/hyper.json`);
+    expect(container).toHaveTextContent(`${PINNED}/aggregate.json`);
   });
 
   it('shows Import’s diagnostics for an aggregate that is refused', async () => {
     const files = fixtureFiles();
     const missing = '00000000-0000-4000-8000-0000000000ff';
     files.set(
-      'hyper.json',
+      'aggregate.json',
       new TextEncoder().encode(JSON.stringify({ version: 1, metaSpaceId: missing })),
     );
 
@@ -362,15 +362,15 @@ describe('mounting an aggregate in the page', () => {
     );
   });
 
-  it('shows a location whose directory holds no hyper.json in the reader’s words', async () => {
+  it('shows a location whose directory holds no aggregate.json in the reader’s words', async () => {
     const files = fixtureFiles();
-    files.delete('hyper.json');
+    files.delete('aggregate.json');
 
     const container = await render(() => mountedStartup(files).resolve('/'));
 
     expect(container).toHaveTextContent(`${PINNED} is not an Aggregate directory:`);
     expect(container).toHaveTextContent(
-      `${PINNED}/hyper.json: a canonical aggregate directory must contain hyper.json`,
+      `${PINNED}/aggregate.json: a canonical aggregate directory must contain aggregate.json`,
     );
   });
 
