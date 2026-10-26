@@ -103,6 +103,12 @@ export const CANVAS_KEYS = {
     ariaKeyShortcuts: 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown',
     description: 'Move the selected Resource',
   },
+  presentFromHere: {
+    keys: ['p'],
+    press: 'plain',
+    ariaKeyShortcuts: 'P',
+    description: 'Present the Active Graph from the selected Resource',
+  },
   removeSelection: {
     keys: ['Delete', 'Backspace'],
     press: 'plain',

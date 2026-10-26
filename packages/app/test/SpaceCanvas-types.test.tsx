@@ -54,5 +54,6 @@ it('takes exactly its surface, reading, placement and Space-level collaborators'
     | 'spaceSession'
     | 'spaceResourceTargets'
     | 'resourceEntityActions'
+    | 'presentFrom'
   >();
 });

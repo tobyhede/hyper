@@ -1,4 +1,4 @@
-import type { UUID } from '@project/core';
+import type { ResourceId, UUID } from '@project/core';
 import { createObservableState, type ObserverErrorReporter } from '@project/persistence';
 import {
   presentationScope,
@@ -32,6 +32,8 @@ export interface PresentingWindow {
    * same activation ask for fullscreen.
    */
   readonly present: () => void;
+  /** {@link present}, from one Resource of the Active Graph (`Navigation.presentFrom`). */
+  readonly presentFrom: (resourceId: ResourceId) => void;
   /** What the presenting keys and the Stage's chrome do. */
   readonly commands: TraversalCommands;
   /** Follow fullscreen and link Notes windows until the returned function is called. */
@@ -140,6 +142,7 @@ export function createPresentingWindow({
     presenting: () => navigation.getState().mode === 'presenting',
     subscribe: navigation.subscribe,
     present: navigation.present,
+    presentFrom: navigation.presentFrom,
     exitPresenting: navigation.exitPresenting,
   });
   const notesLink =
@@ -173,6 +176,14 @@ export function createPresentingWindow({
       restarting = navigation.getState().mode === 'presenting';
       try {
         fullscreenPairing.present();
+      } finally {
+        restarting = false;
+      }
+    },
+    presentFrom: (resourceId) => {
+      restarting = navigation.getState().mode === 'presenting';
+      try {
+        fullscreenPairing.presentFrom(resourceId);
       } finally {
         restarting = false;
       }

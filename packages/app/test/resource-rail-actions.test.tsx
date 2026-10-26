@@ -311,7 +311,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * The dropdown and the context menu draw the identical list
    * (`EntityActionItems`), so this is the one place the order has to hold.
    */
-  it('groups Create Reference, Connect, both copy links, then Remove and Delete, in that order', async () => {
+  it('groups Create Reference, Connect, Present from Here, both copy links, then Remove and Delete, in that order', async () => {
     const session = mount();
 
     await selectResource('A');
@@ -321,6 +321,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
+      ['Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -344,6 +345,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
+      ['Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -770,7 +772,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * each. Rename is absent, which this exact-order assertion would catch as
    * an extra row if it were not.
    */
-  it('groups Create Reference, Connect, Open in New Tab, the copy links, then Remove and Delete on a Space Resource', async () => {
+  it('groups Create Reference, Connect, Present from Here, Open in New Tab, the copy links, then Remove and Delete on a Space Resource', async () => {
     const session = mount(undefined, undefined, withSpaceResource);
 
     await selectResource('A space');
@@ -780,6 +782,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
+      ['Present from Here'],
       ['Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],
@@ -898,6 +901,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(await screen.findByRole('menu'), [
       ['Create Reference'],
       ['Connect to Resource'],
+      ['Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);

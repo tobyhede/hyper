@@ -1,3 +1,4 @@
+import { uuidSchema } from '@project/core';
 import { describe, expect, it } from 'vitest';
 import {
   presentingFullscreen,
@@ -64,10 +65,13 @@ function standInTraversal() {
       return () => listeners.delete(listener);
     },
     present: () => set(true),
+    presentFrom: () => set(true),
     exitPresenting: () => set(false),
   };
   return { traversal, isPresenting: () => presenting, openFromLink: () => set(true) };
 }
+
+const RESOURCE = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -99,6 +103,29 @@ describe('presentingFullscreen', () => {
     coordinator.connect();
 
     coordinator.present();
+
+    expect(browser.requests()).toBe(0);
+  });
+
+  it('requests fullscreen within the gesture that presents from a Resource', () => {
+    const { browser, navigation, coordinator } = connected();
+
+    coordinator.presentFrom(RESOURCE);
+
+    expect(navigation.isPresenting()).toBe(true);
+    expect(browser.requests()).toBe(1);
+  });
+
+  it('requests nothing when presenting from a Resource the Graph does not hold', () => {
+    const browser = standInFullscreen();
+    const traversal: PresentingTraversal = {
+      ...standInTraversal().traversal,
+      presentFrom: () => undefined,
+    };
+    const coordinator = presentingFullscreen(browser.fullscreen, traversal);
+    coordinator.connect();
+
+    coordinator.presentFrom(RESOURCE);
 
     expect(browser.requests()).toBe(0);
   });

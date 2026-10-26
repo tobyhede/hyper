@@ -228,6 +228,15 @@ export interface SpaceCanvasProps {
     resourceId: ResourceId,
     connect: EntityActionGroup,
   ) => readonly EntityActionGroup[];
+  /**
+   * Presenting from a Resource, which `P` asks for: the Active Graph's
+   * Resources, which are the only ones it presents from, and the command.
+   * Absent on a canvas nothing presents from.
+   */
+  readonly presentFrom?: {
+    readonly resourceIds: readonly ResourceId[];
+    readonly run: (resourceId: ResourceId) => void;
+  };
 }
 
 const ACROSS_DRAWINGS: CanvasGestureRefusal = { code: 'edge-across-drawings' };
@@ -263,6 +272,7 @@ export function SpaceCanvas({
   spaceSession,
   spaceResourceTargets,
   resourceEntityActions,
+  presentFrom,
 }: SpaceCanvasProps) {
   const {
     view,
@@ -862,6 +872,29 @@ export function SpaceCanvas({
     };
     window.addEventListener('keydown', addResource);
     return () => window.removeEventListener('keydown', addResource);
+  }, []);
+
+  // `P` presents the Active Graph from the selected Resource of this canvas's own
+  // Map. A drawn Map inside a Space Resource is not presented from, and a
+  // Resource off the Active Graph has nowhere to start, so either leaves the key
+  // alone.
+  const latestPresentFrom = useRef(presentFrom);
+  useLayoutEffect(() => {
+    latestPresentFrom.current = presentFrom;
+  }, [presentFrom]);
+  useEffect(() => {
+    const presentSelected = (event: KeyboardEvent): void => {
+      if (!pressesBinding(CANVAS_KEYS.presentFromHere, event) || keyBelongsElsewhere(event)) return;
+      const present = latestPresentFrom.current;
+      const canvas = latestOccurrences.current.find((value) => value.id === CANVAS_OCCURRENCE);
+      if (present === undefined || canvas?.availability.present !== true) return;
+      const selected = canvas.nodes.find((node) => node.selected);
+      if (selected === undefined || !present.resourceIds.includes(selected.data.resourceId)) return;
+      event.preventDefault();
+      present.run(selected.data.resourceId);
+    };
+    window.addEventListener('keydown', presentSelected);
+    return () => window.removeEventListener('keydown', presentSelected);
   }, []);
 
   // `F2` renames the selected Resource, and this is the *only* handler that answers

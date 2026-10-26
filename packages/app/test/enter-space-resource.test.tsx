@@ -231,7 +231,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
    * single-Space mount, this file's `OpenSpacesApplication` composition is what
    * makes Enter reachable at all.
    */
-  it('groups Create Reference, Connect, Enter and Open in New Tab, the copy links, then Remove and Delete', async () => {
+  it('groups Create Reference, Connect, Present from Here, Enter and Open in New Tab, the copy links, then Remove and Delete', async () => {
     await mount();
 
     await openArchitectureActions();
@@ -240,6 +240,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
+      ['Present from Here'],
       ['Enter', 'Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],
