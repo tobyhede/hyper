@@ -53,6 +53,12 @@ export const CANVAS_KEYS = {
     ariaKeyShortcuts: 'Enter',
     description: 'Open the focused Resource',
   },
+  openAndExpand: {
+    keys: ['Enter'],
+    press: 'shift',
+    ariaKeyShortcuts: 'Shift+Enter',
+    description: 'Open the focused Resource and expand it to fit its content',
+  },
   showFullView: {
     keys: [' '],
     press: 'plain',

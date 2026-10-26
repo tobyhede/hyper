@@ -214,6 +214,7 @@ describe('resourceRailGroups', () => {
     enter: { run: () => undefined, available: true },
     present: { run: () => undefined, available: true, onActiveGraph: true },
     fullView: () => undefined,
+    openAndExpand: () => undefined,
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -224,7 +225,7 @@ describe('resourceRailGroups', () => {
     expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
-      ['full-view', 'present-from-here'],
+      ['open-and-expand', 'full-view', 'present-from-here'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
@@ -274,6 +275,7 @@ describe('resourceRailGroups', () => {
           enter: null,
           present: null,
           fullView: null,
+          openAndExpand: null,
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);

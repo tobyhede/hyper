@@ -3574,7 +3574,7 @@ test('the Resource menu groups Create Reference, Connect, Full View and Present 
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Read in Full View', 'Present from Here'],
+    ['Open and Expand', 'Read in Full View', 'Present from Here'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -3597,7 +3597,7 @@ test(
     const groups = [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Read in Full View', 'Present from Here'],
+      ['Open and Expand', 'Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ];
@@ -3642,7 +3642,7 @@ test('Create Reference is drawn unavailable on a Reference Resource, still leadi
     [/^Create Reference/],
     ['Connect to Resource'],
     // A Resource created just now is on no Graph, so it has nowhere to present from.
-    ['Read in Full View', /^Present from Here/],
+    ['Open and Expand', 'Read in Full View', /^Present from Here/],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],
   ]);

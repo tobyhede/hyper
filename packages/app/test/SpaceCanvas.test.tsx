@@ -401,6 +401,21 @@ it.each(['Enter'])('opens a focused Reference Resource with %s', async (key) => 
 });
 
 /**
+ * Shift+Enter is Open and expand (ADR 0135): one Edit that Opens the Resource
+ * at the size its content needs. jsdom lays nothing out, so the visible canvas
+ * it is capped at is the Closed Size and the Edit Opens it there.
+ */
+it('opens and expands a focused Resource with Shift+Enter', async () => {
+  const { opened } = await mountGraph([resourceNode('A')]);
+
+  const focused = nodeOf(RESOURCE_ID);
+  focused.focus();
+  fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
+
+  expect(opened()).toEqual([RESOURCE_ID]);
+});
+
+/**
  * The render adapter holds no projection before the selected Map's first
  * placement resolves, and drops it when the Map changes or a replacement Space
  * opens (`render-adapter.test.ts`); Resources are on the canvas exactly when it
@@ -440,7 +455,7 @@ describe.each([
     await mountGraph([held], undefined, undefined, 'replacing');
 
     expect(nodeOf(id)).toHaveAccessibleDescription(
-      'Press enter to open a Resource, space to read it in Full View, tab, shift tab or the arrow keys to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to cancel.',
+      'Press enter to open a Resource, shift enter to open and expand it, space to read it in Full View, tab, shift tab or the arrow keys to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to cancel.',
     );
   });
 });

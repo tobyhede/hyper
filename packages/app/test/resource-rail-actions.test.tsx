@@ -321,7 +321,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Read in Full View', 'Present from Here'],
+      ['Open and Expand', 'Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -345,7 +345,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Read in Full View', 'Present from Here'],
+      ['Open and Expand', 'Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
       ['Remove from Map', 'Delete from Space'],
     ]);
@@ -782,7 +782,7 @@ describe('a Resource’s commands on the canvas rail', () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Read in Full View', 'Present from Here'],
+      ['Open and Expand', 'Read in Full View', 'Present from Here'],
       ['Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],
@@ -885,7 +885,8 @@ describe('a Resource’s commands on the canvas rail', () => {
 
   /**
    * An Ur Resource has no content, so its rail offers no Edit (ADR 0113) and no
-   * Open or Close; every other Resource command is its as it is every Resource's.
+   * Open, Close or Open and Expand; every other Resource command is its as it
+   * is every Resource's.
    */
   it('offers an Ur Resource every Resource command and no Edit, Open or Close', async () => {
     const session = mount(undefined, undefined, withUr);

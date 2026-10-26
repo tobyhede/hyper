@@ -7,6 +7,7 @@ import {
   CircleAlert,
   Copy,
   Ellipsis,
+  Expand,
   ExternalLink,
   Eye,
   EyeOff,
@@ -137,6 +138,11 @@ export const OpenIndependentlyIcon = (props: ResourceActionIconProps) => (
 /** Open a Resource in place. */
 export const OpenResourceIcon = (props: ResourceActionIconProps) => (
   <Maximize2 size={14} {...props} />
+);
+
+/** Open a Resource and expand it to fit its content. Lucide `expand`: growing outward, not Opening alone. */
+export const OpenAndExpandIcon = (props: ResourceActionIconProps) => (
+  <Expand size={14} {...props} />
 );
 
 /** Read a Resource in Full View, over the canvas. Lucide `book-open`: reading, not Opening. */

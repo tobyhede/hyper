@@ -16,6 +16,7 @@ import {
   kindNaming,
   PresentIcon,
   FullViewIcon,
+  OpenAndExpandIcon,
   RemoveFromMapIcon,
   ResourceKindIcon,
   type EntityActionGroup,
@@ -45,6 +46,8 @@ export interface ResourceRailCommands {
   readonly present: RailPresentation | null;
   /** Read this Resource in Full View, or `null` where no Full View is drawn. */
   readonly fullView: (() => void) | null;
+  /** Open this Resource and expand it to fit its content, or `null` where it cannot be. */
+  readonly openAndExpand: (() => void) | null;
 }
 
 /** The sentence Present from Here carries while the Active Graph does not hold its Resource. */
@@ -92,7 +95,15 @@ export function resourceRailGroups(
   connect: EntityActionGroup,
   commands: ResourceRailCommands,
 ): readonly EntityActionGroup[] {
-  const { createReference, removeFromMap, deleteFromSpace, enter, present, fullView } = commands;
+  const {
+    createReference,
+    removeFromMap,
+    deleteFromSpace,
+    enter,
+    present,
+    fullView,
+    openAndExpand,
+  } = commands;
   // A Resource no other may reference as its Target offers Create Reference
   // disabled, saying why, so referencing stays a single hop (ADR 0113).
   const terminal = kindFlags(resource.kind).mayBeTarget ? null : referenceTerminal(resource.kind);
@@ -120,8 +131,22 @@ export function resourceRailGroups(
             },
           ],
         ];
-  // Reading a Resource and presenting from it, which change nothing in the Space.
+  // Seeing a Resource whole: expanding it on the Map, which is an Edit, then
+  // reading it and presenting from it, which change nothing in the Space.
   const presenting: EntityActionGroup = [
+    ...(openAndExpand === null
+      ? []
+      : [
+          {
+            id: 'open-and-expand',
+            label: 'Open and Expand',
+            icon: <OpenAndExpandIcon />,
+            onSelect: (): EntityActionOutcome => {
+              openAndExpand();
+              return 'done';
+            },
+          },
+        ]),
     ...(fullView === null
       ? []
       : [
@@ -289,10 +314,18 @@ export function useResourceRailActions(
     presentFrom,
     showFullView,
   }: ResourceRailInput,
-): (resourceId: ResourceId, connect: EntityActionGroup) => readonly EntityActionGroup[] {
+): (
+  resourceId: ResourceId,
+  connect: EntityActionGroup,
+  openAndExpand?: (() => void) | null,
+) => readonly EntityActionGroup[] {
   const { addResource, authorOnCanvas, deleteResource, navigate, present } = availability;
   return useCallback(
-    (resourceId: ResourceId, connect: EntityActionGroup): readonly EntityActionGroup[] => {
+    (
+      resourceId: ResourceId,
+      connect: EntityActionGroup,
+      openAndExpand: (() => void) | null = null,
+    ): readonly EntityActionGroup[] => {
       const resource = space.lookup.resource(resourceId);
       // A node the projection is still drawing for a Resource the working Space
       // no longer has: no commands rather than commands that name nothing.
@@ -344,6 +377,7 @@ export function useResourceRailActions(
                   run: () => presentFrom(resourceId),
                 },
           fullView: showFullView === null ? null : () => showFullView(resourceId),
+          openAndExpand,
         },
       );
     },

@@ -1,4 +1,5 @@
 import {
+  COLLAPSED_RESOURCE_SIZE,
   titleName,
   resourceOpen,
   resourceShape,
@@ -36,7 +37,7 @@ import { Placement } from './placement';
  *
  * Operations arrive with their first real caller rather than ahead of one.
  * Both callers create and delete through `createInMap` and `deleteFromSpace`;
- * `open`, `close`, `resize`, `changeResourceShape`, `addToMap` and
+ * `open`, `close`, `resize`, `openAndExpand`, `changeResourceShape`, `addToMap` and
  * `removeFromMap` are Space Authoring's alone.
  */
 
@@ -358,6 +359,44 @@ function resize(
 }
 
 /**
+ * Open a Resource in one Map and Resize it to the size given, as one Edit
+ * (ADR 0135). The size is floored at the Closed Size on each axis, and the
+ * Resources clear of it move as a {@link resize} moves them. The Open checks
+ * come first, so an Ur Resource is refused `open-requires-content` and nothing
+ * is resized. `unchanged` only for a Resource already Open at that size.
+ */
+function openAndExpand(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  size: Extent,
+): SnapshotEditOutcome {
+  const placed = placedIn(snapshot, mapId);
+  if ('code' in placed) return refused(placed);
+  const at = placed.placement.get(resourceId);
+  if (at === undefined) return refused({ code: 'resource-not-in-map' });
+  const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
+  if (resource === undefined) return refused({ code: 'resource-not-found' });
+  if (!takesOpen(resource.document.kind)) return refused({ code: 'open-requires-content' });
+  const before = resourceSize(at);
+  const after = {
+    width: Math.max(size.width, COLLAPSED_RESOURCE_SIZE.width),
+    height: Math.max(size.height, COLLAPSED_RESOURCE_SIZE.height),
+  };
+  const sameSize = before.width === after.width && before.height === after.height;
+  if (sameSize) {
+    if (resourceOpen(at)) return UNCHANGED;
+    return withEntry(snapshot, mapId, placed.placement, resourceId, { ...at, open: true });
+  }
+  const grown = Placement.place(placed.placement, resourceId, {
+    ...at,
+    open: true,
+    size: after,
+  });
+  return withPlacement(snapshot, mapId, Placement.displace(grown, resourceId, before, after));
+}
+
+/**
  * Draw an Ur Resource in another Shape in one Map (ADR 0121). Every other
  * kind is the rectangle, so a Shape Edit on one is refused whatever it asks for.
  *
@@ -461,6 +500,7 @@ export const SnapshotEdit = {
   open,
   close,
   resize,
+  openAndExpand,
   changeResourceShape,
   addToMap,
   removeFromMap,
