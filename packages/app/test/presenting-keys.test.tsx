@@ -61,7 +61,7 @@ describe('the global Presenting keys', () => {
     expect(traversal.exitPresenting).toHaveBeenCalledTimes(1);
   });
 
-  it('opens a Notes window on S, and leaves a modified S to the browser', () => {
+  it('opens a Notes window on S, and leaves a modified S to the browser, Shift included', () => {
     const traversal = commands();
     render(<Presenting traversal={traversal} />);
 
@@ -69,11 +69,13 @@ describe('the global Presenting keys', () => {
     fireEvent.keyDown(document.body, { key: 'S', shiftKey: true });
     fireEvent.keyDown(document.body, { key: 's', ctrlKey: true });
     fireEvent.keyDown(document.body, { key: 's', metaKey: true });
+    // Caps Lock is not a modifier: it changes the character and never sets `shiftKey`.
+    fireEvent.keyDown(document.body, { key: 'S' });
 
     expect(traversal.openNotes).toHaveBeenCalledTimes(2);
   });
 
-  it('shows or hides the rehearsal notes on N, and leaves a modified N to the browser', () => {
+  it('shows or hides the rehearsal notes on N, and leaves a modified N to the browser, Shift included', () => {
     const traversal = commands();
     render(<Presenting traversal={traversal} />);
 
@@ -81,6 +83,7 @@ describe('the global Presenting keys', () => {
     fireEvent.keyDown(document.body, { key: 'N', shiftKey: true });
     fireEvent.keyDown(document.body, { key: 'n', ctrlKey: true });
     fireEvent.keyDown(document.body, { key: 'n', altKey: true });
+    fireEvent.keyDown(document.body, { key: 'N' });
 
     expect(traversal.toggleNotes).toHaveBeenCalledTimes(2);
   });

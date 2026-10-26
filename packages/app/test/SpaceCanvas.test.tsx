@@ -714,9 +714,9 @@ describe('resize belongs to Resource rather than to a Resource kind', () => {
 });
 
 /**
- * `C` is the only unmodified authoring shortcut there is, so the whole of what
- * makes it safe is *where* it is answered: on React Flow's own wrapper, which a
- * key pressed anywhere else in the app never reaches.
+ * `C` is answered on the window, so what makes it safe is the guard it shares
+ * with every shortcut (`key-bindings.ts`): text entry, menus and dialogs keep
+ * their keys, and a button keeps only the Space and Enter that activate it.
  */
 describe('the C shortcut', () => {
   it('adds a Resource from a focused Resource', async () => {
@@ -798,19 +798,40 @@ describe('the C shortcut', () => {
   );
 
   /**
-   * The canvas zoom controls render *inside* the wrapper this shortcut is
-   * bound to, so its buttons are somewhere a `c` can be pressed while the graph
-   * is still the event's path. A button is not text entry, but it is a control
-   * answering keys of its own, and the F2 guard beside this one already says so
-   * — the two disagreed, and the narrower one is a canvas that adds a Resource when
-   * the author meant to press Zoom in.
+   * A button answers Space and Enter and nothing else, so a `c` pressed after
+   * clicking one is still the canvas's command, as it is after a click on the Dock.
    */
   it.each(['Zoom in', 'Zoom out', 'Fit view'] as const)(
-    'is a keypress on the %s control rather than a command',
+    'adds a Resource from the %s control',
     async (name) => {
       const { addResource } = await mountGraph();
 
       fireEvent.keyDown(await screen.findByRole('button', { name }), { key: 'c' });
+
+      expect(addResource).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('adds a Resource when focus is outside the canvas', async () => {
+    const { addResource } = await mountGraph();
+
+    fireEvent.keyDown(document.body, { key: 'c' });
+
+    expect(addResource).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['menu', 'listbox', 'dialog', 'alertdialog'] as const)(
+    'is a keypress inside a %s rather than a command',
+    async (role) => {
+      const { addResource } = await mountGraph();
+      const surface = document.createElement('div');
+      surface.setAttribute('role', role);
+      const control = document.createElement('button');
+      surface.append(control);
+      document.body.append(surface);
+
+      fireEvent.keyDown(control, { key: 'c' });
+      surface.remove();
 
       expect(addResource).not.toHaveBeenCalled();
     },
@@ -823,14 +844,12 @@ describe('the C shortcut', () => {
    * `visibility: hidden` until it has measured the track, and jsdom measures
    * nothing — so the real control is absent from the accessibility tree here
    * while being an ordinary visible slider in a browser. What is asserted is
-   * the mechanism that excludes it: the `.nokey` its Panel already carries for
-   * React Flow's own subscriptions, which the canvas guard reads too.
+   * the mechanism that excludes it: a range is an `input`, which keeps its keys.
    */
   it('is a keypress on the zoom slider rather than a command', async () => {
     const { addResource } = await mountGraph();
     const slider = await screen.findByLabelText('Zoom');
     expect(slider).toHaveAttribute('type', 'range');
-    expect(slider.closest('.nokey')).not.toBeNull();
 
     fireEvent.keyDown(slider, { key: 'c' });
 

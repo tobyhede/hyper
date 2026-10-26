@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button, Kbd, KbdGroup } from '@project/ui';
+import { PRESENTING_KEYS } from '../key-bindings';
 import type { Move } from '../navigation';
 
 export interface PresentingChromeProps {
@@ -229,7 +230,9 @@ export function PresentingChrome({
                       // the selected move has one: Up and Down move the selection
                       // rather than acting on any single choice, and Space is a
                       // button's own activation rather than a shortcut of ours.
-                      aria-keyshortcuts={move.selected ? 'ArrowRight' : undefined}
+                      aria-keyshortcuts={
+                        move.selected ? PRESENTING_KEYS.advance.ariaKeyShortcuts : undefined
+                      }
                       className="max-w-[16rem] @max-3xl:min-h-11"
                       onClick={
                         move.selected
@@ -254,14 +257,18 @@ export function PresentingChrome({
         </div>
 
         <div className="flex items-center gap-3 @max-3xl:flex-wrap @max-3xl:justify-between">
-          <Button variant="secondary" aria-keyshortcuts="S" onClick={onOpenNotes}>
+          <Button
+            variant="secondary"
+            aria-keyshortcuts={PRESENTING_KEYS.openNotes.ariaKeyShortcuts}
+            onClick={onOpenNotes}
+          >
             Notes window
           </Button>
 
           <Button
             variant={notesShown ? 'default' : 'secondary'}
             aria-pressed={notesShown}
-            aria-keyshortcuts="N"
+            aria-keyshortcuts={PRESENTING_KEYS.toggleNotes.ariaKeyShortcuts}
             onClick={onToggleNotes}
           >
             Rehearsal notes
@@ -275,7 +282,7 @@ export function PresentingChrome({
             <Button
               ref={back}
               variant="secondary"
-              aria-keyshortcuts="ArrowLeft"
+              aria-keyshortcuts={PRESENTING_KEYS.retreat.ariaKeyShortcuts}
               className="@max-3xl:min-h-11"
               onClick={traversed(onRetreat)}
             >
@@ -306,7 +313,7 @@ export function PresentingChrome({
           <Button
             ref={overview}
             variant="secondary"
-            aria-keyshortcuts="Escape"
+            aria-keyshortcuts={PRESENTING_KEYS.exitPresenting.ariaKeyShortcuts}
             data-testid="exit-presenting"
             className="@max-3xl:min-h-11"
             onClick={onExit}

@@ -7,8 +7,32 @@ export interface KeyBinding {
   readonly behaviour: string;
 }
 
-/** Every keyboard binding authored by Hyper in the app and UI packages. */
+/**
+ * Every keyboard binding authored by Hyper in the app and UI packages that
+ * reads `event.key` itself.
+ *
+ * The application's shortcuts are not here: they are declared as data in
+ * `packages/app/src/key-bindings.ts` (`CANVAS_KEYS`, `PRESENTING_KEYS`), whose
+ * own tests hold each one, and matched by `pressesBinding`. What that module
+ * reads directly is its shared guard's deference to a focused control.
+ */
 export const KEY_BINDINGS: readonly KeyBinding[] = [
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: ' ',
+    occurrence: 1,
+    key: 'Space',
+    surface: 'Focused control under any application shortcut',
+    behaviour: 'defer to native control activation',
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'Enter',
+    occurrence: 1,
+    key: 'Enter',
+    surface: 'Focused control under any application shortcut',
+    behaviour: 'defer to native control activation',
+  },
   {
     module: 'packages/ui/src/MarkdownSourceEditor.tsx',
     sourceKey: 'Escape',
@@ -64,152 +88,6 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     key: 'Escape',
     surface: 'Inline title editor',
     behaviour: 'cancel the title edit and restore surface focus',
-  },
-  {
-    module: 'packages/app/src/components/SpaceCanvas.tsx',
-    sourceKey: 'Enter',
-    occurrence: 1,
-    key: 'Enter',
-    surface: 'Canvas Resource',
-    behaviour: 'open the focused Resource',
-  },
-  {
-    module: 'packages/app/src/components/SpaceCanvas.tsx',
-    sourceKey: ' ',
-    occurrence: 1,
-    key: 'Space',
-    surface: 'Canvas Resource',
-    behaviour: 'open the focused Resource',
-  },
-  {
-    module: 'packages/app/src/components/SpaceCanvas.tsx',
-    sourceKey: 'C',
-    occurrence: 1,
-    key: 'C',
-    surface: 'Canvas',
-    behaviour: 'add a Resource on an unmodified, non-repeating press',
-  },
-  {
-    module: 'packages/app/src/components/SpaceCanvas.tsx',
-    sourceKey: 'F2',
-    occurrence: 1,
-    key: 'F2',
-    surface: 'Canvas',
-    behaviour: 'begin renaming the selected Resource',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: ' ',
-    occurrence: 1,
-    key: 'Space',
-    surface: 'Focused control while presenting',
-    behaviour: 'defer to native control activation',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'Enter',
-    occurrence: 1,
-    key: 'Enter',
-    surface: 'Focused control while presenting',
-    behaviour: 'defer to native control activation',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'ArrowRight',
-    occurrence: 1,
-    key: 'ArrowRight',
-    surface: 'Presenting',
-    behaviour: 'advance along the selected outgoing Edge',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: ' ',
-    occurrence: 2,
-    key: 'Space',
-    surface: 'Presenting',
-    behaviour: 'advance along the selected outgoing Edge',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'ArrowLeft',
-    occurrence: 1,
-    key: 'ArrowLeft',
-    surface: 'Presenting',
-    behaviour: 'retreat through Traversal history',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'ArrowUp',
-    occurrence: 1,
-    key: 'ArrowUp',
-    surface: 'Presenting',
-    behaviour: 'select the previous outgoing Edge',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'ArrowDown',
-    occurrence: 1,
-    key: 'ArrowDown',
-    surface: 'Presenting',
-    behaviour: 'select the next outgoing Edge',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'Escape',
-    occurrence: 1,
-    key: 'Escape',
-    surface: 'Presenting',
-    behaviour: 'leave presentation',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 's',
-    occurrence: 1,
-    key: 'S',
-    surface: 'Presenting',
-    behaviour: 'open the Notes window',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'S',
-    occurrence: 1,
-    key: 'Shift+S',
-    surface: 'Presenting',
-    behaviour: 'open the Notes window',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'n',
-    occurrence: 1,
-    key: 'N',
-    surface: 'Presenting',
-    behaviour: 'show or hide the rehearsal notes under the Stage',
-  },
-  {
-    module: 'packages/app/src/presenting-keys.ts',
-    sourceKey: 'N',
-    occurrence: 1,
-    key: 'Shift+N',
-    surface: 'Presenting',
-    behaviour: 'show or hide the rehearsal notes under the Stage',
-  },
-  {
-    module: 'packages/app/src/components/SpaceCanvas.tsx',
-    sourceKey: 'Backspace',
-    occurrence: 1,
-    key: 'Backspace',
-    surface: 'Canvas',
-    behaviour:
-      'remove the focused Resource, else the selected Resource or Edge, through Space Authoring, on an unmodified, non-repeating press',
-  },
-  {
-    module: 'packages/app/src/components/SpaceCanvas.tsx',
-    sourceKey: 'Delete',
-    occurrence: 1,
-    key: 'Delete',
-    surface: 'Canvas',
-    behaviour:
-      'remove the focused Resource, else the selected Resource or Edge, through Space Authoring, on an unmodified, non-repeating press',
   },
   {
     module: 'packages/app/src/edge-authoring-react.tsx',
