@@ -8,9 +8,9 @@ A **GitHub location** is `github:owner/repo@ref/path`. `@ref` defaults to the re
 
 1. In the Cloudflare dashboard, **Workers & Pages** > **Create** > **Import a repository**, and choose this repository (or your fork of it). The Worker's name may differ from `wrangler.jsonc`'s `hyper`: Workers Builds deploys under the connected Worker's name.
 2. Under the build settings:
-   - **Build command:** `bash scripts/cloudflare-build.sh`. It checks that Node is `.node-version`'s major at or above it, installs the pnpm `package.json` names in `packageManager`, then runs `pnpm install --frozen-lockfile` and `pnpm build:mount`.
+   - **Build command:** `pnpm build:mount`. Before it, Workers Builds installs the Node that `.node-version` names and the pnpm that `package.json`'s `packageManager` names, then installs the dependencies from `pnpm-lock.yaml` ([Build image](https://developers.cloudflare.com/workers/ci-cd/builds/build-image/)).
    - **Deploy command:** `npx wrangler deploy` (the default). **Preview command:** `npx wrangler preview` (the default); a branch other than the production one deploys as a Preview, from `wrangler.jsonc`'s `previews`.
-   - **Build variables:** `SKIP_DEPENDENCY_INSTALL=1`, so the script's install, with the pinned pnpm, is the only one. Add `VITE_HYPER_DEFAULT_SOURCE` if this deployment has a default talk. Workers Builds installs the Node that `.node-version` names; set `NODE_VERSION` to the same value only if the build log says otherwise.
+   - **Build variables:** `VITE_HYPER_DEFAULT_SOURCE`, if this deployment has a default talk. No other is needed.
 3. Save and deploy. The Worker answers on its `workers.dev` address.
 
 To check a build locally first: `pnpm build:mount`, then `pnpm exec wrangler deploy --dry-run` and `pnpm exec wrangler dev --port 8787`.
