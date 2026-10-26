@@ -803,13 +803,20 @@ export function SpaceCanvas({
    * screen space, where "right" is what the author sees as right.
    */
   const arrowAlongGraph = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const direction = ARROWS.find(([binding]) => pressesBinding(binding, event.nativeEvent))?.[1];
-    if (direction === undefined) return;
+    const press = event.nativeEvent;
+    if (!ARROWS.some(([binding]) => binding.keys.some((key) => key === press.key))) return;
+    // Shift and an arrow, held or not, is React Flow's nudge.
+    if (press.shiftKey && !press.ctrlKey && !press.metaKey && !press.altKey) return;
     const navigation = graphNavigationFrom(event);
     if (navigation === null) return;
-    // Spent whether or not a Resource lies that way: a plain arrow no longer nudges.
-    event.preventDefault();
+    // React Flow nudges on every other arrow press too, ignoring repeats and
+    // modifiers, so each one stops here. A modified arrow keeps the browser's
+    // meaning; a held one is spent without going further.
     event.stopPropagation();
+    if (press.ctrlKey || press.metaKey || press.altKey) return;
+    event.preventDefault();
+    const direction = ARROWS.find(([binding]) => pressesBinding(binding, press))?.[1];
+    if (direction === undefined) return;
     const centreOf = (element: Element) => {
       const box = element.getBoundingClientRect();
       return { x: box.left + box.width / 2, y: box.top + box.height / 2 };

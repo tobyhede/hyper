@@ -103,6 +103,17 @@ test('the arrow keys follow the Active Graph, and Shift and an arrow move the Re
   await page.keyboard.press(opposite[towardB]);
   await expect(a).toBeFocused();
 
+  // Holding the arrow repeats it, and a repeat no more nudges than the first
+  // press did; nor does an arrow with Ctrl or Alt.
+  await page.keyboard.down(opposite[towardB]);
+  await page.keyboard.down(opposite[towardB]);
+  await page.keyboard.down(opposite[towardB]);
+  await page.keyboard.up(opposite[towardB]);
+  await page.keyboard.press(`Control+${opposite[towardB]}`);
+  await page.keyboard.press('Alt+ArrowDown');
+  await expect(a).toBeFocused();
+  expect(await a.boundingBox()).toEqual(aBox);
+
   await page.keyboard.press('Shift+ArrowDown');
   await expect.poll(async () => (await a.boundingBox())?.y).toBeGreaterThan(aBox.y);
 });
