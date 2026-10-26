@@ -11,10 +11,11 @@ import { usePresentingKeys, type TraversalCommands } from '../src/presenting-key
  * running one command while the browser runs another on the same press.
  */
 
-/** The five operations, each a spy — inferred, so a call is still inspectable. */
+/** The operations, each a spy — inferred, so a call is still inspectable. */
 const commands = () => ({
   advance: vi.fn(),
   retreat: vi.fn(),
+  returnToStart: vi.fn(),
   selectBranch: vi.fn(),
   exitPresenting: vi.fn(),
   openNotes: vi.fn(),
@@ -59,6 +60,45 @@ describe('the global Presenting keys', () => {
     expect(traversal.retreat).toHaveBeenCalledTimes(1);
     expect(traversal.selectBranch.mock.calls).toEqual([[-1], [1]]);
     expect(traversal.exitPresenting).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers a presentation clicker: Page Down goes on, Page Up goes back, Home starts again', () => {
+    const traversal = commands();
+    render(<Presenting traversal={traversal} />);
+
+    fireEvent.keyDown(document.body, { key: 'PageDown' });
+    fireEvent.keyDown(document.body, { key: 'PageUp' });
+    const home = fireEvent.keyDown(document.body, { key: 'Home' });
+
+    expect(traversal.advance).toHaveBeenCalledTimes(1);
+    expect(traversal.retreat).toHaveBeenCalledTimes(1);
+    expect(traversal.returnToStart).toHaveBeenCalledTimes(1);
+    // Spent, so the page does not also scroll.
+    expect(home).toBe(false);
+  });
+
+  it('leaves Page Down and Page Up to content that still scrolls that way', () => {
+    const traversal = commands();
+    render(<Presenting traversal={traversal} />);
+    const content = document.createElement('div');
+    content.style.overflowY = 'auto';
+    Object.defineProperty(content, 'scrollHeight', { value: 500 });
+    Object.defineProperty(content, 'clientHeight', { value: 100 });
+    const paragraph = document.createElement('p');
+    content.append(paragraph);
+    document.body.append(content);
+
+    // At the top: Page Down scrolls, and Page Up has nowhere to scroll, so goes back.
+    expect(fireEvent.keyDown(paragraph, { key: 'PageDown' })).toBe(true);
+    fireEvent.keyDown(paragraph, { key: 'PageUp' });
+    // At the end: Page Down goes on, and Page Up scrolls.
+    content.scrollTop = 400;
+    fireEvent.keyDown(paragraph, { key: 'PageDown' });
+    expect(fireEvent.keyDown(paragraph, { key: 'PageUp' })).toBe(true);
+    content.remove();
+
+    expect(traversal.advance).toHaveBeenCalledTimes(1);
+    expect(traversal.retreat).toHaveBeenCalledTimes(1);
   });
 
   it('opens a Notes window on S, and leaves a modified S to the browser, Shift included', () => {

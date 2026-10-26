@@ -57,7 +57,7 @@ interface KeyboardCommand {
  * The commands available right now, in the order the guidance lists them.
  *
  * Only what the presenter can actually do: Up/Down needs something to choose
- * between, Right needs somewhere to go, Left needs somewhere to go back to.
+ * between, Right needs somewhere to go, Left and Home need somewhere to go back to.
  * Escape is unconditional — leaving presentation is always available.
  */
 function availableCommands(
@@ -66,8 +66,11 @@ function availableCommands(
 ): readonly KeyboardCommand[] {
   const commands: KeyboardCommand[] = [];
   if (moves.length > 1) commands.push({ keys: ['↑', '↓'], action: 'choose' });
-  if (moves.length > 0) commands.push({ keys: ['→'], action: 'go' });
-  if (canRetreat) commands.push({ keys: ['←'], action: 'back' });
+  if (moves.length > 0) commands.push({ keys: ['→', 'PgDn'], action: 'go' });
+  if (canRetreat) {
+    commands.push({ keys: ['←', 'PgUp'], action: 'back' });
+    commands.push({ keys: ['Home'], action: 'start' });
+  }
   commands.push({ keys: ['S'], action: 'notes' });
   commands.push({ keys: ['N'], action: 'rehearse' });
   commands.push({ keys: ['Esc'], action: 'overview' });

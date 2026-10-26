@@ -144,19 +144,28 @@ export const FULL_VIEW_KEYS = {
 
 /** The Traversal keys, answered while presenting. */
 export const PRESENTING_KEYS = {
+  // A presentation clicker sends Page Down and Page Up, so they move through
+  // the talk as Right and Left do, once the content they land in has no
+  // further to scroll (`presenting-keys.ts`).
   advance: {
-    keys: ['ArrowRight', ' '],
+    keys: ['ArrowRight', 'PageDown', ' '],
     press: 'any',
     // Space is the focused move's own activation, so the move announces only
-    // the key that is a shortcut of ours.
-    ariaKeyShortcuts: 'ArrowRight',
+    // the keys that are shortcuts of ours.
+    ariaKeyShortcuts: 'ArrowRight PageDown',
     description: 'Go to the chosen next Resource',
   },
   retreat: {
-    keys: ['ArrowLeft'],
+    keys: ['ArrowLeft', 'PageUp'],
     press: 'any',
-    ariaKeyShortcuts: 'ArrowLeft',
+    ariaKeyShortcuts: 'ArrowLeft PageUp',
     description: 'Go back',
+  },
+  returnToStart: {
+    keys: ['Home'],
+    press: 'any',
+    ariaKeyShortcuts: 'Home',
+    description: 'Go back to the start of the Graph',
   },
   previousBranch: {
     keys: ['ArrowUp'],

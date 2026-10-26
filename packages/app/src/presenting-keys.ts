@@ -10,6 +10,8 @@ import {
 export interface TraversalCommands {
   readonly advance: () => void;
   readonly retreat: () => void;
+  /** Present the Graph again from its start Resource, with nothing to go back to. */
+  readonly returnToStart: () => void;
   readonly selectBranch: (delta: number) => void;
   readonly exitPresenting: () => void;
   /** Open a Notes window following this presentation (ADR 0129). */
@@ -19,9 +21,36 @@ export interface TraversalCommands {
 }
 
 /**
+ * Whether Page Down or Page Up pressed here would still scroll the content the
+ * press landed in, which it then keeps: a presenter reading a long Resource
+ * pages through it first, and a clicker, whose focus is on the chrome after a
+ * move, goes straight on. The nearest scrolling ancestor of the press decides,
+ * so a Resource that fits, or one already paged to its end, lets the press move
+ * through the talk.
+ */
+function pageScrollsContent(event: KeyboardEvent): boolean {
+  const down = event.key === 'PageDown';
+  if (!down && event.key !== 'PageUp') return false;
+  for (
+    let element = event.target instanceof Element ? event.target : null;
+    element !== null;
+    element = element.parentElement
+  ) {
+    const { overflowY } = getComputedStyle(element);
+    if (overflowY !== 'auto' && overflowY !== 'scroll') continue;
+    if (element.scrollHeight <= element.clientHeight) continue;
+    return down
+      ? element.scrollTop + element.clientHeight < element.scrollHeight - 1
+      : element.scrollTop > 0;
+  }
+  return false;
+}
+
+/**
  * The global Traversal commands, bound while a traversal is on.
  *
- * Right commits the selected Edge, Left traverses back, Up and Down move the
+ * Right and Page Down commit the selected Edge, Left and Page Up traverse
+ * back, Home starts the Graph again, Up and Down move the
  * selection among a fork's outgoing Edges without traversing — the move a
  * deck framework's per-key redirect cannot express, and the reason there is no
  * framework here. Escape leaves.
@@ -32,12 +61,14 @@ export interface TraversalCommands {
  * a copy of it in a story fixture would prove the copy (ADR 0052).
  */
 export function usePresentingKeys(active: boolean, commands: TraversalCommands): void {
-  const { advance, retreat, selectBranch, exitPresenting, openNotes, toggleNotes } = commands;
+  const { advance, retreat, returnToStart, selectBranch, exitPresenting, openNotes, toggleNotes } =
+    commands;
   useEffect(() => {
     if (!active) return;
     const bound: readonly (readonly [KeyBinding, () => void])[] = [
       [PRESENTING_KEYS.advance, advance],
       [PRESENTING_KEYS.retreat, retreat],
+      [PRESENTING_KEYS.returnToStart, returnToStart],
       [PRESENTING_KEYS.previousBranch, () => selectBranch(-1)],
       [PRESENTING_KEYS.nextBranch, () => selectBranch(1)],
       [PRESENTING_KEYS.exitPresenting, exitPresenting],
@@ -49,7 +80,7 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
       // nothing reaches past a dialog. Arrow and Escape are not native
       // activations of anything here, so they stay global and reach a presenter
       // whose focus is anywhere at all.
-      if (keyBelongsElsewhere(event)) return;
+      if (keyBelongsElsewhere(event) || pageScrollsContent(event)) return;
       const command = bound.find(([binding]) => pressesBinding(binding, event))?.[1];
       if (command === undefined) return;
       event.preventDefault();
@@ -57,5 +88,14 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active, advance, retreat, selectBranch, exitPresenting, openNotes, toggleNotes]);
+  }, [
+    active,
+    advance,
+    retreat,
+    returnToStart,
+    selectBranch,
+    exitPresenting,
+    openNotes,
+    toggleNotes,
+  ]);
 }
