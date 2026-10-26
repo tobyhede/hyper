@@ -1449,11 +1449,16 @@ describe('the cube entry point', () => {
 
   /*
    * pnpm sets `INIT_CWD` and `npm_lifecycle_event` for every script it runs,
-   * and a process an outer script started inherits both. Only the `infinity-cube`
-   * script's own `INIT_CWD` says where the author invoked it.
+   * and a process an outer script started inherits both. Only the `INIT_CWD` of the `cube` or
+   * `infinity-cube` script itself says where the author invoked it.
    */
   it.each([
     { invokedBy: 'the cube script', lifecycleEvent: 'cube', resolvesIn: 'invoked' },
+    {
+      invokedBy: 'the infinity-cube script',
+      lifecycleEvent: 'infinity-cube',
+      resolvesIn: 'invoked',
+    },
     { invokedBy: 'another script', lifecycleEvent: 'test', resolvesIn: 'cwd' },
     { invokedBy: 'no script', lifecycleEvent: '', resolvesIn: 'cwd' },
   ] as const)(

@@ -26,6 +26,7 @@
     "db:migrate": "prisma-next migrate",
     "db:migrate:sqlite": "prisma-next migrate --config prisma-next.config.sqlite.ts",
     "infinity-cube": "exec node --disable-warning=DEP0205 --import tsx src/cli/entry.ts",
+    "cube": "exec node --disable-warning=DEP0205 --import tsx src/cli/entry.ts",
     "postgres:up": "docker compose up -d --wait",
     "postgres:down": "docker compose down",
     "typecheck:toolchain": "tsx scripts/check-typescript-toolchain.ts",
