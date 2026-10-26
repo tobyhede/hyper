@@ -233,12 +233,15 @@ export interface SpaceCanvasProps {
   /**
    * Presenting from a Resource, which `P` asks for: the Active Graph's
    * Resources, which are the only ones it presents from, and the command.
-   * Absent on a canvas nothing presents from.
+   * Absent on a canvas nothing presents from, which includes a hidden Space's
+   * and one already presenting.
    */
-  readonly presentFrom?: {
-    readonly resourceIds: readonly ResourceId[];
-    readonly run: (resourceId: ResourceId) => void;
-  };
+  readonly presentFrom?:
+    | {
+        readonly resourceIds: readonly ResourceId[];
+        readonly run: (resourceId: ResourceId) => void;
+      }
+    | undefined;
 }
 
 const ACROSS_DRAWINGS: CanvasGestureRefusal = { code: 'edge-across-drawings' };

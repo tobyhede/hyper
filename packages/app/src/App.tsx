@@ -179,9 +179,15 @@ export const createApp = (
           : graphResourceIds(space, activeGraphId),
       [space, activeGraphId],
     );
+    // Only the Space on screen presents from its canvas, and not while it is
+    // already presenting: every open Space keeps its canvas mounted, and each
+    // canvas answers `P` from the window.
     const presentFromCanvas = useMemo(
-      () => ({ resourceIds: activeGraphResourceIds, run: presentingWindow.presentFrom }),
-      [activeGraphResourceIds],
+      () =>
+        active && !presenting
+          ? { resourceIds: activeGraphResourceIds, run: presentingWindow.presentFrom }
+          : undefined,
+      [active, presenting, activeGraphResourceIds],
     );
     const resourceRailActions = useResourceRailActions(composition, {
       space,
