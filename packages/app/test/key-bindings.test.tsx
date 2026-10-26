@@ -66,7 +66,7 @@ describe('the binding table', () => {
     ).toBe(false);
   });
 
-  it('takes a held or modified press for a binding that accepts any', () => {
+  it('takes a held or shifted press for a binding that accepts any', () => {
     expect(pressesBinding(PRESENTING_KEYS.advance, press('ArrowRight', { repeat: true }))).toBe(
       true,
     );
@@ -74,6 +74,15 @@ describe('the binding table', () => {
       pressesBinding(PRESENTING_KEYS.exitPresenting, press('Escape', { shiftKey: true })),
     ).toBe(true);
   });
+
+  it.each(['ctrlKey', 'metaKey', 'altKey'] as const)(
+    'leaves every binding alone under %s, so Alt+Left stays Back',
+    (flag) => {
+      for (const [, binding] of ALL_BINDINGS) {
+        expect(pressesBinding(binding, press(binding.keys[0] ?? '', { [flag]: true }))).toBe(false);
+      }
+    },
+  );
 
   it('announces a non-empty shortcut and description for every binding', () => {
     for (const [, binding] of ALL_BINDINGS) {
@@ -86,6 +95,15 @@ describe('the binding table', () => {
 describe('where a press belongs elsewhere', () => {
   it.each([
     ['a text field', '<input data-target />'],
+    ['a search field', '<input type="search" data-target />'],
+    ['a number field', '<input type="number" data-target />'],
+    ['a select', '<select data-target><option>x</option></select>'],
+    ['an editable region named by an empty value', '<p contenteditable="" data-target>x</p>'],
+    ['a plain-text editable region', '<p contenteditable="plaintext-only" data-target>x</p>'],
+    [
+      'a popover, which is a dialog',
+      '<div role="dialog" class="nokey"><button data-target>x</button></div>',
+    ],
     ['a text area', '<textarea data-target></textarea>'],
     ['an editable region', '<div contenteditable="true"><p data-target>x</p></div>'],
     ['a menu', '<div role="menu"><div role="menuitem" data-target>x</div></div>'],
@@ -104,6 +122,27 @@ describe('where a press belongs elsewhere', () => {
     expect(keyBelongsElsewhere(press('Enter', {}, target))).toBe(true);
     expect(keyBelongsElsewhere(press('c', {}, target))).toBe(false);
     expect(keyBelongsElsewhere(press('ArrowRight', {}, target))).toBe(false);
+  });
+
+  it.each([
+    ['a checkbox', '<input type="checkbox" data-target />'],
+    ['a radio', '<input type="radio" data-target />'],
+    ['a range', '<input type="range" data-target />'],
+  ])('leaves %s its own Space and Enter and nothing else', (_name, html) => {
+    const target = mounted(html);
+    expect(keyBelongsElsewhere(press(' ', {}, target))).toBe(true);
+    expect(keyBelongsElsewhere(press('c', {}, target))).toBe(false);
+    expect(keyBelongsElsewhere(press('Escape', {}, target))).toBe(false);
+  });
+
+  it('answers a key inside the Command Dock, which is marked for React Flow alone', () => {
+    const target = mounted('<div class="nokey"><button data-target>Present</button></div>');
+    expect(keyBelongsElsewhere(press('c', {}, target))).toBe(false);
+  });
+
+  it('keeps every key in an editable region switched on, not one switched off', () => {
+    const target = mounted('<div contenteditable="false"><span data-target>x</span></div>');
+    expect(keyBelongsElsewhere(press('c', {}, target))).toBe(false);
   });
 
   it('defers Space to a composed control through its nearest interactive ancestor', () => {
