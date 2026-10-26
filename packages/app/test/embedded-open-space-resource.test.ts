@@ -92,6 +92,8 @@ const openSpaceResource = (
     display: spaceDisplay(geometry.open ?? true, geometry.kind ?? 'space', target),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
+    borderColor: null,
+    receding: false,
   },
 });
 
@@ -348,6 +350,8 @@ describe('embedded open Space Resource discovery', () => {
         display: fixtureDisplay(false, 'markdown'),
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
+        borderColor: null,
+        receding: false,
       },
     };
     const drawn = embeddedMap({
@@ -433,6 +437,8 @@ describe('embedded open Space Resource discovery', () => {
         display: fixtureDisplay(true, 'markdown'),
         activeGraphId: null,
         activeGraphColor: '#8a94a6',
+        borderColor: null,
+        receding: false,
       },
     };
     expect(

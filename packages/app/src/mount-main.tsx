@@ -25,7 +25,7 @@ const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element #root not found');
 const root = createRoot(rootElement);
 
-const configured = import.meta.env.VITE_HYPER_DEFAULT_SOURCE;
+const configured = import.meta.env.VITE_DEFAULT_SPACE_SOURCE;
 const buildDefault = configured === undefined || configured === '' ? undefined : configured;
 const source = resolveMountSource(sourceParameter(window.location.href), buildDefault);
 

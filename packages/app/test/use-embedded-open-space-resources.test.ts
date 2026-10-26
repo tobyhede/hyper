@@ -41,6 +41,8 @@ const spaceResource = (resourceId: typeof HOST, mapId: typeof MAP): ResourceFlow
     display: fixtureDisplay(true, 'space', '', { spaceId: TARGET, map: mapId }),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
+    borderColor: null,
+    receding: false,
   },
 });
 
