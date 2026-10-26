@@ -297,6 +297,8 @@ function props({
     ),
     activeGraphId: graphId,
     activeGraphColor: '#1f77b4',
+    borderColor: null,
+    receding: false,
     readOnly,
   };
   if (onOpenChange !== undefined)

@@ -486,6 +486,47 @@ test('selecting a graph emphasises it without hiding the others', async ({ page 
   await expect(page.locator('.react-flow__edge')).toHaveCount(9);
 });
 
+test('a Resource is drawn in its Graph colour, and recedes off the Active Graph (ADR 0135)', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await selectCanvas(page, 'Collection 1');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(9);
+  const long = await graphLegendLineStroke(page, 'Long');
+  const short = await graphLegendLineStroke(page, 'Short');
+
+  const strength = (title: string) => nodeByTitle(page, title).locator('.canvas-resource__body');
+  const border = (title: string) => nodeByTitle(page, title).getByTestId('resource');
+  // The border is a `color-mix`, which the browser reports as `color(srgb …)`
+  // rather than `rgb(…)`, so both are read as 0–255 channels.
+  const channels = (color: string): number[] => {
+    const srgb = /^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)/.exec(color);
+    if (srgb !== null) return srgb.slice(1).map((c) => Math.round(Number(c) * 255));
+    return (color.match(/\d+/g) ?? []).slice(0, 3).map(Number);
+  };
+  const borderOf = async (title: string) =>
+    channels(await border(title).evaluate((el) => getComputedStyle(el).borderTopColor));
+
+  // Long is active on load and reaches both.
+  await expect.poll(() => borderOf('D')).toEqual(channels(long));
+  await expect(strength('D')).toHaveCSS('opacity', '1');
+
+  // Short reaches B and not D: B takes Short's colour, and D recedes in Long's,
+  // the first Graph it is in.
+  await activateGraph(page, 'Short');
+  await expect.poll(() => borderOf('B')).toEqual(channels(short));
+  await expect(strength('B')).toHaveCSS('opacity', '1');
+  await expect(strength('D')).toHaveCSS('opacity', '0.5');
+  // Its face stays solid, so Edges behind it do not show through.
+  await expect(border('D')).toHaveCSS('opacity', '1');
+  await expect.poll(() => borderOf('D')).not.toEqual(channels(long));
+
+  // A pointer on a receding Resource brings it back to full strength.
+  await border('D').hover();
+  await expect(strength('D')).toHaveCSS('opacity', '1');
+  await expect.poll(() => borderOf('D')).toEqual(channels(long));
+});
+
 test('a resource shows its title in the graph, and opens to show rendered Markdown', async ({
   page,
 }) => {

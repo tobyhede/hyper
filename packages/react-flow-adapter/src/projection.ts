@@ -1,6 +1,6 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
-import { CLOSED_DISPLAY, bareOperations } from '@project/ui';
+import { CLOSED_DISPLAY, FALLBACK_GRAPH_COLOR, bareOperations } from '@project/ui';
 import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
@@ -25,7 +25,7 @@ import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { DETACHED_END_TRIM, graphLanes } from './edge-lanes';
 import { graphHeadMarkerId } from './GraphHeadMarkers';
 
-const FALLBACK_COLOR = '#8a94a6';
+const FALLBACK_COLOR = FALLBACK_GRAPH_COLOR;
 
 /**
  * Opacity of the Graphs that are not the active one, while one is. With no
@@ -184,6 +184,10 @@ type ResourceNodeCommonData = {
   activeGraphId: GraphId | null;
   /** The active Graph's colour, used by graph-independent authoring handles. */
   activeGraphColor: string;
+  /** The colour of the Graph this Resource is drawn in, or `null` for ink (ADR 0135). */
+  borderColor: string | null;
+  /** Whether this Resource recedes because the Active Graph does not reach it (ADR 0135). */
+  receding: boolean;
   /**
    * Whether this Resource leans because a Resource framing it is being dragged.
    *
@@ -221,6 +225,17 @@ export function bareKindData<K extends Resource['kind']>(kind: K): KindDataOf<K>
 
 export type ColorByGraphId = Readonly<Partial<Record<GraphId, string>>>;
 
+/** How a Resource is drawn for the Graphs that reach it (ADR 0135). */
+export interface ResourceEmphasis {
+  /** The colour of the Graph this Resource is drawn in, or `null` for ink. */
+  readonly borderColor: string | null;
+  /** Whether this Resource recedes because the Active Graph does not reach it. */
+  readonly receding: boolean;
+}
+
+/** Ink at full strength: a Resource no Graph reaches, while nothing recedes. */
+export const UNEMPHASISED: ResourceEmphasis = { borderColor: null, receding: false };
+
 /** Each Graph's head shape; a Graph missing here draws as `DEFAULT_GRAPH_HEAD_SHAPE`. */
 export type HeadShapeByGraphId = Readonly<Partial<Record<GraphId, GraphHeadShape>>>;
 
@@ -244,6 +259,8 @@ export interface ProjectResourceNodesOptions {
   openResourceIds?: ReadonlySet<ResourceId>;
   /** The Shape the Map draws each projected Resource in; absent, every one is the rectangle. */
   resourceShape?: (resourceId: ResourceId) => ResourceShape;
+  /** How each projected Resource is drawn for its Graphs; absent, every one is ink at full strength. */
+  resourceEmphasis?: (resourceId: ResourceId) => ResourceEmphasis;
 }
 
 /**
@@ -285,9 +302,10 @@ function declaredHandles(resource: LayoutStrategyResource): NodeHandle[] {
  * Map resources → React Flow resource nodes, each declaring the four anchors an Edge
  * may attach to on every side. The resource id is the React Flow node id.
  *
- * A Resource's anchors are Graph-independent, and the one colour on a Resource
- * is the Active Graph's, which the composition resolves and passes as
- * `activeGraphColor`.
+ * A Resource's anchors are Graph-independent and drawn in the Active Graph's
+ * colour, which the composition resolves and passes as `activeGraphColor`. Its
+ * border is the colour of the Graph it is drawn in, and whether it recedes, both
+ * from `resourceEmphasis` (ADR 0135).
  *
  * A node carries its resource's *title*, not its content (ADR 0064) — a Closed
  * node's display carries none; resolved content supplies only the facts the
@@ -310,6 +328,7 @@ export function projectResourceNodes(
     const open = options.openResourceIds?.has(resource.id) === true;
     const content = resolveResourceContent(space, resource);
     const display: ResourceDisplay = open ? { shown: 'open', content } : CLOSED_DISPLAY;
+    const emphasis = options.resourceEmphasis?.(resource.id) ?? UNEMPHASISED;
     const node: ResourceFlowNode = {
       id: resource.id,
       type: 'resource',
@@ -326,6 +345,8 @@ export function projectResourceNodes(
         shape: options.resourceShape?.(resource.id) ?? DEFAULT_RESOURCE_SHAPE,
         activeGraphId,
         activeGraphColor: options.activeGraphColor ?? FALLBACK_COLOR,
+        borderColor: emphasis.borderColor,
+        receding: emphasis.receding,
       },
       className: 'rf-resource-node',
     };

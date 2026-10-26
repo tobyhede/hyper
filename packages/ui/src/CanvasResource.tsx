@@ -111,7 +111,13 @@ interface CanvasResourceCommonProps {
    */
   readonly contextNotice?: string | null;
   readonly title: string;
+  /** The Active Graph's colour, which the Title's hover and caret treatment draws in. */
   readonly graphColor: string;
+  /**
+   * The colour of the Graph this Resource is drawn in, which its border and its
+   * Shape's outline take (ADR 0135). Absent, both are ink.
+   */
+  readonly borderColor?: string;
   /**
    * Draw this Resource as content only. Authoring callbacks may still be present in
    * an upstream composition, but this boundary does not expose them as title,
@@ -178,6 +184,7 @@ export const CANVAS_RESOURCE_DRAG_TILT_DEGREES = -1;
  */
 type CanvasResourceStyle = CSSProperties & {
   readonly '--canvas-resource-graph': string;
+  readonly '--canvas-resource-border': string;
   readonly '--canvas-resource-drag-tilt': string;
   readonly '--canvas-resource-shape-inset-inline': string;
   readonly '--canvas-resource-shape-inset-block': string;
@@ -358,6 +365,7 @@ export function CanvasResource(props: CanvasResourceProps) {
   const outline = resourceShapeOutline(drawnResourceShape, size);
   const style: CanvasResourceStyle = {
     '--canvas-resource-graph': graphColor,
+    '--canvas-resource-border': props.borderColor ?? 'var(--canvas-resource-ink-color)',
     '--canvas-resource-drag-tilt': `${CANVAS_RESOURCE_DRAG_TILT_DEGREES}deg`,
     // The Shape's inscribed rectangle, as a share of the rect it is drawn at,
     // which `canvas-resource.css` lays the Title and kind glyph out in.

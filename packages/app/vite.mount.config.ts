@@ -11,7 +11,7 @@ import { workspaceAliases } from './workspace-aliases';
  *
  * It is the application's own page composed by the mount entry,
  * `src/mount-main.tsx`, instead of the HTTP entry, so no host stands behind
- * it. `VITE_HYPER_DEFAULT_SOURCE`, read at build time, names the GitHub
+ * it. `VITE_DEFAULT_SPACE_SOURCE`, read at build time, names the GitHub
  * location the page mounts when its address has no `source`.
  */
 

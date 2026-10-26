@@ -116,6 +116,22 @@ body {
   height: 100%;
 }
 
+/* A Resource the Active Graph does not reach recedes, drawn at half strength
+   over a solid face (`canvas-resource.css`), and comes back to full
+   strength while it is hovered, focused, selected, being edited or offered as
+   the end of a connection, so every anchor it shows is drawn whole (ADR 0135).
+   The node wrapper is the keyboard's tab stop, so its focus counts as well as
+   focus inside the Resource. */
+.rf-resource-node:not(:focus)
+  > .rf-resource-node__inner[data-receding='true'][data-connection-seeking='none']:not(
+    :hover,
+    :focus-within,
+    :has(> .canvas-resource:not([data-state='rest'])),
+    :has(.canvas-resource[data-content-editing='true'])
+  ) {
+  --canvas-resource-strength: 0.5;
+}
+
 /* An Open Resource is whatever rect the Map authored, so the node's own
    subtree stops declaring the collapsed constant and fills the box React Flow
    sized from `node.width`/`node.height` (ADR 0064). The declared width stays the
@@ -157,6 +173,13 @@ body {
   }
 
   .rf-resource-node__inner .react-flow__resize-control.rf-resource-node__resize-control {
+    transition: none;
+  }
+
+  .rf-resource-node__inner > .canvas-resource,
+  .rf-resource-node__inner .canvas-resource__body,
+  .rf-resource-node__inner .canvas-resource__rail,
+  .rf-resource-node__inner .canvas-resource__outline-edge {
     transition: none;
   }
 }

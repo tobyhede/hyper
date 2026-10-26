@@ -85,6 +85,8 @@ const projectionNode = (
     display: fixtureDisplay(open, kind),
     activeGraphId: null,
     activeGraphColor: '#8a94a6',
+    borderColor: null,
+    receding: false,
   },
 });
 
