@@ -71,6 +71,38 @@ export const CANVAS_KEYS = {
     ariaKeyShortcuts: 'Shift+Tab',
     description: 'Go to the previous Resource along the Active Graph',
   },
+  navigateLeft: {
+    keys: ['ArrowLeft'],
+    press: 'plain',
+    ariaKeyShortcuts: 'ArrowLeft',
+    description: 'Go to the Resource to the left along the Active Graph',
+  },
+  navigateRight: {
+    keys: ['ArrowRight'],
+    press: 'plain',
+    ariaKeyShortcuts: 'ArrowRight',
+    description: 'Go to the Resource to the right along the Active Graph',
+  },
+  navigateUp: {
+    keys: ['ArrowUp'],
+    press: 'plain',
+    ariaKeyShortcuts: 'ArrowUp',
+    description: 'Go to the Resource above along the Active Graph',
+  },
+  navigateDown: {
+    keys: ['ArrowDown'],
+    press: 'plain',
+    ariaKeyShortcuts: 'ArrowDown',
+    description: 'Go to the Resource below along the Active Graph',
+  },
+  // Performed by React Flow's own node handler, which moves a Shift+arrow four
+  // steps at a time; declared here so the binding is listed with the rest.
+  nudge: {
+    keys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'],
+    press: 'shift',
+    ariaKeyShortcuts: 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown',
+    description: 'Move the selected Resource',
+  },
   removeSelection: {
     keys: ['Delete', 'Backspace'],
     press: 'plain',
