@@ -377,6 +377,19 @@ it.each(['Enter', ' '])('opens a focused Reference Resource with %s', async (key
   expect(opened()).toEqual([REFERENCE_ID]);
 });
 
+it.each(['Enter', ' '])('leaves %s to a `.nokey` region inside a Resource', async (key) => {
+  const { opened } = await mountGraph([resourceNode('A')]);
+  const region = document.createElement('div');
+  region.className = 'nokey';
+  region.tabIndex = 0;
+  nodeOf(RESOURCE_ID).append(region);
+  region.focus();
+
+  fireEvent.keyDown(region, { key });
+
+  expect(opened()).toEqual([]);
+});
+
 /**
  * The render adapter holds no projection before the selected Map's first
  * placement resolves, and drops it when the Map changes or a replacement Space

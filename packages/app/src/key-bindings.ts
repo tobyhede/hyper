@@ -189,29 +189,42 @@ const NATIVE_ACTIVATION_KEYS: readonly string[] = [' ', 'Enter'];
 const EDITABLE = '[contenteditable]:not([contenteditable="false"])';
 
 /**
- * An input whose keys are text entry, or that moves its own value or caret on
- * the arrows; an input with no type is a text field. Every other input type is
- * a control, as a button is: a checkbox, radio or range answers Space or the
- * arrows the browser gives it, and a shortcut pressed while one has focus is
- * still the application's.
+ * An input that owns its keys: every type but the ones that are pressed as a
+ * button is. A browser treats an empty or unrecognised `type` as text, so the
+ * types are named by exclusion rather than inclusion. A checkbox, radio, button
+ * or file input answers only the Space or Enter {@link keyBelongsElsewhere}
+ * already leaves to it, and a range only that and its {@link MOVES_ON_KEYS}, so
+ * a letter pressed while one has focus is still the application's.
  */
-const TEXT_ENTRY = [
-  'input:not([type])',
-  ...[
-    'date',
-    'datetime-local',
-    'email',
-    'month',
-    'number',
-    'password',
-    'search',
-    'tel',
-    'text',
-    'time',
-    'url',
-    'week',
-  ].map((type) => `input[type="${type}" i]`),
-].join(',');
+const OWN_KEYS_INPUT = `input:not(${[
+  'button',
+  'checkbox',
+  'color',
+  'file',
+  'hidden',
+  'image',
+  'radio',
+  'range',
+  'reset',
+  'submit',
+]
+  .map((type) => `[type="${type}" i]`)
+  .join(',')})`;
+
+/** The keys a slider or spin button moves its own value with. */
+const VALUE_KEYS: readonly string[] = [
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+];
+
+/** A control that moves its value on {@link VALUE_KEYS} and owns no letter. */
+const MOVES_ON_KEYS = 'input[type="range" i], [role="slider"], [role="spinbutton"]';
 
 /** What counts as a control that will act on Space or Enter. */
 const INTERACTIVE = [
@@ -231,15 +244,16 @@ const INTERACTIVE = [
 /**
  * The surfaces that own every key pressed inside them.
  *
- * Text entry is where a letter is being typed. A menu and a listbox answer
- * letters with typeahead and arrows with their own movement. A dialog is modal:
- * a listener that went on acting behind it would run a command behind a surface
- * the person is looking at, one Escape both dismissing the dialog and leaving
- * presentation.
+ * Text entry is where a letter is being typed. A menu, a listbox and a
+ * combobox — a Select trigger is one — answer letters with typeahead and arrows
+ * with their own movement. A dialog is modal: a listener that went on acting behind it would run
+ * a command behind a surface the person is looking at, one Escape both
+ * dismissing the dialog and leaving presentation.
  *
- * A button is not here, nor a checkbox or a range. It answers Space and Enter,
- * which {@link keyBelongsElsewhere} leaves to it, so a letter pressed after
- * clicking the Dock is still the application's.
+ * A button is not here, nor a checkbox or a slider. A button answers Space and
+ * Enter and a slider its value keys, which {@link keyBelongsElsewhere} leaves
+ * to them, so a letter pressed after clicking the Dock or the zoom slider is
+ * still the application's.
  *
  * Nor is `.nokey`, although React Flow's own key subscriptions read it. The
  * whole Command Dock and the presenting chrome carry it, so honouring it here
@@ -249,12 +263,13 @@ const INTERACTIVE = [
  * text field.
  */
 export const OWNS_ITS_KEYS = [
-  TEXT_ENTRY,
+  OWN_KEYS_INPUT,
   'textarea',
   'select',
   EDITABLE,
   '[role="menu"]',
   '[role="listbox"]',
+  '[role="combobox"]',
   '[role="dialog"]',
   '[role="alertdialog"]',
 ].join(',');
@@ -263,8 +278,9 @@ export const OWNS_ITS_KEYS = [
  * Whether the element the press landed on keeps it, so no shortcut answers.
  *
  * The one guard every shortcut listener shares: a surface that owns its keys
- * keeps them all, and a focused control keeps the Space or Enter the browser is
- * already going to activate it with. A `keydown` listener sees that press before
+ * keeps them all, a focused control keeps the Space or Enter the browser is
+ * already going to activate it with, and a focused slider keeps the keys that
+ * move it. A `keydown` listener sees that press before
  * the activation; preventing it stops the activation, and not preventing it but
  * acting anyway runs two commands for one press. `closest` rather than a tag
  * test, because the focused control may be a composition — a Button rendering a
@@ -274,5 +290,6 @@ export function keyBelongsElsewhere(event: KeyboardEvent): boolean {
   const target = event.target;
   if (!(target instanceof Element)) return false;
   if (target.closest(OWNS_ITS_KEYS) !== null) return true;
+  if (VALUE_KEYS.includes(event.key) && target.closest(MOVES_ON_KEYS) !== null) return true;
   return NATIVE_ACTIVATION_KEYS.includes(event.key) && target.closest(INTERACTIVE) !== null;
 }
