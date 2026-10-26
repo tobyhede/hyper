@@ -124,7 +124,8 @@ const subscribeToNothing = (): (() => void) => () => undefined;
  * to, as do every Resource's own controls and editors, so a list naming only
  * text entry would let a drop on Zoom in place an image. It is the surfaces that
  * own their keys (`key-bindings.ts`) and every control besides. Keys are
- * guarded by `keyBelongsElsewhere` instead, bar Delete and Backspace.
+ * guarded by `keyBelongsElsewhere` instead, bar Enter, Space, Delete and
+ * Backspace, which are aimed at a Resource itself.
  *
  * **`.nokey` is the first entry and the load-bearing one.** Every portalled and
  * chrome surface in the tree already marks itself with it for React Flow's own
@@ -743,8 +744,11 @@ export function SpaceCanvas({
     if (bodyEditing) return;
     // Load-bearing rather than defensive: an Open Resource draws its editor
     // *inside* the node, so a Space typed into it would otherwise be cancelled
-    // here before the document ever received the character.
-    if (keyBelongsElsewhere(event.nativeEvent) || !(event.target instanceof Element)) return;
+    // here before the document ever received the character. The narrower guard
+    // rather than `keyBelongsElsewhere`, because a node's own `.nokey` regions —
+    // its rendered content, its toolbar — keep their Space and Enter too.
+    if (!(event.target instanceof Element) || event.target.closest(NOT_A_CANVAS_COMMAND) !== null)
+      return;
     const resource = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
     if (resource === null || !event.currentTarget.contains(resource)) return;
     const resourceId = resource.dataset['id'];

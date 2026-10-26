@@ -45,10 +45,12 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
       [PRESENTING_KEYS.toggleNotes, toggleNotes],
     ];
     const onKeyDown = (event: KeyboardEvent) => {
-      // Space and Enter on a focused chrome control are that control's, and
-      // nothing reaches past a dialog. Arrow and Escape are not native
-      // activations of anything here, so they stay global and reach a presenter
-      // whose focus is anywhere at all.
+      // Space and Enter on a focused chrome control are that control's, and a
+      // surface that owns its keys keeps them all: nothing reaches past a
+      // dialog, a menu's arrows and Escape move and close the menu rather than
+      // the Traversal, and a letter typed into a field is text. Anywhere else —
+      // the Stage, a chrome button, the page — the arrows and Escape are the
+      // Traversal's.
       if (keyBelongsElsewhere(event)) return;
       const command = bound.find(([binding]) => pressesBinding(binding, event))?.[1];
       if (command === undefined) return;

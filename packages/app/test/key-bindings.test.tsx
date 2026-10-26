@@ -81,6 +81,12 @@ describe('where a press belongs elsewhere', () => {
     ['a text field', '<input data-target />'],
     ['a search field', '<input type="search" data-target />'],
     ['a number field', '<input type="number" data-target />'],
+    ['a field with an empty type, which is text', '<input type="" data-target />'],
+    ['a field with an unknown type, which is text', '<input type="hue" data-target />'],
+    [
+      'a Select trigger, which types ahead',
+      '<button role="combobox" data-target><span>Kind</span></button>',
+    ],
     ['a select', '<select data-target><option>x</option></select>'],
     ['an editable region named by an empty value', '<p contenteditable="" data-target>x</p>'],
     ['a plain-text editable region', '<p contenteditable="plaintext-only" data-target>x</p>'],
@@ -111,13 +117,28 @@ describe('where a press belongs elsewhere', () => {
   it.each([
     ['a checkbox', '<input type="checkbox" data-target />'],
     ['a radio', '<input type="radio" data-target />'],
-    ['a range', '<input type="range" data-target />'],
+    ['a submit input', '<input type="submit" data-target />'],
   ])('leaves %s its own Space and Enter and nothing else', (_name, html) => {
     const target = mounted(html);
     expect(keyBelongsElsewhere(press(' ', {}, target))).toBe(true);
     expect(keyBelongsElsewhere(press('c', {}, target))).toBe(false);
     expect(keyBelongsElsewhere(press('Escape', {}, target))).toBe(false);
   });
+
+  it.each([
+    ['a range', '<input type="range" data-target />'],
+    ['a slider', '<div role="slider" tabindex="0" data-target></div>'],
+    ['a spin button', '<div role="spinbutton" tabindex="0" data-target></div>'],
+  ])(
+    'leaves %s the keys that move its value, and its letters to the application',
+    (_name, html) => {
+      const target = mounted(html);
+      for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'PageDown'])
+        expect(keyBelongsElsewhere(press(key, {}, target))).toBe(true);
+      expect(keyBelongsElsewhere(press('c', {}, target))).toBe(false);
+      expect(keyBelongsElsewhere(press('Escape', {}, target))).toBe(false);
+    },
+  );
 
   it('answers a key inside the Command Dock, which is marked for React Flow alone', () => {
     const target = mounted('<div class="nokey"><button data-target>Present</button></div>');
