@@ -6,6 +6,18 @@
   --canvas-resource-muted: var(--canvas-resource-muted-color);
   --canvas-resource-error: var(--canvas-resource-error-color);
 
+  /* How strongly this Resource is drawn, from 0 to 1. A Resource the Active
+     Graph does not reach recedes (ADR 0135): its face stays solid, so nothing
+     behind it shows through, while its border, Title, rail and content are drawn
+     at this strength. The border is mixed towards the face rather than made
+     translucent for the same reason. The composition sets it; the Resource
+     draws it. */
+  --canvas-resource-border-drawn: color-mix(
+    in srgb,
+    var(--canvas-resource-border) calc(var(--canvas-resource-strength, 1) * 100%),
+    var(--canvas-resource-face)
+  );
+
   /* The Title ladder (ADR 0083). One size and one leading are authored — the
      `title` role's — and the two
      rungs below it are ratios of that size rather than sizes of their own. A
@@ -66,7 +78,7 @@
   gap: 0;
   padding: 0;
   overflow: hidden;
-  border: var(--canvas-resource-border-width) solid var(--canvas-resource-border);
+  border: var(--canvas-resource-border-width) solid var(--canvas-resource-border-drawn);
   border-radius: var(--canvas-resource-radius);
   background: var(--canvas-resource-face);
   background-clip: padding-box;
@@ -149,6 +161,12 @@
      which `packages/ui/test/canvas-resource-title-ladder.test.ts` computes from this
      number, the rail's and the border's. */
   padding: 8px 12px;
+}
+
+.canvas-resource__body,
+.canvas-resource__rail {
+  opacity: var(--canvas-resource-strength, 1);
+  transition: opacity var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease);
 }
 
 /* The heading box holds the ladder and caps it. Its own type is the `title`
@@ -298,7 +316,7 @@
      paper and a body drawn in the surrounding theme's text colour is the one
      part of an Open Resource that would not look like the Resource. */
   color: var(--canvas-resource-title);
-  opacity: 1;
+  opacity: var(--canvas-resource-strength, 1);
   transition-property: opacity;
   transition-duration: calc(var(--resource-placement-duration, 200ms) * 0.4);
   transition-timing-function: var(--resource-placement-easing, ease);
@@ -467,7 +485,7 @@
   fill: var(--canvas-resource-face);
   /* The Shape's outline is its border, so it takes the Graph's colour; the
      selection ring beneath it stays ink (ADR 0135). */
-  stroke: var(--canvas-resource-border);
+  stroke: var(--canvas-resource-border-drawn);
   stroke-width: var(--canvas-resource-border-width);
   transition:
     fill var(--resource-hover-duration, 120ms) var(--resource-hover-easing, ease),

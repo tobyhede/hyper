@@ -131,7 +131,7 @@ The current statement of these decisions is [`docs/agents/maps-and-graphs.md`](.
 | [0132](0132-a-mounted-talk-keeps-its-edits-in-the-browser.md) | A mounted talk's in-page store is an IndexedDB `SpaceRepository` in `@project/aggregate`, held to the shared contract and scoped by resolved repository, directory and commit; the talk opens as committed until edited, and Discard local edits remounts from GitHub (refines 0130, 0131). |
 | [0133](0133-the-aggregate-reader-pulls-from-a-source.md) | The aggregate reader pulls from a source that lists one directory and reads one file, and decides itself what to list and read, how many reads run at once, and how every refusal is worded, so the CLI and a mount refuse a directory in the same words (refines 0130). |
 | [0134](0134-a-path-hyper-owns-is-never-a-symbolic-link.md) | A source lists a symbolic link as a link, and the reader refuses one at any path Hyper owns, so a directory that imports is one Export can write back; a link Hyper does not own is the author's (refines 0119, 0133). |
-| [0135](0135-a-resource-is-drawn-in-the-colour-of-its-graph.md) | A Resource is drawn in the colour of the Active Graph when that Graph's Edges reach it; otherwise it recedes to half opacity, bordered in the colour of the first Graph it is in, and nothing recedes while the Active Graph has no Edges (refines 0041). |
+| [0135](0135-a-resource-is-drawn-in-the-colour-of-its-graph.md) | A Resource is drawn in the colour of the Active Graph when that Graph's Edges reach it; otherwise it recedes to half strength over a solid face, bordered in the colour of the first Graph it is in, and nothing recedes while the Active Graph has no Edges (refines 0041). |
 
 ## HTTP
 
