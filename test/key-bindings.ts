@@ -14,7 +14,8 @@ export interface KeyBinding {
  * The application's shortcuts are not here: they are declared as data in
  * `packages/app/src/key-bindings.ts` (`CANVAS_KEYS`, `PRESENTING_KEYS`), whose
  * own tests hold each one, and matched by `pressesBinding`. What that module
- * reads directly is its shared guard's deference to a focused control.
+ * reads directly is its shared guard's deference to a focused control: the
+ * Space and Enter that activate it, and the keys that move a slider's value.
  */
 export const KEY_BINDINGS: readonly KeyBinding[] = [
   {
@@ -32,6 +33,70 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     key: 'Enter',
     surface: 'Focused control under any application shortcut',
     behaviour: 'defer to native control activation',
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'ArrowLeft',
+    occurrence: 1,
+    key: 'ArrowLeft',
+    surface: 'Focused slider or spin button under any application shortcut',
+    behaviour: "defer to a focused slider's value movement",
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'ArrowRight',
+    occurrence: 1,
+    key: 'ArrowRight',
+    surface: 'Focused slider or spin button under any application shortcut',
+    behaviour: "defer to a focused slider's value movement",
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'ArrowUp',
+    occurrence: 1,
+    key: 'ArrowUp',
+    surface: 'Focused slider or spin button under any application shortcut',
+    behaviour: "defer to a focused slider's value movement",
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'ArrowDown',
+    occurrence: 1,
+    key: 'ArrowDown',
+    surface: 'Focused slider or spin button under any application shortcut',
+    behaviour: "defer to a focused slider's value movement",
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'Home',
+    occurrence: 1,
+    key: 'Home',
+    surface: 'Focused slider or spin button under any application shortcut',
+    behaviour: "defer to a focused slider's value movement",
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'End',
+    occurrence: 1,
+    key: 'End',
+    surface: 'Focused slider or spin button under any application shortcut',
+    behaviour: "defer to a focused slider's value movement",
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'PageUp',
+    occurrence: 1,
+    key: 'PageUp',
+    surface: 'Focused slider or spin button under any application shortcut',
+    behaviour: "defer to a focused slider's value movement",
+  },
+  {
+    module: 'packages/app/src/key-bindings.ts',
+    sourceKey: 'PageDown',
+    occurrence: 1,
+    key: 'PageDown',
+    surface: 'Focused slider or spin button under any application shortcut',
+    behaviour: "defer to a focused slider's value movement",
   },
   {
     module: 'packages/ui/src/MarkdownSourceEditor.tsx',
