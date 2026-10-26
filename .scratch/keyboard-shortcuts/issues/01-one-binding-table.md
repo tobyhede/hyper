@@ -11,6 +11,8 @@ Status: resolved
 
 `packages/app/src/key-bindings.ts` declares `CANVAS_KEYS` and `PRESENTING_KEYS`, matches presses with `pressesBinding`, and shares one guard, `keyBelongsElsewhere`. `C`, `F2` and every presenting key go through it, while `Enter`/`Space` (Open) and `Delete`/`Backspace` keep `SpaceCanvas`'s narrower guard, which honours `.nokey`; and the presenting chrome takes its `aria-keyshortcuts` from the table. `C` now listens on the window, so it works while a Dock button or the canvas's Zoom out has focus (`packages/app/e2e/keyboard-shortcuts.spec.ts`).
 
+The table is narrower than asked: a binding holds its keys, its press (`plain` or `any`, which is how modifiers are stated), its `aria-keyshortcuts` and its description, and each listener pairs bindings with its own commands (`presenting-keys.ts` keeps that list beside the hook). A command field would make the table import the commands, which live in `SpaceCanvas` and Navigation, and the sheet in ticket 07 needs only the label. Removal on `Delete` and `Backspace` is held by `packages/app/test/edge-authoring-react.test.tsx`.
+
 Two deviations from the spec:
 
 - **Delete and Backspace stay aimed at the canvas.** Removing a Resource from a Map and deleting an Edge cannot be undone, so those keys keep their old guard: never from a control, never from the chrome. Revisit when issue 09 (Undo) lands.
