@@ -20,9 +20,11 @@
  * changes the character and never sets `shiftKey`, so the flag is the only way
  * to tell an announced `C` from Shift+C.
  *
- * `'any'` takes every press, modified or repeated. It is for a key whose command
+ * `'any'` also takes a repeated or shifted press. It is for a key whose command
  * means the same thing however it arrives, such as moving through a
- * presentation by holding an arrow.
+ * presentation by holding an arrow. Ctrl, Meta and Alt still leave it alone:
+ * with them the key is the browser's or the system's — Alt+Left is Back, and
+ * Ctrl+Arrow and Cmd+Arrow move by word or line.
  */
 export type KeyPress = 'plain' | 'any';
 
@@ -119,12 +121,35 @@ function sameKey(bound: string, pressed: string): boolean {
 /** Whether this press is one the binding answers. */
 export function pressesBinding(binding: KeyBinding, event: KeyboardEvent): boolean {
   if (!binding.keys.some((key) => sameKey(key, event.key))) return false;
-  if (binding.press === 'any') return true;
-  return !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  return binding.press === 'any' || (!event.repeat && !event.shiftKey);
 }
 
 /** The keys a focused control acts on by itself, with no listener's help. */
 const NATIVE_ACTIVATION_KEYS: readonly string[] = [' ', 'Enter'];
+
+/** An element whose text is edited in place. `contenteditable=""` is `true`. */
+const EDITABLE = '[contenteditable]:not([contenteditable="false"])';
+
+/**
+ * An input whose keys are text entry, or that moves its own value or caret on
+ * the arrows. Every other input type is a control, as a button is: a checkbox,
+ * radio or range answers Space or the arrows the browser gives it, and a
+ * shortcut pressed while one has focus is still the application's.
+ */
+const TEXT_ENTRY = `input:not(${[
+  'button',
+  'checkbox',
+  'color',
+  'file',
+  'image',
+  'radio',
+  'range',
+  'reset',
+  'submit',
+]
+  .map((type) => `[type="${type}" i]`)
+  .join(',')})`;
 
 /** What counts as a control that will act on Space or Enter. */
 const INTERACTIVE = [
@@ -134,7 +159,7 @@ const INTERACTIVE = [
   'select',
   'summary',
   'textarea',
-  '[contenteditable="true"]',
+  EDITABLE,
   '[role="button"]',
   '[role="link"]',
   '[role="menuitem"]',
@@ -150,15 +175,22 @@ const INTERACTIVE = [
  * the person is looking at, one Escape both dismissing the dialog and leaving
  * presentation.
  *
- * A button is not here. It answers Space and Enter, which
- * {@link keyBelongsElsewhere} leaves to it, and no other key, so a letter
- * pressed after clicking the Dock is still the application's.
+ * A button is not here, nor a checkbox or a range. It answers Space and Enter,
+ * which {@link keyBelongsElsewhere} leaves to it, so a letter pressed after
+ * clicking the Dock is still the application's.
+ *
+ * Nor is `.nokey`, although React Flow's own key subscriptions read it. The
+ * whole Command Dock and the presenting chrome carry it, so honouring it here
+ * would stop `C` after a click on the Dock and the arrows from a focused move.
+ * The portalled surfaces that carry it are covered by what they are: a popover
+ * is a dialog, a swatch panel is in a menu, and a combobox keeps focus in its
+ * text field.
  */
-const OWNS_ITS_KEYS = [
-  'input',
+export const OWNS_ITS_KEYS = [
+  TEXT_ENTRY,
   'textarea',
   'select',
-  '[contenteditable="true"]',
+  EDITABLE,
   '[role="menu"]',
   '[role="listbox"]',
   '[role="dialog"]',

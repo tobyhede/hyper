@@ -34,6 +34,8 @@ function Presenting({
       <button type="button" onClick={() => undefined}>
         Overview
       </button>
+      <input type="checkbox" aria-label="Loop" />
+      <input type="text" aria-label="Find" />
       {/* A surface over the canvas, of the shape the Sidebar Sheet takes
           below its breakpoint. */}
       <div role="dialog" aria-label="Sidebar">
@@ -170,5 +172,36 @@ describe('the global Presenting keys', () => {
 
     expect(traversal.advance).toHaveBeenCalledTimes(1);
     expect(traversal.selectBranch).toHaveBeenCalledWith(1);
+  });
+
+  /**
+   * Only text entry, a select, an editable region, a menu, a listbox or a dialog
+   * owns every key. A checkbox or range keeps its own Space and Enter, as a
+   * button does, and the presenter's arrows and Escape go on working past it.
+   */
+  it('keeps the Traversal commands global on a focused checkbox, and out of a text field', () => {
+    const traversal = commands();
+    render(<Presenting traversal={traversal} />);
+
+    fireEvent.keyDown(screen.getByRole('checkbox', { name: 'Loop' }), { key: 'ArrowLeft' });
+    fireEvent.keyDown(screen.getByRole('checkbox', { name: 'Loop' }), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Find' }), { key: 'ArrowLeft' });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Find' }), { key: 'Escape' });
+
+    expect(traversal.retreat).toHaveBeenCalledTimes(1);
+    expect(traversal.exitPresenting).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves Alt+Left, Ctrl+Right and Cmd+Space to the browser', () => {
+    const traversal = commands();
+    render(<Presenting traversal={traversal} />);
+
+    const back = fireEvent.keyDown(document.body, { key: 'ArrowLeft', altKey: true });
+    fireEvent.keyDown(document.body, { key: 'ArrowRight', ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: ' ', metaKey: true });
+
+    expect(back).toBe(true);
+    expect(traversal.retreat).not.toHaveBeenCalled();
+    expect(traversal.advance).not.toHaveBeenCalled();
   });
 });

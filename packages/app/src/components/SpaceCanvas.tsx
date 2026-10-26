@@ -83,7 +83,7 @@ import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resour
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
-import { CANVAS_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
+import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, pressesBinding } from '../key-bindings';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -122,8 +122,9 @@ const subscribeToNothing = (): (() => void) => () => undefined;
  *
  * The canvas zoom controls render *inside* the wrapper these handlers are bound
  * to, as do every Resource's own controls and editors, so a list naming only
- * text entry would let a drop on Zoom in place an image. Keys are guarded by
- * `keyBelongsElsewhere` (`key-bindings.ts`) instead.
+ * text entry would let a drop on Zoom in place an image. It is the surfaces that
+ * own their keys (`key-bindings.ts`) and every control besides. Keys are
+ * guarded by `keyBelongsElsewhere` instead, bar Delete and Backspace.
  *
  * **`.nokey` is the first entry and the load-bearing one.** Every portalled and
  * chrome surface in the tree already marks itself with it for React Flow's own
@@ -131,8 +132,7 @@ const subscribeToNothing = (): (() => void) => () => undefined;
  * Reading the same marker is what stops this list drifting into a second,
  * hand-maintained copy of an exclusion the components already declare.
  */
-const NOT_A_CANVAS_COMMAND =
-  '.nokey, input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]';
+const NOT_A_CANVAS_COMMAND = `.nokey, input, button, ${OWNS_ITS_KEYS}`;
 
 /**
  * The Resource a key came from, or `null` if it came from anywhere else.
@@ -1132,10 +1132,11 @@ export function SpaceCanvas({
 
   useEffect(() => {
     const deleteSelection = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.removeSelection, event) || keyBelongsElsewhere(event)) return;
-      // Narrower than every other canvas key, deliberately: removal and Edge
-      // deletion cannot be undone, so the key has to be aimed at the canvas
-      // itself, never at a control on it or at the chrome around it.
+      if (!pressesBinding(CANVAS_KEYS.removeSelection, event)) return;
+      // Narrower than every other canvas key, deliberately, so this guard rather
+      // than `keyBelongsElsewhere`: removal and Edge deletion cannot be undone,
+      // so the key has to be aimed at the canvas itself, never at a control on it
+      // or at the chrome around it.
       if (!(event.target instanceof Element)) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       if (canvasRef.current?.contains(event.target) !== true) return;

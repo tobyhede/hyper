@@ -844,16 +844,17 @@ describe('the C shortcut', () => {
    * `visibility: hidden` until it has measured the track, and jsdom measures
    * nothing — so the real control is absent from the accessibility tree here
    * while being an ordinary visible slider in a browser. What is asserted is
-   * the mechanism that excludes it: a range is an `input`, which keeps its keys.
+   * the rule: a range is a control rather than text entry, so it keeps the
+   * Space and Enter the browser gives it and a letter is still the canvas's.
    */
-  it('is a keypress on the zoom slider rather than a command', async () => {
+  it('answers C on the zoom slider, which owns no letter', async () => {
     const { addResource } = await mountGraph();
     const slider = await screen.findByLabelText('Zoom');
     expect(slider).toHaveAttribute('type', 'range');
 
     fireEvent.keyDown(slider, { key: 'c' });
 
-    expect(addResource).not.toHaveBeenCalled();
+    expect(addResource).toHaveBeenCalledTimes(1);
   });
 });
 
