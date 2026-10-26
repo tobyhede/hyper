@@ -44,7 +44,20 @@ test('Tab and Shift+Tab walk the Active Graph from the selected Resource', async
   }
 
   await page.keyboard.press('Shift+Tab');
-  await expect(nodeByTitle(page, 'D').first()).toBeFocused();
+  const d = nodeByTitle(page, 'D').first();
+  await expect(d).toBeFocused();
+
+  // Escape unselects D. A Resource that has focus but no selection, as one
+  // reached by the browser's own Tab order has, leaves Tab to the browser, so
+  // Tab does not go on to A′ and select it.
+  await page.keyboard.press('Escape');
+  await expect(d).not.toHaveClass(/\bselected\b/);
+  await d.focus();
+  await page.keyboard.press('Tab');
+  await expect(d).not.toBeFocused();
+  await expect(nodeByTitle(page, 'A′').first()).not.toHaveClass(/\bselected\b/);
+
+  await selectResource(d);
   await page.keyboard.press('Tab');
   await expect(nodeByTitle(page, 'A′').first()).toBeFocused();
 

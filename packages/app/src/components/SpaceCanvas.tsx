@@ -84,7 +84,7 @@ import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, pressesBinding } from '../key-bindings';
-import { graphNeighbours, neighbourToward, nextTabStop, type TabRun } from '../graph-navigation';
+import { graphNeighbours, stepAlongGraph, neighbourToward } from '../graph-navigation';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -109,9 +109,9 @@ import {
  */
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default':
-    'Press enter or space to open a Resource, tab, shift tab or the arrow keys to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to cancel.',
+    'Press enter or space to open a Resource, tab, shift tab or the arrow keys to go along the Active Graph from a selected Resource, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
   'node.a11yDescription.keyboardDisabled':
-    'Press enter or space to open a Resource, tab, shift tab or the arrow keys to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to cancel.',
+    'Press enter or space to open a Resource, tab, shift tab or the arrow keys to go along the Active Graph from a selected Resource, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
   'edge.a11yDescription.default':
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
@@ -774,26 +774,21 @@ export function SpaceCanvas({
     return { from, focused, edges: edgesOfGraph, elementOf, moveTo };
   };
 
-  // Tab and Shift+Tab walk the Active Graph from the focused Resource. With no
-  // next Resource, or only one this run of presses has already reached, the
-  // key stays the browser's, so the keyboard is never trapped on the canvas, a
-  // cyclic Graph's included.
-  const tabRun = useRef<TabRun<ResourceId> | null>(null);
+  // Tab and Shift+Tab walk the Active Graph from the focused, selected
+  // Resource. With no next Resource, or once Escape (React Flow's own
+  // unselect) has unselected it, the key stays the browser's, so the keyboard
+  // is never trapped on the canvas, a cyclic Graph's included.
   const tabAlongGraph = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
     const forward = pressesBinding(CANVAS_KEYS.navigateForward, event.nativeEvent);
     if (!forward && !pressesBinding(CANVAS_KEYS.navigateBack, event.nativeEvent)) return;
     const navigation = graphNavigationFrom(event);
     if (navigation === null) return;
-    const step = nextTabStop(
-      tabRun.current,
-      navigation.edges,
-      navigation.from,
-      forward ? 'forward' : 'back',
-    );
-    if (step === undefined || navigation.elementOf(step.to) === null) return;
+    const focusedId = navigation.focused.dataset['id'];
+    if (nodes.find((node) => node.id === focusedId)?.selected !== true) return;
+    const to = stepAlongGraph(navigation.edges, navigation.from, forward ? 'forward' : 'back');
+    if (to === undefined || navigation.elementOf(to) === null) return;
     event.preventDefault();
-    tabRun.current = step.run;
-    navigation.moveTo(step.to);
+    navigation.moveTo(to);
   };
 
   const ARROWS = [

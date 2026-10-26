@@ -90,32 +90,3 @@ export function neighbourToward<Id extends string>(
   }
   return best?.id;
 }
-
-/** Where a run of Tab presses in one direction has been, ending at `at`. */
-export interface TabRun<Id extends string = string> {
-  readonly direction: 'forward' | 'back';
-  readonly at: Id;
-  readonly visited: readonly Id[];
-}
-
-/**
- * The next Resource a Tab press takes focus to, and the run that leaves, or
- * `undefined` when the key should be the browser's.
- *
- * A run goes on while each press starts where the last one ended and goes the
- * same way; anything else starts a new one at `from`. A press whose next
- * Resource the run has already visited ends it, so a cyclic Graph lets focus
- * leave the canvas after one lap rather than holding it.
- */
-export function nextTabStop<Id extends string>(
-  run: TabRun<Id> | null,
-  edges: readonly NavigatedEdge<Id>[],
-  from: Id,
-  direction: 'forward' | 'back',
-): { readonly to: Id; readonly run: TabRun<Id> } | undefined {
-  const visited =
-    run !== null && run.at === from && run.direction === direction ? run.visited : [from];
-  const to = stepAlongGraph(edges, from, direction);
-  if (to === undefined || visited.includes(to)) return undefined;
-  return { to, run: { direction, at: to, visited: [...visited, to] } };
-}

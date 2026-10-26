@@ -105,6 +105,15 @@ export const CANVAS_KEYS = {
     ariaKeyShortcuts: 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown',
     description: 'Move the selected Resource',
   },
+  // Performed by React Flow's own node handler, which unselects a focused,
+  // selected Resource on Escape; declared here so the binding is listed with
+  // the rest, as the way Tab stops going along the Active Graph.
+  unselectResource: {
+    keys: ['Escape'],
+    press: 'plain',
+    ariaKeyShortcuts: 'Escape',
+    description: 'Unselect the focused Resource, so Tab moves on from the canvas',
+  },
   removeSelection: {
     keys: ['Delete', 'Backspace'],
     press: 'plain',
