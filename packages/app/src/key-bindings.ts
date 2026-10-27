@@ -20,8 +20,9 @@
  * changes the character and never sets `shiftKey`, so the flag is the only way
  * to tell an announced `C` from Shift+C.
  *
- * `'shift'` is the same single press with Shift held and nothing else, for the
- * reverse of a plain binding on the same key, as Shift+Tab is of Tab.
+ * `'shift'` is the same single press with Shift held and nothing else, for a
+ * second command on a plain binding's key, as Shift and an arrow moves the
+ * Resource the plain arrow walks from.
  *
  * `'any'` also takes a repeated or shifted press. It is for a key whose command
  * means the same thing however it arrives, such as moving through a
@@ -61,18 +62,6 @@ export const CANVAS_KEYS = {
     ariaKeyShortcuts: 'F2',
     description: 'Rename the selected Resource',
   },
-  navigateForward: {
-    keys: ['Tab'],
-    press: 'plain',
-    ariaKeyShortcuts: 'Tab',
-    description: 'Go to the next Resource along the Active Graph',
-  },
-  navigateBack: {
-    keys: ['Tab'],
-    press: 'shift',
-    ariaKeyShortcuts: 'Shift+Tab',
-    description: 'Go to the previous Resource along the Active Graph',
-  },
   navigateLeft: {
     keys: ['ArrowLeft'],
     press: 'plain',
@@ -107,12 +96,13 @@ export const CANVAS_KEYS = {
   },
   // Performed by React Flow's own node handler, which unselects a focused,
   // selected Resource on Escape; declared here so the binding is listed with
-  // the rest, as the way Tab stops going along the Active Graph.
+  // the rest, as the way the arrow keys stop going along the Active Graph.
   unselectResource: {
     keys: ['Escape'],
     press: 'plain',
     ariaKeyShortcuts: 'Escape',
-    description: 'Unselect the focused Resource, so Tab moves on from the canvas',
+    description:
+      'Unselect the focused Resource, so the arrow keys stop going along the Active Graph',
   },
   removeSelection: {
     keys: ['Delete', 'Backspace'],

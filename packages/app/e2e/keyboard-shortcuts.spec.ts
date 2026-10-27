@@ -24,49 +24,6 @@ test('C adds a Resource while a Dock control has focus', async ({ page }) => {
   await expect(resources).toHaveCount(before + 2);
 });
 
-/**
- * Tab walks the Active Graph — Long, A → B → C → D → A′ — from the focused
- * Resource, Shift+Tab walks it back, and past its end Tab is the browser's again.
- */
-test('Tab and Shift+Tab walk the Active Graph from the selected Resource', async ({ page }) => {
-  await page.goto('/');
-  const a = nodeByTitle(page, 'A').first();
-  await expect(a).toBeVisible();
-  await settled(page);
-  await selectResource(a);
-  await expect(a).toBeFocused();
-
-  for (const title of ['B', 'C', 'D', 'A′']) {
-    await page.keyboard.press('Tab');
-    const next = nodeByTitle(page, title).first();
-    await expect(next).toBeFocused();
-    await expect(next).toHaveClass(/\bselected\b/);
-  }
-
-  await page.keyboard.press('Shift+Tab');
-  const d = nodeByTitle(page, 'D').first();
-  await expect(d).toBeFocused();
-
-  // Escape unselects D. A Resource that has focus but no selection, as one
-  // reached by the browser's own Tab order has, leaves Tab to the browser, so
-  // Tab does not go on to A′ and select it.
-  await page.keyboard.press('Escape');
-  await expect(d).not.toHaveClass(/\bselected\b/);
-  await d.focus();
-  await page.keyboard.press('Tab');
-  await expect(d).not.toBeFocused();
-  await expect(nodeByTitle(page, 'A′').first()).not.toHaveClass(/\bselected\b/);
-
-  await selectResource(d);
-  await page.keyboard.press('Tab');
-  await expect(nodeByTitle(page, 'A′').first()).toBeFocused();
-
-  // A′ is where Long ends: the next Tab moves focus on as the page would.
-  await page.keyboard.press('Tab');
-  await expect(nodeByTitle(page, 'A′').first()).not.toBeFocused();
-});
-
-/** Which arrow points from one box's centre toward another's, on the dominant axis. */
 const arrowToward = (
   from: { x: number; y: number; width: number; height: number },
   to: { x: number; y: number; width: number; height: number },
@@ -85,8 +42,9 @@ const opposite = {
 } as const;
 
 /**
- * A plain arrow follows the Active Graph's Edge that way, either direction, and
- * no longer moves the Resource; Shift and an arrow does.
+ * From a selected Resource, a plain arrow follows the Active Graph's Edge that
+ * way, either direction, and no longer moves the Resource; Shift and an arrow
+ * does.
  */
 test('the arrow keys follow the Active Graph, and Shift and an arrow move the Resource', async ({
   page,
@@ -116,16 +74,22 @@ test('the arrow keys follow the Active Graph, and Shift and an arrow move the Re
   await page.keyboard.press(opposite[towardB]);
   await expect(a).toBeFocused();
 
-  // Holding the arrow repeats it, and a repeat no more nudges than the first
-  // press did; nor does an arrow with Ctrl or Alt.
-  await page.keyboard.down(opposite[towardB]);
-  await page.keyboard.down(opposite[towardB]);
-  await page.keyboard.down(opposite[towardB]);
-  await page.keyboard.up(opposite[towardB]);
-  await page.keyboard.press(`Control+${opposite[towardB]}`);
-  await page.keyboard.press('Alt+ArrowDown');
+  // A held arrow's repeats are spent: toward B, where the first press would
+  // go, a repeat neither walks nor nudges, and nor does the arrow with Ctrl.
+  await a.dispatchEvent('keydown', { key: towardB, repeat: true, bubbles: true });
+  await page.keyboard.press(`Control+${towardB}`);
   await expect(a).toBeFocused();
   expect(await a.boundingBox()).toEqual(aBox);
+
+  // Only from a selected Resource: A focused once Escape has unselected it, as
+  // the browser's Tab would leave it, keeps the arrow toward B to itself.
+  await page.keyboard.press('Escape');
+  await expect(a).not.toHaveClass(/\bselected\b/);
+  await a.focus();
+  await page.keyboard.press(towardB);
+  await expect(a).toBeFocused();
+  await expect(b).not.toHaveClass(/\bselected\b/);
+  await selectResource(a);
 
   await page.keyboard.press('Shift+ArrowDown');
   await expect.poll(async () => (await a.boundingBox())?.y).toBeGreaterThan(aBox.y);

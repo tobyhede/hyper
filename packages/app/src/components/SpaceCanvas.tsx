@@ -84,7 +84,7 @@ import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, pressesBinding } from '../key-bindings';
-import { graphNeighbours, stepAlongGraph, neighbourToward } from '../graph-navigation';
+import { graphNeighbours, neighbourToward } from '../graph-navigation';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -107,11 +107,12 @@ import {
  * `disableKeyboardA11y`, and the one it names `keyboardDisabled` is the one an
  * ordinary keyboard-enabled graph gets.
  */
+const RESOURCE_KEYS_DESCRIPTION =
+  'Press enter or space to open a Resource, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
+
 const ARIA_LABEL_CONFIG = {
-  'node.a11yDescription.default':
-    'Press enter or space to open a Resource, the arrow keys, or tab and shift tab from a selected Resource, to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
-  'node.a11yDescription.keyboardDisabled':
-    'Press enter or space to open a Resource, the arrow keys, or tab and shift tab from a selected Resource, to go along the Active Graph, shift and the arrow keys to move it, backspace or delete to remove it from this Map, and escape to unselect it.',
+  'node.a11yDescription.default': RESOURCE_KEYS_DESCRIPTION,
+  'node.a11yDescription.keyboardDisabled': RESOURCE_KEYS_DESCRIPTION,
   'edge.a11yDescription.default':
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
@@ -775,23 +776,6 @@ export function SpaceCanvas({
     return { from, focused, edges: edgesOfGraph, elementOf, moveTo };
   };
 
-  // Tab and Shift+Tab walk the Active Graph from the focused, selected
-  // Resource. With no next Resource, or once Escape (React Flow's own
-  // unselect) has unselected it, the key stays the browser's, so the keyboard
-  // is never trapped on the canvas, a cyclic Graph's included.
-  const tabAlongGraph = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
-    const forward = pressesBinding(CANVAS_KEYS.navigateForward, event.nativeEvent);
-    if (!forward && !pressesBinding(CANVAS_KEYS.navigateBack, event.nativeEvent)) return;
-    const navigation = graphNavigationFrom(event);
-    if (navigation === null) return;
-    const focusedId = navigation.focused.dataset['id'];
-    if (nodes.find((node) => node.id === focusedId)?.selected !== true) return;
-    const to = stepAlongGraph(navigation.edges, navigation.from, forward ? 'forward' : 'back');
-    if (to === undefined || navigation.elementOf(to) === null) return;
-    event.preventDefault();
-    navigation.moveTo(to);
-  };
-
   const ARROWS = [
     [CANVAS_KEYS.navigateLeft, 'left'],
     [CANVAS_KEYS.navigateRight, 'right'],
@@ -800,8 +784,8 @@ export function SpaceCanvas({
   ] as const;
 
   /**
-   * A plain arrow follows the Active Graph's Edge that way instead of nudging
-   * the Resource, which moves to Shift+arrow. Answered in the capture phase,
+   * From a selected Resource, a plain arrow follows the Active Graph's Edge
+   * that way instead of nudging the Resource, which moves to Shift+arrow. Answered in the capture phase,
    * because React Flow's own node handler nudges on the way back up and would
    * otherwise see the press first. Positions are read from the drawn nodes, in
    * screen space, where "right" is what the author sees as right.
@@ -813,6 +797,11 @@ export function SpaceCanvas({
     if (press.shiftKey && !press.ctrlKey && !press.metaKey && !press.altKey) return;
     const navigation = graphNavigationFrom(event);
     if (navigation === null) return;
+    // Only from a selected Resource. A Resource focused but not selected, as
+    // the browser's Tab or Escape leaves it, has nothing React Flow would
+    // nudge, so the arrow is left alone.
+    const focusedId = navigation.focused.dataset['id'];
+    if (nodes.find((node) => node.id === focusedId)?.selected !== true) return;
     // React Flow nudges on every other arrow press too, ignoring repeats and
     // modifiers, so each one stops here. A modified arrow keeps the browser's
     // meaning; a held one is spent without going further.
@@ -833,8 +822,6 @@ export function SpaceCanvas({
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    tabAlongGraph(event);
-    if (event.defaultPrevented) return;
     if (!pressesBinding(CANVAS_KEYS.openResource, event.nativeEvent)) return;
     if (bodyEditing) return;
     // Load-bearing rather than defensive: an Open Resource draws its editor

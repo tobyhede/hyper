@@ -10,12 +10,11 @@ The canvas's keys can't be discovered and don't hang together. `C` adds a Resour
 
 Every shortcut is declared in one binding table. The handlers, `aria-keyshortcuts`, the Dock's tooltips, a `?` sheet and the tests all read that table. Canvas keys answer wherever focus is, except in a text control, a menu or a dialog.
 
-From a selected Resource:
+From a selected Resource (`Tab` stays the browser's: ticket 02 is not built):
 
 | Key | Action |
 |---|---|
-| `Tab` / `Shift+Tab` | Go along the **Active Graph** forward (first outgoing Edge) or back (incoming Edge). With no next Resource along the Active Graph, Tab is the browser's and leaves the canvas. |
-| Arrow keys | Move to the Active Graph neighbour, by an Edge in either direction, that lies in that direction; the one nearest the pressed axis wins. Nothing that way does nothing. At a fork the arrow picks the branch. |
+| Arrow keys | Move the selection to the Active Graph neighbour, by an Edge in either direction, that lies in that direction; the one nearest the pressed axis wins. Nothing that way does nothing. At a fork the arrow picks the branch. |
 | `Shift`+arrow | Nudge the Resource's position (React Flow's plain-arrow behaviour, moved). |
 | `Enter` | Open, unchanged. |
 | `Shift+Enter` | **Open and expand**: one Edit that Opens and Resizes the Resource to fit its content, capped at the visible canvas area at the current zoom, displacing as a Resize does. The camera then frames it. Refines ADR 0122 (needs its own ADR). |
