@@ -28,6 +28,8 @@ import { canvasElement } from './canvas-element';
 import type { FocusFallback } from './delete-confirmation';
 import { isOpenIndependently, type SpaceEntity } from './entity-actions';
 import type { OpenSpaces } from './open-spaces';
+import { CANVAS_KEYS } from './key-bindings';
+import { shortcutOf } from './shortcut-sheet';
 
 /** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
 export const referenceTerminal = (kind: KindId): string =>
@@ -149,6 +151,7 @@ export function resourceRailGroups(
             id: 'open-and-expand',
             label: 'Open and Expand',
             icon: <OpenAndExpandIcon />,
+            shortcut: shortcutOf(CANVAS_KEYS.openAndExpand),
             onSelect: (): EntityActionOutcome => {
               openAndExpand();
               return 'done';
@@ -162,6 +165,7 @@ export function resourceRailGroups(
             id: 'full-view',
             label: 'Read in Full View',
             icon: <FullViewIcon />,
+            shortcut: shortcutOf(CANVAS_KEYS.showFullView),
             onSelect: (): EntityActionOutcome => {
               fullView();
               return 'done';
@@ -175,6 +179,7 @@ export function resourceRailGroups(
             id: 'present-from-here',
             label: 'Present from Here',
             icon: <PresentIcon color="currentColor" />,
+            shortcut: shortcutOf(CANVAS_KEYS.presentFromHere),
             disabled: !present.available || !present.onActiveGraph,
             description: !present.onActiveGraph
               ? PRESENT_OFF_GRAPH
@@ -196,6 +201,7 @@ export function resourceRailGroups(
             id: 'remove-from-map',
             label: 'Remove from Map',
             icon: <RemoveFromMapIcon />,
+            shortcut: shortcutOf(CANVAS_KEYS.removeSelection),
             onSelect: (): EntityActionOutcome => {
               removeFromMap();
               return 'done';

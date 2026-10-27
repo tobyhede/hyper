@@ -981,4 +981,18 @@ export const parityClaims: readonly ParityClaim[] = [
     claim:
       'A mounted page asking for its GitHub location refuses one that does not read, beside the field with the parser’s reason and the field marked invalid, keeping what was typed; a location that reads clears the refusal and opens.',
   },
+  {
+    id: 'shortcut-sheet-lists-the-authoring-keys',
+    storyFile: 'components/keyboard-shortcuts.stories.tsx',
+    storyExport: 'Authoring',
+    claim:
+      '`?` while authoring opens the keyboard shortcuts sheet listing the canvas’s keys and Full View’s from the binding table, each with its keys, and Escape closes it.',
+  },
+  {
+    id: 'shortcut-sheet-lists-the-presenting-keys',
+    storyFile: 'components/keyboard-shortcuts.stories.tsx',
+    storyExport: 'Presenting',
+    claim:
+      '`?` while presenting opens the keyboard shortcuts sheet listing the keys a presentation answers, and Escape closes the sheet alone.',
+  },
 ] as const;

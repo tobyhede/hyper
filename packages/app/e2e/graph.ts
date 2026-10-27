@@ -859,6 +859,16 @@ export async function expectMenuGroups(
       await expect(locator).toHaveAttribute('role', 'separator');
       continue;
     }
-    await expect(locator).toHaveText(row);
+    // A command's key is drawn at its end and hidden from its name, so the
+    // row is read without what is hidden.
+    const shown = () =>
+      locator.evaluate((item) => {
+        const copy = item.cloneNode(true);
+        if (!(copy instanceof Element)) return '';
+        for (const hidden of copy.querySelectorAll('[aria-hidden="true"]')) hidden.remove();
+        return copy.textContent.replace(/\s+/g, ' ').trim();
+      });
+    if (row instanceof RegExp) await expect.poll(shown).toMatch(row);
+    else await expect.poll(shown).toBe(row);
   }
 }

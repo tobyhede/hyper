@@ -38,6 +38,7 @@ import { CommandDock } from './components/CommandDock';
 import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingStage } from './components/PresentingStage';
+import { ShortcutSheet } from './components/ShortcutSheet';
 import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/ShellNotice';
 
 export const createApp = (
@@ -428,6 +429,7 @@ export const createApp = (
               }}
             />
           )}
+          <ShortcutSheet active={active} presenting={presenting} />
         </div>
       </AppShell>
     );
