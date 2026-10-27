@@ -166,7 +166,7 @@ export const PRESENTING_KEYS = {
     keys: ['Home'],
     press: 'any',
     ariaKeyShortcuts: 'Home',
-    description: 'Go back to the start of the Graph',
+    description: 'Go back to where the presentation began',
   },
   previousBranch: {
     keys: ['ArrowUp'],

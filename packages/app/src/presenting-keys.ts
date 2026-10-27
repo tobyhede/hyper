@@ -10,7 +10,7 @@ import {
 export interface TraversalCommands {
   readonly advance: () => void;
   readonly retreat: () => void;
-  /** Present the Graph again from its start Resource, with nothing to go back to. */
+  /** Go back to where this presentation began. */
   readonly returnToStart: () => void;
   readonly selectBranch: (delta: number) => void;
   readonly exitPresenting: () => void;
@@ -21,27 +21,31 @@ export interface TraversalCommands {
 }
 
 /**
- * Whether Page Down or Page Up pressed here would still scroll the content the
- * press landed in, which it then keeps: a presenter reading a long Resource
- * pages through it first, and a clicker, whose focus is on the chrome after a
- * move, goes straight on. The nearest scrolling ancestor of the press decides,
- * so a Resource that fits, or one already paged to its end, lets the press move
- * through the talk.
+ * Whether Page Down, Page Up or Home pressed here would still scroll the content
+ * the press landed in, which it then keeps: a presenter reading a long Resource
+ * with focus in it pages through it first. A clicker, whose focus is on the
+ * chrome after a move, is outside the content and goes straight on. Each
+ * scrolling ancestor of the press is asked in turn, nearest first, so a code
+ * block paged to its end leaves the press to the Resource around it, and only
+ * when none has further to scroll does the press move through the talk.
  */
-function pageScrollsContent(event: KeyboardEvent): boolean {
+function keyScrollsContent(event: KeyboardEvent): boolean {
   const down = event.key === 'PageDown';
-  if (!down && event.key !== 'PageUp') return false;
+  if (!down && event.key !== 'PageUp' && event.key !== 'Home') return false;
   for (
     let element = event.target instanceof Element ? event.target : null;
     element !== null;
     element = element.parentElement
   ) {
+    if (element.scrollHeight <= element.clientHeight) continue;
     const { overflowY } = getComputedStyle(element);
     if (overflowY !== 'auto' && overflowY !== 'scroll') continue;
-    if (element.scrollHeight <= element.clientHeight) continue;
-    return down
-      ? element.scrollTop + element.clientHeight < element.scrollHeight - 1
-      : element.scrollTop > 0;
+    if (
+      down
+        ? element.scrollTop + element.clientHeight < element.scrollHeight - 1
+        : element.scrollTop > 0
+    )
+      return true;
   }
   return false;
 }
@@ -50,7 +54,7 @@ function pageScrollsContent(event: KeyboardEvent): boolean {
  * The global Traversal commands, bound while a traversal is on.
  *
  * Right and Page Down commit the selected Edge, Left and Page Up traverse
- * back, Home starts the Graph again, Up and Down move the
+ * back, Home goes back to where the presentation began, Up and Down move the
  * selection among a fork's outgoing Edges without traversing — the move a
  * deck framework's per-key redirect cannot express, and the reason there is no
  * framework here. Escape leaves.
@@ -82,7 +86,7 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
       // the Traversal, and a letter typed into a field is text. Anywhere else —
       // the Stage, a chrome button, the page — the arrows and Escape are the
       // Traversal's.
-      if (keyBelongsElsewhere(event) || pageScrollsContent(event)) return;
+      if (keyBelongsElsewhere(event) || keyScrollsContent(event)) return;
       const command = bound.find(([binding]) => pressesBinding(binding, event))?.[1];
       if (command === undefined) return;
       event.preventDefault();

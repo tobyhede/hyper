@@ -168,10 +168,9 @@ export function createPresentingWindow({
   const commands: TraversalCommands = {
     advance: navigation.advance,
     retreat: navigation.retreat,
-    // Navigation's own Present, which starts the Graph again inside the same
-    // presentation: the scope is unchanged, so nothing new is followed, and
-    // fullscreen is already whatever it is.
-    returnToStart: navigation.present,
+    // Back to where this presentation began, not a restart: the presentation,
+    // its clock and its rehearsal notes go on, as they do on Back.
+    returnToStart: navigation.returnToStart,
     selectBranch: navigation.selectBranch,
     exitPresenting: navigation.exitPresenting,
     openNotes,

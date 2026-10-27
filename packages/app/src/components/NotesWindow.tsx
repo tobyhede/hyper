@@ -131,7 +131,7 @@ function Presenting({ view, onAdvance, onRetreat, onSelectBranch }: PresentingPr
           ) : null}
           <span className="notes-window__quiet">
             <Kbd>↑</Kbd> <Kbd>↓</Kbd> choose, <Kbd>→</Kbd> <Kbd>PgDn</Kbd> go, <Kbd>←</Kbd>{' '}
-            <Kbd>PgUp</Kbd> back
+            <Kbd>PgUp</Kbd> back, <Kbd>Home</Kbd> start
           </span>
         </div>
       </section>

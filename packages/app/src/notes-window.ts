@@ -117,6 +117,7 @@ export interface NotesWindow {
   readonly subscribe: (listener: () => void) => () => void;
   readonly advance: () => void;
   readonly retreat: () => void;
+  readonly returnToStart: () => void;
   readonly selectBranch: (delta: number) => void;
   /** Follow until the returned function is called. */
   readonly connect: () => () => void;
@@ -214,6 +215,7 @@ export function createNotesWindow({
     subscribe: observable.subscribe,
     advance: () => follower?.advance(),
     retreat: () => follower?.retreat(),
+    returnToStart: () => follower?.returnToStart(),
     selectBranch: (delta) => follower?.selectBranch(delta),
     connect: () => {
       const channel = links.open(spaceId);

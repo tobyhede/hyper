@@ -188,7 +188,7 @@ test('Space reads a Resource in Full View, walks the Active Graph and leaves', a
   await expect(b.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
 });
 
-/** A presentation clicker sends Page Down and Page Up; Home starts the Graph again. */
+/** A presentation clicker sends Page Down and Page Up; Home goes back to where the presentation began. */
 test('Page Down, Page Up and Home move through a presentation', async ({ page }) => {
   await page.goto('/');
   const a = nodeByTitle(page, 'A').first();

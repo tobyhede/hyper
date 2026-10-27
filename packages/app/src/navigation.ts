@@ -177,6 +177,12 @@ export interface Navigation {
   readonly exitPresenting: () => void;
   readonly advance: () => void;
   readonly retreat: () => void;
+  /**
+   * Go back to the first Resource of Traversal history, where this presentation
+   * began, with the Edge first taken from it selected. Does nothing with
+   * nothing to go back to.
+   */
+  readonly returnToStart: () => void;
   readonly selectBranch: (delta: number) => void;
   readonly activeResourceId: () => ResourceId | null;
   readonly moves: () => readonly Move[];
@@ -556,6 +562,20 @@ export function createNavigation(
         currentResource(back),
       ).findIndex((edge) => edge.to === to);
       observable.publish({ ...state, traversalHistory: back, branchIndex: taken < 0 ? 0 : taken });
+    },
+    returnToStart: () => {
+      const state = observable.getState();
+      if (state.mode !== 'presenting') return;
+      const [first, second] = state.traversalHistory;
+      if (second === undefined) return;
+      const taken = outgoingEdgesFrom(currentSpace(), state.activeGraphId, first).findIndex(
+        (edge) => edge.to === second,
+      );
+      observable.publish({
+        ...state,
+        traversalHistory: [first],
+        branchIndex: taken < 0 ? 0 : taken,
+      });
     },
     selectBranch: (delta) => {
       const state = observable.getState();

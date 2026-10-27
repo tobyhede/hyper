@@ -46,13 +46,12 @@ export function NotesWindowApplication({ notes, now }: NotesWindowApplicationPro
     reset !== null && reset.presentationId === presentationId ? reset.at : (startedAt ?? time);
 
   // Leaving presenting belongs to the presenting window, and this is already
-  // a Notes window: Escape, S and N do nothing here. Neither does Home, which
-  // the window's channel carries no command for.
+  // a Notes window: Escape, S and N do nothing here.
   const nothing = useCallback(() => undefined, []);
   usePresentingKeys(presenting, {
     advance: notes.advance,
     retreat: notes.retreat,
-    returnToStart: nothing,
+    returnToStart: notes.returnToStart,
     selectBranch: notes.selectBranch,
     exitPresenting: nothing,
     openNotes: nothing,

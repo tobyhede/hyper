@@ -70,6 +70,12 @@ describe('the browser presentation channel', () => {
       version: 1,
       kind: 'command',
       presentationId: uuid(1),
+      command: { kind: 'return-to-start' },
+    },
+    {
+      version: 1,
+      kind: 'command',
+      presentationId: uuid(1),
       command: { kind: 'select-branch', delta: -1 },
     },
   ])('hears a message this build can read: $kind', (message) => {

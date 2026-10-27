@@ -316,6 +316,24 @@ describe('the presenting window', () => {
     expect(navigation.activeResourceId()).toBe(OPENING);
   });
 
+  it('goes back on Home to where this presentation began, still the same presentation', () => {
+    const { navigation, window, at } = presentingWindow(
+      mintingIds(FIRST_PRESENTATION, SECOND_PRESENTATION),
+    );
+    window.presentFrom(MIDDLE);
+    window.commands.advance();
+    window.commands.toggleNotes();
+
+    at(2_000);
+    window.commands.returnToStart();
+
+    expect(navigation.activeResourceId()).toBe(MIDDLE);
+    expect(window.getState()).toEqual({
+      presentation: { id: FIRST_PRESENTATION, startedAt: 1_000 },
+      rehearsalNotesShown: true,
+    });
+  });
+
   it('publishes its own presentation to a Notes window', () => {
     const join = channelHub();
     const links: PresentationLinks = {

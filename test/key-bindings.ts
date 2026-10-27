@@ -115,6 +115,14 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'defer to scrolling up until the content starts',
   },
   {
+    module: 'packages/app/src/presenting-keys.ts',
+    sourceKey: 'Home',
+    occurrence: 1,
+    key: 'Home',
+    surface: 'Presenting, with focus in content that scrolls',
+    behaviour: 'defer to scrolling to the top until the content starts',
+  },
+  {
     module: 'packages/ui/src/MarkdownSourceEditor.tsx',
     sourceKey: 'Escape',
     occurrence: 1,

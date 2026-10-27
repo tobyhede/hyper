@@ -53,6 +53,7 @@ const isCommand = (value: unknown): value is PresentationCommand =>
   'kind' in value &&
   (value.kind === 'advance' ||
     value.kind === 'retreat' ||
+    value.kind === 'return-to-start' ||
     (value.kind === 'select-branch' && 'delta' in value && isDelta(value.delta)));
 
 const isMove = (value: unknown): value is PresentedMove =>
