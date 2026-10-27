@@ -94,6 +94,12 @@ export const CANVAS_KEYS = {
     ariaKeyShortcuts: 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown',
     description: 'Move the selected Resource',
   },
+  presentFromHere: {
+    keys: ['p'],
+    press: 'plain',
+    ariaKeyShortcuts: 'P',
+    description: 'Present the Active Graph from the selected Resource',
+  },
   // Performed by React Flow's own node handler, which unselects a focused,
   // selected Resource on Escape; declared here so the binding is listed with
   // the rest, as the way the arrow keys stop going along the Active Graph.

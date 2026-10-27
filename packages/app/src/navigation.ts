@@ -168,6 +168,12 @@ export interface Navigation {
   readonly openPresentation: (selection: MapId, graphId: GraphId, resourceId: ResourceId) => void;
   readonly activateGraph: (graphId: GraphId) => void;
   readonly present: () => void;
+  /**
+   * Present the Active Graph from one of its Resources, with fresh Traversal
+   * history. Does nothing when no Graph is active or the Active Graph does not
+   * hold the Resource.
+   */
+  readonly presentFrom: (resourceId: ResourceId) => void;
   readonly exitPresenting: () => void;
   readonly advance: () => void;
   readonly retreat: () => void;
@@ -259,6 +265,23 @@ function openedState(selection: MapId, resolved: ResolvedMap): NavigationState {
     mode: 'overview',
     activeGraphId: openingGraphId(resolved),
   };
+}
+
+/**
+ * Whether presenting may start from a Resource: a Graph is active and holds it.
+ * The one membership rule, which `Navigation.presentFrom` and every gesture
+ * offering Present from Here ask.
+ */
+export function presentsFrom(
+  space: Space,
+  activeGraphId: GraphId | null,
+  resourceId: ResourceId,
+): boolean {
+  return (
+    activeGraphId !== null &&
+    space.lookup.graph(activeGraphId) !== undefined &&
+    graphResourceIds(space, activeGraphId).includes(resourceId)
+  );
 }
 
 export function createNavigation(
@@ -468,6 +491,18 @@ export function createNavigation(
         activeGraphId: graphId,
         mode: 'presenting',
         traversalHistory: [start],
+        branchIndex: 0,
+      });
+    },
+    presentFrom: (resourceId) => {
+      const state = observable.getState();
+      const graphId = state.activeGraphId;
+      if (graphId === null || !presentsFrom(currentSpace(), graphId, resourceId)) return;
+      observable.publish({
+        selectedMapId: state.selectedMapId,
+        activeGraphId: graphId,
+        mode: 'presenting',
+        traversalHistory: [resourceId],
         branchIndex: 0,
       });
     },

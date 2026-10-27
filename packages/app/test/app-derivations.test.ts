@@ -8,7 +8,11 @@ import { nameOnCreationOf } from '../src/name-on-creation';
 import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';
-import { resourceRailGroups } from '../src/resource-rail-actions';
+import {
+  PRESENT_OFF_GRAPH,
+  PRESENT_WHILE_EDITING,
+  resourceRailGroups,
+} from '../src/resource-rail-actions';
 import { revealStep } from '../src/resources-disclosure';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import { spaceTitlesById } from '../src/space-resource-targets';
@@ -212,6 +216,7 @@ describe('resourceRailGroups', () => {
     removeFromMap: () => undefined,
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
+    present: { run: () => undefined, available: true, onActiveGraph: true },
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -222,9 +227,30 @@ describe('resourceRailGroups', () => {
     expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
+      ['present-from-here'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
+  });
+
+  it('draws Present from Here unavailable, saying why, off the Active Graph', () => {
+    const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
+      ...everything,
+      present: { run: () => undefined, available: true, onActiveGraph: false },
+    })
+      .flat()
+      .find(({ id }) => id === 'present-from-here');
+    expect(row).toMatchObject({ disabled: true, description: PRESENT_OFF_GRAPH });
+  });
+
+  it('draws Present from Here unavailable, saying why, while an edit holds the keyboard', () => {
+    const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
+      ...everything,
+      present: { run: () => undefined, available: false, onActiveGraph: true },
+    })
+      .flat()
+      .find(({ id }) => id === 'present-from-here');
+    expect(row).toMatchObject({ disabled: true, description: PRESENT_WHILE_EDITING });
   });
 
   it.each<Resource>([
@@ -259,6 +285,7 @@ describe('resourceRailGroups', () => {
           removeFromMap: null,
           deleteFromSpace: null,
           enter: null,
+          present: null,
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);

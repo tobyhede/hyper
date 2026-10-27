@@ -3,17 +3,19 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
+import type { ResourceId } from '@project/core';
 import { Alert, AlertDescription, AlertIcon, AlertTitle, AppShell } from '@project/ui';
 import { createNonThrowingReporter } from '@project/persistence';
 import type { BrowserLocation } from './browser-location';
 import type { OpenSpace } from './open-spaces';
 import { resourceSizeVars } from './resource';
-import { canRetreat } from './navigation';
+import { canRetreat, presentsFrom } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
 import type { DestinationOpening } from './destination-opening';
 import { useOpenSpacesStanding } from './open-spaces-context';
@@ -170,6 +172,18 @@ export const createApp = (
     });
     const { entityActions, copyProductDestination, clipboardFailure, dismissClipboardFailure } =
       useSpaceAddresses(browserLocation, space);
+    const canPresentFrom = useCallback(
+      (resourceId: ResourceId) => presentsFrom(space, activeGraphId, resourceId),
+      [space, activeGraphId],
+    );
+    // Only the Space on screen presents from its canvas, and not while it is
+    // already presenting: every open Space keeps its canvas mounted, and each
+    // canvas answers `P` from the window.
+    const presentFromCanvas = useMemo(
+      () =>
+        active && !presenting ? { canPresentFrom, run: presentingWindow.presentFrom } : undefined,
+      [active, presenting, canPresentFrom],
+    );
     const resourceRailActions = useResourceRailActions(composition, {
       space,
       map: selectedMap.map,
@@ -178,6 +192,8 @@ export const createApp = (
       editingResourceBody,
       createReferenceFrom: placement.createReferenceFrom,
       spaces,
+      canPresentFrom,
+      presentFrom: presentingWindow.presentFrom,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
     const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);
@@ -372,6 +388,7 @@ export const createApp = (
                   spaceSession={spaceSession}
                   spaceResourceTargets={spaceResourceTargets.targets}
                   resourceEntityActions={resourceRailActions}
+                  presentFrom={presentFromCanvas}
                 />
               </ReactFlowProvider>
             )}

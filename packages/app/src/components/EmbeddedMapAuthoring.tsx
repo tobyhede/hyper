@@ -37,6 +37,9 @@ export type { EmbeddedPublication };
 
 const EMPTY_NODES: readonly ResourceFlowNode[] = [];
 
+/** A drawn Map inside a Space Resource is not presented from, so none of its Resources is. */
+const NOT_PRESENTED = (): boolean => false;
+
 /** Reuse production projection and Resource controls over an explicitly addressed target Map. */
 export function EmbeddedMapAuthoring({
   parent,
@@ -134,6 +137,8 @@ export function EmbeddedMapAuthoring({
     editingResourceBody,
     createReferenceFrom: placement.createReferenceFrom,
     spaces,
+    canPresentFrom: NOT_PRESENTED,
+    presentFrom: null,
   });
   const selectResource = state.selectResource;
   const [connecting, setConnecting] = useState<Connecting | null>(null);

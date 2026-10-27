@@ -515,10 +515,13 @@ describe('useResourceRailActions', () => {
           authorOnCanvas: available,
           deleteResource: available,
           navigate: available,
+          present: available,
         },
         editingResourceBody: false,
         createReferenceFrom: () => 'done',
         spaces: null,
+        canPresentFrom: () => false,
+        presentFrom: null,
       }),
     );
   };

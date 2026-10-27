@@ -18,6 +18,7 @@ import {
   type SpaceSession,
 } from '@project/persistence';
 import { mountSpaceApp } from '../src/SpaceApp';
+import { canRetreat } from '../src/navigation';
 import { createBrowserLocation } from '../src/browser-location';
 import { recordingHistory } from './browser-history';
 import { mountSpace } from './space-mounting';
@@ -217,6 +218,82 @@ it('keeps a hidden Space presentation unchanged when the active Space receives E
   fireEvent.keyDown(document.body, { key: 'Escape' });
 
   expect(initial.app.navigation.getState().mode).toBe('presenting');
+});
+
+/** A meta Space whose one Resource is on its Active Graph, by an Edge to itself. */
+const presentableMeta = (): SpaceSnapshot => {
+  const base = snapshot('First Space', 'First Resource', 0, 0);
+  return {
+    ...base,
+    document: {
+      ...base.document,
+      maps: base.document.maps?.map((m) => ({
+        ...m,
+        graphs: [
+          { id: OWNED_GRAPH_ID, title: 'Graph', edges: [{ from: RESOURCE_ID, to: RESOURCE_ID }] },
+        ],
+      })),
+    },
+  };
+};
+
+const openPresentable = async (others: readonly SpaceSnapshot[] = []) => {
+  const first = presentableMeta();
+  const backend = new MemorySpaceBackend(
+    SPACE_ID,
+    [first, ...others].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
+  );
+  const spaces = createOpenSpaces({
+    fullscreen: refusingFullscreen,
+    presentations: unlinkedPresentations,
+    images: unusedImageSources,
+    backend,
+    metaSpaceId: SPACE_ID,
+    metaSpaceTitle: first.document.title,
+    newId: newUuid,
+    history: recordingHistory(),
+  });
+  const initial = await spaces.open(SPACE_ID);
+  await act(async () => {
+    render(<OpenSpacesApplication spaces={spaces} initial={initial} />);
+    await Promise.resolve();
+  });
+  act(() => initial.app.adapter.getState().selectResource(RESOURCE_ID));
+  return { spaces, initial };
+};
+
+const pressP = async (): Promise<void> => {
+  await act(async () => {
+    fireEvent.keyDown(document.body, { key: 'p' });
+    await Promise.resolve();
+  });
+};
+
+/** `P` is answered on the window by every mounted canvas, so the Space it reaches is App's to decide. */
+describe('the P shortcut across open Spaces', () => {
+  it('is answered by the Space on screen and not by a hidden one', async () => {
+    const second = { ...snapshot('Second Space', 'Second Resource', 0, 0), id: newUuid() };
+    const { spaces, initial } = await openPresentable([second]);
+    await act(async () => {
+      await spaces.open(second.id);
+    });
+
+    await pressP();
+
+    expect(initial.app.navigation.getState().mode).toBe('overview');
+  });
+
+  it('does not start the talk again while it is being presented', async () => {
+    const { initial } = await openPresentable();
+    await pressP();
+    expect(initial.app.navigation.getState().mode).toBe('presenting');
+    act(() => initial.app.navigation.advance());
+    expect(canRetreat(initial.app.navigation.getState())).toBe(true);
+
+    await pressP();
+
+    expect(canRetreat(initial.app.navigation.getState())).toBe(true);
+  });
 });
 
 describe('Space app conflict recovery', () => {

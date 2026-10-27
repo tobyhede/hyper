@@ -1,5 +1,13 @@
 import { expect, test } from './fixtures';
-import { nodeByTitle, presentControl, selectResource, settled } from './graph';
+import {
+  nodeByTitle,
+  presentControl,
+  presentedName,
+  resourceActions,
+  selectResource,
+  settled,
+  stage,
+} from './graph';
 
 /**
  * The canvas's keys answer wherever focus is, except a surface that owns its
@@ -93,4 +101,32 @@ test('the arrow keys follow the Active Graph, and Shift and an arrow move the Re
 
   await page.keyboard.press('Shift+ArrowDown');
   await expect.poll(async () => (await a.boundingBox())?.y).toBeGreaterThan(aBox.y);
+});
+
+/**
+ * P presents the Active Graph from the selected Resource, with a Traversal that
+ * begins there, so there is nothing to go Back to; the Resource's Actions menu
+ * offers the same command.
+ */
+test('P and Present from Here present from the selected Resource', async ({ page }) => {
+  await page.goto('/');
+  const b = nodeByTitle(page, 'B').first();
+  await expect(b).toBeVisible();
+  await settled(page);
+  await selectResource(b);
+
+  await page.keyboard.press('p');
+
+  await expect(stage(page)).toBeVisible();
+  await expect(presentedName(page)).toHaveText('B');
+  await expect(page.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
+
+  await page.keyboard.press('Escape');
+  await expect(stage(page)).toHaveCount(0);
+
+  const menu = await resourceActions(page, 'C');
+  await menu.getByRole('menuitem', { name: 'Present from Here' }).click();
+
+  await expect(stage(page)).toBeVisible();
+  await expect(presentedName(page)).toHaveText('C');
 });
