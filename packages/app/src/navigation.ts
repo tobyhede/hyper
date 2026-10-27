@@ -267,6 +267,23 @@ function openedState(selection: MapId, resolved: ResolvedMap): NavigationState {
   };
 }
 
+/**
+ * Whether presenting may start from a Resource: a Graph is active and holds it.
+ * The one membership rule, which `Navigation.presentFrom` and every gesture
+ * offering Present from Here ask.
+ */
+export function presentsFrom(
+  space: Space,
+  activeGraphId: GraphId | null,
+  resourceId: ResourceId,
+): boolean {
+  return (
+    activeGraphId !== null &&
+    space.lookup.graph(activeGraphId) !== undefined &&
+    graphResourceIds(space, activeGraphId).includes(resourceId)
+  );
+}
+
 export function createNavigation(
   currentSpace: () => Space,
   initialMapId: MapId,
@@ -480,8 +497,7 @@ export function createNavigation(
     presentFrom: (resourceId) => {
       const state = observable.getState();
       const graphId = state.activeGraphId;
-      if (graphId === null || currentSpace().lookup.graph(graphId) === undefined) return;
-      if (!graphResourceIds(currentSpace(), graphId).includes(resourceId)) return;
+      if (graphId === null || !presentsFrom(currentSpace(), graphId, resourceId)) return;
       observable.publish({
         selectedMapId: state.selectedMapId,
         activeGraphId: graphId,

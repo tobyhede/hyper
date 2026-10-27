@@ -520,7 +520,7 @@ describe('useResourceRailActions', () => {
         editingResourceBody: false,
         createReferenceFrom: () => 'done',
         spaces: null,
-        activeGraphResourceIds: [],
+        canPresentFrom: () => false,
         presentFrom: null,
       }),
     );

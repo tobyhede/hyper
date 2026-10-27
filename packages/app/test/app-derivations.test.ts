@@ -8,7 +8,11 @@ import { nameOnCreationOf } from '../src/name-on-creation';
 import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';
-import { PRESENT_OFF_GRAPH, resourceRailGroups } from '../src/resource-rail-actions';
+import {
+  PRESENT_OFF_GRAPH,
+  PRESENT_WHILE_EDITING,
+  resourceRailGroups,
+} from '../src/resource-rail-actions';
 import { revealStep } from '../src/resources-disclosure';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import { spaceTitlesById } from '../src/space-resource-targets';
@@ -237,6 +241,16 @@ describe('resourceRailGroups', () => {
       .flat()
       .find(({ id }) => id === 'present-from-here');
     expect(row).toMatchObject({ disabled: true, description: PRESENT_OFF_GRAPH });
+  });
+
+  it('draws Present from Here unavailable, saying why, while an edit holds the keyboard', () => {
+    const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
+      ...everything,
+      present: { run: () => undefined, available: false, onActiveGraph: true },
+    })
+      .flat()
+      .find(({ id }) => id === 'present-from-here');
+    expect(row).toMatchObject({ disabled: true, description: PRESENT_WHILE_EDITING });
   });
 
   it.each<Resource>([

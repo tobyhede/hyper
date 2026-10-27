@@ -231,14 +231,14 @@ export interface SpaceCanvasProps {
     connect: EntityActionGroup,
   ) => readonly EntityActionGroup[];
   /**
-   * Presenting from a Resource, which `P` asks for: the Active Graph's
-   * Resources, which are the only ones it presents from, and the command.
+   * Presenting from a Resource, which `P` asks for: whether a Resource is one
+   * it presents from (`presentsFrom`), and the command.
    * Absent on a canvas nothing presents from, which includes a hidden Space's
    * and one already presenting.
    */
   readonly presentFrom?:
     | {
-        readonly resourceIds: readonly ResourceId[];
+        readonly canPresentFrom: (resourceId: ResourceId) => boolean;
         readonly run: (resourceId: ResourceId) => void;
       }
     | undefined;
@@ -893,7 +893,7 @@ export function SpaceCanvas({
       const canvas = latestOccurrences.current.find((value) => value.id === CANVAS_OCCURRENCE);
       if (present === undefined || canvas?.availability.present !== true) return;
       const selected = canvas.nodes.find((node) => node.selected);
-      if (selected === undefined || !present.resourceIds.includes(selected.data.resourceId)) return;
+      if (selected === undefined || !present.canPresentFrom(selected.data.resourceId)) return;
       event.preventDefault();
       present.run(selected.data.resourceId);
     };

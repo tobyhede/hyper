@@ -155,6 +155,16 @@ export function createPresentingWindow({
           presentation: follow,
         });
 
+  /** Present and Present from Here, either of which restarts a talk already under way. */
+  const startPresenting = (start: () => void): void => {
+    restarting = navigation.getState().mode === 'presenting';
+    try {
+      start();
+    } finally {
+      restarting = false;
+    }
+  };
+
   const commands: TraversalCommands = {
     advance: navigation.advance,
     retreat: navigation.retreat,
@@ -173,20 +183,14 @@ export function createPresentingWindow({
     getState: observable.getState,
     subscribe: observable.subscribe,
     present: () => {
-      restarting = navigation.getState().mode === 'presenting';
-      try {
+      startPresenting(() => {
         fullscreenPairing.present();
-      } finally {
-        restarting = false;
-      }
+      });
     },
     presentFrom: (resourceId) => {
-      restarting = navigation.getState().mode === 'presenting';
-      try {
+      startPresenting(() => {
         fullscreenPairing.presentFrom(resourceId);
-      } finally {
-        restarting = false;
-      }
+      });
     },
     commands,
     connect: () => {

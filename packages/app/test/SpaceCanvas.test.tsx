@@ -134,7 +134,10 @@ async function mountGraph(
   const titleEditingChanged = vi.fn();
   const nodesChanged = vi.fn();
   const presentFrom = vi.fn();
-  const presentable = { resourceIds: [RESOURCE_ID], run: presentFrom };
+  const presentable = {
+    canPresentFrom: (resourceId: typeof RESOURCE_ID) => resourceId === RESOURCE_ID,
+    run: presentFrom,
+  };
   let nodes = initialNodes;
   let titleEditing = true;
   const stored = { snapshot, revision: 0n, exportedRevision: null };
