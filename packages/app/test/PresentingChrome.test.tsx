@@ -233,14 +233,14 @@ describe('PresentingChrome', () => {
 
     expect(screen.getByRole('button', { name: 'Go to B' })).toHaveAttribute(
       'aria-keyshortcuts',
-      'ArrowRight',
+      'ArrowRight PageDown',
     );
     expect(screen.getByRole('button', { name: 'Choose C' })).not.toHaveAttribute(
       'aria-keyshortcuts',
     );
     expect(screen.getByRole('button', { name: 'Back' })).toHaveAttribute(
       'aria-keyshortcuts',
-      'ArrowLeft',
+      'ArrowLeft PageUp',
     );
     expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute(
       'aria-keyshortcuts',
@@ -251,13 +251,21 @@ describe('PresentingChrome', () => {
   /** Only the commands the presenter can actually run from where they are. */
   it('lists the keyboard commands currently available and no others', () => {
     const { rerender } = render(chrome({ moves: movesTo(['B', 'C'], 0), canRetreat: true }));
-    expect(guidance()).toEqual(['↑↓choose', '→go', '←back', 'Snotes', 'Nrehearse', 'Escoverview']);
+    expect(guidance()).toEqual([
+      '↑↓choose',
+      '→PgDngo',
+      '←PgUpback',
+      'Homestart',
+      'Snotes',
+      'Nrehearse',
+      'Escoverview',
+    ]);
 
     rerender(chrome({ moves: movesTo(['B'], 0), canRetreat: false }));
-    expect(guidance()).toEqual(['→go', 'Snotes', 'Nrehearse', 'Escoverview']);
+    expect(guidance()).toEqual(['→PgDngo', 'Snotes', 'Nrehearse', 'Escoverview']);
 
     rerender(chrome({ moves: [], canRetreat: true }));
-    expect(guidance()).toEqual(['←back', 'Snotes', 'Nrehearse', 'Escoverview']);
+    expect(guidance()).toEqual(['←PgUpback', 'Homestart', 'Snotes', 'Nrehearse', 'Escoverview']);
 
     rerender(chrome({ moves: [], canRetreat: false }));
     expect(guidance()).toEqual(['Snotes', 'Nrehearse', 'Escoverview']);

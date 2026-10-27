@@ -99,6 +99,22 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: "defer to a focused slider's value movement",
   },
   {
+    module: 'packages/app/src/presenting-keys.ts',
+    sourceKey: 'PageDown',
+    occurrence: 1,
+    key: 'PageDown',
+    surface: 'Presenting, with focus in content that scrolls',
+    behaviour: 'defer to scrolling down until the content ends',
+  },
+  {
+    module: 'packages/app/src/presenting-keys.ts',
+    sourceKey: 'PageUp',
+    occurrence: 1,
+    key: 'PageUp',
+    surface: 'Presenting, with focus in content that scrolls',
+    behaviour: 'defer to scrolling up until the content starts',
+  },
+  {
     module: 'packages/ui/src/MarkdownSourceEditor.tsx',
     sourceKey: 'Escape',
     occurrence: 1,

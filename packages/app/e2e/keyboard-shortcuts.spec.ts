@@ -187,3 +187,25 @@ test('Space reads a Resource in Full View, walks the Active Graph and leaves', a
   await expect(fullView).toHaveCount(0);
   await expect(b.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
 });
+
+/** A presentation clicker sends Page Down and Page Up; Home starts the Graph again. */
+test('Page Down, Page Up and Home move through a presentation', async ({ page }) => {
+  await page.goto('/');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await settled(page);
+  await selectResource(a);
+  await page.keyboard.press('p');
+  await expect(presentedName(page)).toHaveText('A');
+
+  await page.keyboard.press('PageDown');
+  await expect(presentedName(page)).toHaveText('B');
+  await page.keyboard.press('PageDown');
+  await expect(presentedName(page)).toHaveText('C');
+  await page.keyboard.press('PageUp');
+  await expect(presentedName(page)).toHaveText('B');
+
+  await page.keyboard.press('Home');
+  await expect(presentedName(page)).toHaveText('A');
+  await expect(page.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
+});
