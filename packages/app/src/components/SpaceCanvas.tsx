@@ -83,6 +83,8 @@ import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resour
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
+import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, pressesBinding } from '../key-bindings';
+import { graphNeighbours, neighbourToward } from '../graph-navigation';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -105,54 +107,35 @@ import {
  * `disableKeyboardA11y`, and the one it names `keyboardDisabled` is the one an
  * ordinary keyboard-enabled graph gets.
  */
+const RESOURCE_KEYS_DESCRIPTION =
+  'Press enter or space to open a Resource, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
+
 const ARIA_LABEL_CONFIG = {
-  'node.a11yDescription.default':
-    'Press enter or space to open a Resource, backspace or delete to remove it from this Map, the arrow keys to move it, and escape to cancel.',
-  'node.a11yDescription.keyboardDisabled':
-    'Press enter or space to open a Resource, backspace or delete to remove it from this Map, the arrow keys to move it, and escape to cancel.',
+  'node.a11yDescription.default': RESOURCE_KEYS_DESCRIPTION,
+  'node.a11yDescription.keyboardDisabled': RESOURCE_KEYS_DESCRIPTION,
   'edge.a11yDescription.default':
     'Press backspace or delete to remove this Edge from its Graph, or escape to deselect it.',
 } as const;
 
-/**
- * The one unmodified authoring shortcut, named where it is bound.
- *
- * Exported so the control that announces it to a screen reader takes the key
- * from the handler that answers it rather than from a literal beside it: the
- * announcement and the binding are one fact, and two copies of it can drift
- * without anything failing.
- */
-export const ADD_RESOURCE_KEY = 'C';
-
 const subscribeToNothing = (): (() => void) => () => undefined;
 
 /**
- * Where an unmodified letter is somebody else's, not the canvas's command.
+ * Where a paste, a file drop or the delete key is somebody else's, not the canvas's.
  *
- * One selector for both shortcuts, because the two answers have to agree: `C`
- * and `F2` are pressed on the same tree, and a control missing from one list and
- * present in the other makes the same element a command target for one key and
- * not for the other. The canvas zoom controls render *inside* the wrapper both
- * are bound to, so a list naming only text entry would let a `c` with Zoom in
- * focused add a Resource.
- *
- * `button` and `select` are here for a different reason from `input`,
- * `textarea` and `contenteditable`: those are places an author is typing the
- * letter, while a button is a control with a keyboard model of its own that the
- * canvas must not shadow. Both are cases where the key was not aimed here.
+ * The canvas zoom controls render *inside* the wrapper these handlers are bound
+ * to, as do every Resource's own controls and editors, so a list naming only
+ * text entry would let a drop on Zoom in place an image. It is the surfaces that
+ * own their keys (`key-bindings.ts`) and every control besides. Keys are
+ * guarded by `keyBelongsElsewhere` instead, bar Enter, Space, Delete and
+ * Backspace, which are aimed at a Resource itself.
  *
  * **`.nokey` is the first entry and the load-bearing one.** Every portalled and
  * chrome surface in the tree already marks itself with it for React Flow's own
  * `useKeyPress` subscriptions, whose `isInputDOMNode` walks `closest('.nokey')`.
  * Reading the same marker is what stops this list drifting into a second,
- * hand-maintained copy of an exclusion the components already declare: a
- * surface has to opt out once, not once per listener. The roles below stay for
- * the surfaces that carry no marker of their own — `ResourceSearchCombobox`'s popup
- * is `role="presentation"`, not `dialog`, because its input sits outside the
- * popup, so the marker rather than a role is what covers it.
+ * hand-maintained copy of an exclusion the components already declare.
  */
-const NOT_A_CANVAS_COMMAND =
-  '.nokey, input, textarea, select, button, [contenteditable="true"], [role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]';
+const NOT_A_CANVAS_COMMAND = `.nokey, input, button, ${OWNS_ITS_KEYS}`;
 
 /**
  * The Resource a key came from, or `null` if it came from anywhere else.
@@ -758,63 +741,129 @@ export function SpaceCanvas({
     latestOccurrences.current = occurrences;
   }, [occurrences]);
 
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!(event.target instanceof Element)) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      if (bodyEditing) return;
-      // The same exclusion the `C` branch below makes, and load-bearing
-      // rather than defensive: an Open Resource draws its editor *inside* the
-      // node, so a Space typed into it would otherwise be cancelled here
-      // before the document ever received the character.
-      if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
-      const resource = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
-      if (resource === null || !event.currentTarget.contains(resource)) return;
-      const resourceId = resource.dataset['id'];
-      if (resourceId === undefined) return;
-      event.preventDefault();
-      const occurrence = occurrences.find((value) =>
-        value.nodes.some((node) => node.id === resourceId),
-      );
-      if (occurrence?.availability.authorOnCanvas !== true || occurrence.bodyEditing) return;
-      occurrence.openResource(resourceId);
-      return;
-    }
-    // `C` adds a Resource, and it is the only unmodified authoring shortcut there
-    // is. Answered here rather than on the window, so "graph focused" is a
-    // fact about where the event came from rather than a guess: this handler
-    // sits on React Flow's own wrapper, so a key pressed in the toolbar, in a
-    // pane over the graph or in the Resources View never reaches it.
-    //
-    // Three exclusions, and each names a different way the key is not a
-    // command. A modifier makes it a browser or OS shortcut. A repeat is one
-    // press held down, and a command runs once per press. And a text control
-    // is somewhere the author is *typing* a c — the inline title editor stops
-    // its own key events before they get here, so this covers whatever text
-    // entry the canvas gains next rather than a case that exists today.
-    if (event.key.toUpperCase() !== ADD_RESOURCE_KEY) return;
-    // `shiftKey` belongs here for a reason the others do not share: matching
-    // case-insensitively is what lets Caps Lock work, and it lets Shift
-    // through in the same breath, since both arrive as `C`. Only the flag
-    // tells them apart — Caps Lock changes the character and never sets it.
-    // Without this the toolbar announces `aria-keyshortcuts="C"`, which ARIA
-    // defines as the unmodified key, while the canvas answers Shift+C too.
-    if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-    if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
-    // The default is prevented only where the command can actually run
-    // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while authoring is
-    // withdrawn is left to whatever else would have had it. The guard at the
-    // top of this handler is the other half of that: it is `authorOnCanvas`
-    // rather than the mode alone, so every branch below is already behind it.
-    // The selection's occurrence, or the canvas's own Map when nothing is selected.
-    const current =
-      occurrences.find(
-        (value) => value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
-      ) ?? occurrences.find((value) => value.id === CANVAS_OCCURRENCE);
-    if (current === undefined || !current.availability.authorOnCanvas || current.bodyEditing)
-      return;
-    event.preventDefault();
-    current.addResource();
+  /**
+   * The Active Graph walk from the focused Resource, or `null` where there is
+   * none to take: only from the Resource node itself, so a key on one of its
+   * controls is that control's, and only on the canvas's own Map.
+   */
+  const graphNavigationFrom = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!availability.selectNodes) return null;
+    const focused = event.target;
+    if (!(focused instanceof HTMLElement) || !focused.matches('.react-flow__node[data-id]'))
+      return null;
+    const from = resourceOfNode(nodes, focused.dataset['id'] ?? '');
+    if (from === undefined) return null;
+    const canvas = event.currentTarget;
+    const elementOf = (resourceId: ResourceId): HTMLElement | null => {
+      const node = nodes.find((each) => each.data.resourceId === resourceId);
+      return node === undefined
+        ? null
+        : canvas.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(node.id)}"]`);
+    };
+    const edgesOfGraph = edges.flatMap((edge) => {
+      const subject = edgeSelectionOf(edge);
+      return context.graphId !== null && subject?.graphId === context.graphId
+        ? [{ source: subject.edge.from, target: subject.edge.to }]
+        : [];
+    });
+    /** Select and focus a Resource; React Flow pans it into view (`autoPanOnNodeFocus`). */
+    const moveTo = (resourceId: ResourceId | undefined): void => {
+      const next = resourceId === undefined ? null : elementOf(resourceId);
+      if (resourceId === undefined || next === null) return;
+      selectResource(resourceId);
+      next.focus();
+    };
+    return { from, focused, edges: edgesOfGraph, elementOf, moveTo };
   };
+
+  const ARROWS = [
+    [CANVAS_KEYS.navigateLeft, 'left'],
+    [CANVAS_KEYS.navigateRight, 'right'],
+    [CANVAS_KEYS.navigateUp, 'up'],
+    [CANVAS_KEYS.navigateDown, 'down'],
+  ] as const;
+
+  /**
+   * From a selected Resource, a plain arrow follows the Active Graph's Edge
+   * that way instead of nudging the Resource, which moves to Shift+arrow. Answered in the capture phase,
+   * because React Flow's own node handler nudges on the way back up and would
+   * otherwise see the press first. Positions are read from the drawn nodes, in
+   * screen space, where "right" is what the author sees as right.
+   */
+  const arrowAlongGraph = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    const press = event.nativeEvent;
+    if (!ARROWS.some(([binding]) => binding.keys.some((key) => key === press.key))) return;
+    // Shift and an arrow, held or not, is React Flow's nudge.
+    if (press.shiftKey && !press.ctrlKey && !press.metaKey && !press.altKey) return;
+    const navigation = graphNavigationFrom(event);
+    if (navigation === null) return;
+    // Only from a selected Resource. A Resource focused but not selected, as
+    // the browser's Tab or Escape leaves it, has nothing React Flow would
+    // nudge, so the arrow is left alone.
+    const focusedId = navigation.focused.dataset['id'];
+    if (nodes.find((node) => node.id === focusedId)?.selected !== true) return;
+    // React Flow nudges on every other arrow press too, ignoring repeats and
+    // modifiers, so each one stops here. A modified arrow keeps the browser's
+    // meaning; a held one is spent without going further.
+    event.stopPropagation();
+    if (press.ctrlKey || press.metaKey || press.altKey) return;
+    event.preventDefault();
+    const direction = ARROWS.find(([binding]) => pressesBinding(binding, press))?.[1];
+    if (direction === undefined) return;
+    const centreOf = (element: Element) => {
+      const box = element.getBoundingClientRect();
+      return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    };
+    const candidates = graphNeighbours(navigation.edges, navigation.from).flatMap((id) => {
+      const element = navigation.elementOf(id);
+      return element === null ? [] : [{ id, centre: centreOf(element) }];
+    });
+    navigation.moveTo(neighbourToward(centreOf(navigation.focused), candidates, direction));
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!pressesBinding(CANVAS_KEYS.openResource, event.nativeEvent)) return;
+    if (bodyEditing) return;
+    // Load-bearing rather than defensive: an Open Resource draws its editor
+    // *inside* the node, so a Space typed into it would otherwise be cancelled
+    // here before the document ever received the character. The narrower guard
+    // rather than `keyBelongsElsewhere`, because a node's own `.nokey` regions —
+    // its rendered content, its toolbar — keep their Space and Enter too.
+    if (!(event.target instanceof Element) || event.target.closest(NOT_A_CANVAS_COMMAND) !== null)
+      return;
+    const resource = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
+    if (resource === null || !event.currentTarget.contains(resource)) return;
+    const resourceId = resource.dataset['id'];
+    if (resourceId === undefined) return;
+    event.preventDefault();
+    const occurrence = occurrences.find((value) =>
+      value.nodes.some((node) => node.id === resourceId),
+    );
+    if (occurrence?.availability.authorOnCanvas !== true || occurrence.bodyEditing) return;
+    occurrence.openResource(resourceId);
+  };
+
+  // `C` adds a Resource, answered on the window so it reaches the canvas from
+  // wherever focus is — the Dock included — except a surface that owns its keys.
+  // The default is prevented only where the command can actually run
+  // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while
+  // authoring is withdrawn is left to whatever else would have had it.
+  useEffect(() => {
+    const addResource = (event: KeyboardEvent): void => {
+      if (!pressesBinding(CANVAS_KEYS.addResource, event) || keyBelongsElsewhere(event)) return;
+      // The selection's occurrence, or the canvas's own Map when nothing is selected.
+      const current =
+        latestOccurrences.current.find(
+          (value) => value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
+        ) ?? latestOccurrences.current.find((value) => value.id === CANVAS_OCCURRENCE);
+      if (current === undefined || !current.availability.authorOnCanvas || current.bodyEditing)
+        return;
+      event.preventDefault();
+      current.addResource();
+    };
+    window.addEventListener('keydown', addResource);
+    return () => window.removeEventListener('keydown', addResource);
+  }, []);
 
   // `F2` renames the selected Resource, and this is the *only* handler that answers
   // it. Don't add a second, such as a React Flow `onKeyDown` branch: two handlers
@@ -823,10 +872,7 @@ export function SpaceCanvas({
   // when the key is typed into a control.
   useLayoutEffect(() => {
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
-      if (event.key !== 'F2') return;
-      if (event.target instanceof Element && event.target.closest(NOT_A_CANVAS_COMMAND) !== null) {
-        return;
-      }
+      if (!pressesBinding(CANVAS_KEYS.renameResource, event) || keyBelongsElsewhere(event)) return;
       const occurrence = latestOccurrences.current.find((value) =>
         value.nodes.some((node) => node.selected),
       );
@@ -1172,16 +1218,11 @@ export function SpaceCanvas({
 
   useEffect(() => {
     const deleteSelection = (event: KeyboardEvent): void => {
-      if (event.key !== 'Backspace' && event.key !== 'Delete') return;
-      // The two exclusions the `C` binding above spells out, for the reasons it
-      // gives: a command runs once per press, and a modifier makes the key a
-      // browser or OS shortcut rather than this canvas's. `shiftKey` is in the
-      // list for a plainer reason than it is up there — the key is already the
-      // same key, so Shift only makes a chord this canvas never advertised, and
-      // one that belongs to somebody else in several places a browser runs.
-      // Nothing here holds Shift either: `selectionKeyCode` and
-      // `multiSelectionKeyCode` are both `null`.
-      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      if (!pressesBinding(CANVAS_KEYS.removeSelection, event)) return;
+      // Narrower than every other canvas key, deliberately, so this guard rather
+      // than `keyBelongsElsewhere`: removal and Edge deletion cannot be undone,
+      // so the key has to be aimed at the canvas itself, never at a control on it
+      // or at the chrome around it.
       if (!(event.target instanceof Element)) return;
       if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
       if (canvasRef.current?.contains(event.target) !== true) return;
@@ -1570,6 +1611,7 @@ export function SpaceCanvas({
       selectionKeyCode={selectionKeyCode}
       selectionOnDrag={selectionOnDrag}
       onKeyDown={handleKeyDown}
+      onKeyDownCapture={arrowAlongGraph}
       // Programmatically focusable, and deliberately not a tab stop. React Flow's
       // native Edge Escape calls `blur()`, which leaves focus on `body` — not an
       // authoring context — and its pane carries no `tabindex`, so there is

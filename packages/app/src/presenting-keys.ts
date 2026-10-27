@@ -1,4 +1,10 @@
 import { useEffect } from 'react';
+import {
+  keyBelongsElsewhere,
+  pressesBinding,
+  PRESENTING_KEYS,
+  type KeyBinding,
+} from './key-bindings';
 
 /** The Traversal operations the global Presenting keys perform, all Navigation's own. */
 export interface TraversalCommands {
@@ -10,71 +16,6 @@ export interface TraversalCommands {
   readonly openNotes: () => void;
   /** Show or hide the notes under the Stage, for rehearsing on one screen (ADR 0129). */
   readonly toggleNotes: () => void;
-}
-
-/** The keys a focused control acts on by itself, with no listener's help. */
-const NATIVE_ACTIVATION_KEYS: readonly string[] = [' ', 'Enter'];
-
-/** A surface that is over the canvas and owns every key pressed inside it. */
-const MODAL = '[role="dialog"],[role="alertdialog"]';
-
-/**
- * Whether a modal surface owns this press.
- *
- * Deference is not only about a control that activates itself. The persistence
- * conflict dialog and the Resource deletion confirmation are modal and
- * reachable while presenting, and a window listener that went on traversing
- * would run a Traversal command behind a surface the presenter is looking at:
- * one Escape both dismissing the dialog and leaving presentation, Arrow keys
- * moving a Graph nobody can see.
- *
- * The same rule as the one below, spent on a whole surface rather than one
- * control: whatever the press belongs to keeps it.
- */
-function insideAModalSurface(event: KeyboardEvent): boolean {
-  const target = event.target;
-  return target instanceof Element && target.closest(MODAL) !== null;
-}
-
-/** What counts as a control that will act on the press. */
-const INTERACTIVE = [
-  'a[href]',
-  'button',
-  'input',
-  'select',
-  'summary',
-  'textarea',
-  '[contenteditable="true"]',
-  '[role="button"]',
-  '[role="link"]',
-  '[role="menuitem"]',
-  '[role="option"]',
-].join(',');
-
-/**
- * Whether the browser is already going to activate the control this press
- * landed on.
- *
- * A `button` — the chrome's moves, Back and Overview, and every control on the
- * Dock — activates on Space and Enter by itself, and a `keydown` listener on
- * `window` sees that press first. Calling `preventDefault` there stops the
- * activation; not calling it, but still advancing, runs two commands for one
- * press. Either way the presenter gets something they did not ask for from a
- * control they were looking at.
- *
- * So the rule is deference, and it is a rule about **interactive controls**
- * rather than about one button: whatever has focus and activates itself keeps
- * its key. Arrow and Escape are not native activations of anything here, so they
- * stay global and reach a presenter whose focus is anywhere at all.
- *
- * `closest` rather than a tag test, because the focused control may be a
- * composition — a Button rendering a span, a menu item, an editable region —
- * and it is the nearest interactive ancestor that will act on the press.
- */
-function activatesFocusedControl(event: KeyboardEvent): boolean {
-  if (!NATIVE_ACTIVATION_KEYS.includes(event.key)) return false;
-  const target = event.target;
-  return target instanceof Element && target.closest(INTERACTIVE) !== null;
 }
 
 /**
@@ -94,26 +35,27 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
   const { advance, retreat, selectBranch, exitPresenting, openNotes, toggleNotes } = commands;
   useEffect(() => {
     if (!active) return;
+    const bound: readonly (readonly [KeyBinding, () => void])[] = [
+      [PRESENTING_KEYS.advance, advance],
+      [PRESENTING_KEYS.retreat, retreat],
+      [PRESENTING_KEYS.previousBranch, () => selectBranch(-1)],
+      [PRESENTING_KEYS.nextBranch, () => selectBranch(1)],
+      [PRESENTING_KEYS.exitPresenting, exitPresenting],
+      [PRESENTING_KEYS.openNotes, openNotes],
+      [PRESENTING_KEYS.toggleNotes, toggleNotes],
+    ];
     const onKeyDown = (event: KeyboardEvent) => {
-      if (activatesFocusedControl(event) || insideAModalSurface(event)) return;
-      // A modified S or N is the browser's or the system's (Save, New), never ours,
-      // and a held one acts once: a toggle repeated by the keyboard would flicker.
-      const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.repeat;
-      const handler = {
-        ArrowRight: advance,
-        ' ': advance,
-        ArrowLeft: retreat,
-        ArrowUp: () => selectBranch(-1),
-        ArrowDown: () => selectBranch(1),
-        Escape: exitPresenting,
-        s: plain ? openNotes : undefined,
-        S: plain ? openNotes : undefined,
-        n: plain ? toggleNotes : undefined,
-        N: plain ? toggleNotes : undefined,
-      }[event.key];
-      if (!handler) return;
+      // Space and Enter on a focused chrome control are that control's, and a
+      // surface that owns its keys keeps them all: nothing reaches past a
+      // dialog, a menu's arrows and Escape move and close the menu rather than
+      // the Traversal, and a letter typed into a field is text. Anywhere else —
+      // the Stage, a chrome button, the page — the arrows and Escape are the
+      // Traversal's.
+      if (keyBelongsElsewhere(event)) return;
+      const command = bound.find(([binding]) => pressesBinding(binding, event))?.[1];
+      if (command === undefined) return;
       event.preventDefault();
-      handler();
+      command();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
