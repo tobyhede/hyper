@@ -31,9 +31,7 @@ async function openConnect(page: Page, name: string) {
   const node = nodeNamed(page, name);
   await node.click({ position: { x: 10, y: 10 } });
   await expect(node).toHaveClass(/\bselected\b/);
-  // Enter keyboard modality. Not Tab: from a Resource on the Active Graph, Tab
-  // walks to the next one.
-  await page.keyboard.press('Shift');
+  await page.keyboard.press('Tab');
   await page.getByRole('button', { name: `Actions for Resource ${name}`, exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('menuitem', { name: 'Create Reference' })).toBeFocused();

@@ -30,8 +30,7 @@ async function openLong(page: Page): Promise<void> {
 async function openConnect(page: Page, name: string) {
   await selectResource(nodeNamed(page, name));
   // Enter keyboard modality, so the menu opens as it does for a keyboard author.
-  // Not Tab: from a Resource on the Active Graph, Tab walks to the next one.
-  await page.keyboard.press('Shift');
+  await page.keyboard.press('Tab');
   await page.getByRole('button', { name: `Actions for Resource ${name}`, exact: true }).focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('menuitem', { name: 'Create Reference' })).toBeFocused();

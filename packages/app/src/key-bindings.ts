@@ -20,16 +20,13 @@
  * changes the character and never sets `shiftKey`, so the flag is the only way
  * to tell an announced `C` from Shift+C.
  *
- * `'shift'` is the same single press with Shift held and nothing else, for the
- * reverse of a plain binding on the same key, as Shift+Tab is of Tab.
- *
  * `'any'` also takes a repeated or shifted press. It is for a key whose command
  * means the same thing however it arrives, such as moving through a
  * presentation by holding an arrow. Ctrl, Meta and Alt still leave it alone:
  * with them the key is the browser's or the system's — Alt+Left is Back, and
  * Ctrl+Arrow and Cmd+Arrow move by word or line.
  */
-export type KeyPress = 'plain' | 'shift' | 'any';
+export type KeyPress = 'plain' | 'any';
 
 export interface KeyBinding {
   /** The `KeyboardEvent.key` values that press it. A letter matches either case. */
@@ -60,27 +57,6 @@ export const CANVAS_KEYS = {
     press: 'plain',
     ariaKeyShortcuts: 'F2',
     description: 'Rename the selected Resource',
-  },
-  navigateForward: {
-    keys: ['Tab'],
-    press: 'plain',
-    ariaKeyShortcuts: 'Tab',
-    description: 'Go to the next Resource along the Active Graph',
-  },
-  navigateBack: {
-    keys: ['Tab'],
-    press: 'shift',
-    ariaKeyShortcuts: 'Shift+Tab',
-    description: 'Go to the previous Resource along the Active Graph',
-  },
-  // Performed by React Flow's own node handler, which unselects a focused,
-  // selected Resource on Escape; declared here so the binding is listed with
-  // the rest, as the way Tab stops going along the Active Graph.
-  unselectResource: {
-    keys: ['Escape'],
-    press: 'plain',
-    ariaKeyShortcuts: 'Escape',
-    description: 'Unselect the focused Resource, so Tab moves on from the canvas',
   },
   removeSelection: {
     keys: ['Delete', 'Backspace'],
@@ -146,8 +122,7 @@ function sameKey(bound: string, pressed: string): boolean {
 export function pressesBinding(binding: KeyBinding, event: KeyboardEvent): boolean {
   if (!binding.keys.some((key) => sameKey(key, event.key))) return false;
   if (event.ctrlKey || event.metaKey || event.altKey) return false;
-  if (binding.press === 'any') return true;
-  return !event.repeat && event.shiftKey === (binding.press === 'shift');
+  return binding.press === 'any' || (!event.repeat && !event.shiftKey);
 }
 
 /** The keys a focused control acts on by itself, with no listener's help. */
