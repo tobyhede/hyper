@@ -150,6 +150,15 @@ export type AuthoringCompletion =
       readonly size: { readonly width: number; readonly height: number };
     }
   /**
+   * Open and expand: Open one Resource and Resize it to fit its content, as one
+   * Edit (ADR 0137). `size` is the fitted size, floored at the Closed Size.
+   */
+  | {
+      readonly kind: 'opened-resource-to-fit';
+      readonly resourceId: ResourceId;
+      readonly size: { readonly width: number; readonly height: number };
+    }
+  /**
    * Change Shape: the outline one Resource is drawn in on the Map the Edit is
    * written into (ADR 0121). Open or Closed alike; the Shape it already draws as
    * is `unchanged`.
@@ -316,6 +325,7 @@ type MapRequiredOperation = Extract<
   | { readonly kind: 'opened-resource' }
   | { readonly kind: 'closed-resource' }
   | { readonly kind: 'resized-resource' }
+  | { readonly kind: 'opened-resource-to-fit' }
   | { readonly kind: 'changed-resource-shape' }
   | { readonly kind: 'renamed-map' }
   | { readonly kind: 'renamed-graph' }
@@ -1263,6 +1273,15 @@ export function createSpaceAuthoring({
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'resized-resource') {
       const outcome = SnapshotEdit.resize(snapshot, mapId, completion.resourceId, completion.size);
+      if (outcome.kind !== 'completed') return notCompleted(outcome);
+      snapshot = outcome.snapshot;
+    } else if (completion.kind === 'opened-resource-to-fit') {
+      const outcome = SnapshotEdit.openAndExpand(
+        snapshot,
+        mapId,
+        completion.resourceId,
+        completion.size,
+      );
       if (outcome.kind !== 'completed') return notCompleted(outcome);
       snapshot = outcome.snapshot;
     } else if (completion.kind === 'changed-resource-shape') {

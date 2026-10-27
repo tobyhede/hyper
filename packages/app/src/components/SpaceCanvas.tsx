@@ -30,12 +30,15 @@ import {
 } from '@xyflow/react';
 import {
   DEFAULT_KIND,
+  COLLAPSED_RESOURCE_SIZE,
   isAcceptedImageUrl,
+  takesOpen,
   titleName,
   uuidSchema,
   type ResourceId,
   type MapId,
 } from '@project/core';
+import { resolveResourceContent } from '@project/graph';
 import type { SpaceSession } from '@project/persistence';
 import {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
@@ -97,6 +100,7 @@ import {
   type NavigationDirection,
 } from '../graph-navigation';
 import { FullView } from './FullView';
+import { openAndExpandSize, openHeight, visibleCanvasCap } from '../open-and-expand';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -120,7 +124,7 @@ import {
  * ordinary keyboard-enabled graph gets.
  */
 const RESOURCE_KEYS_DESCRIPTION =
-  'Press enter to open a Resource, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
+  'Press enter to open a Resource, shift enter to open and expand it, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
 
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default': RESOURCE_KEYS_DESCRIPTION,
@@ -241,6 +245,7 @@ export interface SpaceCanvasProps {
   readonly resourceEntityActions?: (
     resourceId: ResourceId,
     connect: EntityActionGroup,
+    openAndExpand?: (() => void) | null,
   ) => readonly EntityActionGroup[];
   /**
    * Presenting from a Resource, which `P` asks for: whether a Resource is one
@@ -378,7 +383,7 @@ export function SpaceCanvas({
   const spaceTitle = view.space.title;
   const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
   const addCanvasResource = useCallback(() => createResource(DEFAULT_KIND), [createResource]);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getZoom, setCenter } = useReactFlow();
 
   const spaces = useOpenSpaces();
   const thisSpaceId = spaceSession.getState().working.id;
@@ -527,6 +532,53 @@ export function SpaceCanvas({
    * Resource: the list is portalled out of it, so without the selection moving
    * into the list would withdraw the rail and the trigger the list hangs from.
    */
+  /**
+   * Open and expand (ADR 0137): one Edit Opening the Resource at the size its
+   * content needs, capped at what this canvas shows at the current zoom, after
+   * which the camera centres it at that zoom. The camera is the canvas's own,
+   * so only its own Map's Resources are given it.
+   */
+  const openAndExpand = useCallback(
+    (resourceId: ResourceId): void => {
+      const node = nodes.find((each) => each.data.resourceId === resourceId);
+      const resource = view.space.lookup.resource(resourceId);
+      const area = canvasRef.current;
+      if (node === undefined || resource === undefined || area === null) return;
+      if (!takesOpen(resource.kind)) return;
+      const zoom = getZoom();
+      const content = resolveResourceContent(view.space, resource);
+      const size = openAndExpandSize(
+        {
+          width: node.width ?? COLLAPSED_RESOURCE_SIZE.width,
+          height: node.height ?? COLLAPSED_RESOURCE_SIZE.height,
+        },
+        visibleCanvasCap(area.getBoundingClientRect(), zoom),
+        (at) => openHeight(area, node, content, at),
+      );
+      const result = authoring.complete({ kind: 'opened-resource-to-fit', resourceId, size });
+      if (result.kind === 'refused') return;
+      // Issued, never awaited (ADR 0043). The Resource's top-left stays where
+      // it is, so its new rect is known before the projection draws it.
+      void setCenter(node.position.x + size.width / 2, node.position.y + size.height / 2, {
+        zoom,
+        duration: 0,
+      });
+    },
+    [nodes, view.space, getZoom, setCenter, authoring],
+  );
+  /** Whether Open and expand is offered on a Resource of the canvas's own Map. */
+  const expandable = useCallback(
+    (resourceId: ResourceId): boolean => {
+      const resource = view.space.lookup.resource(resourceId);
+      return (
+        availability.authorOnCanvas &&
+        resource !== undefined &&
+        takesOpen(resource.kind) &&
+        nodes.some((node) => node.data.resourceId === resourceId)
+      );
+    },
+    [availability.authorOnCanvas, view.space, nodes],
+  );
   const resourceActions = useMemo(
     () =>
       resourceEntityActions === undefined
@@ -550,8 +602,17 @@ export function SpaceCanvas({
                     },
                   ]
                 : [],
+              expandable(resourceId) ? () => openAndExpand(resourceId) : null,
             ),
-    [resourceEntityActions, availability.authorOnCanvas, placedResources, selectResource, mapId],
+    [
+      resourceEntityActions,
+      availability.authorOnCanvas,
+      placedResources,
+      selectResource,
+      mapId,
+      expandable,
+      openAndExpand,
+    ],
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
     continuation: surface.continuation,
@@ -954,7 +1015,9 @@ export function SpaceCanvas({
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const opening = pressesBinding(CANVAS_KEYS.openResource, event.nativeEvent);
-    if (!opening && !pressesBinding(CANVAS_KEYS.showFullView, event.nativeEvent)) return;
+    const expanding = pressesBinding(CANVAS_KEYS.openAndExpand, event.nativeEvent);
+    if (!opening && !expanding && !pressesBinding(CANVAS_KEYS.showFullView, event.nativeEvent))
+      return;
     if (bodyEditing) return;
     // Load-bearing rather than defensive: an Open Resource draws its editor
     // *inside* the node, so a Space typed into it would otherwise be cancelled
@@ -968,6 +1031,12 @@ export function SpaceCanvas({
     const resourceId = resource.dataset['id'];
     if (resourceId === undefined) return;
     event.preventDefault();
+    if (expanding) {
+      // The canvas's own Map, whose camera frames the Resource it grows.
+      const target = resourceOfNode(nodes, resourceId);
+      if (target !== undefined && expandable(target)) openAndExpand(target);
+      return;
+    }
     if (!opening) {
       // Full View reads the canvas's own Map; a Map drawn inside a Space
       // Resource offers none.

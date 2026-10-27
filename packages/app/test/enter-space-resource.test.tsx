@@ -240,7 +240,7 @@ describe('entering a Space Resource', { timeout: 15_000 }, () => {
     expectMenuGroups(menu, [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Read in Full View', 'Present from Here'],
+      ['Open and Expand', 'Read in Full View', 'Present from Here'],
       ['Enter', 'Open in New Tab'],
       ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
       ['Remove from Map', 'Delete from Space'],

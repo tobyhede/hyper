@@ -3,6 +3,7 @@
 Status: accepted
 Supersedes: 0066
 Refines: 0064, 0084, 0093, 0106, 0113, 0114, 0121
+Refined by: 0137
 
 A Resource on a Map has a **size**, and whether it is Open is a separate fact. Until now they were one fact: a Closed Resource was always the fixed Closed Size, an Open one was its remembered Open Size, and Open and Close were what changed a Resource's size. An author who wanted a bigger diamond or a wider Markdown card had to Open it first, and Opening also changed what was drawn inside it and moved its neighbours. For an Ur Resource, which has no content, Open meant nothing except "bigger".
 

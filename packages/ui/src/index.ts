@@ -167,6 +167,7 @@ export {
   PlusIcon,
   RemoveFromMapIcon,
   FullViewIcon,
+  OpenAndExpandIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,
