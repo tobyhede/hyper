@@ -3562,7 +3562,7 @@ test('Escape discards a Reference Resource rename without undoing the Reference 
   await expect(page.getByTestId('persistence-status')).toHaveAttribute('data-revision', '1');
 });
 
-test('the Resource menu groups Create Reference, Connect, Present from Here, both copy links, then Remove and Delete', async ({
+test('the Resource menu groups Create Reference, Connect, Full View and Present from Here, both copy links, then Remove and Delete', async ({
   page,
 }) => {
   await page.goto('/');
@@ -3574,7 +3574,7 @@ test('the Resource menu groups Create Reference, Connect, Present from Here, bot
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Present from Here'],
+    ['Read in Full View', 'Present from Here'],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -3597,7 +3597,7 @@ test(
     const groups = [
       ['Create Reference'],
       ['Connect to Resource'],
-      ['Present from Here'],
+      ['Read in Full View', 'Present from Here'],
       ['Copy link to Resource in Map', 'Copy link to Resource'],
       ['Remove from Map', 'Delete from Space'],
     ];
@@ -3642,7 +3642,7 @@ test('Create Reference is drawn unavailable on a Reference Resource, still leadi
     [/^Create Reference/],
     ['Connect to Resource'],
     // A Resource created just now is on no Graph, so it has nowhere to present from.
-    [/^Present from Here/],
+    ['Read in Full View', /^Present from Here/],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],
   ]);

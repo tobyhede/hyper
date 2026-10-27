@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useImperativeHandle, useLayoutEffect, useRef, type ReactNode, type Ref } from 'react';
 import './stage.css';
 import './kinds/ur-stage.css';
 
@@ -14,6 +14,8 @@ export interface StageProps {
    * long Resource scrolled down does not leave the next one scrolled as far.
    */
   readonly contentKey: string;
+  /** The frame's scrolling body, for a caller that moves focus into it. */
+  readonly bodyRef?: Ref<HTMLDivElement | null>;
 }
 
 /**
@@ -29,8 +31,9 @@ export interface StageProps {
  * Presentational: it draws what it is given and owns no traversal, keys or
  * focus beyond its own body.
  */
-export function Stage({ children, chrome, label, contentKey }: StageProps) {
+export function Stage({ children, chrome, label, contentKey, bodyRef }: StageProps) {
   const body = useRef<HTMLDivElement>(null);
+  useImperativeHandle(bodyRef, () => body.current, []);
 
   useLayoutEffect(() => {
     if (body.current !== null) body.current.scrollTop = 0;

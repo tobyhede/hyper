@@ -176,6 +176,9 @@ export const createApp = (
       (resourceId: ResourceId) => presentsFrom(space, activeGraphId, resourceId),
       [space, activeGraphId],
     );
+    // Transient and read-only: no Edit, no address, nothing kept.
+    const [fullViewOf, setFullViewOf] = useState<ResourceId | null>(null);
+    const fullView = useMemo(() => ({ resourceId: fullViewOf, show: setFullViewOf }), [fullViewOf]);
     // Only the Space on screen presents from its canvas, and not while it is
     // already presenting: every open Space keeps its canvas mounted, and each
     // canvas answers `P` from the window.
@@ -194,6 +197,7 @@ export const createApp = (
       spaces,
       canPresentFrom,
       presentFrom: presentingWindow.presentFrom,
+      showFullView: setFullViewOf,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
     const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);
@@ -389,6 +393,7 @@ export const createApp = (
                   spaceResourceTargets={spaceResourceTargets.targets}
                   resourceEntityActions={resourceRailActions}
                   presentFrom={presentFromCanvas}
+                  fullView={fullView}
                 />
               </ReactFlowProvider>
             )}

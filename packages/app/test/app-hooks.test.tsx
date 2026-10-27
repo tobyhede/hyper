@@ -522,6 +522,7 @@ describe('useResourceRailActions', () => {
         spaces: null,
         canPresentFrom: () => false,
         presentFrom: null,
+        showFullView: null,
       }),
     );
   };
