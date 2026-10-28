@@ -302,10 +302,9 @@ export const OPEN_RESOURCE: CanvasCommand<OpenTarget> = {
   run: ({ occurrence, nodeId }) => occurrence.openResource(nodeId),
 };
 
-/** A Resource of the canvas's own Map, and whether a body edit holds the keyboard there. */
+/** A Resource of the canvas's own Map. */
 export interface OwnResourceTarget {
   readonly resourceId: ResourceId;
-  readonly bodyEditing: boolean;
 }
 
 /** What Open and expand needs of the canvas whose camera frames the Resource. */
@@ -324,22 +323,21 @@ export interface ExpandTarget extends OwnResourceTarget {
  * Open and expand (Shift+Enter, ADR 0137): Open a Resource of the canvas's own
  * Map at the size its content needs and centre the camera on it. Own Map only,
  * because the camera is the canvas's. Absent where the Resource cannot be
- * grown there or while a body is being edited.
+ * grown there.
  */
 export const OPEN_AND_EXPAND: CanvasCommand<ExpandTarget> = {
   id: 'canvas.openAndExpand',
   binding: CANVAS_KEYS.openAndExpand,
   aim: 'focused-resource',
   serves: 'own-map',
-  availability: ({ resourceId, bodyEditing, canvas }) =>
-    !bodyEditing && canvas.expandable(resourceId) ? AVAILABLE : ABSENT,
+  availability: ({ resourceId, canvas }) => (canvas.expandable(resourceId) ? AVAILABLE : ABSENT),
   run: ({ resourceId, canvas }) => canvas.openAndExpand(resourceId),
 };
 
 /**
  * Read in Full View (Space): read a Resource of the canvas's own Map in Full
- * View. Absent on a canvas that draws no Full View, wherever the canvas cannot
- * be selected on (while presenting), and while a body is being edited.
+ * View. Absent on a canvas that draws no Full View, and wherever the canvas
+ * cannot be selected on (while presenting).
  */
 export function showFullViewCommand(input: {
   readonly show: ((resourceId: ResourceId) => void) | undefined;
@@ -352,8 +350,7 @@ export function showFullViewCommand(input: {
     binding: CANVAS_KEYS.showFullView,
     aim: 'focused-resource',
     serves: 'own-map',
-    availability: ({ bodyEditing }) =>
-      show !== undefined && selectNodes && !bodyEditing ? AVAILABLE : ABSENT,
+    availability: () => (show !== undefined && selectNodes ? AVAILABLE : ABSENT),
     run: ({ resourceId }) => show?.(resourceId),
   };
 }
