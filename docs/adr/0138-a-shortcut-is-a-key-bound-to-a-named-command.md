@@ -31,3 +31,5 @@ The dispatcher is the keyboard's adapter over these commands, and the rail and t
 ## Consequences
 
 The command ids become the names tests and the sheet use for an action. The editor's Save and Cancel in `@project/ui`'s `MarkdownResourceBody` stay outside the keymap, because `ui` cannot depend on the application's table. Overrides are per browser by design: another browser, another origin, a private window or cleared site data starts from the defaults.
+
+The practices this design is reviewed against, each with an ID, a check and its sources, are in `.scratch/configurable-shortcuts/research.md`.

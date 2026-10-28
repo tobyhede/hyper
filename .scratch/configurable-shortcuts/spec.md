@@ -6,6 +6,8 @@ ADR 0138 (proposed). Every key the application answers becomes a key bound to a 
 
 Builds on the keyboard-shortcuts stack (`.scratch/keyboard-shortcuts/`, PRs #426–#430), merged into `main` on 2026-10-28. Every file, binding and test the tickets name is on `main` from then; this branch was cut before the stack and does not carry them. Ticket 01 is the follow-up the #426 review left open: one keydown dispatcher in place of the canvas's per-command listeners.
 
+Review each ticket against the practices in `research.md`, citing their IDs (`BP-*`).
+
 Not in scope: Undo (`.scratch/keyboard-shortcuts/issues/09-undo.md`), the editor's own Save and Cancel in `@project/ui`, and syncing overrides between browsers.
 
 | Ticket | What | Depends on |
