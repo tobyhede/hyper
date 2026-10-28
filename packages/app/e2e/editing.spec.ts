@@ -351,14 +351,14 @@ test(
     // `color-mix` in `markdown-resource-body.css` — the Resource's own muted ink,
     // washed. Not `--accent`, the chrome's highlighted-row fill, which on the
     // light theme is a near-white and would leave a selection nobody could see
-    // on the Resource's face.
+    // on cream.
     expect(
       await source.evaluate((element) =>
         getComputedStyle(element.firstElementChild ?? element, '::selection').getPropertyValue(
           'background-color',
         ),
       ),
-    ).toBe('color(srgb 0.301961 0.301961 0.301961 / 0.25)');
+    ).toBe('color(srgb 0.290196 0.313726 0.360784 / 0.25)');
 
     const exact = '# Exact\n\n  two spaces and `code`';
     await source.fill(exact);
@@ -454,7 +454,7 @@ test('the Markdown editor code loads only when a Markdown Resource opens', async
 });
 
 /**
- * The flat paper treatment ADR 0051 settled: a pale face, heavy ink rule, and a
+ * The flat paper treatment ADR 0051 settled: cream face, heavy ink rule, and a
  * mono body that is the writing surface rather than a form control.
  *
  * Pinned because nothing else asserts it. With the treatment colocated in its
@@ -476,22 +476,22 @@ test('the opened Resource draws Markdown and its editor on the same paper surfac
 
   await expect(resource.getByTestId('resource')).toHaveCSS(
     'background-color',
-    'rgb(255, 255, 255)',
+    'rgb(255, 250, 240)',
   );
   await (await controls(resource)).getByRole('button', { name: 'Edit Resource A' }).click();
 
   const source = page.locator('[data-slot="markdown-source-editor"]');
   await expect(source).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(source).toHaveCSS('color', 'rgb(17, 17, 17)');
+  await expect(source).toHaveCSS('color', 'rgb(18, 22, 28)');
 
   // The gutter remains legible through the Markdown body component's own theme;
   // application CSS does not reach through to CodeMirror classes (ADR 0063).
-  // `#4d4d4d` is `--canvas-resource-muted-color`, the Resource's own muted ink: this is
-  // drawn on the Resource's face, so it takes the role held to AA against both Resource faces
+  // `#4a505c` is `--canvas-resource-muted-color`, the Resource's own muted ink: this is
+  // drawn on cream, so it takes the role held to AA against both Resource faces
   // rather than the chrome's `--muted-foreground`, which is measured on paper.
   await expect(page.locator('[data-slot="markdown-source-line-numbers"]')).toHaveCSS(
     'color',
-    'rgb(77, 77, 77)',
+    'rgb(74, 80, 92)',
   );
 });
 

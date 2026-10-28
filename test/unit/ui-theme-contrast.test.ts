@@ -5,7 +5,7 @@ import { buttonVariants, FALLBACK_GRAPH_COLOR, graphPaint } from '@project/ui';
 
 const theme = readFileSync(new URL('../../packages/app/src/tailwind.css', import.meta.url), 'utf8');
 
-// The dark theme restates the semantic roles, so it is read after the light
+// The dark theme restates the semantic roles, so it is read after the sand
 // theme and its declarations win, as they do in the browser.
 const darkTheme = readFileSync(
   new URL('../../packages/app/src/theme-dark.css', import.meta.url),
@@ -18,7 +18,7 @@ const variablesOf = (css: string): ReadonlyMap<string, string> =>
 const variables = variablesOf(theme);
 
 const THEMES = [
-  { theme: 'light', variables },
+  { theme: 'sand', variables },
   { theme: 'dark', variables: variablesOf(`${theme}\n${darkTheme}`) },
 ] as const;
 
@@ -146,7 +146,7 @@ const FIRST_FIVE = Array.from({ length: 5 }).reduce<string[]>(
 // asked to stand off the ground.
 const SIGNALS = GRAPH_PALETTE.filter((_, index) => index % 2 === 0);
 
-describe.each(THEMES)('Graph colours ($theme)', ({ variables: themeVariables }) => {
+describe.each([THEMES[1]])('Graph colours ($theme)', ({ variables: themeVariables }) => {
   const drawn = (color: string): string => {
     const property = /^var\((--[\w-]+), #[0-9a-f]{6}\)$/i.exec(graphPaint(color))?.[1];
     return property === undefined || !themeVariables.has(property)

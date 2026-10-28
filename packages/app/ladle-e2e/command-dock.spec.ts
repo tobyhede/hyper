@@ -616,8 +616,7 @@ test(
 
     const finalStroke = await presentSvg.evaluate((element) => getComputedStyle(element).stroke);
     expect(finalStroke).not.toBe(initialStroke);
-    // Orange's stored slot, as the light theme paints it.
-    expect(finalStroke).toBe('rgb(162, 117, 0)');
+    expect(finalStroke).toBe('rgb(255, 127, 14)');
   },
 );
 

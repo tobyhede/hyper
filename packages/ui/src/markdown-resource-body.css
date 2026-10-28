@@ -135,7 +135,7 @@
   --markdown-source-content-padding-top: var(--markdown-resource-content-top);
   --markdown-source-focus-outline: none;
   /* The gutter's ink and its rule come from the **Resource's** muted tone, not the
-     chrome's. Both are drawn on the Resource's face, and `--canvas-resource-muted-color` is the
+     chrome's. Both are drawn on cream, and `--canvas-resource-muted-color` is the
      one role held to AA against both Resource faces
      (`test/unit/canvas-resource-contrast.test.ts`); the chrome's
      `--muted-foreground` is measured against paper and has no claim here. */
@@ -148,7 +148,7 @@
   );
   --markdown-source-gutter-width: var(--markdown-resource-gutter-width);
   --markdown-source-line-number-font-size: 12px;
-  /* Selection on the Resource's face. `--accent` is the chrome's highlighted row and is a
+  /* Selection on cream. `--accent` is the chrome's highlighted row and is a
      near-white on this face — a selection nobody can see. A wash of the Resource's
      own muted ink reads as a selection on both faces without introducing a
      colour, which on this surface would be a Graph's. */

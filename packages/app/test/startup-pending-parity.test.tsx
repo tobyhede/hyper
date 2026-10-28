@@ -115,7 +115,7 @@ const markWidth = (mark: Element | null | undefined): string => {
   return width;
 };
 
-/** Both sides through one CSS parser, so `#dcdcdc` and `rgb(220, 220, 220)` compare equal. */
+/** Both sides through one CSS parser, so `#e5dbc7` and `rgb(229, 219, 199)` compare equal. */
 const asColor = (value: string): string => {
   const probe = document.createElement('div');
   probe.style.color = value;
