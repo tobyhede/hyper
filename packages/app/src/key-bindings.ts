@@ -206,6 +206,20 @@ export const PRESENTING_KEYS = {
   },
 } as const satisfies Record<string, KeyBinding>;
 
+/**
+ * The keys answered everywhere the application takes keys, authoring and
+ * presenting alike. `?` is Shift+/ on many layouts and a key of its own on
+ * others, so it takes any press.
+ */
+export const HELP_KEYS = {
+  showShortcuts: {
+    keys: ['?'],
+    press: 'any',
+    ariaKeyShortcuts: '?',
+    description: 'Show the keyboard shortcuts',
+  },
+} as const satisfies Record<string, KeyBinding>;
+
 function sameKey(bound: string, pressed: string): boolean {
   return bound.length === 1 ? bound.toLowerCase() === pressed.toLowerCase() : bound === pressed;
 }
@@ -213,7 +227,10 @@ function sameKey(bound: string, pressed: string): boolean {
 /** Whether this press is one the binding answers. */
 export function pressesBinding(binding: KeyBinding, event: KeyboardEvent): boolean {
   if (!binding.keys.some((key) => sameKey(key, event.key))) return false;
-  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  // AltGr types a character, as Shift does, and a browser reports it as Ctrl
+  // and Alt held together: `?` is AltGr and a key on some layouts.
+  const altGraph = event.getModifierState('AltGraph');
+  if (event.metaKey || (!altGraph && (event.ctrlKey || event.altKey))) return false;
   if (binding.press === 'any') return true;
   return !event.repeat && event.shiftKey === (binding.press === 'shift');
 }

@@ -5,6 +5,7 @@ import {
   presentedName,
   resourceActions,
   selectResource,
+  selectedCanvas,
   settled,
   stage,
 } from './graph';
@@ -264,4 +265,71 @@ test('Page Down, Page Up and Home move through a presentation', async ({ page })
   await page.keyboard.press('Home');
   await expect(presentedName(page)).toHaveText('A');
   await expect(page.getByRole('button', { name: 'Back', exact: true })).toHaveCount(0);
+});
+
+/** `?` lists the keys of where the reader is: the canvas's while authoring. */
+test(
+  '? shows the authoring keys, and Escape closes the sheet',
+  { tag: '@parity:shortcut-sheet-lists-the-authoring-keys' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A')).toBeVisible();
+    await settled(page);
+    await selectedCanvas(page).focus();
+
+    await page.keyboard.press('Shift+?');
+    const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    await expect(sheet.getByRole('region', { name: 'On the canvas' })).toBeVisible();
+    await expect(sheet).toContainText('Present the Active Graph from the selected Resource');
+
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+  },
+);
+
+/** While presenting the sheet lists the presentation's keys, and its Escape is the sheet's alone. */
+test(
+  '? shows the presenting keys, and Escape closes the sheet while presenting goes on',
+  { tag: '@parity:shortcut-sheet-lists-the-presenting-keys' },
+  async ({ page }) => {
+    await page.goto('/');
+    const a = nodeByTitle(page, 'A').first();
+    await expect(a).toBeVisible();
+    await settled(page);
+    await selectResource(a);
+    await page.keyboard.press('p');
+    await expect(presentedName(page)).toHaveText('A');
+
+    await page.keyboard.press('Shift+?');
+    const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    await expect(sheet.getByRole('region', { name: 'While presenting' })).toBeVisible();
+    await expect(sheet).toContainText('Stop presenting');
+
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await expect(stage(page)).toBeVisible();
+    await expect(presentedName(page)).toHaveText('A');
+  },
+);
+
+/** Full View keeps every key it is pressed in to itself, but `?` still reaches the sheet. */
+test('? shows the sheet from inside Full View, and Escape closes only the sheet', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const a = nodeByTitle(page, 'A').first();
+  await expect(a).toBeVisible();
+  await settled(page);
+  await selectResource(a);
+  await page.keyboard.press('Space');
+  const fullView = page.getByRole('region', { name: 'Full View' });
+  await expect(fullView).toBeFocused();
+
+  await page.keyboard.press('Shift+?');
+  const sheet = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+  await expect(sheet.getByRole('region', { name: 'In Full View' })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(fullView).toBeVisible();
 });

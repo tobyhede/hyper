@@ -88,14 +88,6 @@ export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';
 export type { ResourceChoice, ResourceSearchComboboxProps } from './ResourceSearchCombobox';
 export {
-  Dialog,
-  DialogBackdrop,
-  DialogPopup,
-  DialogPortal,
-  DialogTitle,
-  DialogViewport,
-} from './Dialog';
-export {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -278,6 +270,13 @@ export {
 } from './components/input-group';
 export { Badge } from './components/badge';
 export { Kbd, KbdGroup } from './components/kbd';
+export { KeyShortcutKeys, type KeyShortcut } from './KeyShortcut';
+export {
+  KeyboardShortcutsDialog,
+  type KeyboardShortcutEntry,
+  type KeyboardShortcutSection,
+  type KeyboardShortcutsDialogProps,
+} from './KeyboardShortcutsDialog';
 export { Label } from './components/label';
 export { Separator } from './components/separator';
 export { Slider } from './components/slider';
