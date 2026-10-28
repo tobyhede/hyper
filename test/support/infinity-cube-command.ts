@@ -116,7 +116,7 @@ export const runInfinityCubeScript = (
   args: readonly string[],
   env: Readonly<Record<string, string>> = {},
 ): Promise<CommandResult> =>
-  runCommand('pnpm', ['--silent', 'infinity-cube', '--', ...args], {
+  runCommand('pnpm', ['--silent', 'cube', '--', ...args], {
     env,
     timeoutLabel: 'infinity-cube CLI command',
   });
