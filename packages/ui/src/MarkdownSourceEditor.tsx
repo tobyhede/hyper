@@ -88,7 +88,7 @@ const markdownSourceTheme = EditorView.theme({
   },
   // `--accent` is the chrome's highlighted-row fill, which is what a selection
   // is on chrome paper — but this editor's only mount today is an open Resource,
-  // whose face is cream rather than paper, and a fill picked for one ground is
+  // whose face is not chrome paper, and a fill picked for one ground is
   // a wash on the other. So the surface gets a say, through a custom property
   // like every other appearance decision a caller makes here; a caller still
   // never names a `.cm-*` class (ADR 0063).

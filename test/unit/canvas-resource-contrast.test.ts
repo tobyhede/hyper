@@ -27,7 +27,7 @@ const AA_BODY_TEXT = 4.5;
 const STAGE_TEXT = 7;
 
 // The dark theme restates the Resource's colour tokens, so it is read after the
-// sand theme and its declarations win, as they do in the browser.
+// light theme and its declarations win, as they do in the browser.
 const darkTheme = readFileSync(
   new URL('../../packages/app/src/theme-dark.css', import.meta.url),
   'utf8',
@@ -39,7 +39,7 @@ const tokensOf = (css: string): ReadonlyMap<string, string> =>
   );
 
 const THEMES = [
-  { theme: 'sand', tokens: tokensOf(`${theme}\n${resourceCss}`) },
+  { theme: 'light', tokens: tokensOf(`${theme}\n${resourceCss}`) },
   { theme: 'dark', tokens: tokensOf(`${theme}\n${resourceCss}\n${darkTheme}`) },
 ] as const;
 
