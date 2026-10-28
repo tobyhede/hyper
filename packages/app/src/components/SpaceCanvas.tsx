@@ -356,6 +356,10 @@ export function SpaceCanvas({
     reportEmbeddedMapEditing,
   } = canvasRendering;
   const nodes = useMemo(() => liveProjection?.nodes ?? [], [liveProjection]);
+  const latestNodes = useRef(nodes);
+  useLayoutEffect(() => {
+    latestNodes.current = nodes;
+  }, [nodes]);
   const edges = useMemo(() => liveProjection?.edges ?? [], [liveProjection]);
   // Null while a replacement placement resolves. The canvas keeps drawing the
   // Resources on screen through that window, so a connection is reachable with
@@ -528,11 +532,6 @@ export function SpaceCanvas({
       ? null
       : { from: connectingFrom, anchor: connecting.anchor };
   /**
-   * Connect to Resource, for placed Resources only. Choosing it selects the
-   * Resource: the list is portalled out of it, so without the selection moving
-   * into the list would withdraw the rail and the trigger the list hangs from.
-   */
-  /**
    * Open and expand (ADR 0137): one Edit Opening the Resource at the size its
    * content needs, capped at what this canvas shows at the current zoom, after
    * which the camera centres it at that zoom. The camera is the canvas's own,
@@ -540,7 +539,9 @@ export function SpaceCanvas({
    */
   const openAndExpand = useCallback(
     (resourceId: ResourceId): void => {
-      const node = nodes.find((each) => each.data.resourceId === resourceId);
+      // Read when pressed, so the action factory below is not rebuilt on every
+      // projection a drag or a selection publishes.
+      const node = latestNodes.current.find((each) => each.data.resourceId === resourceId);
       const resource = view.space.lookup.resource(resourceId);
       const area = canvasRef.current;
       if (node === undefined || resource === undefined || area === null) return;
@@ -564,7 +565,7 @@ export function SpaceCanvas({
         duration: 0,
       });
     },
-    [nodes, view.space, getZoom, setCenter, authoring],
+    [view.space, getZoom, setCenter, authoring],
   );
   /** Whether Open and expand is offered on a Resource of the canvas's own Map. */
   const expandable = useCallback(
@@ -574,11 +575,16 @@ export function SpaceCanvas({
         availability.authorOnCanvas &&
         resource !== undefined &&
         takesOpen(resource.kind) &&
-        nodes.some((node) => node.data.resourceId === resourceId)
+        placedResources.some((placed) => placed.id === resourceId)
       );
     },
-    [availability.authorOnCanvas, view.space, nodes],
+    [availability.authorOnCanvas, view.space, placedResources],
   );
+  /**
+   * Connect to Resource, for placed Resources only. Choosing it selects the
+   * Resource: the list is portalled out of it, so without the selection moving
+   * into the list would withdraw the rail and the trigger the list hangs from.
+   */
   const resourceActions = useMemo(
     () =>
       resourceEntityActions === undefined
@@ -1030,13 +1036,16 @@ export function SpaceCanvas({
     if (resource === null || !event.currentTarget.contains(resource)) return;
     const resourceId = resource.dataset['id'];
     if (resourceId === undefined) return;
-    event.preventDefault();
     if (expanding) {
-      // The canvas's own Map, whose camera frames the Resource it grows.
+      // The canvas's own Map, whose camera frames the Resource it grows. A
+      // Resource it cannot grow leaves the key alone.
       const target = resourceOfNode(nodes, resourceId);
-      if (target !== undefined && expandable(target)) openAndExpand(target);
+      if (target === undefined || !expandable(target)) return;
+      event.preventDefault();
+      openAndExpand(target);
       return;
     }
+    event.preventDefault();
     if (!opening) {
       // Full View reads the canvas's own Map; a Map drawn inside a Space
       // Resource offers none.

@@ -2,7 +2,7 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { COLLAPSED_RESOURCE_SIZE, type ResourceContent } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
-import { CanvasResource } from '@project/ui';
+import { CanvasResource, canvasResourceContentOverflow } from '@project/ui';
 
 /** A width and a height, in canvas units unless named otherwise. */
 export interface Extent {
@@ -106,13 +106,7 @@ export function openHeight(
         />,
       );
     });
-    let overflow = 0;
-    for (const element of frame.querySelectorAll(
-      '.canvas-resource__content, .canvas-resource__content *',
-    )) {
-      overflow = Math.max(overflow, element.scrollHeight - element.clientHeight);
-    }
-    return size.height + overflow;
+    return size.height + canvasResourceContentOverflow(frame);
   } finally {
     root.unmount();
     frame.remove();

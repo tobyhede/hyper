@@ -805,3 +805,18 @@ function ContentEditActions({ name, edit }: ContentEditActionsProps) {
     </>
   );
 }
+
+/**
+ * How far the content of a `CanvasResource` drawn inside `root` overflows the
+ * rect it is drawn at, in pixels: the most any element of its content area
+ * would scroll. `0` when it fits, or when `root` holds no Open content.
+ */
+export function canvasResourceContentOverflow(root: Element): number {
+  let overflow = 0;
+  for (const element of root.querySelectorAll(
+    '.canvas-resource__content, .canvas-resource__content *',
+  )) {
+    overflow = Math.max(overflow, element.scrollHeight - element.clientHeight);
+  }
+  return overflow;
+}

@@ -360,10 +360,10 @@ function resize(
 
 /**
  * Open a Resource in one Map and Resize it to the size given, as one Edit
- * (ADR 0137). The size is floored at the Closed Size on each axis, and the
- * Resources clear of it move as a {@link resize} moves them. The Open checks
- * come first, so an Ur Resource is refused `open-requires-content` and nothing
- * is resized. `unchanged` only for a Resource already Open at that size.
+ * (ADR 0137): {@link open} and then {@link resize} on what it answers, so it
+ * refuses what Open refuses and moves what Resize moves. The size is floored at
+ * the Closed Size on each axis. `unchanged` only for a Resource already Open at
+ * that size.
  */
 function openAndExpand(
   snapshot: SpaceSnapshot,
@@ -371,29 +371,18 @@ function openAndExpand(
   resourceId: UUID,
   size: Extent,
 ): SnapshotEditOutcome {
-  const placed = placedIn(snapshot, mapId);
-  if ('code' in placed) return refused(placed);
-  const at = placed.placement.get(resourceId);
-  if (at === undefined) return refused({ code: 'resource-not-in-map' });
-  const resource = snapshot.resources.find((candidate) => candidate.id === resourceId);
-  if (resource === undefined) return refused({ code: 'resource-not-found' });
-  if (!takesOpen(resource.document.kind)) return refused({ code: 'open-requires-content' });
-  const before = resourceSize(at);
-  const after = {
-    width: Math.max(size.width, COLLAPSED_RESOURCE_SIZE.width),
-    height: Math.max(size.height, COLLAPSED_RESOURCE_SIZE.height),
-  };
-  const sameSize = before.width === after.width && before.height === after.height;
-  if (sameSize) {
-    if (resourceOpen(at)) return UNCHANGED;
-    return withEntry(snapshot, mapId, placed.placement, resourceId, { ...at, open: true });
-  }
-  const grown = Placement.place(placed.placement, resourceId, {
-    ...at,
-    open: true,
-    size: after,
-  });
-  return withPlacement(snapshot, mapId, Placement.displace(grown, resourceId, before, after));
+  const opened = open(snapshot, mapId, resourceId);
+  if (opened.kind === 'refused') return opened;
+  const resized = resize(
+    opened.kind === 'completed' ? opened.snapshot : snapshot,
+    mapId,
+    resourceId,
+    {
+      width: Math.max(size.width, COLLAPSED_RESOURCE_SIZE.width),
+      height: Math.max(size.height, COLLAPSED_RESOURCE_SIZE.height),
+    },
+  );
+  return resized.kind === 'unchanged' ? opened : resized;
 }
 
 /**

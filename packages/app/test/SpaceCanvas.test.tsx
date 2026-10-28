@@ -31,6 +31,7 @@ import type { MapSurfacePolicy } from '../src/map-surface-policy';
 const RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
 const OTHER_RESOURCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000005');
 const REFERENCE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000006');
+const UR_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000007');
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const MAP_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000003');
 const GRAPH_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000004');
@@ -49,6 +50,7 @@ const snapshot = spaceSnapshotSchema.parse({
           [RESOURCE_ID]: { x: 0, y: 0, open: false },
           [OTHER_RESOURCE_ID]: { x: 300, y: 0, open: false },
           [REFERENCE_ID]: { x: 600, y: 0, open: false },
+          [UR_ID]: { x: 900, y: 0, open: false },
         },
         graphs: [{ id: GRAPH_ID, title: 'Graph', edges: [] }],
       },
@@ -62,6 +64,7 @@ const snapshot = spaceSnapshotSchema.parse({
       id: REFERENCE_ID,
       document: { title: 'A again', kind: 'reference', content: { target: RESOURCE_ID } },
     },
+    { id: UR_ID, document: { title: 'Gateway', kind: 'ur', content: {} } },
   ],
 });
 
@@ -431,6 +434,17 @@ it('opens and expands a focused Resource with Shift+Enter', async () => {
   fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
 
   expect(opened()).toEqual([RESOURCE_ID]);
+});
+
+it('leaves Shift+Enter alone on a Resource it cannot open and expand', async () => {
+  const { opened } = await mountGraph([resourceNode('Gateway', UR_ID, false, 'ur')]);
+
+  const focused = nodeOf(UR_ID);
+  focused.focus();
+  const unhandled = fireEvent.keyDown(focused, { key: 'Enter', shiftKey: true });
+
+  expect(unhandled).toBe(true);
+  expect(opened()).toEqual([]);
 });
 
 /**
