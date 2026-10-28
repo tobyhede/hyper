@@ -89,3 +89,15 @@ The one intended change in behaviour: Read in Full View on the rail now follows 
 
 - The architecture review is `reviews/architecture-review-keyboard-stack.html` in the project files.
 - Settled answers, Q1–Q14: fold into ticket 01; every canvas key is a command; three aims plus Delete's inside-canvas flag; keys stay silent when unavailable; one run path through command outcomes; target carries its occurrence, and each command declares *own Map* or *any*; the term is "Canvas command"; three availability answers; the Full View rail change is accepted; presenting keys are commands in a sibling module; React Flow keys stay bindings; tests go through availability and run; the canvas builds the commands and hands them to the rail; ADR 0138 is amended.
+
+## Tickets
+
+| Ticket | What | Blocked by |
+| --- | --- | --- |
+| 01 | Record Canvas commands in ADR 0138 and the glossary | none |
+| 02 | Present from Here is one Canvas command (tracer) | the stack merged, 01 |
+| 03 | Remove from Map reports one way | 02 |
+| 04 | Add Resource and Rename are Canvas commands | 02 |
+| 05 | Open, Open and expand and Full View are Canvas commands | 02 |
+| 06 | The presenting keys are commands | 02 |
+| 07 | One listener answers every key | 03, 04, 05, 06 |
