@@ -311,7 +311,7 @@ test('a Markdown Resource’s actions menu groups Create Reference, Connect, Ful
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Read in Full View', /^Present from Here/],
+    ['Open and Expand', 'Read in Full View', /^Present from Here/],
     ['Copy link to Resource in Map', 'Copy link to Resource'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -335,7 +335,7 @@ test('a Reference Resource’s actions menu keeps Create Reference leading, draw
   await expectMenuGroups(menu, [
     [/^Create Reference/],
     ['Connect to Resource'],
-    ['Read in Full View', /^Present from Here/],
+    ['Open and Expand', 'Read in Full View', /^Present from Here/],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Target'],
     ['Remove from Map', 'Delete from Space'],
   ]);
@@ -357,7 +357,7 @@ test('a Space Resource’s actions menu groups Create Reference, Connect, Full V
   await expectMenuGroups(menu, [
     ['Create Reference'],
     ['Connect to Resource'],
-    ['Read in Full View', /^Present from Here/],
+    ['Open and Expand', 'Read in Full View', /^Present from Here/],
     ['Enter', 'Open in New Tab'],
     ['Copy link to Resource in Map', 'Copy link to Resource', 'Copy link to Space'],
     ['Remove from Map', 'Delete from Space'],

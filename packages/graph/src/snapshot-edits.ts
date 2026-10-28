@@ -1,4 +1,5 @@
 import {
+  COLLAPSED_RESOURCE_SIZE,
   titleName,
   resourceOpen,
   resourceShape,
@@ -36,7 +37,7 @@ import { Placement } from './placement';
  *
  * Operations arrive with their first real caller rather than ahead of one.
  * Both callers create and delete through `createInMap` and `deleteFromSpace`;
- * `open`, `close`, `resize`, `changeResourceShape`, `addToMap` and
+ * `open`, `close`, `resize`, `openAndExpand`, `changeResourceShape`, `addToMap` and
  * `removeFromMap` are Space Authoring's alone.
  */
 
@@ -358,6 +359,33 @@ function resize(
 }
 
 /**
+ * Open a Resource in one Map and Resize it to the size given, as one Edit
+ * (ADR 0137): {@link open} and then {@link resize} on what it answers, so it
+ * refuses what Open refuses and moves what Resize moves. The size is floored at
+ * the Closed Size on each axis. `unchanged` only for a Resource already Open at
+ * that size.
+ */
+function openAndExpand(
+  snapshot: SpaceSnapshot,
+  mapId: UUID,
+  resourceId: UUID,
+  size: Extent,
+): SnapshotEditOutcome {
+  const opened = open(snapshot, mapId, resourceId);
+  if (opened.kind === 'refused') return opened;
+  const resized = resize(
+    opened.kind === 'completed' ? opened.snapshot : snapshot,
+    mapId,
+    resourceId,
+    {
+      width: Math.max(size.width, COLLAPSED_RESOURCE_SIZE.width),
+      height: Math.max(size.height, COLLAPSED_RESOURCE_SIZE.height),
+    },
+  );
+  return resized.kind === 'unchanged' ? opened : resized;
+}
+
+/**
  * Draw an Ur Resource in another Shape in one Map (ADR 0121). Every other
  * kind is the rectangle, so a Shape Edit on one is refused whatever it asks for.
  *
@@ -461,6 +489,7 @@ export const SnapshotEdit = {
   open,
   close,
   resize,
+  openAndExpand,
   changeResourceShape,
   addToMap,
   removeFromMap,

@@ -6,6 +6,7 @@ import {
   beginEditing,
   beginReplacing,
   CanvasResource,
+  canvasResourceContentOverflow,
   CLOSED_DISPLAY,
   type KindOperations,
   type ResourceDisplay,
@@ -1731,6 +1732,26 @@ describe('CanvasResource Space Resource', () => {
       />,
     );
     expect(screen.queryByRole('button', { name: /Enter/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('how far an Open Resource overflows', () => {
+  it('answers the most any element of its content would scroll, and nothing outside one', () => {
+    const { container } = render(
+      <CanvasResource
+        kindOperations={{ kind: 'markdown' }}
+        display={opened({ kind: 'markdown', source: 'Long body', via: 'self' })}
+        state="rest"
+        title="Strategies"
+        graphColor="#ffc53d"
+      />,
+    );
+    const text = screen.getByText('Long body');
+    Object.defineProperty(text, 'scrollHeight', { value: 420 });
+    Object.defineProperty(text, 'clientHeight', { value: 100 });
+
+    expect(canvasResourceContentOverflow(container)).toBe(320);
+    expect(canvasResourceContentOverflow(document.createElement('div'))).toBe(0);
   });
 });
 

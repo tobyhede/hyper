@@ -188,6 +188,62 @@ test('Space reads a Resource in Full View, walks the Active Graph and leaves', a
   await expect(b.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
 });
 
+/**
+ * Shift+Enter Opens D, the fixture's long Resource, and grows it to fit its
+ * content in one Edit: its text no longer overflows, A′ to its right makes
+ * room, and the camera frames the whole of it. The Actions menu's Open and
+ * Expand is the same Edit.
+ */
+test('Shift+Enter and Open and Expand open a Resource grown to fit its content', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const d = nodeByTitle(page, 'D').first();
+  const neighbour = nodeByTitle(page, 'A′').first();
+  await expect(d).toBeVisible();
+  await settled(page);
+  const gapOf = async () => {
+    const [left, right] = await Promise.all([d.boundingBox(), neighbour.boundingBox()]);
+    if (left === null || right === null) throw new Error('D and A′ are drawn');
+    return { left, gap: right.x - (left.x + left.width) };
+  };
+  const closed = await gapOf();
+  const persistence = page.getByTestId('persistence-status');
+  const revision = Number(await persistence.getAttribute('data-revision'));
+
+  await selectResource(d);
+  await page.keyboard.press('Shift+Enter');
+
+  await expect(d.locator('.canvas-resource[data-open="true"]')).toHaveCount(1);
+  await expect(persistence).toHaveAttribute('data-revision', String(revision + 1));
+  await settled(page);
+  const body = d.locator('.markdown-resource-body__rendered');
+  await expect(body).toContainText('fifteen');
+  expect(
+    await body.evaluate((element) => element.scrollHeight - element.clientHeight),
+  ).toBeLessThanOrEqual(1);
+  const open = await gapOf();
+  expect(open.left.width).toBeGreaterThan(closed.left.width);
+  expect(open.left.height).toBeGreaterThan(closed.left.height);
+  // A′ took the width change, so the room between them is what it was.
+  expect(Math.abs(open.gap - closed.gap)).toBeLessThanOrEqual(1);
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  expect(open.left.x).toBeGreaterThanOrEqual(0);
+  expect(open.left.y).toBeGreaterThanOrEqual(0);
+  expect(open.left.x + open.left.width).toBeLessThanOrEqual(viewport?.width ?? 0);
+  expect(open.left.y + open.left.height).toBeLessThanOrEqual(viewport?.height ?? 0);
+
+  // Already Open at the size it fits: the same Edit again changes nothing.
+  await (
+    await resourceActions(page, 'D')
+  )
+    .getByRole('menuitem', { name: 'Open and Expand' })
+    .click();
+  await settled(page);
+  await expect(persistence).toHaveAttribute('data-revision', String(revision + 1));
+});
+
 /** A presentation clicker sends Page Down and Page Up; Home goes back to where the presentation began. */
 test('Page Down, Page Up and Home move through a presentation', async ({ page }) => {
   await page.goto('/');

@@ -12,7 +12,11 @@ export { PresentedResource } from './PresentedResource';
 export type { PresentedResourceProps } from './PresentedResource';
 export { Stage } from './Stage';
 export type { StageProps } from './Stage';
-export { CanvasResource, CANVAS_RESOURCE_DRAG_TILT_DEGREES } from './CanvasResource';
+export {
+  CanvasResource,
+  CANVAS_RESOURCE_DRAG_TILT_DEGREES,
+  canvasResourceContentOverflow,
+} from './CanvasResource';
 export { atRest, CLOSED_DISPLAY } from './resource-display';
 export { beginEditing } from './kinds/markdown';
 export { beginReplacing } from './kinds/image';
@@ -167,6 +171,7 @@ export {
   PlusIcon,
   RemoveFromMapIcon,
   FullViewIcon,
+  OpenAndExpandIcon,
   ZoomInIcon,
   ZoomOutIcon,
   PresentIcon,

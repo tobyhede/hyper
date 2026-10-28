@@ -844,6 +844,69 @@ describe('SnapshotEdit.open, close and resize properties', () => {
     coverage.expectEveryCaseGenerated();
   });
 
+  it('Opens and expands as one Edit, the Open then the Resize it stands for', () => {
+    fc.assert(
+      fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
+        const subjectId = RESOURCE_IDS[subjectIndex];
+        if (subjectId === undefined) return;
+        const start = snapshotOf(markdownSubject(generated, subjectIndex));
+        const outcome = SnapshotEdit.openAndExpand(start, MAP_ID, subjectId, size);
+
+        const opened = settled(start, SnapshotEdit.open(start, MAP_ID, subjectId));
+        const stepwise = settled(opened, SnapshotEdit.resize(opened, MAP_ID, subjectId, size));
+        if (stepwise === start) {
+          expect(outcome).toEqual({ kind: 'unchanged' });
+          return;
+        }
+        expect(positionsOf(completed(outcome))).toEqual(positionsOf(stepwise));
+      }),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+
+  it('floors an Open and expand at the Closed Size on each axis', () => {
+    fc.assert(
+      fc.property(
+        entriesArb,
+        subjectArb,
+        fc.record({ width: fc.nat({ max: 900 }), height: fc.nat({ max: 900 }) }),
+        (generated, subjectIndex, size) => {
+          const subjectId = RESOURCE_IDS[subjectIndex];
+          if (subjectId === undefined) return;
+          const start = snapshotOf(
+            with_(markdownSubject(generated, subjectIndex), subjectIndex, { open: false }),
+          );
+          const grown = completed(SnapshotEdit.openAndExpand(start, MAP_ID, subjectId, size));
+          const at = positionsOf(grown)[subjectId];
+
+          expect(at?.open).toBe(true);
+          expect(resourceSize(at ?? {}).width).toBe(
+            Math.max(size.width, COLLAPSED_RESOURCE_SIZE.width),
+          );
+          expect(resourceSize(at ?? {}).height).toBe(
+            Math.max(size.height, COLLAPSED_RESOURCE_SIZE.height),
+          );
+        },
+      ),
+      { seed: SEED, numRuns: RUNS },
+    );
+  });
+
+  it('refuses to Open and expand an Ur Resource, resizing nothing', () => {
+    fc.assert(
+      fc.property(entriesArb, subjectArb, sizeArb, (generated, subjectIndex, size) => {
+        const subjectId = RESOURCE_IDS[subjectIndex];
+        if (subjectId === undefined) return;
+        const snapshot = snapshotOf(with_(generated, subjectIndex, { kind: 'ur', open: false }));
+
+        expect(SnapshotEdit.openAndExpand(snapshot, MAP_ID, subjectId, size)).toEqual({
+          kind: 'refused',
+          refusal: { code: 'open-requires-content' },
+        });
+      }),
+    );
+  });
+
   it('answers unchanged for a Resize to the Closed Size of an entry storing none', () => {
     fc.assert(
       fc.property(entriesArb, subjectArb, (generated, subjectIndex) => {
@@ -863,14 +926,19 @@ describe('SnapshotEdit.open, close and resize properties', () => {
       fc.property(
         entriesArb,
         fc.uuid().map(uuid),
-        fc.constantFrom<'open' | 'close' | 'resize'>('open', 'close', 'resize'),
+        fc.constantFrom<'open' | 'close' | 'resize' | 'openAndExpand'>(
+          'open',
+          'close',
+          'resize',
+          'openAndExpand',
+        ),
         (entries, stranger, operation) => {
           fc.pre(!RESOURCE_IDS.some((id) => id === stranger) && stranger !== MAP_ID);
           const snapshot = snapshotOf(entries);
           const subjectId = RESOURCE_IDS[0];
           const run = (mapId: UUID, resourceId: UUID) =>
-            operation === 'resize'
-              ? SnapshotEdit.resize(snapshot, mapId, resourceId, { width: 560, height: 420 })
+            operation === 'resize' || operation === 'openAndExpand'
+              ? SnapshotEdit[operation](snapshot, mapId, resourceId, { width: 560, height: 420 })
               : SnapshotEdit[operation](snapshot, mapId, resourceId);
 
           expect(run(stranger, subjectId)).toEqual({
