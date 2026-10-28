@@ -6,10 +6,15 @@ import { Button } from '../Button';
 import { cn } from '#lib/utils';
 
 /*
- * shadcn's `base-nova` Dialog, written from the registry's shape because the
- * registry cannot be reached from where it was added. Hyper's extension is
- * `AlertDialogContent`'s: the portal follows the document the content renders
- * in, so a Ladle story's iframe keeps its dialog and focus trap.
+ * shadcn's `base-nova` Dialog: `apps/v4/registry/bases/base/ui/dialog.tsx` in
+ * shadcn-ui/ui with `style-nova.css`'s `cn-dialog-*` classes written out,
+ * because the registry endpoint cannot be reached from this environment. It
+ * differs from that source where `alert-dialog.tsx` does: the overlay takes
+ * `bg-foreground/10`, the popup a `shadow-lg`, the close button the `icon`
+ * size, and the portal follows the document the content renders in, so a
+ * Ladle story's iframe keeps its dialog and focus trap. `DialogFooter` is left
+ * out, as nothing here draws one. Only `KeyboardShortcutsDialog` composes it,
+ * so `@project/ui` exports none of it.
  */
 
 function Dialog(props: DialogPrimitive.Root.Props) {
@@ -104,7 +109,10 @@ function DialogDescription({ className, ...props }: DialogPrimitive.Description.
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn(
+        'text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground',
+        className,
+      )}
       {...props}
     />
   );

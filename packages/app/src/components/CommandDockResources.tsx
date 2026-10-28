@@ -57,12 +57,15 @@ function CreatePeers({ creates }: { readonly creates: readonly DockCreate[] }) {
           size="icon"
           className="nokey"
           aria-label={`Create ${resourceKindName(kind)}`}
-          // The canvas's C creates the default kind, so its button teaches it.
+          // The canvas's C creates the default kind, so its button teaches it,
+          // while C can create one.
           aria-keyshortcuts={
-            kind === DEFAULT_KIND ? CANVAS_KEYS.addResource.ariaKeyShortcuts : undefined
+            kind === DEFAULT_KIND && !disabled
+              ? CANVAS_KEYS.addResource.ariaKeyShortcuts
+              : undefined
           }
           title={
-            kind === DEFAULT_KIND
+            kind === DEFAULT_KIND && !disabled
               ? `Create ${resourceKindName(kind)} (${CANVAS_KEYS.addResource.ariaKeyShortcuts})`
               : `Create ${resourceKindName(kind)}`
           }

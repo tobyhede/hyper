@@ -179,7 +179,11 @@ export function resourceRailGroups(
             id: 'present-from-here',
             label: 'Present from Here',
             icon: <PresentIcon color="currentColor" />,
-            shortcut: shortcutOf(CANVAS_KEYS.presentFromHere),
+            // P answers only where the item does, so a disabled item teaches no key.
+            shortcut:
+              present.available && present.onActiveGraph
+                ? shortcutOf(CANVAS_KEYS.presentFromHere)
+                : undefined,
             disabled: !present.available || !present.onActiveGraph,
             description: !present.onActiveGraph
               ? PRESENT_OFF_GRAPH

@@ -495,6 +495,15 @@ describe('a held replacement draws the Dock menu buttons unavailable', () => {
     });
   });
 
+  it('teaches no C on a Create button it draws unavailable', async () => {
+    await renderDock(<Replacing />);
+    const create = within(dock()).getByRole('button', { name: 'Create Markdown Resource' });
+
+    await waitFor(() => expect(unavailable(create)).toBe(true));
+    expect(create).not.toHaveAttribute('aria-keyshortcuts');
+    expect(create).toHaveAttribute('title', 'Create Markdown Resource');
+  });
+
   it('opens no menu when one is pressed', async () => {
     await renderDock(<Replacing />);
     await waitFor(() => expect(unavailable(menuButtons()[0] ?? dock())).toBe(true));

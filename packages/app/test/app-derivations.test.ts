@@ -243,6 +243,8 @@ describe('resourceRailGroups', () => {
       .flat()
       .find(({ id }) => id === 'present-from-here');
     expect(row).toMatchObject({ disabled: true, description: PRESENT_OFF_GRAPH });
+    // P does nothing here, so the item teaches no key.
+    expect(row?.shortcut).toBeUndefined();
   });
 
   it('draws Present from Here unavailable, saying why, while an edit holds the keyboard', () => {
@@ -253,6 +255,8 @@ describe('resourceRailGroups', () => {
       .flat()
       .find(({ id }) => id === 'present-from-here');
     expect(row).toMatchObject({ disabled: true, description: PRESENT_WHILE_EDITING });
+    // P does nothing here, so the item teaches no key.
+    expect(row?.shortcut).toBeUndefined();
   });
 
   it.each<Resource>([

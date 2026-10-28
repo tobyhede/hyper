@@ -88,17 +88,6 @@ export type { ResourceKindIconProps } from './ResourceKindIcon';
 export { ResourceSearchCombobox } from './ResourceSearchCombobox';
 export type { ResourceChoice, ResourceSearchComboboxProps } from './ResourceSearchCombobox';
 export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
-} from './components/dialog';
-export {
   Command,
   CommandEmpty,
   CommandGroup,

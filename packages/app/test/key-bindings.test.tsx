@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CANVAS_KEYS,
   FULL_VIEW_KEYS,
+  HELP_KEYS,
   keyBelongsElsewhere,
   PRESENTING_KEYS,
   pressesBinding,
@@ -83,6 +84,14 @@ describe('the binding table', () => {
       }
     },
   );
+
+  it('takes a character typed with AltGr, which a browser reports as Ctrl and Alt', () => {
+    const altGraph = { ctrlKey: true, altKey: true, modifierAltGraph: true };
+    expect(pressesBinding(HELP_KEYS.showShortcuts, press('?', altGraph))).toBe(true);
+    expect(
+      pressesBinding(HELP_KEYS.showShortcuts, press('?', { ctrlKey: true, altKey: true })),
+    ).toBe(false);
+  });
 
   it('announces a non-empty shortcut and description for every binding', () => {
     for (const [, binding] of ALL_BINDINGS) {
