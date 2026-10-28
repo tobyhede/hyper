@@ -185,7 +185,7 @@ describe('decorateSharedResourceNode', () => {
         context({ resourceEntityActions }),
       ).entityActions,
     ).toBe(groups);
-    expect(resourceEntityActions).toHaveBeenCalledWith(RESOURCE_ID, false);
+    expect(resourceEntityActions).toHaveBeenCalledWith(RESOURCE_ID);
     expect(
       decorateSharedResourceNode(
         projectionNode(RESOURCE_ID, 'markdown'),
