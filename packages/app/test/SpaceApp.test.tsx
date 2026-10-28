@@ -42,6 +42,7 @@ import {
 } from './command-dock';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { PRESENT_OFF_GRAPH, PRESENT_WHILE_EDITING } from '../src/canvas-commands';
 import type { MapSurface } from '../src/map-surface';
 import type { MapView } from '../src/map-view';
 import { refusingFullscreen } from './fullscreen';
@@ -237,8 +238,10 @@ const presentableMeta = (): SpaceSnapshot => {
   };
 };
 
-const openPresentable = async (others: readonly SpaceSnapshot[] = []) => {
-  const first = presentableMeta();
+const openPresentable = async (
+  others: readonly SpaceSnapshot[] = [],
+  first: SpaceSnapshot = presentableMeta(),
+) => {
   const backend = new MemorySpaceBackend(
     SPACE_ID,
     [first, ...others].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
@@ -262,11 +265,19 @@ const openPresentable = async (others: readonly SpaceSnapshot[] = []) => {
   return { spaces, initial };
 };
 
-const pressP = async (): Promise<void> => {
+const pressP = async (target: Element = document.body): Promise<void> => {
   await act(async () => {
-    fireEvent.keyDown(document.body, { key: 'p' });
+    fireEvent.keyDown(target, { key: 'p' });
     await Promise.resolve();
   });
+};
+
+/** Focus the presentable Resource's node, as a click on it would, and return it. */
+const focusResource = (): HTMLElement => {
+  const node = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${RESOURCE_ID}"]`);
+  if (node === null) throw new Error('the presentable Resource is drawn');
+  act(() => node.focus());
+  return node;
 };
 
 /** `P` is answered on the window by every mounted canvas, so the Space it reaches is App's to decide. */
@@ -293,6 +304,66 @@ describe('the P shortcut across open Spaces', () => {
     await pressP();
 
     expect(canRetreat(initial.app.navigation.getState())).toBe(true);
+  });
+});
+
+/**
+ * Present from Here's rail item and `P` run one Canvas command, so they answer
+ * alike. `P` is pressed where focus is: closing the rail's menu leaves it on the
+ * Actions trigger, whose toolbar keeps its keys from the canvas, so the reader
+ * returns to the selected Resource to press it.
+ */
+describe('Present from Here, by key and on the rail', () => {
+  const presentItem = async (): Promise<HTMLElement> => {
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Actions for Resource First Resource' }),
+    );
+    return screen.findByRole('menuitem', { name: /^Present from Here/ });
+  };
+  const closeMenu = async (): Promise<void> => {
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+  };
+  const pressPOnTheResource = (): Promise<void> => pressP(focusResource());
+
+  it('offers the item and answers the key on the Active Graph', async () => {
+    const { initial } = await openPresentable();
+
+    expect(await presentItem()).not.toHaveAttribute('aria-disabled', 'true');
+    await closeMenu();
+    await pressPOnTheResource();
+
+    expect(initial.app.navigation.getState().mode).toBe('presenting');
+  });
+
+  it('greys the item with the reason off the Active Graph, and leaves the key alone', async () => {
+    const { initial } = await openPresentable([], snapshot('First Space', 'First Resource', 0, 0));
+
+    const item = await presentItem();
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(within(screen.getByRole('menu')).getByText(PRESENT_OFF_GRAPH)).toBeVisible();
+    await closeMenu();
+    await pressPOnTheResource();
+
+    expect(initial.app.navigation.getState().mode).toBe('overview');
+  });
+
+  it('greys the item with the reason while an edit is in progress, and leaves the key alone', async () => {
+    const { initial } = await openPresentable();
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Resource First Resource' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource First Resource' }));
+    await screen.findByRole('textbox', { name: 'Markdown source of First Resource' });
+
+    const item = await presentItem();
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(within(screen.getByRole('menu')).getByText(PRESENT_WHILE_EDITING)).toBeVisible();
+    await closeMenu();
+    expect(
+      screen.getByRole('textbox', { name: 'Markdown source of First Resource' }),
+    ).toBeInTheDocument();
+    await pressPOnTheResource();
+
+    expect(initial.app.navigation.getState().mode).toBe('overview');
   });
 });
 
@@ -1936,5 +2007,82 @@ describe('Space app Map reading', () => {
     );
     // The canvas draws the Space title off the same answered view.
     expect(screen.getByTestId('hud-space')).toHaveTextContent('Answered Space');
+  });
+});
+
+/**
+ * Every key the application answers is answered by a Space's dispatcher
+ * (ADR 0138): no command adds a listener of its own.
+ */
+describe('the keys a Space answers', () => {
+  const pressQuestionMark = async (target: Element): Promise<void> => {
+    await act(async () => {
+      fireEvent.keyDown(target, { key: '?' });
+      await Promise.resolve();
+    });
+  };
+
+  /**
+   * Two other window key listeners are not commands: Edge Authoring's, which
+   * reads whether Alt is held during a connection drag, and React Flow's own
+   * `useKeyPress`, whose keys (Shift+arrow's nudge, Escape's unselect) are the
+   * bindings no command performs yet.
+   */
+  it('adds no window key listener but the dispatcher’s, authoring and presenting', async () => {
+    const added = vi.spyOn(window, 'addEventListener');
+    try {
+      const { initial } = await openPresentable();
+      await pressP();
+      expect(initial.app.navigation.getState().mode).toBe('presenting');
+
+      const keyListeners = added.mock.calls
+        .filter(([type]) => type === 'keydown')
+        .map(([, listener]) => (listener instanceof Function ? listener.name : 'an object'));
+      expect(keyListeners).toContain('dispatchKey');
+      expect(new Set(keyListeners.filter((name) => name !== 'dispatchKey'))).toEqual(
+        new Set(['downHandler', 'updateModifier']),
+      );
+    } finally {
+      added.mockRestore();
+    }
+  });
+
+  it('opens the shortcut sheet with ? from the canvas, from Full View and while presenting', async () => {
+    const { initial } = await openPresentable();
+    const sheet = () => screen.queryByRole('dialog', { name: 'Keyboard shortcuts' });
+
+    await pressQuestionMark(document.body);
+    expect(sheet()).toBeVisible();
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('dialog', { name: 'Keyboard shortcuts' }), {
+        key: 'Escape',
+      });
+      await Promise.resolve();
+    });
+    expect(sheet()).toBeNull();
+
+    const node = focusResource();
+    await act(async () => {
+      fireEvent.keyDown(node, { key: ' ' });
+      await Promise.resolve();
+    });
+    const fullView = screen.getByRole('region', { name: 'Full View' });
+    await pressQuestionMark(fullView);
+    expect(sheet()).toBeVisible();
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('dialog', { name: 'Keyboard shortcuts' }), {
+        key: 'Escape',
+      });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('region', { name: 'Full View' }), { key: 'Escape' });
+      await Promise.resolve();
+    });
+
+    await pressP();
+    expect(initial.app.navigation.getState().mode).toBe('presenting');
+    await pressQuestionMark(document.body);
+    expect(sheet()).toBeVisible();
   });
 });

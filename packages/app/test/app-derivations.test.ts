@@ -9,10 +9,16 @@ import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';
 import {
+  ABSENT,
+  AVAILABLE,
   PRESENT_OFF_GRAPH,
   PRESENT_WHILE_EDITING,
-  resourceRailGroups,
-} from '../src/resource-rail-actions';
+  unavailable,
+  type BoundCommand,
+  type CanvasCommandId,
+  type CommandAvailability,
+} from '../src/canvas-commands';
+import { resourceRailGroups, type ResourceRailCommands } from '../src/resource-rail-actions';
 import { revealStep } from '../src/resources-disclosure';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import { spaceTitlesById } from '../src/space-resource-targets';
@@ -205,20 +211,25 @@ describe('activeGraphOf', () => {
 });
 
 describe('resourceRailGroups', () => {
+  const bound = (id: CanvasCommandId, availability: CommandAvailability): BoundCommand => ({
+    id,
+    run: () => undefined,
+    availability,
+  });
   const addresses: readonly EntityActionGroup[] = [
     [{ id: 'copy-link', label: 'Copy link', onSelect: () => 'done' }],
   ];
   const connect: EntityActionGroup = [
     { id: 'connect-resource', label: 'Connect to Resource', onSelect: () => 'done' },
   ];
-  const everything = {
+  const everything: ResourceRailCommands = {
     createReference: (): EntityActionOutcome => 'done',
-    removeFromMap: () => undefined,
+    removeFromMap: bound('canvas.removeSelection', AVAILABLE),
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
-    present: { run: () => undefined, available: true, onActiveGraph: true },
-    fullView: () => undefined,
-    openAndExpand: () => undefined,
+    present: bound('canvas.presentFromHere', AVAILABLE),
+    fullView: bound('canvas.showFullView', AVAILABLE),
+    openAndExpand: bound('canvas.openAndExpand', AVAILABLE),
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -238,7 +249,7 @@ describe('resourceRailGroups', () => {
   it('draws Present from Here unavailable, saying why, off the Active Graph', () => {
     const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
       ...everything,
-      present: { run: () => undefined, available: true, onActiveGraph: false },
+      present: bound('canvas.presentFromHere', unavailable(PRESENT_OFF_GRAPH)),
     })
       .flat()
       .find(({ id }) => id === 'present-from-here');
@@ -250,7 +261,7 @@ describe('resourceRailGroups', () => {
   it('draws Present from Here unavailable, saying why, while an edit holds the keyboard', () => {
     const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
       ...everything,
-      present: { run: () => undefined, available: false, onActiveGraph: true },
+      present: bound('canvas.presentFromHere', unavailable(PRESENT_WHILE_EDITING)),
     })
       .flat()
       .find(({ id }) => id === 'present-from-here');
@@ -288,12 +299,12 @@ describe('resourceRailGroups', () => {
       ids(
         resourceRailGroups(resource(PLACED_A), addresses, connect, {
           createReference: null,
-          removeFromMap: null,
+          removeFromMap: bound('canvas.removeSelection', ABSENT),
           deleteFromSpace: null,
           enter: null,
-          present: null,
-          fullView: null,
-          openAndExpand: null,
+          present: bound('canvas.presentFromHere', ABSENT),
+          fullView: bound('canvas.showFullView', ABSENT),
+          openAndExpand: bound('canvas.openAndExpand', ABSENT),
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);

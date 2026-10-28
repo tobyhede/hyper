@@ -153,7 +153,7 @@ export const FULL_VIEW_KEYS = {
 export const PRESENTING_KEYS = {
   // A presentation clicker sends Page Down and Page Up, so they move through
   // the talk as Right and Left do, once the content they land in has no
-  // further to scroll (`presenting-keys.ts`).
+  // further to scroll (`presenting-commands.ts`).
   advance: {
     keys: ['ArrowRight', 'PageDown', ' '],
     press: 'any',
@@ -219,6 +219,45 @@ export const HELP_KEYS = {
     description: 'Show the keyboard shortcuts',
   },
 } as const satisfies Record<string, KeyBinding>;
+
+/**
+ * Every command a key performs, by its id, and the keys that perform it until a
+ * reader's overrides exist (ADR 0138). The ids are written out rather than read
+ * from the tables' property names, so a table can be renamed or reorganised
+ * without renaming a command or orphaning a reader's override of it. A binding
+ * absent here is one no command performs: React Flow's nudge and unselect, and
+ * the arrow walks the canvas and Full View answer on their own elements.
+ */
+const DEFAULT_KEYMAP = {
+  'canvas.addResource': CANVAS_KEYS.addResource,
+  'canvas.openResource': CANVAS_KEYS.openResource,
+  'canvas.openAndExpand': CANVAS_KEYS.openAndExpand,
+  'canvas.showFullView': CANVAS_KEYS.showFullView,
+  'canvas.renameResource': CANVAS_KEYS.renameResource,
+  'canvas.presentFromHere': CANVAS_KEYS.presentFromHere,
+  'canvas.removeSelection': CANVAS_KEYS.removeSelection,
+  'presenting.advance': PRESENTING_KEYS.advance,
+  'presenting.retreat': PRESENTING_KEYS.retreat,
+  'presenting.returnToStart': PRESENTING_KEYS.returnToStart,
+  'presenting.previousBranch': PRESENTING_KEYS.previousBranch,
+  'presenting.nextBranch': PRESENTING_KEYS.nextBranch,
+  'presenting.exitPresenting': PRESENTING_KEYS.exitPresenting,
+  'presenting.openNotes': PRESENTING_KEYS.openNotes,
+  'presenting.toggleNotes': PRESENTING_KEYS.toggleNotes,
+  'help.showShortcuts': HELP_KEYS.showShortcuts,
+} satisfies Readonly<Record<string, KeyBinding>>;
+
+/** The stable name of a command a key performs (ADR 0138). */
+export type CommandId = keyof typeof DEFAULT_KEYMAP;
+
+/** Every command id with a key, in the order the keymap lists them. */
+export const commandIdsWithKeys = (): readonly string[] => Object.keys(DEFAULT_KEYMAP);
+
+/**
+ * The keys that perform `id`. Everything that matches, announces or lists a
+ * command's key reads it here, so a remap changes them all at once.
+ */
+export const bindingOf = (id: CommandId): KeyBinding => DEFAULT_KEYMAP[id];
 
 function sameKey(bound: string, pressed: string): boolean {
   return bound.length === 1 ? bound.toLowerCase() === pressed.toLowerCase() : bound === pressed;

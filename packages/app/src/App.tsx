@@ -39,6 +39,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingStage } from './components/PresentingStage';
 import { ShortcutSheet } from './components/ShortcutSheet';
+import { createKeyDispatcher, KeyDispatcherContext, useKeyCover } from './key-dispatcher';
 import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/ShellNotice';
 
 export const createApp = (
@@ -81,8 +82,19 @@ export const createApp = (
   }
 
   const presentingWindow = composition.presenting;
+  // The one place this Space listens for keys (ADR 0138): every command
+  // below registers what it answers here rather than adding a listener.
+  const keyDispatcher = createKeyDispatcher(window);
 
   function App() {
+    return (
+      <KeyDispatcherContext.Provider value={keyDispatcher}>
+        <SpaceApp />
+      </KeyDispatcherContext.Provider>
+    );
+  }
+
+  function SpaceApp() {
     const [drawnClipboardFailures, setDrawnClipboardFailures] = useState<
       readonly DrawnClipboardFailure[]
     >([]);
@@ -196,15 +208,14 @@ export const createApp = (
       editingResourceBody,
       createReferenceFrom: placement.createReferenceFrom,
       spaces,
-      canPresentFrom,
-      presentFrom: presentingWindow.presentFrom,
-      showFullView: setFullViewOf,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
     const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);
     const nameOnCreation = useNameOnCreation(continuation);
-    // Inactive Spaces keep their traversal mounted without receiving global keys.
-    usePresentingKeys(active && presenting, presentingWindow.commands);
+    // A Space open but not on screen keeps its canvas and its traversal mounted,
+    // and answers no key.
+    useKeyCover('off-screen', !active);
+    usePresentingKeys(presenting, presentingWindow.commands);
     const { chrome: dockChrome, onChromeContinuationLand } = useDockChrome(
       opened,
       browserLocation,
@@ -246,7 +257,6 @@ export const createApp = (
     useLayoutEffect(() => {
       canvasLayer.current?.toggleAttribute('inert', presenting);
     }, [presenting]);
-
     return (
       <AppShell
         // The shell yields nothing at its end edge. The Resources list is a
@@ -429,7 +439,7 @@ export const createApp = (
               }}
             />
           )}
-          <ShortcutSheet active={active} presenting={presenting} />
+          <ShortcutSheet presenting={presenting} />
         </div>
       </AppShell>
     );

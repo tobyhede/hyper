@@ -202,6 +202,29 @@ const runtime = (value: SpaceSnapshot) => {
   return loaded.space;
 };
 
+/** The fixture with A Open on its Map. */
+const openedA = () =>
+  spaceSnapshotSchema.parse({
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      maps: [
+        {
+          ...snapshot.document.maps?.[0],
+          positions: {
+            ...snapshot.document.maps?.[0]?.positions,
+            [RESOURCE_ID]: {
+              x: 0,
+              y: 0,
+              open: true,
+              size: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
+            },
+          },
+        },
+      ],
+    },
+  });
+
 function mount(
   opening?: DestinationOpening,
   history?: HistoryApi,
@@ -438,6 +461,30 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
+   * Delete runs the command Remove from Map runs (`canvas-commands.ts`), so a
+   * refused removal by key reads exactly as one from the rail.
+   */
+  it('shows a refusal of Delete as "Resource not removed", as the rail item does', async () => {
+    const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
+      const complete = authoring.complete;
+      vi.spyOn(authoring, 'complete').mockImplementation((target, completion) =>
+        completion.kind === 'removed-resource-from-map'
+          ? { kind: 'refused', refusal: { code: 'resource-not-found' } }
+          : complete(target, completion),
+      );
+    });
+
+    const node = await selectResource('A');
+    fireEvent.keyDown(node, { key: 'Delete' });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Resource not removed');
+    expect(alert).toHaveTextContent('This Resource is no longer part of the Space.');
+    expect(resourceIds(session)).toContain(RESOURCE_ID);
+    await settled(session);
+  });
+
+  /**
    * A refused Graph creation and a refused Reference Resource creation are
    * drawn from command outcomes' `graph-create` and `reference-create`
    * channels, each under its own title, and each dismissal puts away only its
@@ -495,26 +542,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * Open Resource held, and Delete from Space takes its Open state with it.
    */
   it('offers Remove from Map and Delete from Space while the Resource is Open', async () => {
-    const opened = spaceSnapshotSchema.parse({
-      ...snapshot,
-      document: {
-        ...snapshot.document,
-        maps: [
-          {
-            ...snapshot.document.maps?.[0],
-            positions: {
-              ...snapshot.document.maps?.[0]?.positions,
-              [RESOURCE_ID]: {
-                x: 0,
-                y: 0,
-                open: true,
-                size: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
-              },
-            },
-          },
-        ],
-      },
-    });
+    const opened = openedA();
     const session = mount(undefined, undefined, opened);
 
     await selectResource('A');
@@ -522,6 +550,28 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     expect(await screen.findByRole('menuitem', { name: 'Remove from Map' })).toBeVisible();
     expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
+    await settled(session);
+  });
+
+  /**
+   * A body edit holds Shift+Enter and Space, not the commands they run: the
+   * rail still offers Open and Expand and Read in Full View while one is open.
+   */
+  it('keeps Open and Expand and Read in Full View while the Resource’s body is edited', async () => {
+    const session = mount(undefined, undefined, openedA());
+
+    await selectResource('A');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    expect(await screen.findByRole('menuitem', { name: 'Read in Full View' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Open and Expand' })).toBeVisible();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit .* of A$/ }));
+    await screen.findByRole('textbox', { name: /of A$/ });
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Read in Full View' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Open and Expand' })).toBeVisible();
     await settled(session);
   });
 

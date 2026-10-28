@@ -1,0 +1,350 @@
+import type { ResourceId } from '@project/core';
+import type { CommandOutcomes } from './command-outcomes';
+import type { SurfaceAuthoring } from './space-authoring';
+import { keyBelongsElsewhere, OWNS_ITS_KEYS, type CommandId } from './key-bindings';
+import type { KeyAnswer } from './key-dispatcher';
+
+/**
+ * Whether a command can run for a target, and if not, whether it is offered at all.
+ *
+ * `unavailable` is a command that exists here but cannot run now: its rail item
+ * is drawn disabled with the reason, so the reader sees the command and why.
+ * `absent` is a command this target does not have: no item is drawn. A key
+ * answers only `available`; otherwise it stays silent and leaves the press alone.
+ */
+export type CommandAvailability =
+  | { readonly kind: 'available' }
+  | { readonly kind: 'unavailable'; readonly reason: string }
+  | { readonly kind: 'absent' };
+
+export const AVAILABLE: CommandAvailability = { kind: 'available' };
+export const ABSENT: CommandAvailability = { kind: 'absent' };
+export const unavailable = (reason: string): CommandAvailability => ({
+  kind: 'unavailable',
+  reason,
+});
+
+/**
+ * What a Canvas command's key is aimed at, which decides the guard it is
+ * answered under and how its target is found.
+ *
+ * - `focused-resource`: the drawn Resource the press landed on, and never one
+ *   of its own controls, content or toolbar, which keep their keys.
+ * - `selection`: the selected Resource or Edge, from anywhere a surface that
+ *   owns its keys does not hold the press.
+ * - `canvas`: the drawn Map itself, under the same guard as `selection`.
+ */
+export type CanvasCommandAim = 'focused-resource' | 'selection' | 'canvas';
+
+/** A Canvas command's name (ADR 0138). */
+export type CanvasCommandId = Extract<CommandId, `canvas.${string}`>;
+
+/**
+ * A named action on the canvas, which a key, a Resource's rail or both perform.
+ *
+ * The command is the one place its availability and its effect are written:
+ * the dispatcher answers its key through it and the rail draws its item from
+ * it, so the two cannot disagree about when it runs or what it reports.
+ */
+export interface CanvasCommand<Target> {
+  readonly id: CanvasCommandId;
+  readonly aim: CanvasCommandAim;
+  /** Whether it acts on the canvas's own Map only, or on any Map the canvas draws. */
+  readonly serves: 'own-map' | 'any';
+  /**
+   * Whether its key must land on the canvas itself and not on a control on it
+   * or the chrome around it, as a command that cannot be undone must. Such a
+   * key is guarded as a `focused-resource` key is, and its target is found
+   * inside the canvas only.
+   */
+  readonly insideCanvas?: boolean;
+  readonly availability: (target: Target) => CommandAvailability;
+  readonly run: (target: Target) => void;
+}
+
+/** A command bound to one target, as a rail item draws and runs it. */
+export interface BoundCommand {
+  readonly id: CanvasCommandId;
+  readonly availability: CommandAvailability;
+  readonly run: () => void;
+}
+
+/** `command` for `target`, its availability read now. */
+export const bindCommand = <Target>(
+  command: CanvasCommand<Target>,
+  target: Target,
+): BoundCommand => ({
+  id: command.id,
+  availability: command.availability(target),
+  run: () => command.run(target),
+});
+
+/**
+ * Where a paste, a file drop or a key aimed at a Resource is somebody else's,
+ * not the canvas's.
+ *
+ * The canvas zoom controls render *inside* the canvas, as do every Resource's
+ * own controls and editors, so a list naming only text entry would let a drop
+ * on Zoom in place an image. It is the surfaces that own their keys
+ * (`key-bindings.ts`) and every control besides. The `selection` and `canvas`
+ * aims are guarded by `keyBelongsElsewhere` instead; the `focused-resource`
+ * aim and Delete, which are aimed at a Resource itself, are guarded by this.
+ *
+ * **`.nokey` is the first entry and the load-bearing one.** Every portalled and
+ * chrome surface in the tree already marks itself with it for React Flow's own
+ * `useKeyPress` subscriptions, whose `isInputDOMNode` walks `closest('.nokey')`.
+ * Reading the same marker is what stops this list drifting into a second,
+ * hand-maintained copy of an exclusion the components already declare.
+ */
+export const NOT_A_CANVAS_COMMAND = `.nokey, input, button, ${OWNS_ITS_KEYS}`;
+
+/** Whether the guard for `command`'s aim leaves this press to whatever it landed on. */
+const guardedFor = (command: CanvasCommand<never>, event: KeyboardEvent): boolean => {
+  if (command.aim !== 'focused-resource' && command.insideCanvas !== true)
+    return keyBelongsElsewhere(event);
+  return !(event.target instanceof Element) || event.target.closest(NOT_A_CANVAS_COMMAND) !== null;
+};
+
+/**
+ * Answer a press of `command`'s key: past its aim's guard, at the target
+ * `targetOf` finds for the press, and only while the command is available
+ * there. Says whether it ran, which is whether the press was taken.
+ */
+export function answerCommand<Target>(
+  command: CanvasCommand<Target>,
+  event: KeyboardEvent,
+  targetOf: () => Target | undefined,
+): boolean {
+  if (guardedFor(command, event)) return false;
+  const target = targetOf();
+  if (target === undefined || command.availability(target).kind !== 'available') return false;
+  command.run(target);
+  return true;
+}
+
+/** The key answer for `command`, at the target `targetOf` finds for each press. */
+export const keyAnswerOf = <Target>(
+  command: CanvasCommand<Target>,
+  targetOf: (event: KeyboardEvent) => Target | undefined,
+): KeyAnswer => ({
+  id: command.id,
+  answer: (event) => answerCommand(command, event, () => targetOf(event)),
+});
+
+/** The sentence Present from Here carries while the Active Graph does not hold its Resource. */
+export const PRESENT_OFF_GRAPH = 'This Resource is not on the Active Graph.';
+
+/**
+ * The sentence Present from Here carries on the Active Graph while presenting is
+ * withheld (`AuthoringAvailability.present`): a content edit or a rename holds
+ * the keyboard, or an image replacement is running.
+ */
+export const PRESENT_WHILE_EDITING = 'Finish the edit in progress to present.';
+
+/**
+ * Presenting from a Resource: whether the Active Graph holds it
+ * (`presentsFrom`), and the command. Absent on a canvas nothing presents from,
+ * which includes a hidden Space's and one already presenting.
+ */
+export interface PresentFrom {
+  readonly canPresentFrom: (resourceId: ResourceId) => boolean;
+  readonly run: (resourceId: ResourceId) => void;
+}
+
+/**
+ * Present from Here (`P`): present the Active Graph from a Resource of the
+ * canvas's own Map. Off the Active Graph, or while presenting is withheld, it is
+ * offered unavailable with the reason, the Active Graph's reason first.
+ */
+export function presentFromHereCommand(input: {
+  readonly presentFrom: PresentFrom | undefined;
+  /** `AuthoringAvailability.present` for the canvas's own Map. */
+  readonly mayPresent: boolean;
+}): CanvasCommand<ResourceId> {
+  const { presentFrom, mayPresent } = input;
+  return {
+    id: 'canvas.presentFromHere',
+    aim: 'selection',
+    serves: 'own-map',
+    availability: (resourceId) => {
+      if (presentFrom === undefined) return ABSENT;
+      if (!presentFrom.canPresentFrom(resourceId)) return unavailable(PRESENT_OFF_GRAPH);
+      return mayPresent ? AVAILABLE : unavailable(PRESENT_WHILE_EDITING);
+    },
+    run: (resourceId) => presentFrom?.run(resourceId),
+  };
+}
+
+/** What Remove from Map and Delete need of the drawn Map their target is on. */
+export interface RemovalOccurrence {
+  readonly authorOnCanvas: boolean;
+  readonly bodyEditing: boolean;
+  /** Remove a Resource from this Map, reporting a refusal through command outcomes. */
+  readonly removeFromMap: (resourceId: ResourceId) => void;
+  readonly deleteSelectedEdge: () => void;
+}
+
+/** A Resource to remove from its Map, or the selected Edge to delete. */
+export interface RemovalTarget {
+  readonly occurrence: RemovalOccurrence;
+  readonly subject:
+    { readonly kind: 'resource'; readonly resourceId: ResourceId } | { readonly kind: 'edge' };
+}
+
+/**
+ * Remove from Map (Delete, Backspace): remove a Resource from the drawn Map it
+ * is on, or delete the selected Edge. Neither can be undone, so its key must
+ * land inside the canvas. Absent while that Map may not be authored or a body
+ * is being edited.
+ */
+export const REMOVE_SELECTION: CanvasCommand<RemovalTarget> = {
+  id: 'canvas.removeSelection',
+  aim: 'selection',
+  serves: 'any',
+  insideCanvas: true,
+  availability: ({ occurrence }) =>
+    occurrence.authorOnCanvas && !occurrence.bodyEditing ? AVAILABLE : ABSENT,
+  run: ({ occurrence, subject }) => {
+    if (subject.kind === 'resource') occurrence.removeFromMap(subject.resourceId);
+    else occurrence.deleteSelectedEdge();
+  },
+};
+
+/**
+ * Remove a Resource from a Map through command outcomes, so a refusal is
+ * reported on the `resource-remove` channel whichever way it was asked for.
+ */
+export const removeFromMapReportedBy =
+  (commandOutcomes: CommandOutcomes, authoring: Pick<SurfaceAuthoring, 'complete'>) =>
+  (resourceId: ResourceId): void => {
+    commandOutcomes.run('resource-remove', () =>
+      authoring.complete({ kind: 'removed-resource-from-map', resourceId }),
+    );
+  };
+
+/** What Add Resource and Rename need of the drawn Map they act on. */
+export interface AuthoringOccurrence {
+  readonly authorOnCanvas: boolean;
+  readonly bodyEditing: boolean;
+  /** Add a Resource of the default kind to this Map. */
+  readonly addResource: () => void;
+  /** Put the caret in the Title of the Resource drawn as `nodeId` on this Map. */
+  readonly beginTitleEditing: (nodeId: string) => void;
+}
+
+/** Whether a Map may be authored by key now: never while a body is being edited. */
+const authoringAvailability = (occurrence: AuthoringOccurrence): CommandAvailability =>
+  occurrence.authorOnCanvas && !occurrence.bodyEditing ? AVAILABLE : ABSENT;
+
+/**
+ * Add Resource (`C`): add a Resource of the default kind to a drawn Map, the
+ * one holding the selection or else the canvas's own. Absent while that Map
+ * may not be authored or a body is being edited.
+ */
+export const ADD_RESOURCE: CanvasCommand<AuthoringOccurrence> = {
+  id: 'canvas.addResource',
+  aim: 'canvas',
+  serves: 'any',
+  availability: authoringAvailability,
+  run: (occurrence) => occurrence.addResource(),
+};
+
+/** A Resource drawn on a Map, named by its node there. */
+export interface DrawnResourceTarget {
+  readonly occurrence: AuthoringOccurrence;
+  readonly nodeId: string;
+}
+
+/**
+ * Rename (`F2`): put the caret in the selected Resource's Title, on whichever
+ * drawn Map holds it. Absent while that Map may not be authored or a body is
+ * being edited.
+ */
+export const RENAME_RESOURCE: CanvasCommand<DrawnResourceTarget> = {
+  id: 'canvas.renameResource',
+  aim: 'selection',
+  serves: 'any',
+  availability: ({ occurrence }) => authoringAvailability(occurrence),
+  run: ({ occurrence, nodeId }) => occurrence.beginTitleEditing(nodeId),
+};
+
+/** What Open needs of the drawn Map a focused Resource is on. */
+export interface OpeningOccurrence {
+  readonly authorOnCanvas: boolean;
+  readonly bodyEditing: boolean;
+  /** Open the Resource drawn as `nodeId` on this Map. */
+  readonly openResource: (nodeId: string) => void;
+}
+
+/** A focused Resource to Open, named by its node on the Map that draws it. */
+export interface OpenTarget {
+  readonly occurrence: OpeningOccurrence;
+  readonly nodeId: string;
+  /** Whether its kind takes Open: an Ur Resource has no content to show. */
+  readonly takesOpen: boolean;
+}
+
+/**
+ * Open (Enter): Open the focused Resource on whichever drawn Map holds it.
+ * Absent while that Map may not be authored, a body is being edited, or the
+ * Resource's kind does not take Open.
+ */
+export const OPEN_RESOURCE: CanvasCommand<OpenTarget> = {
+  id: 'canvas.openResource',
+  aim: 'focused-resource',
+  serves: 'any',
+  availability: ({ occurrence, takesOpen }) =>
+    takesOpen && occurrence.authorOnCanvas && !occurrence.bodyEditing ? AVAILABLE : ABSENT,
+  run: ({ occurrence, nodeId }) => occurrence.openResource(nodeId),
+};
+
+/** A Resource of the canvas's own Map. */
+export interface OwnResourceTarget {
+  readonly resourceId: ResourceId;
+}
+
+/** What Open and expand needs of the canvas whose camera frames the Resource. */
+export interface ExpandingCanvas {
+  /** Whether the Resource can be grown on the canvas's own Map. */
+  readonly expandable: (resourceId: ResourceId) => boolean;
+  readonly openAndExpand: (resourceId: ResourceId) => void;
+}
+
+/** A Resource of the canvas's own Map to grow, on that canvas. */
+export interface ExpandTarget extends OwnResourceTarget {
+  readonly canvas: ExpandingCanvas;
+}
+
+/**
+ * Open and expand (Shift+Enter, ADR 0137): Open a Resource of the canvas's own
+ * Map at the size its content needs and centre the camera on it. Own Map only,
+ * because the camera is the canvas's. Absent where the Resource cannot be
+ * grown there.
+ */
+export const OPEN_AND_EXPAND: CanvasCommand<ExpandTarget> = {
+  id: 'canvas.openAndExpand',
+  aim: 'focused-resource',
+  serves: 'own-map',
+  availability: ({ resourceId, canvas }) => (canvas.expandable(resourceId) ? AVAILABLE : ABSENT),
+  run: ({ resourceId, canvas }) => canvas.openAndExpand(resourceId),
+};
+
+/**
+ * Read in Full View (Space): read a Resource of the canvas's own Map in Full
+ * View. Absent on a canvas that draws no Full View, and wherever the canvas
+ * cannot be selected on (while presenting).
+ */
+export function showFullViewCommand(input: {
+  readonly show: ((resourceId: ResourceId) => void) | undefined;
+  /** `AuthoringAvailability.selectNodes` for the canvas's own Map. */
+  readonly selectNodes: boolean;
+}): CanvasCommand<OwnResourceTarget> {
+  const { show, selectNodes } = input;
+  return {
+    id: 'canvas.showFullView',
+    aim: 'focused-resource',
+    serves: 'own-map',
+    availability: () => (show !== undefined && selectNodes ? AVAILABLE : ABSENT),
+    run: ({ resourceId }) => show?.(resourceId),
+  };
+}

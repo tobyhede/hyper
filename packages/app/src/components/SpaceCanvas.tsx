@@ -57,11 +57,7 @@ import {
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
 import { connectionAppearance } from '../colors';
-import {
-  describeAuthoringRefusal,
-  describeCanvasGestureRefusal,
-  type CanvasGestureRefusal,
-} from '../authoring-refusal';
+import { describeCanvasGestureRefusal, type CanvasGestureRefusal } from '../authoring-refusal';
 import { CANVAS_OCCURRENCE, observeMapSurfaces, type MapSurface } from '../map-surface';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
@@ -86,13 +82,28 @@ import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resour
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
+import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
 import {
-  CANVAS_KEYS,
-  FULL_VIEW_KEYS,
-  keyBelongsElsewhere,
-  OWNS_ITS_KEYS,
-  pressesBinding,
-} from '../key-bindings';
+  ADD_RESOURCE,
+  answerCommand,
+  bindCommand,
+  keyAnswerOf,
+  NOT_A_CANVAS_COMMAND,
+  OPEN_AND_EXPAND,
+  OPEN_RESOURCE,
+  presentFromHereCommand,
+  REMOVE_SELECTION,
+  removeFromMapReportedBy,
+  RENAME_RESOURCE,
+  showFullViewCommand,
+  type AuthoringOccurrence,
+  type OpenTarget,
+  type OwnResourceTarget,
+  type RemovalTarget,
+  type PresentFrom,
+} from '../canvas-commands';
+import { useKeyAnswers, useKeyCover } from '../key-dispatcher';
+import type { CanvasRailCommands } from '../resource-rail-actions';
 import {
   graphNeighbours,
   neighbourToward,
@@ -134,24 +145,6 @@ const ARIA_LABEL_CONFIG = {
 } as const;
 
 const subscribeToNothing = (): (() => void) => () => undefined;
-
-/**
- * Where a paste, a file drop or the delete key is somebody else's, not the canvas's.
- *
- * The canvas zoom controls render *inside* the wrapper these handlers are bound
- * to, as do every Resource's own controls and editors, so a list naming only
- * text entry would let a drop on Zoom in place an image. It is the surfaces that
- * own their keys (`key-bindings.ts`) and every control besides. Keys are
- * guarded by `keyBelongsElsewhere` instead, bar Enter, Space, Delete and
- * Backspace, which are aimed at a Resource itself.
- *
- * **`.nokey` is the first entry and the load-bearing one.** Every portalled and
- * chrome surface in the tree already marks itself with it for React Flow's own
- * `useKeyPress` subscriptions, whose `isInputDOMNode` walks `closest('.nokey')`.
- * Reading the same marker is what stops this list drifting into a second,
- * hand-maintained copy of an exclusion the components already declare.
- */
-const NOT_A_CANVAS_COMMAND = `.nokey, input, button, ${OWNS_ITS_KEYS}`;
 
 /**
  * The Resource a key came from, or `null` if it came from anywhere else.
@@ -245,7 +238,7 @@ export interface SpaceCanvasProps {
   readonly resourceEntityActions?: (
     resourceId: ResourceId,
     connect: EntityActionGroup,
-    openAndExpand?: (() => void) | null,
+    canvas: CanvasRailCommands,
   ) => readonly EntityActionGroup[];
   /**
    * Presenting from a Resource, which `P` asks for: whether a Resource is one
@@ -253,12 +246,7 @@ export interface SpaceCanvasProps {
    * Absent on a canvas nothing presents from, which includes a hidden Space's
    * and one already presenting.
    */
-  readonly presentFrom?:
-    | {
-        readonly canPresentFrom: (resourceId: ResourceId) => boolean;
-        readonly run: (resourceId: ResourceId) => void;
-      }
-    | undefined;
+  readonly presentFrom?: PresentFrom | undefined;
   /**
    * The Resource read in Full View, which `Space` on a focused Resource shows,
    * and the way to change it. Absent on a canvas that offers no Full View.
@@ -567,6 +555,11 @@ export function SpaceCanvas({
     },
     [view.space, getZoom, setCenter, authoring],
   );
+  /** Present from Here, on the canvas's own Map: what `P` and the rail item both run. */
+  const presentFromHere = useMemo(
+    () => presentFromHereCommand({ presentFrom, mayPresent: availability.present }),
+    [presentFrom, availability.present],
+  );
   /** Whether Open and expand is offered on a Resource of the canvas's own Map. */
   const expandable = useCallback(
     (resourceId: ResourceId): boolean => {
@@ -579,6 +572,15 @@ export function SpaceCanvas({
       );
     },
     [availability.authorOnCanvas, view.space, placedResources],
+  );
+  /** Read in Full View, on the canvas's own Map: what Space and the rail item both run. */
+  const showFullViewHere = useMemo(
+    () =>
+      showFullViewCommand({
+        show: fullView === undefined ? undefined : (resourceId) => fullView.show(resourceId),
+        selectNodes: availability.selectNodes,
+      }),
+    [fullView, availability.selectNodes],
   );
   /**
    * Connect to Resource, for placed Resources only. Choosing it selects the
@@ -608,7 +610,14 @@ export function SpaceCanvas({
                     },
                   ]
                 : [],
-              expandable(resourceId) ? () => openAndExpand(resourceId) : null,
+              {
+                openAndExpand: bindCommand(OPEN_AND_EXPAND, {
+                  resourceId,
+                  canvas: { expandable, openAndExpand },
+                }),
+                fullView: bindCommand(showFullViewHere, { resourceId }),
+                present: bindCommand(presentFromHere, resourceId),
+              },
             ),
     [
       resourceEntityActions,
@@ -618,6 +627,8 @@ export function SpaceCanvas({
       mapId,
       expandable,
       openAndExpand,
+      showFullViewHere,
+      presentFromHere,
     ],
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
@@ -687,9 +698,8 @@ export function SpaceCanvas({
             // answer of `null` alone would consume the key and do nothing at all.
             // There is no refusal to report either — the target is not open,
             // which is a state this press ends rather than a refused Edit.
-            removeResource: () => {
+            removeFromMap: () => {
               void resumeEmbedded(request.spaceId);
-              return null;
             },
             nodes: value.nodes.map((node): ResourceFlowNode => {
               const stamped = withSurfacePolicy(
@@ -808,12 +818,7 @@ export function SpaceCanvas({
         openResource: onOpenResource,
         beginTitleEditing,
         selection,
-        removeResource: (id: string) => {
-          const resourceId = resourceOfNode(nodes, id);
-          if (resourceId === undefined) return null;
-          const result = authoring.complete({ kind: 'removed-resource-from-map', resourceId });
-          return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
-        },
+        removeFromMap: removeFromMapReportedBy(commandOutcomes, authoring),
         edgeAuthoring,
         deleteSelectedEdge: () =>
           edgeSurface.deleteEdges(edgeSurface.edges.filter((edge) => edge.selected)),
@@ -834,7 +839,7 @@ export function SpaceCanvas({
           const resourceId = resourceOfNode(value.nodes, id);
           if (resourceId !== undefined) value.beginTitleEditing(resourceId);
         },
-        removeResource: value.removeResource,
+        removeFromMap: value.removeFromMap,
         edgeAuthoring: value.surface.edgeAuthoring,
         deleteSelectedEdge: () => {
           const selected = value.surface.adapter.getState().selection;
@@ -856,6 +861,7 @@ export function SpaceCanvas({
     [
       nodes,
       authoring,
+      commandOutcomes,
       availability,
       resourceAuthoring.bodyEditing,
       onOpenResource,
@@ -867,11 +873,6 @@ export function SpaceCanvas({
       addCanvasResource,
     ],
   );
-
-  const latestOccurrences = useRef(occurrences);
-  useLayoutEffect(() => {
-    latestOccurrences.current = occurrences;
-  }, [occurrences]);
 
   /** The Active Graph's Edges as Graph navigation reads them, and each Resource's drawn node. */
   const activeGraphLinks = (canvas: HTMLElement) => {
@@ -1009,130 +1010,129 @@ export function SpaceCanvas({
   }, [fullView, fullViewOf, fullViewDrawn]);
 
   // Full View is modal over the canvas it covers: focus cannot move into the
-  // Map beneath it, and the canvas's window keys leave that Map alone, so
-  // nothing is authored where it cannot be seen. An attribute rather than a
+  // Map beneath it, and the Space's dispatcher answers no canvas key while it
+  // is shown, so nothing is authored where it cannot be seen. An attribute rather than a
   // prop, because the React this application runs on does not know `inert`.
   const fullViewShown = fullView !== undefined && fullViewDrawn;
-  const latestFullViewShown = useRef(fullViewShown);
   useLayoutEffect(() => {
-    latestFullViewShown.current = fullViewShown;
     canvasRef.current?.toggleAttribute('inert', fullViewShown);
   }, [fullViewShown]);
+  useKeyCover('full-view', fullViewShown);
 
-  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const opening = pressesBinding(CANVAS_KEYS.openResource, event.nativeEvent);
-    const expanding = pressesBinding(CANVAS_KEYS.openAndExpand, event.nativeEvent);
-    if (!opening && !expanding && !pressesBinding(CANVAS_KEYS.showFullView, event.nativeEvent))
-      return;
-    if (bodyEditing) return;
-    // Load-bearing rather than defensive: an Open Resource draws its editor
-    // *inside* the node, so a Space typed into it would otherwise be cancelled
-    // here before the document ever received the character. The narrower guard
-    // rather than `keyBelongsElsewhere`, because a node's own `.nokey` regions —
-    // its rendered content, its toolbar — keep their Space and Enter too.
-    if (!(event.target instanceof Element) || event.target.closest(NOT_A_CANVAS_COMMAND) !== null)
-      return;
-    const resource = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
-    if (resource === null || !event.currentTarget.contains(resource)) return;
-    const resourceId = resource.dataset['id'];
-    if (resourceId === undefined) return;
-    if (expanding) {
-      // The canvas's own Map, whose camera frames the Resource it grows. A
-      // Resource it cannot grow leaves the key alone.
-      const target = resourceOfNode(nodes, resourceId);
-      if (target === undefined || !expandable(target)) return;
-      event.preventDefault();
-      openAndExpand(target);
-      return;
-    }
-    event.preventDefault();
-    if (!opening) {
-      // Full View reads the canvas's own Map; a Map drawn inside a Space
-      // Resource offers none.
-      const read = resourceOfNode(nodes, resourceId);
-      if (read !== undefined && availability.selectNodes) fullView?.show(read);
-      return;
-    }
-    const occurrence = occurrences.find((value) =>
-      value.nodes.some((node) => node.id === resourceId),
-    );
-    if (occurrence?.availability.authorOnCanvas !== true || occurrence.bodyEditing) return;
-    occurrence.openResource(resourceId);
-  };
-
-  // `C` adds a Resource, answered on the window so it reaches the canvas from
-  // wherever focus is — the Dock included — except a surface that owns its keys.
-  // The default is prevented only where the command can actually run
-  // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while
-  // authoring is withdrawn is left to whatever else would have had it.
-  useEffect(() => {
-    const addResource = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.addResource, event) || keyBelongsElsewhere(event)) return;
-      if (latestFullViewShown.current) return;
-      // The selection's occurrence, or the canvas's own Map when nothing is selected.
-      const current =
-        latestOccurrences.current.find(
-          (value) => value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
-        ) ?? latestOccurrences.current.find((value) => value.id === CANVAS_OCCURRENCE);
-      if (current === undefined || !current.availability.authorOnCanvas || current.bodyEditing)
-        return;
-      event.preventDefault();
-      current.addResource();
-    };
-    window.addEventListener('keydown', addResource);
-    return () => window.removeEventListener('keydown', addResource);
+  // Enter, Shift+Enter and Space are aimed at the focused Resource: the node the
+  // press landed on, inside this canvas, and never one of its own controls,
+  // content or editor. The narrow guard is load-bearing rather than defensive:
+  // an Open Resource draws its editor *inside* the node, so a Space typed into
+  // it would otherwise be taken before the document ever received the
+  // character. Enter Opens on whichever drawn Map holds the node; Shift+Enter
+  // and Space act on the canvas's own Map, whose camera and Full View they use.
+  const focusedNodeOf = useCallback((event: KeyboardEvent): string | undefined => {
+    if (!(event.target instanceof Element)) return undefined;
+    const node = event.target.closest<HTMLElement>('.react-flow__node[data-id]');
+    if (node === null || canvasRef.current?.contains(node) !== true) return undefined;
+    return node.dataset['id'];
   }, []);
+  // A body edit holds the canvas's Enter and Space keys though not its rail, so
+  // a press while one is open finds no Resource to aim at.
+  const ownResourceOf = (event: KeyboardEvent): OwnResourceTarget | undefined => {
+    const nodeId = bodyEditing ? undefined : focusedNodeOf(event);
+    const resourceId = nodeId === undefined ? undefined : resourceOfNode(nodes, nodeId);
+    return resourceId === undefined ? undefined : { resourceId };
+  };
+  useKeyAnswers(
+    [
+      {
+        id: OPEN_RESOURCE.id,
+        answer: (event: KeyboardEvent) =>
+          answerCommand(OPEN_RESOURCE, event, (): OpenTarget | undefined => {
+            const nodeId = focusedNodeOf(event);
+            if (nodeId === undefined) return undefined;
+            for (const occurrence of occurrences) {
+              const node = occurrence.nodes.find((each) => each.id === nodeId);
+              if (node === undefined) continue;
+              return {
+                occurrence: {
+                  authorOnCanvas: occurrence.availability.authorOnCanvas,
+                  // The canvas's own body edit holds the keyboard on every Map it draws.
+                  bodyEditing: bodyEditing || occurrence.bodyEditing,
+                  openResource: occurrence.openResource,
+                },
+                nodeId,
+                takesOpen: takesOpen(node.data.kind),
+              };
+            }
+            return undefined;
+          }),
+      },
+      {
+        id: OPEN_AND_EXPAND.id,
+        answer: (event: KeyboardEvent) =>
+          answerCommand(OPEN_AND_EXPAND, event, () => {
+            const own = ownResourceOf(event);
+            return own === undefined
+              ? undefined
+              : { ...own, canvas: { expandable, openAndExpand } };
+          }),
+      },
+      {
+        id: showFullViewHere.id,
+        answer: (event: KeyboardEvent) =>
+          answerCommand(showFullViewHere, event, () => ownResourceOf(event)),
+      },
+    ],
+    'canvas',
+  );
 
   // `P` presents the Active Graph from the selected Resource of this canvas's own
-  // Map. A drawn Map inside a Space Resource is not presented from, and a
-  // Resource off the Active Graph has nowhere to start, so either leaves the key
-  // alone.
-  const latestPresentFrom = useRef(presentFrom);
-  useLayoutEffect(() => {
-    latestPresentFrom.current = presentFrom;
-  }, [presentFrom]);
-  useEffect(() => {
-    const presentSelected = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.presentFromHere, event) || keyBelongsElsewhere(event)) return;
-      if (latestFullViewShown.current) return;
-      const present = latestPresentFrom.current;
-      const canvas = latestOccurrences.current.find((value) => value.id === CANVAS_OCCURRENCE);
-      if (present === undefined || canvas?.availability.present !== true) return;
-      const selected = canvas.nodes.find((node) => node.selected);
-      if (selected === undefined || !present.canPresentFrom(selected.data.resourceId)) return;
-      event.preventDefault();
-      present.run(selected.data.resourceId);
-    };
-    window.addEventListener('keydown', presentSelected);
-    return () => window.removeEventListener('keydown', presentSelected);
-  }, []);
+  // Map, through the command the rail's Present from Here runs. Nothing on the
+  // canvas answers while Full View covers it.
+  useKeyAnswers(
+    [
+      keyAnswerOf(
+        presentFromHere,
+        () =>
+          occurrences
+            .find((value) => value.id === CANVAS_OCCURRENCE)
+            ?.nodes.find((node) => node.selected)?.data.resourceId,
+      ),
+    ],
+    'canvas',
+  );
 
-  // `F2` renames the selected Resource, and this is the *only* handler that answers
-  // it. Don't add a second, such as a React Flow `onKeyDown` branch: two handlers
-  // for one key means one of them is the unguarded one, and a branch that asks
-  // nothing about the target renames whichever Resource happens to be selected
-  // when the key is typed into a control.
-  useLayoutEffect(() => {
-    const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.renameResource, event) || keyBelongsElsewhere(event)) return;
-      if (latestFullViewShown.current) return;
-      const occurrence = latestOccurrences.current.find((value) =>
-        value.nodes.some((node) => node.selected),
-      );
-      if (
-        occurrence === undefined ||
-        !occurrence.availability.authorOnCanvas ||
-        occurrence.bodyEditing
-      )
-        return;
-      const selected = occurrence.nodes.find((node) => node.selected);
-      if (selected === undefined) return;
-      event.preventDefault();
-      occurrence.beginTitleEditing(selected.id);
-    };
-    window.addEventListener('keydown', beginSelectedTitleEdit);
-    return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, []);
+  // `C` adds a Resource to the Map holding the selection, or else to the
+  // canvas's own, from wherever focus is — the Dock included — except a surface
+  // that owns its keys. `F2` renames the selected Resource on whichever drawn
+  // Map holds it, and is the *only* answer to that key: a second, such as a
+  // React Flow `onKeyDown` branch, would be an unguarded one, renaming whichever
+  // Resource is selected when the key is typed into a control. Neither answers
+  // while Full View covers the canvas, and either leaves its key alone where its
+  // command cannot run (`docs/agents/rendering.md`'s keyboard contract).
+  const authoringOf = (occurrence: (typeof occurrences)[number]): AuthoringOccurrence => ({
+    authorOnCanvas: occurrence.availability.authorOnCanvas,
+    bodyEditing: occurrence.bodyEditing,
+    addResource: occurrence.addResource,
+    beginTitleEditing: occurrence.beginTitleEditing,
+  });
+  useKeyAnswers(
+    [
+      keyAnswerOf(ADD_RESOURCE, () => {
+        const current =
+          occurrences.find(
+            (value) => value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
+          ) ?? occurrences.find((value) => value.id === CANVAS_OCCURRENCE);
+        return current === undefined ? undefined : authoringOf(current);
+      }),
+      keyAnswerOf(RENAME_RESOURCE, () => {
+        for (const occurrence of occurrences) {
+          const selected = occurrence.nodes.find((node) => node.selected);
+          if (selected !== undefined)
+            return { occurrence: authoringOf(occurrence), nodeId: selected.id };
+        }
+        return undefined;
+      }),
+    ],
+    'canvas',
+  );
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
@@ -1459,37 +1459,54 @@ export function SpaceCanvas({
     setCommandRefusal(null);
   }
 
-  useEffect(() => {
-    const deleteSelection = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.removeSelection, event)) return;
-      // Narrower than every other canvas key, deliberately, so this guard rather
-      // than `keyBelongsElsewhere`: removal and Edge deletion cannot be undone,
-      // so the key has to be aimed at the canvas itself, never at a control on it
-      // or at the chrome around it.
-      if (!(event.target instanceof Element)) return;
-      if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
-      if (canvasRef.current?.contains(event.target) !== true) return;
+  /** What Delete is aimed at: the Resource it lands on, else the selection, inside the canvas only. */
+  const removalTargetOf = useCallback(
+    (event: KeyboardEvent): RemovalTarget | undefined => {
+      if (!(event.target instanceof Element) || canvasRef.current?.contains(event.target) !== true)
+        return undefined;
       const focusedNodeId = event.target.closest<HTMLElement>('.react-flow__node[data-id]')
         ?.dataset['id'];
-      const current = latestOccurrences.current.find((value) =>
+      const occurrence = occurrences.find((value) =>
         focusedNodeId === undefined
           ? value.selection.kind !== 'none' || value.nodes.some((node) => node.selected)
           : value.nodes.some((node) => node.id === focusedNodeId),
       );
-      if (current === undefined || !current.availability.authorOnCanvas || current.bodyEditing)
-        return;
-      const nodeId = focusedNodeId ?? current.nodes.find((node) => node.selected)?.id;
-      if (nodeId !== undefined) {
-        event.preventDefault();
-        setCommandRefusal(current.removeResource(nodeId));
-      } else if (current.selection.kind === 'edge') {
-        event.preventDefault();
-        current.deleteSelectedEdge();
-      }
-    };
-    window.addEventListener('keydown', deleteSelection);
-    return () => window.removeEventListener('keydown', deleteSelection);
-  }, []);
+      if (occurrence === undefined) return undefined;
+      const removal = {
+        authorOnCanvas: occurrence.availability.authorOnCanvas,
+        bodyEditing: occurrence.bodyEditing,
+        removeFromMap: occurrence.removeFromMap,
+        deleteSelectedEdge: occurrence.deleteSelectedEdge,
+      };
+      const node =
+        focusedNodeId === undefined
+          ? occurrence.nodes.find((each) => each.selected)
+          : occurrence.nodes.find((each) => each.id === focusedNodeId);
+      if (node !== undefined)
+        return {
+          occurrence: removal,
+          subject: { kind: 'resource' as const, resourceId: node.data.resourceId },
+        };
+      return occurrence.selection.kind === 'edge'
+        ? { occurrence: removal, subject: { kind: 'edge' as const } }
+        : undefined;
+    },
+    [occurrences],
+  );
+  // Delete and Backspace remove from its Map the Resource they land on, or else
+  // the selected one, or delete the selected Edge, on whichever drawn Map holds
+  // it: the command the rail's Remove from Map runs, so both report alike. Only
+  // a press inside the canvas, and nothing while Full View covers it.
+  useKeyAnswers(
+    [
+      {
+        id: REMOVE_SELECTION.id,
+        answer: (event: KeyboardEvent) =>
+          answerCommand(REMOVE_SELECTION, event, () => removalTargetOf(event)),
+      },
+    ],
+    'canvas',
+  );
 
   // The preview is drawn as the Graph the new Edge joins: the target's shown
   // Graph for a connection between one embedding's Resources, else the Active
@@ -1854,7 +1871,6 @@ export function SpaceCanvas({
         multiSelectionKeyCode={multiSelectionKeyCode}
         selectionKeyCode={selectionKeyCode}
         selectionOnDrag={selectionOnDrag}
-        onKeyDown={handleKeyDown}
         onKeyDownCapture={arrowAlongGraph}
         // Programmatically focusable, and deliberately not a tab stop. React Flow's
         // native Edge Escape calls `blur()`, which leaves focus on `body` — not an

@@ -6,7 +6,7 @@
 import { useContext, useEffect, useId, useRef } from 'react';
 import { DEFAULT_KIND } from '@project/core';
 import { ResourceKindIcon, resourceKindName, ToolbarButton, ToolbarGroup } from '@project/ui';
-import { CANVAS_KEYS } from '../key-bindings';
+import { bindingOf } from '../key-bindings';
 import type { MenuSide } from '../dock-placement';
 import { RESOURCES_TRIGGER } from './command-dock-triggers';
 import { DockDisclosureContext, RESOURCES_DISCLOSURE_ID } from './command-dock-shared';
@@ -61,12 +61,12 @@ function CreatePeers({ creates }: { readonly creates: readonly DockCreate[] }) {
           // while C can create one.
           aria-keyshortcuts={
             kind === DEFAULT_KIND && !disabled
-              ? CANVAS_KEYS.addResource.ariaKeyShortcuts
+              ? bindingOf('canvas.addResource').ariaKeyShortcuts
               : undefined
           }
           title={
             kind === DEFAULT_KIND && !disabled
-              ? `Create ${resourceKindName(kind)} (${CANVAS_KEYS.addResource.ariaKeyShortcuts})`
+              ? `Create ${resourceKindName(kind)} (${bindingOf('canvas.addResource').ariaKeyShortcuts})`
               : `Create ${resourceKindName(kind)}`
           }
           disabled={disabled}
