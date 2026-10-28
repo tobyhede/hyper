@@ -2,7 +2,7 @@
 
 **What to build:** The tracer bullet. Present from Here becomes the first Canvas command (`canvas.presentFromHere`, aim *selection*, serves the *own Map*), and one dispatcher per Space answers its key, `P`. The rail's Present from Here item reads the same command: when the command answers *unavailable*, the item is greyed out with that reason ("This Resource is not on the Active Graph." or "Finish the edit in progress to present."), and when it answers *absent*, the item is not offered. `P` runs only when the command is *available*. Otherwise it stays silent and leaves the press alone. The canvas builds the command and hands it to the rail builder, replacing the rail's separate present field. The canvas's own `P` listener is removed.
 
-The dispatcher answers canvas commands only for the Space on screen, while it is not presenting and while no Full View is shown. It picks its guard from the command's aim.
+The dispatcher answers canvas commands only for the Space on screen, while it is not presenting and while no Full View is shown. It picks its guard from the command's aim. This ticket needs only the *selection* aim; 03 adds Delete's inside-canvas flag, 04 the *canvas* aim and 05 the *focused Resource* aim, each extending the vocabulary as it lands.
 
 **Blocked by:** The keyboard-shortcuts stack (#427–#430) merged; 01.
 
