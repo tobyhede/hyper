@@ -42,6 +42,7 @@ import {
 } from './command-dock';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
+import { PRESENT_OFF_GRAPH } from '../src/canvas-commands';
 import type { MapSurface } from '../src/map-surface';
 import type { MapView } from '../src/map-view';
 import { refusingFullscreen } from './fullscreen';
@@ -237,8 +238,10 @@ const presentableMeta = (): SpaceSnapshot => {
   };
 };
 
-const openPresentable = async (others: readonly SpaceSnapshot[] = []) => {
-  const first = presentableMeta();
+const openPresentable = async (
+  others: readonly SpaceSnapshot[] = [],
+  first: SpaceSnapshot = presentableMeta(),
+) => {
   const backend = new MemorySpaceBackend(
     SPACE_ID,
     [first, ...others].map((value) => ({ snapshot: value, revision: 0n, exportedRevision: null })),
@@ -293,6 +296,42 @@ describe('the P shortcut across open Spaces', () => {
     await pressP();
 
     expect(canRetreat(initial.app.navigation.getState())).toBe(true);
+  });
+});
+
+/** Present from Here's rail item and `P` run one Canvas command, so they answer alike. */
+describe('Present from Here, by key and on the rail', () => {
+  const presentItem = async (): Promise<HTMLElement> => {
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Actions for Resource First Resource' }),
+    );
+    return screen.findByRole('menuitem', { name: /^Present from Here/ });
+  };
+  const closeMenu = async (): Promise<void> => {
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+  };
+
+  it('offers the item and answers the key on the Active Graph', async () => {
+    const { initial } = await openPresentable();
+
+    expect(await presentItem()).not.toHaveAttribute('aria-disabled', 'true');
+    await closeMenu();
+    await pressP();
+
+    expect(initial.app.navigation.getState().mode).toBe('presenting');
+  });
+
+  it('greys the item with the reason off the Active Graph, and leaves the key alone', async () => {
+    const { initial } = await openPresentable([], snapshot('First Space', 'First Resource', 0, 0));
+
+    const item = await presentItem();
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(within(screen.getByRole('menu')).getByText(PRESENT_OFF_GRAPH)).toBeVisible();
+    await closeMenu();
+    await pressP();
+
+    expect(initial.app.navigation.getState().mode).toBe('overview');
   });
 });
 
