@@ -9,10 +9,13 @@ import { showsSpace } from '../src/open-spaces-context';
 import { RESOURCE_HEIGHT, RESOURCE_WIDTH } from '../src/resource';
 import { REFERENCE_OFFSET_RATIO, referenceAnchor } from '../src/resource-placement';
 import {
+  ABSENT,
+  AVAILABLE,
   PRESENT_OFF_GRAPH,
   PRESENT_WHILE_EDITING,
-  resourceRailGroups,
-} from '../src/resource-rail-actions';
+  unavailable,
+} from '../src/canvas-commands';
+import { resourceRailGroups } from '../src/resource-rail-actions';
 import { revealStep } from '../src/resources-disclosure';
 import type { SpaceResourceTarget } from '../src/space-resource-lifecycle';
 import { spaceTitlesById } from '../src/space-resource-targets';
@@ -216,7 +219,7 @@ describe('resourceRailGroups', () => {
     removeFromMap: () => undefined,
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
-    present: { run: () => undefined, available: true, onActiveGraph: true },
+    present: { run: () => undefined, availability: AVAILABLE },
     fullView: () => undefined,
     openAndExpand: () => undefined,
   };
@@ -238,7 +241,7 @@ describe('resourceRailGroups', () => {
   it('draws Present from Here unavailable, saying why, off the Active Graph', () => {
     const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
       ...everything,
-      present: { run: () => undefined, available: true, onActiveGraph: false },
+      present: { run: () => undefined, availability: unavailable(PRESENT_OFF_GRAPH) },
     })
       .flat()
       .find(({ id }) => id === 'present-from-here');
@@ -250,7 +253,7 @@ describe('resourceRailGroups', () => {
   it('draws Present from Here unavailable, saying why, while an edit holds the keyboard', () => {
     const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
       ...everything,
-      present: { run: () => undefined, available: false, onActiveGraph: true },
+      present: { run: () => undefined, availability: unavailable(PRESENT_WHILE_EDITING) },
     })
       .flat()
       .find(({ id }) => id === 'present-from-here');
@@ -291,7 +294,7 @@ describe('resourceRailGroups', () => {
           removeFromMap: null,
           deleteFromSpace: null,
           enter: null,
-          present: null,
+          present: { run: () => undefined, availability: ABSENT },
           fullView: null,
           openAndExpand: null,
         }),

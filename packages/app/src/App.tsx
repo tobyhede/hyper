@@ -39,6 +39,7 @@ import { PlacementFailure } from './components/PlacementFailure';
 import { PlacementPending } from './components/PlacementPending';
 import { PresentingStage } from './components/PresentingStage';
 import { ShortcutSheet } from './components/ShortcutSheet';
+import { createKeyDispatcher, KeyDispatcherContext } from './key-dispatcher';
 import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/ShellNotice';
 
 export const createApp = (
@@ -196,8 +197,6 @@ export const createApp = (
       editingResourceBody,
       createReferenceFrom: placement.createReferenceFrom,
       spaces,
-      canPresentFrom,
-      presentFrom: presentingWindow.presentFrom,
       showFullView: setFullViewOf,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
@@ -246,35 +245,39 @@ export const createApp = (
     useLayoutEffect(() => {
       canvasLayer.current?.toggleAttribute('inert', presenting);
     }, [presenting]);
+    // The one place this Space listens for keys (ADR 0138): every command
+    // below registers what it answers here rather than adding a listener.
+    const [keyDispatcher] = useState(() => createKeyDispatcher(window));
 
     return (
-      <AppShell
-        // The shell yields nothing at its end edge. The Resources list is a
-        // Popover anchored to its trigger and floats over the canvas, so it
-        // takes no width from it.
-        notice={
-          <>
-            {clipboardFailure === null ? null : (
-              <ShellNotice title="Link not copied" onDismiss={dismissClipboardFailure}>
-                {clipboardFailure}
-              </ShellNotice>
-            )}
-            {drawnClipboardFailures.map((failure) => (
-              <ShellNotice
-                key={failure.occurrence}
-                title={`${failure.title}: Link not copied`}
-                onDismiss={failure.dismiss}
-              >
-                {failure.message}
-              </ShellNotice>
-            ))}
-            <CommandNotices commandOutcomes={commandOutcomes} />
-            {drawnSpaces
-              .filter((entry) => entry.id !== opened.id)
-              .map((entry) => (
-                <DrawnSpaceNotices key={entry.id} entry={entry} />
+      <KeyDispatcherContext.Provider value={keyDispatcher}>
+        <AppShell
+          // The shell yields nothing at its end edge. The Resources list is a
+          // Popover anchored to its trigger and floats over the canvas, so it
+          // takes no width from it.
+          notice={
+            <>
+              {clipboardFailure === null ? null : (
+                <ShellNotice title="Link not copied" onDismiss={dismissClipboardFailure}>
+                  {clipboardFailure}
+                </ShellNotice>
+              )}
+              {drawnClipboardFailures.map((failure) => (
+                <ShellNotice
+                  key={failure.occurrence}
+                  title={`${failure.title}: Link not copied`}
+                  onDismiss={failure.dismiss}
+                >
+                  {failure.message}
+                </ShellNotice>
               ))}
-            {/* **The one report here with no dismissal, and it is not an
+              <CommandNotices commandOutcomes={commandOutcomes} />
+              {drawnSpaces
+                .filter((entry) => entry.id !== opened.id)
+                .map((entry) => (
+                  <DrawnSpaceNotices key={entry.id} entry={entry} />
+                ))}
+              {/* **The one report here with no dismissal, and it is not an
                 oversight.** The others are about a press that is over, so
                 putting one away changes nothing it is about. This one is about
                 the address the reader is *on*: clearing it is what asks for the
@@ -282,58 +285,58 @@ export const createApp = (
                 dismissal would be a move dressed as an acknowledgement. It is
                 answered by the first move the reader makes — including opening
                 a Resource on the canvas, which the notice never covers. */}
-            {destinationNotFound ? (
-              <Alert variant="destructive">
-                <AlertIcon />
-                <AlertTitle>Destination not found</AlertTitle>
-                <AlertDescription>
-                  The requested address does not exist in this Space.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-          </>
-        }
-      >
-        <ChromeContinuation
-          continuation={continuation}
-          within={graphArea}
-          chromeRenameReady={availability.chromeTitleEdit}
-          onLand={onChromeContinuationLand}
-        />
-        {/* **How this Space's last commit went, for a test rather than a reader.**
+              {destinationNotFound ? (
+                <Alert variant="destructive">
+                  <AlertIcon />
+                  <AlertTitle>Destination not found</AlertTitle>
+                  <AlertDescription>
+                    The requested address does not exist in this Space.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+            </>
+          }
+        >
+          <ChromeContinuation
+            continuation={continuation}
+            within={graphArea}
+            chromeRenameReady={availability.chromeTitleEdit}
+            onLand={onChromeContinuationLand}
+          />
+          {/* **How this Space's last commit went, for a test rather than a reader.**
             The Command Dock draws nothing at all while saving is working — a
             commit settles faster than a cue can be read, so a permanent slot
             reporting the expected outcome is a slot spent on nothing — and that
             decision is the surface's. This is not a cue: it is hidden, and what
             it carries is the revision, which is the *Space's* rather than any
             surface's. It sits beside the canvas for exactly that reason. */}
-        <span
-          hidden
-          aria-hidden="true"
-          data-testid="persistence-status"
-          data-persistence-state={sessionState.persistence.kind}
-          data-revision={String(sessionState.acknowledgedRevision)}
-        >
-          {sessionState.persistence.kind === 'settled'
-            ? 'Persisted'
-            : sessionState.persistence.kind}
-        </span>
-        {active ? <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} /> : null}
-        {active
-          ? drawnSpaces
-              .filter((entry) => entry.id !== opened.id)
-              .map((entry) => (
-                <ArmedDeleteConfirmation
-                  key={entry.id}
-                  deleteConfirmation={entry.app.deleteConfirmation}
-                />
-              ))
-          : null}
-        {/* One child, not a row: the Resources list portals over this rather than
+          <span
+            hidden
+            aria-hidden="true"
+            data-testid="persistence-status"
+            data-persistence-state={sessionState.persistence.kind}
+            data-revision={String(sessionState.acknowledgedRevision)}
+          >
+            {sessionState.persistence.kind === 'settled'
+              ? 'Persisted'
+              : sessionState.persistence.kind}
+          </span>
+          {active ? <ArmedDeleteConfirmation deleteConfirmation={deleteConfirmation} /> : null}
+          {active
+            ? drawnSpaces
+                .filter((entry) => entry.id !== opened.id)
+                .map((entry) => (
+                  <ArmedDeleteConfirmation
+                    key={entry.id}
+                    deleteConfirmation={entry.app.deleteConfirmation}
+                  />
+                ))
+            : null}
+          {/* One child, not a row: the Resources list portals over this rather than
             sitting beside it, so a toggle that says nothing about the Map no
             longer re-flows the canvas and re-measures every Resource on it. */}
-        <div ref={graphArea} className="graph-area size-full min-w-0" style={resourceSizeVars}>
-          {/* **The Space's one command surface, over the canvas rather than
+          <div ref={graphArea} className="graph-area size-full min-w-0" style={resourceSizeVars}>
+            {/* **The Space's one command surface, over the canvas rather than
               beside it** (ADR 0082). It docks to this element: the twelve slots
               are its edges and stops, and every measurement the drag makes is
               relative to it — which is why the frame is a prop rather than
@@ -343,95 +346,96 @@ export const createApp = (
               moves it around is the paper they are working on. It takes no
               layout space from that paper: it is absolutely positioned, and
               `.graph-area` is already the positioned box it resolves against. */}
-          {dockChrome === null ? null : (
-            <CommandDock chrome={dockChrome} container={graphArea} initialEdge="top" />
-          )}
-          {/* The canvas layer. Inert while presenting, so nothing on it is
+            {dockChrome === null ? null : (
+              <CommandDock chrome={dockChrome} container={graphArea} initialEdge="top" />
+            )}
+            {/* The canvas layer. Inert while presenting, so nothing on it is
               reachable, focusable or announced behind the Stage (ADR 0123);
               it stays mounted, so leaving presenting finds it as it was. */}
-          <div ref={canvasLayer} className="size-full">
-            {canvas.kind === 'failure' ? (
-              <PlacementFailure error={canvas.error} />
-            ) : (
-              // Keyed on the replacement epoch: React Flow's store holds a drag in
-              // flight, and the canvas stays mounted while placement is pending,
-              // so only a new store ends a drag begun in the replaced Space.
-              <ReactFlowProvider key={replacementEpoch}>
-                {canvas.kind === 'placeholder' ? <PlacementPending /> : null}
-                {/* Inside the provider and outside the canvas: it reads React
+            <div ref={canvasLayer} className="size-full">
+              {canvas.kind === 'failure' ? (
+                <PlacementFailure error={canvas.error} />
+              ) : (
+                // Keyed on the replacement epoch: React Flow's store holds a drag in
+                // flight, and the canvas stays mounted while placement is pending,
+                // so only a new store ends a drag begun in the replaced Space.
+                <ReactFlowProvider key={replacementEpoch}>
+                  {canvas.kind === 'placeholder' ? <PlacementPending /> : null}
+                  {/* Inside the provider and outside the canvas: it reads React
                     Flow's viewport for controls that live in the toolbar and in
                     the panes over the graph. */}
-                <CanvasCentre report={placement.reportVisibleCentre} />
-                {/* The canvas half of where an Edit continues. Inside the
+                  <CanvasCentre report={placement.reportVisibleCentre} />
+                  {/* The canvas half of where an Edit continues. Inside the
                     provider because `reveal` moves the camera and because an Edge
                     subject becomes an element only through the projection React
                     Flow is drawing. Its chrome half is mounted at the root, since
                     this subtree is conditional on there being Resources at all. */}
-                <CanvasContinuation
-                  continuation={continuation}
-                  onSelectResource={canvasRendering.selectResource}
-                  onSelectEdge={canvasRendering.selectEdge}
-                />
-                <SpaceCanvas
-                  // Keyed on the replacement epoch, so accepting the stored Space
-                  // takes the canvas's local editing state with it. The render
-                  // adapter already drops the projection and drag bookkeeping, but
-                  // an open title editor is the graph's own: it names a Resource from
-                  // a Space that is gone, and its raised invalid guard would go on
-                  // swallowing clicks in the one that replaced it.
-                  key={replacementEpoch}
-                  surface={composition.surface}
-                  reading={reading}
-                  placement={placement}
-                  onDrawnClipboardFailuresChange={reportDrawnClipboardFailures}
-                  onDrawnSpacesChange={reportDrawnSpaces}
-                  commandOutcomes={commandOutcomes}
-                  deleteConfirmation={deleteConfirmation}
-                  imageReplacement={composition.imageReplacement}
-                  pickImages={composition.pickImages}
-                  nameOnCreation={nameOnCreation}
-                  spaceSession={spaceSession}
-                  spaceResourceTargets={spaceResourceTargets.targets}
-                  resourceEntityActions={resourceRailActions}
-                  presentFrom={presentFromCanvas}
-                  fullView={fullView}
-                />
-              </ReactFlowProvider>
-            )}
-          </div>
+                  <CanvasContinuation
+                    continuation={continuation}
+                    onSelectResource={canvasRendering.selectResource}
+                    onSelectEdge={canvasRendering.selectEdge}
+                  />
+                  <SpaceCanvas
+                    // Keyed on the replacement epoch, so accepting the stored Space
+                    // takes the canvas's local editing state with it. The render
+                    // adapter already drops the projection and drag bookkeeping, but
+                    // an open title editor is the graph's own: it names a Resource from
+                    // a Space that is gone, and its raised invalid guard would go on
+                    // swallowing clicks in the one that replaced it.
+                    key={replacementEpoch}
+                    surface={composition.surface}
+                    reading={reading}
+                    placement={placement}
+                    onDrawnClipboardFailuresChange={reportDrawnClipboardFailures}
+                    onDrawnSpacesChange={reportDrawnSpaces}
+                    commandOutcomes={commandOutcomes}
+                    deleteConfirmation={deleteConfirmation}
+                    imageReplacement={composition.imageReplacement}
+                    pickImages={composition.pickImages}
+                    nameOnCreation={nameOnCreation}
+                    spaceSession={spaceSession}
+                    spaceResourceTargets={spaceResourceTargets.targets}
+                    resourceEntityActions={resourceRailActions}
+                    presentFrom={presentFromCanvas}
+                    fullView={fullView}
+                  />
+                </ReactFlowProvider>
+              )}
+            </div>
 
-          {presentedGraphId !== null && activeResourceId !== null && (
-            <PresentingStage
-              space={space}
-              mapId={selectedMapId}
-              graphId={presentedGraphId}
-              resourceId={activeResourceId}
-              moves={moves}
-              canRetreat={canRetreat(navigationState)}
-              onSelectBranch={presentingWindow.commands.selectBranch}
-              onAdvance={presentingWindow.commands.advance}
-              onRetreat={presentingWindow.commands.retreat}
-              onExit={presentingWindow.commands.exitPresenting}
-              onOpenNotes={presentingWindow.commands.openNotes}
-              notesShown={rehearsalNotesShown}
-              onToggleNotes={presentingWindow.commands.toggleNotes}
-              onCopyLink={() => {
-                // `void`: presenting chrome's Copy link is a plain button with
-                // no label to swap, so it has nothing to do with the outcome
-                // beyond the alert `copyProductDestination` already renders.
-                void copyProductDestination({
-                  kind: 'presentation',
-                  spaceId: space.id,
-                  mapId: selectedMapId,
-                  graphId: presentedGraphId,
-                  resourceId: activeResourceId,
-                });
-              }}
-            />
-          )}
-          <ShortcutSheet active={active} presenting={presenting} />
-        </div>
-      </AppShell>
+            {presentedGraphId !== null && activeResourceId !== null && (
+              <PresentingStage
+                space={space}
+                mapId={selectedMapId}
+                graphId={presentedGraphId}
+                resourceId={activeResourceId}
+                moves={moves}
+                canRetreat={canRetreat(navigationState)}
+                onSelectBranch={presentingWindow.commands.selectBranch}
+                onAdvance={presentingWindow.commands.advance}
+                onRetreat={presentingWindow.commands.retreat}
+                onExit={presentingWindow.commands.exitPresenting}
+                onOpenNotes={presentingWindow.commands.openNotes}
+                notesShown={rehearsalNotesShown}
+                onToggleNotes={presentingWindow.commands.toggleNotes}
+                onCopyLink={() => {
+                  // `void`: presenting chrome's Copy link is a plain button with
+                  // no label to swap, so it has nothing to do with the outcome
+                  // beyond the alert `copyProductDestination` already renders.
+                  void copyProductDestination({
+                    kind: 'presentation',
+                    spaceId: space.id,
+                    mapId: selectedMapId,
+                    graphId: presentedGraphId,
+                    resourceId: activeResourceId,
+                  });
+                }}
+              />
+            )}
+            <ShortcutSheet active={active} presenting={presenting} />
+          </div>
+        </AppShell>
+      </KeyDispatcherContext.Provider>
     );
   }
 

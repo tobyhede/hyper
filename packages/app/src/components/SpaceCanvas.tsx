@@ -86,13 +86,16 @@ import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resour
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
+import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
 import {
-  CANVAS_KEYS,
-  FULL_VIEW_KEYS,
-  keyBelongsElsewhere,
-  OWNS_ITS_KEYS,
-  pressesBinding,
-} from '../key-bindings';
+  bindCommand,
+  keyAnswerOf,
+  NOT_A_CANVAS_COMMAND,
+  presentFromHereCommand,
+  type PresentFrom,
+} from '../canvas-commands';
+import { useKeyAnswers } from '../key-dispatcher';
+import type { CanvasRailCommands } from '../resource-rail-actions';
 import {
   graphNeighbours,
   neighbourToward,
@@ -134,24 +137,6 @@ const ARIA_LABEL_CONFIG = {
 } as const;
 
 const subscribeToNothing = (): (() => void) => () => undefined;
-
-/**
- * Where a paste, a file drop or the delete key is somebody else's, not the canvas's.
- *
- * The canvas zoom controls render *inside* the wrapper these handlers are bound
- * to, as do every Resource's own controls and editors, so a list naming only
- * text entry would let a drop on Zoom in place an image. It is the surfaces that
- * own their keys (`key-bindings.ts`) and every control besides. Keys are
- * guarded by `keyBelongsElsewhere` instead, bar Enter, Space, Delete and
- * Backspace, which are aimed at a Resource itself.
- *
- * **`.nokey` is the first entry and the load-bearing one.** Every portalled and
- * chrome surface in the tree already marks itself with it for React Flow's own
- * `useKeyPress` subscriptions, whose `isInputDOMNode` walks `closest('.nokey')`.
- * Reading the same marker is what stops this list drifting into a second,
- * hand-maintained copy of an exclusion the components already declare.
- */
-const NOT_A_CANVAS_COMMAND = `.nokey, input, button, ${OWNS_ITS_KEYS}`;
 
 /**
  * The Resource a key came from, or `null` if it came from anywhere else.
@@ -245,7 +230,7 @@ export interface SpaceCanvasProps {
   readonly resourceEntityActions?: (
     resourceId: ResourceId,
     connect: EntityActionGroup,
-    openAndExpand?: (() => void) | null,
+    canvas: CanvasRailCommands,
   ) => readonly EntityActionGroup[];
   /**
    * Presenting from a Resource, which `P` asks for: whether a Resource is one
@@ -253,12 +238,7 @@ export interface SpaceCanvasProps {
    * Absent on a canvas nothing presents from, which includes a hidden Space's
    * and one already presenting.
    */
-  readonly presentFrom?:
-    | {
-        readonly canPresentFrom: (resourceId: ResourceId) => boolean;
-        readonly run: (resourceId: ResourceId) => void;
-      }
-    | undefined;
+  readonly presentFrom?: PresentFrom | undefined;
   /**
    * The Resource read in Full View, which `Space` on a focused Resource shows,
    * and the way to change it. Absent on a canvas that offers no Full View.
@@ -567,6 +547,11 @@ export function SpaceCanvas({
     },
     [view.space, getZoom, setCenter, authoring],
   );
+  /** Present from Here, on the canvas's own Map: what `P` and the rail item both run. */
+  const presentFromHere = useMemo(
+    () => presentFromHereCommand({ presentFrom, mayPresent: availability.present }),
+    [presentFrom, availability.present],
+  );
   /** Whether Open and expand is offered on a Resource of the canvas's own Map. */
   const expandable = useCallback(
     (resourceId: ResourceId): boolean => {
@@ -608,7 +593,10 @@ export function SpaceCanvas({
                     },
                   ]
                 : [],
-              expandable(resourceId) ? () => openAndExpand(resourceId) : null,
+              {
+                openAndExpand: expandable(resourceId) ? () => openAndExpand(resourceId) : null,
+                present: bindCommand(presentFromHere, resourceId),
+              },
             ),
     [
       resourceEntityActions,
@@ -618,6 +606,7 @@ export function SpaceCanvas({
       mapId,
       expandable,
       openAndExpand,
+      presentFromHere,
     ],
   );
   const resourceAuthoring = useCanvasResourceAuthoring({
@@ -1084,28 +1073,21 @@ export function SpaceCanvas({
   }, []);
 
   // `P` presents the Active Graph from the selected Resource of this canvas's own
-  // Map. A drawn Map inside a Space Resource is not presented from, and a
-  // Resource off the Active Graph has nowhere to start, so either leaves the key
-  // alone.
-  const latestPresentFrom = useRef(presentFrom);
-  useLayoutEffect(() => {
-    latestPresentFrom.current = presentFrom;
-  }, [presentFrom]);
-  useEffect(() => {
-    const presentSelected = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.presentFromHere, event) || keyBelongsElsewhere(event)) return;
-      if (latestFullViewShown.current) return;
-      const present = latestPresentFrom.current;
-      const canvas = latestOccurrences.current.find((value) => value.id === CANVAS_OCCURRENCE);
-      if (present === undefined || canvas?.availability.present !== true) return;
-      const selected = canvas.nodes.find((node) => node.selected);
-      if (selected === undefined || !present.canPresentFrom(selected.data.resourceId)) return;
-      event.preventDefault();
-      present.run(selected.data.resourceId);
-    };
-    window.addEventListener('keydown', presentSelected);
-    return () => window.removeEventListener('keydown', presentSelected);
-  }, []);
+  // Map, through the command the rail's Present from Here runs. Nothing on the
+  // canvas answers while Full View covers it.
+  useKeyAnswers(
+    fullViewShown
+      ? []
+      : [
+          keyAnswerOf(
+            presentFromHere,
+            () =>
+              occurrences
+                .find((value) => value.id === CANVAS_OCCURRENCE)
+                ?.nodes.find((node) => node.selected)?.data.resourceId,
+          ),
+        ],
+  );
 
   // `F2` renames the selected Resource, and this is the *only* handler that answers
   // it. Don't add a second, such as a React Flow `onKeyDown` branch: two handlers

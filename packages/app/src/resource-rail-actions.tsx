@@ -28,7 +28,8 @@ import { canvasElement } from './canvas-element';
 import type { FocusFallback } from './delete-confirmation';
 import { isOpenIndependently, type SpaceEntity } from './entity-actions';
 import type { OpenSpaces } from './open-spaces';
-import { CANVAS_KEYS } from './key-bindings';
+import { ABSENT, type BoundCommand } from './canvas-commands';
+import { CANVAS_KEYS, type KeyBinding } from './key-bindings';
 import { shortcutOf } from './shortcut-sheet';
 
 /** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
@@ -44,33 +45,46 @@ export interface ResourceRailCommands {
   readonly deleteFromSpace: (() => void) | null;
   /** Enter a Space Resource's Space, or `null` without an open set to enter it in. */
   readonly enter: RailNavigation | null;
-  /** Present the Active Graph from this Resource, or `null` with nothing to present from. */
-  readonly present: RailPresentation | null;
+  /** Present the Active Graph from this Resource: the canvas's Present from Here command. */
+  readonly present: BoundCommand;
   /** Read this Resource in Full View, or `null` where no Full View is drawn. */
   readonly fullView: (() => void) | null;
   /** Open this Resource and expand it to fit its content, or `null` where it cannot be. */
   readonly openAndExpand: (() => void) | null;
 }
 
-/** The sentence Present from Here carries while the Active Graph does not hold its Resource. */
-export const PRESENT_OFF_GRAPH = 'This Resource is not on the Active Graph.';
+/**
+ * The Canvas commands a Resource's rail draws, bound to that Resource by the
+ * canvas that owns them: the rail offers each as its command answers, so the
+ * item and the key cannot disagree. A rail drawn with none — a Map inside a
+ * Space Resource — offers them as absent.
+ */
+export type CanvasRailCommands = Pick<ResourceRailCommands, 'openAndExpand' | 'present'>;
+
+const NO_CANVAS_COMMANDS: CanvasRailCommands = {
+  openAndExpand: null,
+  present: { availability: ABSENT, run: () => undefined },
+};
 
 /**
- * The sentence Present from Here carries on the Active Graph while presenting is
- * withheld (`AuthoringAvailability.present`): a content edit or a rename holds
- * the keyboard, or an image replacement is running.
+ * A command's rail item fields: none while it is absent, disabled with its
+ * reason while it is unavailable, and teaching its key only while the key
+ * would answer, so a disabled item teaches no key.
  */
-export const PRESENT_WHILE_EDITING = 'Finish the edit in progress to present.';
-
-/**
- * Present from Here, which is offered disabled with its reason while the
- * Active Graph does not hold the Resource or presenting is withheld, as Create
- * Reference is: the reader sees that the command exists and why it cannot run
- * here.
- */
-export interface RailPresentation extends RailNavigation {
-  readonly onActiveGraph: boolean;
-}
+const commandItem = (command: BoundCommand, binding: KeyBinding) => {
+  const { availability } = command;
+  return availability.kind === 'absent'
+    ? null
+    : {
+        shortcut: availability.kind === 'available' ? shortcutOf(binding) : undefined,
+        disabled: availability.kind === 'unavailable',
+        description: availability.kind === 'unavailable' ? availability.reason : undefined,
+        onSelect: (): EntityActionOutcome => {
+          command.run();
+          return 'done';
+        },
+      };
+};
 
 /**
  * A rail command that navigates, carrying its own availability.
@@ -141,6 +155,7 @@ export function resourceRailGroups(
             },
           ],
         ];
+  const presentItem = commandItem(present, CANVAS_KEYS.presentFromHere);
   // Seeing a Resource whole: expanding it on the Map, which is an Edit, then
   // reading it and presenting from it, which change nothing in the Space.
   const presenting: EntityActionGroup = [
@@ -172,28 +187,14 @@ export function resourceRailGroups(
             },
           },
         ]),
-    ...(present === null
+    ...(presentItem === null
       ? []
       : [
           {
             id: 'present-from-here',
             label: 'Present from Here',
             icon: <PresentIcon color="currentColor" />,
-            // P answers only where the item does, so a disabled item teaches no key.
-            shortcut:
-              present.available && present.onActiveGraph
-                ? shortcutOf(CANVAS_KEYS.presentFromHere)
-                : undefined,
-            disabled: !present.available || !present.onActiveGraph,
-            description: !present.onActiveGraph
-              ? PRESENT_OFF_GRAPH
-              : present.available
-                ? undefined
-                : PRESENT_WHILE_EDITING,
-            onSelect: (): EntityActionOutcome => {
-              present.run();
-              return 'done';
-            },
+            ...presentItem,
           },
         ]),
   ];
@@ -279,12 +280,8 @@ export interface ResourceRailInput {
   readonly entityActions: (entity: SpaceEntity) => readonly EntityActionGroup[];
   readonly availability: Pick<
     AuthoringAvailability,
-    'addResource' | 'authorOnCanvas' | 'deleteResource' | 'navigate' | 'present'
+    'addResource' | 'authorOnCanvas' | 'deleteResource' | 'navigate'
   >;
-  /** Whether Present from Here may start at a Resource (`presentsFrom`). */
-  readonly canPresentFrom: (resourceId: ResourceId) => boolean;
-  /** Present the Active Graph from a Resource, or `null` where nothing presents. */
-  readonly presentFrom: ((resourceId: ResourceId) => void) | null;
   /** Read a Resource in Full View, or `null` where no Full View is drawn. */
   readonly showFullView: ((resourceId: ResourceId) => void) | null;
   readonly editingResourceBody: boolean;
@@ -314,6 +311,16 @@ const railFocusFallback =
       : actionsTriggerOf(resourceId)) ?? canvasElement();
 
 /**
+ * A Resource's rail menu, handed its Connect to Resource group and the Canvas
+ * commands the canvas drawing it binds to it.
+ */
+export type ResourceRailActions = (
+  resourceId: ResourceId,
+  connect: EntityActionGroup,
+  canvas?: CanvasRailCommands,
+) => readonly EntityActionGroup[];
+
+/**
  * The builder a Resource's rail draws its menu from.
  *
  * Remove from Map follows the canvas key's availability, Delete from Space
@@ -332,21 +339,15 @@ export function useResourceRailActions(
     editingResourceBody,
     createReferenceFrom,
     spaces,
-    canPresentFrom,
-    presentFrom,
     showFullView,
   }: ResourceRailInput,
-): (
-  resourceId: ResourceId,
-  connect: EntityActionGroup,
-  openAndExpand?: (() => void) | null,
-) => readonly EntityActionGroup[] {
-  const { addResource, authorOnCanvas, deleteResource, navigate, present } = availability;
+): ResourceRailActions {
+  const { addResource, authorOnCanvas, deleteResource, navigate } = availability;
   return useCallback(
     (
       resourceId: ResourceId,
       connect: EntityActionGroup,
-      openAndExpand: (() => void) | null = null,
+      canvas: CanvasRailCommands = NO_CANVAS_COMMANDS,
     ): readonly EntityActionGroup[] => {
       const resource = space.lookup.resource(resourceId);
       // A node the projection is still drawing for a Resource the working Space
@@ -390,16 +391,8 @@ export function useResourceRailActions(
                     );
                   },
                 },
-          present:
-            presentFrom === null
-              ? null
-              : {
-                  available: present,
-                  onActiveGraph: canPresentFrom(resourceId),
-                  run: () => presentFrom(resourceId),
-                },
           fullView: showFullView === null ? null : () => showFullView(resourceId),
-          openAndExpand,
+          ...canvas,
         },
       );
     },
@@ -414,9 +407,6 @@ export function useResourceRailActions(
       editingResourceBody,
       createReferenceFrom,
       spaces,
-      present,
-      canPresentFrom,
-      presentFrom,
       showFullView,
       authoring,
       commandOutcomes,
