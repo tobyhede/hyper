@@ -43,7 +43,7 @@ export function Divider({ orientation }: { readonly orientation: 'horizontal' | 
  *
  * **Every name here is ink, the Graph's included.** Do not carry the Graph's
  * colour on the name: the palette is pastel because it is drawn as a stroke on
- * the canvas, and the same values set as text on white chrome are too light to read
+ * sand, and the same values set as text on white chrome are too light to read
  * as a name. The glyph beside it carries the colour instead, where a shape
  * rather than a legibility budget is what has to survive.
  */

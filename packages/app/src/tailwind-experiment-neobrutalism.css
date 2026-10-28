@@ -16,7 +16,7 @@
  * The mapping is approximate and cannot be otherwise: their vocabulary has
  * eight colour tokens and this one has more than thirty, so `main` is put on
  * `--primary` and `secondary-background` on `--card`. Their `background` is
- * NOT applied, because in this product the background is the grey canvas the
+ * NOT applied, because in this product the background is the sand canvas the
  * Resources lie on, not a chrome surface.
  *
  * Their palette puts strong colour on every control. This product reserves
