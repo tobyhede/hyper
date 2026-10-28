@@ -157,11 +157,13 @@ describe('mounting an aggregate in the page', () => {
     expect(opened(await startup.resolve('/')).app.currentSpace().id).toBe(META_SPACE_ID);
   });
 
-  it('opens a session marked that its edits are lost on reload, reporting persistence', async () => {
+  it('opens a session that reports persistence and no notice before an Edit', async () => {
     const container = await render(() => mountedStartup(fixtureFiles()).resolve('/'));
 
-    expect(await within(container).findByText('Edits lost on reload')).toBeInTheDocument();
-    expect(within(container).getByTestId('persistence-status')).toHaveTextContent('Persisted');
+    expect(await within(container).findByTestId('persistence-status')).toHaveTextContent(
+      'Persisted',
+    );
+    expect(within(container).queryByText('Edits kept in this page only')).toBeNull();
   });
 
   it('shows the reader’s diagnostics for a directory that is not an aggregate', async () => {

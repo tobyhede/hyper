@@ -7,6 +7,7 @@ import {
   AlertTitle,
   Button,
   CloseIcon,
+  UnsavedIcon,
 } from '@project/ui';
 import { COMMAND_CHANNELS, type CommandOutcomes } from '../command-outcomes';
 import type { OpenSpace } from '../open-spaces';
@@ -42,14 +43,24 @@ export function ShellNotice({
   title,
   onDismiss,
   children,
+  tone = 'refusal',
 }: {
   readonly title: string;
   readonly onDismiss: () => void;
   readonly children: ReactNode;
+  /**
+   * What the report is. A `refusal` is a press that did not do what it asked,
+   * drawn destructive and announced assertively. A `fact` is what a press did
+   * that the reader may not expect, such as where a mounted session keeps its
+   * Edits: drawn neutral, with the glyph for that fact, and announced politely,
+   * because it confirms the reader's own gesture rather than interrupting it.
+   */
+  readonly tone?: 'refusal' | { readonly fact: ReactNode };
 }) {
+  const refusal = tone === 'refusal';
   return (
-    <Alert variant="destructive">
-      <AlertIcon />
+    <Alert variant={refusal ? 'destructive' : 'default'} role={refusal ? 'alert' : 'status'}>
+      {refusal ? <AlertIcon /> : tone.fact}
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>{children}</AlertDescription>
       <AlertAction>
@@ -60,6 +71,23 @@ export function ShellNotice({
         </Button>
       </AlertAction>
     </Alert>
+  );
+}
+
+/**
+ * That a mounted session's Edits are kept in this page only (ADR 0131): drawn
+ * once the reader has made one, because nothing can be lost before then, and
+ * never in the Command Dock, which holds commands rather than facts.
+ */
+export function MountedEditsNotice({ onDismiss }: { readonly onDismiss: () => void }) {
+  return (
+    <ShellNotice
+      title="Edits kept in this page only"
+      onDismiss={onDismiss}
+      tone={{ fact: <UnsavedIcon /> }}
+    >
+      Reloading or closing this page discards them. Nothing is written to GitHub.
+    </ShellNotice>
   );
 }
 

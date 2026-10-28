@@ -18,7 +18,7 @@ import { resourceSizeVars } from './resource';
 import { canRetreat, presentsFrom } from './navigation';
 import { usePresentingKeys } from './presenting-keys';
 import type { DestinationOpening } from './destination-opening';
-import { useOpenSpacesStanding } from './open-spaces-context';
+import { useMountedEditsNotice, useOpenSpacesStanding } from './open-spaces-context';
 import { useAddressedResource } from './addressed-resource';
 import { useResourcePlacement } from './resource-placement';
 import { useMapSurface } from './use-map-surface';
@@ -40,7 +40,12 @@ import { PlacementPending } from './components/PlacementPending';
 import { PresentingStage } from './components/PresentingStage';
 import { ShortcutSheet } from './components/ShortcutSheet';
 import { createKeyDispatcher, KeyDispatcherContext, useKeyCover } from './key-dispatcher';
-import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/ShellNotice';
+import {
+  CommandNotices,
+  DrawnSpaceNotices,
+  MountedEditsNotice,
+  ShellNotice,
+} from './components/ShellNotice';
 
 export const createApp = (
   opened: OpenSpace,
@@ -143,6 +148,7 @@ export const createApp = (
     // that Navigation is not presenting.
     const presentedGraphId = presenting ? navigationState.activeGraphId : null;
     const { spaces, active } = useOpenSpacesStanding(sessionState.working.id);
+    const mountedEdits = useMountedEditsNotice();
     useEffect(() => presentingWindow.connect(), []);
     const { rehearsalNotesShown } = useSyncExternalStore(
       presentingWindow.subscribe,
@@ -278,6 +284,9 @@ export const createApp = (
                 {failure.message}
               </ShellNotice>
             ))}
+            {mountedEdits.notice === 'reported' ? (
+              <MountedEditsNotice onDismiss={mountedEdits.dismiss} />
+            ) : null}
             <CommandNotices commandOutcomes={commandOutcomes} />
             {drawnSpaces
               .filter((entry) => entry.id !== opened.id)

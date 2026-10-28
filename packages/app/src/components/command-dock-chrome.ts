@@ -96,13 +96,6 @@ export interface DockChrome {
   readonly canvas: DockCanvas;
   readonly graph: DockGraph;
   readonly resources: DockResources;
-  /**
-   * The session is mounted (ADR 0130, ADR 0131): its Edits are kept in the
-   * page's memory and lost on reload, which the Dock draws as its unsaved
-   * mark. Not a persistence status: a mounted session's commits are reported
-   * as any session's are.
-   */
-  readonly unsaved: boolean;
   readonly persistence: DockPersistence;
 }
 

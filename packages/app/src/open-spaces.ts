@@ -19,6 +19,7 @@ import {
   type HistoryApi,
 } from './browser-location';
 import { composeApp, type ComposedApp } from './compose-app';
+import { createMountedEdits, type MountedEdits } from './mounted-edits';
 import { destinationOpening, type DestinationOpening } from './destination-opening';
 import type { ImageSources } from './image-creation';
 import type { Fullscreen } from './presenting-fullscreen';
@@ -210,6 +211,12 @@ export interface OpenSpaces {
     confirmation?: RejectedExitConfirmation,
   ) => Promise<ExitSpaceResult>;
   readonly spaceResources: SpaceResourceAuthoring;
+  /**
+   * Whether the page reports that its Edits are kept in it only (ADR 0131).
+   * Only a mounted session ever leaves `quiet`, on the first Edit any of its
+   * Spaces commits.
+   */
+  readonly mountedEdits: MountedEdits;
   /**
    * The browser's location, following whichever Space is on the canvas.
    *
@@ -410,6 +417,7 @@ export function createOpenSpaces({
     },
     report,
   );
+  const mountedEdits = createMountedEdits(report);
   const compositions = new Map<UUID, Promise<OpenSpace>>();
   const drawingHolds = new Map<UUID, number>();
   const assertNavigationAvailable = (): void => {
@@ -601,6 +609,19 @@ export function createOpenSpaces({
       }),
       spaceResources,
     };
+    // An Edit is the session committing past the revision it was opened at.
+    // The first working load of a mapless Space is the host's, made while it
+    // answered the read this session opened from, so it is not one.
+    if (mounted === true) {
+      const openedAt = session.getState().acknowledgedRevision;
+      const reportEdit = (): void => {
+        const { persistence, acknowledgedRevision } = session.getState();
+        if (persistence.kind === 'pending' || acknowledgedRevision !== openedAt) {
+          mountedEdits.edited();
+        }
+      };
+      session.subscribe(reportEdit);
+    }
     session.subscribe(() => {
       const state = observable.getState();
       if (!state.composed.some((entry) => entry.session === session)) return;
@@ -1023,6 +1044,7 @@ export function createOpenSpaces({
     switchTo,
     exit,
     spaceResources,
+    mountedEdits,
     browserLocation,
   };
 }

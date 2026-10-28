@@ -15,7 +15,8 @@ import { stubResizeObserver } from './resize-observer';
 
 /**
  * A mounted session authors as any session does (ADR 0131): its Edits are
- * committed to the page's memory and lost on reload, which the Dock marks.
+ * committed to the page's memory and lost on reload, which a notice over the
+ * canvas reports once the reader has made one.
  * Each case is answered against the same Spaces mounted and unmounted, so the
  * two cannot drift apart.
  */
@@ -149,20 +150,31 @@ const nodeOf = (name: string): HTMLElement => {
 
 const BOTH = [false, true] as const;
 
-describe('the Command Dock of a mounted session', () => {
-  it('marks that edits are lost on reload, beside the persistence status', async () => {
-    await openMeta(true);
+const NOTICE = 'Edits kept in this page only';
 
-    expect(within(dock()).getByText('Edits lost on reload')).toBeInTheDocument();
+/** Rename the Meta Space through its session, as any Edit commits. */
+const edit = (initial: OpenSpace, title: string): void => {
+  act(() => {
+    initial.session.submit({ ...meta, document: { ...meta.document, title } });
+  });
+};
+
+const notice = (): HTMLElement | null =>
+  screen.queryAllByRole('status').find((region) => region.textContent.includes(NOTICE)) ?? null;
+
+describe('the Command Dock of a mounted session', () => {
+  it.each(BOTH)('mounted %s: draws no mark of where Edits go', async (mounted) => {
+    await openMeta(mounted);
+
+    expect(within(dock()).queryByText(/reload/i)).toBeNull();
+    expect(notice()).toBeNull();
     expect(screen.getByTestId('persistence-status')).toHaveTextContent('Persisted');
   });
 
   it('commits an Edit, which the persistence status reports as any session’s', async () => {
     const initial = await openMeta(true);
 
-    act(() => {
-      initial.session.submit({ ...meta, document: { ...meta.document, title: 'Renamed' } });
-    });
+    edit(initial, 'Renamed');
 
     await waitFor(() =>
       expect(screen.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2'),
@@ -170,14 +182,47 @@ describe('the Command Dock of a mounted session', () => {
     expect(screen.getByTestId('persistence-status')).toHaveTextContent('Persisted');
     expect(initial.session.getState().working.document.title).toBe('Renamed');
   });
+});
 
-  it('is not shown unmounted', async () => {
-    await openMeta(false);
+describe('the notice of a mounted session', () => {
+  it('reports, once the reader has made an Edit, that it is kept in this page only', async () => {
+    const initial = await openMeta(true);
 
-    expect(within(dock()).queryByText('Edits lost on reload')).toBeNull();
-    expect(screen.getByTestId('persistence-status')).toHaveTextContent('Persisted');
+    edit(initial, 'Renamed');
+
+    await waitFor(() => expect(notice()).not.toBeNull());
+    expect(notice()).toHaveTextContent('Nothing is written to GitHub');
+    expect(within(dock()).queryByText(NOTICE)).toBeNull();
   });
 
+  it('stays dismissed for the page, whatever is edited next', async () => {
+    const initial = await openMeta(true);
+    edit(initial, 'Renamed');
+    await waitFor(() => expect(notice()).not.toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: `Dismiss: ${NOTICE}` }));
+    expect(notice()).toBeNull();
+
+    edit(initial, 'Renamed again');
+    await waitFor(() =>
+      expect(screen.getByTestId('persistence-status')).toHaveAttribute('data-revision', '3'),
+    );
+    expect(notice()).toBeNull();
+  });
+
+  it('is not drawn unmounted, edited or not', async () => {
+    const initial = await openMeta(false);
+
+    edit(initial, 'Renamed');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('persistence-status')).toHaveAttribute('data-revision', '2'),
+    );
+    expect(notice()).toBeNull();
+  });
+});
+
+describe('the Command Dock of either session', () => {
   it.each(BOTH)('mounted %s: keeps Present and offers Create', async (mounted) => {
     await openMeta(mounted);
 

@@ -455,7 +455,6 @@ export function useDockChrome(
         reportBreak,
       }),
     },
-    unsaved: app.mounted,
     persistence: {
       state: persistence,
       active,

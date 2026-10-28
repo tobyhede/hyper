@@ -1,5 +1,11 @@
 import { encodeCompactUuid, uuidSchema } from '@project/core';
-import { expect, test as base, type BrowserContext, type Page } from '@playwright/test';
+import {
+  expect,
+  test as base,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 import { COMMIT, fakeGitHub, OWNER, REPO } from '../test/fake-github';
 import { fixtureFiles } from '../test/fixture-files';
 import { expectPictureLoaded } from './image';
@@ -130,13 +136,31 @@ test('a missing hashed asset is answered with the page, and nothing keeps it', a
 const UPLOADED_PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAEElEQVR4nGP4z8AAQQxwFgBB0gX7h/C5SAAAAABJRU5ErkJggg==';
 
+const MOUNTED_EDITS = 'Edits kept in this page only';
+
+/** The shell's notice that a mounted session's Edits are kept in this page only. */
+const mountedEditsNotice = (page: Page): Locator =>
+  page.getByRole('status').filter({ hasText: MOUNTED_EDITS });
+
+/** Rename a drawn Resource through its title, as a reader does. */
+async function renameResource(page: Page, from: string, to: string): Promise<void> {
+  const resource = nodeByTitle(page, from).first();
+  await resourceControls(page, resource);
+  await resource.getByRole('button', { name: `Edit Title ${from}` }).click();
+  const title = page.getByRole('textbox', { name: 'Resource title' });
+  await title.fill(to);
+  await title.press('Enter');
+  await expect(nodeByTitle(page, to).first()).toBeVisible();
+}
+
 test(
-  'marks that edits are lost on reload, takes an Edit, and loses it on reload',
-  { tag: '@parity:command-dock-marks-a-mounted-session-unsaved' },
+  'offers every Edit, reports where an Edit is kept, and loses it on reload',
+  { tag: '@parity:command-dock-offers-a-mounted-session-every-edit' },
   async ({ page }) => {
     await openMeta(page);
 
-    await expect(dock(page).getByText('Edits lost on reload', { exact: true })).toBeVisible();
+    await expect(dock(page).getByText(/reload|page only/i)).toHaveCount(0);
+    await expect(mountedEditsNotice(page)).toHaveCount(0);
     for (const create of await dock(page)
       .getByRole('button', { name: /^Create / })
       .all()) {
@@ -157,12 +181,36 @@ test(
     await expect(nodeByTitle(page, 'Renamed A').first()).toBeVisible();
     await expect(status).not.toHaveAttribute('data-revision', revision);
     await expect(status).toHaveText('Persisted');
+    await expect(mountedEditsNotice(page)).toContainText('Nothing is written to GitHub');
+    await expect(dock(page).getByText(/page only/i)).toHaveCount(0);
 
     await page.reload();
     await expect(page.locator('.react-flow__node').first()).toBeVisible();
     await settled(page);
     await expect(nodeByTitle(page, 'A').first()).toBeVisible();
     await expect(nodeByTitle(page, 'Renamed A')).toHaveCount(0);
+    await expect(mountedEditsNotice(page)).toHaveCount(0);
+  },
+);
+
+test(
+  'reports once where Edits are kept, and stays dismissed for the page',
+  { tag: '@parity:mounted-edits-notice-reports-where-edits-are-kept' },
+  async ({ page }) => {
+    await openMeta(page);
+    const status = page.getByTestId('persistence-status');
+
+    await renameResource(page, 'A', 'Renamed A');
+    await expect(mountedEditsNotice(page)).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+
+    await page.getByRole('button', { name: `Dismiss: ${MOUNTED_EDITS}` }).click();
+    await expect(mountedEditsNotice(page)).toHaveCount(0);
+
+    const revision = (await status.getAttribute('data-revision')) ?? '';
+    await renameResource(page, 'Renamed A', 'A again');
+    await expect(status).not.toHaveAttribute('data-revision', revision);
+    await expect(mountedEditsNotice(page)).toHaveCount(0);
   },
 );
 

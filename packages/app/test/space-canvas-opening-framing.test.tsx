@@ -9,6 +9,7 @@ import { bareKindData, type ResourceFlowNode } from '@project/react-flow-adapter
 import { SpaceCanvas } from '../src/components/SpaceCanvas';
 import { composeApp } from '../src/compose-app';
 import { OpenSpacesContext } from '../src/open-spaces-context';
+import { createMountedEdits } from '../src/mounted-edits';
 import type { OpenSpace, OpenSpaces, OpenSpacesState } from '../src/open-spaces';
 import type { SpaceResourceFraming } from '../src/space-resource-framing';
 import { RESOURCE_SIZE } from '../src/resource';
@@ -128,6 +129,7 @@ describe('opening framing on a mounted canvas', () => {
     };
     const spaces: OpenSpaces = {
       metaSpaceId: HOST_ID,
+      mountedEdits: createMountedEdits(() => undefined),
       listing: unused,
       opener: unused,
       select: unused,
@@ -243,6 +245,7 @@ describe('opening framing on a mounted canvas', () => {
     };
     const spaces: OpenSpaces = {
       metaSpaceId: TARGET_ID,
+      mountedEdits: createMountedEdits(() => undefined),
       listing: unused,
       opener: unused,
       select: unused,
