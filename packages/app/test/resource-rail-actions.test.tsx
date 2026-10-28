@@ -202,6 +202,29 @@ const runtime = (value: SpaceSnapshot) => {
   return loaded.space;
 };
 
+/** The fixture with A Open on its Map. */
+const openedA = () =>
+  spaceSnapshotSchema.parse({
+    ...snapshot,
+    document: {
+      ...snapshot.document,
+      maps: [
+        {
+          ...snapshot.document.maps?.[0],
+          positions: {
+            ...snapshot.document.maps?.[0]?.positions,
+            [RESOURCE_ID]: {
+              x: 0,
+              y: 0,
+              open: true,
+              size: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
+            },
+          },
+        },
+      ],
+    },
+  });
+
 function mount(
   opening?: DestinationOpening,
   history?: HistoryApi,
@@ -519,26 +542,7 @@ describe('a Resource’s commands on the canvas rail', () => {
    * Open Resource held, and Delete from Space takes its Open state with it.
    */
   it('offers Remove from Map and Delete from Space while the Resource is Open', async () => {
-    const opened = spaceSnapshotSchema.parse({
-      ...snapshot,
-      document: {
-        ...snapshot.document,
-        maps: [
-          {
-            ...snapshot.document.maps?.[0],
-            positions: {
-              ...snapshot.document.maps?.[0]?.positions,
-              [RESOURCE_ID]: {
-                x: 0,
-                y: 0,
-                open: true,
-                size: { width: RESOURCE_WIDTH, height: RESOURCE_HEIGHT },
-              },
-            },
-          },
-        ],
-      },
-    });
+    const opened = openedA();
     const session = mount(undefined, undefined, opened);
 
     await selectResource('A');
@@ -546,6 +550,30 @@ describe('a Resource’s commands on the canvas rail', () => {
 
     expect(await screen.findByRole('menuitem', { name: 'Remove from Map' })).toBeVisible();
     expect(screen.getByRole('menuitem', { name: 'Delete from Space' })).toBeVisible();
+    await settled(session);
+  });
+
+  /**
+   * Open and Expand and Read in Full View are the commands Shift+Enter and
+   * Space run, so the rail offers them only where the keys would answer: not
+   * while a body edit holds the keyboard.
+   */
+  it('withdraws Open and Expand and Read in Full View while the Resource’s body is edited', async () => {
+    const session = mount(undefined, undefined, openedA());
+
+    await selectResource('A');
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+    expect(await screen.findByRole('menuitem', { name: 'Read in Full View' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Open and Expand' })).toBeVisible();
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Edit .* of A$/ }));
+    await screen.findByRole('textbox', { name: /of A$/ });
+    fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
+
+    await screen.findByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: 'Read in Full View' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Open and Expand' })).toBeNull();
     await settled(session);
   });
 

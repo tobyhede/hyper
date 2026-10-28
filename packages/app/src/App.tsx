@@ -197,7 +197,6 @@ export const createApp = (
       editingResourceBody,
       createReferenceFrom: placement.createReferenceFrom,
       spaces,
-      showFullView: setFullViewOf,
     });
     useUnsettledLeaveGuard(sessionState.persistence.kind, replacingImage);
     const spaceResourceTargets = useSpaceResourceTargetTitles(spaceResources, space.resources);

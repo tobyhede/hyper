@@ -134,7 +134,6 @@ export function EmbeddedMapAuthoring({
     editingResourceBody,
     createReferenceFrom: placement.createReferenceFrom,
     spaces,
-    showFullView: null,
   });
   const selectResource = state.selectResource;
   const [connecting, setConnecting] = useState<Connecting | null>(null);

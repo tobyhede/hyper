@@ -53,10 +53,10 @@ export interface ResourceRailCommands {
   readonly enter: RailNavigation | null;
   /** Present the Active Graph from this Resource: the canvas's Present from Here command. */
   readonly present: BoundCommand;
-  /** Read this Resource in Full View, or `null` where no Full View is drawn. */
-  readonly fullView: (() => void) | null;
-  /** Open this Resource and expand it to fit its content, or `null` where it cannot be. */
-  readonly openAndExpand: (() => void) | null;
+  /** Read this Resource in Full View: the canvas's command Space runs. */
+  readonly fullView: BoundCommand;
+  /** Open this Resource and expand it to fit its content: the canvas's command Shift+Enter runs. */
+  readonly openAndExpand: BoundCommand;
 }
 
 /**
@@ -65,11 +65,17 @@ export interface ResourceRailCommands {
  * item and the key cannot disagree. A rail drawn with none — a Map inside a
  * Space Resource — offers them as absent.
  */
-export type CanvasRailCommands = Pick<ResourceRailCommands, 'openAndExpand' | 'present'>;
+export type CanvasRailCommands = Pick<
+  ResourceRailCommands,
+  'openAndExpand' | 'fullView' | 'present'
+>;
+
+const NO_COMMAND: BoundCommand = { availability: ABSENT, run: () => undefined };
 
 const NO_CANVAS_COMMANDS: CanvasRailCommands = {
-  openAndExpand: null,
-  present: { availability: ABSENT, run: () => undefined },
+  openAndExpand: NO_COMMAND,
+  fullView: NO_COMMAND,
+  present: NO_COMMAND,
 };
 
 /**
@@ -162,37 +168,24 @@ export function resourceRailGroups(
           ],
         ];
   const presentItem = commandItem(present, CANVAS_KEYS.presentFromHere);
+  const openAndExpandItem = commandItem(openAndExpand, CANVAS_KEYS.openAndExpand);
+  const fullViewItem = commandItem(fullView, CANVAS_KEYS.showFullView);
   // Seeing a Resource whole: expanding it on the Map, which is an Edit, then
   // reading it and presenting from it, which change nothing in the Space.
   const presenting: EntityActionGroup = [
-    ...(openAndExpand === null
+    ...(openAndExpandItem === null
       ? []
       : [
           {
             id: 'open-and-expand',
             label: 'Open and Expand',
             icon: <OpenAndExpandIcon />,
-            shortcut: shortcutOf(CANVAS_KEYS.openAndExpand),
-            onSelect: (): EntityActionOutcome => {
-              openAndExpand();
-              return 'done';
-            },
+            ...openAndExpandItem,
           },
         ]),
-    ...(fullView === null
+    ...(fullViewItem === null
       ? []
-      : [
-          {
-            id: 'full-view',
-            label: 'Read in Full View',
-            icon: <FullViewIcon />,
-            shortcut: shortcutOf(CANVAS_KEYS.showFullView),
-            onSelect: (): EntityActionOutcome => {
-              fullView();
-              return 'done';
-            },
-          },
-        ]),
+      : [{ id: 'full-view', label: 'Read in Full View', icon: <FullViewIcon />, ...fullViewItem }]),
     ...(presentItem === null
       ? []
       : [
@@ -285,8 +278,6 @@ export interface ResourceRailInput {
     AuthoringAvailability,
     'addResource' | 'authorOnCanvas' | 'deleteResource' | 'navigate'
   >;
-  /** Read a Resource in Full View, or `null` where no Full View is drawn. */
-  readonly showFullView: ((resourceId: ResourceId) => void) | null;
   readonly editingResourceBody: boolean;
   readonly createReferenceFrom: (resource: Resource) => EntityActionOutcome;
   readonly spaces: OpenSpaces | null;
@@ -342,7 +333,6 @@ export function useResourceRailActions(
     editingResourceBody,
     createReferenceFrom,
     spaces,
-    showFullView,
   }: ResourceRailInput,
 ): ResourceRailActions {
   const { addResource, authorOnCanvas, deleteResource, navigate } = availability;
@@ -395,7 +385,6 @@ export function useResourceRailActions(
                     );
                   },
                 },
-          fullView: showFullView === null ? null : () => showFullView(resourceId),
           ...canvas,
         },
       );
@@ -411,7 +400,6 @@ export function useResourceRailActions(
       editingResourceBody,
       createReferenceFrom,
       spaces,
-      showFullView,
       authoring,
       commandOutcomes,
       currentSpace,

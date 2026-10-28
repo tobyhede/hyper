@@ -6,11 +6,14 @@ import {
   AVAILABLE,
   bindCommand,
   keyAnswerOf,
+  OPEN_AND_EXPAND,
+  OPEN_RESOURCE,
   PRESENT_OFF_GRAPH,
   PRESENT_WHILE_EDITING,
   presentFromHereCommand,
   REMOVE_SELECTION,
   RENAME_RESOURCE,
+  showFullViewCommand,
   unavailable,
   type AuthoringOccurrence,
   type RemovalOccurrence,
@@ -195,5 +198,112 @@ describe('Add Resource and Rename', () => {
     expect(map.addResource).not.toHaveBeenCalled();
     expect(answer.answer(pressOn(document.createElement('button'), 'c'))).toBe(true);
     expect(map.addResource).toHaveBeenCalledOnce();
+  });
+});
+
+describe('Open, Open and expand and Full View', () => {
+  const opening = (overrides: { authorOnCanvas?: boolean; bodyEditing?: boolean } = {}) => ({
+    authorOnCanvas: true,
+    bodyEditing: false,
+    openResource: vi.fn(),
+    ...overrides,
+  });
+  const expanding = () => ({
+    expandable: (id: string) => id === ON_GRAPH,
+    openAndExpand: vi.fn(),
+  });
+  const reading = () => {
+    const show = vi.fn();
+    return { show, command: showFullViewCommand({ show, selectNodes: true }) };
+  };
+
+  /**
+   * Open serves any drawn Map, so Enter Opens a Resource of a Map drawn inside a
+   * Space Resource; the other two use the canvas's own camera and Full View.
+   */
+  it('Opens on any drawn Map, and expands or reads in Full View on the canvas’s own', () => {
+    expect(OPEN_RESOURCE.serves).toBe('any');
+    expect(OPEN_AND_EXPAND.serves).toBe('own-map');
+    expect(reading().command.serves).toBe('own-map');
+
+    const embedded = opening();
+    OPEN_RESOURCE.run({ occurrence: embedded, nodeId: 'embedded-node', takesOpen: true });
+    expect(embedded.openResource).toHaveBeenCalledWith('embedded-node');
+  });
+
+  it('runs each at its Resource', () => {
+    const canvas = expanding();
+    const { show, command } = reading();
+
+    OPEN_AND_EXPAND.run({ resourceId: ON_GRAPH, bodyEditing: false, canvas });
+    command.run({ resourceId: ON_GRAPH, bodyEditing: false });
+
+    expect(canvas.openAndExpand).toHaveBeenCalledWith(ON_GRAPH);
+    expect(show).toHaveBeenCalledWith(ON_GRAPH);
+  });
+
+  it('offers no Open, and no Open and expand, on a Resource whose kind does not take Open', () => {
+    expect(
+      OPEN_RESOURCE.availability({ occurrence: opening(), nodeId: 'n', takesOpen: false }),
+    ).toEqual(ABSENT);
+    expect(
+      OPEN_AND_EXPAND.availability({
+        resourceId: OFF_GRAPH,
+        bodyEditing: false,
+        canvas: expanding(),
+      }),
+    ).toEqual(ABSENT);
+    expect(
+      OPEN_RESOURCE.availability({ occurrence: opening(), nodeId: 'n', takesOpen: true }),
+    ).toEqual(AVAILABLE);
+  });
+
+  it('is absent while a body is being edited', () => {
+    const own = { resourceId: ON_GRAPH, bodyEditing: true };
+
+    expect(
+      OPEN_RESOURCE.availability({
+        occurrence: opening({ bodyEditing: true }),
+        nodeId: 'n',
+        takesOpen: true,
+      }),
+    ).toEqual(ABSENT);
+    expect(OPEN_AND_EXPAND.availability({ ...own, canvas: expanding() })).toEqual(ABSENT);
+    expect(reading().command.availability(own)).toEqual(ABSENT);
+    expect(reading().command.availability({ ...own, bodyEditing: false })).toEqual(AVAILABLE);
+  });
+
+  it('offers no Full View where the canvas cannot be selected on or draws none', () => {
+    const own = { resourceId: ON_GRAPH, bodyEditing: false };
+
+    expect(showFullViewCommand({ show: vi.fn(), selectNodes: false }).availability(own)).toEqual(
+      ABSENT,
+    );
+    expect(showFullViewCommand({ show: undefined, selectNodes: true }).availability(own)).toEqual(
+      ABSENT,
+    );
+  });
+
+  /**
+   * Aimed at the focused Resource, so its own content, toolbar and editor keep
+   * Enter and Space, as a field anywhere does.
+   */
+  it('leaves Enter to a Resource’s own content and controls, and takes it from the Resource', () => {
+    const map = opening();
+    const answer = keyAnswerOf(OPEN_RESOURCE, () => ({
+      occurrence: map,
+      nodeId: 'n',
+      takesOpen: true,
+    }));
+    const node = document.createElement('div');
+    const content = document.createElement('div');
+    content.className = 'nokey';
+    node.append(content);
+
+    for (const target of [content, document.createElement('button')])
+      expect(answer.answer(pressOn(target, 'Enter'))).toBe(false);
+    expect(map.openResource).not.toHaveBeenCalled();
+    expect(answer.answer(pressOn(node, 'Enter'))).toBe(true);
+    expect(map.openResource).toHaveBeenCalledOnce();
   });
 });

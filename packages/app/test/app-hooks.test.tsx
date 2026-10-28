@@ -519,7 +519,6 @@ describe('useResourceRailActions', () => {
         editingResourceBody: false,
         createReferenceFrom: () => 'done',
         spaces: null,
-        showFullView: null,
       }),
     );
   };
