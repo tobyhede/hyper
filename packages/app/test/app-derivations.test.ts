@@ -14,6 +14,9 @@ import {
   PRESENT_OFF_GRAPH,
   PRESENT_WHILE_EDITING,
   unavailable,
+  type BoundCommand,
+  type CanvasCommandId,
+  type CommandAvailability,
 } from '../src/canvas-commands';
 import { resourceRailGroups, type ResourceRailCommands } from '../src/resource-rail-actions';
 import { revealStep } from '../src/resources-disclosure';
@@ -208,6 +211,11 @@ describe('activeGraphOf', () => {
 });
 
 describe('resourceRailGroups', () => {
+  const bound = (id: CanvasCommandId, availability: CommandAvailability): BoundCommand => ({
+    id,
+    run: () => undefined,
+    availability,
+  });
   const addresses: readonly EntityActionGroup[] = [
     [{ id: 'copy-link', label: 'Copy link', onSelect: () => 'done' }],
   ];
@@ -216,12 +224,12 @@ describe('resourceRailGroups', () => {
   ];
   const everything: ResourceRailCommands = {
     createReference: (): EntityActionOutcome => 'done',
-    removeFromMap: { id: 'canvas.removeSelection', run: () => undefined, availability: AVAILABLE },
+    removeFromMap: bound('canvas.removeSelection', AVAILABLE),
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
-    present: { id: 'canvas.presentFromHere', run: () => undefined, availability: AVAILABLE },
-    fullView: { id: 'canvas.showFullView', run: () => undefined, availability: AVAILABLE },
-    openAndExpand: { id: 'canvas.openAndExpand', run: () => undefined, availability: AVAILABLE },
+    present: bound('canvas.presentFromHere', AVAILABLE),
+    fullView: bound('canvas.showFullView', AVAILABLE),
+    openAndExpand: bound('canvas.openAndExpand', AVAILABLE),
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -241,11 +249,7 @@ describe('resourceRailGroups', () => {
   it('draws Present from Here unavailable, saying why, off the Active Graph', () => {
     const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
       ...everything,
-      present: {
-        id: 'canvas.presentFromHere',
-        run: () => undefined,
-        availability: unavailable(PRESENT_OFF_GRAPH),
-      },
+      present: bound('canvas.presentFromHere', unavailable(PRESENT_OFF_GRAPH)),
     })
       .flat()
       .find(({ id }) => id === 'present-from-here');
@@ -257,11 +261,7 @@ describe('resourceRailGroups', () => {
   it('draws Present from Here unavailable, saying why, while an edit holds the keyboard', () => {
     const row = resourceRailGroups(resource(PLACED_A), addresses, connect, {
       ...everything,
-      present: {
-        id: 'canvas.presentFromHere',
-        run: () => undefined,
-        availability: unavailable(PRESENT_WHILE_EDITING),
-      },
+      present: bound('canvas.presentFromHere', unavailable(PRESENT_WHILE_EDITING)),
     })
       .flat()
       .find(({ id }) => id === 'present-from-here');
@@ -299,16 +299,12 @@ describe('resourceRailGroups', () => {
       ids(
         resourceRailGroups(resource(PLACED_A), addresses, connect, {
           createReference: null,
-          removeFromMap: {
-            id: 'canvas.removeSelection',
-            run: () => undefined,
-            availability: ABSENT,
-          },
+          removeFromMap: bound('canvas.removeSelection', ABSENT),
           deleteFromSpace: null,
           enter: null,
-          present: { id: 'canvas.presentFromHere', run: () => undefined, availability: ABSENT },
-          fullView: { id: 'canvas.showFullView', run: () => undefined, availability: ABSENT },
-          openAndExpand: { id: 'canvas.openAndExpand', run: () => undefined, availability: ABSENT },
+          present: bound('canvas.presentFromHere', ABSENT),
+          fullView: bound('canvas.showFullView', ABSENT),
+          openAndExpand: bound('canvas.openAndExpand', ABSENT),
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);

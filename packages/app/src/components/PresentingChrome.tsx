@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Button, Kbd, KbdGroup } from '@project/ui';
-import { PRESENTING_KEYS } from '../key-bindings';
+import { bindingOf } from '../key-bindings';
 import type { Move } from '../navigation';
 
 export interface PresentingChromeProps {
@@ -234,7 +234,7 @@ export function PresentingChrome({
                       // rather than acting on any single choice, and Space is a
                       // button's own activation rather than a shortcut of ours.
                       aria-keyshortcuts={
-                        move.selected ? PRESENTING_KEYS.advance.ariaKeyShortcuts : undefined
+                        move.selected ? bindingOf('presenting.advance').ariaKeyShortcuts : undefined
                       }
                       className="max-w-[16rem] @max-3xl:min-h-11"
                       onClick={
@@ -262,7 +262,7 @@ export function PresentingChrome({
         <div className="flex items-center gap-3 @max-3xl:flex-wrap @max-3xl:justify-between">
           <Button
             variant="secondary"
-            aria-keyshortcuts={PRESENTING_KEYS.openNotes.ariaKeyShortcuts}
+            aria-keyshortcuts={bindingOf('presenting.openNotes').ariaKeyShortcuts}
             onClick={onOpenNotes}
           >
             Notes window
@@ -271,7 +271,7 @@ export function PresentingChrome({
           <Button
             variant={notesShown ? 'default' : 'secondary'}
             aria-pressed={notesShown}
-            aria-keyshortcuts={PRESENTING_KEYS.toggleNotes.ariaKeyShortcuts}
+            aria-keyshortcuts={bindingOf('presenting.toggleNotes').ariaKeyShortcuts}
             onClick={onToggleNotes}
           >
             Rehearsal notes
@@ -285,7 +285,7 @@ export function PresentingChrome({
             <Button
               ref={back}
               variant="secondary"
-              aria-keyshortcuts={PRESENTING_KEYS.retreat.ariaKeyShortcuts}
+              aria-keyshortcuts={bindingOf('presenting.retreat').ariaKeyShortcuts}
               className="@max-3xl:min-h-11"
               onClick={traversed(onRetreat)}
             >
@@ -316,7 +316,7 @@ export function PresentingChrome({
           <Button
             ref={overview}
             variant="secondary"
-            aria-keyshortcuts={PRESENTING_KEYS.exitPresenting.ariaKeyShortcuts}
+            aria-keyshortcuts={bindingOf('presenting.exitPresenting').ariaKeyShortcuts}
             data-testid="exit-presenting"
             className="@max-3xl:min-h-11"
             onClick={onExit}
