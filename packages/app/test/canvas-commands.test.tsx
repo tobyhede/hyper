@@ -115,13 +115,16 @@ describe('Remove from Map', () => {
   });
 
   it('removes a Resource from its Map, or deletes the selected Edge', () => {
-    const map = occurrence();
+    const drawn = occurrence();
 
-    REMOVE_SELECTION.run({ occurrence: map, subject: { kind: 'resource', resourceId: ON_GRAPH } });
-    REMOVE_SELECTION.run({ occurrence: map, subject: { kind: 'edge' } });
+    REMOVE_SELECTION.run({
+      occurrence: drawn,
+      subject: { kind: 'resource', resourceId: ON_GRAPH },
+    });
+    REMOVE_SELECTION.run({ occurrence: drawn, subject: { kind: 'edge' } });
 
-    expect(map.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
-    expect(map.deleteSelectedEdge).toHaveBeenCalledOnce();
+    expect(drawn.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
+    expect(drawn.deleteSelectedEdge).toHaveBeenCalledOnce();
   });
 
   it('is absent while its Map may not be authored or a body is being edited', () => {
@@ -137,9 +140,9 @@ describe('Remove from Map', () => {
   });
 
   it('leaves its key to any control, even one that owns no keys of its own', () => {
-    const map = occurrence();
+    const drawn = occurrence();
     const answer = keyAnswerOf(REMOVE_SELECTION, () => ({
-      occurrence: map,
+      occurrence: drawn,
       subject: { kind: 'resource' as const, resourceId: ON_GRAPH },
     }));
     const toolbar = document.createElement('div');
@@ -149,9 +152,9 @@ describe('Remove from Map', () => {
 
     expect(answer.answer(pressOn(button, 'Delete'))).toBe(false);
     expect(answer.answer(pressOn(toolbar, 'Delete'))).toBe(false);
-    expect(map.removeFromMap).not.toHaveBeenCalled();
+    expect(drawn.removeFromMap).not.toHaveBeenCalled();
     expect(answer.answer(pressOn(document.body, 'Delete'))).toBe(true);
-    expect(map.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
+    expect(drawn.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
   });
 });
 
@@ -165,29 +168,29 @@ describe('Add Resource and Rename', () => {
   });
 
   it('adds a Resource to the Map, and renames the Resource drawn as a node there', () => {
-    const map = occurrence();
+    const drawn = occurrence();
 
-    ADD_RESOURCE.run(map);
-    RENAME_RESOURCE.run({ occurrence: map, nodeId: 'node-a' });
+    ADD_RESOURCE.run(drawn);
+    RENAME_RESOURCE.run({ occurrence: drawn, nodeId: 'node-a' });
 
-    expect(map.addResource).toHaveBeenCalledOnce();
-    expect(map.beginTitleEditing).toHaveBeenCalledWith('node-a');
+    expect(drawn.addResource).toHaveBeenCalledOnce();
+    expect(drawn.beginTitleEditing).toHaveBeenCalledWith('node-a');
   });
 
   it.each([
     ['authoring is withdrawn', { authorOnCanvas: false }],
     ['a body is being edited', { bodyEditing: true }],
   ])('is absent while %s', (_, overrides) => {
-    const map = occurrence(overrides);
+    const drawn = occurrence(overrides);
 
-    expect(ADD_RESOURCE.availability(map)).toEqual(ABSENT);
-    expect(RENAME_RESOURCE.availability({ occurrence: map, nodeId: 'node-a' })).toEqual(ABSENT);
+    expect(ADD_RESOURCE.availability(drawn)).toEqual(ABSENT);
+    expect(RENAME_RESOURCE.availability({ occurrence: drawn, nodeId: 'node-a' })).toEqual(ABSENT);
     expect(ADD_RESOURCE.availability(occurrence())).toEqual(AVAILABLE);
   });
 
   it('leaves C to a field, a menu and a dialog, and takes it from a button', () => {
-    const map = occurrence();
-    const answer = keyAnswerOf(ADD_RESOURCE, () => map);
+    const drawn = occurrence();
+    const answer = keyAnswerOf(ADD_RESOURCE, () => drawn);
     const menu = document.createElement('div');
     menu.setAttribute('role', 'menu');
     const dialog = document.createElement('div');
@@ -195,9 +198,9 @@ describe('Add Resource and Rename', () => {
 
     for (const target of [document.createElement('input'), menu, dialog])
       expect(answer.answer(pressOn(target, 'c'))).toBe(false);
-    expect(map.addResource).not.toHaveBeenCalled();
+    expect(drawn.addResource).not.toHaveBeenCalled();
     expect(answer.answer(pressOn(document.createElement('button'), 'c'))).toBe(true);
-    expect(map.addResource).toHaveBeenCalledOnce();
+    expect(drawn.addResource).toHaveBeenCalledOnce();
   });
 });
 
@@ -289,9 +292,9 @@ describe('Open, Open and expand and Full View', () => {
    * Enter and Space, as a field anywhere does.
    */
   it('leaves Enter to a Resource’s own content and controls, and takes it from the Resource', () => {
-    const map = opening();
+    const drawn = opening();
     const answer = keyAnswerOf(OPEN_RESOURCE, () => ({
-      occurrence: map,
+      occurrence: drawn,
       nodeId: 'n',
       takesOpen: true,
     }));
@@ -302,8 +305,8 @@ describe('Open, Open and expand and Full View', () => {
 
     for (const target of [content, document.createElement('button')])
       expect(answer.answer(pressOn(target, 'Enter'))).toBe(false);
-    expect(map.openResource).not.toHaveBeenCalled();
+    expect(drawn.openResource).not.toHaveBeenCalled();
     expect(answer.answer(pressOn(node, 'Enter'))).toBe(true);
-    expect(map.openResource).toHaveBeenCalledOnce();
+    expect(drawn.openResource).toHaveBeenCalledOnce();
   });
 });
