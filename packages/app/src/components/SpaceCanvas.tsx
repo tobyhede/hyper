@@ -2003,11 +2003,7 @@ export function SpaceCanvas({
         )}
         <ZoomSlider />
         {graphs.length > 0 && (
-          <GraphHud
-            graphs={graphs}
-            colorByGraphId={colorByGraphId}
-            activeGraphId={activeGraphId}
-          />
+          <GraphHud graphs={graphs} colorByGraphId={colorByGraphId} activeGraphId={activeGraphId} />
         )}
         <OpeningFramingCamera framing={openingFraming} />
         {edgeSurface.layer}
