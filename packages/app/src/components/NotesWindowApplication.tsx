@@ -51,6 +51,7 @@ export function NotesWindowApplication({ notes, now }: NotesWindowApplicationPro
   usePresentingKeys(presenting, {
     advance: notes.advance,
     retreat: notes.retreat,
+    returnToStart: notes.returnToStart,
     selectBranch: notes.selectBranch,
     exitPresenting: nothing,
     openNotes: nothing,

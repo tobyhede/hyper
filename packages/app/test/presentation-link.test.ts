@@ -214,6 +214,19 @@ describe('the presentation link', () => {
     expect(shown(follower)).toBe(OPENING);
   });
 
+  it('takes the Stage back to where the presentation began from the Notes window', () => {
+    const join = channelHub();
+    const stage = presentingWindow(join(), mintingIds(FIRST_PRESENTATION));
+    const { follower } = notesWindow(join());
+    stage.navigation.present();
+    follower.advance();
+
+    follower.returnToStart();
+
+    expect(stage.navigation.activeResourceId()).toBe(OPENING);
+    expect(shown(follower)).toBe(OPENING);
+  });
+
   it('shows the moves from the presented Resource, and whether there is one to go back to', () => {
     const join = channelHub();
     const stage = presentingWindow(join(), mintingIds(FIRST_PRESENTATION));

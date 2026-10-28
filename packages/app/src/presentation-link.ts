@@ -45,6 +45,7 @@ export interface PresentationSnapshot {
 export type PresentationCommand =
   | { readonly kind: 'advance' }
   | { readonly kind: 'retreat' }
+  | { readonly kind: 'return-to-start' }
   | { readonly kind: 'select-branch'; readonly delta: number };
 
 /**
@@ -210,6 +211,9 @@ export function presentingLink({
       case 'retreat':
         navigation.retreat();
         return;
+      case 'return-to-start':
+        navigation.returnToStart();
+        return;
       case 'select-branch':
         navigation.selectBranch(command.delta);
         return;
@@ -255,6 +259,7 @@ export interface PresentationFollower {
   readonly subscribe: (listener: () => void) => () => void;
   readonly advance: () => void;
   readonly retreat: () => void;
+  readonly returnToStart: () => void;
   readonly selectBranch: (delta: number) => void;
   /** Announce this window and follow until the returned function is called. */
   readonly connect: () => () => void;
@@ -332,6 +337,7 @@ export function followPresentation(
     subscribe: observable.subscribe,
     advance: () => command({ kind: 'advance' }),
     retreat: () => command({ kind: 'retreat' }),
+    returnToStart: () => command({ kind: 'return-to-start' }),
     selectBranch: (delta) => command({ kind: 'select-branch', delta }),
     // What a window heard before it last disconnected may have ended since, so
     // connecting starts from "not presenting" and asks afresh.

@@ -423,7 +423,7 @@ test(
     // is the one that commits.
     await expect(moves).toHaveAccessibleName('Go to B');
     await expect(page.getByTestId('presenting-keys').getByRole('listitem')).toHaveText([
-      '→go',
+      '→PgDngo',
       'Snotes',
       'Nrehearse',
       'Escoverview',
@@ -764,8 +764,9 @@ test.describe('at a phone width', () => {
 
       await expect(page.getByTestId('presenting-moves').getByRole('button')).toHaveText(['C']);
       await expect(page.getByTestId('presenting-keys').getByRole('listitem')).toHaveText([
-        '→go',
-        '←back',
+        '→PgDngo',
+        '←PgUpback',
+        'Homestart',
         'Snotes',
         'Nrehearse',
         'Escoverview',

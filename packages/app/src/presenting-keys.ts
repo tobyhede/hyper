@@ -10,6 +10,8 @@ import {
 export interface TraversalCommands {
   readonly advance: () => void;
   readonly retreat: () => void;
+  /** Go back to where this presentation began. */
+  readonly returnToStart: () => void;
   readonly selectBranch: (delta: number) => void;
   readonly exitPresenting: () => void;
   /** Open a Notes window following this presentation (ADR 0129). */
@@ -19,9 +21,40 @@ export interface TraversalCommands {
 }
 
 /**
+ * Whether Page Down, Page Up or Home pressed here would still scroll the content
+ * the press landed in, which it then keeps: a presenter reading a long Resource
+ * with focus in it pages through it first. A clicker, whose focus is on the
+ * chrome after a move, is outside the content and goes straight on. Each
+ * scrolling ancestor of the press is asked in turn, nearest first, so a code
+ * block paged to its end leaves the press to the Resource around it, and only
+ * when none has further to scroll does the press move through the talk.
+ */
+function keyScrollsContent(event: KeyboardEvent): boolean {
+  const down = event.key === 'PageDown';
+  if (!down && event.key !== 'PageUp' && event.key !== 'Home') return false;
+  for (
+    let element = event.target instanceof Element ? event.target : null;
+    element !== null;
+    element = element.parentElement
+  ) {
+    if (element.scrollHeight <= element.clientHeight) continue;
+    const { overflowY } = getComputedStyle(element);
+    if (overflowY !== 'auto' && overflowY !== 'scroll') continue;
+    if (
+      down
+        ? element.scrollTop + element.clientHeight < element.scrollHeight - 1
+        : element.scrollTop > 0
+    )
+      return true;
+  }
+  return false;
+}
+
+/**
  * The global Traversal commands, bound while a traversal is on.
  *
- * Right commits the selected Edge, Left traverses back, Up and Down move the
+ * Right and Page Down commit the selected Edge, Left and Page Up traverse
+ * back, Home goes back to where the presentation began, Up and Down move the
  * selection among a fork's outgoing Edges without traversing — the move a
  * deck framework's per-key redirect cannot express, and the reason there is no
  * framework here. Escape leaves.
@@ -32,12 +65,14 @@ export interface TraversalCommands {
  * a copy of it in a story fixture would prove the copy (ADR 0052).
  */
 export function usePresentingKeys(active: boolean, commands: TraversalCommands): void {
-  const { advance, retreat, selectBranch, exitPresenting, openNotes, toggleNotes } = commands;
+  const { advance, retreat, returnToStart, selectBranch, exitPresenting, openNotes, toggleNotes } =
+    commands;
   useEffect(() => {
     if (!active) return;
     const bound: readonly (readonly [KeyBinding, () => void])[] = [
       [PRESENTING_KEYS.advance, advance],
       [PRESENTING_KEYS.retreat, retreat],
+      [PRESENTING_KEYS.returnToStart, returnToStart],
       [PRESENTING_KEYS.previousBranch, () => selectBranch(-1)],
       [PRESENTING_KEYS.nextBranch, () => selectBranch(1)],
       [PRESENTING_KEYS.exitPresenting, exitPresenting],
@@ -51,7 +86,7 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
       // the Traversal, and a letter typed into a field is text. Anywhere else —
       // the Stage, a chrome button, the page — the arrows and Escape are the
       // Traversal's.
-      if (keyBelongsElsewhere(event)) return;
+      if (keyBelongsElsewhere(event) || keyScrollsContent(event)) return;
       const command = bound.find(([binding]) => pressesBinding(binding, event))?.[1];
       if (command === undefined) return;
       event.preventDefault();
@@ -59,5 +94,14 @@ export function usePresentingKeys(active: boolean, commands: TraversalCommands):
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active, advance, retreat, selectBranch, exitPresenting, openNotes, toggleNotes]);
+  }, [
+    active,
+    advance,
+    retreat,
+    returnToStart,
+    selectBranch,
+    exitPresenting,
+    openNotes,
+    toggleNotes,
+  ]);
 }

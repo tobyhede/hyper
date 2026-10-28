@@ -770,6 +770,57 @@ it('traverses a fork, retreats along Traversal history, and reselects the Edge t
   expect(navigation.activeResourceId()).toBe(resourceC);
 });
 
+it('returns to the first Resource of Traversal history, reselecting the Edge first taken', () => {
+  const resourceA = uuid('00000000-0000-4000-8000-000000000002');
+  const resourceB = uuid('00000000-0000-4000-8000-000000000003');
+  const resourceC = uuid('00000000-0000-4000-8000-000000000004');
+  const resourceD = uuid('00000000-0000-4000-8000-000000000005');
+  const forked = spaceOwning(
+    'Fork',
+    [
+      {
+        id: GRAPH_ONE,
+        title: 'Fork',
+        edges: [
+          { from: resourceA, to: resourceB },
+          { from: resourceA, to: resourceC },
+          { from: resourceC, to: resourceD },
+        ],
+      },
+    ],
+    [{ id: resourceA }, { id: resourceB }, { id: resourceC }, { id: resourceD }],
+  );
+  const navigation = navigationFor(() => forked, MAP);
+  navigation.presentFrom(resourceA);
+  navigation.selectBranch(1);
+  navigation.advance();
+  navigation.advance();
+
+  navigation.returnToStart();
+
+  expect(navigation.getState()).toEqual({
+    selectedMapId: MAP,
+    activeGraphId: GRAPH_ONE,
+    mode: 'presenting',
+    traversalHistory: [resourceA],
+    branchIndex: 1,
+  });
+});
+
+it('does nothing on returning to the start with nothing to go back to', () => {
+  const navigation = navigationFor(() => fixture(), MAP);
+  navigation.presentFrom(RESOURCE_B);
+  const observed: NavigationState[] = [];
+  navigation.subscribe(() => observed.push(navigation.getState()));
+
+  navigation.returnToStart();
+  navigation.exitPresenting();
+  observed.length = 0;
+  navigation.returnToStart();
+
+  expect(observed).toHaveLength(0);
+});
+
 /**
  * The addressable position, after every operation that writes one.
  *

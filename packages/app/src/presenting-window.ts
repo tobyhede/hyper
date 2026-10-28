@@ -168,6 +168,9 @@ export function createPresentingWindow({
   const commands: TraversalCommands = {
     advance: navigation.advance,
     retreat: navigation.retreat,
+    // Back to where this presentation began, not a restart: the presentation,
+    // its clock and its rehearsal notes go on, as they do on Back.
+    returnToStart: navigation.returnToStart,
     selectBranch: navigation.selectBranch,
     exitPresenting: navigation.exitPresenting,
     openNotes,
