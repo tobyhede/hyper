@@ -9,9 +9,10 @@
  * `dark:` variant follows, so the registry components' own `dark:` classes turn
  * over with these tokens rather than on a separate signal.
  *
- * The canvas is a flat near-black violet and the Resource is ink-lined in cyan;
- * the chrome's one emphasis is magenta. Glow is kept low, and there is no
- * yellow anywhere. One set of neons serves the whole theme: the Graph colours
+ * The canvas is a flat near-black violet and a Resource in no Graph is lined in
+ * a neutral grey, so colour on a Resource always means a Graph; cyan is the
+ * focus ring and magenta the chrome's one emphasis. Glow is kept low, and there
+ * is no yellow anywhere. One set of neons serves the whole theme: the Graph colours
  * below reuse the theme's own cyan, magenta, green and red, so a colour on the
  * chrome and the same colour on an Edge are one colour.
  * `test/unit/ui-theme-contrast.test.ts` holds each `--role`/`--role-foreground`
@@ -62,7 +63,7 @@
     --xy-minimap-node-background-color: #2a2450;
     --xy-attribution-background-color: rgb(17 14 33 / 60%);
 
-    --canvas-resource-ink-color: var(--neon-cyan);
+    --canvas-resource-ink-color: #cac9d7;
     --canvas-resource-face-rest: #0d0b1a;
     --canvas-resource-face-active: #16122b;
     --canvas-resource-title-color: #f2fbff;
@@ -120,7 +121,7 @@
   }
 
   /* Black in the sand theme, where it is the Resource's ink; here it takes the
-     cyan ink so the corner is still seen on a dark face. */
+     neutral ink so the corner is still seen on a dark face. */
   .rf-resource-node__resize-mark {
     background: var(--canvas-resource-ink-color);
   }
