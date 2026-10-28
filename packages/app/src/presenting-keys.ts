@@ -1,4 +1,4 @@
-import { useKeyAnswers } from './key-dispatcher';
+import { useKeyAnswers, useKeyCover } from './key-dispatcher';
 import {
   presentingCommands,
   presentingKeyAnswer,
@@ -8,15 +8,16 @@ import {
 export type { TraversalCommands } from './presenting-commands';
 
 /**
- * The Presenting commands' keys, answered by the Space's dispatcher while
- * `active`: while the Space on screen is presenting, and never for one that is
- * open but not on screen.
+ * The Presenting commands' keys. While `presenting`, the Stage covers the
+ * canvas, so the Space's dispatcher answers these and no canvas key; a Space
+ * that is not on screen answers neither.
  *
  * A hook rather than a registration written out in `App`, because it is the
  * boundary that owns this behaviour: a Ladle story proving that Space activates
  * a chrome control exactly once has to answer the keys the application
  * answers, and a copy of it in a story fixture would prove the copy (ADR 0052).
  */
-export function usePresentingKeys(active: boolean, traversal: TraversalCommands): void {
-  useKeyAnswers(active ? presentingCommands(traversal).map(presentingKeyAnswer) : []);
+export function usePresentingKeys(presenting: boolean, traversal: TraversalCommands): void {
+  useKeyCover('presenting', presenting);
+  useKeyAnswers(presentingCommands(traversal).map(presentingKeyAnswer), 'presenting');
 }

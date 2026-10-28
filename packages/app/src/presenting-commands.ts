@@ -1,4 +1,4 @@
-import { keyBelongsElsewhere, PRESENTING_KEYS, type KeyBinding } from './key-bindings';
+import { keyBelongsElsewhere, type CommandId } from './key-bindings';
 import type { KeyAnswer } from './key-dispatcher';
 import { ABSENT, AVAILABLE, type CommandAvailability } from './canvas-commands';
 
@@ -16,8 +16,8 @@ export interface TraversalCommands {
   readonly toggleNotes: () => void;
 }
 
-/** A Presenting command's name: its binding's, under the `presenting` context (ADR 0138). */
-export type PresentingCommandId = `presenting.${keyof typeof PRESENTING_KEYS}`;
+/** A Presenting command's name (ADR 0138). */
+export type PresentingCommandId = Extract<CommandId, `presenting.${string}`>;
 
 /**
  * A named move through the talk, answered while the Space on screen presents.
@@ -28,7 +28,6 @@ export type PresentingCommandId = `presenting.${keyof typeof PRESENTING_KEYS}`;
  */
 export interface PresentingCommand {
   readonly id: PresentingCommandId;
-  readonly binding: KeyBinding;
   readonly availability: (press: KeyboardEvent) => CommandAvailability;
   readonly run: () => void;
 }
@@ -81,24 +80,19 @@ export function presentingCommands(traversal: TraversalCommands): readonly Prese
   const { advance, retreat, returnToStart, selectBranch, exitPresenting, openNotes, toggleNotes } =
     traversal;
   const command = (
-    name: keyof typeof PRESENTING_KEYS,
+    id: PresentingCommandId,
     run: () => void,
     availability: PresentingCommand['availability'] = always,
-  ): PresentingCommand => ({
-    id: `presenting.${name}`,
-    binding: PRESENTING_KEYS[name],
-    availability,
-    run,
-  });
+  ): PresentingCommand => ({ id, availability, run });
   return [
-    command('advance', advance, unlessContentScrolls),
-    command('retreat', retreat, unlessContentScrolls),
-    command('returnToStart', returnToStart, unlessContentScrolls),
-    command('previousBranch', () => selectBranch(-1)),
-    command('nextBranch', () => selectBranch(1)),
-    command('exitPresenting', exitPresenting),
-    command('openNotes', openNotes),
-    command('toggleNotes', toggleNotes),
+    command('presenting.advance', advance, unlessContentScrolls),
+    command('presenting.retreat', retreat, unlessContentScrolls),
+    command('presenting.returnToStart', returnToStart, unlessContentScrolls),
+    command('presenting.previousBranch', () => selectBranch(-1)),
+    command('presenting.nextBranch', () => selectBranch(1)),
+    command('presenting.exitPresenting', exitPresenting),
+    command('presenting.openNotes', openNotes),
+    command('presenting.toggleNotes', toggleNotes),
   ];
 }
 
@@ -111,7 +105,7 @@ export function presentingCommands(traversal: TraversalCommands): readonly Prese
  * are the Traversal's.
  */
 export const presentingKeyAnswer = (command: PresentingCommand): KeyAnswer => ({
-  binding: command.binding,
+  id: command.id,
   answer: (event) => {
     if (keyBelongsElsewhere(event) || command.availability(event).kind !== 'available')
       return false;

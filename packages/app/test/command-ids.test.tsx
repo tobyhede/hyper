@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CANVAS_KEYS, PRESENTING_KEYS, type KeyBinding } from '../src/key-bindings';
+import {
+  bindingOf,
+  CANVAS_KEYS,
+  commandIdsWithKeys,
+  PRESENTING_KEYS,
+  type KeyBinding,
+} from '../src/key-bindings';
 import {
   ADD_RESOURCE,
   OPEN_AND_EXPAND,
@@ -33,20 +39,23 @@ const commands = [
   }),
 ];
 
-/** A binding by its command id: the context, then the binding's name in it (ADR 0138). */
-const bindingNamed = (id: string): KeyBinding | undefined => {
-  const [context, name = ''] = id.split('.');
-  const bindings: Readonly<Record<string, KeyBinding>> =
-    context === 'canvas' ? CANVAS_KEYS : context === 'presenting' ? PRESENTING_KEYS : {};
-  return bindings[name];
-};
-
 describe('command ids', () => {
-  it('names each command once, by the one binding it answers', () => {
+  /** `?` is the sheet's own key, answered by the sheet rather than a command module. */
+  it('names each command once, and every command with a key is one of them or `?`', () => {
     const ids = commands.map(({ id }) => id);
 
     expect(new Set(ids).size).toBe(ids.length);
-    for (const { id, binding } of commands) expect(bindingNamed(id)).toBe(binding);
+    expect(commandIdsWithKeys()).toEqual(expect.arrayContaining(ids));
+    expect(commandIdsWithKeys().filter((id) => !new Set<string>(ids).has(id))).toEqual([
+      'help.showShortcuts',
+    ]);
+  });
+
+  /** One binding per id; a key may still serve ids in different contexts, as Space does. */
+  it('gives each command its own binding', () => {
+    const bindings = commands.map(({ id }) => bindingOf(id));
+
+    expect(new Set(bindings).size).toBe(bindings.length);
   });
 
   /**
@@ -55,9 +64,13 @@ describe('command ids', () => {
    * listed for the `?` sheet that no command answers yet.
    */
   it('leaves only the keys React Flow and the canvas walk perform without a command', () => {
-    const commanded = new Set<string>(commands.map(({ id }) => id));
+    const commanded = new Set<KeyBinding>(commands.map(({ id }) => bindingOf(id)));
+    const uncommanded = (table: Readonly<Record<string, KeyBinding>>) =>
+      Object.entries(table)
+        .filter(([, binding]) => !commanded.has(binding))
+        .map(([name]) => name);
 
-    expect(Object.keys(CANVAS_KEYS).filter((name) => !commanded.has(`canvas.${name}`))).toEqual([
+    expect(uncommanded(CANVAS_KEYS)).toEqual([
       'navigateLeft',
       'navigateRight',
       'navigateUp',
@@ -65,8 +78,6 @@ describe('command ids', () => {
       'nudge',
       'unselectResource',
     ]);
-    expect(
-      Object.keys(PRESENTING_KEYS).filter((name) => !commanded.has(`presenting.${name}`)),
-    ).toEqual([]);
+    expect(uncommanded(PRESENTING_KEYS)).toEqual([]);
   });
 });

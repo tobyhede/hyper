@@ -42,7 +42,7 @@ import {
 } from './command-dock';
 import { unusedImageSources } from './image-sources';
 import { CANVAS } from '../src/space-authoring';
-import { PRESENT_OFF_GRAPH } from '../src/canvas-commands';
+import { PRESENT_OFF_GRAPH, PRESENT_WHILE_EDITING } from '../src/canvas-commands';
 import type { MapSurface } from '../src/map-surface';
 import type { MapView } from '../src/map-view';
 import { refusingFullscreen } from './fullscreen';
@@ -299,7 +299,12 @@ describe('the P shortcut across open Spaces', () => {
   });
 });
 
-/** Present from Here's rail item and `P` run one Canvas command, so they answer alike. */
+/**
+ * Present from Here's rail item and `P` run one Canvas command, so they answer
+ * alike. `P` is pressed where focus is: closing the rail's menu leaves it on the
+ * Actions trigger, whose toolbar keeps its keys from the canvas, so the reader
+ * returns to the selected Resource to press it.
+ */
 describe('Present from Here, by key and on the rail', () => {
   const presentItem = async (): Promise<HTMLElement> => {
     fireEvent.click(
@@ -311,13 +316,22 @@ describe('Present from Here, by key and on the rail', () => {
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   };
+  const pressPOnTheResource = async (): Promise<void> => {
+    const node = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${RESOURCE_ID}"]`);
+    if (node === null) throw new Error('the presentable Resource is drawn');
+    act(() => node.focus());
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: 'p' });
+      await Promise.resolve();
+    });
+  };
 
   it('offers the item and answers the key on the Active Graph', async () => {
     const { initial } = await openPresentable();
 
     expect(await presentItem()).not.toHaveAttribute('aria-disabled', 'true');
     await closeMenu();
-    await pressP();
+    await pressPOnTheResource();
 
     expect(initial.app.navigation.getState().mode).toBe('presenting');
   });
@@ -329,7 +343,25 @@ describe('Present from Here, by key and on the rail', () => {
     expect(item).toHaveAttribute('aria-disabled', 'true');
     expect(within(screen.getByRole('menu')).getByText(PRESENT_OFF_GRAPH)).toBeVisible();
     await closeMenu();
-    await pressP();
+    await pressPOnTheResource();
+
+    expect(initial.app.navigation.getState().mode).toBe('overview');
+  });
+
+  it('greys the item with the reason while an edit is in progress, and leaves the key alone', async () => {
+    const { initial } = await openPresentable();
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Resource First Resource' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Resource First Resource' }));
+    await screen.findByRole('textbox', { name: 'Markdown source of First Resource' });
+
+    const item = await presentItem();
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(within(screen.getByRole('menu')).getByText(PRESENT_WHILE_EDITING)).toBeVisible();
+    await closeMenu();
+    expect(
+      screen.getByRole('textbox', { name: 'Markdown source of First Resource' }),
+    ).toBeInTheDocument();
+    await pressPOnTheResource();
 
     expect(initial.app.navigation.getState().mode).toBe('overview');
   });

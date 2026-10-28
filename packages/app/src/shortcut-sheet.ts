@@ -1,11 +1,5 @@
 import type { KeyboardShortcutSection, KeyShortcut } from '@project/ui';
-import {
-  CANVAS_KEYS,
-  FULL_VIEW_KEYS,
-  HELP_KEYS,
-  PRESENTING_KEYS,
-  type KeyBinding,
-} from './key-bindings';
+import { bindingOf, CANVAS_KEYS, FULL_VIEW_KEYS, type KeyBinding } from './key-bindings';
 
 /** How a reader is shown each key `aria-keyshortcuts` names that is not shown as itself. */
 const KEY_NAMES: ReadonlyMap<string, string> = new Map([
@@ -46,16 +40,44 @@ export function shortcutOf(binding: KeyBinding): KeyShortcut {
   };
 }
 
-const sectionOf = (
-  title: string,
-  bindings: Readonly<Record<string, KeyBinding>>,
-): KeyboardShortcutSection => ({
+const sectionOf = (title: string, bindings: readonly KeyBinding[]): KeyboardShortcutSection => ({
   title,
-  shortcuts: Object.values(bindings).map((binding) => ({
+  shortcuts: bindings.map((binding) => ({
     description: binding.description,
     shortcut: shortcutOf(binding),
   })),
 });
+
+// A command's key is read by its id, as the dispatcher and the rail read it;
+// a key no command answers has only its binding.
+const CANVAS_ROWS: readonly KeyBinding[] = [
+  bindingOf('canvas.addResource'),
+  bindingOf('canvas.openResource'),
+  bindingOf('canvas.openAndExpand'),
+  bindingOf('canvas.showFullView'),
+  bindingOf('canvas.renameResource'),
+  CANVAS_KEYS.navigateLeft,
+  CANVAS_KEYS.navigateRight,
+  CANVAS_KEYS.navigateUp,
+  CANVAS_KEYS.navigateDown,
+  CANVAS_KEYS.nudge,
+  bindingOf('canvas.presentFromHere'),
+  CANVAS_KEYS.unselectResource,
+  bindingOf('canvas.removeSelection'),
+  bindingOf('help.showShortcuts'),
+];
+
+const PRESENTING_ROWS: readonly KeyBinding[] = [
+  bindingOf('presenting.advance'),
+  bindingOf('presenting.retreat'),
+  bindingOf('presenting.returnToStart'),
+  bindingOf('presenting.previousBranch'),
+  bindingOf('presenting.nextBranch'),
+  bindingOf('presenting.exitPresenting'),
+  bindingOf('presenting.openNotes'),
+  bindingOf('presenting.toggleNotes'),
+  bindingOf('help.showShortcuts'),
+];
 
 /** What the sheet says it lists, in each mode. */
 export const SHORTCUT_SHEET_DESCRIPTIONS = {
@@ -64,16 +86,17 @@ export const SHORTCUT_SHEET_DESCRIPTIONS = {
 } as const;
 
 /**
- * The sheet's sections for the mode the reader is in, every one read from the
- * binding table, so the sheet cannot list a key the application does not answer.
+ * The sheet's sections for the mode the reader is in. A command's key is read
+ * by its id, so the sheet shows the key the dispatcher answers; the tests hold
+ * each section to every binding of its tables, in their order.
  */
 export function shortcutSections(
   mode: 'authoring' | 'presenting',
 ): readonly KeyboardShortcutSection[] {
   return mode === 'presenting'
-    ? [sectionOf('While presenting', { ...PRESENTING_KEYS, ...HELP_KEYS })]
+    ? [sectionOf('While presenting', PRESENTING_ROWS)]
     : [
-        sectionOf('On the canvas', { ...CANVAS_KEYS, ...HELP_KEYS }),
-        sectionOf('In Full View', FULL_VIEW_KEYS),
+        sectionOf('On the canvas', CANVAS_ROWS),
+        sectionOf('In Full View', Object.values(FULL_VIEW_KEYS)),
       ];
 }
