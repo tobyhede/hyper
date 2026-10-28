@@ -2005,7 +2005,7 @@ describe('the keys a Space answers', () => {
 
       const keyListeners = added.mock.calls
         .filter(([type]) => type === 'keydown')
-        .map(([, listener]) => (typeof listener === 'function' ? listener.name : 'an object'));
+        .map(([, listener]) => (listener instanceof Function ? listener.name : 'an object'));
       expect(keyListeners).toContain('dispatchKey');
       expect(new Set(keyListeners.filter((name) => name !== 'dispatchKey'))).toEqual(
         new Set(['downHandler', 'updateModifier']),
