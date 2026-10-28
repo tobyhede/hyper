@@ -91,12 +91,12 @@ test(
  */
 /**
  * At phone width the canvas HUD would cover the canvas it describes, so the
- * Graph key and the minimap start hidden behind their header, and the header
- * shows them. The header is the one part left in the corner, so there is
+ * Graph key and the minimap start hidden behind their toggle, and the toggle
+ * shows them. The toggle is the one part left in the corner, so there is
  * always a way back.
  */
 test(
-  'the Graph overview starts hidden at phone width and its header shows it',
+  'the Graph overview starts hidden at phone width and its toggle shows it',
   { tag: '@parity:graph-hud-starts-hidden-on-a-small-canvas' },
   async ({ page }) => {
     await page.goto('/');

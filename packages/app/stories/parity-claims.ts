@@ -958,14 +958,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Resource’s resize control lives in — while its header, the one control there, keeps the pointer.',
+      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Resource’s resize control lives in — while its toggle, the one control there, keeps the pointer.',
   },
   {
     id: 'graph-hud-starts-hidden-on-a-small-canvas',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'On a canvas the size of a phone the canvas HUD starts with its Graph key and minimap hidden behind its header, which shows and hides them both; on a roomy canvas it starts shown.',
+      'On a canvas the size of a phone the canvas HUD starts with its Graph key and minimap hidden behind its toggle, which shows and hides them both; on a roomy canvas it starts shown.',
   },
   {
     id: 'graph-hud-key-follows-the-open-map',

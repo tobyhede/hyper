@@ -142,7 +142,9 @@ describe('GraphHud', () => {
     );
 
     expect(screen.getByTestId('panel')).toHaveStyle({ pointerEvents: 'none' });
-    expect(screen.getByRole('button', { name: 'Graphs' })).toHaveClass('pointer-events-auto');
+    expect(screen.getByRole('button', { name: 'Graph overview' })).toHaveClass(
+      'pointer-events-auto',
+    );
   });
 
   /**
@@ -163,10 +165,10 @@ describe('GraphHud', () => {
   });
 
   /**
-   * On a canvas with room for it, the overview starts shown, and its header
+   * On a canvas with room for it, the overview starts shown, and its toggle
    * hides the key and the minimap together and shows them again.
    */
-  it('starts shown on a roomy canvas, and its header hides and shows it', () => {
+  it('starts shown on a roomy canvas, and its toggle hides and shows it', () => {
     render(
       <GraphHud
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
@@ -175,14 +177,22 @@ describe('GraphHud', () => {
       />,
     );
 
-    const toggle = screen.getByRole('button', { name: 'Graphs' });
+    const toggle = screen.getByRole('button', { name: 'Graph overview' });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('graph-legend')).toBeInTheDocument();
     expect(screen.getByTestId('minimap')).toBeInTheDocument();
 
+    // Open, the toggle is a bare chevron: nothing in the panel reads as its title.
+    expect(toggle).toHaveTextContent('');
+    expect(toggle.querySelector('.lucide-route')).toBeNull();
+
     fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('graph-legend')).not.toBeInTheDocument();
+    // Closed, it shows what it holds as two glyphs and no words.
+    expect(toggle).toHaveTextContent('');
+    expect(toggle.querySelector('.lucide-route')).not.toBeNull();
+    expect(toggle.querySelector('.lucide-layout-grid')).not.toBeNull();
     expect(screen.queryByTestId('minimap')).not.toBeInTheDocument();
     expect(screen.getByTestId('panel')).toHaveStyle({ marginBottom: '15px' });
 
@@ -193,7 +203,7 @@ describe('GraphHud', () => {
 
   /**
    * On a phone the overview would cover the canvas it describes, so there it
-   * starts hidden behind its header — and the reader's own choice outlasts a
+   * starts hidden behind its toggle — and the reader's own choice outlasts a
    * later change of size, such as turning the phone.
    */
   it('starts hidden on a small canvas, and keeps the reader’s choice across a resize', () => {
@@ -206,7 +216,7 @@ describe('GraphHud', () => {
       />,
     );
 
-    const toggle = screen.getByRole('button', { name: 'Graphs' });
+    const toggle = screen.getByRole('button', { name: 'Graph overview' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('minimap')).not.toBeInTheDocument();
 

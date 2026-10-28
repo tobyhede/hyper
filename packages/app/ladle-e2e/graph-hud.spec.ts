@@ -27,9 +27,9 @@ const activeGraphOf = (m: Map): Graph => {
   return active;
 };
 
-/** The HUD's header, which shows and hides the Graph key and the minimap. */
+/** The HUD's toggle, which shows and hides the Graph key and the minimap. */
 const overviewToggle = (page: Page) =>
-  page.locator('.react-flow__panel').getByRole('button', { name: 'Graphs', exact: true });
+  page.locator('.react-flow__panel').getByRole('button', { name: 'Graph overview', exact: true });
 
 /** Where the canvas is, read off the element React Flow writes the transform on. */
 const canvasTransform = (page: Page): Promise<string> =>
@@ -180,7 +180,7 @@ test(
  * A `.react-flow__panel` has no `pointer-events` rule of React Flow's own, so
  * a Panel swallows every gesture over its box — and this HUD stands in the
  * corner a Resource's bottom-right resize control lives in. The key is a
- * list, so it hands them back; its header keeps its own, because it is the
+ * list, so it hands them back; its toggle keeps its own, because it is the
  * one control there. The MiniMap
  * beside it is excluded on purpose: it pans and zooms, so it is *meant* to
  * take what lands on it.
@@ -197,7 +197,7 @@ test(
         ([px, py]: readonly number[]) => {
           const element = document.elementFromPoint(px ?? 0, py ?? 0);
           if (element === null) return 'nothing';
-          if (element.closest('.react-flow__panel button') !== null) return 'header';
+          if (element.closest('.react-flow__panel button') !== null) return 'toggle';
           if (element.closest('.react-flow__panel') !== null) return 'hud';
           return 'canvas';
         },
@@ -206,18 +206,18 @@ test(
 
     const key = page.getByTestId('graph-legend');
     const keyBox = await key.boundingBox();
-    const headerBox = await overviewToggle(page).boundingBox();
-    if (keyBox === null || headerBox === null) throw new Error('The HUD drew no measurable box.');
+    const toggleBox = await overviewToggle(page).boundingBox();
+    if (keyBox === null || toggleBox === null) throw new Error('The HUD drew no measurable box.');
 
     // The key's own rows, which are the widest part of the panel.
     expect(await topmostAt(keyBox.x + keyBox.width / 2, keyBox.y + keyBox.height / 2)).toBe(
       'canvas',
     );
     expect(await topmostAt(keyBox.x + 4, keyBox.y + 4)).toBe('canvas');
-    // The header still answers: it shows and hides the overview.
+    // The toggle still answers: it shows and hides the overview.
     expect(
-      await topmostAt(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2),
-    ).toBe('header');
+      await topmostAt(toggleBox.x + toggleBox.width / 2, toggleBox.y + toggleBox.height / 2),
+    ).toBe('toggle');
   },
 );
 
@@ -261,7 +261,7 @@ test(
 
 /**
  * On a phone-sized canvas the HUD would cover what it describes, so the key
- * and the minimap start hidden behind the header, which shows them both. The
+ * and the minimap start hidden behind the toggle, which shows them both. The
  * catalogue's own viewport is roomy, so the `Retained` cases above are the
  * other half: there it starts shown.
  */
@@ -269,7 +269,7 @@ test.describe('on a phone-sized canvas', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test(
-    'the Graph HUD starts hidden behind its header, which shows it',
+    'the Graph HUD starts hidden behind its toggle, which shows it',
     { tag: '@parity:graph-hud-starts-hidden-on-a-small-canvas' },
     async ({ page }) => {
       await page.goto(story('surfaces--graph-hud--retained'));

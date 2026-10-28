@@ -280,6 +280,7 @@ export {
 } from './KeyboardShortcutsDialog';
 export { Label } from './components/label';
 export { Separator } from './components/separator';
+export { Collapsible, CollapsibleContent, CollapsibleTrigger } from './components/collapsible';
 export { Slider } from './components/slider';
 export { Spinner } from './components/spinner';
 export { Textarea } from './components/textarea';

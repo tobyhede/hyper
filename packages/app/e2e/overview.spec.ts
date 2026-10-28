@@ -210,7 +210,7 @@ test(
  * of React Flow's own, so a Panel swallows every gesture over its box — and the
  * HUD stands in the corner a Resource's bottom-right resize control lives in,
  * which is the harm `command-dock.css`'s bottom-edge offset already names for
- * the Dock. The key is a list, so it hands the pointer back; its header keeps
+ * the Dock. The key is a list, so it hands the pointer back; its toggle keeps
  * its own, because it is the one control there — it shows and hides the
  * overview.
  *
@@ -232,7 +232,7 @@ test(
         ([px, py]: readonly number[]) => {
           const element = document.elementFromPoint(px ?? 0, py ?? 0);
           if (element === null) return 'nothing';
-          if (element.closest('.react-flow__panel button') !== null) return 'header';
+          if (element.closest('.react-flow__panel button') !== null) return 'toggle';
           if (element.closest('.react-flow__panel') !== null) return 'hud';
           return 'canvas';
         },
@@ -243,10 +243,10 @@ test(
     expect(await topmostAt(key.x + key.width / 2, key.y + key.height / 2)).toBe('canvas');
     expect(await topmostAt(key.x + 4, key.y + 4)).toBe('canvas');
 
-    // The header is the exception: it is the control that hides the overview.
-    const header = await boxOf(graphOverviewToggle(page), "the HUD's header");
-    expect(await topmostAt(header.x + header.width / 2, header.y + header.height / 2)).toBe(
-      'header',
+    // The toggle is the exception: it is the control that hides the overview.
+    const toggle = await boxOf(graphOverviewToggle(page), "the HUD's toggle");
+    expect(await topmostAt(toggle.x + toggle.width / 2, toggle.y + toggle.height / 2)).toBe(
+      'toggle',
     );
   },
 );
