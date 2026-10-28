@@ -4,9 +4,9 @@
 
 **Blocked by:** #432, which brings proposed ADR 0138 and the configurable-shortcuts tickets this edits.
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] ADR 0138 stays `proposed` and is still absent from `docs/adr/README.md`, which `adr-status-blocks.test.ts` requires.
-- [ ] ADR 0138 states the aims, served Maps, availability answers and run path, and says that keys stay silent when unavailable.
-- [ ] `CONTEXT.md` defines Canvas command, and `current-domain-vocabulary.test.ts` passes.
-- [ ] Configurable-shortcuts ticket 01 points at `.scratch/canvas-commands/`. Its "Keep" paragraph already carries the narrower guard by context; it now names the command's aim as where that guard lives.
+- [x] ADR 0138 stays `proposed` and is still absent from `docs/adr/README.md`, which `adr-status-blocks.test.ts` requires.
+- [x] ADR 0138 states the aims, served Maps, availability answers and run path, and says that keys stay silent when unavailable.
+- [x] `CONTEXT.md` defines Canvas command, and `current-domain-vocabulary.test.ts` passes.
+- [x] Configurable-shortcuts ticket 01 points at `.scratch/canvas-commands/`. Its "Keep" paragraph already carries the narrower guard by context; it now names the command's aim as where that guard lives.
