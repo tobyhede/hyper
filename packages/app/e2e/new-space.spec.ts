@@ -166,7 +166,7 @@ test('Alt empty-drop creates, connects and selects Resource 2 at the previewed p
   const source = authoringHandle(sourceResource, 'source', 'right');
   const from = (await source.boundingBox())!;
   // Up and to the right, not down: the canvas HUD is anchored bottom-right and
-  // is some 218px tall once its Graph key and minimap are both drawn, so a Resource
+  // is over 150px tall once its Graph key and minimap are both drawn, so a Resource
   // dropped below the source's line lands under it — and the hover further down
   // this test, which reveals the created Resource's own controls, then never reaches
   // it. The direction is incidental to what this proves; the collision is not.

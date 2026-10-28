@@ -372,8 +372,6 @@ export function SpaceCanvas({
   const presenting = context.kind === 'canvas' && context.presentingResourceId !== null;
   const placedResources = view.placedResources;
   const { visibleGraphs: graphs, colors: colorByGraphId } = view.projection;
-  const mapTitle = view.selectedMap.map.title;
-  const spaceTitle = view.space.title;
   const { createResource, dropExistingResource, dropSpace, dropImages, pasteImageUrl } = placement;
   const addCanvasResource = useCallback(() => createResource(DEFAULT_KIND), [createResource]);
   const { screenToFlowPosition, getZoom, setCenter } = useReactFlow();
@@ -2006,8 +2004,6 @@ export function SpaceCanvas({
         <ZoomSlider />
         {graphs.length > 0 && (
           <GraphHud
-            spaceTitle={spaceTitle}
-            mapTitle={mapTitle}
             graphs={graphs}
             colorByGraphId={colorByGraphId}
             activeGraphId={activeGraphId}

@@ -951,14 +951,21 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'The canvas HUD names the current Space and open Map read-only, keys every Graph that Map owns and emphasises the active one, attached above a real MiniMap.',
+      'The canvas HUD keys every Graph the open Map owns and emphasises the active one, attached above a real MiniMap, and names neither the Space nor the Map the Command Dock already names.',
   },
   {
     id: 'graph-hud-key-hands-back-the-pointers-it-does-not-need',
     storyFile: 'surfaces/graph-hud.stories.tsx',
     storyExport: 'Retained',
     claim:
-      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Resource’s resize control lives in — while the two clipped identity names keep the pointer, because their title is the only place a truncated name can be read.',
+      'The canvas HUD’s key panel presses nothing, so a pointer over it reaches the canvas beneath rather than being swallowed by the Panel in the corner a Resource’s resize control lives in — while its header, the one control there, keeps the pointer.',
+  },
+  {
+    id: 'graph-hud-starts-hidden-on-a-small-canvas',
+    storyFile: 'surfaces/graph-hud.stories.tsx',
+    storyExport: 'Retained',
+    claim:
+      'On a canvas the size of a phone the canvas HUD starts with its Graph key and minimap hidden behind its header, which shows and hides them both; on a roomy canvas it starts shown.',
   },
   {
     id: 'graph-hud-key-follows-the-open-map',

@@ -1,52 +1,77 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { vi } from 'vitest';
 import { GraphHud } from '../src/GraphHud';
 import { uuid } from './uuid';
 
-vi.mock('@xyflow/react', () => ({
-  Panel: ({
-    position,
-    style,
-    children,
-  }: {
-    position: string;
-    style?: React.CSSProperties;
-    children: React.ReactNode;
-  }) => (
-    <aside data-testid="panel" data-position={position} style={style}>
-      {children}
-    </aside>
-  ),
-  MiniMap: ({
-    style,
-    ...props
-  }: React.HTMLAttributes<HTMLDivElement> & {
-    bgColor?: string;
-    nodeColor?: unknown;
-    nodeStrokeColor?: unknown;
-    pannable?: boolean;
-    zoomable?: boolean;
-  }) => (
-    <div
-      data-testid="minimap"
-      data-custom-background={props.bgColor === undefined ? undefined : 'true'}
-      data-custom-node-color={props.nodeColor === undefined ? undefined : 'true'}
-      data-custom-node-stroke={props.nodeStrokeColor === undefined ? undefined : 'true'}
-      data-pannable={props.pannable === undefined ? undefined : String(props.pannable)}
-      data-zoomable={props.zoomable === undefined ? undefined : String(props.zoomable)}
-      style={style}
-    />
-  ),
+/** The canvas size the mocked React Flow store reports; a desktop unless a test says otherwise. */
+const canvas = vi.hoisted(() => ({
+  size: { width: 1280, height: 800 },
+  listeners: new Set<() => void>(),
 }));
 
+const resizeCanvas = (width: number, height: number) =>
+  act(() => {
+    canvas.size = { width, height };
+    for (const listener of canvas.listeners) listener();
+  });
+
+beforeEach(() => {
+  canvas.size = { width: 1280, height: 800 };
+});
+
+vi.mock('@xyflow/react', async () => {
+  const { useSyncExternalStore } = await import('react');
+  return {
+    useStore: <T,>(selector: (state: { width: number; height: number }) => T): T =>
+      useSyncExternalStore(
+        (listener) => {
+          canvas.listeners.add(listener);
+          return () => canvas.listeners.delete(listener);
+        },
+        () => selector(canvas.size),
+      ),
+    Panel: ({
+      position,
+      style,
+      children,
+    }: {
+      position: string;
+      style?: React.CSSProperties;
+      children: React.ReactNode;
+    }) => (
+      <aside data-testid="panel" data-position={position} style={style}>
+        {children}
+      </aside>
+    ),
+    MiniMap: ({
+      style,
+      ...props
+    }: React.HTMLAttributes<HTMLDivElement> & {
+      bgColor?: string;
+      nodeColor?: unknown;
+      nodeStrokeColor?: unknown;
+      pannable?: boolean;
+      zoomable?: boolean;
+    }) => (
+      <div
+        data-testid="minimap"
+        data-custom-background={props.bgColor === undefined ? undefined : 'true'}
+        data-custom-node-color={props.nodeColor === undefined ? undefined : 'true'}
+        data-custom-node-stroke={props.nodeStrokeColor === undefined ? undefined : 'true'}
+        data-pannable={props.pannable === undefined ? undefined : String(props.pannable)}
+        data-zoomable={props.zoomable === undefined ? undefined : String(props.zoomable)}
+        style={style}
+      />
+    ),
+  };
+});
+
 describe('GraphHud', () => {
-  it('draws an attached identity and Graph key above a sibling minimap', () => {
+  it('draws a Graph key attached above a sibling minimap', () => {
     const activeGraphId = uuid('00000000-0000-4000-8000-000000000010');
     const { container } = render(
       <GraphHud
-        spaceTitle="Atlas"
-        mapTitle="Overview"
         graphs={[
           { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           {
@@ -69,11 +94,6 @@ describe('GraphHud', () => {
     expect(minimap).not.toHaveAttribute('data-custom-background');
     expect(minimap).not.toHaveAttribute('data-custom-node-color');
     expect(minimap).not.toHaveAttribute('data-custom-node-stroke');
-    expect(screen.getByTestId('hud-space')).toHaveTextContent('Atlas');
-    expect(screen.getByTestId('hud-map')).toHaveTextContent('Overview');
-    expect(
-      within(screen.getByTestId('canvas-identity')).queryByRole('button'),
-    ).not.toBeInTheDocument();
     expect(container).toHaveTextContent('Primary');
     expect(container).toHaveTextContent('Alternate');
   });
@@ -91,8 +111,6 @@ describe('GraphHud', () => {
   it('keeps the minimap panning and zooming the canvas', () => {
     render(
       <GraphHud
-        spaceTitle="Atlas"
-        mapTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
@@ -105,22 +123,18 @@ describe('GraphHud', () => {
   });
 
   /**
-   * The key panel presses nothing, so it takes no pointer over the canvas.
+   * The key panel takes no pointer over the canvas, bar its one control.
    *
    * `.react-flow__panel` carries no `pointer-events` rule of its own (React
    * Flow's `style.css` sets only `position`, `z-index` and `margin`), so a
-   * Panel swallows every gesture over its box. This one holds no control —
-   * the identity is read-only and the key is a list — and it sits in the
+   * Panel swallows every gesture over its box — and this one sits in the
    * corner a Resource's resize control lives in, which is the harm
-   * `command-dock.css`'s bottom-edge offset already names. The two truncated
-   * names are the exception and take the pointer back, because their `title`
-   * is the only place a clipped name can be read.
+   * `command-dock.css`'s bottom-edge offset already names. The key is a list,
+   * so it hands them back; the disclosure that hides it takes them again.
    */
   it('lets the canvas take every pointer the key panel does not need', () => {
     render(
       <GraphHud
-        spaceTitle="A Space with a very long name indeed"
-        mapTitle="A Map with a very long name indeed"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
@@ -128,64 +142,84 @@ describe('GraphHud', () => {
     );
 
     expect(screen.getByTestId('panel')).toHaveStyle({ pointerEvents: 'none' });
-    for (const name of [screen.getByTestId('hud-space'), screen.getByTestId('hud-map')]) {
-      expect(name).toHaveClass('pointer-events-auto');
-    }
+    expect(screen.getByRole('button', { name: 'Graphs' })).toHaveClass('pointer-events-auto');
   });
 
   /**
-   * A clipped name is still readable, and a screen reader is told which is which.
-   *
-   * `truncate` ellipsises inside a 200px panel and the Command Dock's header
-   * clips the same two names, so without the `title` there is nowhere left on
-   * the surface to read a long one. The visible glyphs are decoration, so the
-   * words that say Space and Map have to be supplied for the reader that
-   * cannot see them.
+   * The HUD names neither the Space nor the Map: the Command Dock already does,
+   * and a second copy in the corner said nothing the reader did not have.
    */
-  it('names each identity row and keeps a clipped title readable', () => {
-    render(
-      <GraphHud
-        spaceTitle="Atlas"
-        mapTitle="Overview"
-        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
-        colorByGraphId={{}}
-        activeGraphId={null}
-      />,
-    );
-
-    expect(screen.getByTestId('hud-space')).toHaveAttribute('title', 'Atlas');
-    expect(screen.getByTestId('hud-map')).toHaveAttribute('title', 'Overview');
-    const identity = screen.getByTestId('canvas-identity');
-    expect(within(identity).getByText('Space')).toHaveClass('sr-only');
-    expect(within(identity).getByText('Map')).toHaveClass('sr-only');
-  });
-
-  /**
-   * Both identity glyphs are drawn at one size, in one box.
-   *
-   * Without a declared size `MapIcon` draws at 16 inside the same 14px box the
-   * 13px Space cube sits in, so the two rows would have different glyph heights
-   * and different optical centres. Lucide sets no `preserveAspectRatio`, so
-   * SVG's default letterboxes the glyph rather than distorting it — which is why this
-   * reads the declared size rather than a rendered box jsdom does not lay out.
-   */
-  it('draws both identity glyphs at the same size', () => {
+  it('names neither the Space nor the Map', () => {
     const { container } = render(
       <GraphHud
-        spaceTitle="Atlas"
-        mapTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}
       />,
     );
 
-    const space = container.querySelector('[data-icon="space"]');
-    const mapIcon = container.querySelector('.lucide-layout-grid');
-    expect(space).toHaveAttribute('width', '13');
-    expect(space).toHaveAttribute('height', '13');
-    expect(mapIcon).toHaveAttribute('width', '13');
-    expect(mapIcon).toHaveAttribute('height', '13');
+    expect(container.querySelector('[data-icon="space"]')).toBeNull();
+    expect(container.querySelector('.lucide-layout-grid')).toBeNull();
+  });
+
+  /**
+   * On a canvas with room for it, the overview starts shown, and its header
+   * hides the key and the minimap together and shows them again.
+   */
+  it('starts shown on a roomy canvas, and its header hides and shows it', () => {
+    render(
+      <GraphHud
+        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Graphs' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('graph-legend')).toBeInTheDocument();
+    expect(screen.getByTestId('minimap')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('graph-legend')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('minimap')).not.toBeInTheDocument();
+    expect(screen.getByTestId('panel')).toHaveStyle({ marginBottom: '15px' });
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('minimap')).toBeInTheDocument();
+  });
+
+  /**
+   * On a phone the overview would cover the canvas it describes, so there it
+   * starts hidden behind its header — and the reader's own choice outlasts a
+   * later change of size, such as turning the phone.
+   */
+  it('starts hidden on a small canvas, and keeps the reader’s choice across a resize', () => {
+    canvas.size = { width: 390, height: 844 };
+    render(
+      <GraphHud
+        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Graphs' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('minimap')).not.toBeInTheDocument();
+
+    // Short as well as narrow: a phone on its side.
+    resizeCanvas(844, 390);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    resizeCanvas(1280, 800);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(toggle);
+    resizeCanvas(390, 844);
+    resizeCanvas(1280, 800);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 
   /**
@@ -201,8 +235,6 @@ describe('GraphHud', () => {
     const otherGraphId = uuid('00000000-0000-4000-8000-000000000011');
     render(
       <GraphHud
-        spaceTitle="Atlas"
-        mapTitle="Overview"
         graphs={[
           { id: activeGraphId, title: 'Primary', color: '#1f77b4', edges: [] },
           { id: otherGraphId, title: 'Alternate', color: '#f4a259', edges: [] },
@@ -213,7 +245,6 @@ describe('GraphHud', () => {
     );
 
     const key = screen.getByTestId('graph-legend');
-    expect(within(key).getByText('Graphs')).toBeInTheDocument();
     const active = within(key).getByText('Primary').closest('li');
     const inactive = within(key).getByText('Alternate').closest('li');
     expect(active).toHaveAttribute('data-active', 'true');
@@ -239,8 +270,6 @@ describe('GraphHud', () => {
   it('ends each row’s mark in its Graph’s head shape, `arrow` where none is stored', () => {
     render(
       <GraphHud
-        spaceTitle="Atlas"
-        mapTitle="Overview"
         graphs={[
           { id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Plain', edges: [] },
           {
@@ -285,8 +314,6 @@ describe('GraphHud', () => {
   it('keeps list semantics despite the unstyled list', () => {
     render(
       <GraphHud
-        spaceTitle="Atlas"
-        mapTitle="Overview"
         graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
         colorByGraphId={{}}
         activeGraphId={null}

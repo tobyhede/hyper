@@ -10,6 +10,7 @@ import {
   dock,
   mapMenu,
   graphMenu,
+  graphOverviewToggle,
   newMap,
   newGraph,
   settleNewMapName,
@@ -88,6 +89,35 @@ test(
  * focus. The strip is beside the result rather than over it, and the caret
  * lands where the author is looking.
  */
+/**
+ * At phone width the canvas HUD would cover the canvas it describes, so the
+ * Graph key and the minimap start hidden behind their header, and the header
+ * shows them. The header is the one part left in the corner, so there is
+ * always a way back.
+ */
+test(
+  'the Graph overview starts hidden at phone width and its header shows it',
+  { tag: '@parity:graph-hud-starts-hidden-on-a-small-canvas' },
+  async ({ page }) => {
+    await page.goto('/');
+    await expect(nodeByTitle(page, 'A').first()).toBeVisible();
+    await settled(page);
+
+    const toggle = graphOverviewToggle(page);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('graph-legend')).toHaveCount(0);
+    await expect(page.locator('.react-flow__minimap')).toHaveCount(0);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('graph-legend').locator('.legend__item')).toHaveCount(3);
+    await expect(page.locator('.react-flow__minimap')).toBeVisible();
+
+    await toggle.click();
+    await expect(page.locator('.react-flow__minimap')).toHaveCount(0);
+  },
+);
+
 test('Create Resource from the strip names the new Resource on the canvas', async ({ page }) => {
   await page.goto('/');
   await expect(nodeByTitle(page, 'A').first()).toBeVisible();
