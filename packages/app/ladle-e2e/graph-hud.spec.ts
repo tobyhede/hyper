@@ -29,7 +29,9 @@ const activeGraphOf = (m: Map): Graph => {
 
 /** The HUD's toggle, which shows and hides the Graph key and the minimap. */
 const overviewToggle = (page: Page) =>
-  page.locator('.react-flow__panel').getByRole('button', { name: 'Graph overview', exact: true });
+  page
+    .locator('.react-flow__panel')
+    .getByRole('button', { name: 'Toggle graph overview', exact: true });
 
 /** Where the canvas is, read off the element React Flow writes the transform on. */
 const canvasTransform = (page: Page): Promise<string> =>

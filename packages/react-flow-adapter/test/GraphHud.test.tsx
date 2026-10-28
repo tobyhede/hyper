@@ -142,7 +142,7 @@ describe('GraphHud', () => {
     );
 
     expect(screen.getByTestId('panel')).toHaveStyle({ pointerEvents: 'none' });
-    expect(screen.getByRole('button', { name: 'Graph overview' })).toHaveClass(
+    expect(screen.getByRole('button', { name: 'Toggle graph overview' })).toHaveClass(
       'pointer-events-auto',
     );
   });
@@ -177,7 +177,7 @@ describe('GraphHud', () => {
       />,
     );
 
-    const toggle = screen.getByRole('button', { name: 'Graph overview' });
+    const toggle = screen.getByRole('button', { name: 'Toggle graph overview' });
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('graph-legend')).toBeInTheDocument();
     expect(screen.getByTestId('minimap')).toBeInTheDocument();
@@ -216,7 +216,7 @@ describe('GraphHud', () => {
       />,
     );
 
-    const toggle = screen.getByRole('button', { name: 'Graph overview' });
+    const toggle = screen.getByRole('button', { name: 'Toggle graph overview' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByTestId('minimap')).not.toBeInTheDocument();
 
@@ -230,6 +230,32 @@ describe('GraphHud', () => {
     resizeCanvas(390, 844);
     resizeCanvas(1280, 800);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  /**
+   * Before React Flow measures the canvas it reports zero, which says nothing
+   * about the screen: drawing either state then would flash the wrong one on a
+   * phone or on a desktop, so the HUD waits for the measurement.
+   */
+  it('draws nothing until the canvas is measured, then opens on a desktop', () => {
+    canvas.size = { width: 0, height: 0 };
+    render(
+      <GraphHud
+        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    expect(screen.queryByTestId('panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('minimap')).not.toBeInTheDocument();
+
+    resizeCanvas(1280, 800);
+    expect(screen.getByRole('button', { name: 'Toggle graph overview' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByTestId('minimap')).toBeInTheDocument();
   });
 
   /**

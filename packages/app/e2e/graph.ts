@@ -536,7 +536,7 @@ export function graphLegendMarkLine(scope: Locator): Locator {
 export function graphOverviewToggle(page: Page): Locator {
   return page
     .locator('.react-flow__panel')
-    .getByRole('button', { name: 'Graph overview', exact: true });
+    .getByRole('button', { name: 'Toggle graph overview', exact: true });
 }
 
 /** The resolved stroke of one Graph's legend mark line, by its title. */

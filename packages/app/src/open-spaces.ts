@@ -612,15 +612,18 @@ export function createOpenSpaces({
     // An Edit is the session committing past the revision it was opened at.
     // The first working load of a mapless Space is the host's, made while it
     // answered the read this session opened from, so it is not one.
-    if (mounted === true) {
+    // Once the page has reported, no Space need listen any longer.
+    if (mounted === true && mountedEdits.getState() === 'quiet') {
       const openedAt = session.getState().acknowledgedRevision;
-      const reportEdit = (): void => {
-        const { persistence, acknowledgedRevision } = session.getState();
-        if (persistence.kind === 'pending' || acknowledgedRevision !== openedAt) {
-          mountedEdits.edited();
+      const stopListening = session.subscribe(() => {
+        if (mountedEdits.getState() !== 'quiet') {
+          stopListening();
+          return;
         }
-      };
-      session.subscribe(reportEdit);
+        if (session.getState().acknowledgedRevision === openedAt) return;
+        mountedEdits.edited();
+        stopListening();
+      });
     }
     session.subscribe(() => {
       const state = observable.getState();

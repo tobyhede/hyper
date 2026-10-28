@@ -44,6 +44,7 @@ export function ShellNotice({
   onDismiss,
   children,
   tone = 'refusal',
+  icon,
 }: {
   readonly title: string;
   readonly onDismiss: () => void;
@@ -52,15 +53,17 @@ export function ShellNotice({
    * What the report is. A `refusal` is a press that did not do what it asked,
    * drawn destructive and announced assertively. A `fact` is what a press did
    * that the reader may not expect, such as where a mounted session keeps its
-   * Edits: drawn neutral, with the glyph for that fact, and announced politely,
-   * because it confirms the reader's own gesture rather than interrupting it.
+   * Edits: drawn neutral and announced politely, because it confirms the
+   * reader's own gesture rather than interrupting it.
    */
-  readonly tone?: 'refusal' | { readonly fact: ReactNode };
+  readonly tone?: 'refusal' | 'fact';
+  /** The glyph for a `fact`; a `refusal` always draws the alert glyph. */
+  readonly icon?: ReactNode;
 }) {
   const refusal = tone === 'refusal';
   return (
     <Alert variant={refusal ? 'destructive' : 'default'} role={refusal ? 'alert' : 'status'}>
-      {refusal ? <AlertIcon /> : tone.fact}
+      {refusal ? <AlertIcon /> : icon}
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>{children}</AlertDescription>
       <AlertAction>
@@ -84,7 +87,8 @@ export function MountedEditsNotice({ onDismiss }: { readonly onDismiss: () => vo
     <ShellNotice
       title="Edits kept in this page only"
       onDismiss={onDismiss}
-      tone={{ fact: <UnsavedIcon /> }}
+      tone="fact"
+      icon={<UnsavedIcon />}
     >
       Reloading or closing this page discards them. Nothing is written to GitHub.
     </ShellNotice>

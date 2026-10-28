@@ -44,11 +44,14 @@ const ROOMY_WIDTH = 640;
 const ROOMY_HEIGHT = 400;
 
 /**
- * Whether the canvas has room for the overview. An unmeasured canvas reports
- * zero and answers no, so a phone never draws the overview for a frame first.
+ * Whether the canvas has room for the overview, or `null` before React Flow has
+ * measured it: an unmeasured canvas reports zero, and answering either way then
+ * would draw the wrong state for a frame on a phone or on a desktop.
  */
-const canvasIsRoomy = (state: { width: number; height: number }): boolean =>
-  state.width >= ROOMY_WIDTH && state.height >= ROOMY_HEIGHT;
+const canvasIsRoomy = (state: { width: number; height: number }): boolean | null =>
+  state.width === 0 && state.height === 0
+    ? null
+    : state.width >= ROOMY_WIDTH && state.height >= ROOMY_HEIGHT;
 
 /**
  * The canvas HUD: a Graph key attached above React Flow's minimap.
@@ -94,7 +97,9 @@ const canvasIsRoomy = (state: { width: number; height: number }): boolean =>
 export function GraphHud({ graphs, colorByGraphId, activeGraphId }: GraphHudProps) {
   const roomy = useStore(canvasIsRoomy);
   const [chosen, setChosen] = useState<boolean | null>(null);
-  const shown = chosen ?? roomy;
+  // Nothing is drawn until the canvas is measured, so neither state flashes.
+  if (chosen === null && roomy === null) return null;
+  const shown = chosen ?? roomy === true;
 
   return (
     <>
@@ -116,7 +121,7 @@ export function GraphHud({ graphs, colorByGraphId, activeGraphId }: GraphHudProp
           )}
         >
           <CollapsibleTrigger
-            aria-label="Graph overview"
+            aria-label="Toggle graph overview"
             render={
               <Button
                 variant="ghost"
