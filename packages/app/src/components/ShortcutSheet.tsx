@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { KeyboardShortcutsDialog } from '@project/ui';
-import { HELP_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
+import { HELP_KEYS, keyBelongsElsewhere } from '../key-bindings';
+import { useKeyAnswers } from '../key-dispatcher';
 import { SHORTCUT_SHEET_DESCRIPTIONS, shortcutSections } from '../shortcut-sheet';
 
 /**
@@ -18,22 +19,23 @@ export function ShortcutSheet({
   readonly presenting: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const listening = useRef(active);
-  useLayoutEffect(() => {
-    listening.current = active;
-  }, [active]);
-  useEffect(() => {
-    const show = (event: KeyboardEvent): void => {
-      if (!listening.current || !pressesBinding(HELP_KEYS.showShortcuts, event)) return;
-      if (keyBelongsElsewhere(event)) return;
-      event.preventDefault();
-      setOpen(true);
-    };
-    // In the capture phase, because Full View stops every key pressed in it
-    // from going further, and the sheet lists Full View's keys too.
-    window.addEventListener('keydown', show, true);
-    return () => window.removeEventListener('keydown', show, true);
-  }, []);
+  // In the capture phase, because Full View stops every key pressed in it from
+  // going further, and the sheet lists Full View's keys too.
+  useKeyAnswers(
+    active
+      ? [
+          {
+            binding: HELP_KEYS.showShortcuts,
+            answer: (event) => {
+              if (keyBelongsElsewhere(event)) return false;
+              setOpen(true);
+              return true;
+            },
+          },
+        ]
+      : [],
+    'capture',
+  );
   const mode = presenting ? 'presenting' : 'authoring';
   return (
     <KeyboardShortcutsDialog

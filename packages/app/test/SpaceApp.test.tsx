@@ -1977,3 +1977,82 @@ describe('Space app Map reading', () => {
     expect(screen.getByTestId('hud-space')).toHaveTextContent('Answered Space');
   });
 });
+
+/**
+ * Every key the application answers is answered by a Space's dispatcher
+ * (ADR 0138): no command adds a listener of its own.
+ */
+describe('the keys a Space answers', () => {
+  const pressQuestionMark = async (target: Element): Promise<void> => {
+    await act(async () => {
+      fireEvent.keyDown(target, { key: '?' });
+      await Promise.resolve();
+    });
+  };
+
+  /**
+   * Two other window key listeners are not commands: Edge Authoring's, which
+   * reads whether Alt is held during a connection drag, and React Flow's own
+   * `useKeyPress`, whose keys (Shift+arrow's nudge, Escape's unselect) are the
+   * bindings no command performs yet.
+   */
+  it('adds no window key listener but the dispatcher’s, authoring and presenting', async () => {
+    const added = vi.spyOn(window, 'addEventListener');
+    try {
+      const { initial } = await openPresentable();
+      await pressP();
+      expect(initial.app.navigation.getState().mode).toBe('presenting');
+
+      const keyListeners = added.mock.calls
+        .filter(([type]) => type === 'keydown')
+        .map(([, listener]) => (typeof listener === 'function' ? listener.name : 'an object'));
+      expect(keyListeners).toContain('dispatchKey');
+      expect(new Set(keyListeners.filter((name) => name !== 'dispatchKey'))).toEqual(
+        new Set(['downHandler', 'updateModifier']),
+      );
+    } finally {
+      added.mockRestore();
+    }
+  });
+
+  it('opens the shortcut sheet with ? from the canvas, from Full View and while presenting', async () => {
+    const { initial } = await openPresentable();
+    const sheet = () => screen.queryByRole('dialog', { name: 'Keyboard shortcuts' });
+
+    await pressQuestionMark(document.body);
+    expect(sheet()).toBeVisible();
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('dialog', { name: 'Keyboard shortcuts' }), {
+        key: 'Escape',
+      });
+      await Promise.resolve();
+    });
+    expect(sheet()).toBeNull();
+
+    const node = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${RESOURCE_ID}"]`);
+    if (node === null) throw new Error('the presentable Resource is drawn');
+    act(() => node.focus());
+    await act(async () => {
+      fireEvent.keyDown(node, { key: ' ' });
+      await Promise.resolve();
+    });
+    const fullView = screen.getByRole('region', { name: 'Full View' });
+    await pressQuestionMark(fullView);
+    expect(sheet()).toBeVisible();
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('dialog', { name: 'Keyboard shortcuts' }), {
+        key: 'Escape',
+      });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole('region', { name: 'Full View' }), { key: 'Escape' });
+      await Promise.resolve();
+    });
+
+    await pressP();
+    expect(initial.app.navigation.getState().mode).toBe('presenting');
+    await pressQuestionMark(document.body);
+    expect(sheet()).toBeVisible();
+  });
+});
