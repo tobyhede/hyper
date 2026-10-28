@@ -2,6 +2,15 @@ import { createContext, useContext, useLayoutEffect, useRef } from 'react';
 import { bindingOf, pressesBinding, type CommandId } from './key-bindings';
 
 /**
+ * What an answer did with a press: ran its command, or left the press alone and
+ * why, in a sentence a reader of the press log can act on.
+ */
+export type KeyOutcome = { readonly ran: true } | { readonly ran: false; readonly why: string };
+
+export const RAN: KeyOutcome = { ran: true };
+export const declined = (why: string): KeyOutcome => ({ ran: false, why });
+
+/**
  * The command a registration answers, and what it does with a press of its key.
  *
  * The key is the command's binding (`bindingOf`), which the dispatcher reads on
@@ -14,8 +23,19 @@ import { bindingOf, pressesBinding, type CommandId } from './key-bindings';
  */
 export interface KeyAnswer {
   readonly id: CommandId;
-  readonly answer: (event: KeyboardEvent) => boolean;
+  readonly answer: (event: KeyboardEvent) => KeyOutcome;
 }
+
+/** What one listener of a dispatcher did with one press, for the press log. */
+export interface DispatchReport {
+  readonly phase: 'bubble' | 'capture';
+  readonly context: KeyContext;
+  /** Each command whose binding the press matched, in the order it was offered. */
+  readonly attempts: readonly { readonly id: CommandId; readonly outcome: KeyOutcome }[];
+}
+
+/** Told of every press a dispatcher's listener reads, and what came of it. */
+export type KeyTrace = (event: KeyboardEvent, report: DispatchReport) => void;
 
 /**
  * Where a Space is, as its keys see it, most covering first.
@@ -25,7 +45,7 @@ export interface KeyAnswer {
  * - `full-view`: Full View covers the canvas.
  * - `canvas`: nothing covers it.
  */
-type KeyContext = 'off-screen' | 'presenting' | 'full-view' | 'canvas';
+export type KeyContext = 'off-screen' | 'presenting' | 'full-view' | 'canvas';
 
 /** A context a surface puts its Space in while it covers it. */
 export type CoveringContext = Exclude<KeyContext, 'canvas'>;
@@ -77,8 +97,11 @@ interface Registration {
   readonly answersIn: AnswersIn;
 }
 
-/** A dispatcher listening on `target` while anything is registered with it. */
-export function createKeyDispatcher(target: EventTarget): KeyDispatcher {
+/**
+ * A dispatcher listening on `target` while anything is registered with it,
+ * telling `trace`, when there is one, what it did with each press.
+ */
+export function createKeyDispatcher(target: EventTarget, trace?: KeyTrace): KeyDispatcher {
   const registrations = { bubble: new Set<Registration>(), capture: new Set<Registration>() };
   // A list rather than a set: two surfaces may cover a Space the same way, and
   // the context lasts until the last of them uncovers it.
@@ -90,15 +113,21 @@ export function createKeyDispatcher(target: EventTarget): KeyDispatcher {
     function dispatchKey(event: Event): void {
       if (!(event instanceof KeyboardEvent)) return;
       const now = context();
-      if (now === 'off-screen') return;
+      const attempts: { id: CommandId; outcome: KeyOutcome }[] = [];
+      const report = () => trace?.(event, { phase, context: now, attempts });
+      if (now === 'off-screen') return report();
       for (const { answers, answersIn } of [...registrations[phase]]) {
         if (!answersInContext(answersIn, now)) continue;
         for (const { id, answer } of answers()) {
-          if (!pressesBinding(bindingOf(id), event) || !answer(event)) continue;
+          if (!pressesBinding(bindingOf(id), event)) continue;
+          const outcome = answer(event);
+          attempts.push({ id, outcome });
+          if (!outcome.ran) continue;
           event.preventDefault();
-          return;
+          return report();
         }
       }
+      report();
     };
   const listeners = { bubble: listenerOf('bubble'), capture: listenerOf('capture') };
   return {

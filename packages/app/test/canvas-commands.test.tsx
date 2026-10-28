@@ -5,6 +5,7 @@ import {
   ADD_RESOURCE,
   AVAILABLE,
   bindCommand,
+  KEPT_BY_TARGET,
   keyAnswerOf,
   OPEN_AND_EXPAND,
   OPEN_RESOURCE,
@@ -84,10 +85,16 @@ describe('a Canvas command’s key', () => {
     const { run, presentFrom } = presenting();
     const command = presentFromHereCommand({ presentFrom, mayPresent: true });
 
-    expect(keyAnswerOf(command, () => OFF_GRAPH).answer(pressOn(document.body, 'p'))).toBe(false);
-    expect(keyAnswerOf(command, () => undefined).answer(pressOn(document.body, 'p'))).toBe(false);
+    expect(keyAnswerOf(command, () => OFF_GRAPH).answer(pressOn(document.body, 'p'))).toEqual({
+      ran: false,
+      why: PRESENT_OFF_GRAPH,
+    });
+    expect(keyAnswerOf(command, () => undefined).answer(pressOn(document.body, 'p'))).toEqual({
+      ran: false,
+      why: 'Nothing is selected.',
+    });
     expect(run).not.toHaveBeenCalled();
-    expect(keyAnswerOf(command, () => ON_GRAPH).answer(pressOn(document.body, 'p'))).toBe(true);
+    expect(keyAnswerOf(command, () => ON_GRAPH).answer(pressOn(document.body, 'p')).ran).toBe(true);
     expect(run).toHaveBeenCalledWith(ON_GRAPH);
   });
 
@@ -100,7 +107,7 @@ describe('a Canvas command’s key', () => {
       () => ON_GRAPH,
     ).answer(pressOn(field, 'p'));
 
-    expect(taken).toBe(false);
+    expect(taken).toEqual(KEPT_BY_TARGET);
     expect(run).not.toHaveBeenCalled();
   });
 });
@@ -150,10 +157,10 @@ describe('Remove from Map', () => {
     const button = document.createElement('button');
     toolbar.append(button);
 
-    expect(answer.answer(pressOn(button, 'Delete'))).toBe(false);
-    expect(answer.answer(pressOn(toolbar, 'Delete'))).toBe(false);
+    expect(answer.answer(pressOn(button, 'Delete')).ran).toBe(false);
+    expect(answer.answer(pressOn(toolbar, 'Delete')).ran).toBe(false);
     expect(drawn.removeFromMap).not.toHaveBeenCalled();
-    expect(answer.answer(pressOn(document.body, 'Delete'))).toBe(true);
+    expect(answer.answer(pressOn(document.body, 'Delete')).ran).toBe(true);
     expect(drawn.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
   });
 });
@@ -197,9 +204,9 @@ describe('Add Resource and Rename', () => {
     dialog.setAttribute('role', 'dialog');
 
     for (const target of [document.createElement('input'), menu, dialog])
-      expect(answer.answer(pressOn(target, 'c'))).toBe(false);
+      expect(answer.answer(pressOn(target, 'c')).ran).toBe(false);
     expect(drawn.addResource).not.toHaveBeenCalled();
-    expect(answer.answer(pressOn(document.createElement('button'), 'c'))).toBe(true);
+    expect(answer.answer(pressOn(document.createElement('button'), 'c')).ran).toBe(true);
     expect(drawn.addResource).toHaveBeenCalledOnce();
   });
 });
@@ -298,9 +305,9 @@ describe('Open, Open and expand and Full View', () => {
     node.append(content);
 
     for (const target of [content, document.createElement('button')])
-      expect(answer.answer(pressOn(target, 'Enter'))).toBe(false);
+      expect(answer.answer(pressOn(target, 'Enter')).ran).toBe(false);
     expect(drawn.openResource).not.toHaveBeenCalled();
-    expect(answer.answer(pressOn(node, 'Enter'))).toBe(true);
+    expect(answer.answer(pressOn(node, 'Enter')).ran).toBe(true);
     expect(drawn.openResource).toHaveBeenCalledOnce();
   });
 });

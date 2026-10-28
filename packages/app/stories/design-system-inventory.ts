@@ -45,6 +45,15 @@ export const uncataloguedComponents = [
     reason: 'The browser entry point: one `createRoot` call and startup composition.',
   },
   {
+    module: 'packages/app/src/components/PressLog.tsx',
+    reason:
+      'Development diagnostic, drawn only by a dev server started with `VITE_KEY_LOG=1` and absent from every build: it lists each key press and what the dispatchers did with it. It is not application surface for a story to stand for, and its verdicts are unit-tested in `press-log.test.tsx`.',
+  },
+  {
+    module: 'packages/app/src/mount-press-log.tsx',
+    reason: 'The press log entry point: one `createRoot` call, reached only when `VITE_KEY_LOG=1`.',
+  },
+  {
     module: 'packages/app/src/mount-main.tsx',
     reason:
       'The mount entry point (ADR 0130): one `createRoot` call and the mount composition, rendering `GitHubLocationForm` when the page has no location to mount.',

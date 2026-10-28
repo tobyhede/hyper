@@ -40,6 +40,7 @@ import { PlacementPending } from './components/PlacementPending';
 import { PresentingStage } from './components/PresentingStage';
 import { ShortcutSheet } from './components/ShortcutSheet';
 import { createKeyDispatcher, KeyDispatcherContext, useKeyCover } from './key-dispatcher';
+import { pressLogTrace } from './press-log';
 import { CommandNotices, DrawnSpaceNotices, ShellNotice } from './components/ShellNotice';
 
 export const createApp = (
@@ -84,7 +85,7 @@ export const createApp = (
   const presentingWindow = composition.presenting;
   // The one place this Space listens for keys (ADR 0138): every command
   // below registers what it answers here rather than adding a listener.
-  const keyDispatcher = createKeyDispatcher(window);
+  const keyDispatcher = createKeyDispatcher(window, pressLogTrace);
 
   function App() {
     return (
