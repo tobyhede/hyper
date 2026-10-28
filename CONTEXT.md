@@ -255,6 +255,10 @@ _Avoid_: Active Edge (Active belongs to the Graph and Resource used by Graph nav
 The Resource currently reached during Graph navigation or Presenting, whose outgoing Edges are the moves available. It pairs with the **Active Graph**: the Graph names what is being traversed, and the Resource names the position in it. Going back reads Traversal history rather than the Graph, because a Resource reached by a merge has several Edges in and only the path taken says which one was used.
 _Avoid_: current slide, cursor, position, step.
 
+**Canvas command**:
+A named action on the canvas, performed by a key, by an item on a Resource's rail, or by both, and identified by its command id (such as `canvas.presentFromHere`, ADR 0138). It says what it is aimed at (the focused Resource, the selection, or the Map), which drawn Maps it serves, and whether it can run for a target: available, unavailable with a reason, or absent. The key and the rail item are two ways to reach the same command, so they cannot disagree about when it runs or how it reports. A key whose command cannot run stays silent.
+_Avoid_: shortcut (that is the key bound to it), action (the rail's word for its items, some of which have no key), Command Dock (the Space's command surface, a different thing), handler, hotkey.
+
 ## At the render layer
 
 Terms below are **React Flow's**, not ours. They are listed because we build against them directly and need to speak them precisely — not because the domain contains them. Nothing in the domain should be named after one, and no bridging term should be invented between the two.
