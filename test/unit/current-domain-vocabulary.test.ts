@@ -3262,3 +3262,128 @@ describe('the Resource has no front (ADR 0125)', () => {
     }
   });
 });
+
+/**
+ * The application's earlier name. Unlike the domain words above, a product
+ * name is written in prose as much as in code, so this scan reads Markdown too:
+ * the README, `CONTEXT.md`, the guides under `docs/agents/` and the skills.
+ *
+ * Composed from fragments, as every retired word in this file is.
+ */
+const RETIRED_PRODUCT = ['h', 'yper'].join('');
+const RETIRED_PRODUCT_NAME = new RegExp(RETIRED_PRODUCT, 'i');
+
+/**
+ * Migration snapshots are history and are never rewritten; a rewritten one
+ * passes against a migrated local database and fails against a fresh one.
+ */
+const PRODUCT_HISTORY_TREES = ['migrations/', 'migrations-sqlite/'] as const;
+
+/**
+ * The spellings that keep the earlier name, each for a reason outside this
+ * repository's text. Each is removed from a line before the line is read, so a
+ * second use of the name on the same line is still reported.
+ *
+ * - An ADR's file name is its permanent address, and ADR bodies are history.
+ * - A `.scratch/` path cites a historical tree by its directory.
+ * - A checkout on the author's machine is named by that machine.
+ * - The Cloudflare Worker's name is the deployed Worker's identity: changing it
+ *   deploys a second Worker beside the first.
+ * - The root file ADR 0136 renamed is named where an author or operator is
+ *   told to move a talk that still holds it.
+ */
+const PRODUCT_KEPT_SPELLINGS: readonly RegExp[] = [
+  /\b\d{4}-[a-z0-9-]+\.md\b/g,
+  /\.scratch\/[A-Za-z0-9._/-]+/g,
+  new RegExp(`/Users/tobyhede/psrc/${RETIRED_PRODUCT}\\b`, 'g'),
+  new RegExp(`"name": "${RETIRED_PRODUCT}"`, 'g'),
+  new RegExp(`\`wrangler\\.jsonc\`'s \`${RETIRED_PRODUCT}\``, 'g'),
+  new RegExp(`\\b${RETIRED_PRODUCT}\\.json\\b`, 'g'),
+];
+
+const withoutKeptProductSpellings = (line: string): string =>
+  PRODUCT_KEPT_SPELLINGS.reduce((kept, spelling) => kept.replace(spelling, ''), line);
+
+const productHits = (source: string): string[] =>
+  source
+    .split('\n')
+    .flatMap((line, index) =>
+      RETIRED_PRODUCT_NAME.test(withoutKeptProductSpellings(line))
+        ? [`${index + 1}: ${line.trim()}`]
+        : [],
+    );
+
+describe('the application is named InfinityCube', () => {
+  const scanned = trackedFiles().filter(
+    (file) =>
+      ![...HISTORICAL_TREES, ...PRODUCT_HISTORY_TREES].some((tree) => file.startsWith(tree)) &&
+      !/\.(png|jpe?g|gif|ico|woff2?|pdf|webp)$/i.test(file),
+  );
+
+  it('reaches the kinds of file the rename actually touched', () => {
+    expect(scanned).toContain('README.md');
+    expect(scanned).toContain('package.json');
+    expect(scanned).toContain('packages/persistence/src/http-protocol.ts');
+    expect(scanned).toContain('.agents/skills/infinity-cube-authoring/SKILL.md');
+    expect(scanned).toContain('compose.yaml');
+  });
+
+  it('finds the earlier name nowhere it is not kept on purpose', () => {
+    const found = scanned.flatMap((file) => {
+      const source = readTracked(file);
+      return source === null ? [] : productHits(source).map((hit) => `${file}:${hit}`);
+    });
+
+    expect(found).toEqual([]);
+  });
+
+  it('keeps no spelling that has stopped earning itself', () => {
+    const sources = scanned.map((file) => readTracked(file) ?? '');
+    for (const spelling of PRODUCT_KEPT_SPELLINGS) {
+      expect(
+        sources.some((source) => new RegExp(spelling.source).test(source)),
+        `${spelling.source} is kept but nothing uses it`,
+      ).toBe(true);
+    }
+  });
+
+  it('reports the earlier name in every shape it was written in', () => {
+    const capital = RETIRED_PRODUCT.replace('h', 'H');
+    const upper = RETIRED_PRODUCT.toUpperCase();
+    const retired = [
+      `# ${capital}`,
+      `export type ${capital}ProblemCode = string;`,
+      `const ${RETIRED_PRODUCT}HistoryIndex = 0;`,
+      `export const run${capital} = async () => 0;`,
+      `const ${upper}_DIR = process.env['${upper}_DIR'];`,
+      `pnpm ${RETIRED_PRODUCT} run ~/talks/rust-async`,
+      `type: 'https://${RETIRED_PRODUCT}.dev/problems/not-found',`,
+      `export const RESOURCE_DRAG_TYPE = 'application/x-${RETIRED_PRODUCT}-resource-id';`,
+      `import { clear } from '../support/clear-${RETIRED_PRODUCT}-content';`,
+      `POSTGRES_DB=${RETIRED_PRODUCT}_ci`,
+      `git clone https://github.com/tobyhede/${RETIRED_PRODUCT}.git`,
+      `(window as { __${RETIRED_PRODUCT}OverviewTransforms?: string[] })`,
+      // A kept spelling forgives only itself, not the rest of its line.
+      `see docs/adr/0124-one-${RETIRED_PRODUCT}-cli.md, then run pnpm ${RETIRED_PRODUCT} init`,
+    ];
+
+    for (const line of retired) {
+      expect(productHits(line), line).not.toEqual([]);
+    }
+  });
+
+  it('stays silent on the spellings kept on purpose', () => {
+    const kept = [
+      `([ADR 0124](docs/adr/0124-one-${RETIRED_PRODUCT}-cli.md))`,
+      `see \`.scratch/${RETIRED_PRODUCT}-cli/spec.md\``,
+      `"/Users/tobyhede/psrc/${RETIRED_PRODUCT}/.worktrees",`,
+      `  "name": "${RETIRED_PRODUCT}",`,
+      `The Worker's name may differ from \`wrangler.jsonc\`'s \`${RETIRED_PRODUCT}\`.`,
+      `rename it with \`git -C <dir> mv ${RETIRED_PRODUCT}.json aggregate.json\``,
+    ];
+
+    for (const line of kept) {
+      expect(productHits(line), line).toEqual([]);
+    }
+  });
+});
