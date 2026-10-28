@@ -96,10 +96,10 @@
 }
 
 /*
- * **Sand is the canvas and nothing else.** The beige is the paper the Resources are
- * laid on; it is not a tint the chrome inherits. The chrome is a neutral grey
- * scale over sand, so the only two surfaces on screen carrying warmth are the
- * canvas and a Resource's own face, and the only element carrying colour is a Graph.
+ * **The canvas is a neutral grey, a step below the chrome's paper.** It is the
+ * ground the Resources are laid on, not a tint the chrome inherits, and it
+ * carries no hue of its own: the only surface on screen carrying warmth is a
+ * Resource's own cream face, and the only element carrying colour is a Graph.
  *
  * The values live here, once, and every `@project/ui` control, menu, popover
  * and dialog follows without being told — including the ones that portal to
@@ -108,7 +108,7 @@
 :root {
   color-scheme: light;
 
-  --background: #e5dbc7;
+  --background: #dcdcdc;
   --foreground: #1f2933;
   /* Chrome paper: the shell, its popovers, its menus and its dialogs. Neutral
      and a shade off white, so it never reads as the Resource's cream. */
@@ -127,11 +127,9 @@
   --muted: var(--secondary);
   /* Secondary text has **three** grounds in this theme, not one: chrome paper
      (`--card`), the muted fill it is drawn on inside a footer or a field, and
-     the sand canvas itself. The prototype's `#6b7280` was picked against paper
-     alone and reads at 4.12:1 on muted and 3.52:1 on sand — both under AA, and
-     the reason the flip failed `test/unit/ui-theme-contrast.test.ts`. Sand is
-     the tightest of the three, so this is close to the lightest step that
-     clears it: 6.15:1 on paper, 5.43:1 on muted, 4.63:1 on sand. */
+     the grey canvas itself. The canvas is the tightest of the three, so this
+     is close to the lightest step that clears AA on it: 6.15:1 on paper,
+     5.43:1 on muted, 4.64:1 on the canvas. */
   --muted-foreground: #57606d;
   /* The highlighted row in a menu or combobox, and the hover fill on a control.
      A hover is a *pointer report*, not a selection, so it is the lightest step
@@ -145,10 +143,10 @@
   --ring: var(--primary);
   /* React Flow reads its own variables for the pane and the dot pattern and
      never ours, so without these the canvas takes its shipped defaults — a
-     transparent pane and `#91919a` dots, a cool grey that reads as dirt on
-     sand. The dot is the sand a step down rather than a neutral. */
+     transparent pane and `#91919a` dots, heavier than a ground the Resources lie
+     on should be. The dot is the canvas a step down. */
   --xy-background-color: var(--background);
-  --xy-background-pattern-color: #cdbfa4;
+  --xy-background-pattern-color: #c0c0c0;
   --canvas-resource-ink-color: #0b0d11;
   --canvas-resource-face-rest: #f4efe4;
   --canvas-resource-face-active: #fffaf0;
