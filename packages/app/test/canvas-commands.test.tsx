@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { uuidSchema } from '@project/core';
 import {
   ABSENT,
+  ADD_RESOURCE,
   AVAILABLE,
   bindCommand,
   keyAnswerOf,
@@ -9,7 +10,9 @@ import {
   PRESENT_WHILE_EDITING,
   presentFromHereCommand,
   REMOVE_SELECTION,
+  RENAME_RESOURCE,
   unavailable,
+  type AuthoringOccurrence,
   type RemovalOccurrence,
 } from '../src/canvas-commands';
 
@@ -146,5 +149,51 @@ describe('Remove from Map', () => {
     expect(map.removeFromMap).not.toHaveBeenCalled();
     expect(answer.answer(pressOn(document.body, 'Delete'))).toBe(true);
     expect(map.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
+  });
+});
+
+describe('Add Resource and Rename', () => {
+  const occurrence = (overrides: Partial<AuthoringOccurrence> = {}) => ({
+    authorOnCanvas: true,
+    bodyEditing: false,
+    addResource: vi.fn(),
+    beginTitleEditing: vi.fn(),
+    ...overrides,
+  });
+
+  it('adds a Resource to the Map, and renames the Resource drawn as a node there', () => {
+    const map = occurrence();
+
+    ADD_RESOURCE.run(map);
+    RENAME_RESOURCE.run({ occurrence: map, nodeId: 'node-a' });
+
+    expect(map.addResource).toHaveBeenCalledOnce();
+    expect(map.beginTitleEditing).toHaveBeenCalledWith('node-a');
+  });
+
+  it.each([
+    ['authoring is withdrawn', { authorOnCanvas: false }],
+    ['a body is being edited', { bodyEditing: true }],
+  ])('is absent while %s', (_, overrides) => {
+    const map = occurrence(overrides);
+
+    expect(ADD_RESOURCE.availability(map)).toEqual(ABSENT);
+    expect(RENAME_RESOURCE.availability({ occurrence: map, nodeId: 'node-a' })).toEqual(ABSENT);
+    expect(ADD_RESOURCE.availability(occurrence())).toEqual(AVAILABLE);
+  });
+
+  it('leaves C to a field, a menu and a dialog, and takes it from a button', () => {
+    const map = occurrence();
+    const answer = keyAnswerOf(ADD_RESOURCE, () => map);
+    const menu = document.createElement('div');
+    menu.setAttribute('role', 'menu');
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+
+    for (const target of [document.createElement('input'), menu, dialog])
+      expect(answer.answer(pressOn(target, 'c'))).toBe(false);
+    expect(map.addResource).not.toHaveBeenCalled();
+    expect(answer.answer(pressOn(document.createElement('button'), 'c'))).toBe(true);
+    expect(map.addResource).toHaveBeenCalledOnce();
   });
 });

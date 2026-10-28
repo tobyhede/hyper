@@ -222,3 +222,51 @@ export const removeFromMapReportedBy =
       authoring.complete({ kind: 'removed-resource-from-map', resourceId }),
     );
   };
+
+/** What Add Resource and Rename need of the drawn Map they act on. */
+export interface AuthoringOccurrence {
+  readonly authorOnCanvas: boolean;
+  readonly bodyEditing: boolean;
+  /** Add a Resource of the default kind to this Map. */
+  readonly addResource: () => void;
+  /** Put the caret in the Title of the Resource drawn as `nodeId` on this Map. */
+  readonly beginTitleEditing: (nodeId: string) => void;
+}
+
+/** Whether a Map may be authored by key now: never while a body is being edited. */
+const authoringAvailability = (occurrence: AuthoringOccurrence): CommandAvailability =>
+  occurrence.authorOnCanvas && !occurrence.bodyEditing ? AVAILABLE : ABSENT;
+
+/**
+ * Add Resource (`C`): add a Resource of the default kind to a drawn Map, the
+ * one holding the selection or else the canvas's own. Absent while that Map
+ * may not be authored or a body is being edited.
+ */
+export const ADD_RESOURCE: CanvasCommand<AuthoringOccurrence> = {
+  id: 'canvas.addResource',
+  binding: CANVAS_KEYS.addResource,
+  aim: 'canvas',
+  serves: 'any',
+  availability: authoringAvailability,
+  run: (occurrence) => occurrence.addResource(),
+};
+
+/** A Resource drawn on a Map, named by its node there. */
+export interface DrawnResourceTarget {
+  readonly occurrence: AuthoringOccurrence;
+  readonly nodeId: string;
+}
+
+/**
+ * Rename (`F2`): put the caret in the selected Resource's Title, on whichever
+ * drawn Map holds it. Absent while that Map may not be authored or a body is
+ * being edited.
+ */
+export const RENAME_RESOURCE: CanvasCommand<DrawnResourceTarget> = {
+  id: 'canvas.renameResource',
+  binding: CANVAS_KEYS.renameResource,
+  aim: 'selection',
+  serves: 'any',
+  availability: ({ occurrence }) => authoringAvailability(occurrence),
+  run: ({ occurrence, nodeId }) => occurrence.beginTitleEditing(nodeId),
+};
