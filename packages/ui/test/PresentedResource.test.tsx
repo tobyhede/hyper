@@ -23,6 +23,37 @@ describe('PresentedResource', () => {
     expect(container.querySelectorAll('li')).toHaveLength(2);
   });
 
+  /**
+   * The Stage scrolls a presented Resource only when `.resource__body hr`
+   * matches (`stage.css`), so a rule in the Markdown, its own or a Target's,
+   * has to come out as an `hr` inside that wrapper. A setext underline is a
+   * heading, not a rule, and must not.
+   */
+  it.each(['self', 'target'] as const)(
+    'draws a rule in Markdown reached via %s as an hr inside the body the Stage reads',
+    (via) => {
+      const { container } = render(
+        <PresentedResource
+          title="Long"
+          content={{ kind: 'markdown', source: 'Shown.\n\n---\n\nMore.', via }}
+        />,
+      );
+
+      expect(container.querySelector('.resource__body hr')).not.toBeNull();
+    },
+  );
+
+  it('draws a setext underline as a heading, with no hr for the Stage to read', () => {
+    const { container } = render(
+      <PresentedResource
+        title="Short"
+        content={{ kind: 'markdown', source: 'Heading\n---\n\nBody.', via: 'self' }}
+      />,
+    );
+
+    expect(container.querySelector('.resource__body hr')).toBeNull();
+  });
+
   it('presents an Image Resource as its name and its image, the name as the text alternative', () => {
     render(
       <PresentedResource

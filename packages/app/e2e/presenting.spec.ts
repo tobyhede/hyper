@@ -24,6 +24,22 @@ import {
   viewportTransform,
 } from './graph';
 
+/**
+ * The body's `scrollTop` after a run of animation frames, long enough for a
+ * smooth scroll that a key or wheel started to have moved it.
+ */
+async function scrollTopAfterFrames(body: Locator): Promise<number> {
+  return body.evaluate(
+    (element) =>
+      new Promise<number>((resolve) => {
+        let frames = 30;
+        const tick = () =>
+          --frames === 0 ? resolve(element.scrollTop) : requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
+      }),
+  );
+}
+
 /** The Deep dive Space, whose second Resource overflows the frame with no rule. */
 const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 
@@ -306,6 +322,7 @@ test(
     // D is deliberately long, and a rule breaks it. Long is A → B → C → D.
     for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
     await expect(presentedName(page)).toHaveText('D');
+    await expect(presentedResource(page).locator('hr')).toHaveCount(1);
 
     const body = stageBody(page);
     const scrollTop = () => body.evaluate((element) => element.scrollTop);
@@ -359,8 +376,9 @@ test(
     await presentControl(page).click();
     await expect(presentedName(page)).toHaveText('Why placement is authored');
     await page.keyboard.press('ArrowRight');
-    // Three paragraphs under a heading, and no rule.
     await expect(presentedName(page)).toHaveText('Opening in place');
+    // The claim rests on this Resource having no rule; say so rather than assume it.
+    await expect(presentedResource(page).locator('hr')).toHaveCount(0);
 
     const body = stageBody(page);
     expect(
@@ -374,7 +392,9 @@ test(
     await page.mouse.wheel(0, 200);
     await body.focus();
     await page.keyboard.press('PageDown');
-    expect(await body.evaluate((element) => element.scrollTop)).toBe(0);
+    // Page Down scrolls smoothly, so read the position only once a scroll it
+    // started would have had time to move.
+    expect(await scrollTopAfterFrames(body)).toBe(0);
   },
 );
 

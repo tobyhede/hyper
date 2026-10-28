@@ -20,6 +20,21 @@ const body = (page: Page) => stage(page).getByRole('region', { name: 'Presented 
 const presentedName = (page: Page) =>
   frame(page).getByTestId('resource-content').locator('.resource__title');
 
+/**
+ * The body's `scrollTop` after a run of animation frames, long enough for a
+ * smooth scroll that a key or wheel started to have moved it.
+ */
+const scrollTopAfterFrames = (page: Page) =>
+  body(page).evaluate(
+    (element) =>
+      new Promise<number>((resolve) => {
+        let frames = 30;
+        const tick = () =>
+          --frames === 0 ? resolve(element.scrollTop) : requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
+      }),
+  );
+
 /** A picture many times the size of any frame the Stage draws. */
 const OVERSIZED = { width: 4000, height: 3000 } as const;
 
@@ -88,7 +103,6 @@ test(
   async ({ page }) => {
     await page.goto(story('unbroken'));
     await expect(presentedName(page)).toHaveText('Unbroken');
-    const scrollTop = () => body(page).evaluate((element) => element.scrollTop);
     expect(
       await body(page).evaluate((element) => element.scrollHeight > element.clientHeight),
       'Unbroken overflows the frame',
@@ -101,7 +115,9 @@ test(
     await body(page).focus();
     await page.keyboard.press('PageDown');
     await expect(presentedName(page)).toHaveText('Unbroken');
-    expect(await scrollTop()).toBe(0);
+    // Page Down scrolls smoothly, so read the position only once a scroll it
+    // started would have had time to move.
+    expect(await scrollTopAfterFrames(page)).toBe(0);
     expect(await boxOf(frame(page), 'the frame')).toEqual(before);
   },
 );
