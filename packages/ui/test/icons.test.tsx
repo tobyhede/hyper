@@ -216,13 +216,13 @@ describe('the public icon facade', () => {
     const glyphs = container.querySelectorAll('svg');
     expect(glyphs[0]).toHaveAttribute('width', '13');
     expect(glyphs[0]).toHaveAttribute('height', '13');
-    expect(glyphs[0]).toHaveAttribute('stroke', '#123456');
-    expect(glyphs[1]).toHaveAttribute('stroke', '#654321');
+    expect(glyphs[0]?.style.stroke).toBe('var(--graph-paint-123456, #123456)');
+    expect(glyphs[1]?.style.stroke).toBe('var(--graph-paint-654321, #654321)');
     expect(glyphs[1]).toHaveAttribute('width', '16');
     expect(glyphs[1]).toHaveClass('origin-center', 'scale-75');
     expect(glyphs[2]).toHaveAttribute('width', '16');
     expect(glyphs[2]).toHaveClass('origin-center', 'scale-75');
-    expect(glyphs[2]).toHaveAttribute('stroke', '#abcdef');
+    expect(glyphs[2]?.style.stroke).toBe('var(--graph-paint-abcdef, #abcdef)');
     // The Reference Resource sizes its own box; the base inside it always fills the 24-unit
     // viewBox, which is what keeps the badge in the same corner at every size.
     expect(glyphs[3]).toHaveAttribute('width', '11');
@@ -236,7 +236,7 @@ describe('the public icon facade', () => {
    * attribute, so without a prop the only way in is a stylesheet reaching
    * through to the `svg` — a surface overriding a glyph's own drawing.
    */
-  it('fills Present on request, in the colour the glyph was already given', () => {
+  it('fills Present on request, in the paint the glyph was already given', () => {
     const { container } = render(
       <>
         <PresentIcon color="#654321" />
@@ -245,9 +245,9 @@ describe('the public icon facade', () => {
     );
 
     const glyphs = container.querySelectorAll('svg');
-    expect(glyphs[0]).toHaveAttribute('fill', 'none');
-    expect(glyphs[1]).toHaveAttribute('fill', '#654321');
-    expect(glyphs[1]).toHaveAttribute('stroke', '#654321');
+    expect(glyphs[0]?.style.fill).toBe('none');
+    expect(glyphs[1]?.style.fill).toBe('var(--graph-paint-654321, #654321)');
+    expect(glyphs[1]?.style.stroke).toBe('var(--graph-paint-654321, #654321)');
   });
 
   it('keeps Resource-kind glyphs decorative while their wrapper names the kind', () => {

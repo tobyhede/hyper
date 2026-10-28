@@ -284,12 +284,13 @@ test(
     for (let index = 0; index < count; index += 1) {
       const item = specimens.nth(index);
       const label = (await item.locator('.inv-specimen__label').innerText()).trim();
-      // Resolve the label's own hex text through the browser's colour parser
-      // rather than hand-computing rgb(), so this compares against exactly the
-      // colour the label advertises.
+      // Resolve the label's own hex text through the browser's colour parser,
+      // painted as the theme paints that Graph colour (`graphPaint`), rather
+      // than hand-computing rgb(), so this compares against exactly the colour
+      // the canvas draws for the label's slot.
       const expectedColor = await page.evaluate((hex) => {
         const probe = document.createElement('div');
-        probe.style.color = hex;
+        probe.style.color = `var(--graph-paint-${hex.slice(1).toLowerCase()}, ${hex})`;
         document.body.append(probe);
         const resolved = getComputedStyle(probe).color;
         probe.remove();

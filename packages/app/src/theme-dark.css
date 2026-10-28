@@ -8,13 +8,13 @@
  * `dark:` variant follows, so the registry components' own `dark:` classes turn
  * over with these tokens rather than on a separate signal.
  *
- * Brutalist, as the sand theme is: a flat near-black ground, Resources framed
- * in heavy off-white ink, hard offset shadows with no blur, and one signal
- * yellow for emphasis. The shadows are the sand theme's own, which are drawn in
- * `--foreground` and so turn white here without being restated.
+ * Brutalist, as the light theme is, and its mirror: a flat near-black ground,
+ * Resources framed in heavy off-white ink, hard offset shadows with no blur,
+ * and the chrome's emphasis in that same ink. The shadows and the selection
+ * ring are the light theme's own, drawn in `--foreground` and the Resource's
+ * ink, so they turn white here without being restated.
  *
- * A Graph's colour is still the only colour that carries meaning, so the
- * yellow stays on the chrome. Each palette colour is redrawn for this ground
+ * A Graph's colour is the only colour on screen. Each palette colour is redrawn for this ground
  * through the `--graph-paint-<hex>` that `graphPaint` paints with, keeping its
  * hue and its dark and light pair while lifting it clear of the canvas; a
  * Graph's stored colour does not change.
@@ -23,7 +23,7 @@
  * pair, `--destructive` and `--success` on chrome paper, and every palette
  * colour's paint on the canvas; `test/unit/canvas-resource-contrast.test.ts`
  * holds the Resource's text roles on both its faces. Both check this theme as
- * they check the sand one.
+ * they check the light one.
  */
 @media (prefers-color-scheme: dark) {
   :root {
@@ -35,7 +35,7 @@
     --card-foreground: var(--foreground);
     --popover: var(--card);
     --popover-foreground: var(--foreground);
-    --primary: #ffd60a;
+    --primary: #f2f2f2;
     --primary-foreground: #111111;
     --secondary: #262626;
     --secondary-foreground: var(--foreground);
@@ -62,35 +62,34 @@
     --canvas-resource-title-color: #ffffff;
     --canvas-resource-muted-color: #b5b5b5;
     --canvas-resource-error-color: #ff6b61;
-    --canvas-resource-shadow-selected:
-      0 0 0 var(--canvas-resource-selected-ring-width) var(--primary), 6px 6px 0 var(--primary);
 
-    /* The Tableau Classic 20 palette redrawn for a near-black ground: each
-       hue keeps its slot and its dark and light pair, and every one clears 3:1
-       on the canvas. */
-    --graph-paint-1f77b4: #4c9dff;
-    --graph-paint-aec7e8: #a9ccff;
-    --graph-paint-17becf: #22d3e6;
-    --graph-paint-9edae5: #9be9f2;
-    --graph-paint-2ca02c: #3ccf4e;
-    --graph-paint-98df8a: #a3f095;
-    --graph-paint-bcbd22: #d1d32b;
-    --graph-paint-dbdb8d: #ebeb9c;
-    --graph-paint-ff7f0e: #ff8c24;
-    --graph-paint-ffbb78: #ffc68c;
-    --graph-paint-d62728: #ff4a4a;
-    --graph-paint-ff9896: #ffa6a4;
-    --graph-paint-e377c2: #ff7ad1;
-    --graph-paint-f7b6d2: #ffc4de;
-    --graph-paint-9467bd: #b38cff;
-    --graph-paint-c5b0d5: #d8c6ff;
-    --graph-paint-8c564b: #cf8f72;
-    --graph-paint-c49c94: #e0b8ab;
-    --graph-paint-7f7f7f: #a8a8a8;
-    --graph-paint-c7c7c7: #e0e0e0;
+    /* The Signal palette's dark steps, one per Tableau slot a Graph stores:
+       the light theme's hues, lifted for a near-black ground. Held as the
+       light steps are, by
+       `test/unit/ui-theme-contrast.test.ts`. */
+    --graph-paint-1f77b4: #0197ff;
+    --graph-paint-aec7e8: #badbfe;
+    --graph-paint-17becf: #03edf9;
+    --graph-paint-9edae5: #73edf6;
+    --graph-paint-2ca02c: #4ff58a;
+    --graph-paint-98df8a: #a0edb3;
+    --graph-paint-bcbd22: #96bd01;
+    --graph-paint-dbdb8d: #c9e492;
+    --graph-paint-ff7f0e: #d77f07;
+    --graph-paint-ffbb78: #ffcc9f;
+    --graph-paint-d62728: #ff5972;
+    --graph-paint-ff9896: #ffc7ca;
+    --graph-paint-e377c2: #e943c7;
+    --graph-paint-f7b6d2: #fec2ec;
+    --graph-paint-9467bd: #d18fff;
+    --graph-paint-c5b0d5: #e7caff;
+    --graph-paint-8c564b: #ff9653;
+    --graph-paint-c49c94: #fecbae;
+    --graph-paint-7f7f7f: #86cdff;
+    --graph-paint-c7c7c7: #b2defe;
   }
 
-  /* Black in the sand theme, where it is the Resource's ink; here it takes the
+  /* Black in the light theme, where it is the Resource's ink; here it takes the
      off-white ink so the corner is still seen on a dark face. */
   .rf-resource-node__resize-mark {
     background: var(--canvas-resource-ink-color);

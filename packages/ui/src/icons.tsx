@@ -1,3 +1,4 @@
+import { graphPaint } from './graph-color';
 import {
   BookOpen,
   Box,
@@ -62,11 +63,13 @@ export const MapIcon = ({ size = 16 }: { size?: number | undefined }) => <Layout
  * Graph is for, and a path is the resource you present.
  *
  * Drawn heavier than Lucide's default 2. This is the only glyph in the set
- * carrying a *colour* rather than ink, and the palette is pastel because those
- * values are chosen as a stroke on the sand canvas; at 14px on light chrome the
- * same value at the default weight is the faintest mark on the surface. Weight
- * is the right lever because it leaves the hue exactly as the canvas draws it,
- * which is the whole reason the glyph is coloured at all.
+ * carrying a *colour* rather than ink, and its values are chosen as a stroke
+ * on the canvas; at 14px on chrome paper the same value at the default weight
+ * is the faintest mark on the surface. Weight is the right lever because it
+ * leaves the hue exactly as the canvas draws it, which is the whole reason the
+ * glyph is coloured at all. The colour is painted through `graphPaint`, as the
+ * canvas paints it, and in `style` because a `var()` is a CSS value, not a
+ * presentation attribute's.
  */
 export const GraphIcon = ({
   color = 'currentColor',
@@ -74,7 +77,7 @@ export const GraphIcon = ({
 }: {
   color?: string;
   size?: number;
-}) => <Route color={color} size={size} strokeWidth={2.5} />;
+}) => <Route style={{ stroke: graphPaint(color) }} size={size} strokeWidth={2.5} />;
 
 /**
  * Start presenting the active Graph.
@@ -92,12 +95,16 @@ export const GraphIcon = ({
  * negotiate a second icon size.
  */
 export const PresentIcon = ({ color, filled = false }: { color: string; filled?: boolean }) => (
-  <Play className="origin-center scale-75" color={color} fill={filled ? color : 'none'} size={16} />
+  <Play
+    className="origin-center scale-75"
+    style={{ stroke: graphPaint(color), fill: filled ? graphPaint(color) : 'none' }}
+    size={16}
+  />
 );
 
 /** Stop presenting and return to the Space overview. */
 export const StopPresentingIcon = ({ color }: { color: string }) => (
-  <Square className="origin-center scale-75" color={color} size={16} />
+  <Square className="origin-center scale-75" style={{ stroke: graphPaint(color) }} size={16} />
 );
 
 /** Edit the content of a Markdown Resource. */
@@ -291,7 +298,7 @@ interface BaseGlyphProps {
  *
  * **The hole is cut, not painted.** The badge sits over the base's own stroke,
  * and a disc filled with a background colour would have to know which surface
- * it is on — a menu, a popover, a Resource's cream face. An SVG mask removes that
+ * it is on — a menu, a popover, a Resource's face. An SVG mask removes that
  * region from the base instead, so whatever is behind shows through and the
  * mark is legible on every surface. `useId` keeps the mask reference unique
  * when several of these are drawn in one list, which they are.

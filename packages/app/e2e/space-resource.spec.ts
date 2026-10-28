@@ -490,7 +490,7 @@ test(
     // mark.
     await (await resourceControls(page, resource)).getByTestId('space-resource-graph').click();
     const graphRow = page.getByRole('menuitemradio', { name: 'Graph 1' });
-    await expect(graphLegendMarkLine(graphRow)).toHaveCSS('stroke', 'rgb(31, 119, 180)');
+    await expect(graphLegendMarkLine(graphRow)).toHaveCSS('stroke', 'rgb(20, 107, 245)');
     await expect(graphRow.locator('[data-slot="graph-legend-mark"]')).toHaveAttribute(
       'data-head-shape',
       'arrow',

@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The canvas Resource draws on its own paper, cream in the sand theme and a
- * violet a step off the canvas in the dark one, so its text roles are separate
+ * The canvas Resource draws on its own paper, a grey a step off the canvas in
+ * each theme, so its text roles are separate
  * tokens rather than the chrome's `--foreground` and `--muted-foreground`.
  * Separate means they can drift: a colour picked against chrome paper can land
  * on the Resource's face and stay green through
@@ -23,8 +23,11 @@ const resourceCss = readFileSync(
 
 const AA_BODY_TEXT = 4.5;
 
+/** The presenting Stage's bar: WCAG 2.2 AAA (1.4.6), because a projector washes contrast out. */
+const STAGE_TEXT = 7;
+
 // The dark theme restates the Resource's colour tokens, so it is read after the
-// sand theme and its declarations win, as they do in the browser.
+// light theme and its declarations win, as they do in the browser.
 const darkTheme = readFileSync(
   new URL('../../packages/app/src/theme-dark.css', import.meta.url),
   'utf8',
@@ -36,7 +39,7 @@ const tokensOf = (css: string): ReadonlyMap<string, string> =>
   );
 
 const THEMES = [
-  { theme: 'sand', tokens: tokensOf(`${theme}\n${resourceCss}`) },
+  { theme: 'light', tokens: tokensOf(`${theme}\n${resourceCss}`) },
   { theme: 'dark', tokens: tokensOf(`${theme}\n${resourceCss}\n${darkTheme}`) },
 ] as const;
 
@@ -111,5 +114,31 @@ describe('canvas Resource face paint', () => {
     const resourceRule = /^\.canvas-resource \{(?<declarations>[\s\S]*?)^\}/mu.exec(resourceCss);
 
     expect(resourceRule?.groups?.['declarations']).toMatch(/background-clip:\s*padding-box;/u);
+  });
+});
+
+// The Stage draws one Resource on its rest face, in the Resource's own text
+// roles (`stage.css`, `markdown-resource-body.css`), for an audience reading it
+// off a projector.
+describe('presented Resource text on the Stage', () => {
+  const STAGE_TEXT_ROLES = [
+    { role: 'title and body', token: '--canvas-resource-title-color' },
+    { role: 'muted text', token: '--canvas-resource-muted-color' },
+  ] as const;
+
+  const pairs = THEMES.flatMap(({ theme: themeName, tokens }) =>
+    STAGE_TEXT_ROLES.map((text) => ({
+      name: `${text.role} (${themeName})`,
+      tokens,
+      ink: text.token,
+    })),
+  );
+
+  it.each(pairs)('reads at 7:1: $name', ({ tokens, ink }) => {
+    const ratio = contrast(
+      resolve(tokens, `var(${ink})`),
+      resolve(tokens, 'var(--canvas-resource-face-rest)'),
+    );
+    expect(ratio).toBeGreaterThanOrEqual(STAGE_TEXT);
   });
 });

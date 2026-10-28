@@ -96,10 +96,11 @@
 }
 
 /*
- * **Sand is the canvas and nothing else.** The beige is the paper the Resources are
- * laid on; it is not a tint the chrome inherits. The chrome is a neutral grey
- * scale over sand, so the only two surfaces on screen carrying warmth are the
- * canvas and a Resource's own face, and the only element carrying colour is a Graph.
+ * **Signal: one neutral scale, and colour only where it means something.** The
+ * canvas, a Resource's faces and the chrome are greys with no warmth, in this
+ * theme and in `theme-dark.css`, so the only element carrying colour is a
+ * Graph. Each Graph colour is painted for this ground through
+ * `--graph-paint-<hex>` below, as the dark theme paints it for its own.
  *
  * The values live here, once, and every `@project/ui` control, menu, popover
  * and dialog follows without being told — including the ones that portal to
@@ -108,11 +109,11 @@
 :root {
   color-scheme: light;
 
-  --background: #e5dbc7;
-  --foreground: #1f2933;
-  /* Chrome paper: the shell, its popovers, its menus and its dialogs. Neutral
-     and a shade off white, so it never reads as the Resource's cream. */
-  --card: #fbfbfa;
+  --background: #dcdcdc;
+  --foreground: #1a1a1a;
+  /* Chrome paper: the shell, its popovers, its menus and its dialogs. A shade
+     off white, so it never reads as the Resource's face. */
+  --card: #fafafa;
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
@@ -120,46 +121,44 @@
      is a Graph's, and the canvas draws several at once — so the chrome's own
      emphasis (a primary button, an open disclosure, a focus ring) is a dark
      neutral and stays out of that conversation. */
-  --primary: #33404d;
-  --primary-foreground: #fbfbfa;
-  --secondary: #eceded;
+  --primary: #222222;
+  --primary-foreground: #fafafa;
+  --secondary: #ececec;
   --secondary-foreground: var(--foreground);
   --muted: var(--secondary);
   /* Secondary text has **three** grounds in this theme, not one: chrome paper
      (`--card`), the muted fill it is drawn on inside a footer or a field, and
-     the sand canvas itself. The prototype's `#6b7280` was picked against paper
-     alone and reads at 4.12:1 on muted and 3.52:1 on sand — both under AA, and
-     the reason the flip failed `test/unit/ui-theme-contrast.test.ts`. Sand is
-     the tightest of the three, so this is close to the lightest step that
-     clears it: 6.15:1 on paper, 5.43:1 on muted, 4.63:1 on sand. */
-  --muted-foreground: #57606d;
+     the canvas itself. The canvas is the tightest of the three: 6.92:1 on
+     paper, 6.12:1 on muted, 5.27:1 on the canvas. */
+  --muted-foreground: #575757;
   /* The highlighted row in a menu or combobox, and the hover fill on a control.
      A hover is a *pointer report*, not a selection, so it is the lightest step
      that still separates from the paper. */
-  --accent: #f0f0ef;
+  --accent: #f0f0f0;
   --accent-foreground: var(--foreground);
   --destructive: #b3261e;
   --success: #1c7c4a;
-  --border: #dedede;
+  --border: #d4d4d4;
   --input: var(--border);
   --ring: var(--primary);
   /* React Flow reads its own variables for the pane and the dot pattern and
-     never ours, so without these the canvas takes its shipped defaults — a
-     transparent pane and `#91919a` dots, a cool grey that reads as dirt on
-     sand. The dot is the sand a step down rather than a neutral. */
+     never ours, so without these the canvas takes its shipped defaults: a
+     transparent pane and `#91919a` dots, a blue-grey off the neutral scale.
+     The dot is the canvas a step down. */
   --xy-background-color: var(--background);
-  --xy-background-pattern-color: #cdbfa4;
-  --canvas-resource-ink-color: #0b0d11;
-  --canvas-resource-face-rest: #f4efe4;
-  --canvas-resource-face-active: #fffaf0;
-  --canvas-resource-title-color: #12161c;
+  --xy-background-pattern-color: #c0c0c0;
+  --canvas-resource-ink-color: #111111;
+  --canvas-resource-face-rest: #f2f2f2;
+  --canvas-resource-face-active: #ffffff;
+  --canvas-resource-title-color: #111111;
   --resource-hover-duration: 120ms;
   --resource-hover-easing: ease;
-  /* Text roles the Resource draws on its own cream faces. The Resource's paper is
-     warmer and lighter than the chrome's, so these stay separate from
-     `--foreground` and `--muted-foreground` rather than inheriting them;
-     `test/unit/canvas-resource-contrast.test.ts` holds them to AA on both faces. */
-  --canvas-resource-muted-color: #4a505c;
+  /* Text roles the Resource draws on its own faces. The Resource's paper is not
+     the chrome's, so these stay separate from `--foreground` and
+     `--muted-foreground` rather than inheriting them;
+     `test/unit/canvas-resource-contrast.test.ts` holds them to AA on both
+     faces, and to 7:1 on the face the presenting Stage draws. */
+  --canvas-resource-muted-color: #4d4d4d;
   --canvas-resource-error-color: #b3261e;
   /* The Resource's own structural scale: border weight, corner and shadow
      character, kept apart from the chrome's for the same reason the two text
@@ -211,6 +210,32 @@
   --shadow-chrome-lifted-offset: calc(var(--shadow-chrome-elevated-offset) + 4px);
   --shadow-chrome-lifted: var(--shadow-chrome-lifted-offset) var(--shadow-chrome-lifted-offset) 0
     var(--foreground);
+  /* The Signal palette's light steps, one per Tableau slot a Graph stores.
+     Each signal (a palette's even slot) reaches 3:1 on the canvas and both
+     Resource faces, and the first five Graphs Add Graph hands an empty Map
+     stay apart for a reader with protanopia or deuteranopia. The washes (odd
+     slots) are an author's lighter choice and reach no ratio.
+     `test/unit/ui-theme-contrast.test.ts` holds both claims. */
+  --graph-paint-1f77b4: #146bf5;
+  --graph-paint-aec7e8: #6ea4fe;
+  --graph-paint-17becf: #0089a2;
+  --graph-paint-9edae5: #03b7d8;
+  --graph-paint-2ca02c: #044500;
+  --graph-paint-98df8a: #69bc61;
+  --graph-paint-bcbd22: #3c6f00;
+  --graph-paint-dbdb8d: #7db850;
+  --graph-paint-ff7f0e: #a27500;
+  --graph-paint-ffbb78: #d39903;
+  --graph-paint-d62728: #d3014c;
+  --graph-paint-ff9896: #f3798a;
+  --graph-paint-e377c2: #960082;
+  --graph-paint-f7b6d2: #de7dc8;
+  --graph-paint-9467bd: #9e47f1;
+  --graph-paint-c5b0d5: #b88bf1;
+  --graph-paint-8c564b: #cb5a3c;
+  --graph-paint-c49c94: #f37e60;
+  --graph-paint-7f7f7f: #07668f;
+  --graph-paint-c7c7c7: #17b1f5;
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);

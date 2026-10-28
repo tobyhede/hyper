@@ -3,6 +3,7 @@ import type { ReactElement } from 'react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Application } from '../src/components/Application';
 import { MemorySpaceBackendTestControl } from '@project/persistence';
+import { graphPaint } from '@project/ui';
 import { storyOpening, storySpaces } from '../stories/support/application';
 import type { OpenSpace } from '../src/open-spaces';
 import {
@@ -784,8 +785,8 @@ describe('the Graph list marks each row with its legend mark', () => {
   it('keeps the coloured Graph glyph on the identity and on Colour…', async () => {
     await renderDock(<Default />);
     const identityGlyph = graphIdentity().querySelector('svg');
-    const activeColor = identityGlyph?.getAttribute('stroke');
-    expect(activeColor).toMatch(/^#/);
+    const activePaint = identityGlyph?.style.stroke;
+    expect(activePaint).toMatch(/^var\(--graph-paint-[0-9a-f]{6}, #[0-9a-f]{6}\)$/u);
 
     fireEvent.click(graphIdentity());
     const menu = screen.getByRole('menu');
@@ -793,10 +794,12 @@ describe('the Graph list marks each row with its legend mark', () => {
       .getAllByRole('menuitemradio')
       .find((row) => row.getAttribute('aria-checked') === 'true');
     expect(
-      chosen?.querySelector('[data-slot="graph-legend-mark-line"]')?.getAttribute('stroke'),
-    ).toBe(activeColor);
+      graphPaint(
+        chosen?.querySelector('[data-slot="graph-legend-mark-line"]')?.getAttribute('stroke') ?? '',
+      ),
+    ).toBe(activePaint);
     const colour = within(menu).getByRole('menuitem', { name: 'Colour…' });
-    expect(colour.querySelector('svg')).toHaveAttribute('stroke', activeColor ?? '');
+    expect(colour.querySelector('svg')?.style.stroke).toBe(activePaint);
   });
 
   it('leaves the Map list unmarked', async () => {
