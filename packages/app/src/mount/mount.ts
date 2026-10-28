@@ -50,7 +50,7 @@ export interface MountedAggregate {
 }
 
 /**
- * Why the files did not mount, in the two outcomes `pnpm hyper run` reports,
+ * Why the files did not mount, in the two outcomes `pnpm cube run` reports,
  * worded by `describeAggregateReadRefusal` as the CLI words them.
  */
 export type MountRefusal = AggregateReadRefusal;

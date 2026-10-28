@@ -235,7 +235,7 @@ Tracking both paths is deliberate. An ordinary `git worktree add` populates only
 There are four, and only one is vendored:
 
 - **`shadcn`** is vendored from `shadcn/ui` and pinned by `skills-lock.json`, which records its upstream path and the content hash of the files as they stand here. It is **patched locally**, so the hash is not upstream's.
-- **`shadcn-first-ui`**, **`hyper-authoring`** and **`hyper-getting-started`** are owned here. They are reviewed like any other repository document, and the lock does not pin them.
+- **`shadcn-first-ui`**, **`infinity-cube-authoring`** and **`infinity-cube-getting-started`** are owned here. They are reviewed like any other repository document, and the lock does not pin them.
 
 ### The `shadcn` patch
 

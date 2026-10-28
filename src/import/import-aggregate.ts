@@ -85,7 +85,7 @@ const initialize = async (
  * The operator passed `--dangerous-replace`; the repository held nothing when
  * replacement found it empty and holds a Meta Space by the time this writes,
  * because something else established one in between — `pnpm dev`'s startup, or a
- * concurrent `hyper`. Answering `already-initialized` would tell them to re-run
+ * concurrent `cube`. Answering `already-initialized` would tell them to re-run
  * with the flag they just passed. It is the conflict outcome, whose sentence
  * already gives the true advice: nothing was written, run the command again.
  */

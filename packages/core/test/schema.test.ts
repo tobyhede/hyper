@@ -140,7 +140,7 @@ describe('space file schema', () => {
   });
 
   it('rejects version 2, which put the graphs beside the maps instead of in them', () => {
-    // The disposable pre-release shape. Hyper is unreleased, so it has no
+    // The disposable pre-release shape. InfinityCube is unreleased, so it has no
     // compatibility claim on the first-public one and is rejected, not migrated
     // (ADR 0040). `loadSpace` says so in one error; here it is the literal.
     const result = spaceFileSchema.safeParse({

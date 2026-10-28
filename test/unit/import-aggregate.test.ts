@@ -125,7 +125,7 @@ const countingIds = (): (() => UUID) => {
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-import-aggregate-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-import-aggregate-'));
   temporaryDirectories.push(directory);
   return directory;
 };
@@ -179,7 +179,7 @@ describe('importAggregate', () => {
 
   it('refuses a version 2 space directory rather than migrating it', async () => {
     // The disposable pre-release shape: graphs beside the maps instead of
-    // inside them. Hyper is unreleased, so it has no compatibility claim on the
+    // inside them. InfinityCube is unreleased, so it has no compatibility claim on the
     // first-public document and never enters (ADR 0040).
     //
     // Import parses against `importSpaceFileSchema`, which runs ahead of domain
@@ -336,7 +336,7 @@ describe('importAggregate', () => {
 
   /*
    * The gap between the `loadMetaSpaceId` that found nothing and the write that
-   * follows it is real: `pnpm dev`'s startup, or a second `hyper`, can establish
+   * follows it is real: `pnpm dev`'s startup, or a second `cube`, can establish
    * the Meta Space in between. The operator authorized destroying what they
    * read, not what arrived afterwards, so it is reported as the conflict it is,
    * and the advice becomes "run it again".

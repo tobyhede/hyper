@@ -5,7 +5,7 @@ import { GitHubLocationForm } from '../src/components/GitHubLocationForm';
 /** The form with every navigation it asks for recorded. */
 function ask(
   failure?: Parameters<typeof GitHubLocationForm>[0]['failure'],
-  href = 'https://hyper.test/',
+  href = 'https://infinity-cube.test/',
 ) {
   const navigated: string[] = [];
   render(
@@ -34,7 +34,10 @@ describe('asking for a GitHub location', () => {
   });
 
   it('opens the location with the page’s other query parameters', () => {
-    const { navigated, submit } = ask(undefined, 'https://hyper.test/?utm=feed&source=bad#x');
+    const { navigated, submit } = ask(
+      undefined,
+      'https://infinity-cube.test/?utm=feed&source=bad#x',
+    );
 
     submit('github:tobyhede/talk');
 

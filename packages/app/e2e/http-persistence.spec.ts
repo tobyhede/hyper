@@ -169,7 +169,7 @@ test(
         status: 403,
         contentType: 'application/problem+json',
         body: JSON.stringify({
-          type: 'https://hyper.dev/problems/forbidden',
+          type: 'urn:infinity-cube:problem:forbidden',
           title: 'Forbidden',
           status: 403,
           detail: 'Permission denied',

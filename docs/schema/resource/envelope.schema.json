@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/envelope.schema.json",
+  "$id": "https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/resource/envelope.schema.json",
   "title": "Resource envelope",
   "description": "The core's half of a Resource file (ADR 0128): id, Title, the id of a kind, and content the core does not read. It names no kind; resource.schema.json composes it with the kinds a build registers.",
   "type": "object",

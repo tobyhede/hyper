@@ -25,7 +25,11 @@ import {
   problemCatalogue,
   problemCodeForType,
 } from '../src/http-protocol';
-import type { CommitRefusalBody, HyperProblemCode, HyperProblemType } from '../src/http-protocol';
+import type {
+  CommitRefusalBody,
+  InfinityCubeProblemCode,
+  InfinityCubeProblemType,
+} from '../src/http-protocol';
 import { REVISION_CEILING } from '../src/revision-codec';
 
 const SPACE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
@@ -454,8 +458,10 @@ describe('Problem Details', () => {
       fc.property(
         // SAFETY: `Object.keys` widens problemCatalogue's own keys to
         // `string[]`, but every key iterated here comes from problemCatalogue
-        // itself, so each one is a HyperProblemCode literal.
-        fc.constantFrom<HyperProblemCode>(...(Object.keys(problemCatalogue) as HyperProblemCode[])),
+        // itself, so each one is a InfinityCubeProblemCode literal.
+        fc.constantFrom<InfinityCubeProblemCode>(
+          ...(Object.keys(problemCatalogue) as InfinityCubeProblemCode[]),
+        ),
         fc.string({ minLength: 1 }),
         (code, detail) => {
           const encoded = encodeProblemDetails(code, detail, [
@@ -558,9 +564,9 @@ describe('Problem Details', () => {
   it('rejects an unrecognized problem type at the codeForType boundary', () => {
     // SAFETY: deliberately invalid input for problemCodeForType's own runtime
     // check to reject.
-    expect(() => problemCodeForType('https://hyper.dev/problems/nope' as HyperProblemType)).toThrow(
-      'problem details has an unknown type',
-    );
+    expect(() =>
+      problemCodeForType('urn:infinity-cube:problem:nope' as InfinityCubeProblemType),
+    ).toThrow('problem details has an unknown type');
   });
 
   it('falls back to "snapshot" when a schema failure has no field path', () => {

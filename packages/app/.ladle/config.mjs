@@ -1,5 +1,5 @@
 /**
- * Ladle is Hyper's static production-component catalogue. Stable stories are
+ * Ladle is InfinityCube's static production-component catalogue. Stable stories are
  * production-parity evidence under ADR 0052; the parity inventory and runtime
  * enforcement are delivered by design-system baseline Issue 08.
  */

@@ -145,7 +145,7 @@ describe('the browser presentation channel', () => {
 
   it('keeps a server session on the name it has always had', () => {
     expect(presentationChannelName(uuid(2))).toBe(
-      'hyper-presentation:00000000-0000-4000-8000-000000000002',
+      'infinity-cube-presentation:00000000-0000-4000-8000-000000000002',
     );
   });
 

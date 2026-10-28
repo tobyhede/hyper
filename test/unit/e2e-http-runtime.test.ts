@@ -26,7 +26,7 @@ const HARBOUR = readFileSync(
 const HARBOUR_URL = '/images/fZoCiTSlSs9w9S87nrFeaOkPdKB4wvFrbWfaMn23ZOs';
 const startRuntime = async (options: E2eHttpRuntimeOptions) => {
   const app = await createApp(options);
-  return new HttpSpaceBackend('http://hyper.test', {
+  return new HttpSpaceBackend('http://infinity-cube.test', {
     fetch: (input, init) => Promise.resolve(app.fetch(new Request(input, init))),
   });
 };
@@ -81,7 +81,7 @@ describe('e2e HTTP runtime', () => {
   it('serves the tracked fixture images before any request stores one', async () => {
     const app = await createApp({ catalog: 'fixture', startup: true });
 
-    const response = await app.fetch(new Request(`http://hyper.test${HARBOUR_URL}`));
+    const response = await app.fetch(new Request(`http://infinity-cube.test${HARBOUR_URL}`));
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('image/png');

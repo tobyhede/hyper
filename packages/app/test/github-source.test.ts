@@ -648,7 +648,7 @@ describe('readGitHubAggregate', () => {
     );
   });
 
-  it('refuses a symbolic link at a path Hyper owns, and never fetches it', async () => {
+  it('refuses a symbolic link at a path InfinityCube owns, and never fetches it', async () => {
     const linkPath =
       '00000000-0000-4000-8000-000000000060/resources/00000000-0000-4000-8000-0000000000aa.json';
     const files = new Map([...fixtureFiles, [linkPath, text('../../../etc/passwd')]]);
@@ -657,12 +657,12 @@ describe('readGitHubAggregate', () => {
     const result = await readGitHubAggregate(`github:${OWNER}/${REPO}`, github.fetch);
 
     expect((await refusalOf(result)).diagnostics).toEqual([
-      `${PINNED}/${linkPath}: is a symbolic link, which Hyper neither reads nor writes through`,
+      `${PINNED}/${linkPath}: is a symbolic link, which InfinityCube neither reads nor writes through`,
     ]);
     expect(github.rawRequests()).not.toContain(linkPath);
   });
 
-  it('leaves a symbolic link Hyper does not own unread, and mounts', async () => {
+  it('leaves a symbolic link InfinityCube does not own unread, and mounts', async () => {
     const linkPath = 'notes/shared.md';
     const files = new Map([...fixtureFiles, [linkPath, text('../../../etc/passwd')]]);
     const github = fakeGitHub({ files, symlinks: new Set([linkPath]) });

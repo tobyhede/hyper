@@ -2,8 +2,8 @@ import type { SqliteDatabase } from '../../src/sqlite/db';
 import { clearSqlContent } from './clear-sql-content';
 
 /**
- * Delete every Hyper row from a SQLite database file, mirroring
- * `clear-hyper-content.ts` for PostgreSQL. SQLite has no schema namespace, so
+ * Delete every InfinityCube row from a SQLite database file, mirroring
+ * `clear-infinity-cube-content.ts` for PostgreSQL. SQLite has no schema namespace, so
  * this reads `orm.Space`/`orm.Resource`/`orm.RepositoryState` directly rather
  * than through a `.public` prefix.
  */

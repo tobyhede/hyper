@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { runCommand, type CommandResult } from '../support/hyper-command';
+import { runCommand, type CommandResult } from '../support/infinity-cube-command';
 
 /**
  * F2 (ledger): a command that spawns a grandchild inheriting stdout/stderr
@@ -90,7 +90,7 @@ describe('runCommand', () => {
   };
 
   it('rejects with a timeout error and leaves no grandchild running', async () => {
-    workdir = await mkdtemp(join(tmpdir(), 'hyper-command-'));
+    workdir = await mkdtemp(join(tmpdir(), 'infinity-cube-command-'));
     const pidFile = join(workdir, 'grandchild.pid');
     const script = `sleep ${GRANDCHILD_SLEEP_SECONDS} & echo $! > '${pidFile}'; wait`;
 

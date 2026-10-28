@@ -590,12 +590,12 @@ const mountedOptions = { isNavigationHeld: nothingHeld, carriesSource: true };
  */
 describe('the mounted source in the address', () => {
   it('reads a literal + in the source as itself, as a hand-typed ref spells it', () => {
-    expect(sourceParameter('https://hyper.test/?source=github:o/r@v1.0+build')).toBe(
+    expect(sourceParameter('https://infinity-cube.test/?source=github:o/r@v1.0+build')).toBe(
       'github:o/r@v1.0+build',
     );
     expect(
       sourceParameter(
-        `https://hyper.test/${carriedAddress('', 'https://hyper.test/', { set: 'github:o/r@v1.0+build' })}`,
+        `https://infinity-cube.test/${carriedAddress('', 'https://infinity-cube.test/', { set: 'github:o/r@v1.0+build' })}`,
       ),
     ).toBe('github:o/r@v1.0+build');
   });
@@ -861,7 +861,7 @@ describe('pinning the mounted source', () => {
 });
 
 describe('carrying the query to another path', () => {
-  const href = 'https://hyper.test/from?a=1&&source=x&b&source=y#notes';
+  const href = 'https://infinity-cube.test/from?a=1&&source=x&b&source=y#notes';
 
   it('keeps every pair as written, empty and duplicate ones included', () => {
     expect(carriedAddress('/to', href, 'keep')).toBe('/to?a=1&&source=x&b&source=y');
@@ -869,7 +869,7 @@ describe('carrying the query to another path', () => {
 
   it('drops every source pair, a bare one included', () => {
     expect(carriedAddress('/to', href, 'drop')).toBe('/to?a=1&&b');
-    expect(carriedAddress('/to', 'https://hyper.test/?source', 'drop')).toBe('/to');
+    expect(carriedAddress('/to', 'https://infinity-cube.test/?source', 'drop')).toBe('/to');
   });
 
   it('sets the source in the first one’s place, dropping the rest', () => {
@@ -877,12 +877,12 @@ describe('carrying the query to another path', () => {
   });
 
   it('appends a source the query does not have', () => {
-    expect(carriedAddress('/to', 'https://hyper.test/?a=1', { set: 'github:o/r' })).toBe(
+    expect(carriedAddress('/to', 'https://infinity-cube.test/?a=1', { set: 'github:o/r' })).toBe(
       '/to?a=1&source=github:o/r',
     );
   });
 
   it('writes the path alone when no pair is left, never a bare ?', () => {
-    expect(carriedAddress('/to', 'https://hyper.test/?#x', 'keep')).toBe('/to');
+    expect(carriedAddress('/to', 'https://infinity-cube.test/?#x', 'keep')).toBe('/to');
   });
 });

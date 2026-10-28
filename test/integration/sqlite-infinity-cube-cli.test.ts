@@ -4,13 +4,13 @@ import { join } from 'node:path';
 import { AGGREGATE_FILE_VERSION, uuidSchema, type SpaceSnapshot, type UUID } from '@project/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { writeSpaceDirectory as writeLoadedSpaceDirectory } from '../../src/aggregate-directory';
-import { runHyper } from '../../src/cli/run';
+import { runInfinityCube } from '../../src/cli/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { createSqliteDatabase } from '../../src/sqlite/db';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
-import { runHyperScript } from '../support/hyper-command';
+import { runInfinityCubeScript } from '../support/infinity-cube-command';
 import { migrateSqliteFile } from '../support/sqlite-harness';
 import { admitted, pngBytes, showing } from '../support/stored-images';
 
@@ -72,7 +72,7 @@ const otherMeta: SpaceSnapshot = {
   resources: [],
 };
 
-describe('hyper CLI --store sqlite', () => {
+describe('infinity-cube CLI --store sqlite', () => {
   const temporaryDirectories = new Set<string>();
 
   afterEach(async () => {
@@ -90,7 +90,7 @@ describe('hyper CLI --store sqlite', () => {
 
   /** A migrated file this test process owns alone. */
   const migratedFile = async (): Promise<string> => {
-    const path = join(await temporaryDirectory('hyper-sqlite-cli-db-'), 'hyper.db');
+    const path = join(await temporaryDirectory('infinity-cube-sqlite-cli-db-'), 'infinity-cube.db');
     migrateSqliteFile(path);
     return path;
   };
@@ -99,7 +99,7 @@ describe('hyper CLI --store sqlite', () => {
     metaSpaceId: UUID,
     snapshots: readonly SpaceSnapshot[],
   ): Promise<string> => {
-    const directory = await temporaryDirectory('hyper-sqlite-cli-aggregate-');
+    const directory = await temporaryDirectory('infinity-cube-sqlite-cli-aggregate-');
     await writeFile(
       join(directory, AGGREGATE_FILE_NAME),
       `${JSON.stringify({ version: AGGREGATE_FILE_VERSION, metaSpaceId }, null, 2)}\n`,
@@ -129,14 +129,14 @@ describe('hyper CLI --store sqlite', () => {
     }
   };
 
-  const hyper = (path: string, args: readonly string[]) =>
-    runHyperScript([...args, '--store', 'sqlite'], { SQLITE_PATH: path });
+  const cube = (path: string, args: readonly string[]) =>
+    runInfinityCubeScript([...args, '--store', 'sqlite'], { SQLITE_PATH: path });
 
   it('initializes an empty file, reports an identical re-import as unchanged, and refuses a different one', async () => {
     const path = await migratedFile();
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
 
-    await expect(hyper(path, ['import', linked])).resolves.toEqual({
+    await expect(cube(path, ['import', linked])).resolves.toEqual({
       status: 0,
       stdout:
         'Imported the aggregate\n' +
@@ -144,7 +144,7 @@ describe('hyper CLI --store sqlite', () => {
         `Imported space ${TARGET_SPACE_ID} at revision 0\n`,
       stderr: '',
     });
-    await expect(hyper(path, ['import', linked])).resolves.toEqual({
+    await expect(cube(path, ['import', linked])).resolves.toEqual({
       status: 0,
       stdout:
         'The repository already holds this aggregate\n' +
@@ -154,7 +154,7 @@ describe('hyper CLI --store sqlite', () => {
     });
 
     const different = await aggregateDirectory(OTHER_META_SPACE_ID, [otherMeta]);
-    await expect(hyper(path, ['import', different])).resolves.toEqual({
+    await expect(cube(path, ['import', different])).resolves.toEqual({
       status: 1,
       stdout: '',
       stderr: `The repository is already initialized as Meta Space ${META_SPACE_ID}. Re-run with --dangerous-replace to replace it.\n`,
@@ -177,10 +177,10 @@ describe('hyper CLI --store sqlite', () => {
   it('replaces the stored aggregate only with --dangerous-replace', async () => {
     const path = await migratedFile();
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
-    expect((await hyper(path, ['import', linked])).status).toBe(0);
+    expect((await cube(path, ['import', linked])).status).toBe(0);
     const different = await aggregateDirectory(OTHER_META_SPACE_ID, [otherMeta]);
 
-    await expect(hyper(path, ['import', different, '--dangerous-replace'])).resolves.toEqual({
+    await expect(cube(path, ['import', different, '--dangerous-replace'])).resolves.toEqual({
       status: 0,
       stdout: `Imported the aggregate\nImported space ${OTHER_META_SPACE_ID} at revision 0\n`,
       stderr: '',
@@ -206,7 +206,7 @@ describe('hyper CLI --store sqlite', () => {
   it('answers a replacement authorized against a superseded Meta identity as a conflict', async () => {
     const path = await migratedFile();
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
-    expect((await hyper(path, ['import', linked])).status).toBe(0);
+    expect((await cube(path, ['import', linked])).status).toBe(0);
     const proposal = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
     const output: string[] = [];
 
@@ -236,9 +236,9 @@ describe('hyper CLI --store sqlite', () => {
       const postgres: DatabaseTarget = {
         open: () => Promise.reject(new Error('--store sqlite opened PostgreSQL')),
       };
-      return runHyper(['import', proposal, '--dangerous-replace', '--store', 'sqlite'], {
+      return runInfinityCube(['import', proposal, '--dangerous-replace', '--store', 'sqlite'], {
         targets: { sqlite, postgres },
-        workingDirectory: '/sqlite-hyper-cli/unreached',
+        workingDirectory: '/sqlite-infinity-cube-cli/unreached',
         launchRun: () => Promise.reject(new Error('A run was launched')),
         io: {
           stdout: (message) => output.push(message),
@@ -286,11 +286,11 @@ describe('hyper CLI --store sqlite', () => {
     }
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
 
-    const refused = await hyper(path, ['import', linked]);
+    const refused = await cube(path, ['import', linked]);
     expect(refused.status).toBe(1);
     expect(refused.stdout).toBe('');
 
-    await expect(hyper(path, ['import', linked, '--dangerous-replace'])).resolves.toEqual({
+    await expect(cube(path, ['import', linked, '--dangerous-replace'])).resolves.toEqual({
       status: 0,
       stdout:
         'Imported the aggregate\n' +
@@ -315,10 +315,13 @@ describe('hyper CLI --store sqlite', () => {
   it('exports the canonical directory, records the projected revisions, and survives reopen', async () => {
     const path = await migratedFile();
     const linked = await aggregateDirectory(META_SPACE_ID, [targetSpace, metaSpace]);
-    expect((await hyper(path, ['import', linked])).status).toBe(0);
-    const destination = join(await temporaryDirectory('hyper-sqlite-cli-export-'), 'exported');
+    expect((await cube(path, ['import', linked])).status).toBe(0);
+    const destination = join(
+      await temporaryDirectory('infinity-cube-sqlite-cli-export-'),
+      'exported',
+    );
 
-    await expect(hyper(path, ['export', destination])).resolves.toEqual({
+    await expect(cube(path, ['export', destination])).resolves.toEqual({
       status: 0,
       stdout:
         `Exported the aggregate rooted at ${META_SPACE_ID} to ${destination}\n` +
@@ -356,7 +359,7 @@ describe('hyper CLI --store sqlite', () => {
     // The exported directory is an ordinary aggregate: a second, empty file
     // imports it whole. That is the only bridge between two databases.
     const second = await migratedFile();
-    expect((await hyper(second, ['import', destination])).status).toBe(0);
+    expect((await cube(second, ['import', destination])).status).toBe(0);
     await withRepository(second, async (repository) => {
       await expect(repository.loadAggregate()).resolves.toEqual({
         kind: 'loaded',
@@ -387,13 +390,16 @@ describe('hyper CLI --store sqlite', () => {
     await mkdir(join(source, 'images'));
     await writeFile(join(source, 'images', `${image.id}.png`), pngBytes(1));
 
-    expect((await hyper(path, ['import', source])).status).toBe(0);
+    expect((await cube(path, ['import', source])).status).toBe(0);
     await withRepository(path, async (repository) => {
       await expect(repository.loadImage(image.id)).resolves.toEqual(image);
     });
 
-    const destination = join(await temporaryDirectory('hyper-sqlite-cli-export-'), 'exported');
-    expect((await hyper(path, ['export', destination])).status).toBe(0);
+    const destination = join(
+      await temporaryDirectory('infinity-cube-sqlite-cli-export-'),
+      'exported',
+    );
+    expect((await cube(path, ['export', destination])).status).toBe(0);
     expect(new Uint8Array(await readFile(join(destination, 'images', `${image.id}.png`)))).toEqual(
       pngBytes(1),
     );
@@ -401,7 +407,7 @@ describe('hyper CLI --store sqlite', () => {
 
   it('refuses to run without SQLITE_PATH naming a file', async () => {
     await expect(
-      runHyperScript(['import', 'unread', '--store', 'sqlite'], { SQLITE_PATH: '' }),
+      runInfinityCubeScript(['import', 'unread', '--store', 'sqlite'], { SQLITE_PATH: '' }),
     ).resolves.toEqual({
       status: 1,
       stdout: '',
@@ -410,9 +416,12 @@ describe('hyper CLI --store sqlite', () => {
   });
 
   it('refuses a SQLITE_PATH naming no file and creates nothing there', async () => {
-    const path = join(await temporaryDirectory('hyper-sqlite-cli-typo-'), 'hyper.db');
+    const path = join(
+      await temporaryDirectory('infinity-cube-sqlite-cli-typo-'),
+      'infinity-cube.db',
+    );
 
-    await expect(hyper(path, ['import', 'unread'])).resolves.toEqual({
+    await expect(cube(path, ['import', 'unread'])).resolves.toEqual({
       status: 1,
       stdout: '',
       stderr: `Database open failed: SQLite database file does not exist: ${path}. Run pnpm db:migrate:sqlite first.\n`,

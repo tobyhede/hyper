@@ -125,7 +125,7 @@ import {
 /**
  * What the graph tells assistive technology it can do.
  *
- * React Flow's defaults describe its own local deletion. Hyper instead routes
+ * React Flow's defaults describe its own local deletion. InfinityCube instead routes
  * both Resources and Edges through the completed Space Edit lifecycle, so these
  * labels describe the application-owned commands rather than a local array
  * mutation.

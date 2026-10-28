@@ -551,7 +551,7 @@ describe('SqlSpaceRepository (SQLite) — commit and lifecycle edge cases', () =
    */
   const unconnectedPostgres = postgres<PostgresContract>({
     contractJson: postgresContractJson,
-    url: 'postgres://hyper:unused@127.0.0.1:1/hyper',
+    url: 'postgres://infinity_cube:unused@127.0.0.1:1/infinity_cube',
   });
   const postgresRecognition = postgresSqlStore(unconnectedPostgres).isUnavailable;
   afterAll(async () => {

@@ -13,7 +13,7 @@ export default { title: 'Components/GitHub Location Form' };
 export const Asking: Story = () => (
   <GitHubLocationForm
     navigate={() => undefined}
-    href={() => 'https://hyper.test/'}
+    href={() => 'https://infinity-cube.test/'}
     failure={null}
   />
 );

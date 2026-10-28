@@ -47,7 +47,7 @@ SelectTrigger.displayName = 'SelectTrigger';
  * (ADR 0047, ADR 0050) — and shadcn's own `base-nova` select does neither: it
  * picks `align`, `alignOffset`, `side`, `sideOffset` and `alignItemWithTrigger`
  * from `Positioner.Props` and defaults the last to `true`. This matches that,
- * narrowed to the props Hyper's selectors could use. Pinned in
+ * narrowed to the props InfinityCube's selectors could use. Pinned in
  * `test/Select.test.tsx`.
  */
 type SelectContentProps = ComponentPropsWithoutRef<typeof SelectPrimitive.Popup> &

@@ -22,7 +22,7 @@ export default defineConfig({
      * SQLite arm under `vitest.integration.config.ts` made the `postgres` job
      * depend on a SQLite migration it does not perform.
      */
-    env: { ...baseConfig.test?.env, HYPER_DATABASE_TARGET: 'sqlite' },
+    env: { ...baseConfig.test?.env, INFINITY_CUBE_DATABASE_TARGET: 'sqlite' },
     testTimeout: 30_000,
     fileParallelism: false,
   },

@@ -3,7 +3,7 @@ import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
 import { cn } from './lib/utils';
 
 /**
- * Hyper's styled Base UI Popover composition.
+ * InfinityCube's styled Base UI Popover composition.
  *
  * Positioning belongs to Base UI's Positioner, while popup semantics and the
  * portalled surface belong to Popup. Keeping that division here stops callers

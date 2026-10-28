@@ -4,7 +4,7 @@ import type { PopStateAnswer } from '../src/browser-location';
 import { ORIGIN, standInBrowser } from './browser-history';
 
 /** The state the adapter writes for the entry at `index`. */
-const stamp = (index: number) => ({ hyperHistoryIndex: index });
+const stamp = (index: number) => ({ infinityCubeHistoryIndex: index });
 
 /**
  * The native history adapter's index arithmetic, against the stand-in browser,
@@ -33,7 +33,7 @@ describe.each([
   it('continues from the index a reload restored', () => {
     const stand = standInBrowser({
       path: '/spaces/a',
-      state: { hyperHistoryIndex: 3 },
+      state: { infinityCubeHistoryIndex: 3 },
       navigation,
     });
     const history = createBrowserHistory(stand.browser);

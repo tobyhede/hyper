@@ -3,7 +3,7 @@ import { HttpSpaceBackend } from '@project/http';
 import {
   encodeProblemDetails,
   type CommitResult,
-  type HyperProblemCode,
+  type InfinityCubeProblemCode,
 } from '@project/persistence';
 import { RESOURCE_ID, SPACE_ID, oneResourceSnapshot as snapshot } from '../support/space-fixtures';
 
@@ -16,7 +16,7 @@ const commitUpdate = (backend: HttpSpaceBackend) =>
   });
 
 const problemResponse = (
-  problemCode: HyperProblemCode,
+  problemCode: InfinityCubeProblemCode,
   detail: string,
   headers?: HeadersInit,
 ): Response => {
@@ -53,7 +53,7 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
         },
       },
     ],
-  ] as const satisfies readonly (readonly [HyperProblemCode, CommitResult])[];
+  ] as const satisfies readonly (readonly [InfinityCubeProblemCode, CommitResult])[];
 
   for (const [problemCode, result] of permanent) {
     it(`maps ${problemCode} to permanent ${result.code}`, async () => {
@@ -294,7 +294,7 @@ describe('typed Hono HttpSpaceBackend failure classification', () => {
           new ReadableStream({
             start(controller) {
               // Prompt, delivered — and still never a complete body.
-              controller.enqueue(new TextEncoder().encode('{"type":"https://hyper.dev/problems/'));
+              controller.enqueue(new TextEncoder().encode('{"type":"urn:infinity-cube:problem:'));
               init?.signal?.addEventListener('abort', () => {
                 controller.error(new Error('aborted'));
               });

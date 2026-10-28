@@ -1,6 +1,6 @@
 import { afterAll } from 'vitest';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
-import { clearHyperContent } from '../support/clear-hyper-content';
+import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { fastPathRaces } from '../support/fast-path-races';
 import { postgresTestDatabase } from '../support/postgres-database';
 
@@ -10,15 +10,15 @@ import { postgresTestDatabase } from '../support/postgres-database';
  * race waits on the aggregate lock the first holds.
  */
 fastPathRaces('commit fast path races (PostgreSQL)', async () => {
-  await clearHyperContent();
+  await clearInfinityCubeContent();
   return {
     store: postgresSqlStore(postgresTestDatabase),
     runsCommitsConcurrently: true,
-    close: clearHyperContent,
+    close: clearInfinityCubeContent,
   };
 });
 
 afterAll(async () => {
-  await clearHyperContent();
+  await clearInfinityCubeContent();
   await postgresTestDatabase.close();
 });

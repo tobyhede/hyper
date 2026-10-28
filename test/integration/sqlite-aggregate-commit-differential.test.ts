@@ -12,7 +12,7 @@ import { assertDifferential } from '../support/aggregate-commit-differential';
  * the SQLite `SqlSpaceRepository` and how to clear it between runs.
  * `test/integration/aggregate-commit-differential.test.ts` is the PostgreSQL
  * half. This file is named `sqlite-*`, the convention
- * `sqlite-space-repository.test.ts` and `sqlite-hyper-cli.test.ts` already
+ * `sqlite-space-repository.test.ts` and `sqlite-infinity-cube-cli.test.ts` already
  * follow, so `vitest.sqlite.config.ts`'s `include` picks it up and
  * `pnpm test:integration:sqlite` — and so CI's `sqlite` job, which has no
  * `DATABASE_URL` and no PostgreSQL service — actually runs it;

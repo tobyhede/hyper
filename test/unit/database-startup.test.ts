@@ -447,7 +447,7 @@ describe('retryMetaSpaceEstablishment over a PostgreSQL server that refuses this
   it('gives up on a wrong password once a second attempt confirms it', async () => {
     const { repository, close } = await refusedBy(
       '28P01',
-      'password authentication failed for user "hyper"',
+      'password authentication failed for user "infinity_cube"',
     );
     const waits: number[] = [];
     const reported: unknown[] = [];

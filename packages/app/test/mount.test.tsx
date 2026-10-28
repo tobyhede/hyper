@@ -358,7 +358,7 @@ describe('mounting an aggregate in the page', () => {
     const container = await render(() => mountedStartup(files, { github }).resolve('/'));
 
     expect(container).toHaveTextContent(
-      `${PINNED}/${spaceFile}: is a symbolic link, which Hyper neither reads nor writes through`,
+      `${PINNED}/${spaceFile}: is a symbolic link, which InfinityCube neither reads nor writes through`,
     );
   });
 

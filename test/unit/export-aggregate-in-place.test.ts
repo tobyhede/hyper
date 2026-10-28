@@ -45,7 +45,7 @@ const holding = (space: LoadedSpace): MemorySpaceRepository =>
 const temporaryDirectories = new Set<string>();
 
 const makeTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-export-in-place-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-export-in-place-'));
   temporaryDirectories.add(directory);
   return directory;
 };
@@ -171,7 +171,7 @@ describe('Export writes in place', () => {
   });
 
   /*
-   * Hyper owns what Import reads and nothing else. A `.git` tree, a README
+   * InfinityCube owns what Import reads and nothing else. A `.git` tree, a README
    * beside `aggregate.json`, a notes directory and whatever an author keeps in
    * `images/` that Import does not scan are neither read, copied nor touched.
    */
@@ -258,7 +258,7 @@ describe('Export writes in place', () => {
     await writeFile(join(removed, 'space.json'), '{}\n');
     const outside = join(parent, 'outside');
     await mkdir(outside);
-    await writeFile(join(outside, 'kept.md'), "# Not Hyper's\n");
+    await writeFile(join(outside, 'kept.md'), "# Not InfinityCube's\n");
     await symlink(outside, join(removed, 'resources'));
     const tree = await directoryTree(destination);
 
@@ -266,7 +266,9 @@ describe('Export writes in place', () => {
       /symbolic link/,
     );
 
-    await expect(readFile(join(outside, 'kept.md'), 'utf8')).resolves.toBe("# Not Hyper's\n");
+    await expect(readFile(join(outside, 'kept.md'), 'utf8')).resolves.toBe(
+      "# Not InfinityCube's\n",
+    );
     expect(await directoryTree(destination)).toEqual(tree);
   });
 
@@ -276,14 +278,16 @@ describe('Export writes in place', () => {
     await exportTo(holding(storedSpace()), destination);
     const outside = join(parent, 'outside');
     await mkdir(outside);
-    await writeFile(join(outside, 'picture.png'), "not hyper's\n");
+    await writeFile(join(outside, 'picture.png'), "not infinity-cube's\n");
     await symlink(outside, join(destination, 'images'));
 
     await expect(exportAggregate(holding(storedSpace()), destination)).rejects.toThrow(
       /symbolic link/,
     );
 
-    await expect(readFile(join(outside, 'picture.png'), 'utf8')).resolves.toBe("not hyper's\n");
+    await expect(readFile(join(outside, 'picture.png'), 'utf8')).resolves.toBe(
+      "not infinity-cube's\n",
+    );
   });
 
   /*
@@ -296,7 +300,7 @@ describe('Export writes in place', () => {
     await exportTo(holding(storedSpace()), destination);
     const outside = join(parent, 'outside.txt');
     await writeFile(outside, 'outside\n');
-    await symlink(outside, join(destination, '.aggregate.json.hyper-write'));
+    await symlink(outside, join(destination, '.aggregate.json.infinity-cube-write'));
     await writeFile(join(destination, 'aggregate.json'), '{}\n');
 
     await exportTo(holding(storedSpace()), destination);

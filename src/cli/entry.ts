@@ -2,7 +2,7 @@ import { newUuid } from '@project/core';
 import type { DatabaseTarget } from '../database/database-target';
 import { cliArguments, invocationDirectory, processIo } from './process';
 import { launchRun } from './run-launcher';
-import { runHyper } from './run';
+import { runInfinityCube } from './run';
 
 /**
  * Each store's modules load only when its target opens, so a command that
@@ -16,7 +16,7 @@ const sqlite: DatabaseTarget = {
   open: async () => (await import('../sqlite/composition')).sqliteCliComposition().target.open(),
 };
 
-process.exitCode = await runHyper(cliArguments(), {
+process.exitCode = await runInfinityCube(cliArguments(), {
   io: processIo,
   newId: newUuid,
   workingDirectory: invocationDirectory(),

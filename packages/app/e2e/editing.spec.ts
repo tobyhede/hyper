@@ -3028,7 +3028,7 @@ test('only Active Graph Edges are focusable, and focus selects the one reached',
   // Every other Edge the Map draws is out of the tab order entirely.
   expect(await page.locator('.react-flow__edge:not([tabindex])').count()).toBeGreaterThan(0);
 
-  // React Flow does not select an Edge that receives focus; Hyper bridges that,
+  // React Flow does not select an Edge that receives focus; InfinityCube bridges that,
   // so the Delete key acts on the Edge a keyboard author reached.
   await focusable.first().focus();
   await expect(focusable.first()).toHaveClass(/selected/);
@@ -3037,7 +3037,7 @@ test('only Active Graph Edges are focusable, and focus selects the one reached',
 /**
  * React Flow's native Edge Escape clears the selection and calls `blur()`, which
  * can leave focus on `body` — not an authoring context, and not somewhere a
- * canvas command can be issued from. Hyper repairs that and only that: focus
+ * canvas command can be issued from. InfinityCube repairs that and only that: focus
  * already taken by another control is left alone.
  */
 test('Escape on a focused Edge leaves focus on the canvas rather than the document', async ({

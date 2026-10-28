@@ -79,7 +79,7 @@ export interface AggregateReadRefusal {
 
 /**
  * A refusal as the author of the directory `name` reads it, in the same words
- * wherever the directory was read from: `pnpm hyper run`, `pnpm hyper import`
+ * wherever the directory was read from: `pnpm cube run`, `pnpm cube import`
  * and a mount (ADR 0130). No trailing newline; a stream adds its own.
  */
 export const describeAggregateReadRefusal = (
