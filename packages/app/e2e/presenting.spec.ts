@@ -1,3 +1,4 @@
+import { encodeCompactUuid, uuidSchema } from '@project/core';
 // `test` comes from ./fixtures, not @playwright/test — it carries the auto-use
 // gate that fails a test if React Flow logged a warning while it ran.
 import { expect, test, type Locator, type Page } from './fixtures';
@@ -22,6 +23,25 @@ import {
   stageFrame,
   viewportTransform,
 } from './graph';
+
+/**
+ * The body's `scrollTop` after a run of animation frames, long enough for a
+ * smooth scroll that a key or wheel started to have moved it.
+ */
+async function scrollTopAfterFrames(body: Locator): Promise<number> {
+  return body.evaluate(
+    (element) =>
+      new Promise<number>((resolve) => {
+        let frames = 30;
+        const tick = () =>
+          --frames === 0 ? resolve(element.scrollTop) : requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
+      }),
+  );
+}
+
+/** The Deep dive Space, whose second Resource overflows the frame with no rule. */
+const DEEP_DIVE_ID = uuidSchema.parse('00000000-0000-4000-8000-000000000070');
 
 // Presenting draws the Active Resource on its own Stage over an inert canvas
 // (ADR 0123): one 16:9 frame, the largest that fits above the presenting
@@ -290,17 +310,19 @@ test('a Space Resource shows its name only', async ({ page }) => {
 });
 
 /**
- * Overflowing content scrolls inside the frame rather than growing it, and the
- * arrow keys stay traversal while the scroll region has focus.
+ * Overflowing content broken by a horizontal rule scrolls inside the frame
+ * rather than growing it, and the arrow keys stay traversal while the scroll
+ * region has focus.
  */
 test(
   'overflowing content scrolls inside the frame, and the arrow keys still traverse',
   { tag: '@parity:stage-scrolls-overflow-and-arrows-still-traverse' },
   async ({ page }) => {
     await present(page);
-    // D is deliberately long. Long is A → B → C → D.
+    // D is deliberately long, and a rule breaks it. Long is A → B → C → D.
     for (const _ of [0, 1, 2]) await page.keyboard.press('ArrowRight');
     await expect(presentedName(page)).toHaveText('D');
+    await expect(presentedResource(page).locator('hr')).toHaveCount(1);
 
     const body = stageBody(page);
     const scrollTop = () => body.evaluate((element) => element.scrollTop);
@@ -337,6 +359,42 @@ test(
     await expect.poll(scrollTop).toBe(0);
     await page.keyboard.press('ArrowLeft');
     await expect(presentedName(page)).toHaveText('D');
+  },
+);
+
+/**
+ * A slide scrolls only when a horizontal rule marks further content: one with
+ * none is clipped to the frame, however long.
+ */
+test(
+  'overflowing content with no rule is clipped to the frame and never scrolls',
+  { tag: '@parity:stage-clips-content-with-no-rule' },
+  async ({ page }) => {
+    await page.goto(`/spaces/${encodeCompactUuid(DEEP_DIVE_ID)}`);
+    await expect(page.locator('.react-flow__node').first()).toBeVisible();
+    await settled(page);
+    await presentControl(page).click();
+    await expect(presentedName(page)).toHaveText('Why placement is authored');
+    await page.keyboard.press('ArrowRight');
+    await expect(presentedName(page)).toHaveText('Opening in place');
+    // The claim rests on this Resource having no rule; say so rather than assume it.
+    await expect(presentedResource(page).locator('hr')).toHaveCount(0);
+
+    const body = stageBody(page);
+    expect(
+      await body.evaluate((element) => element.scrollHeight > element.clientHeight),
+      'Opening in place overflows the frame',
+    ).toBe(true);
+    await expect(body).toHaveCSS('overflow-y', 'hidden');
+
+    const frame = await boxOf(stageFrame(page), 'the Stage frame');
+    await page.mouse.move(frame.x + frame.width / 2, frame.y + frame.height / 2);
+    await page.mouse.wheel(0, 200);
+    await body.focus();
+    await page.keyboard.press('PageDown');
+    // Page Down scrolls smoothly, so read the position only once a scroll it
+    // started would have had time to move.
+    expect(await scrollTopAfterFrames(body)).toBe(0);
   },
 );
 

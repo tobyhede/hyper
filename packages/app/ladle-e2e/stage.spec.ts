@@ -7,7 +7,7 @@ import { boxOf } from '../e2e/graph';
  * Navigation (ADR 0052, ADR 0123).
  *
  * These prove the Stage's own contract: the frame's geometry, how content that
- * does not fit is fitted or scrolled, and that the production Traversal keys
+ * does not fit is fitted, scrolled or clipped, and that the production Traversal keys
  * still reach the traversal from inside the frame. The canvas behind the Stage
  * is the application suite's to prove.
  */
@@ -19,6 +19,21 @@ const frame = (page: Page) => page.getByTestId('stage-frame');
 const body = (page: Page) => stage(page).getByRole('region', { name: 'Presented Resource' });
 const presentedName = (page: Page) =>
   frame(page).getByTestId('resource-content').locator('.resource__title');
+
+/**
+ * The body's `scrollTop` after a run of animation frames, long enough for a
+ * smooth scroll that a key or wheel started to have moved it.
+ */
+const scrollTopAfterFrames = (page: Page) =>
+  body(page).evaluate(
+    (element) =>
+      new Promise<number>((resolve) => {
+        let frames = 30;
+        const tick = () =>
+          --frames === 0 ? resolve(element.scrollTop) : requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
+      }),
+  );
 
 /** A picture many times the size of any frame the Stage draws. */
 const OVERSIZED = { width: 4000, height: 3000 } as const;
@@ -79,6 +94,31 @@ test(
     await page.keyboard.press('ArrowRight');
     await expect(presentedName(page)).toHaveText('Picture');
     await expect.poll(scrollTop).toBe(0);
+  },
+);
+
+test(
+  'content longer than the frame with no rule is clipped and never scrolls',
+  { tag: '@parity:stage-clips-content-with-no-rule' },
+  async ({ page }) => {
+    await page.goto(story('unbroken'));
+    await expect(presentedName(page)).toHaveText('Unbroken');
+    expect(
+      await body(page).evaluate((element) => element.scrollHeight > element.clientHeight),
+      'Unbroken overflows the frame',
+    ).toBe(true);
+    await expect(body(page)).toHaveCSS('overflow-y', 'hidden');
+    const before = await boxOf(frame(page), 'the frame');
+
+    await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+    await page.mouse.wheel(0, 200);
+    await body(page).focus();
+    await page.keyboard.press('PageDown');
+    await expect(presentedName(page)).toHaveText('Unbroken');
+    // Page Down scrolls smoothly, so read the position only once a scroll it
+    // started would have had time to move.
+    expect(await scrollTopAfterFrames(page)).toBe(0);
+    expect(await boxOf(frame(page), 'the frame')).toEqual(before);
   },
 );
 
