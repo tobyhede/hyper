@@ -23,7 +23,7 @@ const MOUNT_ENTRY = '/src/mount-main.tsx';
  * builds share one `index.html` and its startup view.
  */
 const mountEntry = (): Plugin => ({
-  name: 'hyper-mount-entry',
+  name: 'infinity-cube-mount-entry',
   transformIndexHtml: {
     order: 'pre',
     handler: (html) => {
@@ -39,7 +39,7 @@ const mountEntry = (): Plugin => ({
 
 /** The Cloudflare `_headers` file, hashing the inline scripts of the page as built. */
 const cloudflareHeaders = (): Plugin => ({
-  name: 'hyper-mount-headers',
+  name: 'infinity-cube-mount-headers',
   apply: 'build',
   // After Vite's own HTML plugin, which writes `index.html` into the bundle.
   enforce: 'post',

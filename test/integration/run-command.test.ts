@@ -9,10 +9,10 @@ import { HttpSpaceBackend } from '@project/http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readSingleSpace } from '../../src/aggregate-directory';
 import { initAggregate } from '../../src/run/run';
-import { runCommand } from '../support/hyper-command';
+import { runCommand } from '../support/infinity-cube-command';
 
 /**
- * `pnpm hyper init` and `pnpm hyper run` as an author runs them: their own
+ * `pnpm cube init` and `pnpm cube run` as an author runs them: their own
  * process, a directory of their own, one edit over HTTP and a signal
  * (ADR 0117, ADR 0124). Nothing here needs a database.
  */
@@ -34,11 +34,11 @@ const freePort = (): Promise<number> =>
   });
 
 /**
- * The `hyper` script's command line, so the launcher can run without pnpm in
+ * The `cube` script's command line, so the launcher can run without pnpm in
  * front of it. The script must `exec` node, for the reason
  * `src/cli/run-launcher.ts` gives.
  */
-const hyperScript = async (): Promise<readonly string[]> => {
+const infinityCubeScript = async (): Promise<readonly string[]> => {
   const manifest: unknown = JSON.parse(
     await readFile(join(REPOSITORY_ROOT, 'package.json'), 'utf8'),
   );
@@ -48,13 +48,13 @@ const hyperScript = async (): Promise<readonly string[]> => {
     'scripts' in manifest &&
     typeof manifest.scripts === 'object' &&
     manifest.scripts !== null &&
-    'hyper' in manifest.scripts &&
-    typeof manifest.scripts.hyper === 'string'
-      ? manifest.scripts.hyper
+    'cube' in manifest.scripts &&
+    typeof manifest.scripts.cube === 'string'
+      ? manifest.scripts.cube
       : '';
   const [exec, command, ...args] = script.split(' ');
   if (exec !== 'exec' || command !== 'node') {
-    throw new Error(`Expected the hyper script to exec node: ${script}`);
+    throw new Error(`Expected the cube script to exec node: ${script}`);
   }
   return args;
 };
@@ -87,7 +87,7 @@ afterEach(async () => {
  * as an author does; `launcher` runs the launcher with nothing in front of it.
  */
 const startRunning = async (via: 'pnpm' | 'launcher') => {
-  const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
+  const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
   roots.push(root);
   const directory = join(root, 'talk');
   await initAggregate(directory, newUuid);
@@ -95,12 +95,12 @@ const startRunning = async (via: 'pnpm' | 'launcher') => {
   const runArguments = ['run', directory, '--no-open', '--port', String(port)];
   const child =
     via === 'pnpm'
-      ? spawn('pnpm', ['--silent', 'hyper', ...runArguments], {
+      ? spawn('pnpm', ['--silent', 'infinity-cube', ...runArguments], {
           cwd: REPOSITORY_ROOT,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
         })
-      : spawn(process.execPath, [...(await hyperScript()), ...runArguments], {
+      : spawn(process.execPath, [...(await infinityCubeScript()), ...runArguments], {
           cwd: REPOSITORY_ROOT,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -172,24 +172,24 @@ const startRunning = async (via: 'pnpm' | 'launcher') => {
   };
 };
 
-describe('pnpm hyper init', () => {
+describe('pnpm cube init', () => {
   it(
     'writes a new aggregate to a relative directory from where pnpm was invoked, and prints the run command',
     async () => {
       // The real path, which is the directory pnpm records as where it was invoked.
-      const root = await realpath(await mkdtemp(join(tmpdir(), 'hyper-init-')));
+      const root = await realpath(await mkdtemp(join(tmpdir(), 'infinity-cube-init-')));
       roots.push(root);
       const directory = join(root, 'talk');
 
       const result = await runCommand(
         'pnpm',
-        ['--silent', '--dir', REPOSITORY_ROOT, 'hyper', 'init', 'talk'],
+        ['--silent', '--dir', REPOSITORY_ROOT, 'infinity-cube', 'init', 'talk'],
         { cwd: root, timeoutMs: START_TIMEOUT_MS },
       );
 
       expect(result, result.stderr).toMatchObject({ status: 0, stderr: '' });
       expect(result.stdout).toBe(
-        `Created a new aggregate; run it with: pnpm hyper run ${directory}\n`,
+        `Created a new aggregate; run it with: pnpm cube run ${directory}\n`,
       );
       const { metaSpaceId } = aggregateFileSchema.parse(
         JSON.parse(await readFile(join(directory, 'aggregate.json'), 'utf8')),
@@ -202,17 +202,17 @@ describe('pnpm hyper init', () => {
   );
 });
 
-describe('pnpm hyper run', () => {
+describe('pnpm cube run', () => {
   it(
     'refuses a missing directory, naming init, and writes nothing',
     async () => {
-      const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
+      const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
       roots.push(root);
       const directory = join(root, 'rust-asycn');
 
       const result = await runCommand(
         'pnpm',
-        ['--silent', 'hyper', 'run', directory, '--no-open'],
+        ['--silent', 'infinity-cube', 'run', directory, '--no-open'],
         {
           cwd: REPOSITORY_ROOT,
           timeoutMs: START_TIMEOUT_MS,
@@ -220,7 +220,7 @@ describe('pnpm hyper run', () => {
       );
 
       expect(result.status, result.stderr).not.toBe(0);
-      expect(result.stderr).toContain(`pnpm hyper init ${directory}`);
+      expect(result.stderr).toContain(`pnpm cube init ${directory}`);
       expect(await exists(directory)).toBe(false);
     },
     START_TIMEOUT_MS,
@@ -229,7 +229,7 @@ describe('pnpm hyper run', () => {
   it(
     'refuses a port already in use with a sentence, exiting one',
     async () => {
-      const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
+      const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
       roots.push(root);
       const directory = join(root, 'talk');
       await initAggregate(directory, newUuid);
@@ -241,7 +241,14 @@ describe('pnpm hyper run', () => {
       try {
         const result = await runCommand(
           process.execPath,
-          [...(await hyperScript()), 'run', directory, '--no-open', '--port', String(address.port)],
+          [
+            ...(await infinityCubeScript()),
+            'run',
+            directory,
+            '--no-open',
+            '--port',
+            String(address.port),
+          ],
           { cwd: REPOSITORY_ROOT, timeoutMs: START_TIMEOUT_MS },
         );
 
@@ -268,7 +275,7 @@ describe('pnpm hyper run', () => {
   it(
     'stops, exiting zero and leaving the directory as it was, on SIGINT while it is still starting',
     async () => {
-      const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
+      const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
       roots.push(root);
       const directory = join(root, 'talk');
       await initAggregate(directory, newUuid);
@@ -276,7 +283,7 @@ describe('pnpm hyper run', () => {
       const launcher = spawn(
         process.execPath,
         [
-          ...(await hyperScript()),
+          ...(await infinityCubeScript()),
           'run',
           directory,
           '--no-open',

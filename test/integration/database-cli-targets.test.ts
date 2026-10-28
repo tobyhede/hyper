@@ -5,11 +5,11 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { newUuid, uuidSchema } from '@project/core';
 import type { DatabaseTarget, OpenedDatabaseTarget } from '../../src/database/database-target';
 import { AGGREGATE_FILE_NAME } from '@project/aggregate';
-import { runHyper } from '../../src/cli/run';
+import { runInfinityCube } from '../../src/cli/run';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
-import { clearHyperContent } from '../support/clear-hyper-content';
+import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { openSqliteRepository } from '../support/sqlite-harness';
 import { postgresTestDatabase } from '../support/postgres-database';
 import { markdownResourceFiles, writeAggregateInto } from '../support/aggregate-directory';
@@ -31,13 +31,13 @@ interface CliTargetCase {
  * unrecognised value throws here rather than leaving a file that silently
  * declares no test.
  */
-const configuredTarget = process.env['HYPER_DATABASE_TARGET'];
+const configuredTarget = process.env['INFINITY_CUBE_DATABASE_TARGET'];
 
 const targetCases = (all: readonly CliTargetCase[]): readonly CliTargetCase[] => {
   const selected = all.filter((candidate) => candidate.target === configuredTarget);
   if (selected.length === 0) {
     throw new Error(
-      `HYPER_DATABASE_TARGET names no database target: ${configuredTarget ?? '<unset>'}`,
+      `INFINITY_CUBE_DATABASE_TARGET names no database target: ${configuredTarget ?? '<unset>'}`,
     );
   }
   return selected;
@@ -48,10 +48,10 @@ const cases = targetCases([
     name: 'PostgreSQL',
     target: 'postgres',
     async arrange() {
-      await clearHyperContent();
+      await clearInfinityCubeContent();
       return {
         repository: new SqlSpaceRepository(postgresSqlStore(postgresTestDatabase)),
-        close: clearHyperContent,
+        close: clearInfinityCubeContent,
       };
     },
   },
@@ -88,7 +88,7 @@ afterEach(async () => {
 });
 
 const temporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-cli-target-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-cli-target-'));
   temporaryDirectories.push(directory);
   return directory;
 };
@@ -134,7 +134,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
     const destination = join(await temporaryDirectory(), 'exported');
     try {
       await expect(
-        runHyper(['import', source, '--store', targetCase.target], {
+        runInfinityCube(['import', source, '--store', targetCase.target], {
           io: { stdout, stderr },
           newId: newUuid,
           targets,
@@ -145,7 +145,7 @@ describe.each(cases)('database CLI target ($name)', (targetCase) => {
       expect(stdout).toHaveBeenCalledWith(`Imported space ${META_SPACE_ID} at revision 0\n`);
 
       await expect(
-        runHyper(['export', destination, '--store', targetCase.target], {
+        runInfinityCube(['export', destination, '--store', targetCase.target], {
           io: { stdout, stderr },
           newId: newUuid,
           targets,

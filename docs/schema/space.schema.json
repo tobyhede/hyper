@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/space.schema.json",
-  "title": "Hyper space file",
+  "$id": "https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/space.schema.json",
+  "title": "InfinityCube space file",
   "description": "space.json, in a Space directory named for the Space's Id. It holds structure and nothing else: Resources are their own files and Graphs belong to Maps (ADR 0020, ADR 0040). Every object is strict, so a misspelt key is refused rather than dropped. This is the file as intake reads it: the Space, Map and Graph ids that Export always writes may be omitted by a hand-written file, and intake mints the missing Map and Graph ids (ADR 0030).",
   "type": "object",
   "required": ["version", "title"],

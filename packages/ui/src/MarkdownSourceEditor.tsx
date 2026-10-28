@@ -119,7 +119,7 @@ const markdownSourceHighlighting = syntaxHighlighting(
 );
 
 /**
- * Keys the *surface* owns, withheld from CodeMirror so a Hyper-installed binding
+ * Keys the *surface* owns, withheld from CodeMirror so a InfinityCube-installed binding
  * cannot answer them first (ADR 0048, ADR 0063).
  *
  * `Escape` is the pane's dismissal; `defaultKeymap` would spend it on
@@ -185,10 +185,10 @@ const stableLineNumberLocator = ViewPlugin.define((view) => {
 });
 
 /**
- * Hyper's Markdown source field. CodeMirror owns text editing; its surrounding
+ * InfinityCube's Markdown source field. CodeMirror owns text editing; its surrounding
  * product surface owns drafts, focus order, dismissal and completion (ADR 0063).
  *
- * Existing Hyper component considered: `Textarea`, which has no language,
+ * Existing InfinityCube component considered: `Textarea`, which has no language,
  * gutter or editor-local history behavior. shadcn has no source-editor primitive,
  * so the canonical specialist library is wrapped here rather than exposed to
  * application callers. `PANE_OWNED_KEYS` below states which keys are withheld from

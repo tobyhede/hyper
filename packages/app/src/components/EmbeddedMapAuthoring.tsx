@@ -416,7 +416,8 @@ export function EmbeddedMapAuthoring({
     bottom,
   ]);
   useLayoutEffect(() => {
-    if (import.meta.env.MODE === 'benchmark') performance.mark('hyper:embedded-map-publication');
+    if (import.meta.env.MODE === 'benchmark')
+      performance.mark('infinity-cube:embedded-map-publication');
     publish(parentId, value);
   }, [parentId, value, publish]);
   return (

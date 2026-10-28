@@ -164,7 +164,7 @@ export interface SqlTables<Order> {
     readonly listIds: () => Promise<readonly string[]>;
     /**
      * Answers whether the row existed to delete — `commit`'s own `delete`
-     * change needs to know, and `#truncateHyperContent` (ADR 0094) calls this
+     * change needs to know, and `#truncateInfinityCubeContent` (ADR 0094) calls this
      * too, over stored state it has never validated. So this must never
      * decode `document`: each database module answers it through a
      * count-only delete rather than one that returns the deleted row, which
@@ -225,7 +225,7 @@ export interface SqlTables<Order> {
      */
     readonly deleteExcept: (spaceId: string, keepIds: readonly string[]) => Promise<void>;
     /**
-     * Delete every Resource `spaceId` owns. `#truncateHyperContent` (ADR 0094)
+     * Delete every Resource `spaceId` owns. `#truncateInfinityCubeContent` (ADR 0094)
      * calls this over stored state it has never validated, so — like
      * `Space.deleteById` above — this must never decode `document`: on
      * SQLite, a root-level delete that returns the deleted rows decodes
@@ -527,7 +527,7 @@ export const upsertResourceRow = async (
 
 /**
  * `deleteCount()` rather than `deleteAll()`, for the same reason
- * `deleteSpaceById` above does: `#truncateHyperContent` calls this over
+ * `deleteSpaceById` above does: `#truncateInfinityCubeContent` calls this over
  * stored state it has not validated (ADR 0094), and `deleteAll()` returns the
  * deleted rows — decoded `document` included — which would decode exactly
  * the broken content truncation exists to remove without reading.

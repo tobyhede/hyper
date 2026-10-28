@@ -103,7 +103,7 @@ const storedSpace: LoadedSpace = {
 const temporaryDirectories = new Set<string>();
 
 const makeTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-canonical-export-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-canonical-export-'));
   temporaryDirectories.add(directory);
   return directory;
 };

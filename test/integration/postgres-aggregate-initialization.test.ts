@@ -5,7 +5,7 @@ import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import type { SpaceRepository } from '@project/aggregate';
 import { createPostgresDatabase, type PostgresDatabase } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
-import { clearHyperContent } from '../support/clear-hyper-content';
+import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { postgresTestDatabase as db } from '../support/postgres-database';
 
 const firstMeta: SpaceSnapshot = {
@@ -21,11 +21,11 @@ const secondMeta: SpaceSnapshot = {
 
 describe('PostgreSQL aggregate operations before initialization', () => {
   const databases: PostgresDatabase[] = [];
-  beforeEach(clearHyperContent);
+  beforeEach(clearInfinityCubeContent);
   afterEach(async () => {
     await Promise.all(databases.map((database) => database.close()));
     databases.length = 0;
-    await clearHyperContent();
+    await clearInfinityCubeContent();
   });
   afterAll(() => db.close());
 

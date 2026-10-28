@@ -244,7 +244,7 @@ export function ResourceNode({
   /*
    * Narrow interactive deviation for cancellation the specialist control does
    * not expose:
-   * - Existing Hyper component considered: the existing ResourceNode composition.
+   * - Existing InfinityCube component considered: the existing ResourceNode composition.
    * - shadcn/Base UI component considered: none owns graph-node resizing.
    * - Product requirement that cannot be expressed: pointer cancellation,
    *   window focus loss and unmount must discard the whole canvas draft.

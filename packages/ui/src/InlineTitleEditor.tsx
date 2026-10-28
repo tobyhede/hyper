@@ -88,7 +88,7 @@ export type InlineTitleEditorProps = InlineTitleEditorBase &
  * or on several.
  *
  * Custom-interaction deviation (ADR 0047):
- * - Existing Hyper components considered: `Input` and `Textarea`, composed here with `Field`
+ * - Existing InfinityCube components considered: `Input` and `Textarea`, composed here with `Field`
  *   and `FieldError`.
  * - shadcn/Base UI components considered: Input, Textarea and Field; the registry has no
  *   inline-edit item and no multiline-title item.

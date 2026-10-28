@@ -19,7 +19,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { runDatabaseCli } from '../../src/cli/database-entry';
 import type { DatabaseCommand, RunCommand } from '../../src/cli/arguments';
 import type { CliIo } from '../../src/cli/io';
-import { runHyper } from '../../src/cli/run';
+import { runInfinityCube } from '../../src/cli/run';
 import type { DatabaseTarget } from '../../src/database/database-target';
 import { type SpaceRepository, AGGREGATE_FILE_NAME } from '@project/aggregate';
 import { readSingleSpace } from '../../src/aggregate-directory';
@@ -29,7 +29,7 @@ import {
   type SpaceDirectory,
 } from '../support/aggregate-directory';
 import { MemorySpaceRepository } from '@project/aggregate';
-import { runCommand } from '../support/hyper-command';
+import { runCommand } from '../support/infinity-cube-command';
 
 const SPACE_ID = uuidSchema.parse('11111111-1111-4111-8111-111111111111');
 const RESOURCE_ID = uuidSchema.parse('22222222-2222-4222-8222-222222222222');
@@ -50,7 +50,7 @@ const STORED_RESOURCE_FILE = `${JSON.stringify(
   2,
 )}\n`;
 
-const USAGE = 'Usage: hyper <init|run|import|export|help> [arguments]\n';
+const USAGE = 'Usage: cube <init|run|import|export|help> [arguments]\n';
 
 const storedSpace: LoadedSpace = {
   snapshot: {
@@ -74,7 +74,7 @@ const storedSpace: LoadedSpace = {
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-cli-unit-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-cli-unit-'));
   temporaryDirectories.push(directory);
   return directory;
 };
@@ -141,16 +141,16 @@ const unreachedTarget = (store: string): DatabaseTarget => ({
  * launcher that refuses.
  */
 const unlaunched = {
-  workingDirectory: '/hyper-cli-unit/unreached',
+  workingDirectory: '/infinity-cube-cli-unit/unreached',
   launchRun: () => Promise.reject(new Error('A run was launched')),
 };
 
 /** Run a command line whose default store, PostgreSQL, is the held repository. */
-const hyperOver = (
+const infinityCubeOver = (
   args: readonly string[],
   { repository, io, newId }: OverRepository,
 ): Promise<number> =>
-  runHyper(args, {
+  runInfinityCube(args, {
     io,
     newId,
     targets: { postgres: heldTarget(repository), sqlite: unreachedTarget('sqlite') },
@@ -163,12 +163,12 @@ afterEach(async () => {
   );
 });
 
-describe('runHyper', () => {
+describe('runInfinityCube', () => {
   it('exports the stored aggregate to the canonical version 1 directory', async () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const output = captureIo();
 
-    const exitCode = await hyperOver(['export', destination], {
+    const exitCode = await infinityCubeOver(['export', destination], {
       repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: output.io,
       newId: newUuid,
@@ -204,7 +204,7 @@ describe('runHyper', () => {
     const destination = join(await makeTemporaryDirectory(), 'exported');
     const output = captureIo();
 
-    const exitCode = await hyperOver(['export', destination], {
+    const exitCode = await infinityCubeOver(['export', destination], {
       repository: new MemorySpaceRepository(),
       io: output.io,
       newId: newUuid,
@@ -231,7 +231,7 @@ describe('runHyper', () => {
     await writeFile(join(spaceDirectory, 'resources', 'nested', 'keep.md'), 'keep nested\n');
     await writeFile(join(destination, 'notes.txt'), 'keep root\n');
 
-    const exitCode = await hyperOver(['export', destination], {
+    const exitCode = await infinityCubeOver(['export', destination], {
       repository: new MemorySpaceRepository([storedSpace], SPACE_ID),
       io: captureIo().io,
       newId: newUuid,
@@ -263,7 +263,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository([{ ...storedSpace, revision }], SPACE_ID);
 
     await expect(
-      hyperOver(['export', destination], {
+      infinityCubeOver(['export', destination], {
         repository,
         io: captureIo().io,
         newId: newUuid,
@@ -286,7 +286,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
+      infinityCubeOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr[0]).toMatch(/^Export failed:/);
@@ -323,7 +323,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
+      infinityCubeOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stdout).toEqual([]);
@@ -344,7 +344,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
+      infinityCubeOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -375,7 +375,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
+      infinityCubeOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -406,7 +406,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
+      infinityCubeOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(1);
 
     expect(output.stderr).toEqual([
@@ -453,7 +453,7 @@ describe('runHyper', () => {
     };
 
     await expect(
-      hyperOver(['export', destination], {
+      infinityCubeOver(['export', destination], {
         repository,
         io: captureIo().io,
         newId: newUuid,
@@ -491,7 +491,7 @@ describe('runHyper', () => {
     const output = captureIo();
 
     await expect(
-      hyperOver(['export', destination], { repository, io: output.io, newId: newUuid }),
+      infinityCubeOver(['export', destination], { repository, io: output.io, newId: newUuid }),
     ).resolves.toBe(0);
 
     expect(output.stdout).toEqual([
@@ -562,7 +562,7 @@ describe('runHyper', () => {
     };
 
     await expect(
-      hyperOver(['export', destination], {
+      infinityCubeOver(['export', destination], {
         repository: new MemorySpaceRepository(
           [{ snapshot, revision: 7n, exportedRevision: null }],
           SPACE_ID,
@@ -604,7 +604,7 @@ describe('runHyper', () => {
     };
 
     await expect(
-      hyperOver(['export', destination], {
+      infinityCubeOver(['export', destination], {
         repository: new MemorySpaceRepository([reordered], SPACE_ID),
         io: captureIo().io,
         newId: newUuid,
@@ -636,7 +636,7 @@ describe('runHyper', () => {
     };
 
     await expect(
-      hyperOver(['export', destination], {
+      infinityCubeOver(['export', destination], {
         repository: new MemorySpaceRepository([withMixedLineEndings], SPACE_ID),
         io: captureIo().io,
         newId: newUuid,
@@ -650,7 +650,7 @@ describe('runHyper', () => {
 
   /*
    * Export takes a destination and nothing else because it is whole-aggregate,
-   * so the Space-scoped `hyper export <space-uuid> <destination>` is wrong arity
+   * so the Space-scoped `cube export <space-uuid> <destination>` is wrong arity
    * rather than a Space that cannot be found — which is why it belongs with the
    * other malformed command lines and exits 2. A path with no verb is a usage
    * error too: the verb is never implied by the arguments.
@@ -705,7 +705,7 @@ describe('runHyper', () => {
   ])('rejects invalid arguments $args without opening a store', async ({ args }) => {
     const output = captureIo();
 
-    const exitCode = await runHyper(args, {
+    const exitCode = await runInfinityCube(args, {
       io: output.io,
       newId: newUuid,
       targets: { postgres: unreachedTarget('postgres'), sqlite: unreachedTarget('sqlite') },
@@ -746,7 +746,7 @@ describe('runHyper', () => {
     };
     const output = captureIo();
 
-    const exitCode = await hyperOver(['import', directory], {
+    const exitCode = await infinityCubeOver(['import', directory], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -778,10 +778,14 @@ describe('runHyper', () => {
       },
     ]);
     const repository = new MemorySpaceRepository();
-    await hyperOver(['import', directory], { repository, io: captureIo().io, newId: newUuid });
+    await infinityCubeOver(['import', directory], {
+      repository,
+      io: captureIo().io,
+      newId: newUuid,
+    });
     const output = captureIo();
 
-    const exitCode = await hyperOver(['import', directory], {
+    const exitCode = await infinityCubeOver(['import', directory], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -800,7 +804,7 @@ describe('runHyper', () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
-    const exitCode = await hyperOver(['import', directory, '--dangerous-replace'], {
+    const exitCode = await infinityCubeOver(['import', directory, '--dangerous-replace'], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -832,7 +836,7 @@ describe('runHyper', () => {
       Promise.resolve({ kind: 'conflict', currentMetaSpaceId: SPACE_ID });
     const output = captureIo();
 
-    const exitCode = await hyperOver(['import', directory, '--dangerous-replace'], {
+    const exitCode = await infinityCubeOver(['import', directory, '--dangerous-replace'], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -857,7 +861,7 @@ describe('runHyper', () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
 
-    const exitCode = await hyperOver(['import', directory], {
+    const exitCode = await infinityCubeOver(['import', directory], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -889,7 +893,7 @@ describe('runHyper', () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository();
 
-    const exitCode = await hyperOver(['import', root], {
+    const exitCode = await infinityCubeOver(['import', root], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -950,7 +954,7 @@ describe('runHyper', () => {
     const output = captureIo();
     const repository = new MemorySpaceRepository();
 
-    const exitCode = await hyperOver(['import', root], {
+    const exitCode = await infinityCubeOver(['import', root], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -972,7 +976,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     repository.initializeAggregate = () => Promise.reject(new Error('connection lost'));
 
-    const exitCode = await hyperOver(['import', directory], {
+    const exitCode = await infinityCubeOver(['import', directory], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -989,7 +993,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     repository.loadSpace = () => Promise.reject(new Error('load unavailable'));
 
-    const exitCode = await hyperOver(['import', directory], {
+    const exitCode = await infinityCubeOver(['import', directory], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -1021,7 +1025,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     repository.listSpaces = () => Promise.reject(new Error('catalog unavailable'));
 
-    const exitCode = await hyperOver(['import', root], {
+    const exitCode = await infinityCubeOver(['import', root], {
       repository,
       io: output.io,
       newId: newUuid,
@@ -1040,7 +1044,7 @@ describe('runHyper', () => {
     async ({ args }) => {
       const output = captureIo();
 
-      const exitCode = await runHyper(args, {
+      const exitCode = await runInfinityCube(args, {
         io: output.io,
         newId: newUuid,
         targets: { postgres: unreachedTarget('postgres'), sqlite: unreachedTarget('sqlite') },
@@ -1052,7 +1056,7 @@ describe('runHyper', () => {
       const verbLines = output.stdout
         .join('')
         .split('\n')
-        .filter((line) => line.startsWith('  hyper '));
+        .filter((line) => line.startsWith('  cube '));
       expect(verbLines.map((line) => line.split(/\s+/)[2])).toEqual([
         'init',
         'run',
@@ -1083,7 +1087,7 @@ describe('runHyper', () => {
         : join(await makeTemporaryDirectory(), 'exported');
     if (verb === 'export') {
       expect(
-        await hyperOver(['import', await writeSingleSpaceAggregate()], {
+        await infinityCubeOver(['import', await writeSingleSpaceAggregate()], {
           repository,
           io: captureIo().io,
           newId: newUuid,
@@ -1097,7 +1101,7 @@ describe('runHyper', () => {
         ? { sqlite: heldTarget(repository), postgres: unreachedTarget(other) }
         : { postgres: heldTarget(repository), sqlite: unreachedTarget(other) };
 
-    const exitCode = await runHyper([verb, directory, '--store', store], {
+    const exitCode = await runInfinityCube([verb, directory, '--store', store], {
       io: output.io,
       newId: newUuid,
       targets,
@@ -1113,7 +1117,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository([storedSpace], SPACE_ID);
     const output = captureIo();
 
-    const exitCode = await runHyper(
+    const exitCode = await runInfinityCube(
       ['import', '--store', 'sqlite', '--dangerous-replace', directory],
       {
         io: output.io,
@@ -1136,7 +1140,7 @@ describe('runHyper', () => {
     const repository = new MemorySpaceRepository();
     const output = captureIo();
     const over = (args: readonly string[]) =>
-      runHyper(args, {
+      runInfinityCube(args, {
         io: output.io,
         newId: newUuid,
         targets: { postgres: heldTarget(repository), sqlite: unreachedTarget('sqlite') },
@@ -1324,7 +1328,7 @@ describe('runDatabaseCli', () => {
   });
 });
 
-describe('runHyper author verbs', () => {
+describe('runInfinityCube author verbs', () => {
   const noStores = {
     postgres: unreachedTarget('postgres'),
     sqlite: unreachedTarget('sqlite'),
@@ -1344,7 +1348,7 @@ describe('runHyper author verbs', () => {
   const author = (args: readonly string[], workingDirectory: string) => {
     const output = captureIo();
     const launched: RunCommand[] = [];
-    const exitCode = runHyper(args, {
+    const exitCode = runInfinityCube(args, {
       io: output.io,
       newId: newUuid,
       workingDirectory,
@@ -1375,7 +1379,7 @@ describe('runHyper author verbs', () => {
       expect(await exitCode).toBe(0);
       expect(output.stderr).toEqual([]);
       expect(output.stdout).toEqual([
-        `Created a new aggregate; run it with: pnpm hyper run '${directory}'\n`,
+        `Created a new aggregate; run it with: pnpm cube run '${directory}'\n`,
       ]);
       expect(launched).toEqual([]);
       const aggregateFile: unknown = JSON.parse(
@@ -1423,7 +1427,7 @@ describe('runHyper author verbs', () => {
   );
 });
 
-describe('the hyper entry point', () => {
+describe('the cube entry point', () => {
   const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
   // Resolved from this file because the child's cwd is a temporary directory
   // outside the monorepo, where neither `pnpm exec` nor `--import tsx` finds tsx.
@@ -1440,16 +1444,16 @@ describe('the hyper entry point', () => {
         join(repositoryRoot, 'src/cli/entry.ts'),
         ...args,
       ],
-      { cwd, env, timeoutLabel: 'hyper entry point' },
+      { cwd, env, timeoutLabel: 'infinity-cube entry point' },
     );
 
   /*
    * pnpm sets `INIT_CWD` and `npm_lifecycle_event` for every script it runs,
-   * and a process an outer script started inherits both. Only the `hyper`
+   * and a process an outer script started inherits both. Only the `infinity-cube`
    * script's own `INIT_CWD` says where the author invoked it.
    */
   it.each([
-    { invokedBy: 'the hyper script', lifecycleEvent: 'hyper', resolvesIn: 'invoked' },
+    { invokedBy: 'the cube script', lifecycleEvent: 'cube', resolvesIn: 'invoked' },
     { invokedBy: 'another script', lifecycleEvent: 'test', resolvesIn: 'cwd' },
     { invokedBy: 'no script', lifecycleEvent: '', resolvesIn: 'cwd' },
   ] as const)(

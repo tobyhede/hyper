@@ -1,37 +1,37 @@
 ---
 name: shadcn-first-ui
-description: Implement or change production React UI in Hyper. MUST be used for components, controls, forms, dialogs, menus, popovers, comboboxes, toolbars, cards, panes, and application surfaces. Search @project/ui first, then shadcn; hand-rolled interactive primitives require an explicit deviation. Do not use for throwaway UI prototypes.
+description: Implement or change production React UI in InfinityCube. MUST be used for components, controls, forms, dialogs, menus, popovers, comboboxes, toolbars, cards, panes, and application surfaces. Search @project/ui first, then shadcn; hand-rolled interactive primitives require an explicit deviation. Do not use for throwaway UI prototypes.
 ---
 
 # shadcn-first-ui
 
-Production UI in Hyper is design-system-first. The design-system workspace is the `ui` package, `packages/ui`, published as `@project/ui`. Its upstream is the shadcn `base-nova` registry over Base UI, with Lucide icons (ADR 0050). A component from there is the default, and hand-rolled interactive behaviour is a recorded deviation (ADR 0047). A stable Ladle story is production-parity evidence (ADR 0052).
+Production UI in InfinityCube is design-system-first. The design-system workspace is the `ui` package, `packages/ui`, published as `@project/ui`. Its upstream is the shadcn `base-nova` registry over Base UI, with Lucide icons (ADR 0050). A component from there is the default, and hand-rolled interactive behaviour is a recorded deviation (ADR 0047). A stable Ladle story is production-parity evidence (ADR 0052).
 
-This skill, AGENTS.md and `docs/agents/ui.md` override the vendored `shadcn` skill wherever they disagree. Use the `shadcn` skill for CLI mechanics and component rules. Its generic recommendations name components Hyper deleted on purpose: `Sidebar`, `Sheet`, `Drawer` and `Tabs`. The Command Dock and the Resources list (`ResourcesPopover`) replaced them. `docs/agents/ui.md` says why, and what to use instead.
+This skill, AGENTS.md and `docs/agents/ui.md` override the vendored `shadcn` skill wherever they disagree. Use the `shadcn` skill for CLI mechanics and component rules. Its generic recommendations name components InfinityCube deleted on purpose: `Sidebar`, `Sheet`, `Drawer` and `Tabs`. The Command Dock and the Resources list (`ResourcesPopover`) replaced them. `docs/agents/ui.md` says why, and what to use instead.
 
 A throwaway prototype answers a visual or product question and is outside this skill. Once a design is chosen, build it again through these steps.
 
 ## Steps
 
-1. **Read the catalogue.** The stable stories under `packages/app/stories/components`, `packages/app/stories/surfaces` and `packages/app/stories/space` are the catalogue of what Hyper ships, and `pnpm ladle` serves them. `stories/review` is staged work, not evidence. Read the stories nearest the requirement, the claims on them in `packages/app/stories/parity-claims.ts`, and the component modules behind them. The `ui` package's public surface is `packages/ui/src/index.ts`. Application and adapter code import from `@project/ui` and nothing deeper.
+1. **Read the catalogue.** The stable stories under `packages/app/stories/components`, `packages/app/stories/surfaces` and `packages/app/stories/space` are the catalogue of what InfinityCube ships, and `pnpm ladle` serves them. `stories/review` is staged work, not evidence. Read the stories nearest the requirement, the claims on them in `packages/app/stories/parity-claims.ts`, and the component modules behind them. The `ui` package's public surface is `packages/ui/src/index.ts`. Application and adapter code import from `@project/ui` and nothing deeper.
    Done when you can name the existing `@project/ui` component or composition closest to the requirement, with its story and tests, or can say that none covers it.
 
-2. **Prefer composition.** Build from what step 1 found. Express a styling difference as a variant, a theme token or composition, not as replacement behaviour. A Hyper composite that adds reusable Hyper meaning belongs in `packages/ui`. `CanvasResource`, built from the shared Card primitives, is one. A second Dialog written for a styling difference is not one. Keep each component's documented keyboard, focus, dismissal and accessibility behaviour unless an accepted Hyper requirement contradicts it.
+2. **Prefer composition.** Build from what step 1 found. Express a styling difference as a variant, a theme token or composition, not as replacement behaviour. A InfinityCube composite that adds reusable InfinityCube meaning belongs in `packages/ui`. `CanvasResource`, built from the shared Card primitives, is one. A second Dialog written for a styling difference is not one. Keep each component's documented keyboard, focus, dismissal and accessibility behaviour unless an accepted InfinityCube requirement contradicts it.
    Done when the requirement is met by existing components, or you can name the capability `@project/ui` lacks.
 
-3. **Search the registry.** Run every shadcn CLI call against the `ui` package with the pinned version, for example `pnpm dlx shadcn@4.18.0 search -q <query> -c packages/ui`, then `view`, `docs` and `info` with `-c packages/ui`. `packages/ui/components.json` configures the `base-nova` style, the `#components` aliases and the `@reactflow` registry. If shadcn has nothing, a Base UI primitive is next, wrapped in the smallest shadcn-style component in `packages/ui`. For a specialist widget such as an editor or a graph, wrap its established library behind a Hyper-owned `@project/ui` component, as `MarkdownSourceEditor` wraps CodeMirror.
+3. **Search the registry.** Run every shadcn CLI call against the `ui` package with the pinned version, for example `pnpm dlx shadcn@4.18.0 search -q <query> -c packages/ui`, then `view`, `docs` and `info` with `-c packages/ui`. `packages/ui/components.json` configures the `base-nova` style, the `#components` aliases and the `@reactflow` registry. If shadcn has nothing, a Base UI primitive is next, wrapped in the smallest shadcn-style component in `packages/ui`. For a specialist widget such as an editor or a graph, wrap its established library behind a InfinityCube-owned `@project/ui` component, as `MarkdownSourceEditor` wraps CodeMirror.
    Done when you have chosen a registry item, a Base UI primitive or a specialist library, or have shown that none supplies the capability. If none does, go to step 5.
 
 4. **Add the registry item to the `ui` package.**
    1. Preview the add with `pnpm dlx shadcn@4.18.0 add <item> --dry-run -c packages/ui`.
    2. Read every file the preview lists with `pnpm dlx shadcn@4.18.0 add <item> --diff <file> -c packages/ui`, which implies `--dry-run` and writes nothing. That includes `packages/app/src/tailwind.css`, where the `ui` package's `components.json` points for CSS.
    3. Run the add without `--dry-run`, then export the component's public names from `packages/ui/src/index.ts`.
-   4. When the item overwrites a component that is already here, keep Hyper's recorded extensions. The comment on the component names each one, as `components/badge.tsx`, `input.tsx` and `tooltip.tsx` do. `docs/agents/ui.md` names others, such as `Kbd`'s `keyName="modifier"`. Re-apply every extension the diff removes.
+   4. When the item overwrites a component that is already here, keep InfinityCube's recorded extensions. The comment on the component names each one, as `components/badge.tsx`, `input.tsx` and `tooltip.tsx` do. `docs/agents/ui.md` names others, such as `Kbd`'s `keyName="modifier"`. Re-apply every extension the diff removes.
 
    Done when `pnpm typecheck:packages` passes, the component is exported from `@project/ui`, and every recorded extension in an overwritten file is still there.
 
 5. **Record any deviation before writing it.** Hand-rolled interactive behaviour comes last, and it is recorded before it is written. Add an entry to `interactiveDeviations` in `packages/app/stories/design-system-inventory.ts` with all six answers:
-   - existing Hyper component considered
+   - existing InfinityCube component considered
    - shadcn or Base UI component considered
    - the product requirement that cannot be expressed
    - why composition or a variant is insufficient

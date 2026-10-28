@@ -8,7 +8,7 @@ export interface KeyBinding {
 }
 
 /**
- * Every keyboard binding authored by Hyper in the app and UI packages that
+ * Every keyboard binding authored by InfinityCube in the app and UI packages that
  * reads `event.key` itself.
  *
  * The application's shortcuts are not here: they are declared as data in

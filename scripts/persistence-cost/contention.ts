@@ -220,7 +220,7 @@ const main = async (): Promise<void> => {
   );
 
   const subject = scenario(WORKLOAD);
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-persistence-contention-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-persistence-contention-'));
   let seeder: Target;
   if (ON_SQLITE) {
     seeder = await sqliteTarget(directory, 'contention', []);

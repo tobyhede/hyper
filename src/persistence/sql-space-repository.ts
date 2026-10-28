@@ -856,7 +856,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     await this.#importResources(tables, snapshot);
   }
 
-  async #truncateHyperContent(tables: SqlTables<Order>): Promise<void> {
+  async #truncateInfinityCubeContent(tables: SqlTables<Order>): Promise<void> {
     // Repository state restricts deletion of its Meta Space, so clear the
     // Meta identity row before deleting any Space rows.
     await tables.RepositoryState.delete();
@@ -909,7 +909,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
     tables: SqlTables<Order>,
     input: AggregateInput,
   ): Promise<LoadedAggregate> {
-    await this.#truncateHyperContent(tables);
+    await this.#truncateInfinityCubeContent(tables);
     for (const snapshot of [...input.spaces].sort(ascendingSnapshotId)) {
       await this.#createStoredSpace(tables, snapshot);
     }
@@ -1016,7 +1016,7 @@ export class SqlSpaceRepository<Handle, Order> implements SpaceRepository {
       if (!(error instanceof StaleSpaceRevisionError)) throw error;
       // A stored Space moved, not necessarily the Meta identity, so this id is
       // usually the one the caller expected. The CLI words the conflict to
-      // hold either way (`test/unit/hyper-cli.test.ts`, "does not claim the
+      // hold either way (`test/unit/infinity-cube-cli.test.ts`, "does not claim the
       // Meta identity moved ...").
       return { kind: 'conflict', currentMetaSpaceId: await this.#loadMetaSpaceIdUnserialised() };
     }

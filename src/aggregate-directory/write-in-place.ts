@@ -61,7 +61,7 @@ const createTemporaryFile = async (
 ): Promise<{ readonly temporary: string; readonly handle: FileHandle }> => {
   for (let attempt = 0; ; attempt += 1) {
     const suffix = attempt === 0 ? '' : `.${String(attempt)}`;
-    const temporary = join(dirname(path), `.${basename(path)}${suffix}.hyper-write`);
+    const temporary = join(dirname(path), `.${basename(path)}${suffix}.infinity-cube-write`);
     try {
       return { temporary, handle: await open(temporary, 'wx') };
     } catch (error) {

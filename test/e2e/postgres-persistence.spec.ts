@@ -4,7 +4,7 @@ import { newUuid } from '@project/core';
 import { createServer, type ViteDevServer } from 'vite';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
-import { clearHyperContent } from '../support/clear-hyper-content';
+import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { postgresTestDatabase } from '../support/postgres-database';
 import {
   dragResourceAndCapturePosition,
@@ -44,7 +44,7 @@ const startHost = async (): Promise<{ server: ViteDevServer; baseURL: string }> 
 };
 
 test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) => {
-  // The same handle `clearHyperContent` holds, not a second one beside it.
+  // The same handle `clearInfinityCubeContent` holds, not a second one beside it.
   // That module opens its client at import, so a client of this spec's own
   // would leave that one live after the `finally` below closed only its own —
   // one pool per process is what the closing `finally` can actually account
@@ -70,7 +70,7 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
     // repository this test needs has to be arranged rather than assumed. Safe
     // for the same reason the cleanup below is: `workers: 1` and one test, so
     // nothing else holds this `DATABASE_URL`.
-    await clearHyperContent();
+    await clearInfinityCubeContent();
 
     // The Map is part of the fixture, and has to be. A mapless Space is
     // initialized on its first working load (ADR 0079), and that initialization
@@ -146,11 +146,11 @@ test('a PostgreSQL-backed edit survives a fresh Vite host', async ({ browser }) 
       // The reset runs before the fixture as well as after it, so this Space
       // is Meta on every machine and there is no second branch to fall into.
       //
-      // `clearHyperContent` drops the repository-state row first, which is what
+      // `clearInfinityCubeContent` drops the repository-state row first, which is what
       // releases the key, and it is the same reset the integration suite runs.
       // Safe here for the reason it is safe there: `workers: 1` and one test, so
       // nothing else holds this `DATABASE_URL`.
-      await clearHyperContent();
+      await clearInfinityCubeContent();
       spaceRemains = (await repository.loadSpace(spaceId)) !== undefined;
     } finally {
       await postgresTestDatabase.close();

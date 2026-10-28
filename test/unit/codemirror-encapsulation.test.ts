@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * ADR 0063: `MarkdownSourceEditor` exposes Hyper's contract, not CodeMirror's, and
+ * ADR 0063: `MarkdownSourceEditor` exposes InfinityCube's contract, not CodeMirror's, and
  * application callers cannot configure CodeMirror directly. A stylesheet that names a
  * `.cm-*` class is exactly that configuration reached round the back — it survives no
  * upgrade that renames the class, and it fails silently, because the rule simply stops

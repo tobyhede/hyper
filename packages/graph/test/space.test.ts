@@ -167,7 +167,7 @@ describe('loadSpace', () => {
     // The version 2 shape carries a space-level `graphs` array and maps with
     // none of their own. Read against version 1 it fails twice over — once per
     // map missing the graphs it owns — and none of those issues says the
-    // thing worth saying. Hyper is unreleased, so the answer is rejection
+    // thing worth saying. InfinityCube is unreleased, so the answer is rejection
     // naming the version, never a migration (ADR 0040).
     const result = loadSpace(
       {

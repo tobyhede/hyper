@@ -1,6 +1,6 @@
 # The Aggregate directory
 
-An **Aggregate directory** is the on-disk form of everything Hyper holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm hyper init <dir>` creates one, `pnpm hyper run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), and `pnpm hyper import` and `pnpm hyper export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
+An **Aggregate directory** is the on-disk form of everything InfinityCube holds: every Space, rooted at the Meta Space, plus the pictures its Image Resources show. `pnpm cube init <dir>` creates one, `pnpm cube run <dir>` runs one ([ADR 0117](adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)), and `pnpm cube import` and `pnpm cube export` Import one into a database and Export one back out ([ADR 0124](adr/0124-one-hyper-cli.md)). Exporting writes the same format whichever store it reads from.
 
 The directory is plain files meant for git: JSON in a fixed key order, one JSON Resource file per Resource with a Markdown Resource's source beside it, and pictures named by their content. Exporting the same content twice writes the same bytes, so a diff shows only what changed.
 
@@ -127,7 +127,7 @@ Futures are **lazy**.
 
 A Resource's identity is its `id`, never its file name. Exporting writes every Resource as `resources/<id>.json`, and a Markdown Resource's sidecar as `resources/<id>.md`, whatever they were called before.
 
-Every Resource has `id`, `title`, `kind` and `content`, and none may be left out. The Title must have at least one non-blank line, and may run to several. `kind` is a kind's id; one this version of Hyper does not know is refused. A Resource file is strict, as `space.json` is: a key the envelope or the kind's `content` does not declare, at any depth, is refused, naming the key and the file, so a misspelt key fails loudly. `content` depends on the kind:
+Every Resource has `id`, `title`, `kind` and `content`, and none may be left out. The Title must have at least one non-blank line, and may run to several. `kind` is a kind's id; one this version of InfinityCube does not know is refused. A Resource file is strict, as `space.json` is: a key the envelope or the kind's `content` does not declare, at any depth, is refused, naming the key and the file, so a misspelt key fails loudly. `content` depends on the kind:
 
 | `kind` | `content` |
 | --- | --- |
@@ -153,7 +153,7 @@ The bytes of every stored picture the aggregate's Image Resources show ([ADR 011
 
 - Importing admits every visible regular file in `images/` by the rule an upload uses: the format is read from the bytes, and a file is at most 10 MiB. A file that is not such an image, or is **not named for its own content**, refuses the whole directory.
 - A Resource whose `/images/<content-id>` has no file in `images/` is allowed. It draws as a picture that will not load.
-- An `https:` or `http:` URL stays a URL. Hyper does not download it, and nothing is written to `images/` for it.
+- An `https:` or `http:` URL stays a URL. InfinityCube does not download it, and nothing is written to `images/` for it.
 - Exporting owns the image files in `images/`: a picture no Resource shows any more is removed, and an `images/` left empty is removed. Dotfiles, subdirectories and links inside `images/` are left alone.
 
 ## Which Ids may be left out
@@ -186,7 +186,7 @@ The directory itself, and each Space directory in it, is never renamed or recrea
 
 **There is no whole-write atomicity, backup or recovery copy.** A crash in the middle of a write can leave some files new and some old. Keep the directory under git: git restores it.
 
-**Markdown beside `space.json` is not kept.** A `README.md` or any other `*.md` in a Space directory or its `resources/` is read: unless it is a Markdown Resource's own sidecar, Importing refuses the directory naming it, and the next Export removes it. Keep prose about a Space under a name or directory Hyper does not scan.
+**Markdown beside `space.json` is not kept.** A `README.md` or any other `*.md` in a Space directory or its `resources/` is read: unless it is a Markdown Resource's own sidecar, Importing refuses the directory naming it, and the next Export removes it. Keep prose about a Space under a name or directory InfinityCube does not scan.
 
 ## How a directory is checked
 
@@ -195,7 +195,7 @@ Two layers:
 - **Shape.** Zod schemas in `@project/core` check `aggregate.json`, each `space.json` and each Resource file. The same shapes are published as JSON Schema in [`docs/schema/`](schema/README.md).
 - **References.** `@project/graph` checks that every Edge, placement, `activeGraph`, `defaultMap` and Reference Resource `target` resolves inside its Space, that there are no duplicate Ids or duplicate Edges, and then the aggregate rules above across Spaces.
 
-`pnpm hyper run` and `pnpm hyper import` print what they refuse and exit non-zero. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
+`pnpm cube run` and `pnpm cube import` print what they refuse and exit non-zero. A file that cannot be read is named by its path; a broken reference is named by its Space and the Ids involved. Reading comes before the reference checks, so fixing the first round of problems can reveal a second.
 
 ## Durable URLs and HTTP resources
 

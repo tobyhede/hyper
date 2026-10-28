@@ -182,7 +182,9 @@ const sendRequestLine = (baseUrl: string, target: string): Promise<string> =>
   new Promise((resolve, reject) => {
     const { hostname, port } = new URL(baseUrl);
     const socket = connect(Number(port), hostname, () => {
-      socket.write(`GET ${target} HTTP/1.1\r\nHost: hyper.test\r\nConnection: close\r\n\r\n`);
+      socket.write(
+        `GET ${target} HTTP/1.1\r\nHost: infinity-cube.test\r\nConnection: close\r\n\r\n`,
+      );
     });
     let received = '';
     socket.on('data', (chunk: Uint8Array) => (received += Buffer.from(chunk).toString('utf8')));
@@ -904,7 +906,8 @@ describe('Database HTTP runtime', () => {
     // `src/prisma/db.ts` reads `DATABASE_URL` on every such call. `dotenv` does
     // not override an existing value, so a developer's `.env` cannot decide
     // this test.
-    process.env['DATABASE_URL'] = 'postgresql://hyper:hyper@127.0.0.1:1/hyper';
+    process.env['DATABASE_URL'] =
+      'postgresql://infinity_cube:infinity_cube@127.0.0.1:1/infinity_cube';
     let reported: unknown;
     vi.spyOn(console, 'error').mockImplementation((message: unknown, error: unknown) => {
       if (message === 'Failed to establish the Meta Space at startup') reported = error;

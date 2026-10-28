@@ -44,11 +44,11 @@ describe('Prisma Next SQLite foundation', () => {
   });
 
   it('trims a configured SQLITE_PATH', async () => {
-    vi.stubEnv('SQLITE_PATH', '  /tmp/hyper.db  ');
+    vi.stubEnv('SQLITE_PATH', '  /tmp/infinity-cube.db  ');
 
     const { default: config } = await import('../../prisma-next.config.sqlite');
 
-    expect(config.db).toEqual({ connection: '/tmp/hyper.db' });
+    expect(config.db).toEqual({ connection: '/tmp/infinity-cube.db' });
   });
 
   it('constructs the runtime client without a blank SQLITE_PATH binding', () => {
@@ -58,9 +58,9 @@ describe('Prisma Next SQLite foundation', () => {
   });
 
   it('applies the same absolute-path rule to every SQLite caller', () => {
-    vi.stubEnv('SQLITE_PATH', 'relative/hyper.db');
+    vi.stubEnv('SQLITE_PATH', 'relative/infinity-cube.db');
     expect(() => requireConfiguredSqlitePath()).toThrow(
-      'SQLITE_PATH must be an absolute path: relative/hyper.db',
+      'SQLITE_PATH must be an absolute path: relative/infinity-cube.db',
     );
   });
 
@@ -70,7 +70,7 @@ describe('Prisma Next SQLite foundation', () => {
   });
 
   it('keeps the CLI existing-file rule separate from migration', () => {
-    const parent = mkdtempSync(join(tmpdir(), 'hyper-sqlite-existing-'));
+    const parent = mkdtempSync(join(tmpdir(), 'infinity-cube-sqlite-existing-'));
     try {
       const path = join(parent, 'missing.db');
       vi.stubEnv('SQLITE_PATH', path);
@@ -84,9 +84,9 @@ describe('Prisma Next SQLite foundation', () => {
   });
 
   it('fails clearly when the SQLite parent directory is missing', () => {
-    expect(() => createSqliteDatabase('/no-such-hyper-sqlite-parent/hyper.db')).toThrow(
-      /SQLite parent directory is missing or unwritable/,
-    );
+    expect(() =>
+      createSqliteDatabase('/no-such-infinity-cube-sqlite-parent/infinity-cube.db'),
+    ).toThrow(/SQLite parent directory is missing or unwritable/);
   });
 
   // `access(W_OK)` is a discretionary check the superuser bypasses (POSIX
@@ -98,10 +98,10 @@ describe('Prisma Next SQLite foundation', () => {
   it.skipIf(process.getuid?.() === 0)(
     'fails clearly when the SQLite parent directory is not writable',
     () => {
-      const parent = mkdtempSync(join(tmpdir(), 'hyper-sqlite-readonly-'));
+      const parent = mkdtempSync(join(tmpdir(), 'infinity-cube-sqlite-readonly-'));
       try {
         chmodSync(parent, 0o500);
-        expect(() => createSqliteDatabase(join(parent, 'hyper.db'))).toThrow(
+        expect(() => createSqliteDatabase(join(parent, 'infinity-cube.db'))).toThrow(
           /SQLite parent directory is missing or unwritable/,
         );
       } finally {

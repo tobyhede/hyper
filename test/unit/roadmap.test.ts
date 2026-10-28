@@ -31,7 +31,7 @@ const write = (root: string, path: string, content: string): void => {
 };
 
 const scratch = (): string => {
-  const root = mkdtempSync(join(tmpdir(), 'hyper-roadmap-'));
+  const root = mkdtempSync(join(tmpdir(), 'infinity-cube-roadmap-'));
   roots.push(root);
   return root;
 };
@@ -794,7 +794,7 @@ const runRoadmap = (cwd: string, ...args: readonly string[]) => {
 
 /** A `.scratch` under a fresh temporary cwd, since the script reads `process.cwd()`. */
 const scratchCwd = () => {
-  const cwd = mkdtempSync(join(tmpdir(), 'hyper-roadmap-cli-'));
+  const cwd = mkdtempSync(join(tmpdir(), 'infinity-cube-roadmap-cli-'));
   roots.push(cwd);
   const root = join(cwd, '.scratch');
   mkdirSync(root, { recursive: true });

@@ -133,7 +133,7 @@ async function dragAndMeasure(
     transferMode: 'ReportEvents',
   });
   await page.evaluate(() => window.benchmarkCommits?.reset());
-  await page.evaluate(() => performance.clearMarks('hyper:embedded-map-publication'));
+  await page.evaluate(() => performance.clearMarks('infinity-cube:embedded-map-publication'));
   const followerIds = await Promise.all(
     followers.map((follower) => follower.getAttribute('data-id')),
   );
@@ -239,7 +239,7 @@ async function dragAndMeasure(
   });
   const reactCommits = await page.evaluate(() => window.benchmarkCommits?.take() ?? 0);
   const embeddedPublications = await page.evaluate(
-    () => performance.getEntriesByName('hyper:embedded-map-publication').length,
+    () => performance.getEntriesByName('infinity-cube:embedded-map-publication').length,
   );
   const traceComplete = new Promise<void>((resolve) =>
     session.once('Tracing.tracingComplete', () => resolve()),

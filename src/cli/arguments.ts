@@ -1,14 +1,14 @@
 /** The database an `import` or `export` reaches; connection details come from the environment. */
-export type HyperStore = 'postgres' | 'sqlite';
+export type InfinityCubeStore = 'postgres' | 'sqlite';
 
 export type DatabaseCommand =
   | {
       readonly verb: 'import';
       readonly directory: string;
-      readonly store: HyperStore;
+      readonly store: InfinityCubeStore;
       readonly replace: boolean;
     }
-  | { readonly verb: 'export'; readonly directory: string; readonly store: HyperStore };
+  | { readonly verb: 'export'; readonly directory: string; readonly store: InfinityCubeStore };
 
 export interface InitCommand {
   readonly verb: 'init';
@@ -23,7 +23,8 @@ export interface RunCommand {
   readonly open: boolean;
 }
 
-export type HyperCommand = { readonly verb: 'help' } | InitCommand | RunCommand | DatabaseCommand;
+export type InfinityCubeCommand =
+  { readonly verb: 'help' } | InitCommand | RunCommand | DatabaseCommand;
 
 interface VerbLine {
   readonly synopsis: string;
@@ -48,15 +49,15 @@ const VERB_LINES: readonly VerbLine[] = [
   { synopsis: 'help', summary: 'List every verb' },
 ];
 
-export const USAGE = 'Usage: hyper <init|run|import|export|help> [arguments]\n';
+export const USAGE = 'Usage: cube <init|run|import|export|help> [arguments]\n';
 
 const synopsisWidth = Math.max(...VERB_LINES.map(({ synopsis }) => synopsis.length));
 
-export const HELP = `Usage: hyper <verb> [arguments]\n\n${VERB_LINES.map(
-  ({ synopsis, summary }) => `  hyper ${synopsis.padEnd(synopsisWidth)}  ${summary}\n`,
+export const HELP = `Usage: cube <verb> [arguments]\n\n${VERB_LINES.map(
+  ({ synopsis, summary }) => `  cube ${synopsis.padEnd(synopsisWidth)}  ${summary}\n`,
 ).join('')}`;
 
-const parseStore = (value: string | undefined): HyperStore | undefined => {
+const parseStore = (value: string | undefined): InfinityCubeStore | undefined => {
   switch (value) {
     case 'postgres':
       return 'postgres';
@@ -78,7 +79,7 @@ const parseDatabaseArguments = (
   args: readonly string[],
 ): DatabaseCommand | undefined => {
   let directory: string | undefined;
-  let store: HyperStore | undefined;
+  let store: InfinityCubeStore | undefined;
   let replace = false;
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
@@ -137,7 +138,9 @@ const parseRunArguments = (args: readonly string[]): RunCommand | undefined => {
 };
 
 /** The command a command line names, or `undefined` for a usage error. */
-export const parseHyperArguments = (args: readonly string[]): HyperCommand | undefined => {
+export const parseInfinityCubeArguments = (
+  args: readonly string[],
+): InfinityCubeCommand | undefined => {
   const [verb, ...rest] = args;
   switch (verb) {
     case 'help':

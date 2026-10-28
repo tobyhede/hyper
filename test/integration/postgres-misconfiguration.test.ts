@@ -41,7 +41,7 @@ const wrongPasswordUrl = (): string => {
 /** The configured URL, credentials intact, naming a database the server does not have. */
 const missingDatabaseUrl = (): string => {
   const url = databaseUrl();
-  url.pathname = '/hyper_ticket_38_absent';
+  url.pathname = '/infinity_cube_ticket_38_absent';
   return url.href;
 };
 

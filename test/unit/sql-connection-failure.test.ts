@@ -53,7 +53,10 @@ const cyclicChain = (): Error => {
  */
 describe('postgresSqlStore.isUnavailable', () => {
   const store = postgresSqlStore(
-    postgres<Contract>({ contractJson, url: 'postgres://hyper:unused@127.0.0.1:1/hyper' }),
+    postgres<Contract>({
+      contractJson,
+      url: 'postgres://infinity_cube:unused@127.0.0.1:1/infinity_cube',
+    }),
   );
 
   afterAll(async () => {
@@ -129,7 +132,7 @@ describe('postgresSqlStore.isUnavailable', () => {
   // Authentication and a missing database are the configuration or the
   // server refusing this client, which no wait cures.
   it.each([
-    ['28P01', 'password authentication failed for user "hyper"'],
+    ['28P01', 'password authentication failed for user "infinity_cube"'],
     ['28000', 'no pg_hba.conf entry for host'],
     ['3D000', 'database "missing" does not exist'],
   ])('leaves SQLSTATE %s raised while connecting unclassified', (code, message) => {

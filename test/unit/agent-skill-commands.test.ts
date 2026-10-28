@@ -70,24 +70,26 @@ const namedRootScripts = (skill: string): readonly string[] =>
     .map((match) => match[1] ?? '')
     .filter((command) => !PACKAGE_RUNNER_COMMANDS.has(command));
 
-const HYPER_SKILLS = ['hyper-getting-started', 'hyper-authoring'] as const;
+const INFINITY_CUBE_SKILLS = ['infinity-cube-getting-started', 'infinity-cube-authoring'] as const;
 
-describe('commands in the Hyper getting-started and authoring skills', () => {
-  it.each(HYPER_SKILLS)('%s names only root scripts the repository can run', (name) => {
+describe('commands in the InfinityCube getting-started and authoring skills', () => {
+  it.each(INFINITY_CUBE_SKILLS)('%s names only root scripts the repository can run', (name) => {
     const named = namedRootScripts(readSkill(name));
     const availableScripts = new Set(Object.keys(rootPackage.scripts ?? {}));
 
-    expect(named).toContain('hyper');
+    expect(named).toContain('cube');
     expect(named.filter((script) => !availableScripts.has(script))).toEqual([]);
   });
 });
 
 // The documented check, run as written by `sh` against a live process whose
-// arguments are the run's. `<dir>` is spelled through `$HYPER_DIR`, so the
+// arguments are the run's. `<dir>` is spelled through `$INFINITY_CUBE_DIR`, so the
 // shell's own command line never holds the directory and cannot match itself.
-describe('the hyper-authoring check that nothing is serving the directory', () => {
-  const documented = /`([^`]*run-process\.ts[^`]*)`/.exec(readSkill('hyper-authoring'))?.[1];
-  const parent = mkdtempSync(join(tmpdir(), 'hyper-check-'));
+describe('the infinity-cube-authoring check that nothing is serving the directory', () => {
+  const documented = /`([^`]*run-process\.ts[^`]*)`/.exec(
+    readSkill('infinity-cube-authoring'),
+  )?.[1];
+  const parent = mkdtempSync(join(tmpdir(), 'infinity-cube-check-'));
   const decoys: ChildProcess[] = [];
 
   afterAll(() => {
@@ -95,7 +97,7 @@ describe('the hyper-authoring check that nothing is serving the directory', () =
     rmSync(parent, { recursive: true, force: true });
   });
 
-  // `runHyper` resolves `<dir>` before the launcher sees it; the process holds the resolved path.
+  // `runInfinityCube` resolves `<dir>` before the launcher sees it; the process holds the resolved path.
   const startRunOn = (directory: string): ChildProcess => {
     mkdirSync(directory, { recursive: true });
     const decoy = spawn(
@@ -117,9 +119,9 @@ describe('the hyper-authoring check that nothing is serving the directory', () =
   };
 
   const check = (spelling: string): string => {
-    if (documented === undefined) throw new Error('hyper-authoring names no check command');
-    return spawnSync('sh', ['-c', documented.replaceAll('<dir>', '${HYPER_DIR}')], {
-      env: { ...process.env, HYPER_DIR: spelling },
+    if (documented === undefined) throw new Error('infinity-cube-authoring names no check command');
+    return spawnSync('sh', ['-c', documented.replaceAll('<dir>', '${INFINITY_CUBE_DIR}')], {
+      env: { ...process.env, INFINITY_CUBE_DIR: spelling },
       encoding: 'utf8',
     }).stdout;
   };
@@ -150,7 +152,7 @@ describe('the hyper-authoring check that nothing is serving the directory', () =
     expect(check(join(parent, 'mistyped'))).not.toBe('');
   });
 
-  // A symlink gives a directory two spellings. The run holds the one `runHyper`
+  // A symlink gives a directory two spellings. The run holds the one `runInfinityCube`
   // resolved: the physical `INIT_CWD` pnpm records for a relative `<dir>`, or
   // the path as typed for an absolute one. The person may name either.
   const spellingsOf = (name: string) => {

@@ -5,7 +5,7 @@ import {
   decodeProblemDetails,
   encodeCommitRequest,
   problemCatalogue,
-  type HyperProblemCode,
+  type InfinityCubeProblemCode,
   type SpaceCommit,
   type ImageStore,
   type StoredSpaceRepository,
@@ -70,7 +70,11 @@ const repository = (
 // with it because the catalogue is what a client branches on, and a response
 // naming a type whose title has drifted is a contract change wearing a status
 // that has not.
-const expectProblem = async (response: Response, code: HyperProblemCode, detail?: string) => {
+const expectProblem = async (
+  response: Response,
+  code: InfinityCubeProblemCode,
+  detail?: string,
+) => {
   expect(response.status).toBe(problemCatalogue[code].status);
   expect(response.headers.get('content-type')).toBe('application/problem+json');
   expect(response.headers.get('cache-control')).toBe('no-store');
@@ -105,7 +109,11 @@ describe('commit wire policy', () => {
   // means anything, so the repository must not be asked. A policy that produced
   // the right status while still handing the commit to storage would satisfy a
   // status-only assertion and lose the property the status exists to carry.
-  const wireRejection = async (request: RequestInit, code: HyperProblemCode, detail?: string) => {
+  const wireRejection = async (
+    request: RequestInit,
+    code: InfinityCubeProblemCode,
+    detail?: string,
+  ) => {
     const commit = vi.fn();
     const response = await createSpaceHttpApp(repository({ commit }), {
       newId: mintsNothing,

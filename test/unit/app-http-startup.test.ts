@@ -126,7 +126,7 @@ const startupFor = (newId: () => UUID, metaSpaceId: UUID, ...snapshots: SpaceSna
   );
   const app = createSpaceHttpApp(repository, { newId });
   return startupOver(
-    new HttpSpaceBackend('http://hyper.test', {
+    new HttpSpaceBackend('http://infinity-cube.test', {
       fetch: (input, init) => Promise.resolve(app.fetch(new Request(input, init))),
     }),
   );

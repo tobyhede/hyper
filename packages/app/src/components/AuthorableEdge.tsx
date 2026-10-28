@@ -35,7 +35,7 @@ const edgeElementOf = (from: Element | null, edgeId: string): SVGElement | null 
     ?.querySelector<SVGElement>(`.react-flow__edge[data-id="${edgeId}"]`) ?? null;
 
 /**
- * The application's authorable Edge: the reusable path, plus Hyper's chrome.
+ * The application's authorable Edge: the reusable path, plus InfinityCube's chrome.
  *
  * Curve, midpoint and span all come from one `useRoutedEdgeGeometry`, so the
  * chrome cannot disagree with the drawn line. Only Active Graph Edges draw chrome.

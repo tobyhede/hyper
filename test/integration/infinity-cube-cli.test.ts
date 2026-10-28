@@ -11,8 +11,8 @@ import {
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { postgresTestDatabase } from '../support/postgres-database';
-import { clearHyperContent } from '../support/clear-hyper-content';
-import { runHyperScript } from '../support/hyper-command';
+import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
+import { runInfinityCubeScript } from '../support/infinity-cube-command';
 import { markdownResourceFiles } from '../support/aggregate-directory';
 import { admitted, pngBytes, showing } from '../support/stored-images';
 
@@ -29,7 +29,7 @@ const LINK_RESOURCE_ID = uuidSchema.parse('dabababa-abab-4bab-8bab-abababababab'
 const PICTURE_ID = uuidSchema.parse('dcdcdcdc-dcdc-4cdc-8cdc-dcdcdcdcdcdc');
 const OPENING_ID = uuidSchema.parse('dededede-dede-4ede-8ede-dededededede');
 
-const runHyperCommand = (args: readonly string[]) => runHyperScript(args);
+const runInfinityCubeCommand = (args: readonly string[]) => runInfinityCubeScript(args);
 
 /**
  * The Space the Meta below points at, carrying the Map and Graph that Space
@@ -86,7 +86,7 @@ const metaSpaceSnapshot: SpaceSnapshot = {
 
 const linkedPair = { metaSpaceId: META_SPACE_ID, spaces: [targetSpaceSnapshot, metaSpaceSnapshot] };
 
-describe('hyper CLI', () => {
+describe('infinity-cube CLI', () => {
   const repository = new SqlSpaceRepository(postgresSqlStore(postgresTestDatabase));
   const temporaryDirectories = new Set<string>();
 
@@ -122,7 +122,7 @@ describe('hyper CLI', () => {
     metaSpaceId: UUID,
     snapshots: readonly SpaceSnapshot[],
   ): Promise<string> => {
-    const directory = await temporaryDirectory('hyper-cli-integration-');
+    const directory = await temporaryDirectory('infinity-cube-cli-integration-');
     await writeFile(
       join(directory, AGGREGATE_FILE_NAME),
       `${JSON.stringify({ version: AGGREGATE_FILE_VERSION, metaSpaceId }, null, 2)}\n`,
@@ -142,7 +142,7 @@ describe('hyper CLI', () => {
   };
 
   /*
-   * Every Hyper row, before each case rather than a list of the ids one created.
+   * Every InfinityCube row, before each case rather than a list of the ids one created.
    *
    * The two lifecycle doors are whole-aggregate doors: `--dangerous-replace`
    * deletes rows this file never named, and an id-less Resource in a fixture is
@@ -152,7 +152,7 @@ describe('hyper CLI', () => {
    * case left. Safe because `fileParallelism` is off: one integration
    * file at a time owns the single `DATABASE_URL`.
    */
-  beforeEach(clearHyperContent);
+  beforeEach(clearInfinityCubeContent);
 
   afterEach(async () => {
     await Promise.all(
@@ -162,7 +162,7 @@ describe('hyper CLI', () => {
   });
 
   afterAll(async () => {
-    await clearHyperContent();
+    await clearInfinityCubeContent();
     await postgresTestDatabase.close();
   });
 
@@ -182,7 +182,7 @@ describe('hyper CLI', () => {
       await writeFile(join(directory, IMPORTED_SPACE_ID, 'resources', name), text);
     }
 
-    const result = await runHyperCommand(['import', directory]);
+    const result = await runInfinityCubeCommand(['import', directory]);
 
     expect(result.status).toBe(0);
     expect(result.stdout).toBe(
@@ -217,7 +217,7 @@ describe('hyper CLI', () => {
       metaSpaceSnapshot,
     ]);
 
-    const result = await runHyperCommand(['import', directory]);
+    const result = await runInfinityCubeCommand(['import', directory]);
 
     // Reported in stored id order, which is `loadEverySpace`'s. That puts the
     // ordinary Space first and Meta second — the opposite of what an importer
@@ -261,7 +261,7 @@ describe('hyper CLI', () => {
       },
     ]);
 
-    const result = await runHyperCommand(['import', directory]);
+    const result = await runInfinityCubeCommand(['import', directory]);
 
     // There is no third outcome to fall into. Import either establishes first
     // state or, with `--dangerous-replace`, replaces it; adding a Space beside
@@ -298,12 +298,12 @@ describe('hyper CLI', () => {
       ],
     };
     await seedAggregate({ metaSpaceId: IMPORTED_SPACE_ID, spaces: [snapshot] });
-    const destination = await temporaryDirectory('hyper-cli-export-');
+    const destination = await temporaryDirectory('infinity-cube-cli-export-');
 
     // One argument, because export takes the whole aggregate. A Space on its own
     // is not something the format can round-trip, since a Space Resource pointing
     // out of it would name a target the directory does not hold.
-    const result = await runHyperCommand(['export', destination]);
+    const result = await runInfinityCubeCommand(['export', destination]);
 
     expect(result).toEqual({
       status: 0,
@@ -342,9 +342,9 @@ describe('hyper CLI', () => {
 
   it('round-trips the stored aggregate through the real export and import commands', async () => {
     await seedAggregate(linkedPair);
-    const destination = await temporaryDirectory('hyper-cli-round-trip-');
+    const destination = await temporaryDirectory('infinity-cube-cli-round-trip-');
 
-    const exported = await runHyperCommand(['export', destination]);
+    const exported = await runInfinityCubeCommand(['export', destination]);
     expect(exported).toEqual({
       status: 0,
       stdout:
@@ -357,7 +357,7 @@ describe('hyper CLI', () => {
     // The repository is initialized, so re-importing what it just wrote needs
     // the destructive flag — which is the round trip worth proving. Without it
     // the command would refuse, and the two halves would never meet.
-    const reimported = await runHyperCommand(['import', destination, '--dangerous-replace']);
+    const reimported = await runInfinityCubeCommand(['import', destination, '--dangerous-replace']);
     expect(reimported).toEqual({
       status: 0,
       stdout:
@@ -401,11 +401,13 @@ describe('hyper CLI', () => {
     await mkdir(join(source, 'images'));
     await writeFile(join(source, 'images', `${image.id}.png`), pngBytes(1));
 
-    expect((await runHyperCommand(['import', source])).status).toBe(0);
+    expect((await runInfinityCubeCommand(['import', source])).status).toBe(0);
     await expect(repository.loadImage(image.id)).resolves.toEqual(image);
 
-    const destination = await temporaryDirectory('hyper-cli-images-');
-    expect((await runHyperCommand(['export', destination, '--store', 'postgres'])).status).toBe(0);
+    const destination = await temporaryDirectory('infinity-cube-cli-images-');
+    expect(
+      (await runInfinityCubeCommand(['export', destination, '--store', 'postgres'])).status,
+    ).toBe(0);
     expect(new Uint8Array(await readFile(join(destination, 'images', `${image.id}.png`)))).toEqual(
       pngBytes(1),
     );
@@ -422,7 +424,7 @@ describe('hyper CLI', () => {
     const resourcePath = join(directory, MALFORMED_SPACE_ID, 'resources', 'broken.json');
     await writeFile(resourcePath, '{ "title": "No kind" }\n');
 
-    const result = await runHyperCommand(['import', directory]);
+    const result = await runInfinityCubeCommand(['import', directory]);
 
     expect(result.status).not.toBe(0);
     expect(result.stdout).toBe('');

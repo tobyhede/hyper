@@ -16,7 +16,7 @@ export interface HeldLock {
 }
 
 // Plain JavaScript on `node:sqlite` so the holder is a second OS process with
-// its own handle and its own event loop, and nothing it runs is Hyper's.
+// its own handle and its own event loop, and nothing it runs is InfinityCube's.
 const HOLDER = `
 const { DatabaseSync } = require('node:sqlite');
 const [path, lock, releaseAfter] = process.argv.slice(1);

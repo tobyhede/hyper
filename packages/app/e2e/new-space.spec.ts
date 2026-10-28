@@ -52,7 +52,7 @@ test('centres its first resource without animating it in from the canvas origin'
 }) => {
   await page.addInitScript(() => {
     const transforms: string[] = [];
-    Object.defineProperty(window, '__hyperOverviewTransforms', { value: transforms });
+    Object.defineProperty(window, '__infinityCubeOverviewTransforms', { value: transforms });
 
     const observeViewport = () => {
       const viewport = document.querySelector<HTMLElement>('.react-flow__viewport');
@@ -79,12 +79,13 @@ test('centres its first resource without animating it in from the canvas origin'
   await expect(nodeByTitle(page, 'Resource 1')).toBeVisible();
   await settled(page);
 
-  // SAFETY: `__hyperOverviewTransforms` is a debug array this same spec sets
+  // SAFETY: `__infinityCubeOverviewTransforms` is a debug array this same spec sets
   // on `window` above (`Object.defineProperty`) — not part of the DOM lib's
   // `Window` type, but a value only this test's own instrumentation writes.
   const transforms = await page.evaluate(
     () =>
-      (window as Window & { __hyperOverviewTransforms?: string[] }).__hyperOverviewTransforms ?? [],
+      (window as Window & { __infinityCubeOverviewTransforms?: string[] })
+        .__infinityCubeOverviewTransforms ?? [],
   );
 
   // React Flow's prop-driven initial fit may replace its identity transform once.
