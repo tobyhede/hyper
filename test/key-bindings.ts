@@ -99,7 +99,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: "defer to a focused slider's value movement",
   },
   {
-    module: 'packages/app/src/presenting-keys.ts',
+    module: 'packages/app/src/presenting-commands.ts',
     sourceKey: 'PageDown',
     occurrence: 1,
     key: 'PageDown',
@@ -107,7 +107,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'defer to scrolling down until the content ends',
   },
   {
-    module: 'packages/app/src/presenting-keys.ts',
+    module: 'packages/app/src/presenting-commands.ts',
     sourceKey: 'PageUp',
     occurrence: 1,
     key: 'PageUp',
@@ -115,7 +115,7 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     behaviour: 'defer to scrolling up until the content starts',
   },
   {
-    module: 'packages/app/src/presenting-keys.ts',
+    module: 'packages/app/src/presenting-commands.ts',
     sourceKey: 'Home',
     occurrence: 1,
     key: 'Home',
