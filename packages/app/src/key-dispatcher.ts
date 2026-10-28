@@ -45,16 +45,18 @@ export function createKeyDispatcher(target: EventTarget): KeyDispatcher {
     bubble: new Set<() => readonly KeyAnswer[]>(),
     capture: new Set<() => readonly KeyAnswer[]>(),
   };
-  const listenerOf = (phase: 'bubble' | 'capture') => (event: Event) => {
-    if (!(event instanceof KeyboardEvent)) return;
-    for (const answers of [...registrations[phase]]) {
-      for (const { binding, answer } of answers()) {
-        if (!pressesBinding(binding, event) || !answer(event)) continue;
-        event.preventDefault();
-        return;
+  // Named, so a test listing the window's key listeners can tell this one apart.
+  const listenerOf = (phase: 'bubble' | 'capture') =>
+    function dispatchKey(event: Event): void {
+      if (!(event instanceof KeyboardEvent)) return;
+      for (const answers of [...registrations[phase]]) {
+        for (const { binding, answer } of answers()) {
+          if (!pressesBinding(binding, event) || !answer(event)) continue;
+          event.preventDefault();
+          return;
+        }
       }
-    }
-  };
+    };
   const listeners = { bubble: listenerOf('bubble'), capture: listenerOf('capture') };
   return {
     register: (answers, phase = 'bubble') => {
