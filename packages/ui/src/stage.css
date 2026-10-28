@@ -32,8 +32,14 @@
 
 .stage__body {
   height: 100%;
-  overflow-y: auto;
+  overflow-y: hidden;
   overscroll-behavior: contain;
+}
+
+/* A slide scrolls only when its author marked further content with a
+   horizontal rule; content with none is clipped to the frame, however long. */
+.stage__body:has(.resource__body hr) {
+  overflow-y: auto;
 }
 
 .stage__body:focus-visible {
@@ -41,8 +47,8 @@
   outline-offset: -2px;
 }
 
-/* The presented Resource fills the frame at least, and a long one grows past it
-   for the body to scroll. */
+/* The presented Resource fills the frame at least, and a long one grows past it,
+   for the body to scroll when a horizontal rule breaks it. */
 .stage__body .resource--full {
   box-sizing: border-box;
   min-height: 100%;

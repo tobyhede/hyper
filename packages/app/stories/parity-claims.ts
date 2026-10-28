@@ -669,7 +669,14 @@ export const parityClaims: readonly ParityClaim[] = [
     storyFile: 'components/stage.stories.tsx',
     storyExport: 'LongRead',
     claim:
-      'Content longer than the frame scrolls inside it by wheel and Page Up or Page Down, the arrow keys still traverse while the scroll region has focus, and the next Resource starts at its top.',
+      'Content longer than the frame and broken by a horizontal rule scrolls inside it by wheel and Page Up or Page Down, the arrow keys still traverse while the scroll region has focus, and the next Resource starts at its top.',
+  },
+  {
+    id: 'stage-clips-content-with-no-rule',
+    storyFile: 'components/stage.stories.tsx',
+    storyExport: 'Unbroken',
+    claim:
+      'Content longer than the frame with no horizontal rule is clipped to the frame and never scrolls, by wheel or Page Down.',
   },
   {
     id: 'stage-fits-an-oversized-picture',

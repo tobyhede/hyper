@@ -1097,21 +1097,33 @@ export const stageIds = {
   longRead: stageId(2),
   picture: stageId(3),
   titleSlide: stageId(4),
+  unbroken: stageId(5),
 } as const;
 
 /** The Stage's picture, which the catalogue test serves far larger than any frame. */
 export const STAGE_PICTURE_URL = 'https://example.com/stage-picture.png';
 
 /** Twenty list items: more than a 16:9 frame holds at the Stage's type size. */
+const LONG_POINTS = Array.from({ length: 20 }, (_, index) => `- Point ${index + 1}`);
+
 const LONG_READ_BODY = [
-  'A Resource longer than its frame scrolls inside it.',
+  'A Resource longer than its frame scrolls inside it, because a rule marks more.',
   '',
-  ...Array.from({ length: 20 }, (_, index) => `- Point ${index + 1}`),
+  '---',
+  '',
+  ...LONG_POINTS,
+].join('\n');
+
+const UNBROKEN_BODY = [
+  'A Resource as long, with no rule, is clipped to its frame.',
+  '',
+  ...LONG_POINTS,
 ].join('\n');
 
 /**
- * A line through the three shapes of content the Stage frames: Markdown longer
- * than the frame, a picture, and an Ur Resource with no content below its name.
+ * A line through the shapes of content the Stage frames: Markdown longer than
+ * the frame and broken by a rule, a picture, an Ur Resource with no content
+ * below its name, and Markdown as long with no rule.
  */
 export const stageSnapshot: SpaceSnapshot = {
   id: stageId(0xf),
@@ -1132,6 +1144,7 @@ export const stageSnapshot: SpaceSnapshot = {
             edges: [
               { from: stageIds.longRead, to: stageIds.picture },
               { from: stageIds.picture, to: stageIds.titleSlide },
+              { from: stageIds.titleSlide, to: stageIds.unbroken },
             ],
           },
         ],
@@ -1148,6 +1161,10 @@ export const stageSnapshot: SpaceSnapshot = {
       document: { title: 'Picture', kind: 'image', content: { url: STAGE_PICTURE_URL } },
     },
     { id: stageIds.titleSlide, document: { title: 'Title slide', kind: 'ur', content: {} } },
+    {
+      id: stageIds.unbroken,
+      document: { title: 'Unbroken', kind: 'markdown', content: { source: UNBROKEN_BODY } },
+    },
   ],
 };
 

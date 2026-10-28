@@ -20,11 +20,13 @@ export interface StageProps {
  * The surface presenting draws on: one fixed 16:9 frame, the largest
  * that fits above the chrome strip, letterboxed in the room the Stage fills.
  *
- * The frame's size never depends on its content. Content that overflows scrolls
- * vertically inside the frame's body, which takes focus so Page Up and Page
- * Down reach it; the body is a plain region rather than a control, so a
- * window-level key listener still sees every key pressed in it. Type inside the
- * frame is sized in container units, so it scales with the frame.
+ * The frame's size never depends on its content. Content scrolls vertically
+ * inside the frame's body only when a horizontal rule in it marks further
+ * content; content with none is clipped to the frame, so a slide never scrolls
+ * by accident. The body takes focus so Page Up and Page Down reach it; it is a
+ * plain region rather than a control, so a window-level key listener still sees
+ * every key pressed in it. Type inside the frame is sized in container units,
+ * so it scales with the frame.
  *
  * Presentational: it draws what it is given and owns no traversal, keys or
  * focus beyond its own body.
