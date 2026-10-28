@@ -29,7 +29,7 @@ import { expect, type JSHandle, type Locator, type Page } from '@playwright/test
  * test.
  */
 const fixtureRoot = fileURLToPath(new URL('../fixture', import.meta.url));
-const rawAggregate: unknown = JSON.parse(readFileSync(`${fixtureRoot}/hyper.json`, 'utf8'));
+const rawAggregate: unknown = JSON.parse(readFileSync(`${fixtureRoot}/aggregate.json`, 'utf8'));
 const fixtureAggregate = aggregateFileSchema.parse(rawAggregate);
 const fixtureMetaId = fixtureAggregate.metaSpaceId;
 const fixtureDir = `${fixtureRoot}/${fixtureMetaId}`;

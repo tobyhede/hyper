@@ -786,7 +786,7 @@ describe('scanAggregateFrom', () => {
   const listed = (paths: readonly string[]): AggregateSource =>
     mapSource('/talk', new Map(paths.map((path) => [path, new Uint8Array()])));
 
-  it("finds hyper.json, each Space directory's files and the visible images, in read order", async () => {
+  it("finds aggregate.json, each Space directory's files and the visible images, in read order", async () => {
     expect(await scanAggregateFrom(listed([...MIXED_DIRECTORY].reverse()))).toEqual({
       files: [
         AGGREGATE_FILE_NAME,
@@ -802,7 +802,7 @@ describe('scanAggregateFrom', () => {
     });
   });
 
-  it('finds nothing of a Space directory without a space.json, and no hyper.json it lacks', async () => {
+  it('finds nothing of a Space directory without a space.json, and no aggregate.json it lacks', async () => {
     expect(
       await scanAggregateFrom(
         listed([
@@ -853,7 +853,7 @@ describe('reading from a source', () => {
   const aggregateText = JSON.stringify({ version: 1, metaSpaceId: META_SPACE_ID });
   const metaSpaceFile = JSON.stringify({ version: 1, title: 'Meta' });
 
-  it('reads nothing past a malformed hyper.json', async () => {
+  it('reads nothing past a malformed aggregate.json', async () => {
     const { source, reads } = recordingReads(
       mapSource(
         '/talk',
@@ -874,7 +874,7 @@ describe('reading from a source', () => {
     expect(reads).toEqual([AGGREGATE_FILE_NAME]);
   });
 
-  it('reads hyper.json first, then what the scan finds, in its order', async () => {
+  it('reads aggregate.json first, then what the scan finds, in its order', async () => {
     const image = await admitted(pngBytes(7));
     const files = new Map<string, Uint8Array>([
       [AGGREGATE_FILE_NAME, encode(aggregateText)],
@@ -945,7 +945,7 @@ describe('reading from a source', () => {
     expect(most).toBe(3);
   });
 
-  it('names hyper.json when it could not be read, reading nothing else', async () => {
+  it('names aggregate.json when it could not be read, reading nothing else', async () => {
     const { source, reads } = recordingReads(
       withUnreadable(
         mapSource(
@@ -1111,7 +1111,7 @@ describe('a symbolic link, on disk', () => {
     expect(await discoveryDiagnostics(() => scannedAggregateFiles(root))).toEqual(expected);
   });
 
-  it('refuses a linked hyper.json before reading anything', async () => {
+  it('refuses a linked aggregate.json before reading anything', async () => {
     const root = await makeTemporaryDirectory();
     await linkTo(
       root,

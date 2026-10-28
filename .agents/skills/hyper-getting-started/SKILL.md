@@ -19,9 +19,9 @@ Work from the root of the Hyper clone. Each step ends on its completion criterio
 
 3. **Content directory.** Ask the person where their work lives, or should live. It is any path outside the Hyper clone, for example `~/talks/rust-async`.
    - **New work:** run `pnpm hyper init <dir>`. The directory must be missing or empty; dot-entries such as `.git` and `.DS_Store` do not count, so a fresh `git init` directory is empty. It writes a new aggregate, prints `Created a new aggregate; run it with: pnpm hyper run <dir>` and exits zero without serving. A directory that is not empty is refused and nothing is written: ask the person whether they meant existing work there, or another path.
-   - **Existing work:** the directory must hold `hyper.json` at its top. A directory holding only `space.json` is one Space, not an Aggregate directory, and is refused.
+   - **Existing work:** the directory must hold `aggregate.json` at its top. A directory holding only `space.json` is one Space, not an Aggregate directory, and is refused. One holding `hyper.json` instead of `aggregate.json` is refused too: rename the file with `mv <dir>/hyper.json <dir>/aggregate.json`, which works whether or not the directory is a git repository yet; step 4 then commits the rename before the first run.
 
-   Done when you know the absolute path and `<dir>/hyper.json` exists.
+   Done when you know the absolute path and `<dir>/aggregate.json` exists.
 
 4. **Git.** Make the directory a git repository if it is not in one: `git -C <dir> init`; it can also be done before `init`. Then commit what is there before the first run: `git -C <dir> add -A && git -C <dir> commit -m "Before Hyper"`. A repository with no commit has nothing to restore, and the first write rewrites existing files into Hyper's own form (every Resource becomes `resources/<id>.json`, with a Markdown Resource's source in `resources/<id>.md`), so the commit is what makes git the undo for that first edit. If `git -C <dir> status --porcelain` already prints nothing, there is nothing to commit.
    Done when `git -C <dir> rev-parse --show-toplevel` succeeds and `git -C <dir> status --porcelain` prints nothing.

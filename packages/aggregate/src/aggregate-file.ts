@@ -14,7 +14,7 @@ import type { AggregateInput } from './space-repository';
 import { AggregateDirectoryError, parseSingleSpace, refuseSpaceDocument } from './space-directory';
 
 /** The name of the aggregate file at the root of a canonical aggregate directory. */
-export const AGGREGATE_FILE_NAME = 'hyper.json';
+export const AGGREGATE_FILE_NAME = 'aggregate.json';
 
 /**
  * A path inside `directory`, joined as a string so the reader needs no path
@@ -31,18 +31,18 @@ const textOf = (bytes: Uint8Array): string =>
   new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes);
 
 /**
- * The absence of `hyper.json`, which is what makes a directory an aggregate at
+ * The absence of `aggregate.json`, which is what makes a directory an aggregate at
  * all, is a **discovery** failure rather than a parsing one, and the message
  * names the file: the likeliest way to arrive here is by pointing the command
  * at a single Space directory, which is not what public import takes, and
- * "there is no hyper.json here" is the sentence that says so.
+ * "there is no aggregate.json here" is the sentence that says so.
  */
 const missingAggregateFile = (path: string): AggregateDirectoryError =>
   new AggregateDirectoryError('discovery', [
     `${path}: a canonical aggregate directory must contain ${AGGREGATE_FILE_NAME}`,
   ]);
 
-/** Parse `hyper.json`'s text into the Meta Space it names. */
+/** Parse `aggregate.json`'s text into the Meta Space it names. */
 const parseAggregateFile = (path: string, text: string): UUID => {
   let json: unknown;
   try {
@@ -135,7 +135,7 @@ const refuseLinks = (source: AggregateSource, paths: readonly string[]): void =>
 const isVisibleImage = (name: string): boolean => name !== '' && !name.startsWith('.');
 
 /**
- * The root's listing, refused when `hyper.json`, `images/` or a directory
+ * The root's listing, refused when `aggregate.json`, `images/` or a directory
  * named for a Space is a symbolic link: Export writes into each of those.
  */
 const listRoot = async (source: AggregateSource): Promise<DirectoryListing> => {
@@ -213,7 +213,7 @@ const scanSpaceDirectory = async (
  * file directly in it is read once, as an image. `images/` is listed whether
  * or not the root's listing names it, and a missing one lists empty; a linked
  * one was refused with the root. Nothing deeper is listed, so a sibling
- * aggregate or a nested `hyper.json` is never searched for.
+ * aggregate or a nested `aggregate.json` is never searched for.
  *
  * Every directory is listed before a failure is raised, so each one that
  * could not be listed, or holds a link at a path Hyper owns, is reported
@@ -277,7 +277,7 @@ export interface AggregateScan {
 
 /**
  * The files Importing reads in a source's directory, in the order it reads
- * them, found by listing alone: `hyper.json`; then, for each child directory
+ * them, found by listing alone: `aggregate.json`; then, for each child directory
  * holding a `space.json`, in ordinal name order, that `space.json` followed by
  * the `*.md` beside it and the `resources/*.json` and `resources/*.md`, in
  * ordinal order of their path inside the Space directory; then the visible
@@ -286,7 +286,7 @@ export interface AggregateScan {
  * This is the one discovery rule: `readAggregateFrom` reads what it finds, and
  * Export owns what it finds. A child directory without a `space.json` is not a
  * Space directory, and `images/` is never one. A sibling aggregate, notes and
- * any other file are left out. A directory with no `hyper.json` still answers
+ * any other file are left out. A directory with no `aggregate.json` still answers
  * the rest, which Export owns there as well.
  */
 export const scanAggregateFrom = async (source: AggregateSource): Promise<AggregateScan> => {
@@ -476,8 +476,8 @@ const aggregateContents = (
  * admitted by the rule storing an uploaded picture uses (ADR 0133, ADR 0118).
  *
  * The reader decides everything the read involves, and the source only reaches
- * the files. It lists the root, and refuses a root with no `hyper.json`. It
- * reads and parses `hyper.json` before anything else, so a malformed one stops
+ * the files. It lists the root, and refuses a root with no `aggregate.json`. It
+ * reads and parses `aggregate.json` before anything else, so a malformed one stops
  * the read with nothing else read. It then lists and reads what
  * `scanAggregateFrom` finds, through one pool no wider than the source allows.
  * A directory that could not be listed stops the read as a discovery failure

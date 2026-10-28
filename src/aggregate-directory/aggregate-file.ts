@@ -33,7 +33,7 @@ const aggregateFile = (metaSpaceId: UUID): AggregateFile => ({
 
 /**
  * Every file an aggregate and the stored images it shows serialise to, by path
- * relative to the Aggregate directory: `hyper.json`, each Space's directory
+ * relative to the Aggregate directory: `aggregate.json`, each Space's directory
  * named for its id, and `images/<content-id>.<ext>` (ADR 0118).
  */
 export const aggregateFiles = (
@@ -62,7 +62,7 @@ export const aggregateFiles = (
 /**
  * Every file Import would read in `directory`, by path relative to it: what
  * Export owns there, and so what it removes when the aggregate no longer
- * serialises to it. `hyper.json`, each discovered Space directory's
+ * serialises to it. `aggregate.json`, each discovered Space directory's
  * `space.json` and Resource files, and the visible files in `images/` — and
  * nothing else, so a file Import does not read is never Export's to remove.
  * They are the files `scanAggregateFrom` finds there, in its order, and a
@@ -100,7 +100,7 @@ export const assertExportableDestination = async (destination: string): Promise<
 };
 
 /**
- * Write one Aggregate into a directory, in place: `hyper.json` plus every
+ * Write one Aggregate into a directory, in place: `aggregate.json` plus every
  * Space directory, removing the Space directories and Resource files Import
  * would read that the Aggregate no longer holds. Nothing is checked before
  * writing; `exportAggregate` is the write that checks.

@@ -26,7 +26,7 @@ export type { Resource, ResourceDocument, ResourceFileDocument } from './kinds/r
 export type UUID = z.infer<typeof uuidSchema>;
 export type SpaceDocument = z.infer<typeof spaceDocumentSchema>;
 export type SpaceSnapshot = z.infer<typeof spaceSnapshotSchema>;
-/** `hyper.json` — what a canonical aggregate directory declares about itself. */
+/** `aggregate.json` — what a canonical aggregate directory declares about itself. */
 export type AggregateFile = z.infer<typeof aggregateFileSchema>;
 export type ImportSpaceFile = z.infer<typeof importSpaceFileSchema>;
 export type ImportSpace = z.infer<typeof importSpaceSchema>;

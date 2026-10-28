@@ -1,18 +1,18 @@
 ---
 name: hyper-authoring
-description: Write or change Hyper content as files — an Aggregate directory's `hyper.json`, Space directories, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, and `images/`. Use when writing or editing the files of a Hyper talk or design on disk rather than in the browser; setting Hyper up or starting a run is `hyper-getting-started`.
+description: Write or change Hyper content as files — an Aggregate directory's `aggregate.json`, Space directories, `space.json` Maps, Graphs and Edges, Resource files and their Markdown, and `images/`. Use when writing or editing the files of a Hyper talk or design on disk rather than in the browser; setting Hyper up or starting a run is `hyper-getting-started`.
 ---
 
 # Authoring an Aggregate directory
 
-An **Aggregate directory** is Hyper's on-disk form: `hyper.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `images/` holding stored pictures. The complete reference is [`docs/aggregate-directory.md`](../../../docs/aggregate-directory.md) in the Hyper repository. Read it before writing, and treat it as the authority on every key and rule; this skill is the order to work in and the traps.
+An **Aggregate directory** is Hyper's on-disk form: `aggregate.json` naming the Meta Space, one directory per Space named for its Id, each holding `space.json` and a `resources/` directory of JSON Resource files (with a Markdown Resource's source in its `<id>.md` sidecar), and `images/` holding stored pictures. The complete reference is [`docs/aggregate-directory.md`](../../../docs/aggregate-directory.md) in the Hyper repository. Read it before writing, and treat it as the authority on every key and rule; this skill is the order to work in and the traps.
 
 ## Steps
 
 1. **Stop the run.** If `pnpm hyper run` is running on this directory, stop it (Ctrl-C, or SIGINT to the process group you started) and wait for it to exit. A running Hyper writes every file it owns from memory after every edit, so its next write replaces anything you change in those files underneath it.
    Done when nothing is serving the directory: `if d=$(cd "<dir>" && pwd -P); then ps -Aww -o pid=,command= | sed -n 's/^ *\([0-9][0-9]*\) .*run-process.ts \(.*\) [0-9]* \(no-\)\{0,1\}open$/\1 \2/p' | while read -r pid held; do [ "$held" -ef "$d" ] && echo "$pid"; done; else echo "cannot enter <dir>"; fi`, with `<dir>` absolute, prints nothing. It prints the process id of each run on the directory, and `cannot enter <dir>` when `<dir>` is missing or mistyped. It compares directories, not spellings, so a trailing slash or a symlink on either side, in `<dir>` or in the path the run was started with, still matches, and a sibling sharing its prefix does not.
 
-2. **Read what is there.** If the directory exists, read `hyper.json`, every Space's `space.json` and its Resource files, and check `git -C <dir> status` so your change starts from a clean or known state. A new directory needs a `hyper.json`, and a Meta Space directory with a `space.json`, before anything else: `pnpm hyper init <dir>` from the Hyper clone writes both to a missing or empty directory.
+2. **Read what is there.** If the directory exists, read `aggregate.json`, every Space's `space.json` and its Resource files, and check `git -C <dir> status` so your change starts from a clean or known state. A new directory needs an `aggregate.json`, and a Meta Space directory with a `space.json`, before anything else: `pnpm hyper init <dir>` from the Hyper clone writes both to a missing or empty directory.
    Done when you can name the Meta Space, every Space, and the Ids of the Maps, Graphs and Resources you will touch.
 
 3. **Write the change.** Follow the reference. The rules that most often refuse a hand-written directory:

@@ -449,7 +449,7 @@ export const spaceSnapshotSchema = z.object({
 export const AGGREGATE_FILE_VERSION = 1;
 
 /**
- * `hyper.json` — the root of a canonical aggregate directory.
+ * `aggregate.json` — the root of a canonical aggregate directory.
  *
  * It carries the one fact the directory cannot say for itself: which of its
  * Spaces is Meta. No adapter may infer that from ordering, cardinality or

@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0069, 0078, 0117
-Refined by: 0131, 0132, 0133
+Refined by: 0131, 0132, 0133, 0136
 Related: 0109, 0118, 0124
 
 A static copy of the application can show a talk that lives in a public GitHub repository, with no server, database or per-talk copy of the application. **Mounting** reads a complete aggregate from a **GitHub location**, `github:owner/repo@ref/path`, when the page opens. It keeps that aggregate in a store inside the page, and the page answers its own HTTP API from that store. Everything that reads, navigates and presents works. No Edit is offered or accepted, because there is nowhere to make one durable.

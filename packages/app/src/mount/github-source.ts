@@ -22,7 +22,7 @@ import type { AggregateSource, DirectoryListing, SourceRead } from '@project/agg
  * tree is listed rather than the whole repository's. An API answer that is
  * GitHub's primary or secondary rate limit is answered as one. A path that is
  * not a directory at the commit lists empty, so the reader refuses it as a
- * directory without `hyper.json`.
+ * directory without `aggregate.json`.
  *
  * Nothing is fetched until the reader reads: the source lists from the tree in
  * memory, and the reader decides which files to read, at most

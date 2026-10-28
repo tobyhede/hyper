@@ -2,7 +2,7 @@
 
 Status: accepted
 Refines: 0030, 0117, 0118
-Refined by: 0134
+Refined by: 0134, 0136
 
 Every Export writes the Aggregate directory **in place**: Running's write-through after each edit (ADR 0117), and `pnpm hyper export` and `pnpm hyper:sqlite export` alike. Hyper gives no whole-write atomicity, keeps no backup and leaves no recovery copy. A directory an author keeps their work in is under git, and git is the guarantee.
 
