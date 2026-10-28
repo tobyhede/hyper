@@ -17,6 +17,7 @@ import type { ResourceContent } from '@project/core';
 import {
   beginEditing,
   beginReplacing,
+  graphPaint,
   type CanvasResourceBodyEditor,
   type ImageReplaceEditor,
   type ResourceDisplay,
@@ -1086,8 +1087,8 @@ describe('ResourceNode graph authoring', () => {
       `Connect from ${Position.Bottom}`,
       `Connect from ${Position.Left}`,
     ]);
-    expect(handles.every((handle) => handle.style.backgroundColor === 'rgb(31, 119, 180)')).toBe(
-      true,
+    expect(handles.map((handle) => handle.style.background)).toEqual(
+      Array.from({ length: 4 }, () => graphPaint('#1f77b4')),
     );
   });
 

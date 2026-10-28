@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
+import { graphPaint } from '@project/ui';
 import { GraphHeadMarkers, projectGraphEdges } from '../src/index';
 import { uuid } from './uuid';
 
@@ -38,7 +39,7 @@ const markersIn = (container: HTMLElement) =>
     return {
       id: marker.id,
       headShape: glyph?.getAttribute('data-head-shape'),
-      fill: glyph?.getAttribute('fill'),
+      fill: glyph instanceof SVGElement ? glyph.style.fill : undefined,
     };
   });
 
@@ -47,8 +48,8 @@ describe('GraphHeadMarkers', () => {
     const { container } = render(canvas());
 
     expect(markersIn(container)).toEqual([
-      { id: `graph-head-${RED}`, headShape: 'dot', fill: '#d62728' },
-      { id: `graph-head-${BLUE}`, headShape: 'arrow', fill: '#1f77b4' },
+      { id: `graph-head-${RED}`, headShape: 'dot', fill: graphPaint('#d62728') },
+      { id: `graph-head-${BLUE}`, headShape: 'arrow', fill: graphPaint('#1f77b4') },
     ]);
     // All in one hidden `<defs>`, as React Flow draws its own markers.
     expect(container.querySelectorAll('defs')).toHaveLength(1);

@@ -43,6 +43,7 @@ import type { SpaceSession } from '@project/persistence';
 import {
   CANVAS_RESOURCE_DRAG_TILT_DEGREES,
   GraphIcon,
+  graphPaint,
   spaceViewOf,
   type EntityActionGroup,
 } from '@project/ui';
@@ -1520,7 +1521,7 @@ export function SpaceCanvas({
     [embeddedConnectionParent, embeddedPublications, graphs, colorByGraphId, activeGraphId],
   );
   const connectionLineStyle = useMemo(
-    () => ({ stroke: preview.color, strokeWidth: 3 }),
+    () => ({ stroke: graphPaint(preview.color), strokeWidth: 3 }),
     [preview.color],
   );
 

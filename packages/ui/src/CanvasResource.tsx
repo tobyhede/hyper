@@ -19,6 +19,7 @@ import {
   type ResourceShape,
 } from '@project/core';
 import { Button } from './Button';
+import { graphPaint } from './graph-color';
 import { canvasContent, contentCommand, type KindOperations } from './kinds/registry';
 import { isSpaceOperations } from './kinds/space';
 import { isUrOperations } from './kinds/ur';
@@ -364,8 +365,11 @@ export function CanvasResource(props: CanvasResourceProps) {
   const size = props.size ?? COLLAPSED_RESOURCE_SIZE;
   const outline = resourceShapeOutline(drawnResourceShape, size);
   const style: CanvasResourceStyle = {
-    '--canvas-resource-graph': graphColor,
-    '--canvas-resource-border': props.borderColor ?? 'var(--canvas-resource-ink-color)',
+    '--canvas-resource-graph': graphPaint(graphColor),
+    '--canvas-resource-border':
+      props.borderColor === undefined
+        ? 'var(--canvas-resource-ink-color)'
+        : graphPaint(props.borderColor),
     '--canvas-resource-drag-tilt': `${CANVAS_RESOURCE_DRAG_TILT_DEGREES}deg`,
     // The Shape's inscribed rectangle, as a share of the rect it is drawn at,
     // which `canvas-resource.css` lays the Title and kind glyph out in.

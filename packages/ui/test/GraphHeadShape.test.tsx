@@ -36,6 +36,18 @@ describe('GraphHeadShapeGlyph', () => {
     }
   });
 
+  it("paints through the colour's theme paint, which a property can take and an attribute cannot", () => {
+    const { container } = render(
+      <svg>
+        <GraphHeadShapeGlyph headShape="arrow" color="#ff7f0e" />
+      </svg>,
+    );
+    const glyph = container.querySelector('[data-slot="graph-head-shape"]');
+    expect(glyph instanceof SVGElement ? glyph.style.fill : undefined).toBe(
+      'var(--graph-paint-ff7f0e, #ff7f0e)',
+    );
+  });
+
   it('names every head shape for a person choosing one', () => {
     expect(GRAPH_HEAD_SHAPE_LABELS).toEqual({
       arrow: 'Arrow',

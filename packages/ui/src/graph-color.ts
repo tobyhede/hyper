@@ -15,6 +15,18 @@ export function graphColor(graph: Graph, colorByGraphId: Readonly<Record<string,
   return colorByGraphId[graph.id] ?? graph.color ?? FALLBACK_GRAPH_COLOR;
 }
 
+/**
+ * The paint a Graph's colour is drawn with: a hex colour reaches the surface
+ * through `--graph-paint-<hex>`, which a theme may declare to redraw that
+ * colour for its own ground, and is itself where no theme does. Anything
+ * else, such as a `var()`, is drawn as given. A stored colour stays the hex:
+ * only what is painted goes through here.
+ */
+export function graphPaint(color: string): string {
+  const hex = /^#([0-9a-f]{6})$/i.exec(color)?.[1];
+  return hex === undefined ? color : `var(--graph-paint-${hex.toLowerCase()}, ${color})`;
+}
+
 /** How a Graph's Edges are drawn: the two channels an Edge is told apart by. */
 export interface GraphAppearance {
   readonly color: string;

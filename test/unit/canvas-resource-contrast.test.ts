@@ -37,7 +37,7 @@ const tokensOf = (css: string): ReadonlyMap<string, string> =>
 
 const THEMES = [
   { theme: 'sand', tokens: tokensOf(`${theme}\n${resourceCss}`) },
-  { theme: 'Neon Glitch', tokens: tokensOf(`${theme}\n${resourceCss}\n${darkTheme}`) },
+  { theme: 'dark', tokens: tokensOf(`${theme}\n${resourceCss}\n${darkTheme}`) },
 ] as const;
 
 /** Follows a `var(--a)` chain to the literal colour it bottoms out in. */
