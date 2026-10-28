@@ -84,13 +84,16 @@ import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
 import {
-  bindCommand,
+  ADD_RESOURCE,
   answerCommand,
+  bindCommand,
   keyAnswerOf,
   NOT_A_CANVAS_COMMAND,
   presentFromHereCommand,
   REMOVE_SELECTION,
   removeFromMapReportedBy,
+  RENAME_RESOURCE,
+  type AuthoringOccurrence,
   type RemovalTarget,
   type PresentFrom,
 } from '../canvas-commands';
@@ -852,11 +855,6 @@ export function SpaceCanvas({
     ],
   );
 
-  const latestOccurrences = useRef(occurrences);
-  useLayoutEffect(() => {
-    latestOccurrences.current = occurrences;
-  }, [occurrences]);
-
   /** The Active Graph's Edges as Graph navigation reads them, and each Resource's drawn node. */
   const activeGraphLinks = (canvas: HTMLElement) => {
     const elementOf = (resourceId: ResourceId): HTMLElement | null => {
@@ -997,9 +995,7 @@ export function SpaceCanvas({
   // nothing is authored where it cannot be seen. An attribute rather than a
   // prop, because the React this application runs on does not know `inert`.
   const fullViewShown = fullView !== undefined && fullViewDrawn;
-  const latestFullViewShown = useRef(fullViewShown);
   useLayoutEffect(() => {
-    latestFullViewShown.current = fullViewShown;
     canvasRef.current?.toggleAttribute('inert', fullViewShown);
   }, [fullViewShown]);
 
@@ -1044,29 +1040,6 @@ export function SpaceCanvas({
     occurrence.openResource(resourceId);
   };
 
-  // `C` adds a Resource, answered on the window so it reaches the canvas from
-  // wherever focus is — the Dock included — except a surface that owns its keys.
-  // The default is prevented only where the command can actually run
-  // (`docs/agents/rendering.md`'s keyboard contract), so a `c` typed while
-  // authoring is withdrawn is left to whatever else would have had it.
-  useEffect(() => {
-    const addResource = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.addResource, event) || keyBelongsElsewhere(event)) return;
-      if (latestFullViewShown.current) return;
-      // The selection's occurrence, or the canvas's own Map when nothing is selected.
-      const current =
-        latestOccurrences.current.find(
-          (value) => value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
-        ) ?? latestOccurrences.current.find((value) => value.id === CANVAS_OCCURRENCE);
-      if (current === undefined || !current.availability.authorOnCanvas || current.bodyEditing)
-        return;
-      event.preventDefault();
-      current.addResource();
-    };
-    window.addEventListener('keydown', addResource);
-    return () => window.removeEventListener('keydown', addResource);
-  }, []);
-
   // `P` presents the Active Graph from the selected Resource of this canvas's own
   // Map, through the command the rail's Present from Here runs. Nothing on the
   // canvas answers while Full View covers it.
@@ -1084,32 +1057,42 @@ export function SpaceCanvas({
         ],
   );
 
-  // `F2` renames the selected Resource, and this is the *only* handler that answers
-  // it. Don't add a second, such as a React Flow `onKeyDown` branch: two handlers
-  // for one key means one of them is the unguarded one, and a branch that asks
-  // nothing about the target renames whichever Resource happens to be selected
-  // when the key is typed into a control.
-  useLayoutEffect(() => {
-    const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.renameResource, event) || keyBelongsElsewhere(event)) return;
-      if (latestFullViewShown.current) return;
-      const occurrence = latestOccurrences.current.find((value) =>
-        value.nodes.some((node) => node.selected),
-      );
-      if (
-        occurrence === undefined ||
-        !occurrence.availability.authorOnCanvas ||
-        occurrence.bodyEditing
-      )
-        return;
-      const selected = occurrence.nodes.find((node) => node.selected);
-      if (selected === undefined) return;
-      event.preventDefault();
-      occurrence.beginTitleEditing(selected.id);
-    };
-    window.addEventListener('keydown', beginSelectedTitleEdit);
-    return () => window.removeEventListener('keydown', beginSelectedTitleEdit);
-  }, []);
+  // `C` adds a Resource to the Map holding the selection, or else to the
+  // canvas's own, from wherever focus is — the Dock included — except a surface
+  // that owns its keys. `F2` renames the selected Resource on whichever drawn
+  // Map holds it, and is the *only* answer to that key: a second, such as a
+  // React Flow `onKeyDown` branch, would be an unguarded one, renaming whichever
+  // Resource is selected when the key is typed into a control. Neither answers
+  // while Full View covers the canvas, and either leaves its key alone where its
+  // command cannot run (`docs/agents/rendering.md`'s keyboard contract).
+  const authoringOf = (occurrence: (typeof occurrences)[number]): AuthoringOccurrence => ({
+    authorOnCanvas: occurrence.availability.authorOnCanvas,
+    bodyEditing: occurrence.bodyEditing,
+    addResource: occurrence.addResource,
+    beginTitleEditing: occurrence.beginTitleEditing,
+  });
+  useKeyAnswers(
+    fullViewShown
+      ? []
+      : [
+          keyAnswerOf(ADD_RESOURCE, () => {
+            const current =
+              occurrences.find(
+                (value) =>
+                  value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
+              ) ?? occurrences.find((value) => value.id === CANVAS_OCCURRENCE);
+            return current === undefined ? undefined : authoringOf(current);
+          }),
+          keyAnswerOf(RENAME_RESOURCE, () => {
+            for (const occurrence of occurrences) {
+              const selected = occurrence.nodes.find((node) => node.selected);
+              if (selected !== undefined)
+                return { occurrence: authoringOf(occurrence), nodeId: selected.id };
+            }
+            return undefined;
+          }),
+        ],
+  );
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
   // fresh object literal per render while each of these is stable, and a hook
