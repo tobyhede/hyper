@@ -109,13 +109,16 @@ describe('Remove from Map', () => {
   });
 
   it('removes a Resource from its Map, or deletes the selected Edge', () => {
-    const map = occurrence();
+    const drawn = occurrence();
 
-    REMOVE_SELECTION.run({ occurrence: map, subject: { kind: 'resource', resourceId: ON_GRAPH } });
-    REMOVE_SELECTION.run({ occurrence: map, subject: { kind: 'edge' } });
+    REMOVE_SELECTION.run({
+      occurrence: drawn,
+      subject: { kind: 'resource', resourceId: ON_GRAPH },
+    });
+    REMOVE_SELECTION.run({ occurrence: drawn, subject: { kind: 'edge' } });
 
-    expect(map.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
-    expect(map.deleteSelectedEdge).toHaveBeenCalledOnce();
+    expect(drawn.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
+    expect(drawn.deleteSelectedEdge).toHaveBeenCalledOnce();
   });
 
   it('is absent while its Map may not be authored or a body is being edited', () => {
@@ -131,9 +134,9 @@ describe('Remove from Map', () => {
   });
 
   it('leaves its key to any control, even one that owns no keys of its own', () => {
-    const map = occurrence();
+    const drawn = occurrence();
     const answer = keyAnswerOf(REMOVE_SELECTION, () => ({
-      occurrence: map,
+      occurrence: drawn,
       subject: { kind: 'resource' as const, resourceId: ON_GRAPH },
     }));
     const toolbar = document.createElement('div');
@@ -143,8 +146,8 @@ describe('Remove from Map', () => {
 
     expect(answer.answer(pressOn(button, 'Delete'))).toBe(false);
     expect(answer.answer(pressOn(toolbar, 'Delete'))).toBe(false);
-    expect(map.removeFromMap).not.toHaveBeenCalled();
+    expect(drawn.removeFromMap).not.toHaveBeenCalled();
     expect(answer.answer(pressOn(document.body, 'Delete'))).toBe(true);
-    expect(map.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
+    expect(drawn.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
   });
 });
