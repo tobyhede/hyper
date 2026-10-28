@@ -35,7 +35,7 @@ import {
   removeFromMapReportedBy,
   type BoundCommand,
 } from './canvas-commands';
-import { CANVAS_KEYS, type KeyBinding } from './key-bindings';
+import { bindingOf } from './key-bindings';
 import { shortcutOf } from './shortcut-sheet';
 
 /** The sentence the unavailable Create Reference row of a Resource that may not be a Target carries. */
@@ -70,12 +70,16 @@ export type CanvasRailCommands = Pick<
   'openAndExpand' | 'fullView' | 'present'
 >;
 
-const NO_COMMAND: BoundCommand = { availability: ABSENT, run: () => undefined };
+const absent = (id: BoundCommand['id']): BoundCommand => ({
+  id,
+  availability: ABSENT,
+  run: () => undefined,
+});
 
 const NO_CANVAS_COMMANDS: CanvasRailCommands = {
-  openAndExpand: NO_COMMAND,
-  fullView: NO_COMMAND,
-  present: NO_COMMAND,
+  openAndExpand: absent('canvas.openAndExpand'),
+  fullView: absent('canvas.showFullView'),
+  present: absent('canvas.presentFromHere'),
 };
 
 /**
@@ -83,12 +87,12 @@ const NO_CANVAS_COMMANDS: CanvasRailCommands = {
  * reason while it is unavailable, and teaching its key only while the key
  * would answer, so a disabled item teaches no key.
  */
-const commandItem = (command: BoundCommand, binding: KeyBinding) => {
+const commandItem = (command: BoundCommand) => {
   const { availability } = command;
   return availability.kind === 'absent'
     ? null
     : {
-        shortcut: availability.kind === 'available' ? shortcutOf(binding) : undefined,
+        shortcut: availability.kind === 'available' ? shortcutOf(bindingOf(command.id)) : undefined,
         disabled: availability.kind === 'unavailable',
         description: availability.kind === 'unavailable' ? availability.reason : undefined,
         onSelect: (): EntityActionOutcome => {
@@ -167,9 +171,9 @@ export function resourceRailGroups(
             },
           ],
         ];
-  const presentItem = commandItem(present, CANVAS_KEYS.presentFromHere);
-  const openAndExpandItem = commandItem(openAndExpand, CANVAS_KEYS.openAndExpand);
-  const fullViewItem = commandItem(fullView, CANVAS_KEYS.showFullView);
+  const presentItem = commandItem(present);
+  const openAndExpandItem = commandItem(openAndExpand);
+  const fullViewItem = commandItem(fullView);
   // Seeing a Resource whole: expanding it on the Map, which is an Edit, then
   // reading it and presenting from it, which change nothing in the Space.
   const presenting: EntityActionGroup = [
@@ -197,7 +201,7 @@ export function resourceRailGroups(
           },
         ]),
   ];
-  const removeItem = commandItem(removeFromMap, CANVAS_KEYS.removeSelection);
+  const removeItem = commandItem(removeFromMap);
   const leaving: EntityActionGroup = [
     ...(removeItem === null
       ? []

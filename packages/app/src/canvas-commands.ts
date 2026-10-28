@@ -1,7 +1,7 @@
 import type { ResourceId } from '@project/core';
 import type { CommandOutcomes } from './command-outcomes';
 import type { SurfaceAuthoring } from './space-authoring';
-import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, type KeyBinding } from './key-bindings';
+import { keyBelongsElsewhere, OWNS_ITS_KEYS, type CommandId } from './key-bindings';
 import type { KeyAnswer } from './key-dispatcher';
 
 /**
@@ -36,8 +36,8 @@ export const unavailable = (reason: string): CommandAvailability => ({
  */
 export type CanvasCommandAim = 'focused-resource' | 'selection' | 'canvas';
 
-/** A Canvas command's name: its binding's, under the `canvas` context (ADR 0138). */
-export type CanvasCommandId = `canvas.${keyof typeof CANVAS_KEYS}`;
+/** A Canvas command's name (ADR 0138). */
+export type CanvasCommandId = Extract<CommandId, `canvas.${string}`>;
 
 /**
  * A named action on the canvas, which a key, a Resource's rail or both perform.
@@ -48,7 +48,6 @@ export type CanvasCommandId = `canvas.${keyof typeof CANVAS_KEYS}`;
  */
 export interface CanvasCommand<Target> {
   readonly id: CanvasCommandId;
-  readonly binding: KeyBinding;
   readonly aim: CanvasCommandAim;
   /** Whether it acts on the canvas's own Map only, or on any Map the canvas draws. */
   readonly serves: 'own-map' | 'any';
@@ -65,6 +64,7 @@ export interface CanvasCommand<Target> {
 
 /** A command bound to one target, as a rail item draws and runs it. */
 export interface BoundCommand {
+  readonly id: CanvasCommandId;
   readonly availability: CommandAvailability;
   readonly run: () => void;
 }
@@ -74,6 +74,7 @@ export const bindCommand = <Target>(
   command: CanvasCommand<Target>,
   target: Target,
 ): BoundCommand => ({
+  id: command.id,
   availability: command.availability(target),
   run: () => command.run(target),
 });
@@ -126,7 +127,7 @@ export const keyAnswerOf = <Target>(
   command: CanvasCommand<Target>,
   targetOf: (event: KeyboardEvent) => Target | undefined,
 ): KeyAnswer => ({
-  binding: command.binding,
+  id: command.id,
   answer: (event) => answerCommand(command, event, () => targetOf(event)),
 });
 
@@ -163,7 +164,6 @@ export function presentFromHereCommand(input: {
   const { presentFrom, mayPresent } = input;
   return {
     id: 'canvas.presentFromHere',
-    binding: CANVAS_KEYS.presentFromHere,
     aim: 'selection',
     serves: 'own-map',
     availability: (resourceId) => {
@@ -199,7 +199,6 @@ export interface RemovalTarget {
  */
 export const REMOVE_SELECTION: CanvasCommand<RemovalTarget> = {
   id: 'canvas.removeSelection',
-  binding: CANVAS_KEYS.removeSelection,
   aim: 'selection',
   serves: 'any',
   insideCanvas: true,
@@ -244,7 +243,6 @@ const authoringAvailability = (occurrence: AuthoringOccurrence): CommandAvailabi
  */
 export const ADD_RESOURCE: CanvasCommand<AuthoringOccurrence> = {
   id: 'canvas.addResource',
-  binding: CANVAS_KEYS.addResource,
   aim: 'canvas',
   serves: 'any',
   availability: authoringAvailability,
@@ -264,7 +262,6 @@ export interface DrawnResourceTarget {
  */
 export const RENAME_RESOURCE: CanvasCommand<DrawnResourceTarget> = {
   id: 'canvas.renameResource',
-  binding: CANVAS_KEYS.renameResource,
   aim: 'selection',
   serves: 'any',
   availability: ({ occurrence }) => authoringAvailability(occurrence),
@@ -294,7 +291,6 @@ export interface OpenTarget {
  */
 export const OPEN_RESOURCE: CanvasCommand<OpenTarget> = {
   id: 'canvas.openResource',
-  binding: CANVAS_KEYS.openResource,
   aim: 'focused-resource',
   serves: 'any',
   availability: ({ occurrence, takesOpen }) =>
@@ -327,7 +323,6 @@ export interface ExpandTarget extends OwnResourceTarget {
  */
 export const OPEN_AND_EXPAND: CanvasCommand<ExpandTarget> = {
   id: 'canvas.openAndExpand',
-  binding: CANVAS_KEYS.openAndExpand,
   aim: 'focused-resource',
   serves: 'own-map',
   availability: ({ resourceId, canvas }) => (canvas.expandable(resourceId) ? AVAILABLE : ABSENT),
@@ -347,7 +342,6 @@ export function showFullViewCommand(input: {
   const { show, selectNodes } = input;
   return {
     id: 'canvas.showFullView',
-    binding: CANVAS_KEYS.showFullView,
     aim: 'focused-resource',
     serves: 'own-map',
     availability: () => (show !== undefined && selectNodes ? AVAILABLE : ABSENT),

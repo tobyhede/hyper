@@ -8,7 +8,7 @@ export default { title: 'Components/Keyboard Shortcuts' };
 export const Authoring: Story = () => (
   <>
     <p>Press ? to show the keyboard shortcuts.</p>
-    <ShortcutSheet active presenting={false} />
+    <ShortcutSheet presenting={false} />
   </>
 );
 Authoring.meta = { iframed: true };
@@ -17,7 +17,7 @@ Authoring.meta = { iframed: true };
 export const Presenting: Story = () => (
   <>
     <p>Press ? to show the keyboard shortcuts.</p>
-    <ShortcutSheet active presenting />
+    <ShortcutSheet presenting />
   </>
 );
 Presenting.meta = { iframed: true };

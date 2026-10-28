@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { PRESENTING_KEYS } from '../src/key-bindings';
+import { bindingOf, PRESENTING_KEYS } from '../src/key-bindings';
 import { ABSENT, AVAILABLE } from '../src/canvas-commands';
 import { presentingCommands, presentingKeyAnswer } from '../src/presenting-commands';
 
@@ -30,13 +30,13 @@ function scrollsDown(): HTMLDivElement {
 }
 
 describe('the Presenting commands', () => {
-  it('names each by its binding under the presenting context', () => {
+  it('names each command, and finds its key by that name', () => {
     const commands = presentingCommands(traversal());
 
     expect(commands.map(({ id }) => id)).toEqual(
       Object.keys(PRESENTING_KEYS).map((name) => `presenting.${name}`),
     );
-    expect(commands.map(({ binding }) => binding)).toEqual(Object.values(PRESENTING_KEYS));
+    expect(commands.map(({ id }) => bindingOf(id))).toEqual(Object.values(PRESENTING_KEYS));
   });
 
   it('runs each Traversal operation, a branch move by its direction', () => {

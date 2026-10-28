@@ -102,7 +102,7 @@ import {
   type RemovalTarget,
   type PresentFrom,
 } from '../canvas-commands';
-import { useKeyAnswers } from '../key-dispatcher';
+import { useKeyAnswers, useKeyCover } from '../key-dispatcher';
 import type { CanvasRailCommands } from '../resource-rail-actions';
 import {
   graphNeighbours,
@@ -1010,13 +1010,14 @@ export function SpaceCanvas({
   }, [fullView, fullViewOf, fullViewDrawn]);
 
   // Full View is modal over the canvas it covers: focus cannot move into the
-  // Map beneath it, and the canvas's window keys leave that Map alone, so
-  // nothing is authored where it cannot be seen. An attribute rather than a
+  // Map beneath it, and the Space's dispatcher answers no canvas key while it
+  // is shown, so nothing is authored where it cannot be seen. An attribute rather than a
   // prop, because the React this application runs on does not know `inert`.
   const fullViewShown = fullView !== undefined && fullViewDrawn;
   useLayoutEffect(() => {
     canvasRef.current?.toggleAttribute('inert', fullViewShown);
   }, [fullViewShown]);
+  useKeyCover('full-view', fullViewShown);
 
   // Enter, Shift+Enter and Space are aimed at the focused Resource: the node the
   // press landed on, inside this canvas, and never one of its own controls,
@@ -1039,65 +1040,63 @@ export function SpaceCanvas({
     return resourceId === undefined ? undefined : { resourceId };
   };
   useKeyAnswers(
-    fullViewShown
-      ? []
-      : [
-          {
-            binding: OPEN_RESOURCE.binding,
-            answer: (event: KeyboardEvent) =>
-              answerCommand(OPEN_RESOURCE, event, (): OpenTarget | undefined => {
-                const nodeId = focusedNodeOf(event);
-                if (nodeId === undefined) return undefined;
-                for (const occurrence of occurrences) {
-                  const node = occurrence.nodes.find((each) => each.id === nodeId);
-                  if (node === undefined) continue;
-                  return {
-                    occurrence: {
-                      authorOnCanvas: occurrence.availability.authorOnCanvas,
-                      // The canvas's own body edit holds the keyboard on every Map it draws.
-                      bodyEditing: bodyEditing || occurrence.bodyEditing,
-                      openResource: occurrence.openResource,
-                    },
-                    nodeId,
-                    takesOpen: takesOpen(node.data.kind),
-                  };
-                }
-                return undefined;
-              }),
-          },
-          {
-            binding: OPEN_AND_EXPAND.binding,
-            answer: (event: KeyboardEvent) =>
-              answerCommand(OPEN_AND_EXPAND, event, () => {
-                const own = ownResourceOf(event);
-                return own === undefined
-                  ? undefined
-                  : { ...own, canvas: { expandable, openAndExpand } };
-              }),
-          },
-          {
-            binding: showFullViewHere.binding,
-            answer: (event: KeyboardEvent) =>
-              answerCommand(showFullViewHere, event, () => ownResourceOf(event)),
-          },
-        ],
+    [
+      {
+        id: OPEN_RESOURCE.id,
+        answer: (event: KeyboardEvent) =>
+          answerCommand(OPEN_RESOURCE, event, (): OpenTarget | undefined => {
+            const nodeId = focusedNodeOf(event);
+            if (nodeId === undefined) return undefined;
+            for (const occurrence of occurrences) {
+              const node = occurrence.nodes.find((each) => each.id === nodeId);
+              if (node === undefined) continue;
+              return {
+                occurrence: {
+                  authorOnCanvas: occurrence.availability.authorOnCanvas,
+                  // The canvas's own body edit holds the keyboard on every Map it draws.
+                  bodyEditing: bodyEditing || occurrence.bodyEditing,
+                  openResource: occurrence.openResource,
+                },
+                nodeId,
+                takesOpen: takesOpen(node.data.kind),
+              };
+            }
+            return undefined;
+          }),
+      },
+      {
+        id: OPEN_AND_EXPAND.id,
+        answer: (event: KeyboardEvent) =>
+          answerCommand(OPEN_AND_EXPAND, event, () => {
+            const own = ownResourceOf(event);
+            return own === undefined
+              ? undefined
+              : { ...own, canvas: { expandable, openAndExpand } };
+          }),
+      },
+      {
+        id: showFullViewHere.id,
+        answer: (event: KeyboardEvent) =>
+          answerCommand(showFullViewHere, event, () => ownResourceOf(event)),
+      },
+    ],
+    'canvas',
   );
 
   // `P` presents the Active Graph from the selected Resource of this canvas's own
   // Map, through the command the rail's Present from Here runs. Nothing on the
   // canvas answers while Full View covers it.
   useKeyAnswers(
-    fullViewShown
-      ? []
-      : [
-          keyAnswerOf(
-            presentFromHere,
-            () =>
-              occurrences
-                .find((value) => value.id === CANVAS_OCCURRENCE)
-                ?.nodes.find((node) => node.selected)?.data.resourceId,
-          ),
-        ],
+    [
+      keyAnswerOf(
+        presentFromHere,
+        () =>
+          occurrences
+            .find((value) => value.id === CANVAS_OCCURRENCE)
+            ?.nodes.find((node) => node.selected)?.data.resourceId,
+      ),
+    ],
+    'canvas',
   );
 
   // `C` adds a Resource to the Map holding the selection, or else to the
@@ -1115,26 +1114,24 @@ export function SpaceCanvas({
     beginTitleEditing: occurrence.beginTitleEditing,
   });
   useKeyAnswers(
-    fullViewShown
-      ? []
-      : [
-          keyAnswerOf(ADD_RESOURCE, () => {
-            const current =
-              occurrences.find(
-                (value) =>
-                  value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
-              ) ?? occurrences.find((value) => value.id === CANVAS_OCCURRENCE);
-            return current === undefined ? undefined : authoringOf(current);
-          }),
-          keyAnswerOf(RENAME_RESOURCE, () => {
-            for (const occurrence of occurrences) {
-              const selected = occurrence.nodes.find((node) => node.selected);
-              if (selected !== undefined)
-                return { occurrence: authoringOf(occurrence), nodeId: selected.id };
-            }
-            return undefined;
-          }),
-        ],
+    [
+      keyAnswerOf(ADD_RESOURCE, () => {
+        const current =
+          occurrences.find(
+            (value) => value.selection.kind !== 'none' || value.nodes.some((node) => node.selected),
+          ) ?? occurrences.find((value) => value.id === CANVAS_OCCURRENCE);
+        return current === undefined ? undefined : authoringOf(current);
+      }),
+      keyAnswerOf(RENAME_RESOURCE, () => {
+        for (const occurrence of occurrences) {
+          const selected = occurrence.nodes.find((node) => node.selected);
+          if (selected !== undefined)
+            return { occurrence: authoringOf(occurrence), nodeId: selected.id };
+        }
+        return undefined;
+      }),
+    ],
+    'canvas',
   );
 
   // The operations, not the surface holding them: `useEdgeAuthoring` answers a
@@ -1501,15 +1498,14 @@ export function SpaceCanvas({
   // it: the command the rail's Remove from Map runs, so both report alike. Only
   // a press inside the canvas, and nothing while Full View covers it.
   useKeyAnswers(
-    fullViewShown
-      ? []
-      : [
-          {
-            binding: REMOVE_SELECTION.binding,
-            answer: (event: KeyboardEvent) =>
-              answerCommand(REMOVE_SELECTION, event, () => removalTargetOf(event)),
-          },
-        ],
+    [
+      {
+        id: REMOVE_SELECTION.id,
+        answer: (event: KeyboardEvent) =>
+          answerCommand(REMOVE_SELECTION, event, () => removalTargetOf(event)),
+      },
+    ],
+    'canvas',
   );
 
   // The preview is drawn as the Graph the new Edge joins: the target's shown
