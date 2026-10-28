@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import './tailwind.css';
 import '@xyflow/react/dist/style.css';
 import './styles.css';
+import './theme-dark.css';
 import { newUuid } from '@project/core';
 import { Application } from './components/Application';
 import { GitHubLocationForm } from './components/GitHubLocationForm';
