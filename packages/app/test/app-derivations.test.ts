@@ -217,6 +217,7 @@ describe('resourceRailGroups', () => {
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
     present: { run: () => undefined, available: true, onActiveGraph: true },
+    fullView: () => undefined,
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -227,7 +228,7 @@ describe('resourceRailGroups', () => {
     expect(ids(resourceRailGroups(ur, addresses, connect, everything))).toEqual([
       ['create-reference'],
       ['connect-resource'],
-      ['present-from-here'],
+      ['full-view', 'present-from-here'],
       ['copy-link'],
       ['remove-from-map', 'delete-resource'],
     ]);
@@ -286,6 +287,7 @@ describe('resourceRailGroups', () => {
           deleteFromSpace: null,
           enter: null,
           present: null,
+          fullView: null,
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);

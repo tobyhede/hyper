@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CANVAS_KEYS,
+  FULL_VIEW_KEYS,
   keyBelongsElsewhere,
   PRESENTING_KEYS,
   pressesBinding,
@@ -9,6 +10,7 @@ import {
 
 const ALL_BINDINGS: readonly (readonly [string, KeyBinding])[] = [
   ...Object.entries(CANVAS_KEYS),
+  ...Object.entries(FULL_VIEW_KEYS),
   ...Object.entries(PRESENTING_KEYS),
 ];
 

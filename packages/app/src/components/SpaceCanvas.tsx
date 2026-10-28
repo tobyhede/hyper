@@ -83,8 +83,20 @@ import { useEmbeddedOpenSpaceResources } from '../use-embedded-open-space-resour
 import { useOpenSpaces } from '../open-spaces-context';
 import type { OpenSpace } from '../open-spaces';
 import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
-import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, pressesBinding } from '../key-bindings';
-import { graphNeighbours, neighbourToward } from '../graph-navigation';
+import {
+  CANVAS_KEYS,
+  FULL_VIEW_KEYS,
+  keyBelongsElsewhere,
+  OWNS_ITS_KEYS,
+  pressesBinding,
+} from '../key-bindings';
+import {
+  graphNeighbours,
+  neighbourToward,
+  type NavigatedEdge,
+  type NavigationDirection,
+} from '../graph-navigation';
+import { FullView } from './FullView';
 import type { CommandOutcomes } from '../command-outcomes';
 import type { DeleteConfirmation } from '../delete-confirmation';
 import type { ImageReplacements } from '../image-replacement';
@@ -108,7 +120,7 @@ import {
  * ordinary keyboard-enabled graph gets.
  */
 const RESOURCE_KEYS_DESCRIPTION =
-  'Press enter or space to open a Resource, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
+  'Press enter to open a Resource, space to read it in Full View, backspace or delete to remove it from this Map, and escape to cancel a move or unselect it. From a selected Resource, press the arrow keys to go along the Active Graph, or shift and the arrow keys to move it.';
 
 const ARIA_LABEL_CONFIG = {
   'node.a11yDescription.default': RESOURCE_KEYS_DESCRIPTION,
@@ -242,10 +254,49 @@ export interface SpaceCanvasProps {
         readonly run: (resourceId: ResourceId) => void;
       }
     | undefined;
+  /**
+   * The Resource read in Full View, which `Space` on a focused Resource shows,
+   * and the way to change it. Absent on a canvas that offers no Full View.
+   */
+  readonly fullView?: {
+    readonly resourceId: ResourceId | null;
+    readonly show: (resourceId: ResourceId | null) => void;
+  };
 }
 
 const ACROSS_DRAWINGS: CanvasGestureRefusal = { code: 'edge-across-drawings' };
 const UNAVAILABLE_DRAWING: CanvasGestureRefusal = { code: 'drawn-map-unavailable' };
+
+const ARROWS = [
+  [CANVAS_KEYS.navigateLeft, 'left'],
+  [CANVAS_KEYS.navigateRight, 'right'],
+  [CANVAS_KEYS.navigateUp, 'up'],
+  [CANVAS_KEYS.navigateDown, 'down'],
+] as const;
+
+/** The direction a plain arrow along the Active Graph asks for, if this press is one. */
+const arrowDirectionOf = (event: KeyboardEvent): NavigationDirection | undefined =>
+  ARROWS.find(([binding]) => pressesBinding(binding, event))?.[1];
+
+/** The Active Graph neighbour that lies that way on screen, by the drawn nodes' centres. */
+const neighbourOnScreen = (
+  edges: readonly NavigatedEdge<ResourceId>[],
+  from: ResourceId,
+  elementOf: (resourceId: ResourceId) => HTMLElement | null,
+  direction: NavigationDirection,
+): ResourceId | undefined => {
+  const centreOf = (element: Element) => {
+    const box = element.getBoundingClientRect();
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  };
+  const origin = elementOf(from);
+  if (origin === null) return undefined;
+  const candidates = graphNeighbours(edges, from).flatMap((id) => {
+    const element = elementOf(id);
+    return element === null ? [] : [{ id, centre: centreOf(element) }];
+  });
+  return neighbourToward(centreOf(origin), candidates, direction);
+};
 
 /** The Resource a drawn node shows, by the node's id in one drawing. */
 const resourceOfNode = (nodes: readonly ResourceFlowNode[], id: string): ResourceId | undefined =>
@@ -278,6 +329,7 @@ export function SpaceCanvas({
   spaceResourceTargets,
   resourceEntityActions,
   presentFrom,
+  fullView,
 }: SpaceCanvasProps) {
   const {
     view,
@@ -754,19 +806,8 @@ export function SpaceCanvas({
     latestOccurrences.current = occurrences;
   }, [occurrences]);
 
-  /**
-   * The Active Graph walk from the focused Resource, or `null` where there is
-   * none to take: only from the Resource node itself, so a key on one of its
-   * controls is that control's, and only on the canvas's own Map.
-   */
-  const graphNavigationFrom = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!availability.selectNodes) return null;
-    const focused = event.target;
-    if (!(focused instanceof HTMLElement) || !focused.matches('.react-flow__node[data-id]'))
-      return null;
-    const from = resourceOfNode(nodes, focused.dataset['id'] ?? '');
-    if (from === undefined) return null;
-    const canvas = event.currentTarget;
+  /** The Active Graph's Edges as Graph navigation reads them, and each Resource's drawn node. */
+  const activeGraphLinks = (canvas: HTMLElement) => {
     const elementOf = (resourceId: ResourceId): HTMLElement | null => {
       const node = nodes.find((each) => each.data.resourceId === resourceId);
       return node === undefined
@@ -779,6 +820,22 @@ export function SpaceCanvas({
         ? [{ source: subject.edge.from, target: subject.edge.to }]
         : [];
     });
+    return { edges: edgesOfGraph, elementOf };
+  };
+
+  /**
+   * The Active Graph walk from the focused Resource, or `null` where there is
+   * none to take: only from the Resource node itself, so a key on one of its
+   * controls is that control's, and only on the canvas's own Map.
+   */
+  const graphNavigationFrom = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!availability.selectNodes) return null;
+    const focused = event.target;
+    if (!(focused instanceof HTMLElement) || !focused.matches('.react-flow__node[data-id]'))
+      return null;
+    const from = resourceOfNode(nodes, focused.dataset['id'] ?? '');
+    if (from === undefined) return null;
+    const { edges: edgesOfGraph, elementOf } = activeGraphLinks(event.currentTarget);
     /** Select and focus a Resource; React Flow pans it into view (`autoPanOnNodeFocus`). */
     const moveTo = (resourceId: ResourceId | undefined): void => {
       const next = resourceId === undefined ? null : elementOf(resourceId);
@@ -788,13 +845,6 @@ export function SpaceCanvas({
     };
     return { from, focused, edges: edgesOfGraph, elementOf, moveTo };
   };
-
-  const ARROWS = [
-    [CANVAS_KEYS.navigateLeft, 'left'],
-    [CANVAS_KEYS.navigateRight, 'right'],
-    [CANVAS_KEYS.navigateUp, 'up'],
-    [CANVAS_KEYS.navigateDown, 'down'],
-  ] as const;
 
   /**
    * From a selected Resource, a plain arrow follows the Active Graph's Edge
@@ -821,21 +871,90 @@ export function SpaceCanvas({
     event.stopPropagation();
     if (press.ctrlKey || press.metaKey || press.altKey) return;
     event.preventDefault();
-    const direction = ARROWS.find(([binding]) => pressesBinding(binding, press))?.[1];
+    const direction = arrowDirectionOf(press);
     if (direction === undefined) return;
-    const centreOf = (element: Element) => {
-      const box = element.getBoundingClientRect();
-      return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
-    };
-    const candidates = graphNeighbours(navigation.edges, navigation.from).flatMap((id) => {
-      const element = navigation.elementOf(id);
-      return element === null ? [] : [{ id, centre: centreOf(element) }];
-    });
-    navigation.moveTo(neighbourToward(centreOf(navigation.focused), candidates, direction));
+    navigation.moveTo(
+      neighbourOnScreen(navigation.edges, navigation.from, navigation.elementOf, direction),
+    );
   };
 
+  // Full View walks the Active Graph with the canvas's keys, reading the
+  // positions of the nodes it covers, which stay drawn beneath it. Every key
+  // pressed in it stops there, so no canvas command runs on a Map that cannot
+  // be seen; the Dock above it keeps its own.
+  const fullViewOf = fullView?.resourceId ?? null;
+  const fullViewKeyDown = (
+    event: ReactKeyboardEvent<HTMLDivElement>,
+    fromContent: boolean,
+  ): void => {
+    event.stopPropagation();
+    const canvas = canvasRef.current;
+    if (fullView === undefined || fullViewOf === null || canvas === null) return;
+    if (keyBelongsElsewhere(event.nativeEvent)) return;
+    if (pressesBinding(FULL_VIEW_KEYS.leave, event.nativeEvent)) {
+      event.preventDefault();
+      leaveFullView(false);
+      return;
+    }
+    if (pressesBinding(FULL_VIEW_KEYS.openOnCanvas, event.nativeEvent)) {
+      event.preventDefault();
+      leaveFullView(true);
+      return;
+    }
+    // The walk is the content's: an arrow on the view's own buttons is theirs.
+    if (!fromContent) return;
+    const { edges: edgesOfGraph, elementOf } = activeGraphLinks(canvas);
+    const moveTo = (resourceId: ResourceId | undefined): void => {
+      if (resourceId === undefined || elementOf(resourceId) === null) return;
+      selectResource(resourceId);
+      fullView.show(resourceId);
+    };
+    const direction = arrowDirectionOf(event.nativeEvent);
+    if (direction !== undefined) {
+      event.preventDefault();
+      moveTo(neighbourOnScreen(edgesOfGraph, fullViewOf, elementOf, direction));
+    }
+  };
+
+  /** Back to the canvas, on the Resource last read, Opening it there when asked and allowed. */
+  const leaveFullView = (open: boolean): void => {
+    if (fullView === undefined || fullViewOf === null) return;
+    fullView.show(null);
+    const node = nodes.find((each) => each.data.resourceId === fullViewOf);
+    if (node === undefined) return;
+    selectResource(fullViewOf);
+    // Ahead of the render that would lift it, so the node can take focus now.
+    canvasRef.current?.removeAttribute('inert');
+    canvasRef.current
+      ?.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(node.id)}"]`)
+      ?.focus();
+    if (open && availability.authorOnCanvas && !bodyEditing) onOpenResource(node.id);
+  };
+
+  // Full View lasts while its Resource is drawn here and the canvas may be
+  // selected on: presenting, another Map or a removal ends it.
+  const fullViewDrawn =
+    fullViewOf !== null &&
+    availability.selectNodes &&
+    nodes.some((node) => node.data.resourceId === fullViewOf);
+  useEffect(() => {
+    if (fullViewOf !== null && !fullViewDrawn) fullView?.show(null);
+  }, [fullView, fullViewOf, fullViewDrawn]);
+
+  // Full View is modal over the canvas it covers: focus cannot move into the
+  // Map beneath it, and the canvas's window keys leave that Map alone, so
+  // nothing is authored where it cannot be seen. An attribute rather than a
+  // prop, because the React this application runs on does not know `inert`.
+  const fullViewShown = fullView !== undefined && fullViewDrawn;
+  const latestFullViewShown = useRef(fullViewShown);
+  useLayoutEffect(() => {
+    latestFullViewShown.current = fullViewShown;
+    canvasRef.current?.toggleAttribute('inert', fullViewShown);
+  }, [fullViewShown]);
+
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!pressesBinding(CANVAS_KEYS.openResource, event.nativeEvent)) return;
+    const opening = pressesBinding(CANVAS_KEYS.openResource, event.nativeEvent);
+    if (!opening && !pressesBinding(CANVAS_KEYS.showFullView, event.nativeEvent)) return;
     if (bodyEditing) return;
     // Load-bearing rather than defensive: an Open Resource draws its editor
     // *inside* the node, so a Space typed into it would otherwise be cancelled
@@ -849,6 +968,13 @@ export function SpaceCanvas({
     const resourceId = resource.dataset['id'];
     if (resourceId === undefined) return;
     event.preventDefault();
+    if (!opening) {
+      // Full View reads the canvas's own Map; a Map drawn inside a Space
+      // Resource offers none.
+      const read = resourceOfNode(nodes, resourceId);
+      if (read !== undefined && availability.selectNodes) fullView?.show(read);
+      return;
+    }
     const occurrence = occurrences.find((value) =>
       value.nodes.some((node) => node.id === resourceId),
     );
@@ -864,6 +990,7 @@ export function SpaceCanvas({
   useEffect(() => {
     const addResource = (event: KeyboardEvent): void => {
       if (!pressesBinding(CANVAS_KEYS.addResource, event) || keyBelongsElsewhere(event)) return;
+      if (latestFullViewShown.current) return;
       // The selection's occurrence, or the canvas's own Map when nothing is selected.
       const current =
         latestOccurrences.current.find(
@@ -889,6 +1016,7 @@ export function SpaceCanvas({
   useEffect(() => {
     const presentSelected = (event: KeyboardEvent): void => {
       if (!pressesBinding(CANVAS_KEYS.presentFromHere, event) || keyBelongsElsewhere(event)) return;
+      if (latestFullViewShown.current) return;
       const present = latestPresentFrom.current;
       const canvas = latestOccurrences.current.find((value) => value.id === CANVAS_OCCURRENCE);
       if (present === undefined || canvas?.availability.present !== true) return;
@@ -909,6 +1037,7 @@ export function SpaceCanvas({
   useLayoutEffect(() => {
     const beginSelectedTitleEdit = (event: KeyboardEvent): void => {
       if (!pressesBinding(CANVAS_KEYS.renameResource, event) || keyBelongsElsewhere(event)) return;
+      if (latestFullViewShown.current) return;
       const occurrence = latestOccurrences.current.find((value) =>
         value.nodes.some((node) => node.selected),
       );
@@ -1615,185 +1744,200 @@ export function SpaceCanvas({
   }, [presenting, embeddedRequests, resumeEmbedded]);
 
   const canvas = (
-    <ReactFlow
-      ref={canvasRef}
-      nodes={canvasNodes}
-      edges={canvasEdges}
-      nodeTypes={nodeTypes}
-      edgeTypes={canvasEdgeTypes}
-      onNodesChange={changeCanvasNodes}
-      {...embeddedEvents}
-      onEdgesChange={changeCanvasEdges}
-      // Edge Authoring's own properties, named one by one rather than spread, so
-      // no property order below can silently replace one of its handlers.
-      onConnect={onEmbeddedConnect}
-      onConnectStart={onEmbeddedConnectStart}
-      onConnectEnd={onEmbeddedConnectEnd}
-      isValidConnection={isEmbeddedConnectionValid}
-      onMouseMove={trackPointer}
-      onMouseLeave={forgetPointer}
-      onPaste={onPaste}
-      onEdgeMouseEnter={onCanvasEdgeMouseEnter}
-      onEdgeMouseLeave={onCanvasEdgeMouseLeave}
-      onDragOver={onExternalDragOver}
-      onDrop={onExternalDrop}
-      edgesReconnectable={edgesReconnectable}
-      edgesFocusable={edgesFocusable}
-      // Passed through rather than copied: `useKeyPress` has this value in the
-      // dependency array of its listener effect, so a fresh array per render
-      // re-attaches React Flow's `keydown`/`keyup` on `document`.
-      deleteKeyCode={deleteKeyCode}
-      multiSelectionKeyCode={multiSelectionKeyCode}
-      selectionKeyCode={selectionKeyCode}
-      selectionOnDrag={selectionOnDrag}
-      onKeyDown={handleKeyDown}
-      onKeyDownCapture={arrowAlongGraph}
-      // Programmatically focusable, and deliberately not a tab stop. React Flow's
-      // native Edge Escape calls `blur()`, which leaves focus on `body` — not an
-      // authoring context — and its pane carries no `tabindex`, so there is
-      // nothing for the repair to focus without this. Negative, so the canvas
-      // never becomes a stop a keyboard author has to pass through.
-      tabIndex={-1}
-      fitView={openingFraming === undefined}
-      fitViewOptions={OVERVIEW_FIT}
-      // Nothing on a Resource answers a double click. The Title is a
-      // one-activation control, so the second click of a pair lands in the field
-      // the first one opened — and that field, like the control, carries
-      // `.nopan`, the one class React Flow's zoom filter exempts. The Resource body
-      // carries no such class, so a double click there would zoom the canvas
-      // while meaning nothing to the Resource. Off for the whole canvas rather than
-      // per node, so the gesture does not change meaning two pixels away from a
-      // Resource.
-      zoomOnDoubleClick={false}
-      // While presenting the arrow keys control traversal, so React Flow must not
-      // also read them as moving or selecting a node.
-      nodesDraggable={availability.dragNodes}
-      nodesFocusable={availability.selectNodes}
-      elementsSelectable={availability.selectNodes}
-      // Half of a pair, and useless without the other half. React Flow resolves
-      // this into `NodeProps.isConnectable` and hands it to the node, enforcing
-      // nothing itself on a handle it did not render — so `ResourceNode` forwards it
-      // to the four authoring handles, and only then does this line mean
-      // anything beyond whether the connection line draws.
-      //
-      // **Not `authorOnCanvas`**: a live embedded edit leaves a pointer
-      // connection alone, and `authoring-availability.ts` records why.
-      nodesConnectable={availability.connectOnCanvas}
-      ariaLabelConfig={ARIA_LABEL_CONFIG}
-      // No `connectionMode`: the default is Strict, and every legal drop here is
-      // already source-to-target. Loose only adds source-to-source, which the
-      // authoring handles refuse via `isConnectableEnd` and the graph ports via
-      // `pointer-events: none` — so it would advertise a capability the design forbids.
-      connectionLineStyle={connectionLineStyle}
-      connectionLineComponent={GraphConnectionLine}
-      minZoom={0.2}
-      // React Flow's default ceiling of 2 stops an author well short of reading
-      // one Resource at screen size. See `MAX_ZOOM`.
-      maxZoom={MAX_ZOOM}
-    >
-      <ChromeContinuation
-        continuation={surface.continuation}
-        within={canvasRef}
-        chromeRenameReady={availability.authorOnCanvas}
-      />
-      <Background gap={24} />
-      <GraphHeadMarkers />
-      <svg aria-hidden="true" width={0} height={0}>
-        <defs>
-          {embeddedRequests.map(({ parent, absolute, bounds, tiltCenter }) => (
-            <clipPath key={parent.id} id={embeddedClipId(parent.id)} clipPathUnits="userSpaceOnUse">
-              <rect
-                x={absolute.x + bounds.left}
-                y={absolute.y + bounds.top}
-                width={Math.max(0, bounds.right - bounds.left)}
-                height={Math.max(0, bounds.bottom - bounds.top)}
-                // The window leans with the Resource it is cut out of. Written as
-                // SVG's own `rotate(angle cx cy)`, which carries its centre and
-                // so needs none of the `transform-box` reasoning the Edge layer
-                // does — this `<clipPath>` lives in a 0x0 `<svg>` of its own,
-                // where a view box would mean nothing.
-                transform={
-                  tiltCenter === undefined
-                    ? undefined
-                    : `rotate(${CANVAS_RESOURCE_DRAG_TILT_DEGREES} ${tiltCenter.x} ${tiltCenter.y})`
-                }
-              />
-            </clipPath>
-          ))}
-        </defs>
-      </svg>
-      {embeddedRequests.map((request) =>
-        request.entry?.app.currentSpace().lookup.map(request.mapId) === undefined ? null : (
-          <EmbeddedMapAuthoring
-            key={`${request.parent.id}:${request.mapId}`}
-            parent={request.parent}
-            entry={request.entry}
-            mapId={request.mapId}
-            graphId={request.graphId}
-            policy={request.policy}
-            spaceOnCanvas={
-              availability.authorInEmbeddedMap &&
-              (!embeddedEditing || editingEmbeddingIds.has(request.parent.id))
-            }
-            framing={
-              portalDraft.get(request.parent.data.resourceId) ??
-              spaceViewOf(request.parent.data.display)?.view.framing
-            }
-            bounds={request.bounds}
-            absolute={request.absolute}
-            drawnAbsolute={request.drawnAbsolute}
-            tiltCenter={request.tiltCenter}
-            publish={publishEmbedded}
-          />
-        ),
-      )}
-      {/*
+    <>
+      <ReactFlow
+        ref={canvasRef}
+        nodes={canvasNodes}
+        edges={canvasEdges}
+        nodeTypes={nodeTypes}
+        edgeTypes={canvasEdgeTypes}
+        onNodesChange={changeCanvasNodes}
+        {...embeddedEvents}
+        onEdgesChange={changeCanvasEdges}
+        // Edge Authoring's own properties, named one by one rather than spread, so
+        // no property order below can silently replace one of its handlers.
+        onConnect={onEmbeddedConnect}
+        onConnectStart={onEmbeddedConnectStart}
+        onConnectEnd={onEmbeddedConnectEnd}
+        isValidConnection={isEmbeddedConnectionValid}
+        onMouseMove={trackPointer}
+        onMouseLeave={forgetPointer}
+        onPaste={onPaste}
+        onEdgeMouseEnter={onCanvasEdgeMouseEnter}
+        onEdgeMouseLeave={onCanvasEdgeMouseLeave}
+        onDragOver={onExternalDragOver}
+        onDrop={onExternalDrop}
+        edgesReconnectable={edgesReconnectable}
+        edgesFocusable={edgesFocusable}
+        // Passed through rather than copied: `useKeyPress` has this value in the
+        // dependency array of its listener effect, so a fresh array per render
+        // re-attaches React Flow's `keydown`/`keyup` on `document`.
+        deleteKeyCode={deleteKeyCode}
+        multiSelectionKeyCode={multiSelectionKeyCode}
+        selectionKeyCode={selectionKeyCode}
+        selectionOnDrag={selectionOnDrag}
+        onKeyDown={handleKeyDown}
+        onKeyDownCapture={arrowAlongGraph}
+        // Programmatically focusable, and deliberately not a tab stop. React Flow's
+        // native Edge Escape calls `blur()`, which leaves focus on `body` — not an
+        // authoring context — and its pane carries no `tabindex`, so there is
+        // nothing for the repair to focus without this. Negative, so the canvas
+        // never becomes a stop a keyboard author has to pass through.
+        tabIndex={-1}
+        fitView={openingFraming === undefined}
+        fitViewOptions={OVERVIEW_FIT}
+        // Nothing on a Resource answers a double click. The Title is a
+        // one-activation control, so the second click of a pair lands in the field
+        // the first one opened — and that field, like the control, carries
+        // `.nopan`, the one class React Flow's zoom filter exempts. The Resource body
+        // carries no such class, so a double click there would zoom the canvas
+        // while meaning nothing to the Resource. Off for the whole canvas rather than
+        // per node, so the gesture does not change meaning two pixels away from a
+        // Resource.
+        zoomOnDoubleClick={false}
+        // While presenting the arrow keys control traversal, so React Flow must not
+        // also read them as moving or selecting a node.
+        nodesDraggable={availability.dragNodes}
+        nodesFocusable={availability.selectNodes}
+        elementsSelectable={availability.selectNodes}
+        // Half of a pair, and useless without the other half. React Flow resolves
+        // this into `NodeProps.isConnectable` and hands it to the node, enforcing
+        // nothing itself on a handle it did not render — so `ResourceNode` forwards it
+        // to the four authoring handles, and only then does this line mean
+        // anything beyond whether the connection line draws.
+        //
+        // **Not `authorOnCanvas`**: a live embedded edit leaves a pointer
+        // connection alone, and `authoring-availability.ts` records why.
+        nodesConnectable={availability.connectOnCanvas}
+        ariaLabelConfig={ARIA_LABEL_CONFIG}
+        // No `connectionMode`: the default is Strict, and every legal drop here is
+        // already source-to-target. Loose only adds source-to-source, which the
+        // authoring handles refuse via `isConnectableEnd` and the graph ports via
+        // `pointer-events: none` — so it would advertise a capability the design forbids.
+        connectionLineStyle={connectionLineStyle}
+        connectionLineComponent={GraphConnectionLine}
+        minZoom={0.2}
+        // React Flow's default ceiling of 2 stops an author well short of reading
+        // one Resource at screen size. See `MAX_ZOOM`.
+        maxZoom={MAX_ZOOM}
+      >
+        <ChromeContinuation
+          continuation={surface.continuation}
+          within={canvasRef}
+          chromeRenameReady={availability.authorOnCanvas}
+        />
+        <Background gap={24} />
+        <GraphHeadMarkers />
+        <svg aria-hidden="true" width={0} height={0}>
+          <defs>
+            {embeddedRequests.map(({ parent, absolute, bounds, tiltCenter }) => (
+              <clipPath
+                key={parent.id}
+                id={embeddedClipId(parent.id)}
+                clipPathUnits="userSpaceOnUse"
+              >
+                <rect
+                  x={absolute.x + bounds.left}
+                  y={absolute.y + bounds.top}
+                  width={Math.max(0, bounds.right - bounds.left)}
+                  height={Math.max(0, bounds.bottom - bounds.top)}
+                  // The window leans with the Resource it is cut out of. Written as
+                  // SVG's own `rotate(angle cx cy)`, which carries its centre and
+                  // so needs none of the `transform-box` reasoning the Edge layer
+                  // does — this `<clipPath>` lives in a 0x0 `<svg>` of its own,
+                  // where a view box would mean nothing.
+                  transform={
+                    tiltCenter === undefined
+                      ? undefined
+                      : `rotate(${CANVAS_RESOURCE_DRAG_TILT_DEGREES} ${tiltCenter.x} ${tiltCenter.y})`
+                  }
+                />
+              </clipPath>
+            ))}
+          </defs>
+        </svg>
+        {embeddedRequests.map((request) =>
+          request.entry?.app.currentSpace().lookup.map(request.mapId) === undefined ? null : (
+            <EmbeddedMapAuthoring
+              key={`${request.parent.id}:${request.mapId}`}
+              parent={request.parent}
+              entry={request.entry}
+              mapId={request.mapId}
+              graphId={request.graphId}
+              policy={request.policy}
+              spaceOnCanvas={
+                availability.authorInEmbeddedMap &&
+                (!embeddedEditing || editingEmbeddingIds.has(request.parent.id))
+              }
+              framing={
+                portalDraft.get(request.parent.data.resourceId) ??
+                spaceViewOf(request.parent.data.display)?.view.framing
+              }
+              bounds={request.bounds}
+              absolute={request.absolute}
+              drawnAbsolute={request.drawnAbsolute}
+              tiltCenter={request.tiltCenter}
+              publish={publishEmbedded}
+            />
+          ),
+        )}
+        {/*
         A failed read is announced on the Space Resource that asked for it, named by
         the Title the author gave that Resource: the canvas can hold several
         embeddings, and a sentence naming none of them says nothing about which
         one is empty. Drawn from the standing requests, so a Resource that is Closed
         takes its announcement with it.
       */}
-      {embeddedRequests.flatMap(({ parent, spaceId }) => {
-        const message = embeddedFailures.get(spaceId);
-        return message === undefined
-          ? []
-          : [
-              <span key={parent.id} role="alert" className="canvas-refusal">
-                {`${titleName(parent.data.title)}: ${message}`}
-              </span>,
-            ];
-      })}
-      {/*
+        {embeddedRequests.flatMap(({ parent, spaceId }) => {
+          const message = embeddedFailures.get(spaceId);
+          return message === undefined
+            ? []
+            : [
+                <span key={parent.id} role="alert" className="canvas-refusal">
+                  {`${titleName(parent.data.title)}: ${message}`}
+                </span>,
+              ];
+        })}
+        {/*
         The sentence a refused canvas command leaves behind. Placed and styled
         exactly like Edge Authoring's `gesture` refusal, because it is the same
         case: the press is over, and there is no surface left to attach it to.
       */}
-      {commandRefusal !== null && (
-        <span role="alert" className="canvas-refusal" data-testid="canvas-command-refusal">
-          {commandRefusal}
-        </span>
-      )}
-      <ZoomSlider />
-      {graphs.length > 0 && (
-        <GraphHud
-          spaceTitle={spaceTitle}
-          mapTitle={mapTitle}
-          graphs={graphs}
-          colorByGraphId={colorByGraphId}
-          activeGraphId={activeGraphId}
+        {commandRefusal !== null && (
+          <span role="alert" className="canvas-refusal" data-testid="canvas-command-refusal">
+            {commandRefusal}
+          </span>
+        )}
+        <ZoomSlider />
+        {graphs.length > 0 && (
+          <GraphHud
+            spaceTitle={spaceTitle}
+            mapTitle={mapTitle}
+            graphs={graphs}
+            colorByGraphId={colorByGraphId}
+            activeGraphId={activeGraphId}
+          />
+        )}
+        <OpeningFramingCamera framing={openingFraming} />
+        {edgeSurface.layer}
+        <ResourceConnect
+          connecting={openConnect}
+          placed={placedResources}
+          edgeAuthoring={edgeAuthoring}
+          projectedNodes={projectedNodes}
+          onClose={() => setConnecting(null)}
         />
-      )}
-      <OpeningFramingCamera framing={openingFraming} />
-      {edgeSurface.layer}
-      <ResourceConnect
-        connecting={openConnect}
-        placed={placedResources}
-        edgeAuthoring={edgeAuthoring}
-        projectedNodes={projectedNodes}
-        onClose={() => setConnecting(null)}
-      />
-    </ReactFlow>
+      </ReactFlow>
+      {fullViewShown ? (
+        <FullView
+          space={view.space}
+          resourceId={fullViewOf}
+          onLeave={() => leaveFullView(false)}
+          onOpen={availability.authorOnCanvas ? () => leaveFullView(true) : null}
+          onKeyDown={fullViewKeyDown}
+        />
+      ) : null}
+    </>
   );
   return edgeSurface.provide(
     <GraphConnectionLineHeadShape headShape={preview.headShape}>

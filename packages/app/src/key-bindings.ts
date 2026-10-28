@@ -51,10 +51,16 @@ export const CANVAS_KEYS = {
     description: 'Add a Resource',
   },
   openResource: {
-    keys: ['Enter', ' '],
+    keys: ['Enter'],
     press: 'plain',
-    ariaKeyShortcuts: 'Enter Space',
+    ariaKeyShortcuts: 'Enter',
     description: 'Open the focused Resource',
+  },
+  showFullView: {
+    keys: [' '],
+    press: 'plain',
+    ariaKeyShortcuts: 'Space',
+    description: 'Read the focused Resource in Full View',
   },
   renameResource: {
     keys: ['F2'],
@@ -115,6 +121,25 @@ export const CANVAS_KEYS = {
     press: 'plain',
     ariaKeyShortcuts: 'Delete Backspace',
     description: 'Remove the selected Resource from this Map, or delete the selected Edge',
+  },
+} as const satisfies Record<string, KeyBinding>;
+
+/**
+ * The Full View's own keys. The arrows go along the Active Graph inside it
+ * with the canvas's bindings for the same walk; Tab stays the browser's.
+ */
+export const FULL_VIEW_KEYS = {
+  leave: {
+    keys: [' ', 'Escape'],
+    press: 'plain',
+    ariaKeyShortcuts: 'Space Escape',
+    description: 'Leave Full View',
+  },
+  openOnCanvas: {
+    keys: ['Enter'],
+    press: 'plain',
+    ariaKeyShortcuts: 'Enter',
+    description: 'Leave Full View and Open the Resource on the canvas',
   },
 } as const satisfies Record<string, KeyBinding>;
 

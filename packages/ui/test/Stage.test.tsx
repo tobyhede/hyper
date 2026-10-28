@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { Stage } from '../src/index';
@@ -15,6 +16,17 @@ describe('Stage', () => {
     // Focusable, so Page Up and Page Down reach it from the keyboard.
     expect(body).toHaveAttribute('tabindex', '0');
     expect(body).not.toContainElement(screen.getByRole('button', { name: 'Next' }));
+  });
+
+  it('hands its scroll region to `bodyRef`, so a caller can focus it without reading its markup', () => {
+    const bodyRef = createRef<HTMLDivElement>();
+    render(
+      <Stage label="Presented Resource" contentKey="a" chrome={null} bodyRef={bodyRef}>
+        <p>Content</p>
+      </Stage>,
+    );
+
+    expect(bodyRef.current).toBe(screen.getByRole('region', { name: 'Presented Resource' }));
   });
 
   it('starts new content at its top, keeping the scroll region and its focus', () => {
