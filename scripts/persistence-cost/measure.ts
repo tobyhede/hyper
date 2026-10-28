@@ -404,7 +404,7 @@ const main = async (): Promise<void> => {
   );
   console.log(`- MAX_COMMIT_BODY_BYTES: ${MAX_COMMIT_BODY_BYTES}\n`);
 
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-persistence-cost-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-persistence-cost-'));
   const postgres = TARGETS.includes('postgres')
     ? postgresTarget(requiredDatabaseUrl(), statements)
     : undefined;

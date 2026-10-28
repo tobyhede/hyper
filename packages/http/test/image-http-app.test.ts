@@ -5,7 +5,7 @@ import {
   MAX_IMAGE_BYTES,
   PersistenceUnavailableError,
   problemCatalogue,
-  type HyperProblemCode,
+  type InfinityCubeProblemCode,
   type ImageId,
   type ImageStore,
   type StoredImage,
@@ -76,7 +76,7 @@ const repository = () => {
 const post = (app: ReturnType<typeof createSpaceHttpApp>, body: BodyInit, type = 'image/png') =>
   app.request('/images', { method: 'POST', headers: { 'Content-Type': type }, body });
 
-const expectProblem = async (response: Response, code: HyperProblemCode) => {
+const expectProblem = async (response: Response, code: InfinityCubeProblemCode) => {
   expect(response.status).toBe(problemCatalogue[code].status);
   expect(response.headers.get('content-type')).toBe('application/problem+json');
   expect(decodeProblemDetails(await response.json()).type).toBe(problemCatalogue[code].type);

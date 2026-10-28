@@ -71,7 +71,7 @@ const APPLICATION_COLLECTIONS = ['/api', '/images'] as const;
  * to Vite.
  */
 const isApplicationRequest = (request: IncomingMessage): boolean => {
-  const pathname = URL.parse(request.url ?? '/', 'http://hyper.invalid')?.pathname;
+  const pathname = URL.parse(request.url ?? '/', 'http://infinity-cube.invalid')?.pathname;
   if (pathname === undefined) return false;
   return APPLICATION_COLLECTIONS.some(
     (collection) => pathname === collection || pathname.startsWith(`${collection}/`),
@@ -79,7 +79,7 @@ const isApplicationRequest = (request: IncomingMessage): boolean => {
 };
 
 const pathname = (request: IncomingMessage): string | undefined =>
-  URL.parse(request.url ?? '/', 'http://hyper.invalid')?.pathname ?? undefined;
+  URL.parse(request.url ?? '/', 'http://infinity-cube.invalid')?.pathname ?? undefined;
 
 const writeProductResponse = (
   response: ServerResponse,

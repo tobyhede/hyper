@@ -1,8 +1,8 @@
 import type { SpaceHttpApp } from '@project/http';
 import type {
   CommitRequestJson,
-  HyperProblemStatus,
-  HyperProblemType,
+  InfinityCubeProblemStatus,
+  InfinityCubeProblemType,
   LoadedAggregateJson,
   LoadedSpaceJson,
 } from '@project/persistence';
@@ -31,16 +31,16 @@ it('asks the collection commit for exactly the JSON wire codec accepts', () => {
 it('declares every middleware-produced commit status', () => {
   type PayloadTooLarge = InferResponseType<SpaceCollection['$post'], 413>;
   type UnsupportedMedia = InferResponseType<SpaceCollection['$post'], 415>;
-  expectTypeOf<PayloadTooLarge['type']>().toEqualTypeOf<HyperProblemType>();
-  expectTypeOf<PayloadTooLarge['status']>().toEqualTypeOf<HyperProblemStatus>();
-  expectTypeOf<UnsupportedMedia['type']>().toEqualTypeOf<HyperProblemType>();
-  expectTypeOf<UnsupportedMedia['status']>().toEqualTypeOf<HyperProblemStatus>();
+  expectTypeOf<PayloadTooLarge['type']>().toEqualTypeOf<InfinityCubeProblemType>();
+  expectTypeOf<PayloadTooLarge['status']>().toEqualTypeOf<InfinityCubeProblemStatus>();
+  expectTypeOf<UnsupportedMedia['type']>().toEqualTypeOf<InfinityCubeProblemType>();
+  expectTypeOf<UnsupportedMedia['status']>().toEqualTypeOf<InfinityCubeProblemStatus>();
 });
 
 it('keeps aggregate refusal identities and locations in the inferred 422 body', () => {
   type AggregateRefusal = Exclude<
     InferResponseType<SpaceCollection['$post'], 422>,
-    { type: HyperProblemType }
+    { type: InfinityCubeProblemType }
   >;
   type MissingTarget = Extract<
     AggregateRefusal['errors'][number],

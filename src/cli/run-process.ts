@@ -8,7 +8,7 @@ import { RUN_HANDLING_SIGNALS, RUN_SIGNALS, decodeRunCommand } from './run-launc
 import { shellWord } from './shell-word';
 
 /**
- * The process behind `hyper run <dir>` that runs an Aggregate directory
+ * The process behind `cube run <dir>` that runs an Aggregate directory
  * (ADR 0117). `run-launcher.ts` starts it in a process group of its own,
  * with the command already resolved, and forwards it the signals the
  * terminal sends.
@@ -27,7 +27,7 @@ export const describeRunRefusal = (
 ): string => {
   switch (refusal.kind) {
     case 'empty':
-      return `${directory} holds no aggregate: it is missing or empty. To create one there: pnpm hyper init ${shellWord(directory)}\n`;
+      return `${directory} holds no aggregate: it is missing or empty. To create one there: pnpm cube init ${shellWord(directory)}\n`;
     case 'unreadable':
     case 'aggregate-refused':
       return `${describeAggregateReadRefusal(refusal, directory)}\n`;
@@ -168,7 +168,7 @@ if (entryPoint !== undefined && import.meta.url === pathToFileURL(resolve(entryP
 
   const command = decodeRunCommand(process.argv.slice(2));
   if (command === undefined) {
-    process.stderr.write('The run process is started by `pnpm hyper run <dir>`.\n');
+    process.stderr.write('The run process is started by `pnpm cube run <dir>`.\n');
     process.exit(2);
   }
   await serve(command);

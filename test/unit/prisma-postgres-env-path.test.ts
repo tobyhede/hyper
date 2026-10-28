@@ -27,11 +27,14 @@ describe('PostgreSQL environment resolution', () => {
   });
 
   it('names the root .env from the bundled runtime and from the source alike', async () => {
-    temporaryRoot = await mkdtemp(join(tmpdir(), 'hyper-postgres-env-'));
+    temporaryRoot = await mkdtemp(join(tmpdir(), 'infinity-cube-postgres-env-'));
     await mkdir(join(temporaryRoot, BUNDLE_DIRECTORY), { recursive: true });
     await mkdir(join(temporaryRoot, SOURCE_DIRECTORY), { recursive: true });
     const rootEnv = join(temporaryRoot, '.env');
-    await writeFile(rootEnv, 'DATABASE_URL=postgresql://hyper:hyper@127.0.0.1:5432/hyper\n');
+    await writeFile(
+      rootEnv,
+      'DATABASE_URL=postgresql://infinity_cube:infinity_cube@127.0.0.1:5432/infinity_cube\n',
+    );
 
     // A fixed `../../` offset is the root for one of these and `packages/` for
     // the other, which is the whole of what this holds.
@@ -40,7 +43,7 @@ describe('PostgreSQL environment resolution', () => {
   });
 
   it('prefers the nearest .env above the starting directory', async () => {
-    temporaryRoot = await mkdtemp(join(tmpdir(), 'hyper-postgres-env-'));
+    temporaryRoot = await mkdtemp(join(tmpdir(), 'infinity-cube-postgres-env-'));
     await mkdir(join(temporaryRoot, BUNDLE_DIRECTORY), { recursive: true });
     await writeFile(join(temporaryRoot, '.env'), 'DATABASE_URL=root\n');
     const nearerEnv = join(temporaryRoot, 'packages/app/.env');
@@ -50,7 +53,7 @@ describe('PostgreSQL environment resolution', () => {
   });
 
   it('answers undefined rather than a path no file sits at', async () => {
-    temporaryRoot = await mkdtemp(join(tmpdir(), 'hyper-postgres-env-'));
+    temporaryRoot = await mkdtemp(join(tmpdir(), 'infinity-cube-postgres-env-'));
     const isolated = join(temporaryRoot, BUNDLE_DIRECTORY);
     await mkdir(isolated, { recursive: true });
 

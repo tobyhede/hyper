@@ -3,19 +3,19 @@ import { fileURLToPath } from 'node:url';
 import type { RunCommand } from './arguments';
 
 /**
- * `hyper run <dir>`: run an Aggregate directory (ADR 0117).
+ * `cube run <dir>`: run an Aggregate directory (ADR 0117).
  *
  * The run itself is `run-process.ts`, started here in a process group of its
  * own, so a terminal's signal reaches it only as this launcher forwards it:
  * the run's first signal stops it and its second exits at once, which is only
  * right if each signal it receives is one the author sent.
  *
- * The `hyper` script `exec`s node, so this launcher is the process pnpm runs
+ * The `cube` script `exec`s node, so this launcher is the process pnpm runs
  * and signals whichever `sh` pnpm uses. A shell that forks its last command
  * instead sits between pnpm and the launcher and dies of the SIGTERM pnpm
  * sends it; pnpm then raises that signal on itself and exits before the run
  * has written its last edit. `test/integration/run-command.test.ts` refuses a
- * `hyper` script that does not `exec`.
+ * `cube` script that does not `exec`.
  */
 
 /** The signals that stop a run, which the launcher forwards and the run process answers. */
@@ -31,7 +31,7 @@ export const RUN_HANDLING_SIGNALS = 'handling-signals';
 const RUN = fileURLToPath(new URL('./run-process.ts', import.meta.url));
 
 /**
- * One Ctrl-C reaches this launcher twice under `pnpm hyper run`: once from the
+ * One Ctrl-C reaches this launcher twice under `pnpm cube run`: once from the
  * terminal, which signals its whole foreground group, and once from pnpm,
  * which forwards the signal to the script it runs. A signal carries nothing
  * that tells its sender here, so a repeat of the same signal within this long
@@ -66,8 +66,8 @@ export const decodeRunCommand = (args: readonly string[]): RunCommand | undefine
 /**
  * The run process's own arguments, after node's: `run-process.ts` and the
  * encoded command. The process's command line ends with these, which is what
- * the `hyper-authoring` skill's check reads to find a run on a directory;
- * `test/unit/agent-skill-commands.test.ts`, "the hyper-authoring check that
+ * the `infinity-cube-authoring` skill's check reads to find a run on a directory;
+ * `test/unit/agent-skill-commands.test.ts`, "the infinity-cube-authoring check that
  * nothing is serving the directory", runs that check against them.
  */
 export const runProcessArguments = (command: RunCommand): readonly string[] => [

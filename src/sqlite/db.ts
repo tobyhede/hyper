@@ -41,7 +41,7 @@ const requireWritableParent = (path: string): string => {
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
 export const SQLITE_ENV_PATH = fileURLToPath(new URL('../../.env', import.meta.url));
-export const DEFAULT_SQLITE_PATH = resolve(repositoryRoot, '.scratch/sqlite/hyper.db');
+export const DEFAULT_SQLITE_PATH = resolve(repositoryRoot, '.scratch/sqlite/infinity-cube.db');
 
 export interface SqlitePathOptions {
   readonly defaultPath?: string;

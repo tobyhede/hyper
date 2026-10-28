@@ -1,10 +1,10 @@
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { runCommand } from '../support/hyper-command';
+import { runCommand } from '../support/infinity-cube-command';
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
-const missingParent = '/no-such-hyper-sqlite-parent/hyper.db';
+const missingParent = '/no-such-infinity-cube-sqlite-parent/infinity-cube.db';
 
 /*
  * `dev:sqlite` prints one line and exits 1 for a `SQLITE_PATH` it will not
@@ -14,11 +14,15 @@ const missingParent = '/no-such-hyper-sqlite-parent/hyper.db';
  */
 describe('pnpm dev:sqlite', () => {
   it.each([
-    ['is relative', 'relative/hyper.db', 'SQLITE_PATH must be an absolute path: relative/hyper.db'],
+    [
+      'is relative',
+      'relative/infinity-cube.db',
+      'SQLITE_PATH must be an absolute path: relative/infinity-cube.db',
+    ],
     [
       'names a missing parent',
       missingParent,
-      'SQLite parent directory is missing or unwritable: /no-such-hyper-sqlite-parent',
+      'SQLite parent directory is missing or unwritable: /no-such-infinity-cube-sqlite-parent',
     ],
   ])(
     'reports as one line, and starts nothing, when SQLITE_PATH %s',

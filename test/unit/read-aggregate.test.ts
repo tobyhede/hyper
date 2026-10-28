@@ -40,7 +40,7 @@ const countingIds = (): (() => UUID) => {
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-read-aggregate-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-read-aggregate-'));
   temporaryDirectories.push(directory);
   return directory;
 };
@@ -1072,13 +1072,13 @@ describe('reading from a source', () => {
 });
 
 /*
- * Export does not write or remove through a symbolic link, so a path Hyper
+ * Export does not write or remove through a symbolic link, so a path InfinityCube
  * owns that is one is refused where the directory is read: a directory that
- * imports is one Export can write back. A link at a path Hyper does not own is
+ * imports is one Export can write back. A link at a path InfinityCube does not own is
  * the author's, and is left alone.
  */
 describe('a symbolic link, on disk', () => {
-  const LINK_REASON = 'is a symbolic link, which Hyper neither reads nor writes through';
+  const LINK_REASON = 'is a symbolic link, which InfinityCube neither reads nor writes through';
 
   /** Write `text` to a file outside `root` and link `path` under `root` to it. */
   const linkTo = async (root: string, path: string, text: string): Promise<void> => {
@@ -1182,7 +1182,7 @@ describe('a symbolic link, on disk', () => {
     ]);
   });
 
-  it('leaves a link Hyper does not own to the author', async () => {
+  it('leaves a link InfinityCube does not own to the author', async () => {
     const root = await makeTemporaryDirectory();
     await writeAggregateFile(root, META_SPACE_ID);
     await writeSpace(root, META_SPACE_ID, JSON.stringify({ version: 1, title: 'Meta' }));

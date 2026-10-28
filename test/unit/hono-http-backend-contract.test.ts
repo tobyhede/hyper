@@ -73,7 +73,7 @@ const appFetch =
       app.fetch(
         input instanceof Request
           ? new Request(input, init)
-          : new Request(new URL(String(input), 'http://hyper.test'), init),
+          : new Request(new URL(String(input), 'http://infinity-cube.test'), init),
       ),
     );
 
@@ -89,7 +89,7 @@ const appFetch =
  */
 spaceBackendContract('Hono HttpSpaceBackend', ({ spaces, metaSpaceId }) =>
   Promise.resolve({
-    backend: new HttpSpaceBackend('http://hyper.test', {
+    backend: new HttpSpaceBackend('http://infinity-cube.test', {
       fetch: appFetch(
         createSpaceHttpApp(new MemorySpaceRepository(spaces, metaSpaceId), { newId: mintsNothing }),
       ),
@@ -101,7 +101,7 @@ spaceBackendContract('Hono HttpSpaceBackend', ({ spaces, metaSpaceId }) =>
 describe('HttpSpaceBackend', () => {
   it('lists spaces through the typed Hono application contract', async () => {
     const app = createSpaceHttpApp(repository(), { newId: mintsNothing });
-    const backend = new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) });
+    const backend = new HttpSpaceBackend('http://infinity-cube.test', { fetch: appFetch(app) });
 
     await expect(backend.listSpaces()).resolves.toEqual([{ id: SPACE_ID, title: 'One' }]);
   });
@@ -110,7 +110,7 @@ describe('HttpSpaceBackend', () => {
     const app = createSpaceHttpApp(repository({ loadSpace: () => Promise.resolve(loaded) }), {
       newId: mintsNothing,
     });
-    const backend = new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) });
+    const backend = new HttpSpaceBackend('http://infinity-cube.test', { fetch: appFetch(app) });
 
     await expect(backend.loadSpace(SPACE_ID)).resolves.toEqual(loaded);
   });
@@ -134,7 +134,7 @@ describe('HttpSpaceBackend', () => {
     );
 
     const response = await appFetch(app)(
-      new Request('http://hyper.test/api/spaces', {
+      new Request('http://infinity-cube.test/api/spaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
@@ -171,7 +171,7 @@ describe('HttpSpaceBackend', () => {
       }),
       { newId: mintsNothing },
     );
-    const backend = new HttpSpaceBackend('http://hyper.test', { fetch: appFetch(app) });
+    const backend = new HttpSpaceBackend('http://infinity-cube.test', { fetch: appFetch(app) });
 
     await expect(
       backend.commit({

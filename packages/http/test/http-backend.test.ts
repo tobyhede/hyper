@@ -5,7 +5,7 @@ import {
   encodeCommitResponse,
   encodeLoadedAggregate,
   encodeProblemDetails,
-  type HyperProblemCode,
+  type InfinityCubeProblemCode,
   type SpaceCommit,
 } from '@project/persistence';
 import type { encodeLoadedSpace } from '@project/persistence';
@@ -45,7 +45,7 @@ const jsonResponse = (body: JsonResponseBody, status = 200): Response =>
   });
 
 const problemResponse = (
-  code: HyperProblemCode,
+  code: InfinityCubeProblemCode,
   detail: string,
   headers?: HeadersInit,
 ): Response => {

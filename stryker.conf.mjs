@@ -93,7 +93,7 @@ export default {
 
   /*
    * The sandbox is a plain directory copy made with `fs.copyFile`, and every
-   * entry in `.claude/skills/` (`hyper-authoring`, `hyper-getting-started`,
+   * entry in `.claude/skills/` (`infinity-cube-authoring`, `infinity-cube-getting-started`,
    * `shadcn`, `shadcn-first-ui`) is a git-tracked symlink to a *directory*
    * under `.agents/skills/` (deliberately — CLAUDE.md tracks both harnesses'
    * skill paths; `test/unit/agent-skill-symlinks.test.ts` holds the mirror).

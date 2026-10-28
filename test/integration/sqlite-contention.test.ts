@@ -21,7 +21,7 @@ import {
 } from '../support/sqlite-second-process';
 
 /*
- * One Hyper process owns a SQLite file. Inside it, overlapping
+ * One InfinityCube process owns a SQLite file. Inside it, overlapping
  * repository operations are serialised, so they answer in domain
  * terms and never wait on SQLite. A second process on the same live file is
  * unsupported, and what it causes is an operational failure — thrown, never a
@@ -444,7 +444,7 @@ describe('SQLite contention', () => {
         wait: () => new Promise<void>(() => undefined),
       });
       const loaded = await application.fetch(
-        new Request(`http://hyper.test/api/spaces/${META_ID}`),
+        new Request(`http://infinity-cube.test/api/spaces/${META_ID}`),
       );
       const body = decodeLoadedSpace(
         // SAFETY: JSON.parse is the HTTP body boundary; decodeLoadedSpace parses next.
@@ -453,7 +453,7 @@ describe('SQLite contention', () => {
       const commit = update(retitled(body.snapshot, 'Never stored'), body.revision);
       const post = () =>
         application.fetch(
-          new Request('http://hyper.test/api/spaces', {
+          new Request('http://infinity-cube.test/api/spaces', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(encodeCommitRequest(commit)),
@@ -463,7 +463,7 @@ describe('SQLite contention', () => {
 
       for (const request of [
         post,
-        () => application.fetch(new Request(`http://hyper.test/api/spaces/${META_ID}`)),
+        () => application.fetch(new Request(`http://infinity-cube.test/api/spaces/${META_ID}`)),
       ]) {
         const { settled, elapsed } = await timed(request);
         if (settled.status === 'rejected') throw settled.reason;
@@ -481,7 +481,7 @@ describe('SQLite contention', () => {
         expect(elapsed).toBeLessThan(EXHAUSTED_WAIT_CEILING_MS);
       }
 
-      const backend = new HttpSpaceBackend('http://hyper.test', {
+      const backend = new HttpSpaceBackend('http://infinity-cube.test', {
         fetch: (input, init) => Promise.resolve(application.fetch(new Request(input, init))),
       });
       await expect(backend.commit(commit)).resolves.toMatchObject({

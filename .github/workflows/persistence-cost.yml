@@ -47,12 +47,12 @@ jobs:
         id: postgres-env
         run: |
           password="$(openssl rand -hex 32)"
-          database_url="postgresql://hyper_ci:${password}@127.0.0.1:55432/hyper_ci"
+          database_url="postgresql://infinity_cube_ci:${password}@127.0.0.1:55432/infinity_cube_ci"
           echo "::add-mask::$password"
           echo "::add-mask::$database_url"
           {
-            echo "POSTGRES_DB=hyper_ci"
-            echo "POSTGRES_USER=hyper_ci"
+            echo "POSTGRES_DB=infinity_cube_ci"
+            echo "POSTGRES_USER=infinity_cube_ci"
             echo "POSTGRES_PASSWORD=$password"
             echo "POSTGRES_PORT=55432"
             echo "DATABASE_URL=$database_url"

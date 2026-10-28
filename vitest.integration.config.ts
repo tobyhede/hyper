@@ -26,13 +26,13 @@ export default defineConfig({
      * their PostgreSQL arm alone. Their SQLite arm runs under
      * `vitest.sqlite.config.ts`, in the job that owns a migrated `SQLITE_PATH`.
      */
-    env: { HYPER_DATABASE_TARGET: 'postgres' },
+    env: { INFINITY_CUBE_DATABASE_TARGET: 'postgres' },
     testTimeout: 30_000,
     /**
      * One database, so one file at a time (issue `12`).
      *
      * Truncation here is global by design — `--dangerous-replace` deletes all
-     * Hyper content (ADR 0030), and `truncateHyperContent` is what the
+     * InfinityCube content (ADR 0030), and `truncateInfinityCubeContent` is what the
      * truncate-mode tests exercise. Run in parallel worker threads against the
      * single `DATABASE_URL`, one file's truncation deletes rows another file is
      * mid-assertion on, and the failure surfaces in whichever file lost the

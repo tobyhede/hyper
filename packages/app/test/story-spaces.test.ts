@@ -19,7 +19,7 @@ import {
 /**
  * The Spaces the Ladle catalogue draws, held to production's own rules.
  *
- * ADR 0052 makes a stable story evidence about the UI Hyper ships, and its
+ * ADR 0052 makes a stable story evidence about the UI InfinityCube ships, and its
  * negative to remember forbids making one possible by "translating its state in
  * the harness". Where a Space opens is `requireDefaultMap` reading
  * `space.defaultMap` — so the story fixture must not answer that question

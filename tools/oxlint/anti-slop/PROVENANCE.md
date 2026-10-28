@@ -6,7 +6,7 @@ Vendored from https://github.com/dmmulroy/anti-slop at commit
 Copied: `src/index.ts`, `src/rules/*.ts` (rule implementations only, upstream's
 own `*.test.ts` files excluded), `src/shared/*.ts`.
 
-Not copied: `src/effect/**` (the opt-in Effect rule — Hyper does not depend on
+Not copied: `src/effect/**` (the opt-in Effect rule — InfinityCube does not depend on
 `effect`, per the upstream install skill's guidance to only add it on an
 explicit dependency or request).
 

@@ -1,4 +1,4 @@
-# Hyper
+# InfinityCube
 
 Graph-native technical content. Resources hold the content and live in spatial Maps; authors connect them into curated directed Graphs and offer different Maps onto them. This glossary is the shared language for that domain — it holds no implementation detail (file formats, storage, and rendering libraries are out of scope here), with one exception noted at the end.
 
@@ -25,7 +25,7 @@ _Avoid_: aggregate as a name for a single Space and its Resources (say snapshot)
 **Id**:
 The durable UUID that names a referenceable entity — a Space, Resource, Map, or Graph. It is the entity's only identifier and is unique within that entity's scope: Space and Resource ids are global, while Map and Graph ids are unique within their owning Space. Resource ids are aggregate-global because a complete Meta-rooted aggregate indexes Resources across independently stored Spaces; a Graph belongs to one Map but its id is unique across the whole Space. Different entity kinds may carry the same UUID, and Map or Graph ids scoped to one Space may be reused in another. References carry the id directly in the scope that resolves it rather than pairing it with a second authored or machine-facing name.
 
-An author need not supply one when introducing an entity. Anything accepted into Hyper receives an id before it becomes part of a Space; once assigned, changing it is a real edit because every reference names it.
+An author need not supply one when introducing an entity. Anything accepted into InfinityCube receives an id before it becomes part of a Space; once assigned, changing it is a real edit because every reference names it.
 _Avoid_: guid, key, slug, local id, authored id, and any pairing of a "human" id with a "durable" one.
 
 **Revision**:
@@ -179,7 +179,7 @@ An application-supplied collection of the Space's Resources absent from the sele
 _Avoid_: Space-Resource palette, Resource panel, drawer, popover or Dock as the domain name.
 
 **Exporting**:
-Projecting the complete aggregate into the repository-friendly form an author can review, commit and share. The unit is every Space at once, rooted at the Meta Space, rather than one Space chosen from among them. Outside Running, Exporting is not what makes an edit durable; it records each Space outside Hyper at the revision it was read at. While Running, it is the only thing that does.
+Projecting the complete aggregate into the repository-friendly form an author can review, commit and share. The unit is every Space at once, rooted at the Meta Space, rather than one Space chosen from among them. Outside Running, Exporting is not what makes an edit durable; it records each Space outside InfinityCube at the revision it was read at. While Running, it is the only thing that does.
 _Avoid_: saving, publishing, syncing; exporting a single Space.
 
 **Aggregate directory**:
@@ -187,7 +187,7 @@ The on-disk form Exporting projects and Importing replaces: a directory holding 
 _Avoid_: catalog, bundle, export root as a second name for the same artifact.
 
 **Importing**:
-Taking a complete aggregate from outside Hyper and making it the stored one. It either establishes the aggregate of a repository that has none, or replaces the stored one outright, whatever is stored and whether or not it is a valid aggregate (ADR 0094) — never both, and never partly. Importing does not merge, reconcile or add to what is stored, and it does not rewrite what it read.
+Taking a complete aggregate from outside InfinityCube and making it the stored one. It either establishes the aggregate of a repository that has none, or replaces the stored one outright, whatever is stored and whether or not it is a valid aggregate (ADR 0094) — never both, and never partly. Importing does not merge, reconcile or add to what is stored, and it does not rewrite what it read.
 _Avoid_: loading, restoring, syncing; merging.
 
 **Running**:

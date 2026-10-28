@@ -57,12 +57,12 @@ import {
 } from '@project/ui';
 import './resources-popover.css';
 
-export const RESOURCE_DRAG_TYPE = 'application/x-hyper-resource-id';
+export const RESOURCE_DRAG_TYPE = 'application/x-infinity-cube-resource-id';
 /**
  * A Space row's drag carries the Space's id under its own type, so the canvas
  * can tell which source a drop came from before it reads the id.
  */
-export const SPACE_DRAG_TYPE = 'application/x-hyper-space-id';
+export const SPACE_DRAG_TYPE = 'application/x-infinity-cube-space-id';
 
 type Activation = 'keyboard' | 'pointer';
 

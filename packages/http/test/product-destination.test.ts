@@ -331,7 +331,7 @@ describe('product destinations', () => {
   });
 
   it.each([
-    ['/assets/hyper.svg', { kind: 'outside' }],
+    ['/assets/infinity-cube.svg', { kind: 'outside' }],
     ['/spaces/not-a-compact-uuid', { kind: 'malformed' }],
     [
       `/spaces/${encodeCompactUuid(uuidSchema.parse('00000000-0000-4000-8000-000000000099'))}`,
@@ -376,7 +376,7 @@ describe('product destinations', () => {
   it('classifies paths outside product addressing without loading', async () => {
     const backend = loader();
 
-    await expect(resolveProductDestination(backend, '/assets/hyper.svg')).resolves.toEqual({
+    await expect(resolveProductDestination(backend, '/assets/infinity-cube.svg')).resolves.toEqual({
       kind: 'outside',
     });
     expect(backend.loadSpace).not.toHaveBeenCalled();

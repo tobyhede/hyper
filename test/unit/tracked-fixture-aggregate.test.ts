@@ -118,7 +118,7 @@ afterEach(async () => {
 
 /** A copy of a tracked directory, so a test can add to it without touching the tracked files. */
 const copyOf = async (tracked: string): Promise<string> => {
-  const root = await mkdtemp(join(tmpdir(), 'hyper-fixture-'));
+  const root = await mkdtemp(join(tmpdir(), 'infinity-cube-fixture-'));
   temporaryDirectories.push(root);
   const copy = join(root, 'copy');
   await cp(tracked, copy, { recursive: true });
@@ -200,7 +200,7 @@ const filesUnder = async (root: string): Promise<Record<string, Buffer>> => {
 
 describe('tracked fixture export', () => {
   it('exports the files it imports from its own export, byte for byte', async () => {
-    const root = await mkdtemp(join(tmpdir(), 'hyper-fixture-export-'));
+    const root = await mkdtemp(join(tmpdir(), 'infinity-cube-fixture-export-'));
     temporaryDirectories.push(root);
     const exportOf = async (directory: string, destination: string) => {
       const repository = new MemorySpaceRepository();

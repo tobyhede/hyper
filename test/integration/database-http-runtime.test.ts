@@ -12,7 +12,7 @@ import { createDatabaseHttpApp } from '../../src/http/database-http-runtime';
 import type { DatabaseTarget, OpenedDatabaseTarget } from '../../src/database/database-target';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { sqliteSqlStore } from '../../src/sqlite/sql-store';
-import { clearHyperContent } from '../support/clear-hyper-content';
+import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { openSqliteRepository } from '../support/sqlite-harness';
 import { postgresTestDatabase } from '../support/postgres-database';
 import type { SpaceRepository } from '@project/aggregate';
@@ -50,13 +50,13 @@ interface HttpTargetCase {
  * unrecognised value throws here rather than leaving a file that silently
  * declares no test.
  */
-const configuredTarget = process.env['HYPER_DATABASE_TARGET'];
+const configuredTarget = process.env['INFINITY_CUBE_DATABASE_TARGET'];
 
 const targetCases = (all: readonly HttpTargetCase[]): readonly HttpTargetCase[] => {
   const selected = all.filter((candidate) => candidate.target === configuredTarget);
   if (selected.length === 0) {
     throw new Error(
-      `HYPER_DATABASE_TARGET names no database target: ${configuredTarget ?? '<unset>'}`,
+      `INFINITY_CUBE_DATABASE_TARGET names no database target: ${configuredTarget ?? '<unset>'}`,
     );
   }
   return selected;
@@ -67,10 +67,10 @@ const cases = targetCases([
     name: 'PostgreSQL',
     target: 'postgres',
     async arrange() {
-      await clearHyperContent();
+      await clearInfinityCubeContent();
       return {
         repository: new SqlSpaceRepository(postgresSqlStore(postgresTestDatabase)),
-        close: clearHyperContent,
+        close: clearInfinityCubeContent,
       };
     },
   },
@@ -106,7 +106,7 @@ describe.each(cases)('database HTTP runtime ($name)', (targetCase) => {
       const application = await createDatabaseHttpApp(target, {
         wait: () => new Promise<void>(() => undefined),
       });
-      const response = await application.fetch(new Request('http://hyper.test/api/spaces'));
+      const response = await application.fetch(new Request('http://infinity-cube.test/api/spaces'));
       expect(response.status).toBe(200);
       const summaries = decodeSpaceSummaries(
         // SAFETY: JSON.parse is the HTTP body boundary; decodeSpaceSummaries parses next.
@@ -115,7 +115,9 @@ describe.each(cases)('database HTTP runtime ($name)', (targetCase) => {
       expect(summaries).toEqual([expect.objectContaining({ title: 'New space' })]);
       const metaId = summaries[0]?.id;
       if (metaId === undefined) throw new Error('Expected a Space summary');
-      const loaded = await application.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
+      const loaded = await application.fetch(
+        new Request(`http://infinity-cube.test/api/spaces/${metaId}`),
+      );
       expect(loaded.status).toBe(200);
       const body = decodeLoadedSpace(
         // SAFETY: JSON.parse is the HTTP body boundary; decodeLoadedSpace parses next.
@@ -160,7 +162,7 @@ describe.each(cases)('database HTTP runtime ($name)', (targetCase) => {
       );
       await recovered.promise;
 
-      const response = await application.fetch(new Request('http://hyper.test/api/spaces'));
+      const response = await application.fetch(new Request('http://infinity-cube.test/api/spaces'));
       expect(response.status).toBe(200);
       expect(
         decodeSpaceSummaries(

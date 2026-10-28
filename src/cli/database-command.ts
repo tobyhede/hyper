@@ -71,7 +71,7 @@ const reportImportResult = (result: AggregateImportResult, io: CliIo): number =>
       // (`SqlSpaceRepository.replaceAggregate`'s `StaleSpaceRevisionError`
       // path). So the sentence states what is currently stored as a fact
       // rather than claiming the id is new; the same-id case is held by
-      // `test/unit/hyper-cli.test.ts`'s "does not claim the Meta identity
+      // `test/unit/infinity-cube-cli.test.ts`'s "does not claim the Meta identity
       // moved ..." test.
       io.stderr(
         result.currentMetaSpaceId === undefined

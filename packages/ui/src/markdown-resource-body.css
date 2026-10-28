@@ -1,7 +1,7 @@
 /* The Markdown kind's Open content, beside the component that draws it.
 
    Custom composite record (shadcn-first-ui):
-   - Existing Hyper component considered: CanvasResource, Button, RenderedMarkdown
+   - Existing InfinityCube component considered: CanvasResource, Button, RenderedMarkdown
      and MarkdownSourceEditor are composed here rather than duplicated.
    - shadcn/Base UI component considered: CanvasResource's existing Button supplies
      the rail Edit action; no registry primitive owns rendered/source Markdown

@@ -18,87 +18,88 @@ import { CANONICAL_DECIMAL, REVISION_CEILING } from './revision-codec';
 
 export const problemCatalogue = {
   'invalid-request': {
-    type: 'https://hyper.dev/problems/invalid-request',
+    type: 'urn:infinity-cube:problem:invalid-request',
     title: 'Invalid request',
     status: 400,
   },
   'invalid-space-id': {
-    type: 'https://hyper.dev/problems/invalid-space-id',
+    type: 'urn:infinity-cube:problem:invalid-space-id',
     title: 'Invalid Space id',
     status: 400,
   },
   'unsupported-media-type': {
-    type: 'https://hyper.dev/problems/unsupported-media-type',
+    type: 'urn:infinity-cube:problem:unsupported-media-type',
     title: 'Unsupported media type',
     status: 415,
   },
   'payload-too-large': {
-    type: 'https://hyper.dev/problems/payload-too-large',
+    type: 'urn:infinity-cube:problem:payload-too-large',
     title: 'Payload too large',
     status: 413,
   },
   'invalid-image-id': {
-    type: 'https://hyper.dev/problems/invalid-image-id',
+    type: 'urn:infinity-cube:problem:invalid-image-id',
     title: 'Invalid image id',
     status: 400,
   },
   'image-too-large': {
-    type: 'https://hyper.dev/problems/image-too-large',
+    type: 'urn:infinity-cube:problem:image-too-large',
     title: 'Image too large',
     status: 413,
   },
   'image-format-unsupported': {
-    type: 'https://hyper.dev/problems/image-format-unsupported',
+    type: 'urn:infinity-cube:problem:image-format-unsupported',
     title: 'Image format unsupported',
     status: 415,
   },
   'image-svg-unsupported': {
-    type: 'https://hyper.dev/problems/image-svg-unsupported',
+    type: 'urn:infinity-cube:problem:image-svg-unsupported',
     title: 'SVG image unsupported',
     status: 415,
   },
-  'not-found': { type: 'https://hyper.dev/problems/not-found', title: 'Not found', status: 404 },
+  'not-found': { type: 'urn:infinity-cube:problem:not-found', title: 'Not found', status: 404 },
   'method-not-allowed': {
-    type: 'https://hyper.dev/problems/method-not-allowed',
+    type: 'urn:infinity-cube:problem:method-not-allowed',
     title: 'Method not allowed',
     status: 405,
   },
   'persistence-unavailable': {
-    type: 'https://hyper.dev/problems/persistence-unavailable',
+    type: 'urn:infinity-cube:problem:persistence-unavailable',
     title: 'Persistence unavailable',
     status: 503,
   },
   'invalid-snapshot': {
-    type: 'https://hyper.dev/problems/invalid-snapshot',
+    type: 'urn:infinity-cube:problem:invalid-snapshot',
     title: 'Invalid Space snapshot',
     status: 422,
   },
   unauthorized: {
-    type: 'https://hyper.dev/problems/unauthorized',
+    type: 'urn:infinity-cube:problem:unauthorized',
     title: 'Unauthorized',
     status: 401,
   },
-  forbidden: { type: 'https://hyper.dev/problems/forbidden', title: 'Forbidden', status: 403 },
+  forbidden: { type: 'urn:infinity-cube:problem:forbidden', title: 'Forbidden', status: 403 },
   'request-timeout': {
-    type: 'https://hyper.dev/problems/request-timeout',
+    type: 'urn:infinity-cube:problem:request-timeout',
     title: 'Request timed out',
     status: 408,
   },
   'rate-limited': {
-    type: 'https://hyper.dev/problems/rate-limited',
+    type: 'urn:infinity-cube:problem:rate-limited',
     title: 'Rate limited',
     status: 429,
   },
   'internal-error': {
-    type: 'https://hyper.dev/problems/internal-error',
+    type: 'urn:infinity-cube:problem:internal-error',
     title: 'Internal server error',
     status: 500,
   },
 } as const;
 
-export type HyperProblemCode = keyof typeof problemCatalogue;
-export type HyperProblemStatus = (typeof problemCatalogue)[HyperProblemCode]['status'];
-export type HyperProblemType = (typeof problemCatalogue)[HyperProblemCode]['type'];
+export type InfinityCubeProblemCode = keyof typeof problemCatalogue;
+export type InfinityCubeProblemStatus =
+  (typeof problemCatalogue)[InfinityCubeProblemCode]['status'];
+export type InfinityCubeProblemType = (typeof problemCatalogue)[InfinityCubeProblemCode]['type'];
 
 export interface ProblemError {
   code: 'invalid-value';
@@ -106,33 +107,33 @@ export interface ProblemError {
 }
 
 export interface ProblemDetails {
-  type: HyperProblemType;
+  type: InfinityCubeProblemType;
   title: string;
-  status: HyperProblemStatus;
+  status: InfinityCubeProblemStatus;
   detail: string;
   errors?: ProblemError[];
 }
 
 const JSON_POINTER = /^(?:|(?:\/(?:[^~]|~[01])*)+)$/;
 
-const problemCodeByType = new Map<HyperProblemType, HyperProblemCode>(
+const problemCodeByType = new Map<InfinityCubeProblemType, InfinityCubeProblemCode>(
   Object.entries(problemCatalogue).map(([code, problem]) => [
     problem.type,
     // SAFETY: `Object.entries` widens problemCatalogue's own keys to `string`,
     // but every entry iterated here comes from problemCatalogue itself, so
-    // each key is one of its HyperProblemCode literals.
-    code as HyperProblemCode,
+    // each key is one of its InfinityCubeProblemCode literals.
+    code as InfinityCubeProblemCode,
   ]),
 );
 
-export const problemCodeForType = (type: HyperProblemType): HyperProblemCode => {
+export const problemCodeForType = (type: InfinityCubeProblemType): InfinityCubeProblemCode => {
   const code = problemCodeByType.get(type);
   if (code === undefined) throw new Error('problem details has an unknown type');
   return code;
 };
 
 export const encodeProblemDetails = (
-  code: HyperProblemCode,
+  code: InfinityCubeProblemCode,
   detail: string,
   errors?: readonly ProblemError[],
 ): ProblemDetails => {
@@ -163,15 +164,15 @@ export const decodeProblemDetails = (value: unknown): ProblemDetails => {
   const record = exactRecord(value, keys, 'problem details');
   if (typeof record['type'] !== 'string') throw new Error('problem type must be a string');
   // SAFETY: record['type'] is narrowed to `string` above, but only the `.has`
-  // check below proves it is one of HyperProblemType's known literals — that
+  // check below proves it is one of InfinityCubeProblemType's known literals — that
   // check is what this assertion stands in for.
-  if (!problemCodeByType.has(record['type'] as HyperProblemType)) {
+  if (!problemCodeByType.has(record['type'] as InfinityCubeProblemType)) {
     throw new Error('problem details has an unknown type');
   }
   // SAFETY: the `.has` check above already confirmed record['type'] is one of
-  // HyperProblemType's literals; it just couldn't narrow the index access
+  // InfinityCubeProblemType's literals; it just couldn't narrow the index access
   // itself, since `record` is a plain string-keyed record, not a union type.
-  const code = problemCodeForType(record['type'] as HyperProblemType);
+  const code = problemCodeForType(record['type'] as InfinityCubeProblemType);
   const expected = problemCatalogue[code];
   if (record['title'] !== expected.title) throw new Error('problem title does not match its type');
   if (record['status'] !== expected.status)

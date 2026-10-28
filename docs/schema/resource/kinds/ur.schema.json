@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/resource/kinds/ur.schema.json",
+  "$id": "https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/resource/kinds/ur.schema.json",
   "title": "Ur content",
   "description": "An Ur Resource has no content (ADR 0113), so its content is the empty object.",
   "type": "object",

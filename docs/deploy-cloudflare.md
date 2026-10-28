@@ -1,6 +1,6 @@
 # Deploying to Cloudflare
 
-A talk in a public GitHub repository can be shown from a static copy of Hyper, with no server: **Mounting** (ADR 0130). `pnpm build:mount` writes that copy to `packages/app/dist-mount`, and the repository's `wrangler.jsonc` serves it from Cloudflare Workers static assets, with every product URL answered by the application. The page reads the talk from GitHub when it opens. Edits made there work as anywhere else but last only as long as the page (ADR 0131), so lasting edits stay `pnpm hyper run` on the author's machine.
+A talk in a public GitHub repository can be shown from a static copy of InfinityCube, with no server: **Mounting** (ADR 0130). `pnpm build:mount` writes that copy to `packages/app/dist-mount`, and the repository's `wrangler.jsonc` serves it from Cloudflare Workers static assets, with every product URL answered by the application. The page reads the talk from GitHub when it opens. Edits made there work as anywhere else but last only as long as the page (ADR 0131), so lasting edits stay `pnpm cube run` on the author's machine.
 
 A **GitHub location** is `github:owner/repo@ref/path`. `@ref` defaults to the repository's default branch and `/path` to its root; the directory it names must hold `aggregate.json`. Any page takes one as `?source=github:…`. A build variable, `VITE_DEFAULT_SPACE_SOURCE`, sets the one the bare domain opens; without it, and without `?source=`, the page asks for a location.
 

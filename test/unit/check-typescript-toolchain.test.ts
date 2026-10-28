@@ -195,7 +195,7 @@ describe('what the check probes', () => {
   }, 60_000);
 
   it('reads only the packages: block, so an unrelated pnpm key is not a workspace glob', () => {
-    const root = mkdtempSync(join(tmpdir(), 'hyper-toolchain-'));
+    const root = mkdtempSync(join(tmpdir(), 'infinity-cube-toolchain-'));
     try {
       workspaceAt(root, 'packages/app');
       workspaceAt(root, 'packages/core');
@@ -214,7 +214,7 @@ describe('what the check probes', () => {
   });
 
   it('skips a directory with no manifest, which `pnpm -r typecheck` never enters', () => {
-    const root = mkdtempSync(join(tmpdir(), 'hyper-toolchain-'));
+    const root = mkdtempSync(join(tmpdir(), 'infinity-cube-toolchain-'));
     try {
       workspaceAt(root, 'packages/app');
       // A leftover after a rename, or a plain assets directory. `pnpm -r` skips
@@ -229,7 +229,7 @@ describe('what the check probes', () => {
   });
 
   it('refuses a workspace glob it cannot expand rather than probing fewer', () => {
-    const root = mkdtempSync(join(tmpdir(), 'hyper-toolchain-'));
+    const root = mkdtempSync(join(tmpdir(), 'infinity-cube-toolchain-'));
     try {
       writeFileSync(join(root, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/**/nested'\n");
       expect(() => probedWorkspaces(root)).toThrow(/cannot expand/);

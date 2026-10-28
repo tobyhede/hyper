@@ -12,7 +12,7 @@ import {
   problemCatalogue,
   classifyStoredFailure,
   type AggregateLoadResult,
-  type HyperProblemCode,
+  type InfinityCubeProblemCode,
 } from '@project/persistence';
 import type { UUID } from '@project/core';
 import type { SpaceRepository } from './space-repository';
@@ -24,7 +24,7 @@ const escapeHtml = (value: string): string =>
 
 const problem = (
   code: Extract<
-    HyperProblemCode,
+    InfinityCubeProblemCode,
     | 'invalid-request'
     | 'not-found'
     | 'method-not-allowed'

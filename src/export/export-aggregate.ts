@@ -161,7 +161,7 @@ const markAggregateExported = async (
  * Import would read that the aggregate no longer serialises to is removed. The
  * destination and its Space directories are never renamed or recreated, and
  * nothing Import does not read is touched. A failure part-way leaves some files
- * written and some not; git, not Hyper, restores the directory.
+ * written and some not; git, not InfinityCube, restores the directory.
  */
 export const exportAggregate = async (
   repository: SpaceRepository,

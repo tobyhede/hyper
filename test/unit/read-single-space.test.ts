@@ -46,7 +46,7 @@ const retiredGraphsDocument = {
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-single-space-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-single-space-'));
   temporaryDirectories.push(directory);
   return directory;
 };

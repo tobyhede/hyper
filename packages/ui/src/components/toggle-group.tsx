@@ -8,7 +8,7 @@ import { cn } from '../lib/utils';
  *
  * The shadcn registry's `toggle-group` is Radix, and ADR 0050 puts this
  * repository on Base UI — so this is the smallest shadcn-shaped wrapper over
- * the primitive the registry's Base UI variant documents, written in Hyper's
+ * the primitive the registry's Base UI variant documents, written in InfinityCube's
  * own vocabulary rather than adapted from a Radix item that would drag
  * `radix-ui` in behind it.
  *
