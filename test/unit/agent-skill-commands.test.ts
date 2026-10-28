@@ -72,6 +72,15 @@ const namedRootScripts = (skill: string): readonly string[] =>
 
 const INFINITY_CUBE_SKILLS = ['infinity-cube-getting-started', 'infinity-cube-authoring'] as const;
 
+// The skills, the docs and the tests run `cube`; `infinity-cube` is the same
+// command under the product's name, so the two must not drift apart.
+describe('the cube and infinity-cube scripts', () => {
+  it('are one command', () => {
+    expect(rootPackage.scripts?.['cube']).toMatch(/^exec node /);
+    expect(rootPackage.scripts?.['infinity-cube']).toBe(rootPackage.scripts?.['cube']);
+  });
+});
+
 describe('commands in the InfinityCube getting-started and authoring skills', () => {
   it.each(INFINITY_CUBE_SKILLS)('%s names only root scripts the repository can run', (name) => {
     const named = namedRootScripts(readSkill(name));

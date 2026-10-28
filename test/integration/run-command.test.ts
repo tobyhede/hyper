@@ -95,7 +95,7 @@ const startRunning = async (via: 'pnpm' | 'launcher') => {
   const runArguments = ['run', directory, '--no-open', '--port', String(port)];
   const child =
     via === 'pnpm'
-      ? spawn('pnpm', ['--silent', 'infinity-cube', ...runArguments], {
+      ? spawn('pnpm', ['--silent', 'cube', ...runArguments], {
           cwd: REPOSITORY_ROOT,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -183,7 +183,7 @@ describe('pnpm cube init', () => {
 
       const result = await runCommand(
         'pnpm',
-        ['--silent', '--dir', REPOSITORY_ROOT, 'infinity-cube', 'init', 'talk'],
+        ['--silent', '--dir', REPOSITORY_ROOT, 'cube', 'init', 'talk'],
         { cwd: root, timeoutMs: START_TIMEOUT_MS },
       );
 
@@ -210,14 +210,10 @@ describe('pnpm cube run', () => {
       roots.push(root);
       const directory = join(root, 'rust-asycn');
 
-      const result = await runCommand(
-        'pnpm',
-        ['--silent', 'infinity-cube', 'run', directory, '--no-open'],
-        {
-          cwd: REPOSITORY_ROOT,
-          timeoutMs: START_TIMEOUT_MS,
-        },
-      );
+      const result = await runCommand('pnpm', ['--silent', 'cube', 'run', directory, '--no-open'], {
+        cwd: REPOSITORY_ROOT,
+        timeoutMs: START_TIMEOUT_MS,
+      });
 
       expect(result.status, result.stderr).not.toBe(0);
       expect(result.stderr).toContain(`pnpm cube init ${directory}`);

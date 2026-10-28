@@ -300,7 +300,7 @@ describe('Export writes in place', () => {
     await exportTo(holding(storedSpace()), destination);
     const outside = join(parent, 'outside.txt');
     await writeFile(outside, 'outside\n');
-    await symlink(outside, join(destination, '.aggregate.json.infinity-cube-write'));
+    await symlink(outside, join(destination, '.aggregate.json.export-write'));
     await writeFile(join(destination, 'aggregate.json'), '{}\n');
 
     await exportTo(holding(storedSpace()), destination);
