@@ -1,8 +1,8 @@
 # Keyboard shortcut best practices: a review checklist for React and React Flow apps
 
-The review checklist for Hyper's keyboard work: proposed ADR 0138 (a shortcut is a key bound to a named command), this directory's configurable-shortcuts tickets and the Canvas commands tickets in `.scratch/canvas-commands/`. Each practice has an ID (`BP-*`) that a review can cite. It was first applied to PR #436; that review is not repeated here.
+The review checklist for Hyper's keyboard work: proposed ADR 0138 (a shortcut is a key bound to a named command), this directory's configurable-shortcuts tickets and the Canvas commands tickets in `.scratch/canvas-commands/`. Each practice has an ID (`BP-*`) that a review can cite.
 
-Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut implementation in a React app built on `@xyflow/react` v12. The React Flow claims were checked against the published source of `@xyflow/react` 12.12.0 (with `@xyflow/system` 0.0.83) and 12.11.2 (with `@xyflow/system` 0.0.79), the version this repo pins. Claims about tldraw 5.5.2, Excalidraw (`master`), tinykeys 4.0.1, react-hotkeys-hook 5.3.3, Mousetrap 1.6.5 and kbar 1.0.0 come from their source code. **[DISAGREE]** marks a point where the sources contradict each other. **[INFERENCE]** marks a recommendation that I derived and that no source states.
+Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut implementation in a React app built on `@xyflow/react` v12. The React Flow claims were checked against the published source of `@xyflow/react` 12.12.0 (with `@xyflow/system` 0.0.83) and 12.11.2 (with `@xyflow/system` 0.0.79), the version this repo pins. Claims about tldraw 5.5.2, Excalidraw (`master`), tinykeys 4.0.1, react-hotkeys-hook 5.3.3, Mousetrap 1.6.5 and kbar 1.0.0 come from their source code. **[DISAGREE]** marks a point where the sources contradict each other. **[INFERENCE]** marks a recommendation that I derived and that no source states. A claim about a library's code links to the file in the published package at the version read, on unpkg, so it can be re-checked.
 
 ## Summary
 
@@ -22,8 +22,8 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - Excalidraw routes every action through one `ActionManager.handleKeyDown`.
   - tldraw's `useKeyboardShortcuts` builds one registry and attaches one listener to `body`.
   - kbar collects every action's `shortcut` into a single tinykeys map.
-- **Check:** `grep -rn "addEventListener('keydown'\|addEventListener(\"keydown\"\|useHotkeys(\|tinykeys(" src`. Expect one hit for the dispatcher, plus any hits that are justified. Each additional hit is a finding.
-- **Sources:** [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx), [tldraw useKeyboardShortcuts.ts](https://www.npmjs.com/package/tldraw) (`src/lib/ui/hooks/useKeyboardShortcuts.ts` in the package), [kbar](https://www.npmjs.com/package/kbar) (`lib/InternalEvents.js`, `useShortcuts`).
+- **Check:** Start with `grep -rnE "addEventListener\(['\"]key(down|up)|onkey(down|up)\s*=|onKeyDown(Capture)?=|onKeyUp=|useKeyPress\(|useHotkeys\(|tinykeys\(" src`. Expect one listener hit for the dispatcher. Each other window or document listener, `useKeyPress` or hotkey call is a finding unless it is justified. `onKeyDown` props are fine when they handle a local widget key, and a finding when they answer an app command. The grep is a starting point, not proof: a listener added through a helper or a library will not show up.
+- **Sources:** [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx), [tldraw useKeyboardShortcuts.ts](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts), [kbar InternalEvents.js](https://unpkg.com/browse/kbar@1.0.0/lib/InternalEvents.js) (`useShortcuts`).
 
 **BP-ARCH-2: Keep commands separate from bindings.**
 - **Practice:** A command has a stable string id (for example `graph.next`), a label and a `run` function. A binding is the data `{ key, command, when?, args? }`. Commands never contain key strings.
@@ -38,7 +38,7 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - Excalidraw: each action has a `keyTest(event, appState, elements, app)` plus `viewMode` and `navigation` flags.
   - tldraw: `areShortcutsDisabled(editor)` checks open menus, an editing shape, a crash, and the user's preference.
 - **Check:** Each binding entry carries a `when` (or scope). The handlers in the commands file do not read focus or modal state just to decide whether to run.
-- **Sources:** [VS Code when clauses](https://code.visualstudio.com/api/references/when-clause-contexts), [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx), [tldraw useKeyboardShortcuts.ts](https://www.npmjs.com/package/tldraw).
+- **Sources:** [VS Code when clauses](https://code.visualstudio.com/api/references/when-clause-contexts), [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx), [tldraw useKeyboardShortcuts.ts](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts).
 
 **BP-ARCH-4: Resolve overlaps deterministically, and test for them.**
 - **Practice:** If two bindings could match the same event in the same context, the conflict is reported at build or test time. At runtime the result is deterministic: either an explicit priority or a refusal with a dev warning. It never depends on which handler registered first.
@@ -48,7 +48,7 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - Excalidraw sorts by `keyPriority` and then cancels with `console.warn("Canceling as multiple actions match this shortcut")` if more than one action still matches.
   - tldraw runs every registration whose key matches, with no conflict detection.
 - **Check:** There is a unit test that walks the default table and asserts that no two bindings share a normalised key while their `when` predicates can both be true. At minimum, it checks pairs with the same scope.
-- **Sources:** [VS Code keybindings](https://code.visualstudio.com/docs/configure/keybindings), [tinykeys README, "Keybinding Priorities"](https://www.npmjs.com/package/tinykeys), [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx).
+- **Sources:** [VS Code keybindings](https://code.visualstudio.com/docs/configure/keybindings), [tinykeys README, "Keybinding Priorities"](https://unpkg.com/browse/tinykeys@4.0.1/README.md), [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx).
 
 **BP-ARCH-5: Expose one invocation path.**
 - **Practice:** Shortcuts, menus, toolbar buttons and the command palette all call the same `runCommand(id)`, with the same enabled check. A shortcut for a disabled command does nothing and does not call `preventDefault`.
@@ -62,8 +62,9 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - Excalidraw listens on its container unless `handleKeyboardGlobally` is set.
   - tldraw registers only while `editor.getInstanceState().isFocused` is true.
   - React Flow's `useKeyPress` listens on `document` by default. Two flows on one page therefore both react to Backspace (see BP-RF-3).
-- **Check:** The listener target is the app root, or the dispatcher checks `root.contains(event.target)` or a focus flag. A second instance must not respond to a key pressed in the first.
-- **Sources:** [Excalidraw App.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/components/App.tsx), [tldraw useKeyboardShortcuts.ts](https://www.npmjs.com/package/tldraw), [React Flow useKeyPress](https://reactflow.dev/api-reference/hooks/use-key-press).
+- **Reconciling with BP-ARCH-1, BP-SCOPE-5 and BP-A11Y-4:** containment is the wrong test for an app that owns the page and floats surfaces over the canvas. A key pressed on `body`, in a floating toolbar or dock, or in a dialog or popover rendered into a portal outside the root still belongs to the app, and `root.contains(event.target)` would drop it. Such an app opts into one document-level listener (Excalidraw's `handleKeyboardGlobally`) and scopes instances by state instead: only the active instance (the one on screen, or the one tldraw would call focused) answers, and overlays narrow what it answers (BP-SCOPE-5). Root-scoped listening is for a component embedded in a host page it does not own.
+- **Check:** Either the listener target is the component's root, or the dispatcher is a deliberate global opt-in that checks which instance is active before any command runs. With two instances mounted, a key must reach only the active one, including a key pressed in a portal or on `body`. A global listener with no active-instance check is a finding when instances can coexist.
+- **Sources:** [Excalidraw App.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/components/App.tsx), [tldraw useKeyboardShortcuts.ts](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts), [React Flow useKeyPress](https://reactflow.dev/api-reference/hooks/use-key-press).
 
 ## 2. Scoping and focus
 
@@ -81,7 +82,7 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - Mousetrap and react-hotkeys-hook block form tags and contentEditable by default.
   - tinykeys blocks editable targets unless the target is the listener's own `currentTarget`.
 - **Check:** There is one `isTextEntryTarget(event)` helper, and the dispatcher calls it before matching. Unit tests cover `input[type=text]`, `input[type=checkbox]`, `textarea[readonly]`, a `contenteditable` div and a mounted CodeMirror editor.
-- **Sources:** [tldraw useKeyboardShortcuts.ts](https://www.npmjs.com/package/tldraw), [@xyflow/system isInputDOMNode](https://www.npmjs.com/package/@xyflow/system), [react-hotkeys-hook README](https://www.npmjs.com/package/react-hotkeys-hook), [Mousetrap stopCallback](https://www.npmjs.com/package/mousetrap), [tinykeys README, `options.ignore`](https://www.npmjs.com/package/tinykeys).
+- **Sources:** [tldraw useKeyboardShortcuts.ts](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts), [@xyflow/system isInputDOMNode](https://unpkg.com/browse/@xyflow/system@0.0.79/dist/esm/index.mjs), [react-hotkeys-hook README](https://unpkg.com/browse/react-hotkeys-hook@5.3.3/README.md), [Mousetrap stopCallback](https://unpkg.com/browse/mousetrap@1.6.5/mousetrap.js), [tinykeys README, `options.ignore`](https://unpkg.com/browse/tinykeys@4.0.1/README.md).
 
 **BP-SCOPE-2: Ignore IME composition.**
 - **Practice:** The first check in the dispatcher is `if (event.isComposing || event.keyCode === 229) return;`.
@@ -102,19 +103,19 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - react-aria's `useKeyboard` "stopped [propagation] by default if there is an event handler, unless `event.continuePropagation()` is called". Code built on it can hide keys from the dispatcher.
   - Excalidraw calls both `preventDefault` and `stopPropagation` after an action runs.
 - **Check:** `grep -rn "stopPropagation\|stopImmediatePropagation" src`. Each hit on a keyboard path needs a justification. No hit may be in a capture listener.
-- **Sources:** [react-aria useKeyboard](https://react-aria.adobe.com/useKeyboard), [React Flow source, useKeyPress](https://www.npmjs.com/package/@xyflow/react).
+- **Sources:** [react-aria useKeyboard](https://react-aria.adobe.com/useKeyboard), [React Flow source, useKeyPress](https://unpkg.com/browse/@xyflow/react@12.11.2/dist/esm/index.mjs).
 
 **BP-SCOPE-5: Overlays take over scope.**
 - **Practice:** While a modal dialog, menu, popover or command palette is open, canvas and global character shortcuts are inactive, apart from a short allowlist (for example Escape). Shortcuts come back when it closes.
 - **Why:** tldraw's `areShortcutsDisabled` returns true when `editor.menus.hasAnyOpenMenus()`. The WAI APG warns against shortcuts that conflict with widget keys.
 - **Check:** Overlays add a context key such as `overlayOpen`, or push a scope. Default bindings include `!overlayOpen` (or are scoped). A test opens a menu, presses a canvas letter shortcut, and asserts that nothing happened.
-- **Sources:** [tldraw useKeyboardShortcuts.ts](https://www.npmjs.com/package/tldraw), [WAI-ARIA APG, Keyboard Shortcuts](https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/#keyboardshortcuts).
+- **Sources:** [tldraw useKeyboardShortcuts.ts](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts), [WAI-ARIA APG, Keyboard Shortcuts](https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/#keyboardshortcuts).
 
 **BP-SCOPE-6: Handle shadow DOM and iframes.**
 - **Practice:** The target is read from `event.composedPath()[0]` and not from `event.target`, because shadow DOM retargets events to the host. The dispatcher does not assume that keys typed in an iframe reach the parent document. If an iframe needs shortcuts, it posts them to the parent, or the parent installs a listener in the iframe.
 - **Why:** Mousetrap's comment: "Events originating from a shadow DOM are re-targetted and `e.target` is the shadow host". React Flow's `isInputDOMNode` reads `composedPath()[0]`.
 - **Check:** Look for `composedPath` in the target helper.
-- **Sources:** [Mousetrap](https://www.npmjs.com/package/mousetrap), [@xyflow/system](https://www.npmjs.com/package/@xyflow/system).
+- **Sources:** [Mousetrap](https://unpkg.com/browse/mousetrap@1.6.5/mousetrap.js), [@xyflow/system](https://unpkg.com/browse/@xyflow/system@0.0.79/dist/esm/index.mjs).
 
 ## 3. Key matching
 
@@ -130,7 +131,7 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - AZERTY: `{key:'a', code:'KeyQ'}` matches `a`, not `q`.
   - Dvorak: `{key:'o', code:'KeyS'}` matches `o`.
   - Russian: `{key:'я', code:'KeyZ', ctrlKey:true}` matches `Mod+z`.
-- **Sources:** [MDN KeyboardEvent.code](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code), [UI Events code spec](https://www.w3.org/TR/uievents-code/), [Excalidraw keys.ts](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/common/src/keys.ts), [tldraw](https://www.npmjs.com/package/tldraw) (`useKeyboardShortcuts.ts`, `matchesEvent`), [VS Code Keybinding Issues wiki](https://github.com/Microsoft/vscode/wiki/Keybinding-Issues), [VS Code keybindings, "Keyboard layout-independent bindings"](https://code.visualstudio.com/docs/configure/keybindings), [Figma blog](https://www.figma.com/blog/behind-the-scenes-international-keyboard-shortcuts/).
+- **Sources:** [MDN KeyboardEvent.code](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code), [UI Events code spec](https://www.w3.org/TR/uievents-code/), [Excalidraw keys.ts](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/common/src/keys.ts), [tldraw](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts) (`useKeyboardShortcuts.ts`, `matchesEvent`), [VS Code Keybinding Issues wiki](https://github.com/Microsoft/vscode/wiki/Keybinding-Issues), [VS Code keybindings, "Keyboard layout-independent bindings"](https://code.visualstudio.com/docs/configure/keybindings), [Figma blog](https://www.figma.com/blog/behind-the-scenes-international-keyboard-shortcuts/).
 
 **BP-KEY-2: Define one rule for Shift-produced characters, and normalise CapsLock.**
 - **Practice:** A binding for a shifted character (`?`, `+`, `>`) is written as the character, and the matcher handles Shift consistently. There are two options:
@@ -146,26 +147,27 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - ARIA requires `aria-keyshortcuts` to list the keys pressed ("Shift+2", not "@"), but that is layout-specific.
   - Option (b) assumes US glyph pairs.
 - **Check:** One `normalize(event)` function, used by both matching and recording. Tests cover `?` (US Shift+/), CapsLock with `k` (`{key:'K', shiftKey:false}` matches `k`), and Shift+digit.
-- **Sources:** [MDN KeyboardEvent.key](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key), [tldraw](https://www.npmjs.com/package/tldraw), [Excalidraw App.tsx onKeyDown](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/components/App.tsx), [MDN aria-keyshortcuts](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-keyshortcuts).
+- **Sources:** [MDN KeyboardEvent.key](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key), [tldraw](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts), [Excalidraw App.tsx onKeyDown](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/components/App.tsx), [MDN aria-keyshortcuts](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-keyshortcuts).
 
 **BP-KEY-3: Match modifiers exactly.**
 - **Practice:** A binding matches only if `ctrlKey`, `metaKey`, `altKey` and `shiftKey` each equal what the binding declares, unless the binding marks a modifier as optional. A plain `k` binding must not fire on Ctrl+K or Meta+K.
 - **Why:** tldraw's `matchesEvent` compares all four flags. tinykeys rejects any extra modifier unless it is listed as optional (`[Shift]`). React Flow's `useKeyPress` instead requires the pressed-key set to equal the binding's size.
-- **Check:** The matcher compares all four flags. A test checks that Ctrl+K does not trigger a `k` binding.
-- **Sources:** [tldraw](https://www.npmjs.com/package/tldraw), [tinykeys README](https://www.npmjs.com/package/tinykeys).
+- **Precedence with BP-KEY-2:** for a binding written as a shifted non-letter character (`?`, `+`, `>`), BP-KEY-2's rule decides Shift and this rule decides Ctrl, Alt and Meta. Under option (a), `?` matches `{key:'?', shiftKey:true}` on any layout that types `?`, and Ctrl+? does not match. A `+` binding matches `key:'+'` whether Shift produced it (US Shift+=) or not (numpad, or layouts with an unshifted `+`). `Shift+=` is a layout-specific way to write the same press and should not appear in the table. `Shift+Equal` names the physical key through `code`, which is the option-(b) style, and the table should use one style, not both.
+- **Check:** The matcher compares Ctrl, Alt and Meta exactly, and compares Shift exactly for letters, digits and named keys. A test checks that Ctrl+K does not trigger a `k` binding, and one checks that `?` typed with Shift matches a `?` binding.
+- **Sources:** [tldraw](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts), [tinykeys README](https://unpkg.com/browse/tinykeys@4.0.1/README.md).
 
 **BP-KEY-4: Resolve `Mod` once per platform.**
 - **Practice:** A `Mod` token resolves to Meta on macOS and Control elsewhere, through one `isMac` source that tests can inject. Display strings come from the same resolution (⌘ versus Ctrl).
 - **Why:** CodeMirror: "`Mod-` as a shorthand for `Cmd-` on Mac and `Ctrl-` on other platforms". tinykeys `$mod` and Playwright `ControlOrMeta` mean the same.
 - **[DISAGREE]** tldraw registers both `cmd+x` and `ctrl+x` on every platform. On macOS that turns Ctrl+X into a second alias.
 - **Check:** There is one platform helper, and no `navigator.platform` or `userAgent` sniffing elsewhere. Tests run the matcher with Mac and with non-Mac.
-- **Sources:** [CodeMirror KeyBinding](https://codemirror.net/docs/ref/#view.KeyBinding), [tinykeys README](https://www.npmjs.com/package/tinykeys), [Playwright Keyboard](https://playwright.dev/docs/api/class-keyboard).
+- **Sources:** [CodeMirror KeyBinding](https://codemirror.net/docs/ref/#view.KeyBinding), [tinykeys README](https://unpkg.com/browse/tinykeys@4.0.1/README.md), [Playwright Keyboard](https://playwright.dev/docs/api/class-keyboard).
 
 **BP-KEY-5: Treat AltGr as its own case.**
 - **Practice:** Do not bind Ctrl+Alt+character. On Windows, AltGr arrives as Ctrl+Alt and produces characters such as `{` or `@` on many layouts.
 - **Why:** The VS Code wiki: "pressing `Ctrl+Alt+Digit7` results in `ctrlKey: true, altKey: true, key: "{"`". It advises removing Ctrl+Alt bindings that steal AltGr characters. tinykeys aliases AltGraph explicitly.
 - **Check:** The default table has no `Ctrl+Alt+<printable>`, or each such entry has a written reason. The recorder warns about this combination (BP-REMAP-4).
-- **Sources:** [VS Code Keybinding Issues](https://github.com/Microsoft/vscode/wiki/Keybinding-Issues), [tinykeys README, AltGraph](https://www.npmjs.com/package/tinykeys).
+- **Sources:** [VS Code Keybinding Issues](https://github.com/Microsoft/vscode/wiki/Keybinding-Issues), [tinykeys README, AltGraph](https://unpkg.com/browse/tinykeys@4.0.1/README.md).
 
 **BP-KEY-6: Declare auto-repeat per command.**
 - **Practice:** Each command declares `repeat: true` or `false`, defaulting to false. Toggles, navigation such as "next slide", create and delete ignore `event.repeat`. Continuous actions (zoom, nudge) may allow it.
@@ -173,19 +175,19 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - tinykeys ignores every repeat.
   - tldraw allows only the registration that first matched a held key to repeat, so releasing Shift while Q is still held does not start firing `q`.
   - React Flow's `useKeyPress` does not check `repeat`.
-- **Check:** The binding or command type has a `repeat` field, and the dispatcher checks `if (event.repeat && !binding.repeat) return`. A test holds a key (`{x>5}` in user-event) and expects one run.
-- **Sources:** [MDN KeyboardEvent.key](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key), [tinykeys source](https://www.npmjs.com/package/tinykeys), [tldraw](https://www.npmjs.com/package/tldraw).
+- **Check:** The binding or command type has a `repeat` field, and the dispatcher checks `if (event.repeat && !binding.repeat) return`. A test holds a key with user-event's `{x>5/}` (five keydowns, the later four with `repeat: true`, then a keyup) and expects one run. Without the trailing `/` the key is left held, and later keyboard actions in the same test see it as down.
+- **Sources:** [MDN KeyboardEvent.key](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key), [tinykeys source](https://unpkg.com/browse/tinykeys@4.0.1/dist/tinykeys.mjs), [tldraw](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts).
 
 **BP-KEY-7: Call `preventDefault` only when a command ran.**
 - **Practice:** `preventDefault()` is called after the match succeeds, the `when` check passes and the command is enabled. It is never called for a miss, a disabled command or a skipped target.
 - **Why:** Calling it on a miss breaks typing and browser behaviour. tldraw and Excalidraw call it only inside a matched, enabled action. React Flow's `useKeyPress` calls it on any match, except on a plain key over a `BUTTON` or `A` element.
 - **Check:** The dispatcher has exactly one `preventDefault`, placed after the command runs (or after the run guard passes). Tests: a disabled command leaves `defaultPrevented` false, and an enabled one sets it true.
-- **Sources:** [tldraw](https://www.npmjs.com/package/tldraw), [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx).
+- **Sources:** [tldraw](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts), [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx).
 
 **BP-KEY-8: Avoid OS, browser and assistive technology combinations.**
 - **Practice:** The defaults avoid:
   - any modifier plus Tab, Enter, Space or Escape;
-  - Meta plus a single key;
+  - on Windows and Linux, the Windows/Super key (reported as Meta) plus a single key, which the OS reserves. On macOS Meta is ⌘ and `Mod+<key>` (BP-KEY-4) is the normal form, but avoid the ⌘ chords the OS or browser take (⌘Q, ⌘W, ⌘T, ⌘N, ⌘H, ⌘M, ⌘Tab, ⌘Space);
   - Alt plus a function key;
   - CapsLock, Insert or Scroll Lock combinations, and Ctrl+Option combinations on macOS (screen reader modifier keys);
   - browser chords for print, find, address bar, refresh, bookmarks, history, and new or closed tabs and windows.
@@ -193,13 +195,13 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   Ctrl+W, T and N cannot be intercepted outside Keyboard Lock in fullscreen.
 - **Why:** These are the WAI APG conflict lists. react-hotkeys-hook: "some browser shortcuts (e.g. `meta+w`) cannot be overridden". Firefox's tests show that Ctrl+T and N reach the page only under Keyboard Lock in fullscreen, and that the fullscreen-exit key is "unconditionally reserved".
 - **Check:** A reserved-combo list lives in code and is used by both a default-table test and the recorder (BP-REMAP-4).
-- **Sources:** [WAI-ARIA APG, Keyboard Shortcuts](https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/#keyboardshortcuts), [react-hotkeys-hook README](https://www.npmjs.com/package/react-hotkeys-hook), [Firefox keyboard-lock test](https://searchfox.org/firefox-main/source/browser/base/content/test/fullscreen/browser_fullscreen_keyboard_lock_reserved.js), [MDN aria-keyshortcuts (Control+P example)](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-keyshortcuts).
+- **Sources:** [WAI-ARIA APG, Keyboard Shortcuts](https://www.w3.org/WAI/ARIA/apg/practices/keyboard-interface/#keyboardshortcuts), [react-hotkeys-hook README](https://unpkg.com/browse/react-hotkeys-hook@5.3.3/README.md), [Firefox keyboard-lock test](https://searchfox.org/firefox-main/source/browser/base/content/test/fullscreen/browser_fullscreen_keyboard_lock_reserved.js), [MDN aria-keyshortcuts (Control+P example)](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-keyshortcuts).
 
 **BP-KEY-9: Give sequences a timeout and resolve their prefixes.**
 - **Practice:** If chords or sequences exist (`g i`, `Mod+K Mod+1`), they have a timeout of at least 1000 ms. Escape or a non-matching key cancels them. A prefix that is also a full binding is either rejected or resolved by a documented rule.
 - **Why:** tinykeys' default timeout is 1000 ms, and it warns that "Setting this value too low (i.e. `300`) will be too fast for many of your users". It also logs a conflict when `a b` and `a b c` both exist. kbar sorts sequences longest-first to stop `t s` from also firing `s`.
 - **Check:** The timeout constant is at least 1000. There is a test for prefix overlap.
-- **Sources:** [tinykeys README](https://www.npmjs.com/package/tinykeys), [kbar](https://www.npmjs.com/package/kbar).
+- **Sources:** [tinykeys README](https://unpkg.com/browse/tinykeys@4.0.1/README.md), [kbar](https://unpkg.com/browse/kbar@1.0.0/lib/InternalEvents.js).
 
 ## 4. Accessibility
 
@@ -227,18 +229,18 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - GitHub: "You can disable character key shortcuts, while still allowing shortcuts that use modifier keys".
   - tldraw's `areShortcutsDisabled` checks `!editor.user.getAreKeyboardShortcutsEnabled()`.
 - **Check:** The setting exists, is reachable without a pointer, persists (BP-REMAP-6), and a test shows `k` does nothing while Mod+K still works when it is off.
-- **Sources:** [GitHub keyboard shortcuts](https://docs.github.com/en/get-started/accessibility/keyboard-shortcuts), [tldraw](https://www.npmjs.com/package/tldraw).
+- **Sources:** [GitHub keyboard shortcuts](https://docs.github.com/en/get-started/accessibility/keyboard-shortcuts), [tldraw](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts).
 
 **BP-A11Y-3: Derive every displayed shortcut from the effective bindings.**
 - **Practice:** The help sheet, tooltips, menu items and `aria-keyshortcuts` are all rendered from the effective table (defaults plus overrides) through one formatter. A remap changes all of them.
 - **Why:** MDN: "show the shortcut in menus and tooltips". tldraw renders its `kbd()` labels and its shortcuts dialog from the same action `kbd` strings that drive matching.
 - **Check:** No hard-coded key labels in JSX (`grep "⌘\|Ctrl+"` in components). A test remaps a command and asserts that the tooltip text changes.
-- **Sources:** [MDN aria-keyshortcuts](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-keyshortcuts), [tldraw kbd-utils.ts](https://www.npmjs.com/package/tldraw).
+- **Sources:** [MDN aria-keyshortcuts](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Attributes/aria-keyshortcuts), [tldraw kbd-utils.ts](https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/kbd-utils.ts).
 
-**BP-A11Y-4: Open a shortcut sheet with `?`, available in every scope.**
-- **Practice:** `?` opens a dialog that lists the shortcuts available in the current context, grouped by scope. The sheet is also reachable from a menu, because `?` is itself a character shortcut covered by BP-A11Y-1.
+**BP-A11Y-4: Open a shortcut sheet with `?`, and from a menu that works in every scope.**
+- **Practice:** `?` opens a dialog that lists the shortcuts available in the current context, grouped by scope. `?` is a character shortcut, so it is suppressed like any other: in text entry (BP-SCOPE-1), under an overlay (BP-SCOPE-5) and by the character-shortcuts switch (BP-A11Y-2). Do not exempt it from that switch: SC 2.1.4 covers `?`, and the sheet is where a user goes to remap or turn shortcuts off. The menu entry is therefore the path that works in every scope, and it is required.
 - **Why:** This is the convention in GitHub ("Typing ? … brings up a dialog box that lists the keyboard shortcuts available for that page"), Linear ("Press `?` to see the full list of shortcuts"), Excalidraw (`KEYS.QUESTION_MARK` opens help) and tldraw (shortcuts dialog).
-- **Check:** There is a `help.shortcuts` command bound to `?`, plus a menu entry. The sheet is generated from the table (BP-A11Y-3).
+- **Check:** There is a `help.shortcuts` command bound to `?`, and a menu or dock entry, reachable by keyboard and pointer, that runs the same command with character shortcuts off. The sheet is generated from the table (BP-A11Y-3).
 - **Sources:** [GitHub](https://docs.github.com/en/get-started/accessibility/keyboard-shortcuts), [Linear](https://linear.app/enablement/guide/navigating-linear), [Excalidraw App.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/components/App.tsx).
 
 **BP-A11Y-5: Use `aria-keyshortcuts` correctly, and only to describe.**
@@ -255,7 +257,7 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
   - MDN on `application`: "the web author is completely responsible for handling any and all keyboard input… The `Tab`, `Space` and `Enter` keys, as well as `Escape`, must be handled by the application". It adds that it "should be added to the lowest common container possible".
   - React Flow 12.12.0 renders `role: "application"` on `.react-flow`.
 - **Check:** Escape and Tab leave the canvas or move within it predictably. Readable content (an opened Resource) is not inside the application region, or it carries `role="document"`. Character shortcuts outside the canvas are covered by BP-A11Y-2.
-- **Sources:** [WebAIM NVDA](https://webaim.org/articles/nvda/), [MDN application role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/application_role), [React Flow source](https://www.npmjs.com/package/@xyflow/react).
+- **Sources:** [WebAIM NVDA](https://webaim.org/articles/nvda/), [MDN application role](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/application_role), [React Flow source](https://unpkg.com/browse/@xyflow/react@12.11.2/dist/esm/index.mjs).
 
 **BP-A11Y-7: Shortcuts are never the only way.**
 - **Practice:** Every command bound to a key is also reachable by Tab or a menu, and by pointer.
@@ -328,7 +330,7 @@ Researched 2026-10-28. This is a checklist for reviewing a keyboard shortcut imp
 | `multiSelectionKeyCode` | `'Meta'` on macOS, `'Control'` elsewhere | Hold to click-select several elements |
 | `zoomActivationKeyCode` | Same as above | Hold to zoom |
 | `panActivationKeyCode` | `'Space'` | Hold to pan |
-| `disableKeyboardA11y` | `false` | When true, disables arrow-key movement |
+| `disableKeyboardA11y` | `false` | When true, disables arrow-key movement and, despite the docs, a focused node's Enter, Space and Escape selection (source of 12.11.2 and 12.12.0; see BP-RF-2) |
 | `nodesFocusable`, `edgesFocusable` | `true` | Tab focus; Enter or Space selects |
 
 Each key prop accepts `null` to turn it off, or an array of alternatives.
@@ -343,10 +345,10 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
   - The multi-selection rectangle does the same.
   - All of this is skipped when `isInputDOMNode` is true or when `disableKeyboardA11y` is set. The edge handler checks only `disableKeyboardA11y`.
   - Node movement is announced through an `aria-live` message.
-  - The docs say: "If you set `disableKeyboardA11y={true}`, arrow-key movement is disabled (but tab-focus and selection still work)". However, the 12.12.0 source also skips the node's Enter, Space and Escape selection when the flag is set.
+  - The docs say: "If you set `disableKeyboardA11y={true}`, arrow-key movement is disabled (but tab-focus and selection still work)". However, the source of both 12.11.2 (this repo's version) and 12.12.0 also skips the node's Enter, Space and Escape selection when the flag is set.
 - **Practice:** The app's dispatcher must not also bind plain Enter, Space, Escape or arrows on the canvas without accounting for these handlers. React Flow runs first (on the focused element) and does not stop propagation.
 - **Check:** The dispatcher's canvas bindings for these keys either skip when `event.target.closest('.react-flow__node, .react-flow__edge')`, or `disableKeyboardA11y` is set and the app reimplements the behaviour. Test the node-focused case.
-- **Sources:** [React Flow Accessibility](https://reactflow.dev/learn/advanced-use/accessibility), [@xyflow/react source](https://www.npmjs.com/package/@xyflow/react) (`NodeWrapper`/`EdgeWrapper` `onKeyDown`, `NodesSelection`).
+- **Sources:** [React Flow Accessibility](https://reactflow.dev/learn/advanced-use/accessibility), [@xyflow/react source](https://unpkg.com/browse/@xyflow/react@12.11.2/dist/esm/index.mjs) (`NodeWrapper`/`EdgeWrapper` `onKeyDown`, `NodesSelection`).
 
 **BP-RF-3: Know how `useKeyPress` works.**
 - **What it does:**
@@ -360,7 +362,7 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
 - **Practice:** Do not build app commands on `useKeyPress`. Use the app dispatcher.
 - **Check:** `useKeyPress` is used only for held-key state, if at all.
 - **Version note:** In 12.11.2, the version this repo pins, keys were split with `kc.replace('+', '\n')`, which replaces only the first `+`. A three-part binding such as `'Meta+Shift+z'` therefore does not parse correctly. 12.12.0 uses `/\+/g`.
-- **Sources:** [useKeyPress API](https://reactflow.dev/api-reference/hooks/use-key-press), [@xyflow/react 12.11.2 and 12.12.0 dist](https://www.npmjs.com/package/@xyflow/react).
+- **Sources:** [useKeyPress API](https://reactflow.dev/api-reference/hooks/use-key-press), [@xyflow/react 12.11.2 dist](https://unpkg.com/browse/@xyflow/react@12.11.2/dist/esm/index.mjs), [12.12.0 dist](https://unpkg.com/browse/@xyflow/react@12.12.0/dist/esm/index.mjs).
 
 **BP-RF-4: Use the `nokey`, `nodrag`, `nowheel` and `nopan` class conventions.**
 - **Practice:** Interactive content inside a node (inputs, CodeMirror, buttons) carries:
@@ -371,19 +373,19 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
 
   `nokey` is a fixed string in `@xyflow/system`. It is not configurable and is not documented as a prop. The others are configurable through `noDragClassName`, `noWheelClassName` and `noPanClassName`.
 - **Check:** Editable or scrollable regions rendered inside a node have the relevant classes. The app's text-entry helper (BP-SCOPE-1) also honours `.nokey`, so both layers agree.
-- **Sources:** [ReactFlow API reference](https://reactflow.dev/api-reference/react-flow), [@xyflow/system isInputDOMNode](https://www.npmjs.com/package/@xyflow/system).
+- **Sources:** [ReactFlow API reference](https://reactflow.dev/api-reference/react-flow), [@xyflow/system isInputDOMNode](https://unpkg.com/browse/@xyflow/system@0.0.79/dist/esm/index.mjs).
 
 **BP-RF-5: Take over deletion through the app's command.**
 - **Practice:** If deletion must go through the app's own Edit path (validation, undo, persistence), set `deleteKeyCode={null}` and bind Delete and Backspace in the dispatcher to the app's delete command. Alternatively, keep React Flow's key and gate it with `onBeforeDelete`. Do not do both.
 - **Why:** React Flow deletes inside a `useEffect` when its key state flips, through `deleteElements`, outside the app dispatcher's `when` predicates and its preventDefault rule.
 - **Check:** Exactly one path deletes on a key. A test presses Backspace with a node selected and asserts one deletion. Another test presses Backspace in a node's input and asserts no deletion.
-- **Sources:** [@xyflow/react source](https://www.npmjs.com/package/@xyflow/react) (`useGlobalKeyHandler`), [ReactFlow API reference](https://reactflow.dev/api-reference/react-flow).
+- **Sources:** [@xyflow/react source](https://unpkg.com/browse/@xyflow/react@12.11.2/dist/esm/index.mjs) (`useGlobalKeyHandler`), [ReactFlow API reference](https://reactflow.dev/api-reference/react-flow).
 
 **BP-RF-6: Keep React Flow's announced instructions in line with the actual bindings.**
 - **Practice:** If any built-in key is changed or disabled, override the matching `ariaLabelConfig` strings.
 - **Why:** The default `node.a11yDescription.default` text says "Press delete to remove it", but the default `deleteKeyCode` is `'Backspace'`. If a key is remapped or set to `null`, the announced instructions become false.
 - **Check:** `ariaLabelConfig` is set whenever `deleteKeyCode`, `disableKeyboardA11y` or selection behaviour differs from the defaults, and its text names the effective keys (from the formatter, BP-A11Y-3).
-- **Sources:** [React Flow Accessibility](https://reactflow.dev/learn/advanced-use/accessibility), [@xyflow/system defaultAriaLabelConfig](https://www.npmjs.com/package/@xyflow/system).
+- **Sources:** [React Flow Accessibility](https://reactflow.dev/learn/advanced-use/accessibility), [@xyflow/system defaultAriaLabelConfig](https://unpkg.com/browse/@xyflow/system@0.0.79/dist/esm/index.mjs).
 
 **BP-RF-7: Avoid conflicts over Space, Shift and Mod.**
 - **Practice:** Do not bind an app command to plain Space, or to holding Shift or Mod, while `panActivationKeyCode`, `selectionKeyCode` or `multiSelectionKeyCode` use them. Do not treat Mod+click as a command when `multiSelectionKeyCode` is Mod.
@@ -402,7 +404,7 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
 **BP-TEST-2: Run focus scenarios through the real dispatcher.**
 - **Practice:** Integration tests use `user.keyboard` against rendered components:
   - `{Control>}k{/Control}` for chords, and `[KeyQ]` for codes;
-  - `{a>5/}` for repeat;
+  - `{a>5/}` for repeat, which releases the key afterwards (BP-KEY-6);
   - a `keyboardMap` for other layouts.
 
   Each test focuses a specific element first (input, textarea, CodeMirror, open menu, focused React Flow node, body) and asserts both that the command ran or did not run and the value of `defaultPrevented`.
@@ -425,11 +427,11 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
 
 ## 8. React mechanics
 
-**BP-REACT-1: Subscribe once and read the latest values through a ref or Effect Event.**
-- **Practice:** The dispatcher's `useEffect` adds the listener once, or when the target changes, and removes it in cleanup. Handlers and context are read through a ref updated each render, or through `useEffectEvent`. Re-subscribing on every render or every state change is a finding.
-- **Why:** React: Effect Events "always 'see' the latest values from render… without re-synchronizing your Effect". React 19.2 lists `useEffectEvent` under its new features. tinykeys' README shows exactly this pattern. tldraw instead rebuilds its whole registry when its dependencies change, which works but re-subscribes.
+**BP-REACT-1: Subscribe once and read the latest values through a ref.**
+- **Practice:** The dispatcher's effect adds the listener once, or when the target changes, and removes it in cleanup. Handlers and context are read through a ref updated each render (or in a layout effect). Re-subscribing on every render or every state change is a finding. `useEffectEvent` does the same job but exists only from React 19.2; this repo is on React 18.3.1, so the ref is the form to use and to expect.
+- **Why:** React: Effect Events "always 'see' the latest values from render… without re-synchronizing your Effect", which is what the ref achieves on React 18. tinykeys' README shows the ref pattern. tldraw instead rebuilds its whole registry when its dependencies change, which works but re-subscribes.
 - **Check:** The listener effect has a stable dependency list (target only). Command lookup happens at event time.
-- **Sources:** [React useEffectEvent](https://react.dev/reference/react/useEffectEvent), [React 19.2](https://react.dev/blog/2025/10/01/react-19-2), [tinykeys README, "React Hooks Example"](https://www.npmjs.com/package/tinykeys).
+- **Sources:** [React useEffectEvent](https://react.dev/reference/react/useEffectEvent), [React 19.2](https://react.dev/blog/2025/10/01/react-19-2), [tinykeys README, "React Hooks Example"](https://unpkg.com/browse/tinykeys@4.0.1/README.md).
 
 **BP-REACT-2: Make cleanup idempotent under StrictMode.**
 - **Practice:** Every `addEventListener` has a matching removal with the same function and the same `capture` flag, or uses an `AbortController` `signal`. Registering a scope or binding returns an unregister function. No module-level "registered" flag can break when the effect runs setup, cleanup, setup.
@@ -441,7 +443,7 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
 - **Practice:** If components contribute bindings or scopes (an overlay pushing a modal scope), the registry orders them by explicit priority or a scope stack. It never orders them by registration or effect order, because effects run children-first, and StrictMode and remounts reorder them.
 - **Why:** tinykeys documents that "the order of your keybindings matters". Excalidraw uses an explicit `keyPriority`. VS Code uses an explicit rule order.
 - **Check:** Registration takes a `priority` or `scope`. A test registers in both orders and gets the same winner.
-- **Sources:** [tinykeys README](https://www.npmjs.com/package/tinykeys), [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx).
+- **Sources:** [tinykeys README](https://unpkg.com/browse/tinykeys@4.0.1/README.md), [Excalidraw manager.tsx](https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx).
 
 **BP-REACT-4: Keep the context the predicates read current at dispatch time.**
 - **Practice:** The context the `when` predicates read is current when the key is pressed. Read it from stores (`getState()`) at event time rather than from a render-time closure. An overlay sets its scope when it becomes interactive. If a key could arrive in the gap between mount and effect, set the scope in `useLayoutEffect` or synchronously in the open action. **[INFERENCE]**
@@ -477,7 +479,7 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
 - React Flow `<ReactFlow>` API: https://reactflow.dev/api-reference/react-flow
 - React Flow useKeyPress: https://reactflow.dev/api-reference/hooks/use-key-press
 - React Flow Accessibility: https://reactflow.dev/learn/advanced-use/accessibility
-- @xyflow/react 12.11.2 and 12.12.0, @xyflow/system 0.0.79 and 0.0.83, published dist read directly: https://www.npmjs.com/package/@xyflow/react, https://www.npmjs.com/package/@xyflow/system
+- @xyflow/react 12.11.2 and 12.12.0, @xyflow/system 0.0.79 and 0.0.83, published dist read directly: https://unpkg.com/browse/@xyflow/react@12.11.2/dist/esm/index.mjs, https://unpkg.com/browse/@xyflow/react@12.12.0/dist/esm/index.mjs, https://unpkg.com/browse/@xyflow/system@0.0.79/dist/esm/index.mjs, https://unpkg.com/browse/@xyflow/system@0.0.83/dist/esm/index.mjs
 
 **Other apps and libraries**
 - VS Code:
@@ -485,7 +487,7 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
   - When clause contexts: https://code.visualstudio.com/api/references/when-clause-contexts
   - Keybinding Issues wiki: https://github.com/Microsoft/vscode/wiki/Keybinding-Issues
 - CodeMirror KeyBinding: https://codemirror.net/docs/ref/#view.KeyBinding
-- tldraw 5.5.2, read from the published `src/lib/ui/hooks/useKeyboardShortcuts.ts` and `kbd-utils.ts`: https://www.npmjs.com/package/tldraw
+- tldraw 5.5.2, read from the published `src/lib/ui/hooks/useKeyboardShortcuts.ts` and `kbd-utils.ts`: https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/hooks/useKeyboardShortcuts.ts, https://unpkg.com/browse/tldraw@5.5.2/src/lib/ui/kbd-utils.ts
 - Excalidraw:
   - keys.ts: https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/common/src/keys.ts
   - manager.tsx: https://raw.githubusercontent.com/excalidraw/excalidraw/master/packages/excalidraw/actions/manager.tsx
@@ -493,10 +495,10 @@ Each key prop accepts `null` to turn it off, or an array of alternatives.
 - Figma, "Behind the scenes: international keyboard shortcuts": https://www.figma.com/blog/behind-the-scenes-international-keyboard-shortcuts/
 - GitHub Docs, Keyboard shortcuts: https://docs.github.com/en/get-started/accessibility/keyboard-shortcuts
 - Linear, Navigating Linear: https://linear.app/enablement/guide/navigating-linear
-- tinykeys 4.0.1 README and source: https://www.npmjs.com/package/tinykeys
-- react-hotkeys-hook 5.3.3 README: https://www.npmjs.com/package/react-hotkeys-hook
-- Mousetrap 1.6.5 source: https://www.npmjs.com/package/mousetrap
-- kbar 1.0.0 source: https://www.npmjs.com/package/kbar
+- tinykeys 4.0.1 README and source: https://unpkg.com/browse/tinykeys@4.0.1/README.md, https://unpkg.com/browse/tinykeys@4.0.1/dist/tinykeys.mjs
+- react-hotkeys-hook 5.3.3 README: https://unpkg.com/browse/react-hotkeys-hook@5.3.3/README.md
+- Mousetrap 1.6.5 source: https://unpkg.com/browse/mousetrap@1.6.5/mousetrap.js
+- kbar 1.0.0 source: https://unpkg.com/browse/kbar@1.0.0/lib/InternalEvents.js
 - react-aria useKeyboard: https://react-aria.adobe.com/useKeyboard
 - Testing Library user-event keyboard: https://testing-library.com/docs/user-event/keyboard
 - Playwright Keyboard: https://playwright.dev/docs/api/class-keyboard
