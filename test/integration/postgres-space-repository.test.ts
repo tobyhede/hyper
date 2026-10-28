@@ -5,13 +5,13 @@ import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresTestDatabase as db } from '../support/postgres-database';
 import { createPostgresDatabase, type PostgresDatabase } from '../../src/prisma/db';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
-import { clearHyperContent } from '../support/clear-hyper-content';
+import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { recordResourceWrites } from '../support/record-resource-writes';
 import { recreatingBeforeRowLock, spaceRepositoryContract } from '../support/repository-contract';
 import { expectPersisted } from '../support/persistence-contract';
 
 /**
- * Every Hyper row, gone. The same deletion `--dangerous-replace` performs, and safe
+ * Every InfinityCube row, gone. The same deletion `--dangerous-replace` performs, and safe
  * for the same reason the replacement cases below are: `fileParallelism` is
  * off, so one integration file at a time owns the single `DATABASE_URL`.
  */
@@ -29,7 +29,7 @@ import { expectPersisted } from '../support/persistence-contract';
 // The whole contract -- lifecycle and commit alike -- runs directly against
 // `SqlSpaceRepository`.
 spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
-  await clearHyperContent();
+  await clearInfinityCubeContent();
   // Clients minted by `reopenRepository` below, closed with the harness.
   const reopenedDatabases: PostgresDatabase[] = [];
   const recreation = recreatingBeforeRowLock(postgresSqlStore(db));
@@ -43,7 +43,7 @@ spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
         await database.close();
       }
       reopenedDatabases.length = 0;
-      await clearHyperContent();
+      await clearInfinityCubeContent();
     },
     /*
      * A fresh host means a fresh client: `createPostgresDatabase()` returns a
@@ -55,7 +55,7 @@ spaceRepositoryContract('SqlSpaceRepository (PostgreSQL)', async () => {
      *
      * Unlike `test/support/sqlite-harness.ts`, the original client is not
      * closed first. It is the module-level handle this whole file shares —
-     * `clearHyperContent` and every raw-column write below go through it, and
+     * `clearInfinityCubeContent` and every raw-column write below go through it, and
      * `afterAll` closes it — so closing it here would take the rest of the file
      * down with it. That is also why the SQLite harness has to close: a second
      * live writer against one SQLite file is unsupported, while PostgreSQL
@@ -459,7 +459,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
    * either write lands, and the Meta row lock decides which writes first. The
    * *loser* of the row-lock queue does not simply wait its turn and then
    * write against the row it originally read. The winner's whole
-   * `replaceAggregate` -- including `truncateHyperContent`'s delete of the very
+   * `replaceAggregate` -- including `truncateInfinityCubeContent`'s delete of the very
    * row the loser is blocked on -- runs and commits before the loser's blocked
    * self-update ever unblocks, so the loser's `lockMetaIdentity` self-update
    * finds the row gone and conflicts against the identity the winner just
@@ -713,7 +713,7 @@ describe('SqlSpaceRepository (PostgreSQL)', () => {
    * rather than round-tripping the row's real one. `#replaceUnserialised`'s
    * own doc comment says that is safe because every relocked row is either
    * truncated in the same transaction (`#replaceAllSpaces` -> `#truncate
-   * HyperContent`, which deletes every currently stored row, relocked or not)
+   * InfinityCubeContent`, which deletes every currently stored row, relocked or not)
    * or the whole transaction rolls back on a `StaleSpaceRevisionError`, and
    * this holds the rollback half. `SPACE_ID` sorts before `OTHER_
    * SPACE_ID`, so `loadAllForReplacement`'s ascending order relocks `SPACE_ID`

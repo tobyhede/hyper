@@ -684,7 +684,7 @@ export const renderRoadmap = (roadmap: Roadmap, release: ReleaseScope | null = n
 };
 
 const stableRoadmapUuid = (name: string): string => {
-  const hex = createHash('sha256').update(`hyper-release-roadmap:${name}`).digest('hex');
+  const hex = createHash('sha256').update(`infinity-cube-release-roadmap:${name}`).digest('hex');
   const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 };
@@ -1083,7 +1083,7 @@ export const renderRoadmapHtml = (
     '<!doctype html>',
     '<html lang="en"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    '<title>Hyper roadmap</title>',
+    '<title>InfinityCube roadmap</title>',
     `<style>${STYLE}</style>`,
     '</head><body><main>',
     '<h1>Where we are</h1>',

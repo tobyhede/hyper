@@ -76,7 +76,7 @@ export const startRefusingPostgresServer = async (
   });
   await listenOnLoopback(server);
   return {
-    url: `postgres://hyper:wrong@127.0.0.1:${loopbackPort(server)}/hyper`,
+    url: `postgres://infinity_cube:wrong@127.0.0.1:${loopbackPort(server)}/infinity-cube`,
     close: () => closeServer(server),
   };
 };

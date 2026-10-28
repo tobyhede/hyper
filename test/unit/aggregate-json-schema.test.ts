@@ -36,7 +36,7 @@ import spaceFileSchema from '../../docs/schema/space.schema.json';
  */
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
-const base = 'https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/';
+const base = 'https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/';
 
 const ajv = new Ajv2020({ strict: true, allErrors: true });
 ajv.addSchema([
@@ -101,7 +101,7 @@ const withPlacement = (extra: Record<string, Json>) =>
   space([mapEntry({ [resourceA]: { ...placement(), ...extra } })]);
 const withEdge = (next: Json) => space([mapEntry(undefined, [graph([next])])]);
 const { title: _title, ...untitledEdge } = edge();
-const hyper = { version: 1, metaSpaceId: '2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c' };
+const aggregateFile = { version: 1, metaSpaceId: '2b1c9a40-0f0e-4c55-9d3a-6f1d2e3a4b5c' };
 
 const spaceCases: [string, Json][] = [
   ['a whole file', space()],
@@ -141,11 +141,11 @@ const spaceCases: [string, Json][] = [
 ];
 
 const aggregateCases: [string, Json][] = [
-  ['a whole file', hyper],
-  ['an unknown key', { ...hyper, spaces: [] }],
-  ['version 2', { ...hyper, version: 2 }],
+  ['a whole file', aggregateFile],
+  ['an unknown key', { ...aggregateFile, spaces: [] }],
+  ['version 2', { ...aggregateFile, version: 2 }],
   ['no metaSpaceId', { version: 1 }],
-  ['a metaSpaceId that is not an Id', { ...hyper, metaSpaceId: 'x' }],
+  ['a metaSpaceId that is not an Id', { ...aggregateFile, metaSpaceId: 'x' }],
 ];
 
 describe('the aggregate JSON Schemas agree with intake', () => {

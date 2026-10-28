@@ -18,7 +18,7 @@ const write = (root: string, path: string, content: string): void => {
 };
 
 const fixture = (): string => {
-  const root = mkdtempSync(join(tmpdir(), 'hyper-ui-catalog-'));
+  const root = mkdtempSync(join(tmpdir(), 'infinity-cube-ui-catalog-'));
   roots.push(root);
   write(root, 'packages/ui/src/index.ts', "export { Button } from './Button';");
   write(

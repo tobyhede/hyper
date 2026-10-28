@@ -161,7 +161,7 @@ export const handRolledStyles = [
 export const interactiveDeviations = [
   {
     subject: 'packages/ui/src/ImageReplaceTarget.tsx — dropping a file on the upload target',
-    existingHyperComponentConsidered:
+    existingInfinityCubeComponentConsidered:
       '`Empty` (outline treatment) with `InputGroup` and `Button`, which the target is composed of, and the injected file picker its Upload opens. None of them accepts a dropped file.',
     shadcnOrBaseUiConsidered:
       "shadcn's `empty-outline` and `empty-input-group` examples, which the target follows. The registry has no dropzone component and Base UI has no drop primitive.",
@@ -176,7 +176,7 @@ export const interactiveDeviations = [
   },
   {
     subject: 'packages/app/src/browser-file-picker.ts — the browser file picker',
-    existingHyperComponentConsidered:
+    existingInfinityCubeComponentConsidered:
       '`@project/ui`\'s `Input` with `type="file"`, which `ImageFilePicker` was. A component is mounted by a surface, so Create Image Resource and Replace image each mounted one and the app had two pickers.',
     shadcnOrBaseUiConsidered:
       'The registry and Base UI have no file picker; a file input is the browser’s own control, with nothing to compose.',

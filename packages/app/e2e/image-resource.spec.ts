@@ -2005,7 +2005,7 @@ test('a Resource dragged from the Resources list onto an edited drawn Map is ref
   // of another Space can place.
   await child.evaluate((element, resourceId) => {
     const transfer = new DataTransfer();
-    transfer.setData('application/x-hyper-resource-id', resourceId);
+    transfer.setData('application/x-infinity-cube-resource-id', resourceId);
     const box = element.getBoundingClientRect();
     const init = {
       dataTransfer: transfer,

@@ -10,7 +10,7 @@ import { Button } from '../Button';
  * asks for: the toolbar itself is the single tab stop, the arrow keys move
  * between its items, and `Home`/`End` reach the ends. The shadcn registry
  * carries no toolbar, so this is the smallest wrapper over the primitive that
- * gives Hyper the component in its own vocabulary.
+ * gives InfinityCube the component in its own vocabulary.
  *
  * It supplies no layout of its own. A toolbar is drawn by the surface that
  * owns it — the Resource rail's row and gap are the Resource's, not the toolbar's —

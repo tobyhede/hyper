@@ -361,7 +361,7 @@ export const mapSchema = z.preprocess(
 /**
  * The **first-public** space document version.
  *
- * Any other version is rejected rather than migrated: Hyper is unreleased and
+ * Any other version is rejected rather than migrated: InfinityCube is unreleased and
  * makes no compatibility claim on a pre-release shape (ADR 0040). A named constant rather than a literal inlined in one schema, because
  * `documentRefusal` in `@project/graph` reads the declared version
  * *before* the schema parses — at domain intake and at the file importer both —

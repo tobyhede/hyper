@@ -2,7 +2,7 @@ import { afterAll, describe, it } from 'vitest';
 import { SqlSpaceRepository } from '../../src/persistence/sql-space-repository';
 import { postgresSqlStore } from '../../src/prisma/sql-store';
 import { postgresTestDatabase } from '../support/postgres-database';
-import { clearHyperContent } from '../support/clear-hyper-content';
+import { clearInfinityCubeContent } from '../support/clear-infinity-cube-content';
 import { assertDifferential } from '../support/aggregate-commit-differential';
 
 /*
@@ -21,12 +21,12 @@ describe('aggregate commit adapter differential', () => {
   it('gives memory and PostgreSQL the same public outcome over generated aggregate changes', async () => {
     await assertDifferential({
       repository: new SqlSpaceRepository(postgresSqlStore(postgresTestDatabase)),
-      clear: clearHyperContent,
+      clear: clearInfinityCubeContent,
     });
   });
 
   afterAll(async () => {
-    await clearHyperContent();
+    await clearInfinityCubeContent();
     await postgresTestDatabase.close();
   });
 });

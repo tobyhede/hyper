@@ -1,16 +1,16 @@
 import type { HistoryApi } from './browser-location';
 
 interface HistoryPosition {
-  readonly hyperHistoryIndex: number;
+  readonly infinityCubeHistoryIndex: number;
 }
 
 /** The browser's history state is external input, including entries authored before startup. */
 const isHistoryPosition = (value: unknown): value is HistoryPosition =>
   typeof value === 'object' &&
   value !== null &&
-  'hyperHistoryIndex' in value &&
-  typeof value.hyperHistoryIndex === 'number' &&
-  Number.isSafeInteger(value.hyperHistoryIndex);
+  'infinityCubeHistoryIndex' in value &&
+  typeof value.infinityCubeHistoryIndex === 'number' &&
+  Number.isSafeInteger(value.infinityCubeHistoryIndex);
 
 /** The part of the Navigation API a hold uses, where the browser has it. */
 export interface NativeNavigation {
@@ -44,8 +44,8 @@ const ignore = (): undefined => undefined;
 /** Same-document traversals can be held without overwriting either history entry. */
 export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
   const initial: unknown = browser.history.state;
-  let index = isHistoryPosition(initial) ? initial.hyperHistoryIndex : 0;
-  browser.history.replaceState({ hyperHistoryIndex: index }, '', browser.location.href);
+  let index = isHistoryPosition(initial) ? initial.infinityCubeHistoryIndex : 0;
+  browser.history.replaceState({ infinityCubeHistoryIndex: index }, '', browser.location.href);
   const { navigation } = browser;
   /**
    * The Navigation API key of each entry the adapter has stood on, by index.
@@ -64,12 +64,12 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
     href: () => browser.location.href,
     push: (path) => {
       written += 1;
-      browser.history.pushState({ hyperHistoryIndex: ++index }, '', path);
+      browser.history.pushState({ infinityCubeHistoryIndex: ++index }, '', path);
       record(index);
     },
     replace: (path) => {
       written += 1;
-      browser.history.replaceState({ hyperHistoryIndex: index }, '', path);
+      browser.history.replaceState({ infinityCubeHistoryIndex: index }, '', path);
     },
     onPopState: (listener) => {
       /**
@@ -194,11 +194,15 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
             rewinds = [];
             return;
           }
-          browser.history.replaceState({ hyperHistoryIndex: index + 1 }, '', browser.location.href);
+          browser.history.replaceState(
+            { infinityCubeHistoryIndex: index + 1 },
+            '',
+            browser.location.href,
+          );
           arrive(index + 1);
           return;
         }
-        const next = position.hyperHistoryIndex;
+        const next = position.infinityCubeHistoryIndex;
         if (rewinds.length > 0) {
           steer(next);
           return;
@@ -216,10 +220,14 @@ export function createBrowserHistory(browser: NativeBrowser): HistoryApi {
       const traversed = (event: Pick<PopStateEvent, 'state'>): void => {
         const position: unknown = event.state;
         let next: number;
-        if (isHistoryPosition(position)) next = position.hyperHistoryIndex;
+        if (isHistoryPosition(position)) next = position.infinityCubeHistoryIndex;
         else {
           next = index + 1;
-          browser.history.replaceState({ hyperHistoryIndex: next }, '', browser.location.href);
+          browser.history.replaceState(
+            { infinityCubeHistoryIndex: next },
+            '',
+            browser.location.href,
+          );
         }
         record(next);
         at = next;

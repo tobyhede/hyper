@@ -7,24 +7,24 @@ import {
 
 describe('parseGitHubLocation', () => {
   it('reads owner, repository, ref and path', () => {
-    expect(parseGitHubLocation('github:tobyhede/hyper@main/talks/pgdu')).toEqual({
+    expect(parseGitHubLocation('github:tobyhede/infinity-cube@main/talks/pgdu')).toEqual({
       ok: true,
-      location: { owner: 'tobyhede', repo: 'hyper', ref: 'main', path: 'talks/pgdu' },
+      location: { owner: 'tobyhede', repo: 'infinity-cube', ref: 'main', path: 'talks/pgdu' },
     });
   });
 
   it('leaves a missing ref and path to their defaults', () => {
-    expect(parseGitHubLocation('github:tobyhede/hyper')).toEqual({
+    expect(parseGitHubLocation('github:tobyhede/infinity-cube')).toEqual({
       ok: true,
-      location: { owner: 'tobyhede', repo: 'hyper', ref: undefined, path: '' },
+      location: { owner: 'tobyhede', repo: 'infinity-cube', ref: undefined, path: '' },
     });
-    expect(parseGitHubLocation('github:tobyhede/hyper@v1.0')).toEqual({
+    expect(parseGitHubLocation('github:tobyhede/infinity-cube@v1.0')).toEqual({
       ok: true,
-      location: { owner: 'tobyhede', repo: 'hyper', ref: 'v1.0', path: '' },
+      location: { owner: 'tobyhede', repo: 'infinity-cube', ref: 'v1.0', path: '' },
     });
-    expect(parseGitHubLocation('github:tobyhede/hyper/talks')).toEqual({
+    expect(parseGitHubLocation('github:tobyhede/infinity-cube/talks')).toEqual({
       ok: true,
-      location: { owner: 'tobyhede', repo: 'hyper', ref: undefined, path: 'talks' },
+      location: { owner: 'tobyhede', repo: 'infinity-cube', ref: undefined, path: 'talks' },
     });
   });
 
@@ -44,20 +44,20 @@ describe('parseGitHubLocation', () => {
 
   it.each([
     ['', 'no scheme'],
-    ['tobyhede/hyper', 'no scheme'],
-    ['gitlab:tobyhede/hyper', 'another scheme'],
+    ['tobyhede/infinity-cube', 'no scheme'],
+    ['gitlab:tobyhede/infinity-cube', 'another scheme'],
     ['github:', 'no owner'],
     ['github:tobyhede', 'no repository'],
     ['github:tobyhede/', 'an empty repository'],
-    ['github:/hyper', 'an empty owner'],
-    ['github:toby_hede/hyper', 'an owner GitHub cannot name'],
+    ['github:/infinity-cube', 'an empty owner'],
+    ['github:toby_hede/infinity-cube', 'an owner GitHub cannot name'],
     ['github:tobyhede/..', 'a dot repository'],
-    ['github:tobyhede/hyper@', 'an empty ref'],
-    ['github:tobyhede/hyper@main/', 'an empty path segment'],
-    ['github:tobyhede/hyper@main/talks//pgdu', 'an empty path segment'],
-    ['github:tobyhede/hyper@main/../secrets', 'a parent segment'],
-    ['github:tobyhede/hyper@main/./talks', 'a current-directory segment'],
-    ['github:tobyhede/hyper@ma in', 'whitespace in the ref'],
+    ['github:tobyhede/infinity-cube@', 'an empty ref'],
+    ['github:tobyhede/infinity-cube@main/', 'an empty path segment'],
+    ['github:tobyhede/infinity-cube@main/talks//pgdu', 'an empty path segment'],
+    ['github:tobyhede/infinity-cube@main/../secrets', 'a parent segment'],
+    ['github:tobyhede/infinity-cube@main/./talks', 'a current-directory segment'],
+    ['github:tobyhede/infinity-cube@ma in', 'whitespace in the ref'],
     ['github:o/r@@', 'a ref that is exactly @'],
     ['github:o/r@a@{1}', 'a ref containing @{'],
   ])('refuses %j (%s)', (input) => {

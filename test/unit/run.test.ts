@@ -58,7 +58,7 @@ const manualClock = () => {
 const temporaryRoots: string[] = [];
 
 const temporaryRoot = async (): Promise<string> => {
-  const root = await mkdtemp(join(tmpdir(), 'hyper-run-'));
+  const root = await mkdtemp(join(tmpdir(), 'infinity-cube-run-'));
   temporaryRoots.push(root);
   return root;
 };
@@ -113,7 +113,7 @@ const running = (start: RunStart): Run => {
 };
 
 const backendFor = (run: Run) =>
-  new HttpSpaceBackend('http://hyper.test', {
+  new HttpSpaceBackend('http://infinity-cube.test', {
     fetch: (input, init) => Promise.resolve(run.host.fetch(new Request(input, init))),
   });
 

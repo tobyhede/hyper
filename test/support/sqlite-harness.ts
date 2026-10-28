@@ -29,8 +29,8 @@ export const migrateSqliteFile = (path: string): void => {
 };
 
 export const openSqliteRepository = async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-sqlite-'));
-  const path = join(directory, 'hyper.db');
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-sqlite-'));
+  const path = join(directory, 'infinity-cube.db');
   migrateSqliteFile(path);
   const database = createSqliteDatabase(path);
   let activeDatabase = database;

@@ -16,7 +16,7 @@ import {
   createWorkingSpaceLoader,
   classifyStoredFailure,
   problemCatalogue,
-  type HyperProblemCode,
+  type InfinityCubeProblemCode,
   type ImageRefusal,
   type ImageStore,
   type ProblemError,
@@ -114,7 +114,7 @@ export const MAX_DRAINED_BODY_BYTES = MAX_COMMIT_BODY_BYTES * 8;
 
 const problem = (
   context: Context,
-  code: HyperProblemCode,
+  code: InfinityCubeProblemCode,
   detail: string,
   errors?: readonly ProblemError[],
 ) => {
@@ -644,7 +644,7 @@ export const createSpaceHttpApp = (
   return app;
 };
 
-const httpExceptionProblem = (status: number): HyperProblemCode => {
+const httpExceptionProblem = (status: number): InfinityCubeProblemCode => {
   switch (status) {
     case 400:
       return 'invalid-request';

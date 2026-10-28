@@ -26,7 +26,7 @@ import type { SpaceRepository } from '@project/aggregate';
  * against PostgreSQL and `test/integration/sqlite-aggregate-commit-differential.test.ts`
  * calls it against SQLite (named for `vitest.sqlite.config.ts`'s `sqlite-*`
  * inclusion, the way `sqlite-space-repository.test.ts` and
- * `sqlite-hyper-cli.test.ts` are), so a change to the property itself
+ * `sqlite-infinity-cube-cli.test.ts` are), so a change to the property itself
  * cannot drift between the two databases it runs against.
  */
 

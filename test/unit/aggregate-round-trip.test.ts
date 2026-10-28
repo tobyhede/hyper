@@ -32,7 +32,7 @@ const SECOND_FRAMING = { centreX: 120, centreY: -40, zoom: 0.8 };
 const temporaryDirectories: string[] = [];
 
 const makeTemporaryDirectory = async (): Promise<string> => {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-round-trip-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-round-trip-'));
   temporaryDirectories.push(directory);
   return directory;
 };
@@ -550,7 +550,7 @@ describe('stored image bytes', () => {
   });
 
   /*
-   * What an author commits is what Hyper reads back and writes again, so a run
+   * What an author commits is what InfinityCube reads back and writes again, so a run
    * that changes nothing changes no byte of the directory, pictures included.
    */
   it('round-trips a directory with images byte-for-byte through Import then Export', async () => {

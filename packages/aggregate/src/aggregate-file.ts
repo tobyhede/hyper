@@ -106,10 +106,10 @@ const listOrRefuse = async (
   return answer.listing;
 };
 
-/** Why a path Hyper owns may not be a symbolic link. */
-const LINK_REASON = 'is a symbolic link, which Hyper neither reads nor writes through';
+/** Why a path InfinityCube owns may not be a symbolic link. */
+const LINK_REASON = 'is a symbolic link, which InfinityCube neither reads nor writes through';
 
-/** The links among `listing`'s that `owns` says Hyper owns, by path relative to the source. */
+/** The links among `listing`'s that `owns` says InfinityCube owns, by path relative to the source. */
 const ownedLinks = (
   directory: string,
   listing: DirectoryListing,
@@ -117,12 +117,12 @@ const ownedLinks = (
 ): readonly string[] =>
   listing.links.filter(owns).map((name) => (directory === '' ? name : `${directory}/${name}`));
 
-/** A diagnostic for each of `paths`, each a symbolic link at a path Hyper owns, in ordinal order. */
+/** A diagnostic for each of `paths`, each a symbolic link at a path InfinityCube owns, in ordinal order. */
 const linkDiagnostics = (source: AggregateSource, paths: readonly string[]): readonly string[] =>
   [...paths].sort(compareOrdinal).map((path) => `${joinPath(source.name, path)}: ${LINK_REASON}`);
 
 /**
- * Refuse a directory holding a symbolic link at a path Hyper owns: Export
+ * Refuse a directory holding a symbolic link at a path InfinityCube owns: Export
  * does not write or remove through a link, so it could not write that
  * directory back.
  */
@@ -216,7 +216,7 @@ const scanSpaceDirectory = async (
  * aggregate or a nested `aggregate.json` is never searched for.
  *
  * Every directory is listed before a failure is raised, so each one that
- * could not be listed, or holds a link at a path Hyper owns, is reported
+ * could not be listed, or holds a link at a path InfinityCube owns, is reported
  * together, in ordinal order with `images/` last, as every file that could
  * not be read is.
  */

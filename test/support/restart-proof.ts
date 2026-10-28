@@ -55,7 +55,7 @@ export async function expectRestartProofExport(
   repository: SpaceRepository,
   fixture: SpaceSnapshot,
 ): Promise<void> {
-  const directory = await mkdtemp(join(tmpdir(), 'hyper-restart-proof-export-'));
+  const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-restart-proof-export-'));
   try {
     await expect(exportAggregate(repository, directory)).resolves.toMatchObject({
       kind: 'exported',

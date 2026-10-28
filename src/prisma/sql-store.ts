@@ -231,7 +231,7 @@ export const postgresSqlStore = (database: PostgresDatabase) => {
       return database.transaction((tx) => fn({ orm: tx.orm.public, execute: tx.execute }));
     },
     async lockAggregate(handle: Handle): Promise<void> {
-      // The fixed database-local pair is Hyper's aggregate lock namespace and
+      // The fixed database-local pair is InfinityCube's aggregate lock namespace and
       // singleton identity, independent of which (if any) Meta Space exists.
       // Prisma Next 0.16.0's facade exposes raw expressions, not standalone
       // statements. count(*) guarantees one projection even on the empty

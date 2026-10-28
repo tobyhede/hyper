@@ -46,7 +46,7 @@ const SPACE_ID = uuidSchema.parse('d0000000-0000-4000-8000-000000000001');
 // every read below — direct and transactional alike — meets the connection
 // refusal itself rather than a cached contract-marker failure.
 const database = postgres<Contract>(
-  postgresOptionsFor('postgres://hyper:unused@127.0.0.1:1/hyper'),
+  postgresOptionsFor('postgres://infinity_cube:unused@127.0.0.1:1/infinity_cube'),
 );
 const repository = new SqlSpaceRepository(postgresSqlStore(database));
 
@@ -143,7 +143,7 @@ describe('SqlSpaceRepository (PostgreSQL) after a first read meets an outage', (
     const port = loopbackPort(server);
 
     const outageDatabase = postgres<Contract>(
-      postgresOptionsFor(`postgres://hyper:unused@127.0.0.1:${port}/hyper`),
+      postgresOptionsFor(`postgres://infinity_cube:unused@127.0.0.1:${port}/infinity_cube`),
     );
     const outageRepository = new SqlSpaceRepository(postgresSqlStore(outageDatabase));
     try {
@@ -192,9 +192,12 @@ describe('SqlSpaceRepository (PostgreSQL) against a server that refuses this cli
     ] as const;
 
   it.each([
-    ['28P01', 'password authentication failed for user "hyper"'],
-    ['28000', 'no pg_hba.conf entry for host "127.0.0.1", user "hyper", database "hyper"'],
-    ['3D000', 'database "hyper" does not exist'],
+    ['28P01', 'password authentication failed for user "infinity_cube"'],
+    [
+      '28000',
+      'no pg_hba.conf entry for host "127.0.0.1", user "infinity_cube", database "infinity_cube"',
+    ],
+    ['3D000', 'database "infinity_cube" does not exist'],
   ])('leaves SQLSTATE %s unclassified inside and outside a transaction', async (code, message) => {
     const { repository: refusingRepository, close } = await refusedBy(code, message);
     try {
@@ -252,7 +255,7 @@ describe('The Space API over a PostgreSQL server that will not serve it', () => 
   it('answers a wrong password on a direct read 500 internal-error', async () => {
     const server = await startRefusingPostgresServer(
       '28P01',
-      'password authentication failed for user "hyper"',
+      'password authentication failed for user "infinity_cube"',
     );
     const refusing = postgres<Contract>(postgresOptionsFor(server.url));
     try {

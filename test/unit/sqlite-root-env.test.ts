@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SQLITE_ENV_PATH } from '../../src/sqlite/db';
-import { runCommand } from '../support/hyper-command';
+import { runCommand } from '../support/infinity-cube-command';
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
 const appRoot = join(repositoryRoot, 'packages/app');
@@ -23,9 +23,9 @@ describe('SQLite root environment composition', () => {
   it('gives the real migration, host, CLI and development compositions one root .env path', async () => {
     expect(SQLITE_ENV_PATH).toBe(join(repositoryRoot, '.env'));
     delete process.env['SQLITE_PATH'];
-    temporaryRoot = await mkdtemp(join(tmpdir(), 'hyper-sqlite-root-env-'));
+    temporaryRoot = await mkdtemp(join(tmpdir(), 'infinity-cube-sqlite-root-env-'));
     const envPath = join(temporaryRoot, '.env');
-    const databasePath = join(temporaryRoot, 'sqlite/hyper.db');
+    const databasePath = join(temporaryRoot, 'sqlite/infinity-cube.db');
     await mkdir(join(temporaryRoot, 'sqlite'), { recursive: true });
     await writeFile(envPath, `SQLITE_PATH=${databasePath}\n`);
     await writeFile(databasePath, '');

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/tobyhede/hyper/main/docs/schema/id.schema.json",
-  "title": "Hyper Id",
+  "$id": "https://raw.githubusercontent.com/tobyhede/infinity-cube/main/docs/schema/id.schema.json",
+  "title": "InfinityCube Id",
   "description": "A durable UUID, the Id of a Space, Map, Graph or Resource. Shared by the built aggregate.json and space.json schemas and the Resource file schema.",
   "type": "string",
   "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"

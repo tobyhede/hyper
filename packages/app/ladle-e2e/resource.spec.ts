@@ -248,7 +248,7 @@ test(
         height: line.getBoundingClientRect().height,
       };
     });
-    // The Title Hyper has always drawn: 18px, weight 600, leading 1.12 and
+    // The Title InfinityCube has always drawn: 18px, weight 600, leading 1.12 and
     // tracking -0.02em, resolved against its own size.
     expect(drawn.fontSize).toBeCloseTo(18, 2);
     expect(drawn.fontWeight).toBe('600');

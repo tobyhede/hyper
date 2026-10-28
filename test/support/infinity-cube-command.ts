@@ -20,8 +20,8 @@ const DEFAULT_TIMEOUT_LABEL = 'command';
  * Run one command, capturing stdout/stderr and enforcing a timeout.
  *
  * Exported so a test can inject a short-lived, deterministic reproduction
- * (`test/unit/hyper-command.test.ts`) without spawning a real `hyper` CLI.
- * `runHyperScript` below is the one production caller.
+ * (`test/unit/infinity-cube-command.test.ts`) without spawning a real `cube` CLI.
+ * `runInfinityCubeScript` below is the one production caller.
  *
  * `detached: true` makes the spawned process the leader of its own POSIX
  * process group rather than joining ours, so a grandchild it starts without
@@ -106,17 +106,17 @@ export const runCommand = (
   });
 
 /**
- * Run the `hyper` package script as its own process, as an operator would.
+ * Run the `cube` package script as its own process, as an operator would.
  *
  * `--store` in `args` chooses the database, PostgreSQL by default. `env` is
  * added to this process's environment, which is how a SQLite case names the
  * file it owns.
  */
-export const runHyperScript = (
+export const runInfinityCubeScript = (
   args: readonly string[],
   env: Readonly<Record<string, string>> = {},
 ): Promise<CommandResult> =>
-  runCommand('pnpm', ['--silent', 'hyper', '--', ...args], {
+  runCommand('pnpm', ['--silent', 'cube', '--', ...args], {
     env,
-    timeoutLabel: 'hyper CLI command',
+    timeoutLabel: 'infinity-cube CLI command',
   });

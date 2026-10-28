@@ -82,12 +82,12 @@ const overHttp = (stored: LoadedSpace) => {
   const repository = new MemorySpaceRepository([stored], META_ID);
   const app = createSpaceHttpApp(repository, { newId: mintsNothing });
   const posted: number[] = [];
-  const backend = new HttpSpaceBackend('http://hyper.test', {
+  const backend = new HttpSpaceBackend('http://infinity-cube.test', {
     fetch: async (input, init) => {
       const request =
         input instanceof Request
           ? new Request(input, init)
-          : new Request(new URL(String(input), 'http://hyper.test'), init);
+          : new Request(new URL(String(input), 'http://infinity-cube.test'), init);
       if (request.method === 'POST') posted.push((await request.clone().arrayBuffer()).byteLength);
       return app.fetch(request);
     },

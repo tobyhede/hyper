@@ -7,7 +7,7 @@ import { describeRunRefusal } from '../../src/cli/run-process';
 describe('a run refusal', () => {
   it('names init, with the directory as one shell word, for a missing or empty directory', () => {
     expect(describeRunRefusal({ kind: 'empty' }, '/talks/rust asycn')).toBe(
-      "/talks/rust asycn holds no aggregate: it is missing or empty. To create one there: pnpm hyper init '/talks/rust asycn'\n",
+      "/talks/rust asycn holds no aggregate: it is missing or empty. To create one there: pnpm cube init '/talks/rust asycn'\n",
     );
   });
 

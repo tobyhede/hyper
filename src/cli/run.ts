@@ -2,11 +2,17 @@ import { resolve } from 'node:path';
 import { describeError } from './describe-error';
 import type { UUID } from '@project/core';
 import type { DatabaseTarget } from '../database/database-target';
-import { HELP, USAGE, parseHyperArguments, type HyperStore, type RunCommand } from './arguments';
+import {
+  HELP,
+  USAGE,
+  parseInfinityCubeArguments,
+  type InfinityCubeStore,
+  type RunCommand,
+} from './arguments';
 import type { CliIo } from './io';
 import { shellWord } from './shell-word';
 
-export interface HyperDependencies {
+export interface InfinityCubeDependencies {
   readonly io: CliIo;
   readonly newId: () => UUID;
   /** What every relative `<dir>` is relative to: where the author invoked pnpm. */
@@ -16,14 +22,14 @@ export interface HyperDependencies {
    * by a verb that reaches a database, so help, a usage error, `init` and
    * `run` open none.
    */
-  readonly targets: Readonly<Record<HyperStore, DatabaseTarget>>;
+  readonly targets: Readonly<Record<InfinityCubeStore, DatabaseTarget>>;
   /** Serve an Aggregate directory until the author stops it, answering the exit code. */
   readonly launchRun: (command: RunCommand) => Promise<number>;
 }
 
 const init = async (
   directory: string,
-  { io, newId }: Pick<HyperDependencies, 'io' | 'newId'>,
+  { io, newId }: Pick<InfinityCubeDependencies, 'io' | 'newId'>,
 ): Promise<number> => {
   let result;
   try {
@@ -38,16 +44,16 @@ const init = async (
     io.stderr(`${directory} is not empty; init writes only to a missing or empty directory.\n`);
     return 1;
   }
-  io.stdout(`Created a new aggregate; run it with: pnpm hyper run ${shellWord(directory)}\n`);
+  io.stdout(`Created a new aggregate; run it with: pnpm cube run ${shellWord(directory)}\n`);
   return 0;
 };
 
-/** Run one `hyper` command line and answer its exit code. A usage error exits 2. */
-export const runHyper = async (
+/** Run one `cube` command line and answer its exit code. A usage error exits 2. */
+export const runInfinityCube = async (
   args: readonly string[],
-  { io, newId, workingDirectory, targets, launchRun }: HyperDependencies,
+  { io, newId, workingDirectory, targets, launchRun }: InfinityCubeDependencies,
 ): Promise<number> => {
-  const command = parseHyperArguments(args);
+  const command = parseInfinityCubeArguments(args);
   if (command === undefined) {
     io.stderr(USAGE);
     return 2;

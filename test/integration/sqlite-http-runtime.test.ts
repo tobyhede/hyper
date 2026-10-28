@@ -49,9 +49,9 @@ describe('SQLite HTTP runtime', () => {
   // `pnpm dev:sqlite` migrates from the repository root and serves from
   // `packages/app`, so a relative path names a different file in each step.
   it('refuses to compose when SQLITE_PATH is relative', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'hyper-sqlite-relative-'));
+    const directory = await mkdtemp(join(tmpdir(), 'infinity-cube-sqlite-relative-'));
     close = () => rm(directory, { recursive: true, force: true });
-    vi.stubEnv('SQLITE_PATH', relative(process.cwd(), join(directory, 'hyper.db')));
+    vi.stubEnv('SQLITE_PATH', relative(process.cwd(), join(directory, 'infinity-cube.db')));
     const reported: unknown[] = [];
 
     await expect(
@@ -69,7 +69,7 @@ describe('SQLite HTTP runtime', () => {
       database: harness.database,
       wait: () => new Promise<void>(() => undefined),
     });
-    const listed = await first.fetch(new Request('http://hyper.test/api/spaces'));
+    const listed = await first.fetch(new Request('http://infinity-cube.test/api/spaces'));
     const summaries = decodeSpaceSummaries(
       // SAFETY: JSON.parse is the HTTP body boundary; decodeSpaceSummaries parses next.
       JSON.parse(await listed.text()) as unknown,
@@ -87,7 +87,7 @@ describe('SQLite HTTP runtime', () => {
       database: reopened,
       wait: () => new Promise<void>(() => undefined),
     });
-    const again = await second.fetch(new Request('http://hyper.test/api/spaces'));
+    const again = await second.fetch(new Request('http://infinity-cube.test/api/spaces'));
     expect(again.status).toBe(200);
     expect(
       decodeSpaceSummaries(
@@ -96,7 +96,9 @@ describe('SQLite HTTP runtime', () => {
       ),
     ).toEqual([expect.objectContaining({ id: metaId, title: 'New space' })]);
 
-    const loaded = await second.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
+    const loaded = await second.fetch(
+      new Request(`http://infinity-cube.test/api/spaces/${metaId}`),
+    );
     expect(loaded.status).toBe(200);
     expect(
       decodeLoadedSpace(
@@ -114,14 +116,16 @@ describe('SQLite HTTP runtime', () => {
     });
     close = harness.close;
 
-    const listed = await application.fetch(new Request('http://hyper.test/api/spaces'));
+    const listed = await application.fetch(new Request('http://infinity-cube.test/api/spaces'));
     const summaries = decodeSpaceSummaries(
       // SAFETY: JSON.parse is the HTTP body boundary; decodeSpaceSummaries parses next.
       JSON.parse(await listed.text()) as unknown,
     );
     const metaId = summaries[0]?.id;
     if (metaId === undefined) throw new Error('Expected a Space summary');
-    const loaded = await application.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
+    const loaded = await application.fetch(
+      new Request(`http://infinity-cube.test/api/spaces/${metaId}`),
+    );
     const body = decodeLoadedSpace(
       // SAFETY: JSON.parse is the HTTP body boundary; decodeLoadedSpace parses next.
       JSON.parse(await loaded.text()) as unknown,
@@ -132,7 +136,7 @@ describe('SQLite HTTP runtime', () => {
       document: { ...body.snapshot.document, title: 'Edited over HTTP' },
     };
     const posted = await application.fetch(
-      new Request('http://hyper.test/api/spaces', {
+      new Request('http://infinity-cube.test/api/spaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
@@ -161,7 +165,9 @@ describe('SQLite HTTP runtime', () => {
       deletedSpaceIds: [],
     });
 
-    const reread = await application.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
+    const reread = await application.fetch(
+      new Request(`http://infinity-cube.test/api/spaces/${metaId}`),
+    );
     expect(
       decodeLoadedSpace(
         // SAFETY: JSON.parse is the HTTP body boundary; decodeLoadedSpace parses next.
@@ -170,7 +176,7 @@ describe('SQLite HTTP runtime', () => {
     ).toBe('Edited over HTTP');
 
     const stale = await application.fetch(
-      new Request('http://hyper.test/api/spaces', {
+      new Request('http://infinity-cube.test/api/spaces', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
@@ -205,7 +211,9 @@ describe('SQLite HTTP runtime', () => {
       database: reopened,
       wait: () => new Promise<void>(() => undefined),
     });
-    const afterReopen = await second.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
+    const afterReopen = await second.fetch(
+      new Request(`http://infinity-cube.test/api/spaces/${metaId}`),
+    );
     expect(afterReopen.status).toBe(200);
     expect(
       decodeLoadedSpace(
@@ -227,14 +235,16 @@ describe('SQLite HTTP runtime', () => {
     });
     close = harness.close;
 
-    const listed = await application.fetch(new Request('http://hyper.test/api/spaces'));
+    const listed = await application.fetch(new Request('http://infinity-cube.test/api/spaces'));
     const summaries = decodeSpaceSummaries(
       // SAFETY: JSON.parse is the HTTP body boundary; decodeSpaceSummaries parses next.
       JSON.parse(await listed.text()) as unknown,
     );
     const metaId = summaries[0]?.id;
     if (metaId === undefined) throw new Error('Expected a Space summary');
-    const loaded = await application.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`));
+    const loaded = await application.fetch(
+      new Request(`http://infinity-cube.test/api/spaces/${metaId}`),
+    );
     const body = decodeLoadedSpace(
       // SAFETY: JSON.parse is the HTTP body boundary; decodeLoadedSpace parses next.
       JSON.parse(await loaded.text()) as unknown,
@@ -257,11 +267,11 @@ describe('SQLite HTTP runtime', () => {
 
     const unavailable = problemCatalogue['persistence-unavailable'];
     const responses = [
-      await application.fetch(new Request('http://hyper.test/api/spaces')),
-      await application.fetch(new Request(`http://hyper.test/api/spaces/${metaId}`)),
-      await application.fetch(new Request('http://hyper.test/api/aggregate')),
+      await application.fetch(new Request('http://infinity-cube.test/api/spaces')),
+      await application.fetch(new Request(`http://infinity-cube.test/api/spaces/${metaId}`)),
+      await application.fetch(new Request('http://infinity-cube.test/api/aggregate')),
       await application.fetch(
-        new Request('http://hyper.test/api/spaces', {
+        new Request('http://infinity-cube.test/api/spaces', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(encodeCommitRequest(commit)),
@@ -279,7 +289,7 @@ describe('SQLite HTTP runtime', () => {
       expect(problem.status).toBe(503);
     }
 
-    const backend = new HttpSpaceBackend('http://hyper.test', {
+    const backend = new HttpSpaceBackend('http://infinity-cube.test', {
       fetch: (input, init) => Promise.resolve(application.fetch(new Request(input, init))),
     });
     await expect(backend.commit(commit)).resolves.toMatchObject({

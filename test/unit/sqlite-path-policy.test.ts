@@ -21,27 +21,27 @@ describe('SQLite path policy', () => {
 
   it('accepts a POSIX absolute path and refuses a relative one', async () => {
     delete process.env['SQLITE_PATH'];
-    temporaryRoot = await mkdtemp(join(tmpdir(), 'hyper-sqlite-path-policy-'));
+    temporaryRoot = await mkdtemp(join(tmpdir(), 'infinity-cube-sqlite-path-policy-'));
     const envPath = join(temporaryRoot, 'absolute.env');
-    const databasePath = join(temporaryRoot, 'hyper.db');
+    const databasePath = join(temporaryRoot, 'infinity-cube.db');
     await writeFile(envPath, `SQLITE_PATH=${databasePath}\n`);
 
     expect(configuredSqlitePath({ envPath })).toBe(databasePath);
 
     const relativeEnvPath = join(temporaryRoot, 'relative.env');
-    await writeFile(relativeEnvPath, 'SQLITE_PATH=relative/hyper.db\n');
+    await writeFile(relativeEnvPath, 'SQLITE_PATH=relative/infinity-cube.db\n');
     delete process.env['SQLITE_PATH'];
 
     expect(() => configuredSqlitePath({ envPath: relativeEnvPath })).toThrow(
-      'SQLITE_PATH must be an absolute path: relative/hyper.db',
+      'SQLITE_PATH must be an absolute path: relative/infinity-cube.db',
     );
   });
 
   it('resolves every call against the environment file that call names', async () => {
     delete process.env['SQLITE_PATH'];
-    temporaryRoot = await mkdtemp(join(tmpdir(), 'hyper-sqlite-path-policy-'));
-    const first = join(temporaryRoot, 'first/hyper.db');
-    const second = join(temporaryRoot, 'second/hyper.db');
+    temporaryRoot = await mkdtemp(join(tmpdir(), 'infinity-cube-sqlite-path-policy-'));
+    const first = join(temporaryRoot, 'first/infinity-cube.db');
+    const second = join(temporaryRoot, 'second/infinity-cube.db');
     await mkdir(dirname(first), { recursive: true });
     await mkdir(dirname(second), { recursive: true });
     const firstEnv = join(temporaryRoot, 'first.env');
@@ -54,9 +54,9 @@ describe('SQLite path policy', () => {
   });
 
   it('keeps a configured SQLITE_PATH ahead of the environment file', async () => {
-    temporaryRoot = await mkdtemp(join(tmpdir(), 'hyper-sqlite-path-policy-'));
-    const fromFile = join(temporaryRoot, 'file/hyper.db');
-    const exported = join(temporaryRoot, 'exported/hyper.db');
+    temporaryRoot = await mkdtemp(join(tmpdir(), 'infinity-cube-sqlite-path-policy-'));
+    const fromFile = join(temporaryRoot, 'file/infinity-cube.db');
+    const exported = join(temporaryRoot, 'exported/infinity-cube.db');
     await mkdir(dirname(fromFile), { recursive: true });
     await mkdir(dirname(exported), { recursive: true });
     const envPath = join(temporaryRoot, '.env');

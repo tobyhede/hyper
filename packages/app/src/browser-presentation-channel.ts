@@ -121,7 +121,9 @@ const isPresentationMessage = (value: unknown): value is PresentationMessage => 
  * session has no scope and keeps the name it has always had.
  */
 export const presentationChannelName = (spaceId: UUID, scope?: string): string =>
-  scope === undefined ? `hyper-presentation:${spaceId}` : `hyper-presentation:${spaceId}@${scope}`;
+  scope === undefined
+    ? `infinity-cube-presentation:${spaceId}`
+    : `infinity-cube-presentation:${spaceId}@${scope}`;
 
 /**
  * The one adapter over the browser's `BroadcastChannel` for the presentation
@@ -183,7 +185,7 @@ export interface NativeLocks {
 
 /** The name of the lock a presenting window holds for one presentation. */
 export const presentationPresenceName = (presentationId: UUID): string =>
-  `hyper-presenting:${presentationId}`;
+  `infinity-cube-presenting:${presentationId}`;
 
 /** Presence where the browser offers none to watch: never gone. */
 const steadyPresence: PresentationPresence = {

@@ -59,7 +59,7 @@ export const States: Story = () => (
 );
 
 /**
- * The one Title with no break in it: the ordinary case, and the Title Hyper has
+ * The one Title with no break in it: the ordinary case, and the Title InfinityCube has
  * always drawn.
  */
 const ONE_LINE_TITLE = 'Strategies';

@@ -1,6 +1,6 @@
-# Hyper
+# InfinityCube
 
-Hyper is for technical talks and designs whose ideas connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. [React Flow](https://reactflow.dev) draws every Graph at once, each in its own colour, at the positions you chose.
+InfinityCube is for technical talks and designs whose ideas connect as a graph rather than a single line. You write **Resources** (Markdown, pictures, or whole nested Spaces), place them on a **Map**, and connect them with **Graphs**: named, coloured, directed paths through the same Resources. [React Flow](https://reactflow.dev) draws every Graph at once, each in its own colour, at the positions you chose.
 
 **Presenting is traversing a Graph on its own Stage** ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)). Present takes the browser fullscreen where it can and draws the Graph's first Resource on a full-window Stage, one 16:9 frame letterboxed over the canvas, which stays behind it untouched ([ADR 0123](docs/adr/0123-presenting-draws-on-its-own-stage-not-on-the-canvas.md)). Arrow keys follow the Graph's Edges: Right follows the selected one, Left goes back along the path taken, Up and Down choose at a fork. Leaving presenting shows the canvas exactly as it was.
 
@@ -11,21 +11,21 @@ Your work is a directory of plain files, an [Aggregate directory](docs/aggregate
 You need Node ≥ 26.8.1 and pnpm 9. Node no longer bundles corepack, so install pnpm with `npm install -g pnpm@9` if you do not have it.
 
 ```sh
-git clone https://github.com/tobyhede/hyper.git
-cd hyper
+git clone https://github.com/tobyhede/infinity-cube.git
+cd infinity-cube
 pnpm install
 git init ~/talks/rust-async
-pnpm hyper init ~/talks/rust-async
+pnpm cube init ~/talks/rust-async
 git -C ~/talks/rust-async add -A
 git -C ~/talks/rust-async commit -m "New talk"
-pnpm hyper run ~/talks/rust-async
+pnpm cube run ~/talks/rust-async
 ```
 
 `init` writes a new aggregate to `~/talks/rust-async`, which must be empty apart from dot-entries such as `.git`, and prints the command that runs it. Committing what it wrote before the first run gives git a revision to restore. `run` prints the address it serves (`http://localhost:4173/` unless that port is taken) and opens it in your browser.
 
 1. Edit. Pick a Graph in the Command Dock, the toolbar floating over the canvas; every Graph stays drawn, and the one you pick is emphasised. Select a Resource to reveal its toolbar, and use Edit to write its Title and Markdown. Drag a Resource to move it. Drag from one of a Resource's four handles to another Resource to add an Edge to the active Graph; hold Option (macOS) or Alt and drop on empty canvas to create a new Resource and connect it in one go.
 2. Press **Present** to traverse the Graph: `→` follows an Edge, `←` goes back, `↑` / `↓` choose at a fork, `Esc` returns to the Map.
-3. Press Ctrl-C in the terminal. Hyper writes anything not yet on disk and exits.
+3. Press Ctrl-C in the terminal. InfinityCube writes anything not yet on disk and exits.
 4. Commit your work in the directory's own repository:
 
    ```sh
@@ -34,38 +34,38 @@ pnpm hyper run ~/talks/rust-async
    git commit -m "First draft"
    ```
 
-Run `pnpm hyper run` from the Hyper clone every time, pointing at whichever directory you are working on. For every `pnpm hyper` verb, a relative path is relative to where you ran pnpm.
+Run `pnpm cube run` from the InfinityCube clone every time, pointing at whichever directory you are working on. For every `pnpm cube` verb, a relative path is relative to where you ran pnpm.
 
 ## How Running works
 
-`pnpm hyper run <dir>` **runs** an Aggregate directory ([ADR 0117](docs/adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)). Hyper reads the directory into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept.
+`pnpm cube run <dir>` **runs** an Aggregate directory ([ADR 0117](docs/adr/0117-running-serves-an-aggregate-directory-as-the-durable-copy.md)). InfinityCube reads the directory into memory, serves it, and writes it back as you edit. While it runs, **the directory is your work**; nothing else is kept.
 
-- **Your content lives in its own git repository**, at any path you like. Hyper does not need it to be inside the Hyper clone, and nothing of yours belongs there.
-- **Hyper writes the directory on every edit.** Once your edits have been quiet for about a second, Hyper writes the directory, so `git status` shows what you changed. Stopping Hyper writes anything still pending. Ctrl-C, closing the terminal (SIGHUP) and SIGTERM all stop it the same way; a second Ctrl-C exits at once without waiting.
-- **Git is your undo.** Hyper keeps no history of its own and does not lock the directory or watch it for changes. The last write wins. To undo an edit, check out the earlier file. If you `git pull` while Hyper is running, or run Hyper twice on one directory, Hyper's next write replaces what is on disk with what it holds, and you recover the other version with git. Pull and edit files with Hyper stopped.
-- **An edit is lost if Hyper exits without writing it.** If Hyper is killed outright (`kill -9`, a power cut) within that quiet second, or a second Ctrl-C exits it without waiting, the edits not yet written are lost. A write can also fail, for example when the disk is full or a path is a symbolic link, which Hyper refuses to write through. While Hyper runs, it prints `Could not write the directory:` with the reason and tries again a second later. If the write made on stopping fails, Hyper prints `Stopped, but the last edits were not written:` with the reason and exits with status 1, and the edits it could not write are lost. A stop that wrote everything ends with `Stopped; <dir> holds every edit.`; check for that line before treating the directory as complete.
-- **Hyper writes only its own files, in place.** It writes `aggregate.json`, the Space directories' `space.json` and Resource files, and `images/`, changing only the files whose content changed. Anything else in the directory, such as `.git`, a README or a `notes/` directory, is left alone, and the directory itself is never moved or recreated. A crash in the middle of a write can leave some files new and some old; git restores them.
-- **A `*.md` file beside `space.json` is removed by the next write.** Hyper reads every Markdown file in a Space's directory and its `resources/` directory as a Resource, and rewrites them all. Keep your own notes elsewhere, for example in a `notes/` directory: other files and directories are left alone.
+- **Your content lives in its own git repository**, at any path you like. InfinityCube does not need it to be inside the InfinityCube clone, and nothing of yours belongs there.
+- **InfinityCube writes the directory on every edit.** Once your edits have been quiet for about a second, InfinityCube writes the directory, so `git status` shows what you changed. Stopping InfinityCube writes anything still pending. Ctrl-C, closing the terminal (SIGHUP) and SIGTERM all stop it the same way; a second Ctrl-C exits at once without waiting.
+- **Git is your undo.** InfinityCube keeps no history of its own and does not lock the directory or watch it for changes. The last write wins. To undo an edit, check out the earlier file. If you `git pull` while InfinityCube is running, or run InfinityCube twice on one directory, InfinityCube's next write replaces what is on disk with what it holds, and you recover the other version with git. Pull and edit files with InfinityCube stopped.
+- **An edit is lost if InfinityCube exits without writing it.** If InfinityCube is killed outright (`kill -9`, a power cut) within that quiet second, or a second Ctrl-C exits it without waiting, the edits not yet written are lost. A write can also fail, for example when the disk is full or a path is a symbolic link, which InfinityCube refuses to write through. While InfinityCube runs, it prints `Could not write the directory:` with the reason and tries again a second later. If the write made on stopping fails, InfinityCube prints `Stopped, but the last edits were not written:` with the reason and exits with status 1, and the edits it could not write are lost. A stop that wrote everything ends with `Stopped; <dir> holds every edit.`; check for that line before treating the directory as complete.
+- **InfinityCube writes only its own files, in place.** It writes `aggregate.json`, the Space directories' `space.json` and Resource files, and `images/`, changing only the files whose content changed. Anything else in the directory, such as `.git`, a README or a `notes/` directory, is left alone, and the directory itself is never moved or recreated. A crash in the middle of a write can leave some files new and some old; git restores them.
+- **A `*.md` file beside `space.json` is removed by the next write.** InfinityCube reads every Markdown file in a Space's directory and its `resources/` directory as a Resource, and rewrites them all. Keep your own notes elsewhere, for example in a `notes/` directory: other files and directories are left alone.
 - **Pictures are written to `images/`.** A picture you upload is written to the directory's `images/`, named by its content, so committing the directory commits the picture. A picture linked by `https:` URL stays a link.
-- **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm hyper init` command that creates one there, so a mistyped path never becomes a new aggregate. Dot-entries such as `.git` and `.DS_Store` do not count, so `git init` before `init` is fine. A directory that is not a valid Aggregate directory is refused, with its problems printed, and nothing is served; fix the files and start again. A run with no edits leaves the directory byte-for-byte as it was. Opening a Space in the browser can itself be an edit: a Space that names no `defaultMap`, or a Meta Space with no Map, records one when it is first opened.
-- **Ports and the browser.** Hyper serves on port 4173, or the next free port if that one is taken. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running Hyper headless or from an agent:
+- **Starting.** `run` serves an existing Aggregate directory only. A missing or empty directory is refused, naming the `pnpm cube init` command that creates one there, so a mistyped path never becomes a new aggregate. Dot-entries such as `.git` and `.DS_Store` do not count, so `git init` before `init` is fine. A directory that is not a valid Aggregate directory is refused, with its problems printed, and nothing is served; fix the files and start again. A run with no edits leaves the directory byte-for-byte as it was. Opening a Space in the browser can itself be an edit: a Space that names no `defaultMap`, or a Meta Space with no Map, records one when it is first opened.
+- **Ports and the browser.** InfinityCube serves on port 4173, or the next free port if that one is taken. `--port <port>` picks the port and fails if it is taken. `--no-open` leaves the browser alone, for running InfinityCube headless or from an agent:
 
   ```sh
-  pnpm hyper run ~/talks/rust-async --port 4200 --no-open
+  pnpm cube run ~/talks/rust-async --port 4200 --no-open
   ```
 
-The file format, including what Hyper keeps and removes when it writes, is described in [`docs/aggregate-directory.md`](docs/aggregate-directory.md).
+The file format, including what InfinityCube keeps and removes when it writes, is described in [`docs/aggregate-directory.md`](docs/aggregate-directory.md).
 
-## Using Hyper with agents
+## Using InfinityCube with agents
 
-This repository carries four agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`. Two are for using Hyper:
+This repository carries four agent skills, in [`.agents/skills/`](.agents/skills/) and linked from `.claude/skills/`. Two are for using InfinityCube:
 
-- **`hyper-getting-started`**: sets a person up from a fresh clone: checks Node and pnpm, installs, chooses or creates the content directory as its own git repository, and starts a run.
-- **`hyper-authoring`**: writes or changes an Aggregate directory as files: Spaces, Resources, Maps, Graphs, Edges and pictures. It stops the run first, because Hyper's next write would replace edits made underneath it.
+- **`infinity-cube-getting-started`**: sets a person up from a fresh clone: checks Node and pnpm, installs, chooses or creates the content directory as its own git repository, and starts a run.
+- **`infinity-cube-authoring`**: writes or changes an Aggregate directory as files: Spaces, Resources, Maps, Graphs, Edges and pictures. It stops the run first, because InfinityCube's next write would replace edits made underneath it.
 
-The other two, `shadcn-first-ui` and `shadcn`, are for developing Hyper's own UI.
+The other two, `shadcn-first-ui` and `shadcn`, are for developing InfinityCube's own UI.
 
-## Developing Hyper
+## Developing InfinityCube
 
 Read [`AGENTS.md`](AGENTS.md) before changing code. It is written for coding agents and is the authority on commands, package boundaries, conventions and what "done" means here; this section is the human summary.
 
@@ -80,7 +80,7 @@ pnpm dev:new         # fresh one-resource memory space at http://localhost:5174
 pnpm dev:fixture     # tracked test fixture in memory at http://localhost:5175
 ```
 
-A completed edit is committed automatically through the persistence session; the persistence indicator reports `Saving changes` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart. Under `pnpm hyper run` it is written to the directory being run.
+A completed edit is committed automatically through the persistence session; the persistence indicator reports `Saving changes` and then `Persisted`. Under `pnpm dev` the edit lands in PostgreSQL and outlives the page; under `pnpm dev:new` and `pnpm dev:fixture` it lives in that server's memory repository, surviving browser reloads but not a restart. Under `pnpm cube run` it is written to the directory being run.
 
 The Space, a Map, a Resource, a Graph and each Active Resource reached while Presenting have durable URLs built from their UUIDs ([ADR 0069](docs/adr/0069-entities-have-durable-web-addresses.md)). The Command Dock and the presenting chrome offer **Copy link** for the current one, browser Back and Forward follow the entries, and a pasted link reopens the same place. Resolving a URL is navigation, never authoring.
 
@@ -109,7 +109,7 @@ In `.env`, choose a URL-safe password and use it in both blank values:
 
 ```dotenv
 POSTGRES_PASSWORD=<your-local-password>
-DATABASE_URL=postgresql://hyper:<your-local-password>@127.0.0.1:55432/hyper
+DATABASE_URL=postgresql://infinity_cube:<your-local-password>@127.0.0.1:55432/infinity_cube
 ```
 
 Then start PostgreSQL 17.5, run the real database test, and stop the container:
@@ -129,7 +129,7 @@ pnpm contract:emit
 pnpm db:migrate
 ```
 
-Compose and Hyper's Prisma config/runtime read the same ignored `.env`;
+Compose and InfinityCube's Prisma config/runtime read the same ignored `.env`;
 deployed environments should inject `DATABASE_URL` through their secret
 manager. `pnpm postgres:down` keeps the named data volume. To delete local
 database state, run the destructive reset `docker compose down --volumes`.
@@ -139,31 +139,31 @@ database state, run the destructive reset `docker compose down --volumes`.
 SQLite is an opt-in development host beside PostgreSQL, not a replacement for it:
 
 ```sh
-pnpm dev:sqlite                                   # app at http://localhost:5177, file at .scratch/sqlite/hyper.db
-SQLITE_PATH=/absolute/path/hyper.db pnpm test:integration:sqlite
+pnpm dev:sqlite                                   # app at http://localhost:5177, file at .scratch/sqlite/infinity-cube.db
+SQLITE_PATH=/absolute/path/infinity-cube.db pnpm test:integration:sqlite
 ```
 
 `SQLITE_PATH` names the file for the host and the CLI. The integration suite needs it set but does not test against it: `pnpm test:integration:sqlite` runs `pnpm db:migrate:sqlite` first, which fails with `PN-CLI-4005` when the variable is absent because `prisma-next.config.sqlite.ts` then declares no `db.connection`, while the cases themselves each mint and remove a fresh temp file through `openSqliteRepository`. So the value the suite is given is migrated and then left alone.
 
-Use a stable absolute path in a local directory the application owns. The host and CLI both refuse to start when `SQLITE_PATH` is unset or blank, or when its parent directory is missing or not writable, and the CLI also refuses a file that does not exist, since SQLite would otherwise create an empty unmigrated one and fail on a missing table. **A relative value is refused by the host and by the CLI.** `pnpm db:migrate:sqlite` runs from the repository root while the host runs from `packages/app`, so a relative value would migrate one file and open another: `pnpm dev:sqlite` refuses one before migrating, so nothing under the repository root is touched, and the host checks again at composition, so a relative path reaching it by another route is still refused. `pnpm hyper import --store sqlite` and `pnpm hyper export --store sqlite` refuse one too, with `SQLITE_PATH must be an absolute path`. A network filesystem, a file shared between hosts and a hosted SQLite service are not supported deployments.
+Use a stable absolute path in a local directory the application owns. The host and CLI both refuse to start when `SQLITE_PATH` is unset or blank, or when its parent directory is missing or not writable, and the CLI also refuses a file that does not exist, since SQLite would otherwise create an empty unmigrated one and fail on a missing table. **A relative value is refused by the host and by the CLI.** `pnpm db:migrate:sqlite` runs from the repository root while the host runs from `packages/app`, so a relative value would migrate one file and open another: `pnpm dev:sqlite` refuses one before migrating, so nothing under the repository root is touched, and the host checks again at composition, so a relative path reaching it by another route is still refused. `pnpm cube import --store sqlite` and `pnpm cube export --store sqlite` refuse one too, with `SQLITE_PATH must be an absolute path`. A network filesystem, a file shared between hosts and a hosted SQLite service are not supported deployments.
 
-**One Hyper process per file.** Inside that process every repository operation is serialised, so overlapping Edits answer as they would on PostgreSQL: a stale revision is a conflict, and nothing waits on SQLite. A second process on the same live file — `pnpm hyper import --store sqlite` against a file `pnpm dev:sqlite` holds, or two hosts — is unsupported. SQLite locks the whole file, so when the two meet, an operation either fails at once, waits out the driver's fixed 5 second busy timeout and then fails, or waits and succeeds if the other process's lock clears before that timeout. A second process that is only reading is enough: a commit here cannot finish while that read's transaction is open. The wait is synchronous, so the host answers nothing else for those seconds. A failure either way answers `503 persistence-unavailable`, which the browser retries, never a `409`, and no partial write or stuck lock is left behind (`test/integration/sqlite-contention.test.ts`).
+**One InfinityCube process per file.** Inside that process every repository operation is serialised, so overlapping Edits answer as they would on PostgreSQL: a stale revision is a conflict, and nothing waits on SQLite. A second process on the same live file — `pnpm cube import --store sqlite` against a file `pnpm dev:sqlite` holds, or two hosts — is unsupported. SQLite locks the whole file, so when the two meet, an operation either fails at once, waits out the driver's fixed 5 second busy timeout and then fails, or waits and succeeds if the other process's lock clears before that timeout. A second process that is only reading is enough: a commit here cannot finish while that read's transaction is open. The wait is synchronous, so the host answers nothing else for those seconds. A failure either way answers `503 persistence-unavailable`, which the browser retries, never a `409`, and no partial write or stuck lock is left behind (`test/integration/sqlite-contention.test.ts`).
 
-The file uses SQLite's default rollback journal (`journal_mode=delete`) with `synchronous=FULL`; WAL is not enabled. To back it up, stop the host (or anything else writing the file) and copy the file, or use SQLite's own backup API (`sqlite3 hyper.db ".backup copy.db"`). Do not copy the file while a writer has it open: a copy taken mid-transaction need not be a consistent database.
+The file uses SQLite's default rollback journal (`journal_mode=delete`) with `synchronous=FULL`; WAL is not enabled. To back it up, stop the host (or anything else writing the file) and copy the file, or use SQLite's own backup API (`sqlite3 infinity-cube.db ".backup copy.db"`). Do not copy the file while a writer has it open: a copy taken mid-transaction need not be a consistent database.
 
 ### Importing and Exporting a database
 
-The `hyper` CLI moves a complete [Aggregate directory](docs/aggregate-directory.md) in and out of a database. The unit is always the whole aggregate, every Space rooted at the Meta Space, never one Space chosen from among them.
+The `cube` CLI moves a complete [Aggregate directory](docs/aggregate-directory.md) in and out of a database. The unit is always the whole aggregate, every Space rooted at the Meta Space, never one Space chosen from among them.
 
 ```sh
-pnpm hyper export ./my-aggregate                       # write the complete stored aggregate
-pnpm hyper import ./my-aggregate                       # initialize an empty repository from it
-pnpm hyper import ./my-aggregate --dangerous-replace   # replace the stored aggregate outright
+pnpm cube export ./my-aggregate                       # write the complete stored aggregate
+pnpm cube import ./my-aggregate                       # initialize an empty repository from it
+pnpm cube import ./my-aggregate --dangerous-replace   # replace the stored aggregate outright
 ```
 
 Both verbs reach PostgreSQL unless `--store sqlite` names SQLite. Two doors and no mode parameter on either. Without the flag, an already-initialized repository is left exactly as it is and the command says so; with it, whatever is stored — a valid aggregate or state the repository refuses to read — is replaced atomically, authorized by the Meta identity the repository just reported ([ADR 0094](docs/adr/0094-dangerous-truncate-replaces-whatever-is-stored.md)). There is no merge mode.
 
-The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to replace, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `hyper` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
+The flag is **permission to destroy rather than a demand that something be destroyed**: given an empty repository there is nothing to replace, so it takes the initializing door instead and the result is an ordinary first import. Should something else establish a Meta Space in the gap — `pnpm dev`'s startup, a concurrent `cube` — that is reported as a conflict saying nothing was written and to run the command again, rather than advising the flag the operator has just passed.
 
 Initializing a database is not a command: a host establishes a new Space in an empty database at start-up ([ADR 0124](docs/adr/0124-one-hyper-cli.md)). So a database a host has already started on holds an aggregate, and importing into it needs `--dangerous-replace`.
 
@@ -172,8 +172,8 @@ Export writes the destination in place, exactly as a run does ([ADR 0119](docs/a
 The same commands run against a SQLite file with `--store sqlite`, which requires `SQLITE_PATH` to name an already-migrated file (`pnpm db:migrate:sqlite`). The flag, not the environment's contents, picks the database, so a command without it stays PostgreSQL even when `.env` names both. Run it only against a file no host has open — stop `pnpm dev:sqlite` first, or point it at a different file. An exported directory is the only way to move an aggregate between the two databases:
 
 ```sh
-pnpm hyper export ./my-aggregate                               # from PostgreSQL
-SQLITE_PATH=/absolute/path/hyper.db pnpm hyper import ./my-aggregate --store sqlite   # into an empty SQLite file
+pnpm cube export ./my-aggregate                               # from PostgreSQL
+SQLITE_PATH=/absolute/path/infinity-cube.db pnpm cube import ./my-aggregate --store sqlite   # into an empty SQLite file
 ```
 
 ### Architecture
@@ -204,7 +204,7 @@ Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy 
 
 **Resources.** The graph draws a Closed Resource's **Title**, not its content. Opening a Resource shows its content inside the same rect, which Open never resizes or moves ([ADR 0064](docs/adr/0064-opening-a-card-expands-it-in-place.md), [ADR 0122](docs/adr/0122-a-resources-size-is-independent-of-open.md)); editing its source is a separate action. The same Markdown renderer draws the Active Resource on the Stage while Presenting. A Resource occupies exactly one position in a Map; showing the same content at a second position is the job of a Reference Resource ([ADR 0004](docs/adr/0004-cards-are-the-graph.md)).
 
-**The browser never touches files.** It lists, opens and commits Spaces over HTTP and nothing else. Reading and writing an Aggregate directory is server-side: the `hyper` CLI's `init`, `run`, `import` and `export`.
+**The browser never touches files.** It lists, opens and commits Spaces over HTTP and nothing else. Reading and writing an Aggregate directory is server-side: the `cube` CLI's `init`, `run`, `import` and `export`.
 
 ### Tests
 
@@ -212,12 +212,12 @@ Two ship, both in `@project/graph`. `gridStrategy` is a pure automatic strategy 
 - Unresolved Resource, Edge and Graph references and duplicate ids (`@project/graph`).
 - Graph navigation behaviour, with fast-check property tests for clamping/monotonicity and validation invariants.
 - React Flow projection correctness (`@project/react-flow-adapter`).
-- Aggregate directory round trips, Export and Import, and a `pnpm hyper run` that edits over HTTP and stops on SIGINT (`test/unit`, `test/integration`).
+- Aggregate directory round trips, Export and Import, and a `pnpm cube run` that edits over HTTP and stops on SIGINT (`test/unit`, `test/integration`).
 - Playwright flows: app loads, the graph is visible, a Graph is selected, Resources open, a completed drag reaches the backend and survives a reload, a drawn connection mints and activates a Graph, and a Graph is traversed on the Stage.
 
 ### Current limitations
 
-- **No undo inside the application.** Under `pnpm hyper run`, git is the undo.
+- **No undo inside the application.** Under `pnpm cube run`, git is the undo.
 - **Overlay legibility.** The graph draws every Graph at once, at the positions the Map authored. An Edge runs backward whenever the author placed its target left of its source — which two Graphs disagreeing about the order of Resources they share will force on one of them — and nothing routes an Edge around a Resource: every Edge is the bezier React Flow draws, so a backward one curls back on itself.
 - **A Resource's size is authored, never measured.** Any placement may carry a `size`, no smaller than the Closed Size (260×146) on either axis, which is also its default whether the Resource is Open or Closed; only an Ur Resource may take a `shape` other than a rectangle. The Closed Size is declared once, as `COLLAPSED_RESOURCE_SIZE` in `packages/core/src/resource-geometry.ts`. Content adapts to the Resource, not the reverse, which is why a measured DOM size never decides placement.
 - **No speaker view, timer, transitions or export to another presentation format.** They return, if wanted, as their own decisions designed against a traversal ([ADR 0024](docs/adr/0024-presenting-is-traversing-a-route.md)).
