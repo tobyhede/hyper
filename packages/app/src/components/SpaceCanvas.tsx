@@ -591,7 +591,7 @@ export function SpaceCanvas({
     () =>
       resourceEntityActions === undefined
         ? undefined
-        : (resourceId: ResourceId, bodyEditing: boolean) =>
+        : (resourceId: ResourceId) =>
             resourceEntityActions(
               resourceId,
               // Connecting is an Edit, so it goes where the canvas's authoring goes.
@@ -613,10 +613,9 @@ export function SpaceCanvas({
               {
                 openAndExpand: bindCommand(OPEN_AND_EXPAND, {
                   resourceId,
-                  bodyEditing,
                   canvas: { expandable, openAndExpand },
                 }),
-                fullView: bindCommand(showFullViewHere, { resourceId, bodyEditing }),
+                fullView: bindCommand(showFullViewHere, { resourceId }),
                 present: bindCommand(presentFromHere, resourceId),
               },
             ),
@@ -1032,10 +1031,12 @@ export function SpaceCanvas({
     if (node === null || canvasRef.current?.contains(node) !== true) return undefined;
     return node.dataset['id'];
   }, []);
+  // A body edit holds the canvas's Enter and Space keys though not its rail, so
+  // a press while one is open finds no Resource to aim at.
   const ownResourceOf = (event: KeyboardEvent): OwnResourceTarget | undefined => {
-    const nodeId = focusedNodeOf(event);
+    const nodeId = bodyEditing ? undefined : focusedNodeOf(event);
     const resourceId = nodeId === undefined ? undefined : resourceOfNode(nodes, nodeId);
-    return resourceId === undefined ? undefined : { resourceId, bodyEditing };
+    return resourceId === undefined ? undefined : { resourceId };
   };
   useKeyAnswers(
     fullViewShown

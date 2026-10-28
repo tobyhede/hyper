@@ -238,8 +238,8 @@ describe('Open, Open and expand and Full View', () => {
     const canvas = expanding();
     const { show, command } = reading();
 
-    OPEN_AND_EXPAND.run({ resourceId: ON_GRAPH, bodyEditing: false, canvas });
-    command.run({ resourceId: ON_GRAPH, bodyEditing: false });
+    OPEN_AND_EXPAND.run({ resourceId: ON_GRAPH, canvas });
+    command.run({ resourceId: ON_GRAPH });
 
     expect(canvas.openAndExpand).toHaveBeenCalledWith(ON_GRAPH);
     expect(show).toHaveBeenCalledWith(ON_GRAPH);
@@ -252,7 +252,6 @@ describe('Open, Open and expand and Full View', () => {
     expect(
       OPEN_AND_EXPAND.availability({
         resourceId: OFF_GRAPH,
-        bodyEditing: false,
         canvas: expanding(),
       }),
     ).toEqual(ABSENT);
@@ -261,9 +260,7 @@ describe('Open, Open and expand and Full View', () => {
     ).toEqual(AVAILABLE);
   });
 
-  it('is absent while a body is being edited', () => {
-    const own = { resourceId: ON_GRAPH, bodyEditing: true };
-
+  it('offers no Open while a body is being edited', () => {
     expect(
       OPEN_RESOURCE.availability({
         occurrence: opening({ bodyEditing: true }),
@@ -271,13 +268,10 @@ describe('Open, Open and expand and Full View', () => {
         takesOpen: true,
       }),
     ).toEqual(ABSENT);
-    expect(OPEN_AND_EXPAND.availability({ ...own, canvas: expanding() })).toEqual(ABSENT);
-    expect(reading().command.availability(own)).toEqual(ABSENT);
-    expect(reading().command.availability({ ...own, bodyEditing: false })).toEqual(AVAILABLE);
   });
 
   it('offers no Full View where the canvas cannot be selected on or draws none', () => {
-    const own = { resourceId: ON_GRAPH, bodyEditing: false };
+    const own = { resourceId: ON_GRAPH };
 
     expect(showFullViewCommand({ show: vi.fn(), selectNodes: false }).availability(own)).toEqual(
       ABSENT,

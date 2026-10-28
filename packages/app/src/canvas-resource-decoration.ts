@@ -50,7 +50,7 @@ export interface CanvasResourceDecorationContext {
   readonly beginBodyEditing: (node: ResourceFlowNode) => void;
   readonly bodyEditorResourceId: string | null;
   readonly resourceEntityActions?:
-    ((resourceId: ResourceId, bodyEditing: boolean) => readonly EntityActionGroup[]) | undefined;
+    ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
 }
 
 export function applyResourceDataPatch(
@@ -301,7 +301,7 @@ export function decorateSharedResourceNode(
     // authoring is on…') and `CanvasResource.test.tsx` ('keeps a pending
     // replacement mounted when its entity actions become unavailable').
     patch.entityActions = context.authorOnCanvas
-      ? context.resourceEntityActions(node.data.resourceId, context.bodyEditing)
+      ? context.resourceEntityActions(node.data.resourceId)
       : [];
   }
   return patch;

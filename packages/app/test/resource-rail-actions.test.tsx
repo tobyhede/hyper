@@ -554,11 +554,10 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
-   * Open and Expand and Read in Full View are the commands Shift+Enter and
-   * Space run, so the rail offers them only where the keys would answer: not
-   * while a body edit holds the keyboard.
+   * A body edit holds Shift+Enter and Space, not the commands they run: the
+   * rail still offers Open and Expand and Read in Full View while one is open.
    */
-  it('withdraws Open and Expand and Read in Full View while the Resource’s body is edited', async () => {
+  it('keeps Open and Expand and Read in Full View while the Resource’s body is edited', async () => {
     const session = mount(undefined, undefined, openedA());
 
     await selectResource('A');
@@ -571,9 +570,8 @@ describe('a Resource’s commands on the canvas rail', () => {
     await screen.findByRole('textbox', { name: /of A$/ });
     fireEvent.click(await screen.findByRole('button', { name: 'Actions for Resource A' }));
 
-    await screen.findByRole('menu');
-    expect(screen.queryByRole('menuitem', { name: 'Read in Full View' })).toBeNull();
-    expect(screen.queryByRole('menuitem', { name: 'Open and Expand' })).toBeNull();
+    expect(await screen.findByRole('menuitem', { name: 'Read in Full View' })).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Open and Expand' })).toBeVisible();
     await settled(session);
   });
 

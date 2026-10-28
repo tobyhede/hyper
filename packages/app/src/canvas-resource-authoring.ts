@@ -138,12 +138,9 @@ export interface CanvasResourceAuthoringInput {
    * Absent leaves every Resource exactly as it was, which is what a read-only or
    * embedded canvas wants: a Resource drawn where none of these commands can run
    * offers no menu rather than one that refuses.
-   *
-   * Handed whether a body edit holds the keyboard here, which this module owns
-   * and the canvas's own commands are withheld by, as their keys are.
    */
   readonly resourceEntityActions?:
-    ((resourceId: ResourceId, bodyEditing: boolean) => readonly EntityActionGroup[]) | undefined;
+    ((resourceId: ResourceId) => readonly EntityActionGroup[]) | undefined;
   /**
    * Which Open Space Resources currently have their embedded canvas in Edit.
    *
