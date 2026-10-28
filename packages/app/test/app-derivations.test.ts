@@ -220,8 +220,8 @@ describe('resourceRailGroups', () => {
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
     present: { run: () => undefined, availability: AVAILABLE },
-    fullView: () => undefined,
-    openAndExpand: () => undefined,
+    fullView: { run: () => undefined, availability: AVAILABLE },
+    openAndExpand: { run: () => undefined, availability: AVAILABLE },
   };
   const ids = (groups: readonly EntityActionGroup[]) =>
     groups.map((group) => group.map(({ id }) => id));
@@ -295,8 +295,8 @@ describe('resourceRailGroups', () => {
           deleteFromSpace: null,
           enter: null,
           present: { run: () => undefined, availability: ABSENT },
-          fullView: null,
-          openAndExpand: null,
+          fullView: { run: () => undefined, availability: ABSENT },
+          openAndExpand: { run: () => undefined, availability: ABSENT },
         }),
       ),
     ).toEqual([['connect-resource'], ['copy-link']]);
