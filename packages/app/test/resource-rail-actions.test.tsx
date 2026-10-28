@@ -438,6 +438,30 @@ describe('a Resource’s commands on the canvas rail', () => {
   });
 
   /**
+   * Delete runs the command Remove from Map runs (`canvas-commands.ts`), so a
+   * refused removal by key reads exactly as one from the rail.
+   */
+  it('shows a refusal of Delete as "Resource not removed", as the rail item does', async () => {
+    const session = mount(undefined, undefined, snapshot, ({ authoring }) => {
+      const complete = authoring.complete;
+      vi.spyOn(authoring, 'complete').mockImplementation((target, completion) =>
+        completion.kind === 'removed-resource-from-map'
+          ? { kind: 'refused', refusal: { code: 'resource-not-found' } }
+          : complete(target, completion),
+      );
+    });
+
+    const node = await selectResource('A');
+    fireEvent.keyDown(node, { key: 'Delete' });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Resource not removed');
+    expect(alert).toHaveTextContent('This Resource is no longer part of the Space.');
+    expect(resourceIds(session)).toContain(RESOURCE_ID);
+    await settled(session);
+  });
+
+  /**
    * A refused Graph creation and a refused Reference Resource creation are
    * drawn from command outcomes' `graph-create` and `reference-create`
    * channels, each under its own title, and each dismissal puts away only its

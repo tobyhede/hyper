@@ -57,11 +57,7 @@ import {
   type ResourceFlowNode,
 } from '@project/react-flow-adapter';
 import { connectionAppearance } from '../colors';
-import {
-  describeAuthoringRefusal,
-  describeCanvasGestureRefusal,
-  type CanvasGestureRefusal,
-} from '../authoring-refusal';
+import { describeCanvasGestureRefusal, type CanvasGestureRefusal } from '../authoring-refusal';
 import { CANVAS_OCCURRENCE, observeMapSurfaces, type MapSurface } from '../map-surface';
 import { useCanvasResourceAuthoring } from '../canvas-resource-authoring';
 import type { SpaceResourceTargets } from '../space-resource-targets';
@@ -89,9 +85,13 @@ import { EmbeddedMapAuthoring } from './EmbeddedMapAuthoring';
 import { CANVAS_KEYS, FULL_VIEW_KEYS, keyBelongsElsewhere, pressesBinding } from '../key-bindings';
 import {
   bindCommand,
+  answerCommand,
   keyAnswerOf,
   NOT_A_CANVAS_COMMAND,
   presentFromHereCommand,
+  REMOVE_SELECTION,
+  removeFromMapReportedBy,
+  type RemovalTarget,
   type PresentFrom,
 } from '../canvas-commands';
 import { useKeyAnswers } from '../key-dispatcher';
@@ -676,9 +676,8 @@ export function SpaceCanvas({
             // answer of `null` alone would consume the key and do nothing at all.
             // There is no refusal to report either — the target is not open,
             // which is a state this press ends rather than a refused Edit.
-            removeResource: () => {
+            removeFromMap: () => {
               void resumeEmbedded(request.spaceId);
-              return null;
             },
             nodes: value.nodes.map((node): ResourceFlowNode => {
               const stamped = withSurfacePolicy(
@@ -797,12 +796,7 @@ export function SpaceCanvas({
         openResource: onOpenResource,
         beginTitleEditing,
         selection,
-        removeResource: (id: string) => {
-          const resourceId = resourceOfNode(nodes, id);
-          if (resourceId === undefined) return null;
-          const result = authoring.complete({ kind: 'removed-resource-from-map', resourceId });
-          return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
-        },
+        removeFromMap: removeFromMapReportedBy(commandOutcomes, authoring),
         edgeAuthoring,
         deleteSelectedEdge: () =>
           edgeSurface.deleteEdges(edgeSurface.edges.filter((edge) => edge.selected)),
@@ -823,7 +817,7 @@ export function SpaceCanvas({
           const resourceId = resourceOfNode(value.nodes, id);
           if (resourceId !== undefined) value.beginTitleEditing(resourceId);
         },
-        removeResource: value.removeResource,
+        removeFromMap: value.removeFromMap,
         edgeAuthoring: value.surface.edgeAuthoring,
         deleteSelectedEdge: () => {
           const selected = value.surface.adapter.getState().selection;
@@ -845,6 +839,7 @@ export function SpaceCanvas({
     [
       nodes,
       authoring,
+      commandOutcomes,
       availability,
       resourceAuthoring.bodyEditing,
       onOpenResource,
@@ -1441,37 +1436,55 @@ export function SpaceCanvas({
     setCommandRefusal(null);
   }
 
-  useEffect(() => {
-    const deleteSelection = (event: KeyboardEvent): void => {
-      if (!pressesBinding(CANVAS_KEYS.removeSelection, event)) return;
-      // Narrower than every other canvas key, deliberately, so this guard rather
-      // than `keyBelongsElsewhere`: removal and Edge deletion cannot be undone,
-      // so the key has to be aimed at the canvas itself, never at a control on it
-      // or at the chrome around it.
-      if (!(event.target instanceof Element)) return;
-      if (event.target.closest(NOT_A_CANVAS_COMMAND) !== null) return;
-      if (canvasRef.current?.contains(event.target) !== true) return;
+  /** What Delete is aimed at: the Resource it lands on, else the selection, inside the canvas only. */
+  const removalTargetOf = useCallback(
+    (event: KeyboardEvent): RemovalTarget | undefined => {
+      if (!(event.target instanceof Element) || canvasRef.current?.contains(event.target) !== true)
+        return undefined;
       const focusedNodeId = event.target.closest<HTMLElement>('.react-flow__node[data-id]')
         ?.dataset['id'];
-      const current = latestOccurrences.current.find((value) =>
+      const occurrence = occurrences.find((value) =>
         focusedNodeId === undefined
           ? value.selection.kind !== 'none' || value.nodes.some((node) => node.selected)
           : value.nodes.some((node) => node.id === focusedNodeId),
       );
-      if (current === undefined || !current.availability.authorOnCanvas || current.bodyEditing)
-        return;
-      const nodeId = focusedNodeId ?? current.nodes.find((node) => node.selected)?.id;
-      if (nodeId !== undefined) {
-        event.preventDefault();
-        setCommandRefusal(current.removeResource(nodeId));
-      } else if (current.selection.kind === 'edge') {
-        event.preventDefault();
-        current.deleteSelectedEdge();
-      }
-    };
-    window.addEventListener('keydown', deleteSelection);
-    return () => window.removeEventListener('keydown', deleteSelection);
-  }, []);
+      if (occurrence === undefined) return undefined;
+      const removal = {
+        authorOnCanvas: occurrence.availability.authorOnCanvas,
+        bodyEditing: occurrence.bodyEditing,
+        removeFromMap: occurrence.removeFromMap,
+        deleteSelectedEdge: occurrence.deleteSelectedEdge,
+      };
+      const node =
+        focusedNodeId === undefined
+          ? occurrence.nodes.find((each) => each.selected)
+          : occurrence.nodes.find((each) => each.id === focusedNodeId);
+      if (node !== undefined)
+        return {
+          occurrence: removal,
+          subject: { kind: 'resource' as const, resourceId: node.data.resourceId },
+        };
+      return occurrence.selection.kind === 'edge'
+        ? { occurrence: removal, subject: { kind: 'edge' as const } }
+        : undefined;
+    },
+    [occurrences],
+  );
+  // Delete and Backspace remove from its Map the Resource they land on, or else
+  // the selected one, or delete the selected Edge, on whichever drawn Map holds
+  // it: the command the rail's Remove from Map runs, so both report alike. Only
+  // a press inside the canvas, and nothing while Full View covers it.
+  useKeyAnswers(
+    fullViewShown
+      ? []
+      : [
+          {
+            binding: REMOVE_SELECTION.binding,
+            answer: (event: KeyboardEvent) =>
+              answerCommand(REMOVE_SELECTION, event, () => removalTargetOf(event)),
+          },
+        ],
+  );
 
   // The preview is drawn as the Graph the new Edge joins: the target's shown
   // Graph for a connection between one embedding's Resources, else the Active

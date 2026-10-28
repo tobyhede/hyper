@@ -1,4 +1,6 @@
 import type { ResourceId } from '@project/core';
+import type { CommandOutcomes } from './command-outcomes';
+import type { SurfaceAuthoring } from './space-authoring';
 import { CANVAS_KEYS, keyBelongsElsewhere, OWNS_ITS_KEYS, type KeyBinding } from './key-bindings';
 import type { KeyAnswer } from './key-dispatcher';
 
@@ -50,6 +52,13 @@ export interface CanvasCommand<Target> {
   readonly aim: CanvasCommandAim;
   /** Whether it acts on the canvas's own Map only, or on any Map the canvas draws. */
   readonly serves: 'own-map' | 'any';
+  /**
+   * Whether its key must land on the canvas itself and not on a control on it
+   * or the chrome around it, as a command that cannot be undone must. Such a
+   * key is guarded as a `focused-resource` key is, and its target is found
+   * inside the canvas only.
+   */
+  readonly insideCanvas?: boolean;
   readonly availability: (target: Target) => CommandAvailability;
   readonly run: (target: Target) => void;
 }
@@ -88,31 +97,38 @@ export const bindCommand = <Target>(
  */
 export const NOT_A_CANVAS_COMMAND = `.nokey, input, button, ${OWNS_ITS_KEYS}`;
 
-/** Whether the guard for `aim` leaves this press to whatever it landed on. */
-const guardedFor = (aim: CanvasCommandAim, event: KeyboardEvent): boolean => {
-  if (aim !== 'focused-resource') return keyBelongsElsewhere(event);
+/** Whether the guard for `command`'s aim leaves this press to whatever it landed on. */
+const guardedFor = (command: CanvasCommand<never>, event: KeyboardEvent): boolean => {
+  if (command.aim !== 'focused-resource' && command.insideCanvas !== true)
+    return keyBelongsElsewhere(event);
   return !(event.target instanceof Element) || event.target.closest(NOT_A_CANVAS_COMMAND) !== null;
 };
 
 /**
- * The key answer for `command`: past its aim's guard, at the target `targetOf`
- * finds for the press, and only while the command is available there.
+ * Answer a press of `command`'s key: past its aim's guard, at the target
+ * `targetOf` finds for the press, and only while the command is available
+ * there. Says whether it ran, which is whether the press was taken.
  */
-export function keyAnswerOf<Target>(
+export function answerCommand<Target>(
+  command: CanvasCommand<Target>,
+  event: KeyboardEvent,
+  targetOf: () => Target | undefined,
+): boolean {
+  if (guardedFor(command, event)) return false;
+  const target = targetOf();
+  if (target === undefined || command.availability(target).kind !== 'available') return false;
+  command.run(target);
+  return true;
+}
+
+/** The key answer for `command`, at the target `targetOf` finds for each press. */
+export const keyAnswerOf = <Target>(
   command: CanvasCommand<Target>,
   targetOf: (event: KeyboardEvent) => Target | undefined,
-): KeyAnswer {
-  return {
-    binding: command.binding,
-    answer: (event) => {
-      if (guardedFor(command.aim, event)) return false;
-      const target = targetOf(event);
-      if (target === undefined || command.availability(target).kind !== 'available') return false;
-      command.run(target);
-      return true;
-    },
-  };
-}
+): KeyAnswer => ({
+  binding: command.binding,
+  answer: (event) => answerCommand(command, event, () => targetOf(event)),
+});
 
 /** The sentence Present from Here carries while the Active Graph does not hold its Resource. */
 export const PRESENT_OFF_GRAPH = 'This Resource is not on the Active Graph.';
@@ -158,3 +174,51 @@ export function presentFromHereCommand(input: {
     run: (resourceId) => presentFrom?.run(resourceId),
   };
 }
+
+/** What Remove from Map and Delete need of the drawn Map their target is on. */
+export interface RemovalOccurrence {
+  readonly authorOnCanvas: boolean;
+  readonly bodyEditing: boolean;
+  /** Remove a Resource from this Map, reporting a refusal through command outcomes. */
+  readonly removeFromMap: (resourceId: ResourceId) => void;
+  readonly deleteSelectedEdge: () => void;
+}
+
+/** A Resource to remove from its Map, or the selected Edge to delete. */
+export interface RemovalTarget {
+  readonly occurrence: RemovalOccurrence;
+  readonly subject:
+    { readonly kind: 'resource'; readonly resourceId: ResourceId } | { readonly kind: 'edge' };
+}
+
+/**
+ * Remove from Map (Delete, Backspace): remove a Resource from the drawn Map it
+ * is on, or delete the selected Edge. Neither can be undone, so its key must
+ * land inside the canvas. Absent while that Map may not be authored or a body
+ * is being edited.
+ */
+export const REMOVE_SELECTION: CanvasCommand<RemovalTarget> = {
+  id: 'canvas.removeSelection',
+  binding: CANVAS_KEYS.removeSelection,
+  aim: 'selection',
+  serves: 'any',
+  insideCanvas: true,
+  availability: ({ occurrence }) =>
+    occurrence.authorOnCanvas && !occurrence.bodyEditing ? AVAILABLE : ABSENT,
+  run: ({ occurrence, subject }) => {
+    if (subject.kind === 'resource') occurrence.removeFromMap(subject.resourceId);
+    else occurrence.deleteSelectedEdge();
+  },
+};
+
+/**
+ * Remove a Resource from a Map through command outcomes, so a refusal is
+ * reported on the `resource-remove` channel whichever way it was asked for.
+ */
+export const removeFromMapReportedBy =
+  (commandOutcomes: CommandOutcomes, authoring: Pick<SurfaceAuthoring, 'complete'>) =>
+  (resourceId: ResourceId): void => {
+    commandOutcomes.run('resource-remove', () =>
+      authoring.complete({ kind: 'removed-resource-from-map', resourceId }),
+    );
+  };

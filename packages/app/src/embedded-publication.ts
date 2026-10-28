@@ -29,7 +29,8 @@ export interface EmbeddedPublication extends EmbeddedPublicationSnapshot {
   readonly origin: { readonly x: number; readonly y: number };
   readonly edges: readonly Edge[];
   readonly changeNodes: (changes: NodeChange<ResourceFlowNode>[]) => void;
-  readonly removeResource: (id: string) => string | null;
+  /** Remove a Resource from this Map, reporting a refusal through command outcomes. */
+  readonly removeFromMap: (resourceId: ResourceId) => void;
   readonly mayConnectResources: (from: ResourceId, to: ResourceId) => boolean;
   /** How a connection between this embedding's Resources is previewed: as the Graph it joins. */
   readonly connectionAppearance: () => GraphAppearance;

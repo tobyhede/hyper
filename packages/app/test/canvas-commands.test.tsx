@@ -8,11 +8,20 @@ import {
   PRESENT_OFF_GRAPH,
   PRESENT_WHILE_EDITING,
   presentFromHereCommand,
+  REMOVE_SELECTION,
   unavailable,
+  type RemovalOccurrence,
 } from '../src/canvas-commands';
 
 const ON_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000001');
 const OFF_GRAPH = uuidSchema.parse('00000000-0000-4000-8000-000000000002');
+
+/** A press whose target is `target`, as the window sees it. */
+const pressOn = (target: Element, key: string): KeyboardEvent => {
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'target', { value: target });
+  return event;
+};
 
 const presenting = () => {
   const run = vi.fn();
@@ -65,12 +74,6 @@ describe('Present from Here', () => {
 });
 
 describe('a Canvas command’s key', () => {
-  const pressOn = (target: Element, key: string): KeyboardEvent => {
-    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
-    Object.defineProperty(event, 'target', { value: target });
-    return event;
-  };
-
   it('runs the command at its target only while it is available', () => {
     const { run, presentFrom } = presenting();
     const command = presentFromHereCommand({ presentFrom, mayPresent: true });
@@ -93,5 +96,55 @@ describe('a Canvas command’s key', () => {
 
     expect(taken).toBe(false);
     expect(run).not.toHaveBeenCalled();
+  });
+});
+
+describe('Remove from Map', () => {
+  const occurrence = (overrides: Partial<RemovalOccurrence> = {}) => ({
+    authorOnCanvas: true,
+    bodyEditing: false,
+    removeFromMap: vi.fn(),
+    deleteSelectedEdge: vi.fn(),
+    ...overrides,
+  });
+
+  it('removes a Resource from its Map, or deletes the selected Edge', () => {
+    const map = occurrence();
+
+    REMOVE_SELECTION.run({ occurrence: map, subject: { kind: 'resource', resourceId: ON_GRAPH } });
+    REMOVE_SELECTION.run({ occurrence: map, subject: { kind: 'edge' } });
+
+    expect(map.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
+    expect(map.deleteSelectedEdge).toHaveBeenCalledOnce();
+  });
+
+  it('is absent while its Map may not be authored or a body is being edited', () => {
+    const subject = { kind: 'resource', resourceId: ON_GRAPH } as const;
+
+    expect(REMOVE_SELECTION.availability({ occurrence: occurrence(), subject })).toEqual(AVAILABLE);
+    expect(
+      REMOVE_SELECTION.availability({ occurrence: occurrence({ authorOnCanvas: false }), subject }),
+    ).toEqual(ABSENT);
+    expect(
+      REMOVE_SELECTION.availability({ occurrence: occurrence({ bodyEditing: true }), subject }),
+    ).toEqual(ABSENT);
+  });
+
+  it('leaves its key to any control, even one that owns no keys of its own', () => {
+    const map = occurrence();
+    const answer = keyAnswerOf(REMOVE_SELECTION, () => ({
+      occurrence: map,
+      subject: { kind: 'resource' as const, resourceId: ON_GRAPH },
+    }));
+    const toolbar = document.createElement('div');
+    toolbar.className = 'nokey';
+    const button = document.createElement('button');
+    toolbar.append(button);
+
+    expect(answer.answer(pressOn(button, 'Delete'))).toBe(false);
+    expect(answer.answer(pressOn(toolbar, 'Delete'))).toBe(false);
+    expect(map.removeFromMap).not.toHaveBeenCalled();
+    expect(answer.answer(pressOn(document.body, 'Delete'))).toBe(true);
+    expect(map.removeFromMap).toHaveBeenCalledWith(ON_GRAPH);
   });
 });
