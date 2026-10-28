@@ -26,7 +26,7 @@ import {
 } from '../embedded-map';
 import type { OpenSpace } from '../open-spaces';
 import { useSpaceResourceTargets } from '../space-resource-targets';
-import { describeAuthoringRefusal } from '../authoring-refusal';
+import { removeFromMapReportedBy } from '../canvas-commands';
 import type { EmbeddedPublication } from '../embedded-publication';
 import { authoredFromDrawn, type SpaceResourceFraming } from '../space-resource-framing';
 import { spaceResourceEmbedCamera } from '../camera';
@@ -342,15 +342,7 @@ export function EmbeddedMapAuthoring({
       origin,
       bodyEditing: authoring.bodyEditing,
       titleEditing: authoring.titleEditing,
-      removeResource: (id) => {
-        const resourceId = localIds.get(id);
-        if (resourceId === undefined) return null;
-        const result = composition.authoring.complete({
-          kind: 'removed-resource-from-map',
-          resourceId,
-        });
-        return result.kind === 'refused' ? describeAuthoringRefusal(result.refusal) : null;
-      },
+      removeFromMap: removeFromMapReportedBy(contextual.commandOutcomes, composition.authoring),
       mayConnectResources: (from, to) =>
         composition.authoring.edgeEligibility({ kind: 'connect', from, to }).kind === 'eligible',
       connectionAppearance: () =>
@@ -384,6 +376,7 @@ export function EmbeddedMapAuthoring({
       },
     };
   }, [
+    contextual.commandOutcomes,
     clipboardFailure,
     dismissClipboardFailure,
     parentId,

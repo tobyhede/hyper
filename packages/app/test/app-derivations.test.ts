@@ -216,7 +216,7 @@ describe('resourceRailGroups', () => {
   ];
   const everything = {
     createReference: (): EntityActionOutcome => 'done',
-    removeFromMap: () => undefined,
+    removeFromMap: { run: () => undefined, availability: AVAILABLE },
     deleteFromSpace: () => undefined,
     enter: { run: () => undefined, available: true },
     present: { run: () => undefined, availability: AVAILABLE },
@@ -291,7 +291,7 @@ describe('resourceRailGroups', () => {
       ids(
         resourceRailGroups(resource(PLACED_A), addresses, connect, {
           createReference: null,
-          removeFromMap: null,
+          removeFromMap: { run: () => undefined, availability: ABSENT },
           deleteFromSpace: null,
           enter: null,
           present: { run: () => undefined, availability: ABSENT },

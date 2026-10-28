@@ -28,7 +28,13 @@ import { canvasElement } from './canvas-element';
 import type { FocusFallback } from './delete-confirmation';
 import { isOpenIndependently, type SpaceEntity } from './entity-actions';
 import type { OpenSpaces } from './open-spaces';
-import { ABSENT, type BoundCommand } from './canvas-commands';
+import {
+  ABSENT,
+  bindCommand,
+  REMOVE_SELECTION,
+  removeFromMapReportedBy,
+  type BoundCommand,
+} from './canvas-commands';
 import { CANVAS_KEYS, type KeyBinding } from './key-bindings';
 import { shortcutOf } from './shortcut-sheet';
 
@@ -39,8 +45,8 @@ export const referenceTerminal = (kind: KindId): string =>
 export interface ResourceRailCommands {
   /** Create Reference, or `null` while no Resource may be added. */
   readonly createReference: (() => EntityActionOutcome) | null;
-  /** Remove from Map, or `null` while it is unavailable. */
-  readonly removeFromMap: (() => void) | null;
+  /** Remove from Map: the command Delete and Backspace run, bound to this Resource. */
+  readonly removeFromMap: BoundCommand;
   /** Arm Delete from Space's confirmation, or `null` while it is unavailable. */
   readonly deleteFromSpace: (() => void) | null;
   /** Enter a Space Resource's Space, or `null` without an open set to enter it in. */
@@ -198,19 +204,16 @@ export function resourceRailGroups(
           },
         ]),
   ];
+  const removeItem = commandItem(removeFromMap, CANVAS_KEYS.removeSelection);
   const leaving: EntityActionGroup = [
-    ...(removeFromMap === null
+    ...(removeItem === null
       ? []
       : [
           {
             id: 'remove-from-map',
             label: 'Remove from Map',
             icon: <RemoveFromMapIcon />,
-            shortcut: shortcutOf(CANVAS_KEYS.removeSelection),
-            onSelect: (): EntityActionOutcome => {
-              removeFromMap();
-              return 'done';
-            },
+            ...removeItem,
           },
         ]),
     ...(deleteFromSpace === null
@@ -359,14 +362,15 @@ export function useResourceRailActions(
         connect,
         {
           createReference: addResource ? () => createReferenceFrom(resource) : null,
-          removeFromMap:
-            authorOnCanvas && !editingResourceBody
-              ? () => {
-                  commandOutcomes.run('resource-remove', () =>
-                    authoring.complete({ kind: 'removed-resource-from-map', resourceId }),
-                  );
-                }
-              : null,
+          removeFromMap: bindCommand(REMOVE_SELECTION, {
+            occurrence: {
+              authorOnCanvas,
+              bodyEditing: editingResourceBody,
+              removeFromMap: removeFromMapReportedBy(commandOutcomes, authoring),
+              deleteSelectedEdge: () => undefined,
+            },
+            subject: { kind: 'resource', resourceId },
+          }),
           deleteFromSpace: deleteResource
             ? () =>
                 resourceDeletion.askToDelete(resource, railFocusFallback(currentSpace, resourceId))
