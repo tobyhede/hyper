@@ -25,13 +25,13 @@ export interface KeyAnswer {
  * - `full-view`: Full View covers the canvas.
  * - `canvas`: nothing covers it.
  */
-export type KeyContext = 'off-screen' | 'presenting' | 'full-view' | 'canvas';
+type KeyContext = 'off-screen' | 'presenting' | 'full-view' | 'canvas';
 
 /** A context a surface puts its Space in while it covers it. */
 export type CoveringContext = Exclude<KeyContext, 'canvas'>;
 
-/** Where a registration's commands are answered. */
-export type AnswersIn = 'canvas' | 'presenting' | 'on-screen';
+/** Where a registration's commands are answered: in one context, or in any on screen. */
+export type AnswersIn = Extract<KeyContext, 'canvas' | 'presenting'> | 'on-screen';
 
 const COVERING_ORDER: readonly CoveringContext[] = ['off-screen', 'presenting', 'full-view'];
 
@@ -90,6 +90,7 @@ export function createKeyDispatcher(target: EventTarget): KeyDispatcher {
     function dispatchKey(event: Event): void {
       if (!(event instanceof KeyboardEvent)) return;
       const now = context();
+      if (now === 'off-screen') return;
       for (const { answers, answersIn } of [...registrations[phase]]) {
         if (!answersInContext(answersIn, now)) continue;
         for (const { id, answer } of answers()) {

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useKeyAnswers, useKeyCover } from './key-dispatcher';
 import {
   presentingCommands,
@@ -19,5 +20,9 @@ export type { TraversalCommands } from './presenting-commands';
  */
 export function usePresentingKeys(presenting: boolean, traversal: TraversalCommands): void {
   useKeyCover('presenting', presenting);
-  useKeyAnswers(presentingCommands(traversal).map(presentingKeyAnswer), 'presenting');
+  const answers = useMemo(
+    () => presentingCommands(traversal).map(presentingKeyAnswer),
+    [traversal],
+  );
+  useKeyAnswers(answers, 'presenting');
 }

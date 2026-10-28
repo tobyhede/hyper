@@ -265,11 +265,19 @@ const openPresentable = async (
   return { spaces, initial };
 };
 
-const pressP = async (): Promise<void> => {
+const pressP = async (target: Element = document.body): Promise<void> => {
   await act(async () => {
-    fireEvent.keyDown(document.body, { key: 'p' });
+    fireEvent.keyDown(target, { key: 'p' });
     await Promise.resolve();
   });
+};
+
+/** Focus the presentable Resource's node, as a click on it would, and return it. */
+const focusResource = (): HTMLElement => {
+  const node = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${RESOURCE_ID}"]`);
+  if (node === null) throw new Error('the presentable Resource is drawn');
+  act(() => node.focus());
+  return node;
 };
 
 /** `P` is answered on the window by every mounted canvas, so the Space it reaches is App's to decide. */
@@ -316,15 +324,7 @@ describe('Present from Here, by key and on the rail', () => {
     fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
   };
-  const pressPOnTheResource = async (): Promise<void> => {
-    const node = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${RESOURCE_ID}"]`);
-    if (node === null) throw new Error('the presentable Resource is drawn');
-    act(() => node.focus());
-    await act(async () => {
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: 'p' });
-      await Promise.resolve();
-    });
-  };
+  const pressPOnTheResource = (): Promise<void> => pressP(focusResource());
 
   it('offers the item and answers the key on the Active Graph', async () => {
     const { initial } = await openPresentable();
@@ -2061,9 +2061,7 @@ describe('the keys a Space answers', () => {
     });
     expect(sheet()).toBeNull();
 
-    const node = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${RESOURCE_ID}"]`);
-    if (node === null) throw new Error('the presentable Resource is drawn');
-    act(() => node.focus());
+    const node = focusResource();
     await act(async () => {
       fireEvent.keyDown(node, { key: ' ' });
       await Promise.resolve();
