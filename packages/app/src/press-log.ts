@@ -33,15 +33,15 @@ export interface PressEntry {
   readonly prevented: boolean;
 }
 
-const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock']);
-
 /** Whether a press is only a modifier going down, which the log leaves out. */
-export const isModifierOnly = (event: KeyboardEvent): boolean => MODIFIER_KEYS.has(event.key);
+export const isModifierOnly = (event: KeyboardEvent): boolean => event.getModifierState(event.key);
+
+/** A one-character key as a person would name it; the space bar is the one with no glyph. */
+const characterName = (character: string): string => character.trim().toUpperCase() || 'Space';
 
 /** A press as a person would name it: `Shift+P`, `Ctrl+Enter`, `Space`. */
 export function pressLabel(event: KeyboardEvent): string {
-  const key =
-    event.key === ' ' ? 'Space' : event.key.length === 1 ? event.key.toUpperCase() : event.key;
+  const key = event.key.length === 1 ? characterName(event.key) : event.key;
   return [
     event.ctrlKey ? 'Ctrl' : null,
     event.altKey ? 'Alt' : null,

@@ -70,7 +70,7 @@ export function PressLog() {
   return (
     <section
       aria-label="Press log"
-      className="nokey pointer-events-none fixed top-2 left-2 z-[1000] w-[30rem] max-w-[calc(100vw-1rem)] rounded-md bg-black/85 p-2 font-mono text-[11px] leading-snug text-white shadow-lg"
+      className="nokey pointer-events-none fixed top-2 left-2 z-[1000] w-[30rem] max-w-[calc(100vw-1rem)] rounded-md bg-black/85 p-2 font-mono text-xs leading-snug text-white shadow-lg"
     >
       <header className="pointer-events-auto mb-1 flex items-center gap-2">
         <span className="font-semibold">Press log</span>
