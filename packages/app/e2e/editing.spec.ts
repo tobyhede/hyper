@@ -1968,7 +1968,7 @@ test('the open Resources list takes no width from the canvas it feeds', async ({
   expect(after.x, 'the canvas keeps its position while the list is open').toBe(before.x);
 
   // And they are still the reader's to operate, not just to look at.
-  await expect(legend).toContainText('Graph');
+  await expect(legend.locator('.legend__item')).toHaveCount(3);
   await overview.click({ position: { x: 4, y: 4 } });
   await expect(list).toBeVisible();
 });
