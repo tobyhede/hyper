@@ -48,6 +48,8 @@ const ROOMY_HEIGHT = 400;
  * measured it: an unmeasured canvas reports zero, and answering either way then
  * would draw the wrong state for a frame on a phone or on a desktop.
  */
+const heightOf = (state: { height: number }): number => state.height;
+
 const canvasIsRoomy = (state: { width: number; height: number }): boolean | null =>
   state.width === 0 && state.height === 0
     ? null
@@ -96,6 +98,7 @@ const canvasIsRoomy = (state: { width: number; height: number }): boolean | null
  */
 export function GraphHud({ graphs, colorByGraphId, activeGraphId }: GraphHudProps) {
   const roomy = useStore(canvasIsRoomy);
+  const canvasHeight = useStore(heightOf);
   const [chosen, setChosen] = useState<boolean | null>(null);
   // Nothing is drawn until the canvas is measured, so neither state flashes.
   if (chosen === null && roomy === null) return null;
@@ -113,6 +116,16 @@ export function GraphHud({ graphs, colorByGraphId, activeGraphId }: GraphHudProp
         <Collapsible
           open={shown}
           onOpenChange={setChosen}
+          // Open, the key grows upward from above the minimap, and its trigger
+          // sits at the key's top. Capped at the canvas left above the minimap,
+          // a long key on a short canvas clips its last rows (the Dock's Graph
+          // choice lists every one) rather than pushing the trigger off the
+          // canvas, where nothing could close it again.
+          style={
+            shown
+              ? { maxHeight: Math.max(canvasHeight - MINIMAP_HEIGHT - 2 * PANEL_INSET, 0) }
+              : undefined
+          }
           className={cn(
             'relative overflow-hidden border border-border bg-card shadow-lg',
             // Closed, the panel shrinks to its trigger, so on a phone it clears

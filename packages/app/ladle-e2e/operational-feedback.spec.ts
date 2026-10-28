@@ -83,7 +83,12 @@ test(
 
     const notice = page.getByRole('status');
     await expect(notice.getByText('Edits kept in this page only')).toBeVisible();
-    await expect(notice).toContainText('Nothing is written to GitHub');
+    await expect(
+      notice.getByText(
+        'Reloading or closing this page discards them. Nothing is written to GitHub.',
+        { exact: true },
+      ),
+    ).toBeVisible();
     await expect(page.getByRole('alert')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Dismiss: Edits kept in this page only' }).click();

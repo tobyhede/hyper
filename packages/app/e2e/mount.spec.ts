@@ -181,7 +181,12 @@ test(
     await expect(nodeByTitle(page, 'Renamed A').first()).toBeVisible();
     await expect(status).not.toHaveAttribute('data-revision', revision);
     await expect(status).toHaveText('Persisted');
-    await expect(mountedEditsNotice(page)).toContainText('Nothing is written to GitHub');
+    await expect(
+      mountedEditsNotice(page).getByText(
+        'Reloading or closing this page discards them. Nothing is written to GitHub.',
+        { exact: true },
+      ),
+    ).toBeVisible();
     await expect(dock(page).getByText(/page only/i)).toHaveCount(0);
 
     await page.reload();

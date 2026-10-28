@@ -233,6 +233,31 @@ describe('GraphHud', () => {
   });
 
   /**
+   * Open on a short canvas, the key is capped to the room above the minimap, so
+   * however many Graphs it lists, its trigger stays on the canvas.
+   */
+  it('caps the open key to the canvas above the minimap', () => {
+    canvas.size = { width: 1280, height: 300 };
+    render(
+      <GraphHud
+        graphs={[{ id: uuid('00000000-0000-4000-8000-000000000010'), title: 'Only', edges: [] }]}
+        colorByGraphId={{}}
+        activeGraphId={null}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Toggle graph overview' });
+    fireEvent.click(toggle);
+
+    const panel = screen.getByTestId('panel');
+    const key = panel.firstElementChild;
+    if (!(key instanceof HTMLElement)) throw new Error('the key is not drawn in the panel');
+    // 300 high, less the 150px minimap and the 15px inset above and below it.
+    expect(key.style.maxHeight).toBe('120px');
+    expect(key).toContainElement(toggle);
+  });
+
+  /**
    * Before React Flow measures the canvas it reports zero, which says nothing
    * about the screen: drawing either state then would flash the wrong one on a
    * phone or on a desktop, so the HUD waits for the measurement.
