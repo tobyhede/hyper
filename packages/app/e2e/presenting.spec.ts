@@ -305,11 +305,11 @@ test('a Space Resource shows the Map it selects', async ({ page }) => {
   await presentControl(page).click();
   await expect(presentedName(page)).toHaveText('Presentation');
   await expect(presentedResource(page)).toHaveAttribute('data-content-kind', 'space');
-  const map = presentedResource(page).getByTestId('presented-map');
+  const drawing = presentedResource(page).getByTestId('presented-map');
   for (const name of ['Opening remarks', 'The problem', 'Closing'])
-    await expect(map.locator('.react-flow__node', { hasText: name })).toBeVisible();
-  await expect(map.locator('.react-flow__edge').first()).toBeAttached();
-  await expect(map).toHaveCSS('pointer-events', 'none');
+    await expect(drawing.locator('.react-flow__node', { hasText: name })).toBeVisible();
+  await expect(drawing.locator('.react-flow__edge').first()).toBeAttached();
+  await expect(drawing).toHaveCSS('pointer-events', 'none');
 
   await page.keyboard.press('ArrowRight');
   await expect(presentedName(page)).toHaveText('Deep dive');

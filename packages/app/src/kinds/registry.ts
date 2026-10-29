@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   imageKind,
   KIND_IDS,
@@ -7,6 +7,7 @@ import {
   spaceKind,
   urKind,
   type KindId,
+  type ResourceContent,
 } from '@project/core';
 import type { ResourceFlowNode } from '@project/react-flow-adapter';
 import {
@@ -18,7 +19,12 @@ import {
 import type { KindCreation } from '../kind-creation';
 import { imageCreation, imageDecoration, type ImageCreationContext } from './image';
 import { markdownCreation, markdownDecoration, type MarkdownCreationContext } from './markdown';
-import { spaceCreation, spaceDecoration, type SpaceCreationContext } from './space';
+import {
+  spaceCreation,
+  spaceDecoration,
+  spacePresentation,
+  type SpaceCreationContext,
+} from './space';
 import { urCreation, urDecoration, type UrCreationContext } from './ur';
 
 /** What every kind's Create reads, together. */
@@ -92,3 +98,12 @@ export function useKindDecoratedNodes(
   const [decorate] = useState(() => kindDecorationMemo(KIND_DECORATORS));
   return decorate(nodes, context);
 }
+
+/**
+ * What the Stage draws in place of a content's own view, for the one kind
+ * whose presented content needs the application: a Space Resource's Map.
+ * Every other kind's presented content is its view half's, so this answers
+ * `undefined` for it.
+ */
+export const presentedByApplication = (content: ResourceContent): ReactNode =>
+  content.kind === spaceKind.id ? spacePresentation(content) : undefined;

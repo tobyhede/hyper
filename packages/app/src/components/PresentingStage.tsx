@@ -2,7 +2,7 @@ import type { GraphId, MapId, ResourceId } from '@project/core';
 import { resolveResourceContent, type Space } from '@project/graph';
 import { PresentedResource, Stage } from '@project/ui';
 import { presentedNotes } from '../notes-window';
-import { PresentedSpaceMap } from './PresentedSpaceMap';
+import { presentedByApplication } from '../kinds/registry';
 import { PresentedNotesList } from './PresentedNotesList';
 import { PresentingChrome, type PresentingChromeProps } from './PresentingChrome';
 import './rehearsal-notes.css';
@@ -56,13 +56,7 @@ export function PresentingStage({
       }
     >
       <PresentedResource title={resource.title} content={content}>
-        {content.kind === 'space' ? (
-          <PresentedSpaceMap
-            spaceId={content.view.spaceId}
-            mapId={content.view.map}
-            graphId={content.view.graph}
-          />
-        ) : undefined}
+        {presentedByApplication(content)}
       </PresentedResource>
     </Stage>
   );

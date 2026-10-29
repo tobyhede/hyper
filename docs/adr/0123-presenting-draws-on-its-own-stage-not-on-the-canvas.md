@@ -1,6 +1,6 @@
 # Presenting draws on its own Stage, not on the canvas
 
-Status: accepted, amended 2026-10-29: a Space Resource draws its Map on the Stage
+Status: accepted
 Supersedes: 0027, 0044
 Refines: 0024
 Refined by: 0129
