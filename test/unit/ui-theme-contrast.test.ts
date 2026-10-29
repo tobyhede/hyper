@@ -142,7 +142,7 @@ const FIRST_FIVE = Array.from({ length: 5 }).reduce<string[]>(
 );
 
 /** A hex colour's OKLCH chroma and hue in degrees, from its OKLab point. */
-const chromaHue = (hex: string): { readonly chroma: number; readonly hue: number } => {
+const chromaHue = (hex: string) => {
   const [, a, b] = oklab(hex);
   return {
     chroma: Math.hypot(a!, b!),
