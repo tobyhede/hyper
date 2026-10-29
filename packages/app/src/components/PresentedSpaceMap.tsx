@@ -92,11 +92,19 @@ function PresentedMapDrawing({
     spaceOnCanvas: false,
   });
   const projected = canvasRendering.projected;
+  // The canvas fades what is off the selected Graph so an author can see the
+  // Graph; an audience is shown the whole diagram, so nothing recedes here.
   const nodes = useMemo(
-    () => projected?.nodes.map((node) => withSurfacePolicy(node, 'inert')) ?? [],
+    () =>
+      projected?.nodes.map((node) =>
+        withSurfacePolicy({ ...node, data: { ...node.data, receding: false } }, 'inert'),
+      ) ?? [],
     [projected],
   );
-  const edges = useMemo(() => [...(projected?.edges ?? [])], [projected]);
+  const edges = useMemo(
+    () => projected?.edges.map((edge) => ({ ...edge, style: { ...edge.style, opacity: 1 } })) ?? [],
+    [projected],
+  );
   const frame = useRef<HTMLDivElement>(null);
   const { fitView } = useReactFlow();
   // The frame grows and shrinks with the window and with fullscreen, and the

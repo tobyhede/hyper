@@ -83,6 +83,16 @@
   overflow: hidden;
 }
 
+.stage__body .resource--full.resource--drawn {
+  padding: 2.5cqw 3cqw;
+}
+
+/* A smaller name, so the drawing below it has the room. */
+.stage__body .resource--drawn .resource__title {
+  margin-bottom: 1cqw;
+  font-size: 3.6cqw;
+}
+
 .stage__body .resource--drawn > :last-child {
   flex: 1;
   min-height: 0;

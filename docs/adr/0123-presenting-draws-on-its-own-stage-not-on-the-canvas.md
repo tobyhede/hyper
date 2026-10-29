@@ -15,7 +15,7 @@ What the Stage draws depends on the Resource's kind, through the content `resolv
 - a Markdown Resource draws its Markdown through the shared sanitised renderer;
 - an Image Resource draws its picture, fitted to the frame and never replaced from the Stage;
 - a Reference Resource draws its own name over its Target's content, by the single hop ADR 0070 defines;
-- a Space Resource draws its name over the Map and Graph it selects, whole, fitted to the room below the name and taking no pointer, drawn by the same Map surface its embedding on the canvas uses (ADR 0112), as does a Reference Resource whose Target is one;
+- a Space Resource draws its name over the Map and Graph it selects, whole, fitted to the room below the name, at full strength and taking no pointer, drawn by the same Map surface its embedding on the canvas uses (ADR 0112), as does a Reference Resource whose Target is one;
 - an Ur Resource draws its name alone, as does a Reference Resource whose Target is one.
 
 A Resource's position, size (ADR 0122), Shape (ADR 0121) and Open or Closed state (ADR 0064) are the Map's, and none of them reaches the Stage. A Closed Resource, an Open one and one resized to any size are framed the same way.

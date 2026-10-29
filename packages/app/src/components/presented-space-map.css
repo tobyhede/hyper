@@ -7,3 +7,9 @@
 .presented-map__flow {
   background: transparent;
 }
+
+/* A Resource's name is sized for an author at a desk; across a room it reads
+   a third as large again. */
+.presented-map .canvas-resource {
+  --canvas-resource-title-size: 24px;
+}
