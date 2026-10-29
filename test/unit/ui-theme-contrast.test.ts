@@ -224,15 +224,6 @@ describe('the dark theme keeps its colours to their jobs', () => {
       chromaHue(resolveColor(darkVariables, '--canvas-resource-ink-color')).chroma,
     ).toBeLessThan(0.03);
   });
-
-  // The selection ring is the chrome's magenta on every Resource (ADR 0135), so
-  // no Graph may be painted near it or selecting that Graph's Resource would
-  // not show.
-  it.each([...GRAPH_PALETTE])('keeps %s clear of the selection colour', (color) => {
-    expect(deltaE(drawn(color), resolveColor(darkVariables, '--primary'))).toBeGreaterThanOrEqual(
-      10,
-    );
-  });
 });
 
 describe('the fallback Graph colour on the dark canvas', () => {

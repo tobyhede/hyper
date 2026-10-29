@@ -2,6 +2,7 @@
 
 Status: accepted
 Refines: 0041
+Refined by: 0139
 Related: 0028, 0040, 0112, 0129
 
 Activating a Graph is emphasis, not filtering (`maps-and-graphs.md` R29). Until now the emphasis was on the Edges alone: another Graph's Edges recede and the HUD dims its key, while every Resource kept the same ink border and full strength. A reader could not see from a Resource which Graph it belongs to, or whether the Active Graph reaches it.

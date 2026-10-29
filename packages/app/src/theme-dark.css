@@ -13,9 +13,10 @@
  * a neutral grey, so colour on a Resource always means a Graph; cyan is the
  * focus ring and magenta the chrome's one emphasis. Glow is kept low, and there
  * is no yellow anywhere. One set of neons serves the whole theme: the Graph
- * colours below reuse the theme's own cyan, green and red, so a colour on the
- * chrome and the same colour on an Edge are one colour; magenta stays the
- * selection's alone.
+ * colours below reuse the theme's own cyan, magenta, green and red, so a colour
+ * on the chrome and the same colour on an Edge are one colour. A selected
+ * Resource is ringed in its own border colour (ADR 0139), so no Graph colour
+ * can be mistaken for selection.
  * `test/unit/ui-theme-contrast.test.ts` holds each `--role`/`--role-foreground`
  * pair, `--destructive` and `--success` on chrome paper, and every Graph palette
  * colour on the canvas; `test/unit/canvas-resource-contrast.test.ts` holds the
@@ -32,8 +33,8 @@
 
     --neon-cyan: #00f0ff;
     --neon-magenta: #ff2bd6;
-    --neon-green: #7cf86c;
-    --neon-red: #f8495f;
+    --neon-green: #39ff88;
+    --neon-red: #ff4d6d;
 
     --background: #07060d;
     --foreground: #e8f7ff;
@@ -70,11 +71,6 @@
     --canvas-resource-title-color: #f2fbff;
     --canvas-resource-muted-color: #a8a3dc;
     --canvas-resource-error-color: #ff5c7a;
-    --canvas-resource-shadow-dragging:
-      7px 7px 0 var(--primary), 0 0 12px color-mix(in srgb, var(--neon-cyan) 25%, transparent);
-    --canvas-resource-shadow-selected:
-      0 0 0 var(--canvas-resource-selected-ring-width) var(--primary),
-      0 0 10px color-mix(in srgb, var(--neon-magenta) 30%, transparent);
 
     --shadow-chrome-elevated:
       var(--shadow-chrome-elevated-offset) var(--shadow-chrome-elevated-offset) 0 var(--primary),
@@ -99,31 +95,30 @@
 
     /* Each Graph colour redrawn for this ground, one per Tableau slot a Graph
        stores, through the `--graph-paint-<hex>` that `graphPaint` paints with;
-       a Graph's stored colour does not change. The cyan, green and red slots
-       are the theme's own neons; pink is an orchid, never the selection's
-       magenta, so selecting a Resource always shows. Each hue's second shade
-       is a deeper or brighter neon of it, never a pastel. Held by
+       a Graph's stored colour does not change. The cyan, pink, green and red
+       slots are the theme's own neons. Each hue's second shade is a deeper or
+       brighter neon of it, never a pastel. Held by
        `test/unit/ui-theme-contrast.test.ts`. */
-    --graph-paint-1f77b4: #1e71f8;
-    --graph-paint-aec7e8: #399bfe;
+    --graph-paint-1f77b4: #158ffe;
+    --graph-paint-aec7e8: #0063f6;
     --graph-paint-17becf: var(--neon-cyan);
-    --graph-paint-9edae5: #00fcc1;
+    --graph-paint-9edae5: #03c3c3;
     --graph-paint-2ca02c: var(--neon-green);
-    --graph-paint-98df8a: #2ed908;
-    --graph-paint-bcbd22: #098188;
-    --graph-paint-dbdb8d: #08cee6;
-    --graph-paint-ff7f0e: #ea8401;
-    --graph-paint-ffbb78: #ffa04a;
+    --graph-paint-98df8a: #07dd22;
+    --graph-paint-bcbd22: #028758;
+    --graph-paint-dbdb8d: #03b65e;
+    --graph-paint-ff7f0e: #d75c05;
+    --graph-paint-ffbb78: #ff9a3c;
     --graph-paint-d62728: var(--neon-red);
-    --graph-paint-ff9896: #d10053;
-    --graph-paint-e377c2: #e982ff;
-    --graph-paint-f7b6d2: #b724f4;
-    --graph-paint-9467bd: #b17ffe;
-    --graph-paint-c5b0d5: #7d25fe;
-    --graph-paint-8c564b: #fd8d78;
-    --graph-paint-c49c94: #ab4501;
-    --graph-paint-7f7f7f: #abcff0;
-    --graph-paint-c7c7c7: #6e95b1;
+    --graph-paint-ff9896: #db005b;
+    --graph-paint-e377c2: var(--neon-magenta);
+    --graph-paint-f7b6d2: #c801c1;
+    --graph-paint-9467bd: #bb78fe;
+    --graph-paint-c5b0d5: #9b00fd;
+    --graph-paint-8c564b: #ff8162;
+    --graph-paint-c49c94: #ba2e01;
+    --graph-paint-7f7f7f: #a5d0f6;
+    --graph-paint-c7c7c7: #6081a0;
   }
 
   .canvas-resource[data-state='rest']:hover {
