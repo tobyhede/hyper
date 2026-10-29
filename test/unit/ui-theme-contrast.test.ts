@@ -167,10 +167,15 @@ describe.each([THEMES[1]])('Graph colours ($theme)', ({ variables: themeVariable
     expect(drawn(color)).not.toBe(color);
   });
 
+  // The canvas, both Resource faces, and the chrome a Graph's glyph and swatch
+  // sit on: the Dock's paper, a hovered control and a highlighted menu row.
   const grounds = [
     '--background',
     '--canvas-resource-face-rest',
     '--canvas-resource-face-active',
+    '--card',
+    '--secondary',
+    '--accent',
   ] as const;
 
   it.each(GRAPH_PALETTE.flatMap((color) => grounds.map((ground) => ({ color, ground }))))(
@@ -194,6 +199,19 @@ describe.each([THEMES[1]])('Graph colours ($theme)', ({ variables: themeVariable
     expect(deltaE(a, b)).toBeGreaterThanOrEqual(15);
     expect(deltaE(a, b, PROTANOPIA)).toBeGreaterThanOrEqual(8);
     expect(deltaE(a, b, DEUTERANOPIA)).toBeGreaterThanOrEqual(8);
+  });
+
+  // Every colour Add Graph hands out, the first shade of each of the ten hues,
+  // stays apart for normal vision. Ten hues cannot all hold the first five's
+  // floors, so the floor here is lower and colour vision is asked of the first
+  // five alone.
+  const firstShades = GRAPH_PALETTE.filter((_, index) => index % 2 === 0);
+  const allPairs = firstShades.flatMap((first, index) =>
+    firstShades.slice(index + 1).map((second) => ({ first, second })),
+  );
+
+  it.each(allPairs)('Add Graph keeps $first and $second apart', ({ first, second }) => {
+    expect(deltaE(drawn(first), drawn(second))).toBeGreaterThanOrEqual(10);
   });
 });
 
@@ -238,7 +256,10 @@ describe('the fallback Graph colour on the dark canvas', () => {
   it('reaches 3:1', () => {
     const darkVariables = THEMES[1].variables;
     expect(
-      contrast(FALLBACK_GRAPH_COLOR, resolveColor(darkVariables, '--background')),
+      contrast(
+        resolveColor(darkVariables, '--graph-paint-8a94a6'),
+        resolveColor(darkVariables, '--background'),
+      ),
     ).toBeGreaterThanOrEqual(3);
   });
 });
