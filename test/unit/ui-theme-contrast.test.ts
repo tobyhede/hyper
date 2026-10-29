@@ -141,10 +141,19 @@ const FIRST_FIVE = Array.from({ length: 5 }).reduce<string[]>(
   [],
 );
 
-// The even slots are each hue's signal, the one Add Graph reaches for; the odd
-// slots are washes an author picks from Colour…, and only the signals are
-// asked to stand off the ground.
-const SIGNALS = GRAPH_PALETTE.filter((_, index) => index % 2 === 0);
+/** A hex colour's OKLCH chroma and hue in degrees, from its OKLab point. */
+const chromaHue = (hex: string): { readonly chroma: number; readonly hue: number } => {
+  const [, a, b] = oklab(hex);
+  return {
+    chroma: Math.hypot(a!, b!),
+    hue: ((Math.atan2(b!, a!) * 180) / Math.PI + 360) % 360,
+  };
+};
+
+// OKLCH hues from yellow-orange to yellow-green, the band the dark theme keeps
+// out of every colour it paints: yellow on its near-black ground reads as
+// glare whatever its contrast ratio.
+const YELLOW_HUES = { from: 78, to: 120 } as const;
 
 describe.each([THEMES[1]])('Graph colours ($theme)', ({ variables: themeVariables }) => {
   const drawn = (color: string): string => {
@@ -164,7 +173,7 @@ describe.each([THEMES[1]])('Graph colours ($theme)', ({ variables: themeVariable
     '--canvas-resource-face-active',
   ] as const;
 
-  it.each(SIGNALS.flatMap((color) => grounds.map((ground) => ({ color, ground }))))(
+  it.each(GRAPH_PALETTE.flatMap((color) => grounds.map((ground) => ({ color, ground }))))(
     '$color reaches 3:1 on $ground',
     ({ color, ground }) => {
       expect(contrast(drawn(color), resolveColor(themeVariables, ground))).toBeGreaterThanOrEqual(
@@ -185,6 +194,44 @@ describe.each([THEMES[1]])('Graph colours ($theme)', ({ variables: themeVariable
     expect(deltaE(a, b)).toBeGreaterThanOrEqual(15);
     expect(deltaE(a, b, PROTANOPIA)).toBeGreaterThanOrEqual(8);
     expect(deltaE(a, b, DEUTERANOPIA)).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe('the dark theme keeps its colours to their jobs', () => {
+  const darkVariables = THEMES[1].variables;
+  const drawn = (color: string): string => {
+    const property = /^var\((--[\w-]+), #[0-9a-f]{6}\)$/i.exec(graphPaint(color))?.[1];
+    return property === undefined ? color : resolveColor(darkVariables, property);
+  };
+
+  const painted = [
+    ...GRAPH_PALETTE.map((color) => ({ name: `Graph ${color}`, hex: drawn(color) })),
+    ...['--primary', '--ring', '--destructive', '--success'].map((name) => ({
+      name,
+      hex: resolveColor(darkVariables, name),
+    })),
+  ];
+
+  it.each(painted)('$name ($hex) is not yellow', ({ hex }) => {
+    const { chroma, hue } = chromaHue(hex);
+    expect(chroma < 0.04 || hue < YELLOW_HUES.from || hue > YELLOW_HUES.to).toBe(true);
+  });
+
+  // A Resource in no Graph is lined in the ink, so any colour there would read
+  // as a Graph's.
+  it('lines a Resource in no Graph in a neutral', () => {
+    expect(
+      chromaHue(resolveColor(darkVariables, '--canvas-resource-ink-color')).chroma,
+    ).toBeLessThan(0.03);
+  });
+
+  // The selection ring is the chrome's magenta on every Resource (ADR 0135), so
+  // no Graph may be painted near it or selecting that Graph's Resource would
+  // not show.
+  it.each([...GRAPH_PALETTE])('keeps %s clear of the selection colour', (color) => {
+    expect(deltaE(drawn(color), resolveColor(darkVariables, '--primary'))).toBeGreaterThanOrEqual(
+      10,
+    );
   });
 });
 

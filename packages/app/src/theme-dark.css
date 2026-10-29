@@ -60,9 +60,9 @@
     --xy-background-color: var(--background);
     --xy-background-pattern-color: #2a1f4a;
     --xy-minimap-background-color: var(--card);
-    --xy-minimap-mask-background-color: rgb(7 6 13 / 60%);
+    --xy-minimap-mask-background-color: color-mix(in srgb, var(--background) 60%, transparent);
     --xy-minimap-node-background-color: #2a2450;
-    --xy-attribution-background-color: rgb(17 14 33 / 60%);
+    --xy-attribution-background-color: color-mix(in srgb, var(--card) 60%, transparent);
 
     --canvas-resource-ink-color: #a4a3ae;
     --canvas-resource-face-rest: #0d0b1a;
@@ -70,25 +70,32 @@
     --canvas-resource-title-color: #f2fbff;
     --canvas-resource-muted-color: #a8a3dc;
     --canvas-resource-error-color: #ff5c7a;
-    --canvas-resource-shadow-dragging: 7px 7px 0 var(--primary), 0 0 12px rgb(0 240 255 / 25%);
+    --canvas-resource-shadow-dragging:
+      7px 7px 0 var(--primary), 0 0 12px color-mix(in srgb, var(--neon-cyan) 25%, transparent);
     --canvas-resource-shadow-selected:
       0 0 0 var(--canvas-resource-selected-ring-width) var(--primary),
-      0 0 10px rgb(255 43 214 / 30%);
+      0 0 10px color-mix(in srgb, var(--neon-magenta) 30%, transparent);
 
     --shadow-chrome-elevated:
       var(--shadow-chrome-elevated-offset) var(--shadow-chrome-elevated-offset) 0 var(--primary),
-      0 0 14px rgb(255 43 214 / 12%);
+      0 0 14px color-mix(in srgb, var(--neon-magenta) 12%, transparent);
     --shadow-chrome-lifted:
       var(--shadow-chrome-lifted-offset) var(--shadow-chrome-lifted-offset) 0 var(--primary),
-      0 0 18px rgb(255 43 214 / 16%);
+      0 0 18px color-mix(in srgb, var(--neon-magenta) 16%, transparent);
 
     /* The theme's own effects, named so the applied properties below read them
-       off a token as every structural value here does. */
-    --neon-resource-hover-glow: 0 0 8px rgb(0 240 255 / 22%);
-    --neon-frame-glitch-wide: -4px 0 0 rgb(0 240 255 / 80%), 4px 0 0 rgb(255 43 214 / 80%);
-    --neon-frame-glitch-skew: 3px 2px 0 rgb(0 240 255 / 80%), -3px -2px 0 rgb(255 43 214 / 80%);
-    --neon-frame-glitch-hot: -5px 0 0 rgb(255 43 214 / 80%), 5px 0 0 rgb(0 240 255 / 80%);
-    --neon-title-split: -1px 0 rgb(0 240 255 / 55%), 1px 0 rgb(255 43 214 / 55%);
+       off a token as every structural value here does. Every colour in them is
+       one of the two neons above, mixed toward transparent. */
+    --neon-glitch-cyan: color-mix(in srgb, var(--neon-cyan) 80%, transparent);
+    --neon-glitch-magenta: color-mix(in srgb, var(--neon-magenta) 80%, transparent);
+    --neon-split-cyan: color-mix(in srgb, var(--neon-cyan) 55%, transparent);
+    --neon-split-magenta: color-mix(in srgb, var(--neon-magenta) 55%, transparent);
+    --neon-resource-hover-glow: 0 0 8px color-mix(in srgb, var(--neon-cyan) 22%, transparent);
+    --neon-frame-glitch-wide: -4px 0 0 var(--neon-glitch-cyan), 4px 0 0 var(--neon-glitch-magenta);
+    --neon-frame-glitch-skew:
+      3px 2px 0 var(--neon-glitch-cyan), -3px -2px 0 var(--neon-glitch-magenta);
+    --neon-frame-glitch-hot: -5px 0 0 var(--neon-glitch-magenta), 5px 0 0 var(--neon-glitch-cyan);
+    --neon-title-split: -1px 0 var(--neon-split-cyan), 1px 0 var(--neon-split-magenta);
 
     /* Each Graph colour redrawn for this ground, one per Tableau slot a Graph
        stores, through the `--graph-paint-<hex>` that `graphPaint` paints with;
