@@ -188,12 +188,19 @@ export interface RemovalOccurrence {
 export interface RemovalTarget {
   readonly occurrence: RemovalOccurrence;
   readonly subject:
-    { readonly kind: 'resource'; readonly resourceId: ResourceId } | { readonly kind: 'edge' };
+    | {
+        readonly kind: 'resource';
+        readonly resourceId: ResourceId;
+        /** The Resources selected together with it, removed with it. */
+        readonly alongside?: readonly ResourceId[];
+      }
+    | { readonly kind: 'edge' };
 }
 
 /**
  * Remove from Map (Delete, Backspace): remove a Resource from the drawn Map it
- * is on, or delete the selected Edge. Neither can be undone, so its key must
+ * is on, with the Resources selected together with it, or delete the selected
+ * Edge. Neither can be undone, so its key must
  * land inside the canvas. Absent while that Map may not be authored or a body
  * is being edited.
  */
@@ -205,8 +212,12 @@ export const REMOVE_SELECTION: CanvasCommand<RemovalTarget> = {
   availability: ({ occurrence }) =>
     occurrence.authorOnCanvas && !occurrence.bodyEditing ? AVAILABLE : ABSENT,
   run: ({ occurrence, subject }) => {
-    if (subject.kind === 'resource') occurrence.removeFromMap(subject.resourceId);
-    else occurrence.deleteSelectedEdge();
+    if (subject.kind === 'edge') {
+      occurrence.deleteSelectedEdge();
+      return;
+    }
+    for (const resourceId of [subject.resourceId, ...(subject.alongside ?? [])])
+      occurrence.removeFromMap(resourceId);
   },
 };
 

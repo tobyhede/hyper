@@ -57,6 +57,12 @@ import { NewResourcePreview } from './components/NewResourcePreview';
  * `SpaceCanvas` passes `reactFlowProps` explicitly rather than spreading it, so
  * no property order can silently replace a handler this module owns.
  */
+/**
+ * The keys that add a Resource to the selection on a click. One array for the
+ * life of the module: React Flow keys its document listener on this value.
+ */
+const MULTI_SELECTION_KEYS: string[] = ['Shift', 'Meta', 'Control'];
+
 export interface EdgeOwnedReactFlowProps {
   readonly onConnect: OnConnect;
   readonly onConnectStart: OnConnectStart;
@@ -72,9 +78,13 @@ export interface EdgeOwnedReactFlowProps {
   readonly edgesFocusable: false;
   /** The app owns deletion; React Flow must install no document listener. */
   readonly deleteKeyCode: null;
-  /** Version 1 authors one element at a time (Edge Authoring design). */
-  readonly multiSelectionKeyCode: null;
-  readonly selectionKeyCode: null;
+  /**
+   * Several Resources are selected together by Shift, Cmd or Ctrl and a click,
+   * or by Shift and a drag on the canvas, which draws React Flow's selection
+   * box; a plain drag still pans. An Edge is still selected alone.
+   */
+  readonly multiSelectionKeyCode: typeof MULTI_SELECTION_KEYS;
+  readonly selectionKeyCode: 'Shift';
   readonly selectionOnDrag: false;
 }
 
@@ -656,8 +666,8 @@ export function useEdgeAuthoring({
       edgesReconnectable: false,
       edgesFocusable: false,
       deleteKeyCode: null,
-      multiSelectionKeyCode: null,
-      selectionKeyCode: null,
+      multiSelectionKeyCode: MULTI_SELECTION_KEYS,
+      selectionKeyCode: 'Shift',
       selectionOnDrag: false,
     }),
     [

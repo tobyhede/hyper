@@ -92,9 +92,14 @@ export interface EdgeSubject {
  * What the canvas has selected — one subject of one kind, never two.
  *
  * Discriminated rather than a pair of nullable fields, because "a Resource and an
- * Edge are both selected" is not a state React Flow produces once modifier
- * multi-selection and the selection rectangle are off, and a shape that can
+ * Edge are both selected" is a state nothing here produces, and a shape that can
  * express it invites a second mutual-exclusion policy beside React Flow's own.
+ *
+ * Several Resources may be selected together, by Shift and a drag or by Shift,
+ * Cmd or Ctrl and a click: the one most recently selected is the subject here,
+ * which the rail and every single-subject command act on, and the others are
+ * the nodes React Flow holds selected beside it (`selectedTogether`), which a
+ * drag moves with it and Delete removes with it.
  */
 export type CanvasSelection =
   | { readonly kind: 'none' }
@@ -163,14 +168,24 @@ export function edgeSelectionOf(edge: Edge): EdgeSelection | null {
 function withSelection(
   nodes: readonly ResourceFlowNode[],
   selection: CanvasSelection,
+  together: ReadonlySet<string> = NONE_TOGETHER,
 ): ResourceFlowNode[] {
   const selectedResourceId = selectedResourceOf(selection);
-  return nodes.map((node) =>
-    node.selected === (node.id === selectedResourceId)
-      ? node
-      : { ...node, selected: node.id === selectedResourceId },
-  );
+  return nodes.map((node) => {
+    const selected =
+      node.id === selectedResourceId || (selectedResourceId !== null && together.has(node.id));
+    return node.selected === selected ? node : { ...node, selected };
+  });
 }
+
+const NONE_TOGETHER: ReadonlySet<string> = new Set();
+
+/**
+ * The nodes React Flow holds selected: the selected Resource's and those
+ * selected together with it, or none.
+ */
+export const selectedTogether = (nodes: readonly ResourceFlowNode[]): ReadonlySet<string> =>
+  new Set(nodes.flatMap((node) => (node.selected === true ? [node.id] : [])));
 
 export interface RenderAdapterState {
   /**
@@ -501,6 +516,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       const reconciled = withSelection(
         reconcile(current?.nodes ?? [], nodes, state.dragOrigins),
         state.selection,
+        selectedTogether(current?.nodes ?? []),
       );
       set({ projection: { nodes: reconciled, edges: [...edges] } });
     },
@@ -545,6 +561,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
           nodes: withSelection(
             reconcile(projection.nodes, projected, state.dragOrigins),
             state.selection,
+            selectedTogether(projection.nodes),
           ),
         },
       });
@@ -588,7 +605,7 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
       // selected, then the other kind deselected — and reading the array would
       // let the second batch answer `none` for a Resource that was never the
       // subject. See `changeEdges` for the other half of the same rule.
-      const selection = additiveSelection(
+      const additive = additiveSelection(
         state.selection,
         selectChanges(relevant).flatMap((change) => {
           const resourceId = owned.get(change.id);
@@ -597,7 +614,21 @@ export function createRenderAdapter(authoring: RenderAdapterAuthoring): RenderAd
             : [{ subject: { kind: 'resource', resourceId } as const, selected: change.selected }];
         }),
       );
-      const nodes = withSelection(applied, selection);
+      // What React Flow now holds selected, which a modifier click or a
+      // selection box can make more than one. Shift-clicking the subject off
+      // leaves the others selected, and the last of them becomes the subject.
+      const together = selectedTogether(applied);
+      const last = [...together]
+        .flatMap((id) => {
+          const resourceId = owned.get(id);
+          return resourceId === undefined ? [] : [resourceId];
+        })
+        .at(-1);
+      const selection: CanvasSelection =
+        additive.kind === 'none' && last !== undefined
+          ? { kind: 'resource', resourceId: last }
+          : additive;
+      const nodes = withSelection(applied, selection, together);
       const positionChanges = relevant.filter(
         (change): change is NodePositionChange => change.type === 'position',
       );

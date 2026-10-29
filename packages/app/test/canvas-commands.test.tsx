@@ -127,6 +127,18 @@ describe('Remove from Map', () => {
     expect(drawn.deleteSelectedEdge).toHaveBeenCalledOnce();
   });
 
+  it('removes the Resources selected together with the one it is aimed at', () => {
+    const removed: string[] = [];
+    const drawn = occurrence({ removeFromMap: (resourceId) => removed.push(resourceId) });
+
+    REMOVE_SELECTION.run({
+      occurrence: drawn,
+      subject: { kind: 'resource', resourceId: ON_GRAPH, alongside: [OFF_GRAPH] },
+    });
+
+    expect(removed).toEqual([ON_GRAPH, OFF_GRAPH]);
+  });
+
   it('is absent while its Map may not be authored or a body is being edited', () => {
     const subject = { kind: 'resource', resourceId: ON_GRAPH } as const;
 
