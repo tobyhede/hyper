@@ -123,13 +123,17 @@
    that can be pressed says so before it is pressed, which leaves the fill free
    to mean only "on" rather than carrying the affordance as well as the state. */
 .resources-popover__filter {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(2.75rem, 1fr));
   gap: 4px;
 }
 
+/* The toggles share the row's width in equal columns, and a kind more than
+   fit starts a second row of the same columns rather than overflowing. */
 .resources-popover__toggle {
-  gap: 5px;
-  padding: 5px 8px;
+  min-width: 0;
+  gap: 3px;
+  padding: 5px 4px;
   border-color: var(--border);
   background: var(--card);
   /* A hairline in the theme's ink, as every other hairline is, rather than

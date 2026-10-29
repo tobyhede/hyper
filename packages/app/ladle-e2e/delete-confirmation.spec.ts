@@ -80,7 +80,7 @@ test(
     await expect(
       reach.getByRole('list', { name: 'Collection 2' }).getByRole('listitem'),
     ).toHaveText(['Echo']);
-    await expect(question.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await expect(question.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
     await cancelsAndAsksAgain(page, question, 'Delete Opening from Space');
   },
 );
@@ -105,10 +105,11 @@ test('a reach taller than the viewport scrolls inside the question, which keeps 
   await page.goto(story('resource'));
   const question = page.getByRole('alertdialog', { name: 'Delete Opening From Space?' });
   await expect(question.getByRole('button', { name: 'Delete', exact: true })).toBeInViewport();
-  await expect(question.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await expect(question.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
 
   const reach = question.getByRole('region', { name: 'What the deletion reaches' });
   expect(await reach.evaluate((region) => region.scrollHeight > region.clientHeight)).toBe(true);
+  await page.keyboard.press('Shift+Tab');
   await page.keyboard.press('Shift+Tab');
   await expect(reach).toBeFocused();
   await page.keyboard.press('End');
