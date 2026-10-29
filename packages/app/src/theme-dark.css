@@ -12,9 +12,10 @@
  * The canvas is a flat near-black violet and a Resource in no Graph is lined in
  * a neutral grey, so colour on a Resource always means a Graph; cyan is the
  * focus ring and magenta the chrome's one emphasis. Glow is kept low, and there
- * is no yellow anywhere. One set of neons serves the whole theme: the Graph colours
- * below reuse the theme's own cyan, magenta, green and red, so a colour on the
- * chrome and the same colour on an Edge are one colour.
+ * is no yellow anywhere. One set of neons serves the whole theme: the Graph
+ * colours below reuse the theme's own cyan, green and red, so a colour on the
+ * chrome and the same colour on an Edge are one colour; magenta stays the
+ * selection's alone.
  * `test/unit/ui-theme-contrast.test.ts` holds each `--role`/`--role-foreground`
  * pair, `--destructive` and `--success` on chrome paper, and every Graph palette
  * colour on the canvas; `test/unit/canvas-resource-contrast.test.ts` holds the
@@ -31,8 +32,8 @@
 
     --neon-cyan: #00f0ff;
     --neon-magenta: #ff2bd6;
-    --neon-green: #39ff88;
-    --neon-red: #ff4d6d;
+    --neon-green: #7cf86c;
+    --neon-red: #f8495f;
 
     --background: #07060d;
     --foreground: #e8f7ff;
@@ -91,29 +92,31 @@
 
     /* Each Graph colour redrawn for this ground, one per Tableau slot a Graph
        stores, through the `--graph-paint-<hex>` that `graphPaint` paints with;
-       a Graph's stored colour does not change. The cyan, green, red and magenta
-       slots are the theme's own neons. Held by
+       a Graph's stored colour does not change. The cyan, green and red slots
+       are the theme's own neons; pink is an orchid, never the selection's
+       magenta, so selecting a Resource always shows. Each hue's second shade
+       is a deeper or brighter neon of it, never a pastel. Held by
        `test/unit/ui-theme-contrast.test.ts`. */
-    --graph-paint-1f77b4: #0197ff;
-    --graph-paint-aec7e8: #badbfe;
+    --graph-paint-1f77b4: #1e71f8;
+    --graph-paint-aec7e8: #399bfe;
     --graph-paint-17becf: var(--neon-cyan);
-    --graph-paint-9edae5: #73edf6;
+    --graph-paint-9edae5: #00fcc1;
     --graph-paint-2ca02c: var(--neon-green);
-    --graph-paint-98df8a: #a0edb3;
-    --graph-paint-bcbd22: #96bd01;
-    --graph-paint-dbdb8d: #c9e492;
-    --graph-paint-ff7f0e: #d77f07;
-    --graph-paint-ffbb78: #ffcc9f;
+    --graph-paint-98df8a: #2ed908;
+    --graph-paint-bcbd22: #098188;
+    --graph-paint-dbdb8d: #08cee6;
+    --graph-paint-ff7f0e: #ea8401;
+    --graph-paint-ffbb78: #ffa04a;
     --graph-paint-d62728: var(--neon-red);
-    --graph-paint-ff9896: #ffc7ca;
-    --graph-paint-e377c2: var(--neon-magenta);
-    --graph-paint-f7b6d2: #fec2ec;
-    --graph-paint-9467bd: #d18fff;
-    --graph-paint-c5b0d5: #e7caff;
-    --graph-paint-8c564b: #ff9653;
-    --graph-paint-c49c94: #fecbae;
-    --graph-paint-7f7f7f: #86cdff;
-    --graph-paint-c7c7c7: #b2defe;
+    --graph-paint-ff9896: #d10053;
+    --graph-paint-e377c2: #e982ff;
+    --graph-paint-f7b6d2: #b724f4;
+    --graph-paint-9467bd: #b17ffe;
+    --graph-paint-c5b0d5: #7d25fe;
+    --graph-paint-8c564b: #fd8d78;
+    --graph-paint-c49c94: #ab4501;
+    --graph-paint-7f7f7f: #abcff0;
+    --graph-paint-c7c7c7: #6e95b1;
   }
 
   .canvas-resource[data-state='rest']:hover {
