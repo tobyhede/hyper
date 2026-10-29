@@ -88,6 +88,7 @@ export const imageKind = defineKind({
   flags: {
     takesResourceShape: false,
     canOpen: true,
+    opensToFit: false,
     mayBeTarget: true,
     ownsReferencedSpaces: false,
   },

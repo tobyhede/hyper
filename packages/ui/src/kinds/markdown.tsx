@@ -44,6 +44,7 @@ const markdownCanvas = (content: MarkdownContent, area: CanvasArea) => {
       <MarkdownResourceBody
         source={content.source}
         ariaLabel={`Markdown source of ${area.name}`}
+        drawnName={area.name}
         {...body}
       />
     </ResourceContentEditProvider>

@@ -24,6 +24,7 @@ export const urKind = defineKind({
   flags: {
     takesResourceShape: true,
     canOpen: false,
+    opensToFit: false,
     mayBeTarget: true,
     ownsReferencedSpaces: false,
   },

@@ -33,6 +33,7 @@ import {
   DEFAULT_KIND,
   COLLAPSED_RESOURCE_SIZE,
   isAcceptedImageUrl,
+  opensToFit,
   takesOpen,
   titleName,
   uuidSchema,
@@ -528,14 +529,14 @@ export function SpaceCanvas({
    * so only its own Map's Resources are given it.
    */
   const openAndExpand = useCallback(
-    (resourceId: ResourceId): void => {
+    (resourceId: ResourceId): 'completed' | 'retained' => {
       // Read when pressed, so the action factory below is not rebuilt on every
       // projection a drag or a selection publishes.
       const node = latestNodes.current.find((each) => each.data.resourceId === resourceId);
       const resource = view.space.lookup.resource(resourceId);
       const area = canvasRef.current;
-      if (node === undefined || resource === undefined || area === null) return;
-      if (!takesOpen(resource.kind)) return;
+      if (node === undefined || resource === undefined || area === null) return 'retained';
+      if (!takesOpen(resource.kind)) return 'retained';
       const zoom = getZoom();
       const content = resolveResourceContent(view.space, resource);
       const size = openAndExpandSize(
@@ -547,15 +548,34 @@ export function SpaceCanvas({
         (at) => openHeight(area, node, content, at),
       );
       const result = authoring.complete({ kind: 'opened-resource-to-fit', resourceId, size });
-      if (result.kind === 'refused') return;
+      if (result.kind === 'refused') return 'retained';
       // Issued, never awaited (ADR 0043). The Resource's top-left stays where
       // it is, so its new rect is known before the projection draws it.
       void setCenter(node.position.x + size.width / 2, node.position.y + size.height / 2, {
         zoom,
         duration: 0,
       });
+      return 'completed';
     },
     [view.space, getZoom, setCenter, authoring],
+  );
+  /**
+   * Open on the canvas's own Map, front to back like a card: a Resource whose
+   * kind opens to fit and that was never resized Opens grown to its content, as
+   * Open and expand does, so it is read in the box rather than in two lines of
+   * the Closed Size; one the author has sized Opens at that size. Answers
+   * nothing where the plain Open Edit serves.
+   */
+  const openToFit = useCallback(
+    (resourceId: ResourceId): 'completed' | 'retained' | undefined => {
+      const resource = view.space.lookup.resource(resourceId);
+      return resource !== undefined &&
+        opensToFit(resource.kind) &&
+        view.selectedMap.map.positions[resourceId]?.size === undefined
+        ? openAndExpand(resourceId)
+        : undefined;
+    },
+    [view.space, view.selectedMap, openAndExpand],
   );
   /** Present from Here, on the canvas's own Map: what `P` and the rail item both run. */
   const presentFromHere = useMemo(
@@ -648,6 +668,7 @@ export function SpaceCanvas({
     pickImages,
     spaceResourceTargets,
     resourceEntityActions: resourceActions,
+    openToFit,
     portalEditing: editingPortals,
     onPortalEditingChange,
   });

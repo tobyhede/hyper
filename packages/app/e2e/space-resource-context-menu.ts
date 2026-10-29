@@ -155,7 +155,7 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(graphTrigger).toBeFocused();
   await openMenu('graph');
   await page.getByRole('menuitem', { name: 'Delete Graph 1', exact: true }).click();
-  await expect(graphQuestion.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+  await expect(graphQuestion.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(graphQuestion).toHaveCount(0);
   await expect(graphTrigger).toBeFocused();
@@ -183,7 +183,7 @@ export async function exerciseSpaceResourceContextMenus(
   await expect(mapQuestion).toContainText(
     'Permanently deletes the Map, and all Graphs from the Space.',
   );
-  await expect(mapQuestion.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+  await expect(mapQuestion.getByRole('button', { name: 'Delete', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(mapQuestion).toHaveCount(0);
   await expect(mapTrigger).toBeFocused();

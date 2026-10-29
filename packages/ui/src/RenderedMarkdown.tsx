@@ -10,7 +10,7 @@ interface RenderedMarkdownProps {
    * is left out, so a presented Resource whose source opens with its own Title
    * does not show the Title twice.
    */
-  readonly drawnName?: string;
+  readonly drawnName?: string | undefined;
 }
 
 /**

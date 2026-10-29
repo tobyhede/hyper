@@ -277,6 +277,9 @@ export const takesResourceShape = (kind: KindId): boolean => kindFlags(kind).tak
 /** Whether a Resource of this kind may be Open, as its kind declares (ADR 0122). */
 export const takesOpen = (kind: KindId): boolean => kindFlags(kind).canOpen;
 
+/** Whether Opening a never-resized Resource of this kind grows it to its content, as its kind declares. */
+export const opensToFit = (kind: KindId): boolean => kindFlags(kind).opensToFit;
+
 /**
  * What a Map stores for one Resource: its origin, and optionally whether it is
  * Open, its size and its Shape. Each optional field has an application

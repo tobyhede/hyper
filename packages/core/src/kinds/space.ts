@@ -119,6 +119,7 @@ export const spaceKind = defineKind({
   flags: {
     takesResourceShape: false,
     canOpen: true,
+    opensToFit: false,
     mayBeTarget: true,
     ownsReferencedSpaces: true,
   },
