@@ -608,6 +608,11 @@ test('the body editor shows its shortcut hint only with actual focus', async ({ 
   await expect(pairs.last()).toContainText('Cancel');
   await expect(editor).toBeFocused();
   await expect(hint).toHaveCSS('opacity', '1');
+  // A row of its own under the editor, never over the author's first line.
+  const firstLine = await editor.locator('.cm-line').first().boundingBox();
+  const hintBox = await hint.boundingBox();
+  if (firstLine === null || hintBox === null) throw new Error('missing line or hint');
+  expect(hintBox.y).toBeGreaterThanOrEqual(firstLine.y + firstLine.height);
   const caps = hint.locator('[data-slot="kbd"]');
   await expect(caps).toHaveCount(3);
   // A cap is an object, not set-back type: it is outlined, and outlined only —
