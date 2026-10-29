@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { titleName, UNRESOLVED_CONTENT, type ResourceContent } from '@project/core';
 import { presentedContent } from './kinds/registry';
 import { UnresolvedContent } from './UnresolvedContent';
@@ -12,6 +13,12 @@ export interface PresentedResourceProps {
   readonly title: string;
   /** The Resource's resolved content, its own or its Target's. */
   readonly content: ResourceContent;
+  /**
+   * Drawn in place of the content's own view, for content only the composing
+   * application can draw: a Space Resource's Map, which needs the Space it
+   * points at.
+   */
+  readonly children?: ReactNode;
 }
 
 /**
@@ -19,16 +26,20 @@ export interface PresentedResourceProps {
  * its kind's view half draws it: a Markdown Resource's **parsed**, through
  * `RenderedMarkdown`.
  */
-export function PresentedResource({ title, content }: PresentedResourceProps) {
+export function PresentedResource({ title, content, children }: PresentedResourceProps) {
   const name = titleName(title);
   return (
     <article
-      className="resource resource--full"
+      className={
+        children === undefined
+          ? 'resource resource--full'
+          : 'resource resource--full resource--drawn'
+      }
       data-testid="resource-content"
       data-content-kind={content.kind}
     >
       <h2 className="resource__title">{name}</h2>
-      <PresentedContent name={name} content={content} />
+      {children ?? <PresentedContent name={name} content={content} />}
     </article>
   );
 }

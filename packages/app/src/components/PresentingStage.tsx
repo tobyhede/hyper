@@ -2,6 +2,7 @@ import type { GraphId, MapId, ResourceId } from '@project/core';
 import { resolveResourceContent, type Space } from '@project/graph';
 import { PresentedResource, Stage } from '@project/ui';
 import { presentedNotes } from '../notes-window';
+import { PresentedSpaceMap } from './PresentedSpaceMap';
 import { PresentedNotesList } from './PresentedNotesList';
 import { PresentingChrome, type PresentingChromeProps } from './PresentingChrome';
 import './rehearsal-notes.css';
@@ -36,6 +37,7 @@ export function PresentingStage({
 }: PresentingStageProps) {
   const resource = space.lookup.resource(resourceId);
   if (resource === undefined) return null;
+  const content = resolveResourceContent(space, resource);
   const notes = chrome.notesShown ? presentedNotes(space, mapId, graphId, resourceId) : undefined;
   return (
     <Stage
@@ -53,7 +55,15 @@ export function PresentingStage({
         </>
       }
     >
-      <PresentedResource title={resource.title} content={resolveResourceContent(space, resource)} />
+      <PresentedResource title={resource.title} content={content}>
+        {content.kind === 'space' ? (
+          <PresentedSpaceMap
+            spaceId={content.view.spaceId}
+            mapId={content.view.map}
+            graphId={content.view.graph}
+          />
+        ) : undefined}
+      </PresentedResource>
     </Stage>
   );
 }

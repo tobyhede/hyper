@@ -1,0 +1,9 @@
+/* A Space Resource's Map on the Stage is drawn on the slide's own paper, and
+   takes no pointer: the audience watches it, nobody works it. */
+.presented-map {
+  pointer-events: none;
+}
+
+.presented-map__flow {
+  background: transparent;
+}
