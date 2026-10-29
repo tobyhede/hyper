@@ -224,6 +224,14 @@ describe('the dark theme keeps its colours to their jobs', () => {
       chromaHue(resolveColor(darkVariables, '--canvas-resource-ink-color')).chroma,
     ).toBeLessThan(0.03);
   });
+
+  // Nor may a Graph, the fallback included, be drawn near that ink, or its
+  // Resources would read as in no Graph.
+  it.each([...GRAPH_PALETTE, FALLBACK_GRAPH_COLOR])('keeps %s clear of the ink', (color) => {
+    expect(
+      deltaE(drawn(color), resolveColor(darkVariables, '--canvas-resource-ink-color')),
+    ).toBeGreaterThanOrEqual(10);
+  });
 });
 
 describe('the fallback Graph colour on the dark canvas', () => {

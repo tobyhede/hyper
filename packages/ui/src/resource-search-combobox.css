@@ -17,11 +17,12 @@
    divider's grey.
 
    Every value is read off the Resource's own tokens, because the popup is drawn as
-   Resource paper: its ink, its active face, and the muted role
-   `test/unit/canvas-resource-contrast.test.ts` holds to AA on that face. So the
-   popup follows each theme without a theme restating it. */
+   Resource paper: its title and muted text roles, which
+   `test/unit/canvas-resource-contrast.test.ts` holds to AA on its active face, and
+   its ink for the border and the tints. So the popup follows each theme without a
+   theme restating it. */
 [data-resource-search-combobox] {
-  --foreground: var(--canvas-resource-ink-color);
+  --foreground: var(--canvas-resource-title-color);
   --popover: var(--canvas-resource-face-active);
   --popover-foreground: var(--foreground);
   --accent: color-mix(in srgb, var(--canvas-resource-ink-color) 8%, var(--popover));
@@ -43,7 +44,7 @@
   min-width: var(--anchor-width);
   color: var(--popover-foreground);
   background: var(--popover);
-  border: var(--csc-border-width) solid var(--foreground);
+  border: var(--csc-border-width) solid var(--canvas-resource-ink-color);
   border-radius: var(--canvas-resource-radius);
   box-shadow: none;
 }

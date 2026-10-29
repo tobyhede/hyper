@@ -119,6 +119,10 @@
     --graph-paint-c49c94: #ba2e01;
     --graph-paint-7f7f7f: #a5d0f6;
     --graph-paint-c7c7c7: #6081a0;
+    /* The colour a Graph with none stored is drawn in (`FALLBACK_GRAPH_COLOR`),
+       which sand draws as a grey beside Tableau's: here it takes the grey
+       slot's paint, so it stays a Graph colour and is never the neutral ink. */
+    --graph-paint-8a94a6: var(--graph-paint-7f7f7f);
   }
 
   .canvas-resource[data-state='rest']:hover {
