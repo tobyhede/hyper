@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The canvas Resource draws on its own cream paper, warmer and lighter than the
- * chrome's, so its text roles are separate tokens rather than the chrome's
- * `--foreground` and `--muted-foreground`. Separate means they can drift: a
- * colour picked against chrome paper can land on cream and stay green through
+ * The canvas Resource draws on its own paper, cream in the sand theme and a
+ * violet a step off the canvas in the dark one, so its text roles are separate
+ * tokens rather than the chrome's `--foreground` and `--muted-foreground`.
+ * Separate means they can drift: a colour picked against chrome paper can land
+ * on the Resource's face and stay green through
  * every other check — `canvas-resource.spec.ts` asserts that the refusal message
  * says the right words, never that it can be read.
  *
@@ -22,22 +23,36 @@ const resourceCss = readFileSync(
 
 const AA_BODY_TEXT = 4.5;
 
-const tokens = new Map(
-  [...`${theme}\n${resourceCss}`.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map((match) => [
-    match[1]!,
-    match[2]!.trim(),
-  ]),
+// The dark theme restates the Resource's colour tokens, so it is read after the
+// sand theme and its declarations win, as they do in the browser.
+const darkTheme = readFileSync(
+  new URL('../../packages/app/src/theme-dark.css', import.meta.url),
+  'utf8',
 );
 
+const tokensOf = (css: string): ReadonlyMap<string, string> =>
+  new Map(
+    [...css.matchAll(/^\s*(--[\w-]+):\s*([^;]+);/gm)].map((match) => [match[1]!, match[2]!.trim()]),
+  );
+
+const THEMES = [
+  { theme: 'sand', tokens: tokensOf(`${theme}\n${resourceCss}`) },
+  { theme: 'dark', tokens: tokensOf(`${theme}\n${resourceCss}\n${darkTheme}`) },
+] as const;
+
 /** Follows a `var(--a)` chain to the literal colour it bottoms out in. */
-function resolve(value: string, seen = new Set<string>()): string {
+function resolve(
+  tokens: ReadonlyMap<string, string>,
+  value: string,
+  seen = new Set<string>(),
+): string {
   const reference = /^var\((--[\w-]+)\)$/u.exec(value.trim());
   if (reference === null) return value.trim();
   const name = reference[1]!;
   if (seen.has(name)) throw new Error(`cyclic custom property: ${name}`);
   const next = tokens.get(name);
   if (next === undefined) throw new Error(`undefined custom property: ${name}`);
-  return resolve(next, new Set(seen).add(name));
+  return resolve(tokens, next, new Set(seen).add(name));
 }
 
 function channel(component: number): number {
@@ -74,16 +89,19 @@ const FACES = [
 ] as const;
 
 describe('canvas Resource text on its own faces', () => {
-  const pairs = TEXT_ON_RESOURCE.flatMap((text) =>
-    FACES.map((face) => ({
-      name: `${text.role} on the ${face.state} face`,
-      ink: text.token,
-      face: face.token,
-    })),
+  const pairs = THEMES.flatMap(({ theme: themeName, tokens }) =>
+    TEXT_ON_RESOURCE.flatMap((text) =>
+      FACES.map((face) => ({
+        name: `${text.role} on the ${face.state} face (${themeName})`,
+        tokens,
+        ink: text.token,
+        face: face.token,
+      })),
+    ),
   );
 
-  it.each(pairs)('reads at AA: $name', ({ ink, face }) => {
-    const ratio = contrast(resolve(`var(${ink})`), resolve(`var(${face})`));
+  it.each(pairs)('reads at AA: $name', ({ tokens, ink, face }) => {
+    const ratio = contrast(resolve(tokens, `var(${ink})`), resolve(tokens, `var(${face})`));
     expect(ratio).toBeGreaterThanOrEqual(AA_BODY_TEXT);
   });
 });

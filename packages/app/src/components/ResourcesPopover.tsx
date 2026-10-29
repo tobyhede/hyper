@@ -53,6 +53,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  graphPaint,
   kindNaming,
 } from '@project/ui';
 import './resources-popover.css';
@@ -274,7 +275,7 @@ function GraphDot({ graph }: { readonly graph: MembershipGraph }) {
     <span
       className="size-2 shrink-0 rounded-full ring-1 ring-foreground/20"
       data-graph-id={graph.id}
-      style={{ background: graph.color }}
+      style={{ background: graphPaint(graph.color) }}
     />
   );
 }

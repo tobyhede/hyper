@@ -1,0 +1,98 @@
+/*
+ * **The dark theme.** The same semantic tokens `tailwind.css` declares,
+ * restated for a reader whose system asks for dark. Every control, menu and
+ * Resource already reads its colour off a token, so redefining the tokens is
+ * the whole switch.
+ *
+ * It follows `prefers-color-scheme` alone, which is also what Tailwind v4's
+ * `dark:` variant follows, so the registry components' own `dark:` classes turn
+ * over with these tokens rather than on a separate signal.
+ *
+ * Brutalist, as the sand theme is: a flat near-black ground, Resources framed
+ * in heavy off-white ink, hard offset shadows with no blur, and one signal
+ * yellow for emphasis. The shadows are the sand theme's own, which are drawn in
+ * `--foreground` and so turn white here without being restated.
+ *
+ * A Graph's colour is still the only colour that carries meaning, so the
+ * yellow stays on the chrome. Each palette colour is redrawn for this ground
+ * through the `--graph-paint-<hex>` that `graphPaint` paints with, keeping its
+ * hue and its dark and light pair while lifting it clear of the canvas; a
+ * Graph's stored colour does not change.
+ *
+ * `test/unit/ui-theme-contrast.test.ts` holds each `--role`/`--role-foreground`
+ * pair, `--destructive` and `--success` on chrome paper, and every palette
+ * colour's paint on the canvas; `test/unit/canvas-resource-contrast.test.ts`
+ * holds the Resource's text roles on both its faces. Both check this theme as
+ * they check the sand one.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --background: #111111;
+    --foreground: #f2f2f2;
+    --card: #1b1b1b;
+    --card-foreground: var(--foreground);
+    --popover: var(--card);
+    --popover-foreground: var(--foreground);
+    --primary: #ffd60a;
+    --primary-foreground: #111111;
+    --secondary: #262626;
+    --secondary-foreground: var(--foreground);
+    --muted: var(--secondary);
+    --muted-foreground: #b0b0b0;
+    --accent: #303030;
+    --accent-foreground: var(--foreground);
+    --destructive: #ff5a4f;
+    --success: #4ade80;
+    --border: #4a4a4a;
+    --input: var(--border);
+    --ring: var(--primary);
+
+    --xy-background-color: var(--background);
+    --xy-background-pattern-color: #2e2e2e;
+    --xy-minimap-background-color: var(--card);
+    --xy-minimap-mask-background-color: rgb(17 17 17 / 60%);
+    --xy-minimap-node-background-color: #3a3a3a;
+    --xy-attribution-background-color: rgb(27 27 27 / 60%);
+
+    --canvas-resource-ink-color: #f2f2f2;
+    --canvas-resource-face-rest: #1b1b1b;
+    --canvas-resource-face-active: #262626;
+    --canvas-resource-title-color: #ffffff;
+    --canvas-resource-muted-color: #b5b5b5;
+    --canvas-resource-error-color: #ff6b61;
+    --canvas-resource-shadow-selected:
+      0 0 0 var(--canvas-resource-selected-ring-width) var(--primary), 6px 6px 0 var(--primary);
+
+    /* The Tableau Classic 20 palette redrawn for a near-black ground: each
+       hue keeps its slot and its dark and light pair, and every one clears 3:1
+       on the canvas. */
+    --graph-paint-1f77b4: #4c9dff;
+    --graph-paint-aec7e8: #a9ccff;
+    --graph-paint-17becf: #22d3e6;
+    --graph-paint-9edae5: #9be9f2;
+    --graph-paint-2ca02c: #3ccf4e;
+    --graph-paint-98df8a: #a3f095;
+    --graph-paint-bcbd22: #d1d32b;
+    --graph-paint-dbdb8d: #ebeb9c;
+    --graph-paint-ff7f0e: #ff8c24;
+    --graph-paint-ffbb78: #ffc68c;
+    --graph-paint-d62728: #ff4a4a;
+    --graph-paint-ff9896: #ffa6a4;
+    --graph-paint-e377c2: #ff7ad1;
+    --graph-paint-f7b6d2: #ffc4de;
+    --graph-paint-9467bd: #b38cff;
+    --graph-paint-c5b0d5: #d8c6ff;
+    --graph-paint-8c564b: #cf8f72;
+    --graph-paint-c49c94: #e0b8ab;
+    --graph-paint-7f7f7f: #a8a8a8;
+    --graph-paint-c7c7c7: #e0e0e0;
+  }
+
+  /* Black in the sand theme, where it is the Resource's ink; here it takes the
+     off-white ink so the corner is still seen on a dark face. */
+  .rf-resource-node__resize-mark {
+    background: var(--canvas-resource-ink-color);
+  }
+}

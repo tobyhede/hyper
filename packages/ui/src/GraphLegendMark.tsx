@@ -1,5 +1,5 @@
 import { GraphHeadShapeGlyph } from './GraphHeadShape';
-import type { GraphAppearance } from './graph-color';
+import { graphPaint, type GraphAppearance } from './graph-color';
 
 /** A Graph's resolved appearance — the caller resolves both through `graphAppearance`. */
 export type GraphLegendMarkProps = GraphAppearance;
@@ -54,6 +54,7 @@ export function GraphLegendMark({ color, headShape }: GraphLegendMarkProps) {
           x2={LINE_END}
           y2={0}
           stroke={color}
+          style={{ stroke: graphPaint(color) }}
           strokeWidth={LINE_WIDTH}
         />
         <GraphHeadShapeGlyph headShape={headShape} color={color} />

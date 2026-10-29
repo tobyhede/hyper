@@ -1,6 +1,6 @@
 import type { Node, NodeHandle } from '@xyflow/react';
 import { Position } from '@xyflow/react';
-import { CLOSED_DISPLAY, FALLBACK_GRAPH_COLOR, bareOperations } from '@project/ui';
+import { CLOSED_DISPLAY, FALLBACK_GRAPH_COLOR, bareOperations, graphPaint } from '@project/ui';
 import type { EntityActionGroup, KindOperationsByKind, ResourceDisplay } from '@project/ui';
 import {
   DEFAULT_GRAPH_HEAD_SHAPE,
@@ -431,7 +431,7 @@ export function projectGraphEdges(
       // the canvas and React Flow hands the Edge as `url('#…')`.
       markerEnd: graphHeadMarkerId(edge.graphId),
       style: {
-        stroke: color,
+        stroke: graphPaint(color),
         strokeWidth: isActiveGraph ? 3 : 2,
         opacity: emphasized ? 1 : OTHER_GRAPH_OPACITY,
       },

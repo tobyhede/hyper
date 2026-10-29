@@ -11,7 +11,12 @@ import {
   type OnResizeStart,
   type ShouldResize,
 } from '@xyflow/react';
-import { CanvasResource, isSpaceOperations, type CanvasResourceProps } from '@project/ui';
+import {
+  CanvasResource,
+  graphPaint,
+  isSpaceOperations,
+  type CanvasResourceProps,
+} from '@project/ui';
 import type { ResourceFlowNode } from './projection';
 import { AUTHORING_HANDLE_DIAMETER } from './authoring-handle';
 import { useConnectionEndEligible } from './connection-end-eligibility';
@@ -160,7 +165,7 @@ export function ResourceNode({
       style={{
         width: AUTHORING_HANDLE_DIAMETER,
         height: AUTHORING_HANDLE_DIAMETER,
-        background: data.activeGraphColor,
+        background: graphPaint(data.activeGraphColor),
       }}
     />
   );

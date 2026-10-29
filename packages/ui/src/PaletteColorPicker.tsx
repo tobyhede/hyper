@@ -1,4 +1,5 @@
 import { useState, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import { graphPaint } from './graph-color';
 import { cn } from './lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import { swatchPanelClassName } from './SwatchMenu';
@@ -15,7 +16,7 @@ export function PaletteColorSwatch({ color }: { readonly color: string }) {
   return (
     <span
       className="size-full rounded-chrome-sm border border-border/60"
-      style={{ backgroundColor: color }}
+      style={{ backgroundColor: graphPaint(color) }}
     />
   );
 }

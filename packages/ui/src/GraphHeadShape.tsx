@@ -1,4 +1,5 @@
 import type { GraphHeadShape } from '@project/core';
+import { graphPaint } from './graph-color';
 import { cn } from './lib/utils';
 
 /**
@@ -36,8 +37,11 @@ export function GraphHeadShapeGlyph({ headShape, color }: GraphHeadShapeGlyphPro
   const paint = {
     'data-slot': 'graph-head-shape',
     'data-head-shape': headShape,
+    // The attributes name the colour; the style paints it, and a theme's
+    // `--graph-paint-*` reaches only a property, never an attribute.
     fill: color,
     stroke: color,
+    style: { fill: graphPaint(color), stroke: graphPaint(color) },
     strokeWidth: 1,
     strokeLinecap: 'round',
     strokeLinejoin: 'round',

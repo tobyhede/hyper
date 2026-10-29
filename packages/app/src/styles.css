@@ -303,7 +303,7 @@ body {
   --authoring-handle-border-width: 3px;
 
   z-index: 1;
-  border: var(--authoring-handle-border-width) solid #0b0d11;
+  border: var(--authoring-handle-border-width) solid var(--canvas-resource-ink-color);
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildGraphRenderEdges, loadSpace, type Space } from '@project/graph';
 import type { ResourceId, ResourceShape, SpaceFile } from '@project/core';
+import { graphPaint } from '@project/ui';
 import { Position } from '@xyflow/react';
 import { AUTHORING_HANDLE_DIAMETER } from '../src/authoring-handle';
 import {
@@ -420,7 +421,7 @@ describe('projectGraphEdges', () => {
     // at that moment (ADR 0087), so there is nothing for the projection to name.
     expect(mainEdge.sourceHandle).toBeUndefined();
     expect(mainEdge.targetHandle).toBeUndefined();
-    expect(mainEdge.style?.stroke).toBe('#111111');
+    expect(mainEdge.style?.stroke).toBe(graphPaint('#111111'));
   });
 
   it('carries the Graph it belongs to and no geometry of its own', () => {

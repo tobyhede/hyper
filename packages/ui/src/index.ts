@@ -108,6 +108,7 @@ export {
   FALLBACK_GRAPH_COLOR,
   graphAppearance,
   graphColor,
+  graphPaint,
   type GraphAppearance,
 } from './graph-color';
 export { GraphLegendMark } from './GraphLegendMark';
