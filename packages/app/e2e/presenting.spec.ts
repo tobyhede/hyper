@@ -310,6 +310,8 @@ test('a Space Resource shows the Map it selects', async ({ page }) => {
     await expect(drawing.locator('.react-flow__node', { hasText: name })).toBeVisible();
   await expect(drawing.locator('.react-flow__edge').first()).toBeAttached();
   await expect(drawing).toHaveCSS('pointer-events', 'none');
+  await expect(drawing).toHaveAttribute('role', 'img');
+  await expect(drawing).toHaveAttribute('aria-description', /Opening remarks/);
 
   await page.keyboard.press('ArrowRight');
   await expect(presentedName(page)).toHaveText('Deep dive');

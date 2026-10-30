@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
-import type { GraphId, MapId, UUID } from '@project/core';
+import { titleName, type GraphId, type MapId, type UUID } from '@project/core';
 import { edgeTypes, GraphHeadMarkers, nodeTypes } from '@project/react-flow-adapter';
 import { Empty, EmptyHeader, EmptyTitle } from '@project/ui';
 import { createMapSurface } from '../map-surface';
@@ -145,14 +145,16 @@ function PresentedMapDrawing({
     if (nodes.length > 0) void fitView(STAGE_FIT);
   }, [nodes, fitView]);
   return (
-    // One image to assistive technology, named by its Map: the nodes inside
-    // are drawn for the audience and take no focus.
+    // One image to assistive technology, named by its Map and described by the
+    // names of the Resources on it: the nodes inside are drawn for the audience
+    // and take no focus.
     <div
       ref={frame}
       className="presented-map"
       data-testid="presented-map"
       role="img"
       aria-label={`Map ${mapTitle}`}
+      aria-description={nodes.map((node) => titleName(node.data.title)).join(', ')}
     >
       <ReactFlow
         className="presented-map__flow"
