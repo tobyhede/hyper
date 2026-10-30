@@ -13,16 +13,23 @@
    reaches the whole portalled subtree, so `--border` in particular must not be used
    for a one-rule colour: `@theme inline` maps it to `--color-border`, which
    `ComboboxSeparator`, `Button`'s secondary and ghost variants and `DropdownMenu`
-   all consume, and any of them rendered in this popup would silently take cream. */
+   all consume, and any of them rendered in this popup would silently take the
+   divider's grey.
+
+   Every value is read off the Resource's own tokens, because the popup is drawn as
+   Resource paper: its title and muted text roles, which
+   `test/unit/canvas-resource-contrast.test.ts` holds to AA on its active face, and
+   its ink for the border and the tints. So the popup follows each theme without a
+   theme restating it. */
 [data-resource-search-combobox] {
-  --foreground: #0b0d11;
-  --popover: #fffaf0;
+  --foreground: var(--canvas-resource-title-color);
+  --popover: var(--canvas-resource-face-active);
   --popover-foreground: var(--foreground);
-  --accent: #f0ebe1;
+  --accent: color-mix(in srgb, var(--canvas-resource-ink-color) 8%, var(--popover));
   --accent-foreground: var(--foreground);
-  --muted-foreground: #9aa3b3;
-  --csc-divider: #ded6c7;
-  --csc-refused-foreground: #887f70;
+  --muted-foreground: var(--canvas-resource-muted-color);
+  --csc-divider: color-mix(in srgb, var(--canvas-resource-ink-color) 15%, var(--popover));
+  --csc-refused-foreground: var(--canvas-resource-muted-color);
   /* This popup's own border weight and item weight: a private singleton and a
      private step, neither part of the Resource's central `--canvas-resource-*`
      scale — 3px is this popup's own pick, not the Resource's 4px, and
@@ -37,7 +44,7 @@
   min-width: var(--anchor-width);
   color: var(--popover-foreground);
   background: var(--popover);
-  border: var(--csc-border-width) solid var(--foreground);
+  border: var(--csc-border-width) solid var(--canvas-resource-ink-color);
   border-radius: var(--canvas-resource-radius);
   box-shadow: none;
 }
@@ -62,10 +69,8 @@
 }
 
 /* A refused choice stays legible rather than dimmed: the Combobox's own disabled
-   opacity is overridden, not its semantics. Its reason is drawn in
-   `--muted-foreground`, which on this cream face is under AA. The canvas Resource
-   answers the same contrast problem with a token of its own (`tailwind.css`);
-   this popup does not, and changing what it looks like is a design decision. */
+   opacity is overridden, not its semantics. It is drawn in the Resource's muted
+   role, so it reads at AA and still sits below the choices it can be told from. */
 [data-resource-search-combobox] [data-slot='combobox-item'][data-disabled] {
   color: var(--csc-refused-foreground);
   background: var(--popover);

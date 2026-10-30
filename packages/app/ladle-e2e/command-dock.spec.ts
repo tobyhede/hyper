@@ -643,7 +643,7 @@ test(
       .getByRole('menuitem', { name: 'Colour…' })
       .locator('svg')
       .first()
-      .getAttribute('stroke');
+      .evaluate((element) => getComputedStyle(element).stroke);
 
     await trigger.click({ delay: 120 });
     const group = page.getByRole('group', { name: 'Graph head shape' });
@@ -658,7 +658,7 @@ test(
       'true',
     );
     for (const glyph of await group.locator('[data-slot="graph-head-shape"]').all())
-      await expect(glyph).toHaveAttribute('fill', colour ?? '');
+      await expect(glyph).toHaveCSS('fill', colour);
     // The check marking the current head shape leaves its glyph clear to read.
     const current = group.getByRole('menuitemradio', { name: 'Arrow', exact: true });
     const glyphBox = await boxOf(current.locator('[data-slot="graph-head-shape"]'), 'Arrow glyph');

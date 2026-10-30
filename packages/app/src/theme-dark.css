@@ -1,98 +1,176 @@
 /*
- * **The dark theme.** The same semantic tokens `tailwind.css` declares,
- * restated for a reader whose system asks for dark. Every control, menu and
- * Resource already reads its colour off a token, so redefining the tokens is
- * the whole switch.
+ * **Neon Glitch: the dark theme.** The same semantic tokens `tailwind.css`
+ * declares, restated for a reader whose system asks for dark. Every control,
+ * menu and Resource already reads its colour off a token, so redefining the
+ * tokens is the whole switch; the rules after the tokens add the theme's own
+ * effects.
  *
  * It follows `prefers-color-scheme` alone, which is also what Tailwind v4's
  * `dark:` variant follows, so the registry components' own `dark:` classes turn
  * over with these tokens rather than on a separate signal.
  *
- * Brutalist, as the sand theme is: a flat near-black ground, Resources framed
- * in heavy off-white ink, hard offset shadows with no blur, and one signal
- * yellow for emphasis. The shadows are the sand theme's own, which are drawn in
- * `--foreground` and so turn white here without being restated.
- *
- * A Graph's colour is still the only colour that carries meaning, so the
- * yellow stays on the chrome. Each palette colour is redrawn for this ground
- * through the `--graph-paint-<hex>` that `graphPaint` paints with, keeping its
- * hue and its dark and light pair while lifting it clear of the canvas; a
- * Graph's stored colour does not change.
- *
+ * The canvas is a flat near-black violet and a Resource in no Graph is lined in
+ * a neutral grey, so colour on a Resource always means a Graph; cyan is the
+ * focus ring and magenta the chrome's one emphasis. Glow is kept low, and there
+ * is no yellow anywhere. One set of neons serves the whole theme: the Graph
+ * colours below reuse the theme's own cyan, magenta, green and red, so a colour
+ * on the chrome and the same colour on an Edge are one colour. A selected
+ * Resource is ringed in its own border colour (ADR 0139), so no Graph colour
+ * can be mistaken for selection.
  * `test/unit/ui-theme-contrast.test.ts` holds each `--role`/`--role-foreground`
- * pair, `--destructive` and `--success` on chrome paper, and every palette
- * colour's paint on the canvas; `test/unit/canvas-resource-contrast.test.ts`
- * holds the Resource's text roles on both its faces. Both check this theme as
- * they check the sand one.
+ * pair, `--destructive` and `--success` on chrome paper, and every Graph palette
+ * colour on the canvas; `test/unit/canvas-resource-contrast.test.ts` holds the
+ * Resource's text roles on both its faces.
+ *
+ * The glitch is decoration. Titles carry a still one-pixel split, and the
+ * animated burst runs on the Resource's frame, which nothing clips, only under
+ * the pointer and only when the reader has not asked for reduced motion. Prose,
+ * menus, fields and status text are drawn clean.
  */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
 
-    --background: #111111;
-    --foreground: #f2f2f2;
-    --card: #1b1b1b;
+    --neon-cyan: #00f0ff;
+    --neon-magenta: #ff2bd6;
+    --neon-green: #39ff88;
+    --neon-red: #ff4d6d;
+
+    --background: #07060d;
+    --foreground: #e8f7ff;
+    --card: #110e21;
     --card-foreground: var(--foreground);
     --popover: var(--card);
     --popover-foreground: var(--foreground);
-    --primary: #ffd60a;
-    --primary-foreground: #111111;
-    --secondary: #262626;
+    --primary: var(--neon-magenta);
+    --primary-foreground: #12001a;
+    --secondary: #1c1838;
     --secondary-foreground: var(--foreground);
     --muted: var(--secondary);
-    --muted-foreground: #b0b0b0;
-    --accent: #303030;
+    /* Clears AA on all three of its grounds: 7.71:1 on chrome paper, 6.91:1
+       on muted and 8.21:1 on the canvas. */
+    --muted-foreground: #a49ee0;
+    --accent: #241e48;
     --accent-foreground: var(--foreground);
-    --destructive: #ff5a4f;
-    --success: #4ade80;
-    --border: #4a4a4a;
+    --destructive: var(--neon-red);
+    --success: var(--neon-green);
+    --border: #3b2f73;
     --input: var(--border);
-    --ring: var(--primary);
+    --ring: var(--neon-cyan);
 
     --xy-background-color: var(--background);
-    --xy-background-pattern-color: #2e2e2e;
+    --xy-background-pattern-color: #2a1f4a;
     --xy-minimap-background-color: var(--card);
-    --xy-minimap-mask-background-color: rgb(17 17 17 / 60%);
-    --xy-minimap-node-background-color: #3a3a3a;
-    --xy-attribution-background-color: rgb(27 27 27 / 60%);
+    --xy-minimap-mask-background-color: color-mix(in srgb, var(--background) 60%, transparent);
+    --xy-minimap-node-background-color: #2a2450;
+    --xy-attribution-background-color: color-mix(in srgb, var(--card) 60%, transparent);
 
-    --canvas-resource-ink-color: #f2f2f2;
-    --canvas-resource-face-rest: #1b1b1b;
-    --canvas-resource-face-active: #262626;
-    --canvas-resource-title-color: #ffffff;
-    --canvas-resource-muted-color: #b5b5b5;
-    --canvas-resource-error-color: #ff6b61;
-    --canvas-resource-shadow-selected:
-      0 0 0 var(--canvas-resource-selected-ring-width) var(--primary), 6px 6px 0 var(--primary);
+    --canvas-resource-ink-color: #a4a3ae;
+    --canvas-resource-face-rest: #0d0b1a;
+    --canvas-resource-face-active: #16122b;
+    --canvas-resource-title-color: #f2fbff;
+    --canvas-resource-muted-color: #a8a3dc;
+    --canvas-resource-error-color: #ff5c7a;
 
-    /* The Tableau Classic 20 palette redrawn for a near-black ground: each
-       hue keeps its slot and its dark and light pair, and every one clears 3:1
-       on the canvas. */
-    --graph-paint-1f77b4: #4c9dff;
-    --graph-paint-aec7e8: #a9ccff;
-    --graph-paint-17becf: #22d3e6;
-    --graph-paint-9edae5: #9be9f2;
-    --graph-paint-2ca02c: #3ccf4e;
-    --graph-paint-98df8a: #a3f095;
-    --graph-paint-bcbd22: #d1d32b;
-    --graph-paint-dbdb8d: #ebeb9c;
-    --graph-paint-ff7f0e: #ff8c24;
-    --graph-paint-ffbb78: #ffc68c;
-    --graph-paint-d62728: #ff4a4a;
-    --graph-paint-ff9896: #ffa6a4;
-    --graph-paint-e377c2: #ff7ad1;
-    --graph-paint-f7b6d2: #ffc4de;
-    --graph-paint-9467bd: #b38cff;
-    --graph-paint-c5b0d5: #d8c6ff;
-    --graph-paint-8c564b: #cf8f72;
-    --graph-paint-c49c94: #e0b8ab;
-    --graph-paint-7f7f7f: #a8a8a8;
-    --graph-paint-c7c7c7: #e0e0e0;
+    --shadow-chrome-elevated:
+      var(--shadow-chrome-elevated-offset) var(--shadow-chrome-elevated-offset) 0 var(--primary),
+      0 0 14px color-mix(in srgb, var(--neon-magenta) 12%, transparent);
+    --shadow-chrome-lifted:
+      var(--shadow-chrome-lifted-offset) var(--shadow-chrome-lifted-offset) 0 var(--primary),
+      0 0 18px color-mix(in srgb, var(--neon-magenta) 16%, transparent);
+
+    /* The theme's own effects, named so the applied properties below read them
+       off a token as every structural value here does. Every colour in them is
+       one of the two neons above, mixed toward transparent. */
+    --neon-glitch-cyan: color-mix(in srgb, var(--neon-cyan) 80%, transparent);
+    --neon-glitch-magenta: color-mix(in srgb, var(--neon-magenta) 80%, transparent);
+    --neon-split-cyan: color-mix(in srgb, var(--neon-cyan) 55%, transparent);
+    --neon-split-magenta: color-mix(in srgb, var(--neon-magenta) 55%, transparent);
+    --neon-resource-hover-glow: 0 0 8px color-mix(in srgb, var(--neon-cyan) 22%, transparent);
+    --neon-frame-glitch-wide: -4px 0 0 var(--neon-glitch-cyan), 4px 0 0 var(--neon-glitch-magenta);
+    --neon-frame-glitch-skew:
+      3px 2px 0 var(--neon-glitch-cyan), -3px -2px 0 var(--neon-glitch-magenta);
+    --neon-frame-glitch-hot: -5px 0 0 var(--neon-glitch-magenta), 5px 0 0 var(--neon-glitch-cyan);
+    --neon-title-split: -1px 0 var(--neon-split-cyan), 1px 0 var(--neon-split-magenta);
+
+    /* Each Graph colour redrawn for this ground, one per Tableau slot a Graph
+       stores, through the `--graph-paint-<hex>` that `graphPaint` paints with;
+       a Graph's stored colour does not change. The cyan, pink, green and red
+       slots are the theme's own neons. Each hue's second shade is a deeper or
+       brighter neon of it, but Brown and Grey are no neons: Brown is a brown
+       and Brown light a tan, and Grey and Grey light are their stored greys
+       tinted like the ink, one darker and one lighter than the ink a Resource
+       in no Graph wears. Held by
+       `test/unit/ui-theme-contrast.test.ts`. */
+    --graph-paint-1f77b4: #158ffe;
+    --graph-paint-aec7e8: #0063f6;
+    --graph-paint-17becf: var(--neon-cyan);
+    --graph-paint-9edae5: #03c3c3;
+    --graph-paint-2ca02c: var(--neon-green);
+    --graph-paint-98df8a: #07dd22;
+    --graph-paint-bcbd22: #028758;
+    --graph-paint-dbdb8d: #03b65e;
+    --graph-paint-ff7f0e: #d75c05;
+    --graph-paint-ffbb78: #ff9a3c;
+    --graph-paint-d62728: var(--neon-red);
+    --graph-paint-ff9896: #db005b;
+    --graph-paint-e377c2: var(--neon-magenta);
+    --graph-paint-f7b6d2: #c801c1;
+    --graph-paint-9467bd: #bb78fe;
+    --graph-paint-c5b0d5: #a31cff;
+    --graph-paint-8c564b: #9a6a3a;
+    --graph-paint-c49c94: #c69262;
+    --graph-paint-7f7f7f: #7f7e89;
+    --graph-paint-c7c7c7: #c7c6d0;
+    /* The colour a Graph with none stored is drawn in (`FALLBACK_GRAPH_COLOR`),
+       which sand draws as a grey beside Tableau's: here it takes the grey
+       slot's paint, so it stays a Graph colour and is never the neutral ink. */
+    --graph-paint-8a94a6: var(--graph-paint-7f7f7f);
+  }
+
+  .canvas-resource[data-state='rest']:hover {
+    box-shadow: var(--neon-resource-hover-glow);
   }
 
   /* Black in the sand theme, where it is the Resource's ink; here it takes the
-     off-white ink so the corner is still seen on a dark face. */
+     neutral ink so the corner is still seen on a dark face. */
   .rf-resource-node__resize-mark {
     background: var(--canvas-resource-ink-color);
+  }
+
+  .canvas-resource__title-line[data-role='title'],
+  .command-dock__space .command-dock__name {
+    text-shadow: var(--neon-title-split);
+  }
+}
+
+@media (prefers-color-scheme: dark) and (prefers-reduced-motion: no-preference) {
+  .canvas-resource[data-state='rest']:hover {
+    animation: neon-glitch 2.4s steps(1) infinite;
+  }
+}
+
+/* Short bursts on a long cycle: the frame's split jumps wide, skews and
+   settles, and most of the cycle is the resting glow, so a Resource held under
+   the pointer is still read rather than watched. The frame rather than the
+   title, because a title line clips its own overflow and would cut the split
+   off at its ends. */
+@keyframes neon-glitch {
+  0%,
+  78%,
+  100% {
+    box-shadow: var(--neon-resource-hover-glow);
+  }
+
+  80% {
+    box-shadow: var(--neon-frame-glitch-wide);
+  }
+
+  84% {
+    box-shadow: var(--neon-frame-glitch-skew);
+  }
+
+  88% {
+    box-shadow: var(--neon-frame-glitch-hot);
   }
 }

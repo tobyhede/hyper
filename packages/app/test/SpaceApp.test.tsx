@@ -2001,9 +2001,8 @@ describe('Space app Map reading', () => {
     // No membership reaches the row, so it carries no description of one.
     expect(rows[0]).not.toHaveAttribute('aria-describedby');
     // Supporting evidence: the Graph glyph is drawn in the projection's colour.
-    expect(screen.getByTestId('active-graph').querySelector('svg')).toHaveAttribute(
-      'stroke',
-      '#123456',
+    expect(screen.getByTestId('active-graph').querySelector('svg')?.style.stroke).toBe(
+      'var(--graph-paint-123456, #123456)',
     );
     // The canvas draws the Space title off the same answered view.
     expect(screen.getByTestId('hud-space')).toHaveTextContent('Answered Space');

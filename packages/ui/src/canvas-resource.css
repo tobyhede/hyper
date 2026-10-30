@@ -17,6 +17,12 @@
     var(--canvas-resource-border) calc(var(--canvas-resource-strength, 1) * 100%),
     var(--canvas-resource-face)
   );
+  /* The selection ring is the Resource's border drawn again outside it, in the
+     border's own colour, so a selected Resource carries a double-width border
+     in its Graph's colour, or in ink when it is in no Graph (ADR 0139). A
+     selected Resource is at full strength, so the drawn border is its colour. */
+  --canvas-resource-shadow-selected: 0 0 0 var(--canvas-resource-selected-ring-width)
+    var(--canvas-resource-border-drawn);
 
   /* The Title ladder (ADR 0083). One size and one leading are authored — the
      `title` role's — and the two
@@ -483,8 +489,8 @@
 
 .canvas-resource__outline-edge {
   fill: var(--canvas-resource-face);
-  /* The Shape's outline is its border, so it takes the Graph's colour; the
-     selection ring beneath it stays ink (ADR 0135). */
+  /* The Shape's outline is its border, so it takes the Graph's colour, as the
+     selection ring beneath it does (ADR 0135, ADR 0139). */
   stroke: var(--canvas-resource-border-drawn);
   stroke-width: var(--canvas-resource-border-width);
   transition:
@@ -498,6 +504,7 @@
 .canvas-resource__outline-ring {
   display: none;
   fill: none;
+  stroke: var(--canvas-resource-border-drawn);
   stroke-width: calc(
     var(--canvas-resource-border-width) + 2 * var(--canvas-resource-selected-ring-width)
   );
