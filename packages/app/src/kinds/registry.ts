@@ -109,9 +109,11 @@ type ContentByKind = { [K in KindId]: Extract<ResourceContent, { readonly kind: 
  * the Space it points at. `null` for a kind whose presented content is its view
  * half's alone.
  */
-const PRESENTATIONS: {
+type KindPresentations = {
   readonly [K in KindId]: ((content: ContentByKind[K]) => ReactNode) | null;
-} = {
+};
+
+const PRESENTATIONS: KindPresentations = {
   [markdownKind.id]: null,
   [imageKind.id]: null,
   [urKind.id]: null,
